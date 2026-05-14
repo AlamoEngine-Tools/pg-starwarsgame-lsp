@@ -7,13 +7,18 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="KopiLua" Version="1.0.6752.15716"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8"/>
+        <PackageReference Include="System.IO.Abstractions" Version="22.1.1"/>
+        <PackageReference Include="YamlDotNet" Version="16.3.0"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="PG.StarWarsGame.LSP.Schema.Tests"/>
     </ItemGroup>
 
 </Project>

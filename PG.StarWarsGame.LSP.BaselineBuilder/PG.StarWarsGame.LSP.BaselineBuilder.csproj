@@ -1,19 +1,20 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
+        <OutputType>Exe</OutputType>
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="KopiLua" Version="1.0.6752.15716"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8"/>
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Assets\PG.StarWarsGame.LSP.Assets.csproj"/>
+        <ProjectReference Include="..\..\ModVerify\src\PetroglyphTools\PG.StarWarsGame.Engine\PG.StarWarsGame.Engine.csproj"/>
     </ItemGroup>
 
 </Project>

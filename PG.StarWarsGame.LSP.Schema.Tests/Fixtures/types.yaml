@@ -1,0 +1,7 @@
+types:
+  - typeName: SpaceUnit
+    nameTag: Name
+  - typeName: HardPoint
+    nameTag: Name
+  - typeName: Faction
+    nameTag: Name

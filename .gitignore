@@ -492,3 +492,7 @@ fabric.properties
 .ionide
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,rider,visualstudiocode
+
+# ignore the schema dir
+/schema
+GenerateSchemaYaml.ps1

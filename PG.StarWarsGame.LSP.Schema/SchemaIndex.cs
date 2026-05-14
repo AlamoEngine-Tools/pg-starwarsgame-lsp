@@ -1,0 +1,83 @@
+using PG.StarWarsGame.LSP.Core.Schema;
+
+namespace PG.StarWarsGame.LSP.Schema;
+
+/// <summary>Immutable in-memory snapshot of the schema repository.</summary>
+public sealed class SchemaIndex
+{
+    public static readonly SchemaIndex Empty = new([], [], []);
+    private readonly Dictionary<string, List<XmlTagDefinition>> _allByTagName;
+    private readonly IReadOnlyList<EnumDefinition> _allEnumsList;
+    private readonly IReadOnlyList<GameObjectTypeDefinition> _allTypesList;
+    private readonly IReadOnlyList<XmlTagDefinition> _allTagsList;
+    private readonly Dictionary<string, EnumDefinition> _enums;
+    private readonly Dictionary<string, XmlTagDefinition> _tags;
+    private readonly Dictionary<string, IReadOnlyList<XmlTagDefinition>> _tagsByType;
+    private readonly Dictionary<string, GameObjectTypeDefinition> _types;
+
+    public SchemaIndex(
+        IEnumerable<(string typeName, IReadOnlyList<XmlTagDefinition> tags)> tagsByType,
+        IEnumerable<GameObjectTypeDefinition> types,
+        IEnumerable<EnumDefinition> enums)
+    {
+        _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase);
+        _tagsByType = new Dictionary<string, IReadOnlyList<XmlTagDefinition>>(StringComparer.OrdinalIgnoreCase);
+        _allByTagName = new Dictionary<string, List<XmlTagDefinition>>(StringComparer.OrdinalIgnoreCase);
+        _types = new Dictionary<string, GameObjectTypeDefinition>(StringComparer.OrdinalIgnoreCase);
+        _enums = new Dictionary<string, EnumDefinition>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (typeName, tags) in tagsByType)
+        {
+            foreach (var tag in tags)
+            {
+                _tags.TryAdd(tag.Tag, tag);
+                if (!_allByTagName.TryGetValue(tag.Tag, out var all))
+                    _allByTagName[tag.Tag] = all = [];
+                all.Add(tag);
+            }
+
+            _tagsByType[typeName] = tags;
+        }
+
+        foreach (var type in types)
+            _types[type.TypeName] = type;
+
+        foreach (var e in enums)
+            _enums[e.Name] = e;
+
+        _allTagsList = [.. _tags.Values];
+        _allTypesList = [.. _types.Values];
+        _allEnumsList = [.. _enums.Values];
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => _allTagsList;
+
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _allTypesList;
+
+    public IReadOnlyList<EnumDefinition> AllEnums => _allEnumsList;
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return _tags.TryGetValue(tagName, out var def) ? def : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+    {
+        return _allByTagName.TryGetValue(tagName, out var list) ? list.AsReadOnly() : [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        return _types.TryGetValue(typeName, out var def) ? def : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        return _tagsByType.TryGetValue(typeName, out var list) ? list : [];
+    }
+
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return _enums.TryGetValue(enumName, out var def) ? def : null;
+    }
+}

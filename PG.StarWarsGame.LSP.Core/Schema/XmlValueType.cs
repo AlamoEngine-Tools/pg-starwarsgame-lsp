@@ -1,0 +1,205 @@
+namespace PG.StarWarsGame.LSP.Core.Schema;
+
+/// <summary>Mirrors Petroglyph's internal XML value-type map.</summary>
+public enum XmlValueType
+{
+    Boolean = 0,
+    Type2 = 2,
+
+    /// <summary>Small integer audio parameter (play count, max concurrent instances; -1 = unlimited).</summary>
+    SfxCount = 3,
+
+    /// <summary>Integer percentage 0–100 used for audio volume and probability fields.</summary>
+    SfxPercentage = 4,
+    IntType5 = 5,
+    IntType6 = 6,
+    Float = 8,
+    Double = 9,
+
+    /// <summary>Unsigned integer for hardware capability metrics (CPU MHz, texture memory MB, fill/vertex rates).</summary>
+    HardwareUInt = 10,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type11 = 11,
+
+    /// <summary>Hex-encoded DirectX shader version string (e.g. "0x0200" = SM 2.0).</summary>
+    ShaderVersionHex = 12,
+
+    /// <summary>Hex-encoded GPU vendor ID string (e.g. "0x10DE" = NVIDIA).</summary>
+    VendorIdHex = 13,
+    DynamicEnumValue = 14,
+    FloatVector2 = 15,
+    FloatVector3 = 16,
+    FloatVector4 = 17,
+    IntList = 18,
+    FloatList = 19,
+    Type20 = 20,
+
+    /// <summary>UV texture channel index (expected range 0–3).</summary>
+    UvSlotIndex = 21,
+    RGBA = 22,
+
+    /// <summary>
+    ///     Any string value — filenames, text IDs, and named-object references. Use referenceType in YAML to distinguish
+    ///     actual object refs.
+    /// </summary>
+    NameReference = 23,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type24 = 24,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type25 = 25,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type26 = 26,
+
+    /// <summary>A space-separated list of named-object references. referenceType in YAML identifies the referenced pool.</summary>
+    NameReferenceList = 27,
+    Type28 = 28,
+
+    /// <summary>A strongly-typed single object reference; the engine knows exactly which pool to query.</summary>
+    TypeReference = 29,
+
+    /// <summary>A list of game-object names (space-separated). Typically unit/type names within one pool.</summary>
+    GameObjectTypeReferenceList = 30,
+
+    /// <summary>A reference to an SFXEvent by name.</summary>
+    SFXEventReference = 31,
+
+    /// <summary>A reference to a SpeechEvent by name.</summary>
+    SpeechEventReference = 32,
+
+    /// <summary>A reference to a MusicEvent by name.</summary>
+    MusicEventReference = 33,
+    Type34 = 34,
+    Type35 = 35,
+    Type36 = 36,
+    Type37 = 37,
+    Type38 = 38,
+
+    /// <summary>A reference to an SFXEvent used for HUD feedback (special-weapon state changes, etc.).</summary>
+    SfxEventHudReference = 39,
+    Type40 = 40,
+
+    /// <summary>Per-faction music event map.</summary>
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    MusicEventPerFactionMap = 41,
+
+    /// <summary>A space-separated list of type references.</summary>
+    TypeReferenceList = 42,
+
+    /// <summary>Per-faction scalar value (e.g. starting credits per faction).</summary>
+    PerFactionValue = 43,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type44 = 44,
+    Type45 = 45,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type46 = 46,
+    FloatTupleList = 47,
+    IntFloatTupleList = 48,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type49 = 49,
+
+    /// <summary>Ship class enum value (ShipClass, not the generic DynamicEnumValue).</summary>
+    ShipClassType = 50,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type51 = 51,
+
+    /// <summary>Weighted list of music events.</summary>
+    MusicEventWeightedList = 52,
+    Type53 = 53,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    ShipNameTextFileList = 54,
+    Type55 = 55,
+
+    /// <summary>AbilitySubObjectList -> need further investigation and dedicated implementation.</summary>
+    Type56 = 56,
+
+    /// <summary>UnitAbilitiesDataSubObjectList -> need further investigation and dedicated implementation.</summary>
+    Type57 = 57,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type58 = 58,
+
+    /// <summary>Death clone specification (condition + type pair).</summary>
+    DeathCloneSpec = 59,
+
+    /// <summary>Per-faction integer map (e.g. maximum political control by faction).</summary>
+    PerFactionIntMap = 60,
+
+    /// <summary>Inaccuracy distance map (category, float pairs).</summary>
+    InaccuracyMap = 61,
+    DamageToArmorMod = 62,
+    Type63 = 63,
+    LocalisationToTextureMap = 64,
+    HardPointTypeToTextureMap = 65,
+
+    /// <summary>
+    ///     Comma-separated (HardPointType, SFXEvent name) tuple. Maps a hard-point slot to an SFXEvent; multiple entries
+    ///     per tag. Empty SFXEvent name is valid (slot declared, no sound).
+    /// </summary>
+    HardPointSfxMap = 66,
+    Type67 = 67,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type68 = 68,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type69 = 69,
+
+    /// <summary>
+    ///     Comma-separated (unit type name, int count) tuple per tech level. Count of -1 means unlimited/default stack
+    ///     size. Multiple entries per tag define multi-unit spawn sets.
+    /// </summary>
+    UnitSpawnTable = 70,
+
+    /// <summary>
+    ///     Comma-separated (unit type name, float probability) tuple. Used for destruction survivor and map-load spawn
+    ///     tables.
+    /// </summary>
+    UnitSpawnProbabilityTable = 71,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    CategoryToIntegerMap = 72,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type73 = 73,
+
+    /// <summary>Projectile category enum name (e.g. a named combat category used for targeting logic).</summary>
+    ProjectileCategory = 74,
+
+    /// <summary>Cable-attack render mode enum name.</summary>
+    CableRenderMode = 75,
+
+    /// <summary>
+    ///     Comma-separated (ability name, SFXEvent name) tuple for GUI ability toggle feedback. Empty SFXEvent name is
+    ///     valid (ability declared, no toggle sound).
+    /// </summary>
+    AbilitySfxMap = 76,
+
+    /// <summary>
+    ///     Comma-separated tuple of (AbilityMultiplierType C++ enum name, float multiplier). Applied per
+    ///     SpecialAbilityData Mod_Multiplier entry; multiple entries allowed per ability.
+    /// </summary>
+    AbilityModMultiplier = 77,
+
+    /// <summary>
+    ///     Comma-separated tuple of (AbilityFlagType C++ enum name, bool). Sets a named boolean modifier flag on the
+    ///     ability.
+    /// </summary>
+    AbilityModFlag = 78,
+    Type79 = 79,
+    Type80 = 80,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type81 = 81,
+
+    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    Type82 = 82
+}

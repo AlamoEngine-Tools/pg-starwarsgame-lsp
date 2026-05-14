@@ -1,0 +1,18 @@
+tags:
+  - tag: Affiliation
+    type: NameReferenceList
+    referenceType: Faction
+  - tag: SFXEvent_Select
+    type: SFXEventReference
+    referenceType: SFXEvent
+  - tag: Tactical_Health
+    type: Float
+  - tag: CategoryMask
+    type: DynamicEnumValue
+    enumName: GameObjectCategoryType
+  - tag: Next_Level_Base
+    type: TypeReference
+    referenceType: GroundBase
+  - tag: Projectile_Types
+    type: GameObjectTypeReferenceList
+    referenceType: Projectile
