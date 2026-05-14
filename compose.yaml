@@ -1,0 +1,7 @@
+﻿services:
+  pg.starwarsgame.lsp.server:
+    image: pg.starwarsgame.lsp.server
+    build:
+      context: .
+      dockerfile: PG.StarWarsGame.LSP.Server/Dockerfile
+
