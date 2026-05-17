@@ -20,11 +20,11 @@ public sealed class BaselinePopulator
         _logger.LogDebug("Populating symbol index from baseline ({SymbolCount} symbols)", baseline.Symbols.Count);
 
         foreach (var sym in baseline.Symbols)
-            symbolIndex.Add(new GameSymbol
+            symbolIndex.Add(new IndexedSymbol
             {
                 Name = sym.Name,
                 TypeName = sym.TypeName,
-                Location = new SymbolLocation(sym.FilePath, sym.Line)
+                Location = new IndexedSymbolLocation(sym.FilePath, sym.Line)
             });
 
         _logger.LogInformation("Symbol index populated: {Count} symbols added", baseline.Symbols.Count);

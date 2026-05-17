@@ -4,9 +4,9 @@ namespace PG.StarWarsGame.LSP.Assets.Tests;
 
 public sealed class SymbolIndexTests
 {
-    private static GameSymbol Symbol(string name, string type = "Unit", string file = "", int line = 0)
+    private static IndexedSymbol Symbol(string name, string type = "Unit", string file = "", int line = 0)
     {
-        return new GameSymbol { Name = name, TypeName = type, Location = new SymbolLocation(file, line) };
+        return new IndexedSymbol { Name = name, TypeName = type, Location = new IndexedSymbolLocation(file, line) };
     }
 
     [Fact]

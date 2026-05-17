@@ -72,16 +72,16 @@ public sealed class BaselinePopulatorTests
 
     private sealed class FakeSymbolIndex : ISymbolIndex
     {
-        public IReadOnlyList<GameSymbol> Lookup(string name)
+        public IReadOnlyList<IndexedSymbol> Lookup(string name)
         {
             return [];
         }
 
-        public IReadOnlyList<GameSymbol> LookupByType(string typeName)
+        public IReadOnlyList<IndexedSymbol> LookupByType(string typeName)
         {
             return [];
         }
 
-        public IReadOnlyList<GameSymbol> All => [];
+        public IReadOnlyList<IndexedSymbol> All => [];
     }
 }

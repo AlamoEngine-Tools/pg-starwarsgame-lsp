@@ -51,11 +51,11 @@ public sealed class BaselineDataService
         var count = 0;
         foreach (var entry in engine.GameObjectTypeManager.Entries)
         {
-            _index.Add(new GameSymbol
+            _index.Add(new IndexedSymbol
             {
                 Name = entry.Name,
                 TypeName = entry.ClassificationName,
-                Location = new SymbolLocation(
+                Location = new IndexedSymbolLocation(
                     entry.Location.XmlFile ?? string.Empty,
                     entry.Location.Line ?? 0)
             });
