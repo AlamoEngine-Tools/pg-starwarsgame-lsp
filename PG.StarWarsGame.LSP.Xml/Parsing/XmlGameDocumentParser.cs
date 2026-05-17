@@ -69,8 +69,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var tagDef = _schema.GetTag(child.Name);
                 if (tagDef?.ReferenceKind != ReferenceKind.XmlObject) continue;
 
-                var targetId = child.InnerText.Trim();
+                var innerText = child.InnerText;
+                var targetId = innerText.Trim();
                 if (string.IsNullOrEmpty(targetId)) continue;
+
+                var lineStart = text.LastIndexOf('\n', Math.Max(0, child.InnerStartIndex - 1)) + 1;
+                var leadingWs = innerText.Length - innerText.TrimStart().Length;
+                var column    = child.InnerStartIndex - lineStart + leadingWs;
 
                 references.Add(new GameReference(
                     targetId,
@@ -78,7 +83,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     tagDef.ReferenceType,
                     documentUri,
                     child.Line - 1,
-                    child.InnerStartIndex,
+                    column,
                     targetId.Length));
             }
         }

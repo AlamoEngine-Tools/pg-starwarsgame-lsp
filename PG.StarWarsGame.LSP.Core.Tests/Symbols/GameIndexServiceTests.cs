@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
@@ -41,7 +42,7 @@ public sealed class GameIndexServiceTests
     }
 
     private static IGameIndexService Build(params IGameDocumentParser[] parsers) =>
-        new GameIndexService(parsers);
+        new GameIndexService(parsers, NullLogger<GameIndexService>.Instance);
 
     // ── ApplyBaseline ────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ public sealed class GameIndexServiceTests
         await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, default);
 
         // Now swap to a parser returning a different symbol and try to commit version 1
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, [symV1]))]);
+        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, [symV1]))], NullLogger<GameIndexService>.Instance);
         // Manually set state: apply the v2 document
         // Instead, test it directly: after committing v2, version 1 must not overwrite.
         // We verify this by checking the symbol from v2 is still present after a v1 attempt.
@@ -161,7 +162,7 @@ public sealed class GameIndexServiceTests
 
         // Second parse of same URI: FakeParser still returns OLD_UNIT but with version 2;
         // swap the parser to return NEW_UNIT
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, [updated]))]);
+        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, [updated]))], NullLogger<GameIndexService>.Instance);
         // Apply the first document manually then update
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
@@ -181,7 +182,7 @@ public sealed class GameIndexServiceTests
 
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("OLD_TARGET"));
 
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, refs: [newRef]))]);
+        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, refs: [newRef]))], NullLogger<GameIndexService>.Instance);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
 
@@ -251,7 +252,7 @@ public sealed class GameIndexServiceTests
         var svcA = Build(new FakeParser(Doc("", 0, [symA])));
         await svcA.UpdateDocumentAsync("file:///a.xml", "", 1, default);
 
-        var svcB = new GameIndexService([new FakeParser(Doc("", 0, [symB]))]);
+        var svcB = new GameIndexService([new FakeParser(Doc("", 0, [symB]))], NullLogger<GameIndexService>.Instance);
         await svcB.UpdateDocumentAsync("file:///a.xml", "", 1, default);
         await svcB.UpdateDocumentAsync("file:///b.xml", "", 1, default);
 

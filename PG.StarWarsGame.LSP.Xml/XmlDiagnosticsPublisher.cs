@@ -133,7 +133,7 @@ public sealed class XmlDiagnosticsPublisher
                 {
                     Severity = DiagnosticSeverity.Error,
                     Message  = msg,
-                    Range    = new Range(new Position(r.Line, 0), new Position(r.Line, int.MaxValue)),
+                    Range    = new Range(new Position(r.Line, r.Column), new Position(r.Line, r.Column + r.Length)),
                     Source   = "pg-swg-lsp"
                 });
             }
