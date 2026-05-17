@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.IO.Compression;
 using MessagePack;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -16,12 +17,20 @@ public static class BaselineSerializer
             DynamicEnumValues   = ToSerializedArray(baseline.DynamicEnumValues),
             HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues)
         };
-        return MessagePackSerializer.Serialize(dto);
+        var msgpack = MessagePackSerializer.Serialize(dto);
+        using var ms = new MemoryStream();
+        using (var gz = new GZipStream(ms, CompressionLevel.Optimal))
+            gz.Write(msgpack);
+        return ms.ToArray();
     }
 
     public static BaselineIndex Deserialize(byte[] data)
     {
-        var dto      = MessagePackSerializer.Deserialize<SerializedBaseline>(data);
+        using var ms = new MemoryStream(data);
+        using var gz = new GZipStream(ms, CompressionMode.Decompress);
+        using var decompressed = new MemoryStream();
+        gz.CopyTo(decompressed);
+        var dto      = MessagePackSerializer.Deserialize<SerializedBaseline>(decompressed.ToArray());
         var builtAt  = DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs);
         var symbols  = dto.Symbols.ToImmutableDictionary(s => s.Id);
         var enums    = FromSerializedArray(dto.DynamicEnumValues);

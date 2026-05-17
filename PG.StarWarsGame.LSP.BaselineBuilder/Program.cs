@@ -1,25 +1,59 @@
+using System.IO.Abstractions;
 using System.Security.Cryptography;
+using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using PG.Commons;
 using PG.StarWarsGame.Engine;
+using PG.StarWarsGame.Files.ALO;
+using PG.StarWarsGame.Files.MEG;
+using PG.StarWarsGame.Files.MTD;
+using PG.StarWarsGame.Files.XML;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema.Providers;
 
 if (args.Length < 2)
 {
-    Console.Error.WriteLine("Usage: BaselineBuilder <game-path> <output-file>");
+    Console.Error.WriteLine("Usage: BaselineBuilder <game-path> <output-file> [schema-path]");
     Console.Error.WriteLine("  game-path   Path to the game installation directory (contains StarWarsG.exe)");
     Console.Error.WriteLine("  output-file Output path for the .baseline binary file");
+    Console.Error.WriteLine("  schema-path Path to schema/eaw/ directory (optional, auto-detected if omitted)");
     return 1;
 }
 
-var gamePath    = args[0];
-var outputFile  = args[1];
+var gamePath = args[0];
+var outputFile = args[1];
+var schemaPath = args.Length >= 3 ? args[2] : FindSchemaPath();
 
 var services = new ServiceCollection();
 services.AddLogging(b => b.AddConsole().SetMinimumLevel(LogLevel.Information));
+services.AddSingleton<IFileSystem, FileSystem>();
+services.AddSingleton<IHashingService>(sp => new HashingService(sp));
+PetroglyphCommons.ContributeServices(services);
+services.SupportMEG();
+services.SupportALO();
+services.SupportXML();
+services.SupportMTD();
 PetroglyphEngineServiceContribution.ContributeServices(services);
+
+if (schemaPath is not null && Directory.Exists(schemaPath))
+{
+    services.AddSingleton<ISchemaProvider>(sp =>
+    {
+        var logger = sp.GetRequiredService<ILogger<LocalFileSchemaProvider>>();
+        var provider = new LocalFileSchemaProvider(schemaPath, logger);
+        provider.Load();
+        return provider;
+    });
+    Console.WriteLine($"Schema: {schemaPath}");
+}
+else
+{
+    Console.Error.WriteLine($"Schema directory not found ({schemaPath ?? "none"}) — type names will fall back to GameObjectType.");
+}
+
 var sp = services.BuildServiceProvider();
 
 var engineService = sp.GetRequiredService<IPetroglyphStarWarsGameEngineService>();
@@ -43,26 +77,26 @@ var sfxEvents = engine.SfxGameManager.Entries
     .ToList();
 Console.WriteLine($"SFX events: {sfxEvents.Count}");
 
-// Load gameconstants.xml for dynamic enums
+// Read GameConstants.xml via the engine's virtual file system (handles MEG archives)
 string? gameConstantsXml = null;
-var gcPath = Path.Combine(gamePath, "Data", "XML", "GameConstants.xml");
-if (File.Exists(gcPath))
-    gameConstantsXml = await File.ReadAllTextAsync(gcPath);
-
-// Project
-var schemaProvider = sp.GetService<ISchemaProvider>();
-if (schemaProvider is null)
+using (var stream = engine.GameRepository.TryOpenFile("Data\\XML\\GameConstants.xml"))
 {
-    Console.Error.WriteLine("No ISchemaProvider registered — type names will fall back to GameObjectType.");
-    schemaProvider = new NullSchemaProvider();
+    if (stream is not null)
+        gameConstantsXml = await new StreamReader(stream).ReadToEndAsync();
 }
 
-var projector = new GameSymbolProjector(schemaProvider);
-var baseline  = projector.Project(gameObjects, sfxEvents, gameConstantsXml, manifestHash);
-Console.WriteLine($"Projected {baseline.Symbols.Count} symbols, {baseline.DynamicEnumValues.Count} dynamic enum(s)");
+var schemaProvider = sp.GetService<ISchemaProvider>();
+var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
+var baseline = projector.Project(gameObjects, sfxEvents, gameConstantsXml, manifestHash);
+Console.WriteLine($"Projected {baseline.Symbols.Count} symbols, {baseline.DynamicEnumValues.Count} dynamic enum(s), {baseline.HardcodedEnumValues.Sum(kv => kv.Value.Length)} hardcoded enum value(s)");
 
 // Serialize
 var data = BaselineSerializer.Serialize(baseline);
+
+var outputDir = Path.GetDirectoryName(outputFile);
+if (!string.IsNullOrEmpty(outputDir))
+    Directory.CreateDirectory(outputDir);
+
 await File.WriteAllBytesAsync(outputFile, data);
 Console.WriteLine($"Written: {outputFile} ({data.Length:N0} bytes)");
 
@@ -83,19 +117,42 @@ static string ComputeManifestHash(string gamePath)
         if (File.Exists(path))
             hash.AppendData(File.ReadAllBytes(path));
     }
+
     return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
+}
+
+// Walk up from the binary's directory until we find schema/eaw
+static string? FindSchemaPath()
+{
+    var dir = AppContext.BaseDirectory;
+    for (var i = 0; i < 8; i++)
+    {
+        var candidate = Path.Combine(dir, "schema", "eaw");
+        if (Directory.Exists(candidate))
+            return candidate;
+        var parent = Directory.GetParent(dir)?.FullName;
+        if (parent is null) break;
+        dir = parent;
+    }
+    return null;
 }
 
 // Minimal fallback when no schema is wired — all types become GameObjectType.
 file sealed class NullSchemaProvider : ISchemaProvider
 {
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
-    public IReadOnlyList<XmlTagDefinition>         AllTags        => [];
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public IReadOnlyList<EnumDefinition>           AllEnums       => [];
-    public XmlTagDefinition?                       GetTag(string t)              => null;
-    public IReadOnlyList<XmlTagDefinition>         GetAllTagDefinitions(string t) => [];
-    public IReadOnlyList<XmlTagDefinition>         GetTagsForType(string t)       => [];
-    public EnumDefinition?                         GetEnum(string e)              => null;
-    public GameObjectTypeDefinition?               GetObjectType(string t)        => null;
+    public IReadOnlyList<EnumDefinition> AllEnums => [];
+
+    public XmlTagDefinition? GetTag(string t) => null;
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t) => [];
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t) => [];
+    public EnumDefinition? GetEnum(string e) => null;
+    public GameObjectTypeDefinition? GetObjectType(string t) => null;
 }
