@@ -4,40 +4,49 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
-    private readonly XmlDocumentBuffer _buffer;
-    private readonly IXmlDiagnosticsPublisher _diagnosticsPublisher;
+    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IGameIndexService _indexService;
 
-    public XmlTextDocumentSyncHandler(XmlDocumentBuffer buffer, IXmlDiagnosticsPublisher diagnosticsPublisher)
+    public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService)
     {
-        _buffer = buffer;
-        _diagnosticsPublisher = diagnosticsPublisher;
+        _workspaceHost = workspaceHost;
+        _indexService = indexService;
     }
 
-    public override Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
+    public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
-        var text = request.TextDocument.Text;
-        _buffer.Set(request.TextDocument.Uri, text);
-        _diagnosticsPublisher.Publish(request.TextDocument.Uri, text);
-        return Unit.Task;
+        var uri     = request.TextDocument.Uri.ToString();
+        var text    = request.TextDocument.Text;
+        var version = request.TextDocument.Version ?? 0;
+
+        _workspaceHost.AddOrUpdate(uri, text, version);
+        await _indexService.UpdateDocumentAsync(uri, text, version, ct);
+        return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
+    public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
     {
-        var text = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
-        _buffer.Set(request.TextDocument.Uri, text);
-        _diagnosticsPublisher.Publish(request.TextDocument.Uri, text);
-        return Unit.Task;
+        var uri     = request.TextDocument.Uri.ToString();
+        var text    = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
+        var version = request.TextDocument.Version ?? 0;
+
+        _workspaceHost.AddOrUpdate(uri, text, version);
+        await _indexService.UpdateDocumentAsync(uri, text, version, ct);
+        return Unit.Value;
     }
 
     public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
     {
-        _buffer.Remove(request.TextDocument.Uri);
-        _diagnosticsPublisher.ClearDiagnostics(request.TextDocument.Uri);
+        var uri = request.TextDocument.Uri.ToString();
+        _workspaceHost.Remove(uri);
+        _indexService.RemoveDocument(uri);
         return Unit.Task;
     }
 

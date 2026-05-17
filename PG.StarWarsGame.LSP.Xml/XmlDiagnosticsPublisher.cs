@@ -5,47 +5,140 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Validation;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsPublisher
+public sealed class XmlDiagnosticsPublisher
 {
+    private readonly Action<PublishDiagnosticsParams> _publish;
+    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly ISchemaProvider _schema;
-    private readonly ILanguageServerFacade _server;
     private readonly IXmlValueValidatorRegistry _validators;
+
+    private HashSet<string> _lastPublishedUris = [];
 
     public XmlDiagnosticsPublisher(
         ILanguageServerFacade server,
+        IGameIndexService indexService,
+        IGameWorkspaceHost workspaceHost,
+        ISchemaProvider schema,
+        IXmlValueValidatorRegistry validators,
+        ILogger<XmlDiagnosticsPublisher> logger)
+        : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, schema, validators, logger)
+    { }
+
+    internal XmlDiagnosticsPublisher(
+        Action<PublishDiagnosticsParams> publish,
+        IGameIndexService indexService,
+        IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         IXmlValueValidatorRegistry validators,
         ILogger<XmlDiagnosticsPublisher> logger)
     {
-        _server = server;
-        _schema = schema;
-        _validators = validators;
-        _logger = logger;
+        _publish      = publish;
+        _workspaceHost = workspaceHost;
+        _schema       = schema;
+        _validators   = validators;
+        _logger       = logger;
+
+        indexService.IndexChanged += OnIndexChanged;
     }
 
-    public void Publish(DocumentUri uri, string text)
+    private void OnIndexChanged(GameIndex newIndex)
     {
-        var diagnostics = CollectDiagnostics(text, uri);
-        _server.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
+        var currentUris = new HashSet<string>(newIndex.Documents.Keys);
+
+        foreach (var uri in currentUris)
         {
-            Uri = uri,
-            Diagnostics = new Container<Diagnostic>(diagnostics)
-        });
+            var allDiags = new List<Diagnostic>();
+
+            if (_workspaceHost.TryGet(uri, out var doc))
+                allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
+
+            allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
+            allDiags.AddRange(CollectUnresolvedRefDiagnostics(uri, newIndex));
+
+            _publish(new PublishDiagnosticsParams
+            {
+                Uri         = DocumentUri.From(uri),
+                Diagnostics = new Container<Diagnostic>(allDiags)
+            });
+        }
+
+        // Clear diagnostics for URIs that are no longer in the index.
+        foreach (var uri in _lastPublishedUris)
+        {
+            if (!currentUris.Contains(uri))
+            {
+                _publish(new PublishDiagnosticsParams
+                {
+                    Uri         = DocumentUri.From(uri),
+                    Diagnostics = new Container<Diagnostic>()
+                });
+            }
+        }
+
+        _lastPublishedUris = currentUris;
     }
 
-    public void ClearDiagnostics(DocumentUri uri)
+    internal IReadOnlyList<Diagnostic> CollectDuplicateIdDiagnostics(string documentUri, GameIndex index)
     {
-        _server.TextDocument.PublishDiagnostics(new PublishDiagnosticsParams
+        var diagnostics = new List<Diagnostic>();
+        foreach (var (id, symbols) in index.WorkspaceDefinitions)
         {
-            Uri = uri,
-            Diagnostics = new Container<Diagnostic>()
-        });
+            if (symbols.Length <= 1) continue;
+            foreach (var sym in symbols)
+            {
+                if (sym.Origin is not FileOrigin fo || fo.Uri != documentUri) continue;
+
+                var otherUris = symbols
+                    .Where(s => !ReferenceEquals(s, sym))
+                    .Select(s => s.Origin is FileOrigin f ? f.Uri : "unknown")
+                    .Distinct()
+                    .ToList();
+                var othersText = otherUris.Count == 1
+                    ? $" Also defined in: {otherUris[0]}."
+                    : $" Also defined in: {string.Join(", ", otherUris)}.";
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message  = $"Duplicate object ID '{id}': IDs must be globally unique.{othersText}",
+                    Range    = new Range(new Position(fo.Line, 0), new Position(fo.Line, int.MaxValue)),
+                    Source   = "pg-swg-lsp"
+                });
+            }
+        }
+        return diagnostics;
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectUnresolvedRefDiagnostics(string documentUri, GameIndex index)
+    {
+        var diagnostics = new List<Diagnostic>();
+        foreach (var (targetId, refs) in index.WorkspaceReferences)
+        {
+            if (index.Resolve(targetId) is not null) continue;
+            foreach (var r in refs)
+            {
+                if (r.DocumentUri != documentUri) continue;
+                var msg = r.ExpectedTypeName is not null
+                    ? $"Unresolved reference '{targetId}' (expected {r.ExpectedTypeName})."
+                    : $"Unresolved reference '{targetId}'.";
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message  = msg,
+                    Range    = new Range(new Position(r.Line, 0), new Position(r.Line, int.MaxValue)),
+                    Source   = "pg-swg-lsp"
+                });
+            }
+        }
+        return diagnostics;
     }
 
     internal List<Diagnostic> CollectDiagnostics(string text, DocumentUri? uri = null)
