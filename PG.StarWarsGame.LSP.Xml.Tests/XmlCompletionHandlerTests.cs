@@ -2,6 +2,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -11,13 +12,13 @@ public sealed class XmlCompletionHandlerTests
 
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
-    private static (XmlCompletionHandler handler, XmlDocumentBuffer buffer, FakeSchemaProvider schema,
+    private static (XmlCompletionHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
         FakeProposalRegistry proposals) Build()
     {
-        var buffer = new XmlDocumentBuffer();
-        var schema = new FakeSchemaProvider();
+        var host      = new FakeGameWorkspaceHost();
+        var schema    = new FakeSchemaProvider();
         var proposals = new FakeProposalRegistry();
-        return (new XmlCompletionHandler(buffer, schema, proposals), buffer, schema, proposals);
+        return (new XmlCompletionHandler(host, schema, proposals), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -51,12 +52,12 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_TagNameContext_ReturnsTagsForType()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         schema.AddType(MakeType("Faction"));
         schema.AddTagForType("Faction", MakeTag("Max_Speed"));
         schema.AddTagForType("Faction", MakeTag("Display_Name"));
 
-        buffer.Set(TestUri, "<Faction>\n  <\n</Faction>");
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <\n</Faction>", 1);
         // cursor on line 1 after '<'
         var result = await handler.Handle(At(1, 3), CancellationToken.None);
 
@@ -68,13 +69,13 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_TagNameContext_SingletonAlreadyPresent_ExcludedFromList()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         schema.AddType(MakeType("Faction"));
         schema.AddTagForType("Faction", MakeTag("Max_Speed"));
         schema.AddTagForType("Faction", MakeTag("Display_Name"));
 
         // Max_Speed already present
-        buffer.Set(TestUri, "<Faction>\n  <Max_Speed>500</Max_Speed>\n  <\n</Faction>");
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <Max_Speed>500</Max_Speed>\n  <\n</Faction>", 1);
         var result = await handler.Handle(At(2, 3), CancellationToken.None);
 
         var labels = result.Items.Select(i => i.Label).ToList();
@@ -85,12 +86,12 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_TagNameContext_MultipleAllowedAlreadyPresent_StillInList()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         schema.AddType(MakeType("Faction"));
         schema.AddTagForType("Faction", MakeTag("SFXEvent_Attack", true));
 
         // SFXEvent_Attack already present; still allowed again
-        buffer.Set(TestUri, "<Faction>\n  <SFXEvent_Attack>Sfx_A</SFXEvent_Attack>\n  <\n</Faction>");
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <SFXEvent_Attack>Sfx_A</SFXEvent_Attack>\n  <\n</Faction>", 1);
         var result = await handler.Handle(At(2, 3), CancellationToken.None);
 
         var labels = result.Items.Select(i => i.Label).ToList();
@@ -100,10 +101,10 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_TagNameContext_ParentNotInSchema_ReturnsEmpty()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         // No type registered for SpaceUnit
 
-        buffer.Set(TestUri, "<SpaceUnit>\n  <\n</SpaceUnit>");
+        host.AddOrUpdate(TestUri.ToString(), "<SpaceUnit>\n  <\n</SpaceUnit>", 1);
         var result = await handler.Handle(At(1, 3), CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -112,12 +113,12 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_TagNameContext_PartialPrefix_FiltersResults()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         schema.AddType(MakeType("Faction"));
         schema.AddTagForType("Faction", MakeTag("SFXEvent_Attack"));
         schema.AddTagForType("Faction", MakeTag("Max_Speed"));
 
-        buffer.Set(TestUri, "<Faction>\n  <SFX\n</Faction>");
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <SFX\n</Faction>", 1);
         // cursor at col 6 (after '<SFX')
         var result = await handler.Handle(At(1, 6), CancellationToken.None);
 
@@ -129,11 +130,11 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_TagNameContext_InsertTextIsSnippet()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         schema.AddType(MakeType("Faction"));
         schema.AddTagForType("Faction", MakeTag("Max_Speed"));
 
-        buffer.Set(TestUri, "<Faction>\n  <\n</Faction>");
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <\n</Faction>", 1);
         var result = await handler.Handle(At(1, 3), CancellationToken.None);
 
         var item = result.Items.Single(i => i.Label == "Max_Speed");
@@ -146,13 +147,13 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_ValueCompletion_CursorInsideNonTypeRoot_ReturnsEmpty()
     {
-        var (handler, buffer, schema, proposals) = Build();
+        var (handler, host, schema, proposals) = Build();
         // Hardpoints is registered as a tag but NOT as a type (unregistered file-level wrapper)
         schema.AddTagForType("SomeOtherType", MakeTag("Hardpoints"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "HP_01" }];
 
         // Cursor inside the root <Hardpoints> body — must not offer value completions
-        buffer.Set(TestUri, "<Hardpoints>\n  \n</Hardpoints>");
+        host.AddOrUpdate(TestUri.ToString(), "<Hardpoints>\n  \n</Hardpoints>", 1);
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -161,14 +162,14 @@ public sealed class XmlCompletionHandlerTests
     [Fact]
     public async Task Handle_ValueCompletion_EnclosingElementIsType_ReturnsEmpty()
     {
-        var (handler, buffer, schema, proposals) = Build();
+        var (handler, host, schema, proposals) = Build();
         schema.AddType(MakeType("Faction"));
         // Faction is also registered as a tag with the same name (name collision)
         schema.AddTagForType("SomeOtherType", MakeTag("Faction"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "EMPIRE" }];
 
         // Cursor inside the type-container body — not inside a field tag
-        buffer.Set(TestUri, "<Faction>\n  \n</Faction>");
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  \n</Faction>", 1);
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
         Assert.Empty(result.Items);
@@ -176,53 +177,41 @@ public sealed class XmlCompletionHandlerTests
 
     // ── fakes ───────────────────────────────────────────────────────────────
 
+    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
+    {
+        private readonly Dictionary<string, TrackedDocument> _docs = [];
+
+        public void AddOrUpdate(string uri, string text, int version)
+            => _docs[uri] = new TrackedDocument(uri, text, version);
+
+        public void Remove(string uri) => _docs.Remove(uri);
+
+        public bool TryGet(string uri, out TrackedDocument doc)
+            => _docs.TryGetValue(uri, out doc!);
+
+        public IEnumerable<TrackedDocument> All => _docs.Values;
+    }
+
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
 
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
+        public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
         public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
+        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
 
         public IReadOnlyList<XmlTagDefinition> GetTagsForType(string name)
-        {
-            return _tagsByType.TryGetValue(name, out var list) ? list : [];
-        }
+            => _tagsByType.TryGetValue(name, out var list) ? list : [];
 
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
+        public EnumDefinition? GetEnum(string _) => null;
         public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public event EventHandler? SchemaRefreshed { add { } remove { } }
 
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
+        public void AddType(GameObjectTypeDefinition type) => _types[type.TypeName] = type;
 
         public void AddTagForType(string typeName, XmlTagDefinition tag)
         {
@@ -238,8 +227,6 @@ public sealed class XmlCompletionHandlerTests
         public IReadOnlyList<ValueProposal> ProposalsToReturn { get; set; } = [];
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition __, string ___)
-        {
-            return ProposalsToReturn;
-        }
+            => ProposalsToReturn;
     }
 }

@@ -5,24 +5,25 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlHoverHandler : HoverHandlerBase
 {
-    private readonly XmlDocumentBuffer _buffer;
+    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILspConfigurationProvider _config;
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly ISchemaProvider _schema;
 
     public XmlHoverHandler(
-        XmlDocumentBuffer buffer,
+        IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         ILspConfigurationProvider config,
         ILogger<XmlHoverHandler> logger)
     {
-        _buffer = buffer;
+        _workspaceHost = workspaceHost;
         _schema = schema;
         _config = config;
         _logger = logger;
@@ -33,9 +34,10 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         _logger.LogDebug("Hover request at {Line}:{Character}",
             request.Position.Line, request.Position.Character);
 
-        var text = _buffer.Get(request.TextDocument.Uri);
-        if (text is null)
+        var uri = request.TextDocument.Uri.ToString();
+        if (!_workspaceHost.TryGet(uri, out var doc))
             return Task.FromResult<Hover?>(null);
+        var text = doc.Text;
 
         var lines = text.Split('\n');
         var lineIndex = request.Position.Line;

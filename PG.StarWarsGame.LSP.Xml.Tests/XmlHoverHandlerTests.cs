@@ -3,6 +3,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -12,14 +13,13 @@ public sealed class XmlHoverHandlerTests
 
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
-    private static (XmlHoverHandler handler, XmlDocumentBuffer buffer, FakeSchemaProvider schema, FakeConfigProvider
-        config) Build()
+    private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
+        FakeConfigProvider config) Build()
     {
-        var buffer = new XmlDocumentBuffer();
+        var host   = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var config = new FakeConfigProvider();
-        return (new XmlHoverHandler(buffer, schema, config, NullLogger<XmlHoverHandler>.Instance), buffer, schema,
-            config);
+        return (new XmlHoverHandler(host, schema, config, NullLogger<XmlHoverHandler>.Instance), host, schema, config);
     }
 
     private static HoverParams At(int line, int character)
@@ -64,8 +64,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_LineOutOfBounds_ReturnsNull()
     {
-        var (handler, buffer, _, _) = Build();
-        buffer.Set(TestUri, "<Foo/>");
+        var (handler, host, _, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Foo/>", 1);
 
         var result = await handler.Handle(At(99, 0), CancellationToken.None);
         Assert.Null(result);
@@ -74,8 +74,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_CursorOnValue_ReturnsNull()
     {
-        var (handler, buffer, _, _) = Build();
-        buffer.Set(TestUri, "<Max_Speed>500</Max_Speed>");
+        var (handler, host, _, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Max_Speed>500</Max_Speed>", 1);
         // cursor on "500" (position 11)
         var result = await handler.Handle(At(0, 11), CancellationToken.None);
         Assert.Null(result);
@@ -84,8 +84,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_TagNotInSchema_ReturnsNull()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Max_Speed>500</Max_Speed>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Max_Speed>500</Max_Speed>", 1);
         schema.TagToReturn = null;
         schema.TypeToReturn = null;
 
@@ -98,8 +98,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_CursorOnOpeningTagName_ReturnsTagHover()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
         schema.TagToReturn = MakeTag();
 
         // cursor on 'M' of Max_Speed (line 1, col 1)
@@ -113,8 +113,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_CursorOnClosingTagName_ReturnsTagHover()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
         schema.TagToReturn = MakeTag();
 
         // "</Max_Speed>" starts at index 14; 'M' is at 16 (line 1)
@@ -126,8 +126,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_DeprecatedTag_HoverContainsDeprecatedMarker()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<Old_Tag/>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Old_Tag/>\n</Root>", 1);
         schema.TagToReturn = MakeTag("Old_Tag", true);
 
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
@@ -139,8 +139,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_AvailableSince_IncludedInHover()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<New_Tag/>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<New_Tag/>\n</Root>", 1);
         schema.TagToReturn = MakeTag("New_Tag", since: "FoC 1.0");
 
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
@@ -152,8 +152,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_LocaleUsedFromConfig()
     {
-        var (handler, buffer, schema, config) = Build();
-        buffer.Set(TestUri, "<Root>\n<Foo/>\n</Root>");
+        var (handler, host, schema, config) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
         schema.TagToReturn = MakeTag("Foo", descEn: "English", descDe: "Deutsch");
         config.Locale = "de";
 
@@ -167,9 +167,9 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_HoverRange_MatchesTagNameSpan()
     {
-        var (handler, buffer, schema, _) = Build();
+        var (handler, host, schema, _) = Build();
         // "<Root>\n<Foo/>\n</Root>" — on line 1, 'F' at col 1, length 3
-        buffer.Set(TestUri, "<Root>\n<Foo/>\n</Root>");
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
         schema.TagToReturn = MakeTag("Foo");
 
         var result = await handler.Handle(At(1, 1), CancellationToken.None);
@@ -184,8 +184,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_FloatTag_HoverContainsFormatHint()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
         schema.TagToReturn = MakeTag(); // ValueType = Float
 
         var result = await handler.Handle(At(1, 1), CancellationToken.None);
@@ -197,8 +197,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_NameReferenceXmlObject_HoverContainsReferenceHint()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<Affiliation/>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation/>\n</Root>", 1);
         schema.TagToReturn = new XmlTagDefinition
         {
             Tag = "Affiliation",
@@ -217,8 +217,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_DynamicEnumValue_HoverContainsEnumHint()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Root>\n<Armor_Type/>\n</Root>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Armor_Type/>\n</Root>", 1);
         schema.TagToReturn = new XmlTagDefinition
         {
             Tag = "Armor_Type",
@@ -237,8 +237,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_NonTypeRootTagMatchesTagName_ReturnsNull()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Hardpoints><Max_Speed>500</Max_Speed></Hardpoints>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Hardpoints><Max_Speed>500</Max_Speed></Hardpoints>", 1);
         schema.TagToReturn = MakeTag("Hardpoints"); // registered as a tag but NOT as a type
         // schema.TypeToReturn = null (default)
 
@@ -251,8 +251,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_TagNameCollidesWithTypeName_TypeHoverWins()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<Faction>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>", 1);
         schema.TagToReturn = MakeTag("Faction"); // Faction is also a tag name
         schema.TypeToReturn = new GameObjectTypeDefinition
         {
@@ -273,8 +273,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_TypeRootElement_ReturnsTypeHover()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<GameObjectType>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<GameObjectType>", 1);
         schema.TagToReturn = null; // not a tag
         schema.TypeToReturn = new GameObjectTypeDefinition
         {
@@ -294,8 +294,8 @@ public sealed class XmlHoverHandlerTests
     [Fact]
     public async Task Handle_SingletonType_HoverContainsSingleton()
     {
-        var (handler, buffer, schema, _) = Build();
-        buffer.Set(TestUri, "<GameConstants/>");
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<GameConstants/>", 1);
         schema.TagToReturn = null;
         schema.TypeToReturn = new GameObjectTypeDefinition
         {
@@ -309,58 +309,44 @@ public sealed class XmlHoverHandlerTests
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("singleton", md, StringComparison.OrdinalIgnoreCase);
     }
+
     // ── fakes ───────────────────────────────────────────────────────────────
+
+    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
+    {
+        private readonly Dictionary<string, TrackedDocument> _docs = [];
+
+        public void AddOrUpdate(string uri, string text, int version)
+            => _docs[uri] = new TrackedDocument(uri, text, version);
+
+        public void Remove(string uri) => _docs.Remove(uri);
+
+        public bool TryGet(string uri, out TrackedDocument doc)
+            => _docs.TryGetValue(uri, out doc!);
+
+        public IEnumerable<TrackedDocument> All => _docs.Values;
+    }
 
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
         public XmlTagDefinition? TagToReturn { get; set; }
         public GameObjectTypeDefinition? TypeToReturn { get; set; }
 
-        public XmlTagDefinition? GetTag(string _)
-        {
-            return TagToReturn;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
+        public XmlTagDefinition? GetTag(string _) => TagToReturn;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string _)
-        {
-            return TypeToReturn;
-        }
-
+        public GameObjectTypeDefinition? GetObjectType(string _) => TypeToReturn;
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
-
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public EnumDefinition? GetEnum(string _) => null;
         public IReadOnlyList<EnumDefinition> AllEnums => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
+        public event EventHandler? SchemaRefreshed { add { } remove { } }
     }
 
     private sealed class FakeConfigProvider : ILspConfigurationProvider
     {
         public string Locale { get; set; } = "en";
         public LspConfiguration Current => new() { Locale = Locale };
-
-        public void LoadFrom(object? _)
-        {
-        }
+        public void LoadFrom(object? _) { }
     }
 }

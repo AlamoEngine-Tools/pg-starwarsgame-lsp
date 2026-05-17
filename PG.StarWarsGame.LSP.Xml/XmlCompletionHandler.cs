@@ -5,30 +5,32 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCompletionHandler : CompletionHandlerBase
 {
-    private readonly XmlDocumentBuffer _buffer;
+    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
 
     public XmlCompletionHandler(
-        XmlDocumentBuffer buffer,
+        IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         IXmlValueProposalRegistry proposals)
     {
-        _buffer = buffer;
+        _workspaceHost = workspaceHost;
         _schema = schema;
         _proposals = proposals;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
-        var text = _buffer.Get(request.TextDocument.Uri);
-        if (text is null)
+        var uri = request.TextDocument.Uri.ToString();
+        if (!_workspaceHost.TryGet(uri, out var doc))
             return Task.FromResult(new CompletionList());
+        var text = doc.Text;
 
         var lines = text.Split('\n');
         var lineIndex = request.Position.Line;
