@@ -4,15 +4,21 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 public enum XmlValueType
 {
     Boolean = 0,
-    Type2 = 2,
+
+    /// <summary>Small integer audio parameter (Priority, Pitch, Pan values); valid range roughly 0–140.</summary>
+    AudioParamInt = 2,
 
     /// <summary>Small integer audio parameter (play count, max concurrent instances; -1 = unlimited).</summary>
     SfxCount = 3,
 
     /// <summary>Integer percentage 0–100 used for audio volume and probability fields.</summary>
     SfxPercentage = 4,
-    IntType5 = 5,
-    IntType6 = 6,
+
+    /// <summary>Non-negative integer (tech levels, font sizes, frame counts).</summary>
+    UInt = 5,
+
+    /// <summary>General signed integer (credits, priorities, frame numbers).</summary>
+    Int = 6,
     Float = 8,
     Double = 9,
 
@@ -33,7 +39,8 @@ public enum XmlValueType
     FloatVector4 = 17,
     IntList = 18,
     FloatList = 19,
-    Type20 = 20,
+    /// <summary>Space-separated list of 3D float vectors (e.g., Squadron_Offsets, Bombardment_Lighting_Color_List).</summary>
+    FloatVector3List = 20,
 
     /// <summary>UV texture channel index (expected range 0–3).</summary>
     UvSlotIndex = 21,
@@ -56,7 +63,8 @@ public enum XmlValueType
 
     /// <summary>A space-separated list of named-object references. referenceType in YAML identifies the referenced pool.</summary>
     NameReferenceList = 27,
-    Type28 = 28,
+    /// <summary>Named position label string (e.g., "In_Base", "Out_Base", "Orbital").</summary>
+    PositionLabel = 28,
 
     /// <summary>A strongly-typed single object reference; the engine knows exactly which pool to query.</summary>
     TypeReference = 29,
@@ -72,7 +80,8 @@ public enum XmlValueType
 
     /// <summary>A reference to a MusicEvent by name.</summary>
     MusicEventReference = 33,
-    Type34 = 34,
+    /// <summary>Conditional SFX event override pair (unit type name + SFXEvent name).</summary>
+    ConditionalSfxEvent = 34,
     Type35 = 35,
     Type36 = 36,
     Type37 = 37,
@@ -80,7 +89,8 @@ public enum XmlValueType
 
     /// <summary>A reference to an SFXEvent used for HUD feedback (special-weapon state changes, etc.).</summary>
     SfxEventHudReference = 39,
-    Type40 = 40,
+    /// <summary>Conditional SpeechEvent intro trigger with Or/And logic (unit type conditions + SpeechEvent name).</summary>
+    ConditionalSpeechEvent = 40,
 
     /// <summary>Per-faction music event map.</summary>
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
@@ -94,7 +104,8 @@ public enum XmlValueType
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     Type44 = 44,
-    Type45 = 45,
+    /// <summary>Per-faction planet reference pair ("FactionName, PlanetName").</summary>
+    PerFactionPlanet = 45,
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     Type46 = 46,
@@ -112,16 +123,19 @@ public enum XmlValueType
 
     /// <summary>Weighted list of music events.</summary>
     MusicEventWeightedList = 52,
-    Type53 = 53,
+    /// <summary>Per-faction object list pair (faction name + space-separated object names).</summary>
+    PerFactionObjectList = 53,
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     ShipNameTextFileList = 54,
-    Type55 = 55,
 
-    /// <summary>AbilitySubObjectList -> need further investigation and dedicated implementation.</summary>
+    /// <summary>Campaign force deployment tuple (faction name, planet name, unit type name).</summary>
+    ForceDeploymentList = 55,
+
+    /// <summary>Ability sub-object list (engine internal: AbilitySubObjectList). Semantics not fully characterized.</summary>
     Type56 = 56,
 
-    /// <summary>UnitAbilitiesDataSubObjectList -> need further investigation and dedicated implementation.</summary>
+    /// <summary>Unit abilities data sub-object list (engine internal: UnitAbilitiesDataSubObjectList). Semantics not fully characterized.</summary>
     Type57 = 57,
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
@@ -136,7 +150,8 @@ public enum XmlValueType
     /// <summary>Inaccuracy distance map (category, float pairs).</summary>
     InaccuracyMap = 61,
     DamageToArmorMod = 62,
-    Type63 = 63,
+    /// <summary>Audio 3D provider name string (quoted DirectSound3D provider name, e.g., "EAX").</summary>
+    Audio3dProviderName = 63,
     LocalisationToTextureMap = 64,
     HardPointTypeToTextureMap = 65,
 
@@ -145,7 +160,8 @@ public enum XmlValueType
     ///     per tag. Empty SFXEvent name is valid (slot declared, no sound).
     /// </summary>
     HardPointSfxMap = 66,
-    Type67 = 67,
+    /// <summary>Faction name reference (single faction identifier string).</summary>
+    FactionReference = 67,
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     Type68 = 68,
@@ -194,8 +210,11 @@ public enum XmlValueType
     ///     ability.
     /// </summary>
     AbilityModFlag = 78,
-    Type79 = 79,
-    Type80 = 80,
+    /// <summary>BinkMovie frame-event tuple (frame number + event name or script action).</summary>
+    MovieFrameTrigger = 79,
+
+    /// <summary>CommandBarComponent boolean/numeric GUI property (property name + value pair).</summary>
+    CommandBarProperty = 80,
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     Type81 = 81,

@@ -10,8 +10,8 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 /// <summary>
 ///     Loads the schema from a remote HTTP source (e.g. raw GitHub).
 ///     Fetches _index.json first, then each listed YAML file.
-///     Downloaded files are persisted to a local cache keyed by the SHA-256 of _index.json;
-///     subsequent startups serve from disk when the manifest has not changed.
+///     Downloaded files are persisted to a local cache; the cache is validated by a SHA-256
+///     checksum of the manifest plus all downloaded YAML file contents.
 /// </summary>
 public sealed class HttpSchemaProvider : ISchemaProvider
 {

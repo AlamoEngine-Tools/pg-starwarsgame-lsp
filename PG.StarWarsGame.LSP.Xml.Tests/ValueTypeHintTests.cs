@@ -338,16 +338,16 @@ public sealed class ValueTypeHintTests
     // ── unknown / unnamed types ───────────────────────────────────────────────
 
     [Fact]
-    public void Type20_ReturnsNull()
+    public void FloatVector3List_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.Type20));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.FloatVector3List));
         Assert.Null(hint);
     }
 
     [Fact]
-    public void Type2_ReturnsNull()
+    public void AudioParamInt_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.Type2));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.AudioParamInt));
         Assert.Null(hint);
     }
 }
