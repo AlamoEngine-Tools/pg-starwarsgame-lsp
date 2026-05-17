@@ -1,3 +1,5 @@
+using System.Xml;
+using System.Xml.Linq;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -58,7 +60,10 @@ public sealed class XmlDiagnosticsPublisher
             var allDiags = new List<Diagnostic>();
 
             if (_workspaceHost.TryGet(uri, out var doc))
+            {
                 allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
+                allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
+            }
 
             allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
             allDiags.AddRange(CollectUnresolvedRefDiagnostics(uri, newIndex));
@@ -238,6 +243,88 @@ public sealed class XmlDiagnosticsPublisher
             WalkNodes(child, diagnostics, lines);
         }
     }
+
+    internal IReadOnlyList<Diagnostic> CollectEnumBoundaryDiagnostics(
+        string documentUri, string text, GameIndex index)
+    {
+        var hardcoded = index.Baseline.HardcodedEnumValues;
+        if (hardcoded.IsEmpty) return [];
+        if (!documentUri.EndsWith("GameConstants.xml", StringComparison.OrdinalIgnoreCase)) return [];
+
+        XDocument doc;
+        try { doc = XDocument.Parse(text, LoadOptions.SetLineInfo); }
+        catch { return []; }
+
+        var diagnostics = new List<Diagnostic>();
+
+        foreach (var (enumName, tagName) in
+            (IEnumerable<(string, string)>)[("DamageType", "Damage_Types"), ("ArmorType", "Armor_Types")])
+        {
+            if (!hardcoded.TryGetValue(enumName, out var knownHardcoded)) continue;
+            var knownSet = new HashSet<string>(knownHardcoded, StringComparer.OrdinalIgnoreCase);
+
+            var el = doc.Descendants(tagName).FirstOrDefault();
+            if (el is null) continue;
+
+            var pastBoundary = false;
+            foreach (var node in el.Nodes())
+            {
+                if (node is XComment c && IsBoundaryComment(c.Value))
+                {
+                    pastBoundary = true;
+                    continue;
+                }
+                if (!pastBoundary || node is not XText textNode) continue;
+
+                var li = (IXmlLineInfo)textNode;
+                EmitTokenDiagnostics(textNode.Value, li.LineNumber, li.LinePosition,
+                    knownSet, diagnostics);
+            }
+        }
+
+        return diagnostics;
+    }
+
+    private void EmitTokenDiagnostics(
+        string raw, int startLine, int startCol,
+        HashSet<string> knownSet, List<Diagnostic> diagnostics)
+    {
+        var lines = raw.Split('\n');
+        for (var li = 0; li < lines.Length; li++)
+        {
+            var line = lines[li].TrimEnd('\r');
+            var lineNumber = startLine + li;
+            var col = 0;
+
+            while (col < line.Length)
+            {
+                while (col < line.Length && char.IsWhiteSpace(line[col])) col++;
+                if (col >= line.Length) break;
+
+                var tokenStart = col;
+                while (col < line.Length && !char.IsWhiteSpace(line[col])) col++;
+                var token = line[tokenStart..col];
+
+                if (knownSet.Contains(token)) continue;
+
+                // 0-based column: first line of text node starts at startCol-1, subsequent at 0
+                var tokenCol0 = (li == 0 ? startCol - 1 : 0) + tokenStart;
+                var tokenLine0 = lineNumber - 1;
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Message  = $"'{token}' is below the hard-coded section boundary. Add new damage/armor types above the boundary comment.",
+                    Range    = new Range(
+                        new Position(tokenLine0, tokenCol0),
+                        new Position(tokenLine0, tokenCol0 + token.Length)),
+                    Source   = "pg-swg-lsp"
+                });
+            }
+        }
+    }
+
+    private static bool IsBoundaryComment(string commentText) =>
+        commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
 
     private static Diagnostic BuildDiagnostic(HtmlNode node, XmlValidationResult result, string[] lines,
         bool openingTagOnly = false)

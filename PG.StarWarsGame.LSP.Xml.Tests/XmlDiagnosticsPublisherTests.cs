@@ -400,7 +400,9 @@ public sealed class XmlDiagnosticsPublisherTests
             Baseline = new BaselineIndex(
                 ImmutableDictionary<string, GameSymbol>.Empty.Add("UNIT_BASELINE", baselineSym),
                 DateTimeOffset.UtcNow,
-                "hash")
+                "hash",
+                ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+                ImmutableDictionary<string, ImmutableArray<string>>.Empty)
         };
 
         var diags = publisher.CollectUnresolvedRefDiagnostics("file:///a.xml", index);
@@ -427,6 +429,153 @@ public sealed class XmlDiagnosticsPublisherTests
         var diags = publisher.CollectUnresolvedRefDiagnostics("file:///a.xml", index);
 
         Assert.Empty(diags);
+    }
+
+    // ── enum boundary diagnostics ────────────────────────────────────────────
+
+    private static GameIndex IndexWithHardcodedEnums(
+        ImmutableDictionary<string, ImmutableArray<string>> hardcoded)
+    {
+        var baseline = new BaselineIndex(
+            ImmutableDictionary<string, GameSymbol>.Empty,
+            DateTimeOffset.UtcNow, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            hardcoded);
+        return GameIndex.Empty with { Baseline = baseline };
+    }
+
+    [Fact]
+    public void CollectEnumBoundaryDiagnostics_NonGameConstantsFile_NoWarning()
+    {
+        var (publisher, _, _, _) = BuildSubscribed();
+        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("DamageType", ["EXPLOSIVE"]);
+        var index = IndexWithHardcodedEnums(hardcoded);
+
+        const string xml = """
+            <GameConstants>
+              <Damage_Types>NEW_TYPE
+            <!-- PLEASE add your new damage types ABOVE this point. -->
+            EXPLOSIVE
+              </Damage_Types>
+            </GameConstants>
+            """;
+
+        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///units.xml", xml, index);
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void CollectEnumBoundaryDiagnostics_EmptyHardcodedBaseline_NoWarning()
+    {
+        var (publisher, _, _, _) = BuildSubscribed();
+        var index = IndexWithHardcodedEnums(
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+
+        const string xml = """
+            <GameConstants>
+              <Damage_Types>CUSTOM
+            <!-- PLEASE add your new damage types ABOVE this point. -->
+            MYSTERY_TYPE
+              </Damage_Types>
+            </GameConstants>
+            """;
+
+        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void CollectEnumBoundaryDiagnostics_NoBoundaryComment_NoWarning()
+    {
+        var (publisher, _, _, _) = BuildSubscribed();
+        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("DamageType", ["EXPLOSIVE"]);
+        var index = IndexWithHardcodedEnums(hardcoded);
+
+        const string xml = "<GameConstants><Damage_Types>EXPLOSIVE ENERGY CUSTOM</Damage_Types></GameConstants>";
+
+        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void CollectEnumBoundaryDiagnostics_KnownHardcodedToken_NoWarning()
+    {
+        var (publisher, _, _, _) = BuildSubscribed();
+        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("DamageType", ["EXPLOSIVE", "ENERGY"]);
+        var index = IndexWithHardcodedEnums(hardcoded);
+
+        const string xml = """
+            <GameConstants>
+              <Damage_Types>CUSTOM_TYPE
+            <!-- PLEASE add your new damage types ABOVE this point. -->
+            EXPLOSIVE ENERGY
+              </Damage_Types>
+            </GameConstants>
+            """;
+
+        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void CollectEnumBoundaryDiagnostics_MisplacedToken_EmitsWarning()
+    {
+        var (publisher, _, _, _) = BuildSubscribed();
+        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("DamageType", ["EXPLOSIVE", "ENERGY"]);
+        var index = IndexWithHardcodedEnums(hardcoded);
+
+        // SABER_SLASH was added below the boundary — not in the hardcoded set
+        const string xml = """
+            <GameConstants>
+              <Damage_Types>CUSTOM_TYPE
+            <!-- PLEASE add your new damage types ABOVE this point. -->
+            EXPLOSIVE SABER_SLASH ENERGY
+              </Damage_Types>
+            </GameConstants>
+            """;
+
+        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
+
+        Assert.Single(diags);
+        Assert.Contains("SABER_SLASH", diags[0].Message);
+        Assert.Equal(DiagnosticSeverity.Warning, diags[0].Severity);
+    }
+
+    [Fact]
+    public void CollectEnumBoundaryDiagnostics_MultipleEnums_BothChecked()
+    {
+        var (publisher, _, _, _) = BuildSubscribed();
+        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("DamageType", ["EXPLOSIVE"])
+            .Add("ArmorType",  ["ARMOR_INFANTRY"]);
+        var index = IndexWithHardcodedEnums(hardcoded);
+
+        const string xml = """
+            <GameConstants>
+              <Damage_Types>CUSTOM
+            <!-- PLEASE add your new damage types ABOVE this point. -->
+            EXPLOSIVE MOD_DAMAGE_BELOW
+              </Damage_Types>
+              <Armor_Types>MY_ARMOR
+            <!-- PLEASE add your new armor types ABOVE this point. -->
+            ARMOR_INFANTRY MOD_ARMOR_BELOW
+              </Armor_Types>
+            </GameConstants>
+            """;
+
+        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
+
+        Assert.Equal(2, diags.Count);
+        Assert.Contains(diags, d => d.Message.Contains("MOD_DAMAGE_BELOW"));
+        Assert.Contains(diags, d => d.Message.Contains("MOD_ARMOR_BELOW"));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

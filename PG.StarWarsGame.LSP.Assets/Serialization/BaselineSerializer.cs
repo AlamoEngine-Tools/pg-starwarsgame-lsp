@@ -12,24 +12,46 @@ public static class BaselineSerializer
         {
             Symbols             = baseline.Symbols.Values.ToArray(),
             BuiltAtMs           = baseline.BuiltAt.ToUnixTimeMilliseconds(),
-            SourceManifestHash  = baseline.SourceManifestHash
+            SourceManifestHash  = baseline.SourceManifestHash,
+            DynamicEnumValues   = ToSerializedArray(baseline.DynamicEnumValues),
+            HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues)
         };
         return MessagePackSerializer.Serialize(dto);
     }
 
     public static BaselineIndex Deserialize(byte[] data)
     {
-        var dto     = MessagePackSerializer.Deserialize<SerializedBaseline>(data);
-        var builtAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs);
-        var symbols = dto.Symbols.ToImmutableDictionary(s => s.Id);
-        return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash);
+        var dto      = MessagePackSerializer.Deserialize<SerializedBaseline>(data);
+        var builtAt  = DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs);
+        var symbols  = dto.Symbols.ToImmutableDictionary(s => s.Id);
+        var enums    = FromSerializedArray(dto.DynamicEnumValues);
+        var hardcoded = FromSerializedArray(dto.HardcodedEnumValues);
+        return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded);
     }
+
+    private static SerializedEnumValues[] ToSerializedArray(
+        ImmutableDictionary<string, ImmutableArray<string>> dict) =>
+        dict.Select(kv => new SerializedEnumValues { Name = kv.Key, Values = kv.Value.ToArray() })
+            .ToArray();
+
+    private static ImmutableDictionary<string, ImmutableArray<string>> FromSerializedArray(
+        SerializedEnumValues[] arr) =>
+        arr.ToImmutableDictionary(e => e.Name, e => e.Values.ToImmutableArray());
 }
 
 [MessagePackObject]
 public sealed class SerializedBaseline
 {
-    [Key(0)] public GameSymbol[] Symbols            { get; set; } = [];
-    [Key(1)] public long         BuiltAtMs           { get; set; }
-    [Key(2)] public string       SourceManifestHash  { get; set; } = string.Empty;
+    [Key(0)] public GameSymbol[]           Symbols             { get; set; } = [];
+    [Key(1)] public long                   BuiltAtMs           { get; set; }
+    [Key(2)] public string                 SourceManifestHash  { get; set; } = string.Empty;
+    [Key(3)] public SerializedEnumValues[] DynamicEnumValues   { get; set; } = [];
+    [Key(4)] public SerializedEnumValues[] HardcodedEnumValues { get; set; } = [];
+}
+
+[MessagePackObject]
+public sealed class SerializedEnumValues
+{
+    [Key(0)] public string   Name   { get; set; } = string.Empty;
+    [Key(1)] public string[] Values { get; set; } = [];
 }

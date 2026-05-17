@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
+// ReSharper disable SuggestVarOrType_Elsewhere
+
 namespace PG.StarWarsGame.LSP.Assets.Tests.Serialization;
 
 public sealed class BaselineSerializerTests
@@ -101,7 +103,9 @@ public sealed class BaselineSerializerTests
     {
         var baseline = new BaselineIndex(
             ImmutableDictionary<string, GameSymbol>.Empty,
-            TestDate, "abc123hash");
+            TestDate, "abc123hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
         var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
 
@@ -121,8 +125,72 @@ public sealed class BaselineSerializerTests
         Assert.True(result.Symbols.ContainsKey("BETA"));
     }
 
+    // ── DynamicEnumValues ────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_DynamicEnumValues()
+    {
+        var baseline = new BaselineIndex(
+            ImmutableDictionary<string, GameSymbol>.Empty,
+            TestDate, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("DamageType", ["EXPLOSIVE", "ENERGY", "GRENADE"])
+                .Add("ArmorType",  ["ARMOR_INFANTRY", "ARMOR_VEHICLE"]),
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(2, result.DynamicEnumValues.Count);
+        Assert.Collection(result.DynamicEnumValues["DamageType"],
+            v => Assert.Equal("EXPLOSIVE", v),
+            v => Assert.Equal("ENERGY",    v),
+            v => Assert.Equal("GRENADE",   v));
+        Assert.Collection(result.DynamicEnumValues["ArmorType"],
+            v => Assert.Equal("ARMOR_INFANTRY", v),
+            v => Assert.Equal("ARMOR_VEHICLE",  v));
+    }
+
+    [Fact]
+    public void RoundTrip_EmptyDynamicEnumValues()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        Assert.Empty(result.DynamicEnumValues);
+    }
+
+    // ── HardcodedEnumValues ──────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_HardcodedEnumValues()
+    {
+        var baseline = new BaselineIndex(
+            ImmutableDictionary<string, GameSymbol>.Empty,
+            TestDate, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("DamageType", ["EXPLOSIVE", "ENERGY"])
+                .Add("ArmorType",  ["ARMOR_INFANTRY"]));
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(2, result.HardcodedEnumValues.Count);
+        Assert.Collection(result.HardcodedEnumValues["DamageType"],
+            v => Assert.Equal("EXPLOSIVE", v),
+            v => Assert.Equal("ENERGY",    v));
+        Assert.Collection(result.HardcodedEnumValues["ArmorType"],
+            v => Assert.Equal("ARMOR_INFANTRY", v));
+    }
+
+    [Fact]
+    public void RoundTrip_EmptyHardcodedEnumValues()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        Assert.Empty(result.HardcodedEnumValues);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols) =>
-        new(symbols.ToImmutableDictionary(s => s.Id), TestDate, "hash");
+        new(symbols.ToImmutableDictionary(s => s.Id), TestDate, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 }

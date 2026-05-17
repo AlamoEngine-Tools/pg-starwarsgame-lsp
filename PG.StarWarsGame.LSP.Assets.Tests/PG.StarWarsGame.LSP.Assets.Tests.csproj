@@ -20,6 +20,9 @@
 
     <ItemGroup>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Assets\PG.StarWarsGame.LSP.Assets.csproj"/>
+        <ProjectReference Include="..\..\ModVerify\src\PetroglyphTools\PG.StarWarsGame.Files.XML\PG.StarWarsGame.Files.XML.csproj">
+            <SetTargetFramework>TargetFramework=netstandard2.1</SetTargetFramework>
+        </ProjectReference>
     </ItemGroup>
 
 </Project>

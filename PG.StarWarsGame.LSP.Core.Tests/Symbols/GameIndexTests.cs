@@ -13,7 +13,9 @@ public sealed class GameIndexTests
     private static BaselineIndex Baseline(params GameSymbol[] symbols) =>
         new(symbols.ToImmutableDictionary(s => s.Id),
             DateTimeOffset.UtcNow,
-            "hash-abc");
+            "hash-abc",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
     private static GameIndex WithBaseline(params GameSymbol[] symbols) =>
         GameIndex.Empty with { Baseline = Baseline(symbols) };
