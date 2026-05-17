@@ -17,7 +17,7 @@ var server = await LanguageServer.From(options => options
     .WithOutput(Console.OpenStandardOutput())
     .ConfigureLogging(x => x
         .AddLanguageProtocolLogging()
-        .SetMinimumLevel(LogLevel.Debug))
+        .SetMinimumLevel(LogLevel.Information))
     .WithHandler<XmlTextDocumentSyncHandler>()
     .WithHandler<XmlHoverHandler>()
     .WithHandler<XmlCompletionHandler>()
@@ -45,6 +45,7 @@ var server = await LanguageServer.From(options => options
         services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
         services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
         services.AddSingleton<IGameIndexService, GameIndexService>();
+        services.AddSingleton<WorkspaceScanner>();
 
         services.AddHttpClient(nameof(HttpSchemaProvider));
 
@@ -83,6 +84,7 @@ var server = await LanguageServer.From(options => options
                 {
                     logger.LogError(ex, "Local schema load failed");
                 }
+
                 break;
         }
     })
@@ -94,6 +96,15 @@ var server = await LanguageServer.From(options => options
         // Apply empty baseline — Phase G will replace this with snapshot deserialization.
         var indexService = server.Services.GetRequiredService<IGameIndexService>();
         indexService.ApplyBaseline(BaselineIndex.Empty);
+
+        // Scan workspace folders in the background — non-blocking.
+        var folders = request.WorkspaceFolders?.Select(f => f.Uri.GetFileSystemPath()).ToList()
+                      ?? (request.RootUri is not null ? [request.RootUri.GetFileSystemPath()] : []);
+        if (folders.Count > 0)
+        {
+            var scanner = server.Services.GetRequiredService<WorkspaceScanner>();
+            _ = Task.Run(() => scanner.ScanAsync(folders, CancellationToken.None), CancellationToken.None);
+        }
 
         await Task.CompletedTask;
     })
