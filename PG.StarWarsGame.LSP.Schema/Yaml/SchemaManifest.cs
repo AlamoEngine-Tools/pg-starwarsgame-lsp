@@ -9,4 +9,5 @@ public sealed class SchemaManifest
     public List<string> Tags { get; set; } = [];
     public List<string> Types { get; set; } = [];
     public List<string> Enums { get; set; } = [];
+    public List<string> Hardcoded { get; set; } = [];
 }

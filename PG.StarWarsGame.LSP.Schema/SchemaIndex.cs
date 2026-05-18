@@ -18,7 +18,8 @@ public sealed class SchemaIndex
     public SchemaIndex(
         IEnumerable<(string typeName, IReadOnlyList<XmlTagDefinition> tags)> tagsByType,
         IEnumerable<GameObjectTypeDefinition> types,
-        IEnumerable<EnumDefinition> enums)
+        IEnumerable<EnumDefinition> enums,
+        IEnumerable<HardcodedReferenceSet>? hardcodedSets = null)
     {
         _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase);
         _tagsByType = new Dictionary<string, IReadOnlyList<XmlTagDefinition>>(StringComparer.OrdinalIgnoreCase);
@@ -48,6 +49,7 @@ public sealed class SchemaIndex
         AllTags = [.. _tags.Values];
         AllObjectTypes = [.. _types.Values];
         AllEnums = [.. _enums.Values];
+        AllHardcodedSets = hardcodedSets?.ToArray() ?? [];
     }
 
     public IReadOnlyList<XmlTagDefinition> AllTags { get; }
@@ -55,6 +57,8 @@ public sealed class SchemaIndex
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes { get; }
 
     public IReadOnlyList<EnumDefinition> AllEnums { get; }
+
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets { get; }
 
     public XmlTagDefinition? GetTag(string tagName)
     {

@@ -67,6 +67,7 @@ public sealed class XmlDiagnosticsPublisher
             {
                 allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
                 allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
+                allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
             }
 
             allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
@@ -330,6 +331,93 @@ public sealed class XmlDiagnosticsPublisher
                     Source = "pg-swg-lsp"
                 });
             }
+        }
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
+        string documentUri, string text, GameIndex index)
+    {
+        var hardcodedSets = _schema.AllHardcodedSets;
+        if (hardcodedSets.Count == 0) return [];
+
+        var diagnostics = new List<Diagnostic>();
+        var doc = new HtmlDocument();
+        doc.LoadHtml(text);
+        WalkForHardcodedRefs(doc.DocumentNode, text, hardcodedSets, diagnostics);
+        return diagnostics;
+    }
+
+    private void WalkForHardcodedRefs(
+        HtmlNode node, string text,
+        IReadOnlyList<HardcodedReferenceSet> hardcodedSets,
+        List<Diagnostic> diagnostics)
+    {
+        foreach (var child in node.ChildNodes)
+        {
+            if (child.NodeType != HtmlNodeType.Element) continue;
+
+            var tagDef = _schema.GetTag(child.Name);
+            if (tagDef?.ReferenceKind == ReferenceKind.HardcodedSet && tagDef.ReferenceType is not null)
+            {
+                var set = hardcodedSets.FirstOrDefault(s =>
+                    string.Equals(s.Name, tagDef.ReferenceType, StringComparison.OrdinalIgnoreCase));
+                if (set is not null)
+                    EmitHardcodedRefDiagnostics(child, tagDef, set, text, diagnostics);
+            }
+
+            WalkForHardcodedRefs(child, text, hardcodedSets, diagnostics);
+        }
+    }
+
+    private static void EmitHardcodedRefDiagnostics(
+        HtmlNode child, XmlTagDefinition tagDef, HardcodedReferenceSet set,
+        string text, List<Diagnostic> diagnostics)
+    {
+        var validNames = new HashSet<string>(
+            tagDef.ValueGroup is null
+                ? set.Values.Select(v => v.Name)
+                : set.Values
+                    .Where(v => v.Groups.Count == 0 ||
+                                v.Groups.Any(g => string.Equals(g, tagDef.ValueGroup,
+                                    StringComparison.OrdinalIgnoreCase)))
+                    .Select(v => v.Name),
+            StringComparer.OrdinalIgnoreCase);
+
+        var innerText = child.InnerText;
+        char[] separators = [',', ' ', '\t', '\r', '\n'];
+
+        var i = 0;
+        while (i < innerText.Length)
+        {
+            while (i < innerText.Length && Array.IndexOf(separators, innerText[i]) >= 0)
+                i++;
+            if (i >= innerText.Length) break;
+
+            var tokenStart = i;
+            while (i < innerText.Length && Array.IndexOf(separators, innerText[i]) < 0)
+                i++;
+
+            var token = innerText[tokenStart..i];
+            if (token.Length == 0 || validNames.Contains(token)) continue;
+
+            var absPos = child.InnerStartIndex + tokenStart;
+            var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
+            var newlineCount = 0;
+            for (var j = 0; j < tokenStart && j < innerText.Length; j++)
+                if (innerText[j] == '\n') newlineCount++;
+            var line0 = child.Line - 1 + newlineCount;
+            var col0 = absPos - lineStart;
+
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Error,
+                Message =
+                    $"'{token}' is not a known {tagDef.ReferenceType}. Check the schema for valid names.",
+                Range = new Range(
+                    new Position(line0, col0),
+                    new Position(line0, col0 + token.Length)),
+                Source = "pg-swg-lsp"
+            });
         }
     }
 

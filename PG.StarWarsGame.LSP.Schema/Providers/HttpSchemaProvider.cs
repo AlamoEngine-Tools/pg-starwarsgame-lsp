@@ -67,6 +67,8 @@ public sealed class HttpSchemaProvider : ISchemaProvider
 
     public IReadOnlyList<EnumDefinition> AllEnums => _current.AllEnums;
 
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
+
     public async Task LoadAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Fetching schema manifest from {BaseUrl}", _baseUrl);
@@ -95,6 +97,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
         var tagsByType = new List<(string, IReadOnlyList<XmlTagDefinition>)>();
         var types = new List<GameObjectTypeDefinition>();
         var enums = new List<EnumDefinition>();
+        var hardcodedSets = new List<HardcodedReferenceSet>();
         var fetchedFiles = new List<(string relativePath, string content)>();
 
         foreach (var path in manifest.Tags)
@@ -159,13 +162,36 @@ public sealed class HttpSchemaProvider : ISchemaProvider
                 fetchedFiles.Add((path, raw));
         }
 
-        _current = new SchemaIndex(tagsByType, types, enums);
+        foreach (var path in manifest.Hardcoded)
+        {
+            var (parsed, raw) = await FetchYamlAsync<HardcodedReferenceSet>(
+                path, yaml => [YamlSchemaParser.ParseHardcodedSetFile(yaml)], ct);
+            if (parsed is null)
+            {
+                var fallback = _current.AllHardcodedSets;
+                if (fallback.Count == 0)
+                    _logger.LogWarning(
+                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                hardcodedSets.AddRange(fallback);
+            }
+            else
+            {
+                hardcodedSets.AddRange(parsed);
+            }
+
+            if (raw is not null)
+                fetchedFiles.Add((path, raw));
+        }
+
+        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
 
         _cache.Update(indexJson, fetchedFiles);
 
-        _logger.LogInformation("Schema index built: {TagCount} tags, {TypeCount} types, {EnumCount} enums",
-            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count);
+        _logger.LogInformation(
+            "Schema index built: {TagCount} tags, {TypeCount} types, {EnumCount} enums, {HardcodedCount} hardcoded set(s)",
+            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count,
+            _current.AllHardcodedSets.Count);
     }
 
     // Returns (parsed, rawYaml). rawYaml is null on 304 (ETag hit); parsed is null on 304 too.

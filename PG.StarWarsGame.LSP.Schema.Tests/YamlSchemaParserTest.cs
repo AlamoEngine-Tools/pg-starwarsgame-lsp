@@ -183,4 +183,78 @@ public sealed class YamlSchemaParserTest
 
         Assert.Empty(YamlSchemaParser.ParseTypeFile(yaml));
     }
+
+    // ── ParseHardcodedSetFile ───────────────────────────────────────────────
+
+    [Fact]
+    public void ParseHardcodedSetFile_AllFields_MappedCorrectly()
+    {
+        const string yaml = """
+                            name: BehaviorModule
+                            description:
+                              en: "Known C++ behaviour module names."
+                            deprecated: true
+                            availableSince: "EaW 1.0"
+                            values:
+                              - name: GenericTransport
+                                description:
+                                  en: "Generic transport."
+                                deprecated: false
+                                availableSince: "EaW 1.0"
+                                groups:
+                                  - space
+                                  - land
+                            """;
+
+        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
+
+        Assert.Equal("BehaviorModule", set.Name);
+        Assert.Equal("Known C++ behaviour module names.", set.Description["en"]);
+        Assert.True(set.Deprecated);
+        Assert.Equal("EaW 1.0", set.AvailableSince);
+
+        var value = Assert.Single(set.Values);
+        Assert.Equal("GenericTransport", value.Name);
+        Assert.Equal("Generic transport.", value.Description["en"]);
+        Assert.False(value.Deprecated);
+        Assert.Equal("EaW 1.0", value.AvailableSince);
+        Assert.Equal(["space", "land"], value.Groups);
+    }
+
+    [Fact]
+    public void ParseHardcodedSetFile_MinimalEntry_DefaultsApplied()
+    {
+        const string yaml = """
+                            name: BehaviorModule
+                            values:
+                              - name: GenericTransport
+                            """;
+
+        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
+
+        Assert.Equal("BehaviorModule", set.Name);
+        Assert.False(set.Deprecated);
+        Assert.Null(set.AvailableSince);
+        Assert.Empty(set.Description);
+
+        var value = Assert.Single(set.Values);
+        Assert.Equal("GenericTransport", value.Name);
+        Assert.False(value.Deprecated);
+        Assert.Null(value.AvailableSince);
+        Assert.Empty(value.Groups);
+    }
+
+    [Fact]
+    public void ParseHardcodedSetFile_EmptyValues_ReturnsEmptyList()
+    {
+        const string yaml = """
+                            name: BehaviorModule
+                            values: []
+                            """;
+
+        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
+
+        Assert.Equal("BehaviorModule", set.Name);
+        Assert.Empty(set.Values);
+    }
 }

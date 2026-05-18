@@ -240,6 +240,8 @@ public sealed class XmlCompletionHandlerTest
 
         public IReadOnlyList<EnumDefinition> AllEnums => [];
 
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
         public event EventHandler? SchemaRefreshed
         {
             add { }

@@ -75,6 +75,8 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
 
     public IReadOnlyList<EnumDefinition> AllEnums => _current.AllEnums;
 
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
+
     public void Load()
     {
         _logger.LogDebug("Loading schema from {Path}", _rootPath);
@@ -82,6 +84,7 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
         var tagsByType = new List<(string, IReadOnlyList<XmlTagDefinition>)>();
         var types = new List<GameObjectTypeDefinition>();
         var enums = new List<EnumDefinition>();
+        var hardcodedSets = new List<HardcodedReferenceSet>();
 
         foreach (var file in Directory.EnumerateFiles(_rootPath, "*.yaml", SearchOption.AllDirectories))
         {
@@ -97,18 +100,23 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
             {
                 enums.Add(YamlSchemaParser.ParseEnumFile(File.ReadAllText(file), _logger));
             }
+            else if (parts.Length == 2 && parts[0].Equals("hardcoded", StringComparison.OrdinalIgnoreCase))
+            {
+                hardcodedSets.Add(YamlSchemaParser.ParseHardcodedSetFile(File.ReadAllText(file)));
+            }
             else if (parts.Length == 1 && parts[0].Equals("types.yaml", StringComparison.OrdinalIgnoreCase))
             {
                 types.AddRange(YamlSchemaParser.ParseTypeFile(File.ReadAllText(file)));
             }
         }
 
-        _current = new SchemaIndex(tagsByType, types, enums);
+        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
 
         _logger.LogInformation(
-            "Schema loaded: {TagCount} tags across {TypeCount} types, {EnumCount} enums from {Path}",
-            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count, _rootPath);
+            "Schema loaded: {TagCount} tags across {TypeCount} types, {EnumCount} enums, {HardcodedCount} hardcoded set(s) from {Path}",
+            _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count,
+            _current.AllHardcodedSets.Count, _rootPath);
     }
 
     private void OnFileChanged(object _, FileSystemEventArgs __)

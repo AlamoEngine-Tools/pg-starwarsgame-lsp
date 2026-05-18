@@ -14,6 +14,8 @@ public interface ISchemaProvider
 
     IReadOnlyList<EnumDefinition> AllEnums { get; }
 
+    IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets { get; }
+
     /// <summary>Returns the first definition found for this tag across all types. Use when context type is unknown.</summary>
     XmlTagDefinition? GetTag(string tagName);
 

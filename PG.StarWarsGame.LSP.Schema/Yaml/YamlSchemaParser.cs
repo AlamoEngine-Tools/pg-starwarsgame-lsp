@@ -71,6 +71,29 @@ internal static class YamlSchemaParser
         return result;
     }
 
+    public static HardcodedReferenceSet ParseHardcodedSetFile(string yaml)
+    {
+        var file = Deserializer.Deserialize<YamlHardcodedSetFile>(yaml);
+        var values = new List<HardcodedReferenceSetValue>(file.Values.Count);
+        foreach (var v in file.Values)
+            values.Add(new HardcodedReferenceSetValue
+            {
+                Name = v.Name,
+                Description = v.Description,
+                Deprecated = v.Deprecated,
+                AvailableSince = v.AvailableSince,
+                Groups = v.Groups
+            });
+        return new HardcodedReferenceSet
+        {
+            Name = file.Name,
+            Description = file.Description,
+            Deprecated = file.Deprecated,
+            AvailableSince = file.AvailableSince,
+            Values = values
+        };
+    }
+
     public static EnumDefinition ParseEnumFile(string yaml, ILogger? logger = null)
     {
         var file = Deserializer.Deserialize<YamlEnumFile>(yaml);

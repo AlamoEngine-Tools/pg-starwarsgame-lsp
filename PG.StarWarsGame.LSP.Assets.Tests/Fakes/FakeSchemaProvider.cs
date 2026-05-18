@@ -23,6 +23,7 @@ internal sealed class FakeSchemaProvider : ISchemaProvider
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
 
     public XmlTagDefinition? GetTag(string tagName)
     {

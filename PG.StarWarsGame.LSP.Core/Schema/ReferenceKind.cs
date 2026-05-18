@@ -32,6 +32,13 @@ public enum ReferenceKind
     /// <summary>Enum value — either a dynamic XML enum (see <see cref="XmlTagDefinition.EnumName" />) or a hardcoded C++ enum.</summary>
     Enum,
 
+    /// <summary>
+    ///     Each space/comma-separated token must exist in a <see cref="HardcodedReferenceSet" />
+    ///     exposed by <see cref="ISchemaProvider.AllHardcodedSets" />, keyed by
+    ///     <see cref="XmlTagDefinition.ReferenceType" />.
+    /// </summary>
+    HardcodedSet,
+
     /// <summary>Reference kind cannot be classified; LSP skips validation for this tag.</summary>
     Unknown
 }
