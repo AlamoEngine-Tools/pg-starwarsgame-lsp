@@ -8,6 +8,8 @@ public sealed class GameIndexService : IGameIndexService
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ILogger<GameIndexService> _logger;
     private GameIndex _current = GameIndex.Empty;
+    private int _suppressionDepth;
+    private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
 
     public GameIndexService(IEnumerable<IGameDocumentParser> parsers, ILogger<GameIndexService> logger)
     {
@@ -18,6 +20,42 @@ public sealed class GameIndexService : IGameIndexService
     public GameIndex Current => Volatile.Read(ref _current);
 
     public event Action<GameIndex>? IndexChanged;
+
+    public IDisposable BeginBulkUpdate()
+    {
+        Interlocked.Increment(ref _suppressionDepth);
+        return new BulkUpdateScope(this);
+    }
+
+    private void EndBulkUpdate()
+    {
+        if (Interlocked.Decrement(ref _suppressionDepth) > 0)
+            return;
+        if (Interlocked.Exchange(ref _hasPendingEvent, 0) != 0)
+            RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    private void RaiseIndexChanged(GameIndex index)
+    {
+        if (Volatile.Read(ref _suppressionDepth) > 0)
+        {
+            Interlocked.Exchange(ref _hasPendingEvent, 1);
+            return;
+        }
+        IndexChanged?.Invoke(index);
+    }
+
+    private sealed class BulkUpdateScope : IDisposable
+    {
+        private readonly GameIndexService _owner;
+        private int _disposed;
+        public BulkUpdateScope(GameIndexService owner) => _owner = owner;
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                _owner.EndBulkUpdate();
+        }
+    }
 
     public async Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
     {
@@ -46,7 +84,7 @@ public sealed class GameIndexService : IGameIndexService
 
         _logger.LogDebug("Indexed {Uri} v{Version} ({Symbols} symbols, {Refs} refs)",
             uri, newDoc.Version, newDoc.Symbols.Length, newDoc.References.Length);
-        IndexChanged?.Invoke(Volatile.Read(ref _current));
+        RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
     public void RemoveDocument(string uri)
@@ -61,7 +99,7 @@ public sealed class GameIndexService : IGameIndexService
         while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         _logger.LogDebug("Removed document {Uri} from index", uri);
-        IndexChanged?.Invoke(Volatile.Read(ref _current));
+        RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
     public void ApplyBaseline(BaselineIndex baseline)
@@ -75,7 +113,7 @@ public sealed class GameIndexService : IGameIndexService
         while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count, baseline.BuiltAt);
-        IndexChanged?.Invoke(Volatile.Read(ref _current));
+        RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
     private static GameIndex ApplyDocumentIndex(GameIndex index, DocumentIndex doc)

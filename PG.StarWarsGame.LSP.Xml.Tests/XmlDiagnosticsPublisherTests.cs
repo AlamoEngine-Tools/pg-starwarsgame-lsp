@@ -649,6 +649,13 @@ public sealed class XmlDiagnosticsPublisherTests
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
         public void RemoveDocument(string uri) { }
         public void ApplyBaseline(BaselineIndex baseline) { }
+        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+            public void Dispose() { }
+        }
     }
 
     private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost

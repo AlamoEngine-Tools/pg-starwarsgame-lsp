@@ -23,6 +23,7 @@ public sealed class WorkspaceScannerTests
     {
         private readonly object _lock = new();
         public readonly List<(string Uri, int Version)> Calls = [];
+        public int BeginBulkUpdateCallCount;
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged { add { } remove { } }
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
@@ -33,6 +34,17 @@ public sealed class WorkspaceScannerTests
         }
         public void RemoveDocument(string uri) { }
         public void ApplyBaseline(BaselineIndex baseline) { }
+        public IDisposable BeginBulkUpdate()
+        {
+            Interlocked.Increment(ref BeginBulkUpdateCallCount);
+            return NullDisposable.Instance;
+        }
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+            public void Dispose() { }
+        }
     }
 
     private static string Root(string sub) =>
@@ -111,6 +123,22 @@ public sealed class WorkspaceScannerTests
             () => Build(fs, svc, new FakeParser()).ScanAsync([root], cts.Token));
 
         Assert.Empty(svc.Calls);
+    }
+
+    [Fact]
+    public async Task ScanAsync_UsesBeginBulkUpdate_Exactly_Once()
+    {
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "a.xml")] = new("<Root/>"),
+            [Path.Combine(root, "b.xml")] = new("<Root/>"),
+        });
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        Assert.Equal(1, svc.BeginBulkUpdateCallCount);
     }
 
     [Fact]

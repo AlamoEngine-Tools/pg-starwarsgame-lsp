@@ -265,6 +265,68 @@ public sealed class GameIndexServiceTests
         Assert.Single(svcB.Current.WorkspaceDefinitions["DUP"]);
     }
 
+    // ── BeginBulkUpdate ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task BeginBulkUpdate_Suppresses_IndexChanged_During_Scope()
+    {
+        var svc = Build(new FakeParser(Doc("", 0)));
+        var fired = 0;
+        svc.IndexChanged += _ => fired++;
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
+            await svc.UpdateDocumentAsync("file:///b.xml", "<X/>", 1, default);
+            Assert.Equal(0, fired); // still suppressed mid-scope
+        }
+
+        Assert.Equal(1, fired); // exactly one fire on dispose
+    }
+
+    [Fact]
+    public async Task BeginBulkUpdate_Fires_IndexChanged_Exactly_Once_For_Many_Updates()
+    {
+        var svc = Build(new FakeParser(Doc("", 0)));
+        var fireCount = 0;
+        svc.IndexChanged += _ => fireCount++;
+
+        using (svc.BeginBulkUpdate())
+        {
+            for (var i = 0; i < 10; i++)
+                await svc.UpdateDocumentAsync($"file:///{i}.xml", "<X/>", 1, default);
+        }
+
+        Assert.Equal(1, fireCount);
+    }
+
+    [Fact]
+    public void BeginBulkUpdate_No_Updates_Does_Not_Fire_IndexChanged()
+    {
+        var svc = Build();
+        var fired = false;
+        svc.IndexChanged += _ => fired = true;
+
+        using (svc.BeginBulkUpdate()) { /* no updates */ }
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public async Task BeginBulkUpdate_Final_IndexChanged_Reflects_All_Updates()
+    {
+        var sym = Symbol("UNIT_A");
+        var svc = Build(new FakeParser(Doc("", 0, [sym])));
+        GameIndex? captured = null;
+        svc.IndexChanged += idx => captured = idx;
+
+        using (svc.BeginBulkUpdate())
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.NotNull(captured);
+        Assert.True(captured!.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
     // ── Cancellation ─────────────────────────────────────────────────────────
 
     [Fact]

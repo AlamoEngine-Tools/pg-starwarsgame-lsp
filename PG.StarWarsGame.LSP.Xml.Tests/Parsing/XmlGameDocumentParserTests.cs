@@ -25,6 +25,19 @@ public sealed class XmlGameDocumentParserTests
             ReferenceType = referenceType
         };
 
+    private static XmlTagDefinition ListRefTag(
+        string tag, string referenceType,
+        XmlValueType valueType = XmlValueType.GameObjectTypeReferenceList,
+        TagSemanticType semanticType = TagSemanticType.Default) =>
+        new()
+        {
+            Tag = tag,
+            ValueType = valueType,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceType = referenceType,
+            SemanticType = semanticType,
+        };
+
     private static XmlTagDefinition PlainTag(string tag) =>
         new() { Tag = tag, ValueType = XmlValueType.Float };
 
@@ -224,6 +237,112 @@ public sealed class XmlGameDocumentParserTests
 
         Assert.Equal("file:///f.xml", result.DocumentUri);
         Assert.Equal(7, result.Version);
+    }
+
+    // ── multi-value reference splitting ──────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_CommaSeparated_ListTag_Emits_One_Reference_Per_Name()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Squadron"));
+        schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Squadron Name="SQ_1"><Squadron_Units>X_Wing, A_Wing, B_Wing</Squadron_Units></Squadron>""",
+            1, default);
+
+        Assert.Equal(3, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "X_Wing");
+        Assert.Contains(result.References, r => r.TargetId == "A_Wing");
+        Assert.Contains(result.References, r => r.TargetId == "B_Wing");
+    }
+
+    [Fact]
+    public async Task ParseAsync_SpaceSeparated_ListTag_Emits_One_Reference_Per_Name()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Squadron"));
+        schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Squadron Name="SQ_1"><Squadron_Units>X_Wing A_Wing B_Wing</Squadron_Units></Squadron>""",
+            1, default);
+
+        Assert.Equal(3, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "X_Wing");
+        Assert.Contains(result.References, r => r.TargetId == "A_Wing");
+        Assert.Contains(result.References, r => r.TargetId == "B_Wing");
+    }
+
+    [Fact]
+    public async Task ParseAsync_PerFactionObjectList_Skips_First_Token()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(ListRefTag("Transport_Units", "Unit", XmlValueType.PerFactionObjectList));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="UNIT_A"><Transport_Units>Pirates, Ship_A, Ship_B</Transport_Units></Unit>""",
+            1, default);
+
+        Assert.Equal(2, result.References.Length);
+        Assert.DoesNotContain(result.References, r => r.TargetId == "Pirates");
+        Assert.Contains(result.References, r => r.TargetId == "Ship_A");
+        Assert.Contains(result.References, r => r.TargetId == "Ship_B");
+    }
+
+    [Fact]
+    public async Task ParseAsync_PrerequisiteExpression_Emits_Reference_Per_Name()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(ListRefTag("Required_Special_Structures", "GameObjectType",
+            XmlValueType.GameObjectTypeReferenceList, TagSemanticType.PrerequisiteExpression));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="UNIT_A"><Required_Special_Structures>A | B, C</Required_Special_Structures></Unit>""",
+            1, default);
+
+        Assert.Equal(3, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "A");
+        Assert.Contains(result.References, r => r.TargetId == "B");
+        Assert.Contains(result.References, r => r.TargetId == "C");
+    }
+
+    [Fact]
+    public async Task ParseAsync_Empty_ListTag_Value_Emits_No_References()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Squadron"));
+        schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Squadron Name="SQ_1"><Squadron_Units></Squadron_Units></Squadron>""",
+            1, default);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SingleValue_RefTag_Still_Emits_Exactly_One_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(RefTag("Spawn_Unit", "Unit"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("UNIT_B", reference.TargetId);
     }
 
     // ── FakeSchemaProvider ───────────────────────────────────────────────────

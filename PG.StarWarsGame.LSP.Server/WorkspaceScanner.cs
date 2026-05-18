@@ -54,15 +54,17 @@ public sealed class WorkspaceScanner
         var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
         try
         {
-            await Parallel.ForEachAsync(files, options, async (file, token) =>
+            using (_indexService.BeginBulkUpdate())
             {
-                var text = await _fs.File.ReadAllTextAsync(file, token);
-                await _indexService.UpdateDocumentAsync(file, text, 0, token);
-                var done = Interlocked.Increment(ref indexed);
-                _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
-                progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
-            });
-
+                await Parallel.ForEachAsync(files, options, async (file, token) =>
+                {
+                    var text = await _fs.File.ReadAllTextAsync(file, token);
+                    await _indexService.UpdateDocumentAsync(file, text, 0, token);
+                    var done = Interlocked.Increment(ref indexed);
+                    _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
+                    progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
+                });
+            } // fires one IndexChanged with the complete final state
             progress?.OnNext($"Indexed {indexed} file(s)", 100, null);
         }
         finally

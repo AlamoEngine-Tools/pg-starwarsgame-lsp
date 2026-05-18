@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -11,6 +12,14 @@ using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Server;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+
+if (args.Contains("--wait-for-debugger") || Environment.GetEnvironmentVariable("LSP_WAIT_DEBUGGER") == "1")
+{
+    Console.Error.WriteLine($"[LSP] Waiting for debugger — PID {Environment.ProcessId}");
+    while (!Debugger.IsAttached)
+        Thread.Sleep(100);
+    Console.Error.WriteLine("[LSP] Debugger attached, continuing startup.");
+}
 
 var server = await LanguageServer.From(options => options
     .WithInput(Console.OpenStandardInput())

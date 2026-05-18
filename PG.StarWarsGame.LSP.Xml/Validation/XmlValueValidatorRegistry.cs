@@ -5,8 +5,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public sealed class XmlValueValidatorRegistry : IXmlValueValidatorRegistry
 {
-    private readonly IReadOnlyDictionary<XmlValueType, IXmlValueValidator> _validators;
     private readonly IReadOnlyDictionary<TagSemanticType, IXmlValueValidator> _semanticValidators;
+    private readonly IReadOnlyDictionary<XmlValueType, IXmlValueValidator> _validators;
 
     public XmlValueValidatorRegistry(IEnumerable<IXmlValueValidator> validators)
     {
@@ -29,7 +29,7 @@ public sealed class XmlValueValidatorRegistry : IXmlValueValidatorRegistry
             return new XmlValidationResult
             {
                 IsValid = false,
-                Severity = XmlValidationSeverity.Warning,
+                Severity = XmlValidationSeverity.Hint,
                 Message = $"No validator registered for value type '{valueType}' on tag '{tag.Tag}'."
             };
 

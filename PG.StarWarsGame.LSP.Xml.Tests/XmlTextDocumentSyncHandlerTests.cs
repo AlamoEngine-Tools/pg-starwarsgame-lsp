@@ -201,5 +201,12 @@ public sealed class XmlTextDocumentSyncHandlerTests
 
         public void RemoveDocument(string uri) => RemoveCalls.Add(uri);
         public void ApplyBaseline(BaselineIndex baseline) { }
+        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+            public void Dispose() { }
+        }
     }
 }

@@ -16,11 +16,11 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlDiagnosticsPublisher
 {
-    private readonly Action<PublishDiagnosticsParams> _publish;
-    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
+    private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly ISchemaProvider _schema;
     private readonly IXmlValueValidatorRegistry _validators;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     private HashSet<string> _lastPublishedUris = [];
 
@@ -32,7 +32,8 @@ public sealed class XmlDiagnosticsPublisher
         IXmlValueValidatorRegistry validators,
         ILogger<XmlDiagnosticsPublisher> logger)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, schema, validators, logger)
-    { }
+    {
+    }
 
     internal XmlDiagnosticsPublisher(
         Action<PublishDiagnosticsParams> publish,
@@ -42,11 +43,11 @@ public sealed class XmlDiagnosticsPublisher
         IXmlValueValidatorRegistry validators,
         ILogger<XmlDiagnosticsPublisher> logger)
     {
-        _publish      = publish;
+        _publish = publish;
         _workspaceHost = workspaceHost;
-        _schema       = schema;
-        _validators   = validators;
-        _logger       = logger;
+        _schema = schema;
+        _validators = validators;
+        _logger = logger;
 
         indexService.IndexChanged += OnIndexChanged;
     }
@@ -70,23 +71,19 @@ public sealed class XmlDiagnosticsPublisher
 
             _publish(new PublishDiagnosticsParams
             {
-                Uri         = DocumentUri.From(uri),
+                Uri = DocumentUri.From(uri),
                 Diagnostics = new Container<Diagnostic>(allDiags)
             });
         }
 
         // Clear diagnostics for URIs that are no longer in the index.
         foreach (var uri in _lastPublishedUris)
-        {
             if (!currentUris.Contains(uri))
-            {
                 _publish(new PublishDiagnosticsParams
                 {
-                    Uri         = DocumentUri.From(uri),
+                    Uri = DocumentUri.From(uri),
                     Diagnostics = new Container<Diagnostic>()
                 });
-            }
-        }
 
         _lastPublishedUris = currentUris;
     }
@@ -113,12 +110,13 @@ public sealed class XmlDiagnosticsPublisher
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Message  = $"Duplicate object ID '{id}': IDs must be globally unique.{othersText}",
-                    Range    = new Range(new Position(fo.Line, 0), new Position(fo.Line, int.MaxValue)),
-                    Source   = "pg-swg-lsp"
+                    Message = $"Duplicate object ID '{id}': IDs must be globally unique.{othersText}",
+                    Range = new Range(new Position(fo.Line, 0), new Position(fo.Line, int.MaxValue)),
+                    Source = "pg-swg-lsp"
                 });
             }
         }
+
         return diagnostics;
     }
 
@@ -137,12 +135,13 @@ public sealed class XmlDiagnosticsPublisher
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
-                    Message  = msg,
-                    Range    = new Range(new Position(r.Line, r.Column), new Position(r.Line, r.Column + r.Length)),
-                    Source   = "pg-swg-lsp"
+                    Message = msg,
+                    Range = new Range(new Position(r.Line, r.Column), new Position(r.Line, r.Column + r.Length)),
+                    Source = "pg-swg-lsp"
                 });
             }
         }
+
         return diagnostics;
     }
 
@@ -252,13 +251,19 @@ public sealed class XmlDiagnosticsPublisher
         if (!documentUri.EndsWith("GameConstants.xml", StringComparison.OrdinalIgnoreCase)) return [];
 
         XDocument doc;
-        try { doc = XDocument.Parse(text, LoadOptions.SetLineInfo); }
-        catch { return []; }
+        try
+        {
+            doc = XDocument.Parse(text, LoadOptions.SetLineInfo);
+        }
+        catch
+        {
+            return [];
+        }
 
         var diagnostics = new List<Diagnostic>();
 
         foreach (var (enumName, tagName) in
-            (IEnumerable<(string, string)>)[("DamageType", "Damage_Types"), ("ArmorType", "Armor_Types")])
+                 (IEnumerable<(string, string)>)[("DamageType", "Damage_Types"), ("ArmorType", "Armor_Types")])
         {
             if (!hardcoded.TryGetValue(enumName, out var knownHardcoded)) continue;
             var knownSet = new HashSet<string>(knownHardcoded, StringComparer.OrdinalIgnoreCase);
@@ -274,6 +279,7 @@ public sealed class XmlDiagnosticsPublisher
                     pastBoundary = true;
                     continue;
                 }
+
                 if (!pastBoundary || node is not XText textNode) continue;
 
                 var li = (IXmlLineInfo)textNode;
@@ -313,18 +319,21 @@ public sealed class XmlDiagnosticsPublisher
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Warning,
-                    Message  = $"'{token}' is below the hard-coded section boundary. Add new damage/armor types above the boundary comment.",
-                    Range    = new Range(
+                    Message =
+                        $"'{token}' is below the hard-coded section boundary. Add new damage/armor types above the boundary comment.",
+                    Range = new Range(
                         new Position(tokenLine0, tokenCol0),
                         new Position(tokenLine0, tokenCol0 + token.Length)),
-                    Source   = "pg-swg-lsp"
+                    Source = "pg-swg-lsp"
                 });
             }
         }
     }
 
-    private static bool IsBoundaryComment(string commentText) =>
-        commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+    private static bool IsBoundaryComment(string commentText)
+    {
+        return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static Diagnostic BuildDiagnostic(HtmlNode node, XmlValidationResult result, string[] lines,
         bool openingTagOnly = false)
@@ -363,14 +372,24 @@ public sealed class XmlDiagnosticsPublisher
 
         return new Diagnostic
         {
-            Severity = result.Severity == XmlValidationSeverity.Warning
-                ? DiagnosticSeverity.Warning
-                : DiagnosticSeverity.Error,
+            Severity = MapSeverity(result.Severity),
             Message = result.Message,
             Range = new Range(
                 new Position(startLine, startCol),
                 new Position(endLine, endCol)),
             Source = "pg-swg-lsp"
+        };
+    }
+
+    private static DiagnosticSeverity? MapSeverity(XmlValidationSeverity resultSeverity)
+    {
+        return resultSeverity switch
+        {
+            XmlValidationSeverity.Error => DiagnosticSeverity.Error,
+            XmlValidationSeverity.Warning => DiagnosticSeverity.Warning,
+            XmlValidationSeverity.Information => DiagnosticSeverity.Information,
+            XmlValidationSeverity.Hint => DiagnosticSeverity.Hint,
+            _ => throw new ArgumentOutOfRangeException(nameof(resultSeverity), resultSeverity, null)
         };
     }
 }

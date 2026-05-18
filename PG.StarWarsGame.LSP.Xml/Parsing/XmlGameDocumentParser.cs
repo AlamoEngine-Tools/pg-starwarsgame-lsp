@@ -70,21 +70,22 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 if (tagDef?.ReferenceKind != ReferenceKind.XmlObject) continue;
 
                 var innerText = child.InnerText;
-                var targetId = innerText.Trim();
-                if (string.IsNullOrEmpty(targetId)) continue;
+                foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
+                {
+                    var absPos    = child.InnerStartIndex + tokenOffset;
+                    var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
+                    var line      = child.Line - 1 + CountNewlines(innerText, tokenOffset);
+                    var column    = absPos - lineStart;
 
-                var lineStart = text.LastIndexOf('\n', Math.Max(0, child.InnerStartIndex - 1)) + 1;
-                var leadingWs = innerText.Length - innerText.TrimStart().Length;
-                var column    = child.InnerStartIndex - lineStart + leadingWs;
-
-                references.Add(new GameReference(
-                    targetId,
-                    GameSymbolKind.XmlObject,
-                    tagDef.ReferenceType,
-                    documentUri,
-                    child.Line - 1,
-                    column,
-                    targetId.Length));
+                    references.Add(new GameReference(
+                        name,
+                        GameSymbolKind.XmlObject,
+                        tagDef.ReferenceType,
+                        documentUri,
+                        line,
+                        column,
+                        name.Length));
+                }
             }
         }
 
@@ -92,5 +93,67 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri, version,
             symbols.ToImmutableArray(),
             references.ToImmutableArray()));
+    }
+
+    private static IEnumerable<(string Name, int Offset)> SplitReferenceNames(
+        XmlTagDefinition tagDef, string innerText)
+    {
+        char[]? separators;
+        bool skipFirst;
+
+        if (tagDef.SemanticType == TagSemanticType.PrerequisiteExpression)
+        {
+            separators = ['|', ',', ' ', '\t', '\r', '\n'];
+            skipFirst  = false;
+        }
+        else if (tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
+                                  or XmlValueType.TypeReferenceList)
+        {
+            separators = [',', ' ', '\t', '\r', '\n'];
+            skipFirst  = false;
+        }
+        else if (tagDef.ValueType == XmlValueType.PerFactionObjectList)
+        {
+            separators = [',', ' ', '\t', '\r', '\n'];
+            skipFirst  = true;
+        }
+        else
+        {
+            // Single-value tag — no splitting
+            var trimmed = innerText.Trim();
+            if (trimmed.Length > 0)
+                yield return (trimmed, innerText.IndexOf(trimmed, StringComparison.Ordinal));
+            yield break;
+        }
+
+        var isFirst = skipFirst;
+        var i = 0;
+        while (i < innerText.Length)
+        {
+            while (i < innerText.Length && Array.IndexOf(separators, innerText[i]) >= 0)
+                i++;
+            if (i >= innerText.Length) break;
+
+            var tokenStart = i;
+            while (i < innerText.Length && Array.IndexOf(separators, innerText[i]) < 0)
+                i++;
+
+            var token = innerText[tokenStart..i];
+            if (token.Length > 0)
+            {
+                if (isFirst)
+                    isFirst = false;
+                else
+                    yield return (token, tokenStart);
+            }
+        }
+    }
+
+    private static int CountNewlines(string text, int upToOffset)
+    {
+        var count = 0;
+        for (var i = 0; i < upToOffset && i < text.Length; i++)
+            if (text[i] == '\n') count++;
+        return count;
     }
 }
