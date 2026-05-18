@@ -21,14 +21,31 @@ public sealed class XmlValueValidatorRegistry : IXmlValueValidatorRegistry
 
     public XmlValidationResult Validate(XmlValueType valueType, string rawValue, XmlTagDefinition tag)
     {
-        if (tag.SemanticType != TagSemanticType.Default &&
-            _semanticValidators.TryGetValue(tag.SemanticType, out var semanticValidator))
+        if (tag.SemanticType != TagSemanticType.Default)
+        {
+            if (!_semanticValidators.TryGetValue(tag.SemanticType, out var semanticValidator))
+                return new XmlValidationResult
+                {
+#if DEBUG
+                    IsValid = true,
+#else
+                    IsValid = false,
+#endif
+                    Severity = XmlValidationSeverity.Hint,
+                    Message =
+                        $"No validator registered for value type '{valueType}' with semantic precision {tag.SemanticType} on tag '{tag.Tag}'."
+                };
             return semanticValidator.Validate(rawValue, tag);
+        }
 
         if (!_validators.TryGetValue(valueType, out var validator))
             return new XmlValidationResult
             {
+#if DEBUG
+                IsValid = true,
+#else
                 IsValid = false,
+#endif
                 Severity = XmlValidationSeverity.Hint,
                 Message = $"No validator registered for value type '{valueType}' on tag '{tag.Tag}'."
             };

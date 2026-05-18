@@ -16,15 +16,17 @@ public static class XmlLanguageServiceExtensions
 
         // Validator system — add IXmlValueValidator implementations here to register new validators
         services.AddSingleton<IXmlValueValidatorRegistry, XmlValueValidatorRegistry>();
-        services.AddSingleton<IXmlValueValidator, PrerequisiteExpressionValidator>();
         services.AddSingleton<IXmlValueValidator, BooleanValueValidator>();
-        services.AddSingleton<IXmlValueValidator, FloatValueValidator>();
-        services.AddSingleton<IXmlValueValidator, ShaderVersionHexValidator>();
-        services.AddSingleton<IXmlValueValidator, VendorIdHexValidator>();
         services.AddSingleton<IXmlValueValidator, DynamicEnumValueValidator>();
+        services.AddSingleton<IXmlValueValidator, FloatValueValidator>();
         services.AddSingleton<IXmlValueValidator, FloatVector3Validator>();
         services.AddSingleton<IXmlValueValidator, FloatVector4Validator>();
+        services.AddSingleton<IXmlValueValidator, IntValueValidator>();
+        services.AddSingleton<IXmlValueValidator, PrerequisiteExpressionValidator>();
         services.AddSingleton<IXmlValueValidator, RgbaValidator>();
+        services.AddSingleton<IXmlValueValidator, ShaderVersionHexValidator>();
+        services.AddSingleton<IXmlValueValidator, UintValueValidator>();
+        services.AddSingleton<IXmlValueValidator, VendorIdHexValidator>();
 
         // Proposal system — add IXmlValueProposalProvider implementations here to register new providers
         services.AddSingleton<IXmlValueProposalRegistry, XmlValueProposalRegistry>();

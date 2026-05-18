@@ -275,3 +275,62 @@ public sealed class RgbaValidatorTests
         Assert.False(Sut.Validate(value, Tag).IsValid);
     }
 }
+
+// ── IntValidator ─────────────────────────────────────────────────────────────
+
+public sealed class IntValidatorTests
+{
+    private static readonly IntValueValidator Sut = new();
+    private static readonly XmlTagDefinition Tag = TagOf.Make("Int_Value", XmlValueType.Int);
+
+    [Theory]
+    [InlineData("2147483647" /*int.MaxValue*/)]
+    [InlineData("-2147483648" /*int.MinValue*/)]
+    [InlineData("0")]
+    [InlineData("1")]
+    [InlineData("-1")]
+    public void Valid_int_values_pass(string value)
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
+
+    [Theory]
+    [InlineData("-1 0")]
+    [InlineData("abc")]
+    [InlineData("1 2")]
+    [InlineData("")]
+    [InlineData("2147483648" /*int.MaxValue + 1*/)]
+    [InlineData("-2147483649" /*int.MinValue - 1*/)]
+    public void Invalid_int_values_fail(string value)
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
+}
+
+// ── IntValidator ─────────────────────────────────────────────────────────────
+
+public sealed class UintValidatorTests
+{
+    private static readonly UintValueValidator Sut = new();
+    private static readonly XmlTagDefinition Tag = TagOf.Make("Uint_Value", XmlValueType.UInt);
+
+    [Theory]
+    [InlineData("2147483647" /*int.MaxValue*/)]
+    [InlineData("0")]
+    [InlineData("1")]
+    public void Valid_uint_values_pass(string value)
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
+
+    [Theory]
+    [InlineData("2147483648" /*int.MaxValue + 1*/)]
+    [InlineData("-1 0")]
+    [InlineData("abc")]
+    [InlineData("1 2")]
+    [InlineData("")]
+    public void Invalid_uint_values_fail(string value)
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
+}
