@@ -7,9 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validators;
 
 file static class TagOf
 {
-    public static XmlTagDefinition Make(string name, XmlValueType type)
+    public static XmlTagDefinition Make(string name, XmlValueType type, TagSemanticType semanticType = TagSemanticType.Default)
     {
-        return new XmlTagDefinition { Tag = name, ValueType = type };
+        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
     }
 }
 
@@ -106,24 +106,76 @@ public sealed class VendorIdHexValidatorTests
 public sealed class DynamicEnumValueValidatorTests
 {
     private static readonly DynamicEnumValueValidator Sut = new();
-    private static readonly XmlTagDefinition Tag = TagOf.Make("CategoryMask", XmlValueType.DynamicEnumValue);
+    private static readonly XmlTagDefinition Tag = TagOf.Make("MovementClass", XmlValueType.DynamicEnumValue);
+    private static readonly XmlTagDefinition FlagTag = TagOf.Make("CategoryMask", XmlValueType.DynamicEnumValue, TagSemanticType.FlagList);
+
+    [Theory]
+    [InlineData("Infantry")]
+    [InlineData("Build Pad")]
+    [InlineData("Galactic_Automatic")]
+    [InlineData("1x1")]
+    public void Valid_single_enum_identifiers_pass(string value)
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
 
     [Theory]
     [InlineData("Infantry")]
     [InlineData("Infantry | Vehicle | Air")]
     [InlineData("Build Pad")]
-    [InlineData("Galactic_Automatic")]
-    [InlineData("1x1")]
-    public void Valid_enum_identifiers_pass(string value)
+    public void Valid_flag_list_identifiers_pass(string value)
     {
-        Assert.True(Sut.Validate(value, Tag).IsValid);
+        Assert.True(Sut.Validate(value, FlagTag).IsValid);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("Infantry|")]
     [InlineData("|Infantry")]
-    public void Invalid_enum_identifiers_fail(string value)
+    [InlineData("Infantry | Vehicle | Air")]
+    public void Pipe_on_single_enum_tag_fails(string value)
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("Infantry|")]
+    [InlineData("|Infantry")]
+    public void Invalid_flag_list_identifiers_fail(string value)
+    {
+        Assert.False(Sut.Validate(value, FlagTag).IsValid);
+    }
+}
+
+// ── PrerequisiteExpressionValidator ──────────────────────────────────────────
+
+public sealed class PrerequisiteExpressionValidatorTests
+{
+    private static readonly PrerequisiteExpressionValidator Sut = new();
+    private static readonly XmlTagDefinition Tag =
+        TagOf.Make("Required_Special_Structures", XmlValueType.GameObjectTypeReferenceList, TagSemanticType.PrerequisiteExpression);
+
+    [Theory]
+    [InlineData("U_Ground_Barracks")]
+    [InlineData("StructA | StructB")]
+    [InlineData("StructA, StructB")]
+    [InlineData("StructA StructB")]
+    [InlineData("StructA | StructB, StructC | StructD")]
+    [InlineData("StructA | StructB StructC | StructD")]
+    [InlineData("A | B, C")]
+    public void Valid_expressions_pass(string value)
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("|StructA")]
+    [InlineData("StructA|")]
+    [InlineData("StructA | | StructB")]
+    [InlineData("StructA,,StructB")]
+    public void Invalid_expressions_fail(string value)
     {
         Assert.False(Sut.Validate(value, Tag).IsValid);
     }

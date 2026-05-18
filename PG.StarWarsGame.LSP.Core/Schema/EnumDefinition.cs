@@ -6,6 +6,13 @@ public sealed record EnumValueDefinition
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
     public bool Deprecated { get; init; }
     public string? AvailableSince { get; init; }
+
+    /// <summary>
+    ///     Zero or more value-group keys this value belongs to. Empty means "all groups."
+    ///     Used by completion providers to pre-filter suggestions when the enclosing tag
+    ///     carries a <c>valueGroup</c> annotation.
+    /// </summary>
+    public IReadOnlyList<string> Groups { get; init; } = [];
 }
 
 public sealed record EnumDefinition

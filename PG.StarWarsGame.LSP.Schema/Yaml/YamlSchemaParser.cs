@@ -30,6 +30,11 @@ internal static class YamlSchemaParser
                 logger?.LogWarning("Unknown referenceKind '{Kind}' for tag '{Tag}' — defaulting to None",
                     entry.ReferenceKind, entry.Tag);
 
+            var st = TagSemanticType.Default;
+            if (entry.SemanticType is not null && !Enum.TryParse(entry.SemanticType, true, out st))
+                logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' — defaulting to Default",
+                    entry.SemanticType, entry.Tag);
+
             result.Add(new XmlTagDefinition
             {
                 Tag = entry.Tag,
@@ -37,6 +42,8 @@ internal static class YamlSchemaParser
                 ReferenceKind = rk,
                 ReferenceType = entry.ReferenceType,
                 EnumName = entry.EnumName,
+                SemanticType = st,
+                ValueGroup = entry.ValueGroup,
                 Deprecated = entry.Deprecated,
                 AvailableSince = entry.AvailableSince,
                 Description = entry.Description,
@@ -85,7 +92,8 @@ internal static class YamlSchemaParser
                 Name = v.Name,
                 Description = v.Description,
                 Deprecated = v.Deprecated,
-                AvailableSince = v.AvailableSince
+                AvailableSince = v.AvailableSince,
+                Groups = v.Groups,
             });
         return new EnumDefinition
         {

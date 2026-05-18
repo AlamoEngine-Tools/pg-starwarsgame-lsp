@@ -13,14 +13,20 @@ public sealed partial class DynamicEnumValueValidator : IXmlValueValidator
         var trimmed = rawValue.Trim();
         if (string.IsNullOrEmpty(trimmed))
             return XmlValidationResult.Failure(
-                $"'' is not a valid enum identifier for <{tag.Tag}>. Expected one or more identifiers separated by '|'.");
+                $"'' is not a valid enum identifier for <{tag.Tag}>.");
 
-        foreach (var segment in trimmed.Split('|'))
+        var isFlagList = tag.SemanticType == TagSemanticType.FlagList;
+
+        if (!isFlagList && trimmed.Contains('|'))
+            return XmlValidationResult.Failure(
+                $"<{tag.Tag}> expects a single enum identifier; '|' is not allowed here.");
+
+        foreach (var segment in trimmed.Split(isFlagList ? '|' : ','))
         {
             var part = segment.Trim();
             if (part.Length == 0 || !SegmentPattern().IsMatch(part))
                 return XmlValidationResult.Failure(
-                    $"'{trimmed}' is not a valid enum identifier for <{tag.Tag}>. Expected one or more identifiers separated by '|'.");
+                    $"'{trimmed}' is not a valid enum identifier for <{tag.Tag}>.");
         }
 
         return XmlValidationResult.Valid();

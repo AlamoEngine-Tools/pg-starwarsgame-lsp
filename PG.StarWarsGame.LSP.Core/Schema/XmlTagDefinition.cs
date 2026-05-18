@@ -14,6 +14,19 @@ public record XmlTagDefinition
     /// <summary>Non-null when ReferenceKind is Enum — names the enum definition to validate against.</summary>
     public string? EnumName { get; init; }
 
+    /// <summary>
+    ///     Optional semantic refinement of the base <see cref="ValueType" />.
+    ///     <see cref="TagSemanticType.Default" /> when no refinement is specified.
+    /// </summary>
+    public TagSemanticType SemanticType { get; init; }
+
+    /// <summary>
+    ///     Optional free-form key identifying which semantic subset of valid values is appropriate for this tag.
+    ///     Used by completion providers to pre-filter suggestions.
+    ///     <c>null</c> means "no restriction beyond what the base <see cref="ValueType" /> implies."
+    /// </summary>
+    public string? ValueGroup { get; init; }
+
     /// <summary>If true, this tag is deprecated and should not be used in new files.</summary>
     public bool Deprecated { get; init; }
 

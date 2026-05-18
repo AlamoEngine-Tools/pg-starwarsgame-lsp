@@ -16,6 +16,7 @@ public static class XmlLanguageServiceExtensions
 
         // Validator system — add IXmlValueValidator implementations here to register new validators
         services.AddSingleton<IXmlValueValidatorRegistry, XmlValueValidatorRegistry>();
+        services.AddSingleton<IXmlValueValidator, PrerequisiteExpressionValidator>();
         services.AddSingleton<IXmlValueValidator, BooleanValueValidator>();
         services.AddSingleton<IXmlValueValidator, FloatValueValidator>();
         services.AddSingleton<IXmlValueValidator, ShaderVersionHexValidator>();
