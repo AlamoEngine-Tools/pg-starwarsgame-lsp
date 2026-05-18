@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -8,8 +11,11 @@ internal static class ValueTypeHint
     {
         return tag.ValueType switch
         {
-            XmlValueType.Float or XmlValueType.Double =>
+            XmlValueType.Float =>
                 "**Format:** `1`, `1.0`, or `1.0f`",
+
+            XmlValueType.NormalizedFloat =>
+                "**Format:** float in `[0.0, 1.0]` — e.g. `0.5`, `0.75f`",
 
             XmlValueType.Boolean =>
                 "**Format:** `True`, `False`, `Yes`, `No`, `1`, or `0`",

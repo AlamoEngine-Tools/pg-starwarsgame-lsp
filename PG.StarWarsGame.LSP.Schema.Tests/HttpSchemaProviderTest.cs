@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using System.IO.Abstractions.TestingHelpers;
 using System.Net;
 using System.Net.Http.Headers;
@@ -9,7 +12,7 @@ using PG.StarWarsGame.LSP.Schema.Providers;
 
 namespace PG.StarWarsGame.LSP.Schema.Tests;
 
-public sealed class HttpSchemaProviderTests
+public sealed class HttpSchemaProviderTest
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 

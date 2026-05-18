@@ -1,10 +1,13 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
-public sealed class GameIndexServiceTests
+public sealed class GameIndexServiceTest
 {
     // ── helpers / fakes ──────────────────────────────────────────────────────
 

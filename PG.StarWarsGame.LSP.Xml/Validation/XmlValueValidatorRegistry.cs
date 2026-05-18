@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Validation;
 
@@ -21,20 +24,9 @@ public sealed class XmlValueValidatorRegistry : IXmlValueValidatorRegistry
 
     public XmlValidationResult Validate(XmlValueType valueType, string rawValue, XmlTagDefinition tag)
     {
-        if (tag.SemanticType != TagSemanticType.Default)
+        if (tag.SemanticType != TagSemanticType.Default
+            && _semanticValidators.TryGetValue(tag.SemanticType, out var semanticValidator))
         {
-            if (!_semanticValidators.TryGetValue(tag.SemanticType, out var semanticValidator))
-                return new XmlValidationResult
-                {
-#if DEBUG
-                    IsValid = true,
-#else
-                    IsValid = false,
-#endif
-                    Severity = XmlValidationSeverity.Hint,
-                    Message =
-                        $"No validator registered for value type '{valueType}' with semantic precision {tag.SemanticType} on tag '{tag.Tag}'."
-                };
             return semanticValidator.Validate(rawValue, tag);
         }
 

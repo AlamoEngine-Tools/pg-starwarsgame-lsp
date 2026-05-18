@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -8,7 +11,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
-public sealed class XmlDiagnosticsPublisherTests
+public sealed class XmlDiagnosticsPublisherTest
 {
     // ── helpers ─────────────────────────────────────────────────────────────
 

@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>Mirrors Petroglyph's internal XML value-type map.</summary>
@@ -20,7 +23,8 @@ public enum XmlValueType
     /// <summary>General signed integer (credits, priorities, frame numbers).</summary>
     Int = 6,
     Float = 8,
-    Double = 9,
+    /// <summary>Floating-point value constrained to [0.0, 1.0] (fractions, multipliers, probabilities).</summary>
+    NormalizedFloat = 9,
 
     /// <summary>Unsigned integer for hardware capability metrics (CPU MHz, texture memory MB, fill/vertex rates).</summary>
     HardwareUInt = 10,

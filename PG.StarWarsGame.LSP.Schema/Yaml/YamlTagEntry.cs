@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 namespace PG.StarWarsGame.LSP.Schema.Yaml;
 
 /// <summary>YAML deserialization model for a single tag entry.</summary>
@@ -14,9 +17,4 @@ internal sealed class YamlTagEntry
     public string? AvailableSince { get; set; }
     public Dictionary<string, string> Description { get; set; } = [];
     public bool MultipleAllowed { get; set; }
-}
-
-internal sealed class YamlTagFile
-{
-    public List<YamlTagEntry> Tags { get; set; } = [];
 }

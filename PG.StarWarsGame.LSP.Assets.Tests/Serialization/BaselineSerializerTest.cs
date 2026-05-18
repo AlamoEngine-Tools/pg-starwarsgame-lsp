@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -6,7 +9,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Serialization;
 
-public sealed class BaselineSerializerTests
+public sealed class BaselineSerializerTest
 {
     private static readonly DateTimeOffset TestDate =
         new(2026, 1, 15, 10, 30, 0, TimeSpan.Zero);

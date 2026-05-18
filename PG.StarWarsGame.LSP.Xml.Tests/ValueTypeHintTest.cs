@@ -1,8 +1,11 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
-public sealed class ValueTypeHintTests
+public sealed class ValueTypeHintTest
 {
     private static XmlTagDefinition Tag(
         XmlValueType type,
@@ -31,11 +34,12 @@ public sealed class ValueTypeHintTests
     }
 
     [Fact]
-    public void Double_SameHintAsFloat()
+    public void NormalizedFloat_HintContainsRange()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.Double));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NormalizedFloat));
         Assert.NotNull(hint);
-        Assert.Contains("1.0f", hint);
+        Assert.Contains("0.0", hint);
+        Assert.Contains("1.0", hint);
     }
 
     [Fact]

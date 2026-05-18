@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Validation;
@@ -25,6 +28,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlValueValidator, PrerequisiteExpressionValidator>();
         services.AddSingleton<IXmlValueValidator, RgbaValidator>();
         services.AddSingleton<IXmlValueValidator, ShaderVersionHexValidator>();
+        services.AddSingleton<IXmlValueValidator, NormalizedFloatValidator>();
         services.AddSingleton<IXmlValueValidator, UintValueValidator>();
         services.AddSingleton<IXmlValueValidator, VendorIdHexValidator>();
 

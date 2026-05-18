@@ -1,3 +1,6 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using PG.StarWarsGame.Files.XML;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Tests.Fakes;
@@ -5,7 +8,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
-public sealed class GameSymbolProjectorTests
+public sealed class GameSymbolProjectorTest
 {
     private static readonly FakeSchemaProvider Schema = new(
         "CombatBonusAbility", "SFXEvent", "GameObjectType", "SpawnAbility");

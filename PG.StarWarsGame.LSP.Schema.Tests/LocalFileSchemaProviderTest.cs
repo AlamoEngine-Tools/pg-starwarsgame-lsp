@@ -1,14 +1,17 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Schema.Providers;
 
 namespace PG.StarWarsGame.LSP.Schema.Tests;
 
-public sealed class LocalFileSchemaProviderTests : IDisposable
+public sealed class LocalFileSchemaProviderTest : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
-    public LocalFileSchemaProviderTests()
+    public LocalFileSchemaProviderTest()
     {
         Directory.CreateDirectory(_tempDir);
     }

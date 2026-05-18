@@ -1,14 +1,17 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
-public sealed class LspConfigurationProviderTests : IDisposable
+public sealed class LspConfigurationProviderTest : IDisposable
 {
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
-    public LspConfigurationProviderTests()
+    public LspConfigurationProviderTest()
     {
         Directory.CreateDirectory(_tempDir);
     }
