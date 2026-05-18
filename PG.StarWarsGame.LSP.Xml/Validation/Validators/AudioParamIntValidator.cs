@@ -6,15 +6,15 @@ using PG.StarWarsGame.LSP.Core.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Validators;
 
-public sealed class UintValueValidator : IXmlValueValidator
+public sealed class AudioParamIntValidator : IXmlValueValidator
 {
-    public XmlValueType ValueType => XmlValueType.UInt;
+    public XmlValueType ValueType => XmlValueType.AudioParamInt;
 
     public XmlValidationResult Validate(string rawValue, XmlTagDefinition tag)
     {
-        if (!int.TryParse(rawValue.Trim(), out var value) || value < 0)
+        if (!int.TryParse(rawValue.Trim(), out var value) || value < 0 || value > 127)
             return XmlValidationResult.Failure(
-                $"'{rawValue.Trim()}' is not a valid unsigned integer for <{tag.Tag}>. Expected a non-negative integer.");
+                $"'{rawValue.Trim()}' is not a valid audio parameter integer for <{tag.Tag}>. Expected an integer in [0, 127].");
         return XmlValidationResult.Valid();
     }
 }

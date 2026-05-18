@@ -6,15 +6,15 @@ using PG.StarWarsGame.LSP.Core.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Validators;
 
-public sealed class UintValueValidator : IXmlValueValidator
+public sealed class TypeReferenceListValidator : IXmlValueValidator
 {
-    public XmlValueType ValueType => XmlValueType.UInt;
+    public XmlValueType ValueType => XmlValueType.TypeReferenceList;
 
     public XmlValidationResult Validate(string rawValue, XmlTagDefinition tag)
     {
-        if (!int.TryParse(rawValue.Trim(), out var value) || value < 0)
-            return XmlValidationResult.Failure(
-                $"'{rawValue.Trim()}' is not a valid unsigned integer for <{tag.Tag}>. Expected a non-negative integer.");
+        var trimmed = rawValue.Trim();
+        if (trimmed.Length == 0)
+            return XmlValidationResult.Failure($"'' is not a valid type reference list for <{tag.Tag}>.");
         return XmlValidationResult.Valid();
     }
 }
