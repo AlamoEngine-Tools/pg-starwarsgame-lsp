@@ -102,13 +102,15 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             {
                 var fallback = _current.GetTagsForType(typeName);
                 if (fallback.Count == 0)
-                    _logger.LogWarning("304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                    _logger.LogWarning(
+                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
                 tagsByType.Add((typeName, fallback.ToList()));
             }
             else
             {
                 tagsByType.Add((typeName, parsed));
             }
+
             if (raw is not null)
                 fetchedFiles.Add((path, raw));
         }
@@ -120,13 +122,15 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             {
                 var fallback = _current.AllObjectTypes;
                 if (fallback.Count == 0)
-                    _logger.LogWarning("304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                    _logger.LogWarning(
+                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
                 types.AddRange(fallback);
             }
             else
             {
                 types.AddRange(parsed);
             }
+
             if (raw is not null)
                 fetchedFiles.Add((path, raw));
         }
@@ -139,13 +143,15 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             {
                 var fallback = _current.AllEnums;
                 if (fallback.Count == 0)
-                    _logger.LogWarning("304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                    _logger.LogWarning(
+                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
                 enums.AddRange(fallback);
             }
             else
             {
                 enums.AddRange(parsed);
             }
+
             if (raw is not null)
                 fetchedFiles.Add((path, raw));
         }

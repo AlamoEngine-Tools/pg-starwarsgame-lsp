@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
-    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly IGameIndexService _indexService;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService)
     {
@@ -22,8 +22,8 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
-        var uri     = request.TextDocument.Uri.ToString();
-        var text    = request.TextDocument.Text;
+        var uri = request.TextDocument.Uri.ToString();
+        var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
 
         _workspaceHost.AddOrUpdate(uri, text, version);
@@ -33,8 +33,8 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
     public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
     {
-        var uri     = request.TextDocument.Uri.ToString();
-        var text    = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
+        var uri = request.TextDocument.Uri.ToString();
+        var text = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
         var version = request.TextDocument.Version ?? 0;
 
         _workspaceHost.AddOrUpdate(uri, text, version);

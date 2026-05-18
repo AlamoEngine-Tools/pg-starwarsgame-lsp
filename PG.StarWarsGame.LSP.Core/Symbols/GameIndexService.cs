@@ -5,11 +5,11 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public sealed class GameIndexService : IGameIndexService
 {
-    private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ILogger<GameIndexService> _logger;
+    private readonly IEnumerable<IGameDocumentParser> _parsers;
     private GameIndex _current = GameIndex.Empty;
-    private int _suppressionDepth;
     private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
+    private int _suppressionDepth;
 
     public GameIndexService(IEnumerable<IGameDocumentParser> parsers, ILogger<GameIndexService> logger)
     {
@@ -25,36 +25,6 @@ public sealed class GameIndexService : IGameIndexService
     {
         Interlocked.Increment(ref _suppressionDepth);
         return new BulkUpdateScope(this);
-    }
-
-    private void EndBulkUpdate()
-    {
-        if (Interlocked.Decrement(ref _suppressionDepth) > 0)
-            return;
-        if (Interlocked.Exchange(ref _hasPendingEvent, 0) != 0)
-            RaiseIndexChanged(Volatile.Read(ref _current));
-    }
-
-    private void RaiseIndexChanged(GameIndex index)
-    {
-        if (Volatile.Read(ref _suppressionDepth) > 0)
-        {
-            Interlocked.Exchange(ref _hasPendingEvent, 1);
-            return;
-        }
-        IndexChanged?.Invoke(index);
-    }
-
-    private sealed class BulkUpdateScope : IDisposable
-    {
-        private readonly GameIndexService _owner;
-        private int _disposed;
-        public BulkUpdateScope(GameIndexService owner) => _owner = owner;
-        public void Dispose()
-        {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-                _owner.EndBulkUpdate();
-        }
     }
 
     public async Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
@@ -74,13 +44,13 @@ public sealed class GameIndexService : IGameIndexService
             var existing = snapshot.Documents.GetValueOrDefault(uri);
             if (existing is not null && existing.Version >= newDoc.Version)
             {
-                _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri, newDoc.Version, existing.Version);
+                _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri,
+                    newDoc.Version, existing.Version);
                 return;
             }
 
             updated = ApplyDocumentIndex(snapshot, newDoc);
-        }
-        while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         _logger.LogDebug("Indexed {Uri} v{Version} ({Symbols} symbols, {Refs} refs)",
             uri, newDoc.Version, newDoc.Symbols.Length, newDoc.References.Length);
@@ -95,8 +65,7 @@ public sealed class GameIndexService : IGameIndexService
             snapshot = Volatile.Read(ref _current);
             if (!snapshot.Documents.ContainsKey(uri)) return;
             updated = StripDocumentFromIndex(snapshot, uri);
-        }
-        while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         _logger.LogDebug("Removed document {Uri} from index", uri);
         RaiseIndexChanged(Volatile.Read(ref _current));
@@ -108,12 +77,31 @@ public sealed class GameIndexService : IGameIndexService
         do
         {
             snapshot = Volatile.Read(ref _current);
-            updated  = snapshot with { Baseline = baseline };
-        }
-        while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+            updated = snapshot with { Baseline = baseline };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
-        _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count, baseline.BuiltAt);
+        _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count,
+            baseline.BuiltAt);
         RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    private void EndBulkUpdate()
+    {
+        if (Interlocked.Decrement(ref _suppressionDepth) > 0)
+            return;
+        if (Interlocked.Exchange(ref _hasPendingEvent, 0) != 0)
+            RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    private void RaiseIndexChanged(GameIndex index)
+    {
+        if (Volatile.Read(ref _suppressionDepth) > 0)
+        {
+            Interlocked.Exchange(ref _hasPendingEvent, 1);
+            return;
+        }
+
+        IndexChanged?.Invoke(index);
     }
 
     private static GameIndex ApplyDocumentIndex(GameIndex index, DocumentIndex doc)
@@ -125,25 +113,21 @@ public sealed class GameIndexService : IGameIndexService
 
         var defs = base_.WorkspaceDefinitions;
         foreach (var sym in doc.Symbols)
-        {
             defs = defs.TryGetValue(sym.Id, out var arr)
                 ? defs.SetItem(sym.Id, arr.Add(sym))
                 : defs.Add(sym.Id, ImmutableArray.Create(sym));
-        }
 
         var refs = base_.WorkspaceReferences;
         foreach (var reference in doc.References)
-        {
             refs = refs.TryGetValue(reference.TargetId, out var arr)
                 ? refs.SetItem(reference.TargetId, arr.Add(reference))
                 : refs.Add(reference.TargetId, ImmutableArray.Create(reference));
-        }
 
         return base_ with
         {
-            Documents            = base_.Documents.SetItem(doc.DocumentUri, doc),
+            Documents = base_.Documents.SetItem(doc.DocumentUri, doc),
             WorkspaceDefinitions = defs,
-            WorkspaceReferences  = refs
+            WorkspaceReferences = refs
         };
     }
 
@@ -170,9 +154,26 @@ public sealed class GameIndexService : IGameIndexService
 
         return index with
         {
-            Documents            = index.Documents.Remove(uri),
+            Documents = index.Documents.Remove(uri),
             WorkspaceDefinitions = defs,
-            WorkspaceReferences  = refs
+            WorkspaceReferences = refs
         };
+    }
+
+    private sealed class BulkUpdateScope : IDisposable
+    {
+        private readonly GameIndexService _owner;
+        private int _disposed;
+
+        public BulkUpdateScope(GameIndexService owner)
+        {
+            _owner = owner;
+        }
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) == 0)
+                _owner.EndBulkUpdate();
+        }
     }
 }

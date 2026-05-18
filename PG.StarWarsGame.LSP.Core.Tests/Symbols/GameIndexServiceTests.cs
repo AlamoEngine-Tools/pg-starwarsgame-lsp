@@ -8,41 +8,28 @@ public sealed class GameIndexServiceTests
 {
     // ── helpers / fakes ──────────────────────────────────────────────────────
 
-    private static GameSymbol Symbol(string id, string uri = "file:///f.xml") =>
-        new(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri, 1, null), null);
+    private static GameSymbol Symbol(string id, string uri = "file:///f.xml")
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri, 1, null), null);
+    }
 
-    private static GameReference Reference(string targetId, string docUri = "file:///f.xml") =>
-        new(targetId, null, null, docUri, 1, 0, 4);
+    private static GameReference Reference(string targetId, string docUri = "file:///f.xml")
+    {
+        return new GameReference(targetId, null, null, docUri, 1, 0, 4);
+    }
 
     private static DocumentIndex Doc(string uri, int version,
-        GameSymbol[]? symbols = null, GameReference[]? refs = null) =>
-        new(uri, version,
+        GameSymbol[]? symbols = null, GameReference[]? refs = null)
+    {
+        return new DocumentIndex(uri, version,
             (symbols ?? []).ToImmutableArray(),
-            (refs    ?? []).ToImmutableArray());
-
-    private sealed class FakeParser : IGameDocumentParser
-    {
-        private readonly DocumentIndex _result;
-        public FakeParser(DocumentIndex result) => _result = result;
-        public bool CanParse(string ext) => ext == ".xml";
-        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
-            CancellationToken ct) =>
-            ValueTask.FromResult(_result with { DocumentUri = uri, Version = version });
+            (refs ?? []).ToImmutableArray());
     }
 
-    private sealed class CancellingParser : IGameDocumentParser
+    private static IGameIndexService Build(params IGameDocumentParser[] parsers)
     {
-        public bool CanParse(string ext) => true;
-        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
-            CancellationToken ct)
-        {
-            ct.ThrowIfCancellationRequested();
-            return ValueTask.FromResult(Doc(uri, version));
-        }
+        return new GameIndexService(parsers, NullLogger<GameIndexService>.Instance);
     }
-
-    private static IGameIndexService Build(params IGameDocumentParser[] parsers) =>
-        new GameIndexService(parsers, NullLogger<GameIndexService>.Instance);
 
     // ── ApplyBaseline ────────────────────────────────────────────────────────
 
@@ -184,7 +171,8 @@ public sealed class GameIndexServiceTests
 
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("OLD_TARGET"));
 
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, refs: [newRef]))], NullLogger<GameIndexService>.Instance);
+        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, refs: [newRef]))],
+            NullLogger<GameIndexService>.Instance);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
 
@@ -307,7 +295,10 @@ public sealed class GameIndexServiceTests
         var fired = false;
         svc.IndexChanged += _ => fired = true;
 
-        using (svc.BeginBulkUpdate()) { /* no updates */ }
+        using (svc.BeginBulkUpdate())
+        {
+            /* no updates */
+        }
 
         Assert.False(fired);
     }
@@ -321,7 +312,9 @@ public sealed class GameIndexServiceTests
         svc.IndexChanged += idx => captured = idx;
 
         using (svc.BeginBulkUpdate())
+        {
             await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        }
 
         Assert.NotNull(captured);
         Assert.True(captured!.WorkspaceDefinitions.ContainsKey("UNIT_A"));
@@ -336,7 +329,43 @@ public sealed class GameIndexServiceTests
         using var cts = new CancellationTokenSource();
         cts.Cancel();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(
-            () => svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, cts.Token));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, cts.Token));
+    }
+
+    private sealed class FakeParser : IGameDocumentParser
+    {
+        private readonly DocumentIndex _result;
+
+        public FakeParser(DocumentIndex result)
+        {
+            _result = result;
+        }
+
+        public bool CanParse(string ext)
+        {
+            return ext == ".xml";
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
+            CancellationToken ct)
+        {
+            return ValueTask.FromResult(_result with { DocumentUri = uri, Version = version });
+        }
+    }
+
+    private sealed class CancellingParser : IGameDocumentParser
+    {
+        public bool CanParse(string ext)
+        {
+            return true;
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
+            CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            return ValueTask.FromResult(Doc(uri, version));
+        }
     }
 }

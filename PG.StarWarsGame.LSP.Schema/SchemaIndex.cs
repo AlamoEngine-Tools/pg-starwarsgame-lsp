@@ -7,9 +7,6 @@ public sealed class SchemaIndex
 {
     public static readonly SchemaIndex Empty = new([], [], []);
     private readonly Dictionary<string, List<XmlTagDefinition>> _allByTagName;
-    private readonly IReadOnlyList<EnumDefinition> _allEnumsList;
-    private readonly IReadOnlyList<GameObjectTypeDefinition> _allTypesList;
-    private readonly IReadOnlyList<XmlTagDefinition> _allTagsList;
     private readonly Dictionary<string, EnumDefinition> _enums;
     private readonly Dictionary<string, XmlTagDefinition> _tags;
     private readonly Dictionary<string, IReadOnlyList<XmlTagDefinition>> _tagsByType;
@@ -45,16 +42,16 @@ public sealed class SchemaIndex
         foreach (var e in enums)
             _enums[e.Name] = e;
 
-        _allTagsList = [.. _tags.Values];
-        _allTypesList = [.. _types.Values];
-        _allEnumsList = [.. _enums.Values];
+        AllTags = [.. _tags.Values];
+        AllObjectTypes = [.. _types.Values];
+        AllEnums = [.. _enums.Values];
     }
 
-    public IReadOnlyList<XmlTagDefinition> AllTags => _allTagsList;
+    public IReadOnlyList<XmlTagDefinition> AllTags { get; }
 
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _allTypesList;
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes { get; }
 
-    public IReadOnlyList<EnumDefinition> AllEnums => _allEnumsList;
+    public IReadOnlyList<EnumDefinition> AllEnums { get; }
 
     public XmlTagDefinition? GetTag(string tagName)
     {

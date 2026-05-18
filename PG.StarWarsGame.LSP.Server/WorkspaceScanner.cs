@@ -9,9 +9,9 @@ namespace PG.StarWarsGame.LSP.Server;
 public sealed class WorkspaceScanner
 {
     private readonly IFileSystem _fs;
-    private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceScanner> _logger;
+    private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly IServerWorkDoneManager? _workDone;
 
     public WorkspaceScanner(IFileSystem fs, IEnumerable<IGameDocumentParser> parsers,
@@ -36,19 +36,17 @@ public sealed class WorkspaceScanner
 
         IWorkDoneObserver? progress = null;
         if (_workDone?.IsSupported == true)
-        {
             progress = await _workDone.Create(
                 new WorkDoneProgressBegin
                 {
-                    Title       = "Indexing workspace",
-                    Message     = $"Scanning {files.Count} file(s)…",
+                    Title = "Indexing workspace",
+                    Message = $"Scanning {files.Count} file(s)…",
                     Cancellable = false,
-                    Percentage  = 0
+                    Percentage = 0
                 },
-                onError:    null!,
-                onComplete: null!,
+                null!,
+                null!,
                 ct);
-        }
 
         var indexed = 0;
         var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
@@ -65,6 +63,7 @@ public sealed class WorkspaceScanner
                     progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
                 });
             } // fires one IndexChanged with the complete final state
+
             progress?.OnNext($"Indexed {indexed} file(s)", 100, null);
         }
         finally

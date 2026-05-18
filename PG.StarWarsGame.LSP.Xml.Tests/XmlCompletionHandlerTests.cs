@@ -15,8 +15,8 @@ public sealed class XmlCompletionHandlerTests
     private static (XmlCompletionHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
         FakeProposalRegistry proposals) Build()
     {
-        var host      = new FakeGameWorkspaceHost();
-        var schema    = new FakeSchemaProvider();
+        var host = new FakeGameWorkspaceHost();
+        var schema = new FakeSchemaProvider();
         var proposals = new FakeProposalRegistry();
         return (new XmlCompletionHandler(host, schema, proposals), host, schema, proposals);
     }
@@ -91,7 +91,8 @@ public sealed class XmlCompletionHandlerTests
         schema.AddTagForType("Faction", MakeTag("SFXEvent_Attack", true));
 
         // SFXEvent_Attack already present; still allowed again
-        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <SFXEvent_Attack>Sfx_A</SFXEvent_Attack>\n  <\n</Faction>", 1);
+        host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  <SFXEvent_Attack>Sfx_A</SFXEvent_Attack>\n  <\n</Faction>",
+            1);
         var result = await handler.Handle(At(2, 3), CancellationToken.None);
 
         var labels = result.Items.Select(i => i.Label).ToList();
@@ -182,12 +183,19 @@ public sealed class XmlCompletionHandlerTests
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
@@ -198,20 +206,47 @@ public sealed class XmlCompletionHandlerTests
         private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
 
-        public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+        public XmlTagDefinition? GetTag(string name)
+        {
+            return _tags.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
 
         public IReadOnlyList<XmlTagDefinition> GetTagsForType(string name)
-            => _tagsByType.TryGetValue(name, out var list) ? list : [];
+        {
+            return _tagsByType.TryGetValue(name, out var list) ? list : [];
+        }
 
-        public EnumDefinition? GetEnum(string _) => null;
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
 
-        public void AddType(GameObjectTypeDefinition type) => _types[type.TypeName] = type;
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void AddType(GameObjectTypeDefinition type)
+        {
+            _types[type.TypeName] = type;
+        }
 
         public void AddTagForType(string typeName, XmlTagDefinition tag)
         {
@@ -227,6 +262,8 @@ public sealed class XmlCompletionHandlerTests
         public IReadOnlyList<ValueProposal> ProposalsToReturn { get; set; } = [];
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition __, string ___)
-            => ProposalsToReturn;
+        {
+            return ProposalsToReturn;
+        }
     }
 }

@@ -36,12 +36,12 @@ public sealed class XmlDiagnosticsPublisherTests
 
     // Subscription / routing tests use this builder so they can control the index service.
     private static (XmlDiagnosticsPublisher publisher,
-                    List<PublishDiagnosticsParams> published,
-                    FakeGameIndexService indexService,
-                    FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null)
+        List<PublishDiagnosticsParams> published,
+        FakeGameIndexService indexService,
+        FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null)
     {
-        var published     = new List<PublishDiagnosticsParams>();
-        var indexService  = new FakeGameIndexService();
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
         var publisher = new XmlDiagnosticsPublisher(
             p => published.Add(p),
@@ -453,13 +453,13 @@ public sealed class XmlDiagnosticsPublisherTests
         var index = IndexWithHardcodedEnums(hardcoded);
 
         const string xml = """
-            <GameConstants>
-              <Damage_Types>NEW_TYPE
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-            EXPLOSIVE
-              </Damage_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>NEW_TYPE
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           EXPLOSIVE
+                             </Damage_Types>
+                           </GameConstants>
+                           """;
 
         var diags = publisher.CollectEnumBoundaryDiagnostics("file:///units.xml", xml, index);
 
@@ -474,13 +474,13 @@ public sealed class XmlDiagnosticsPublisherTests
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
         const string xml = """
-            <GameConstants>
-              <Damage_Types>CUSTOM
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-            MYSTERY_TYPE
-              </Damage_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>CUSTOM
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           MYSTERY_TYPE
+                             </Damage_Types>
+                           </GameConstants>
+                           """;
 
         var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
 
@@ -511,13 +511,13 @@ public sealed class XmlDiagnosticsPublisherTests
         var index = IndexWithHardcodedEnums(hardcoded);
 
         const string xml = """
-            <GameConstants>
-              <Damage_Types>CUSTOM_TYPE
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-            EXPLOSIVE ENERGY
-              </Damage_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>CUSTOM_TYPE
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           EXPLOSIVE ENERGY
+                             </Damage_Types>
+                           </GameConstants>
+                           """;
 
         var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
 
@@ -534,13 +534,13 @@ public sealed class XmlDiagnosticsPublisherTests
 
         // SABER_SLASH was added below the boundary — not in the hardcoded set
         const string xml = """
-            <GameConstants>
-              <Damage_Types>CUSTOM_TYPE
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-            EXPLOSIVE SABER_SLASH ENERGY
-              </Damage_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>CUSTOM_TYPE
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           EXPLOSIVE SABER_SLASH ENERGY
+                             </Damage_Types>
+                           </GameConstants>
+                           """;
 
         var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
 
@@ -555,21 +555,21 @@ public sealed class XmlDiagnosticsPublisherTests
         var (publisher, _, _, _) = BuildSubscribed();
         var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
             .Add("DamageType", ["EXPLOSIVE"])
-            .Add("ArmorType",  ["ARMOR_INFANTRY"]);
+            .Add("ArmorType", ["ARMOR_INFANTRY"]);
         var index = IndexWithHardcodedEnums(hardcoded);
 
         const string xml = """
-            <GameConstants>
-              <Damage_Types>CUSTOM
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-            EXPLOSIVE MOD_DAMAGE_BELOW
-              </Damage_Types>
-              <Armor_Types>MY_ARMOR
-            <!-- PLEASE add your new armor types ABOVE this point. -->
-            ARMOR_INFANTRY MOD_ARMOR_BELOW
-              </Armor_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>CUSTOM
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           EXPLOSIVE MOD_DAMAGE_BELOW
+                             </Damage_Types>
+                             <Armor_Types>MY_ARMOR
+                           <!-- PLEASE add your new armor types ABOVE this point. -->
+                           ARMOR_INFANTRY MOD_ARMOR_BELOW
+                             </Armor_Types>
+                           </GameConstants>
+                           """;
 
         var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
 
@@ -645,16 +645,37 @@ public sealed class XmlDiagnosticsPublisherTests
     {
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
-        public void Fire(GameIndex index) => IndexChanged?.Invoke(index);
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
+
+        public void Fire(GameIndex index)
+        {
+            IndexChanged?.Invoke(index);
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -662,15 +683,26 @@ public sealed class XmlDiagnosticsPublisherTests
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void Set(string uri, string text, int version = 1)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        public void AddOrUpdate(string uri, string text, int version)
+        {
+            Set(uri, text, version);
+        }
 
-        public void AddOrUpdate(string uri, string text, int version) => Set(uri, text, version);
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
+
+        public void Set(string uri, string text, int version = 1)
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
     }
 }

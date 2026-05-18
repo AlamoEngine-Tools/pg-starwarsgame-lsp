@@ -5,12 +5,11 @@ using PG.StarWarsGame.LSP.Core.Validation;
 namespace PG.StarWarsGame.LSP.Xml.Validation.Validators;
 
 /// <summary>
-/// Validates the boolean prerequisite expression format used by Required_Special_Structures.
-///
-/// Syntax: one or more OR-groups separated by commas or spaces (AND).
-/// Within an OR-group, names are separated by '|'.
-/// '|' binds more tightly than ',' or space, so:
-///   "A | B, C | D"  →  (A OR B) AND (C OR D)
+///     Validates the boolean prerequisite expression format used by Required_Special_Structures.
+///     Syntax: one or more OR-groups separated by commas or spaces (AND).
+///     Within an OR-group, names are separated by '|'.
+///     '|' binds more tightly than ',' or space, so:
+///     "A | B, C | D"  →  (A OR B) AND (C OR D)
 /// </summary>
 public sealed partial class PrerequisiteExpressionValidator : IXmlValueValidator
 {

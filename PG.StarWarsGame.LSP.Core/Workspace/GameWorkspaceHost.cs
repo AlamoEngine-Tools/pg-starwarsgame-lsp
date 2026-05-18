@@ -7,12 +7,19 @@ public sealed class GameWorkspaceHost : IGameWorkspaceHost
     private readonly ConcurrentDictionary<string, TrackedDocument> _docs = new();
 
     public void AddOrUpdate(string uri, string text, int version)
-        => _docs[uri] = new TrackedDocument(uri, text, version);
+    {
+        _docs[uri] = new TrackedDocument(uri, text, version);
+    }
 
-    public void Remove(string uri) => _docs.TryRemove(uri, out _);
+    public void Remove(string uri)
+    {
+        _docs.TryRemove(uri, out _);
+    }
 
     public bool TryGet(string uri, out TrackedDocument doc)
-        => _docs.TryGetValue(uri, out doc!);
+    {
+        return _docs.TryGetValue(uri, out doc!);
+    }
 
     public IEnumerable<TrackedDocument> All => _docs.Values;
 }

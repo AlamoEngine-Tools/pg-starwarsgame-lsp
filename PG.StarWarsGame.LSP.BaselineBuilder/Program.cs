@@ -51,7 +51,8 @@ if (schemaPath is not null && Directory.Exists(schemaPath))
 }
 else
 {
-    Console.Error.WriteLine($"Schema directory not found ({schemaPath ?? "none"}) — type names will fall back to GameObjectType.");
+    Console.Error.WriteLine(
+        $"Schema directory not found ({schemaPath ?? "none"}) — type names will fall back to GameObjectType.");
 }
 
 var sp = services.BuildServiceProvider();
@@ -88,7 +89,8 @@ using (var stream = engine.GameRepository.TryOpenFile("Data\\XML\\GameConstants.
 var schemaProvider = sp.GetService<ISchemaProvider>();
 var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
 var baseline = projector.Project(gameObjects, sfxEvents, gameConstantsXml, manifestHash);
-Console.WriteLine($"Projected {baseline.Symbols.Count} symbols, {baseline.DynamicEnumValues.Count} dynamic enum(s), {baseline.HardcodedEnumValues.Sum(kv => kv.Value.Length)} hardcoded enum value(s)");
+Console.WriteLine(
+    $"Projected {baseline.Symbols.Count} symbols, {baseline.DynamicEnumValues.Count} dynamic enum(s), {baseline.HardcodedEnumValues.Sum(kv => kv.Value.Length)} hardcoded enum value(s)");
 
 // Serialize
 var data = BaselineSerializer.Serialize(baseline);
@@ -134,6 +136,7 @@ static string? FindSchemaPath()
         if (parent is null) break;
         dir = parent;
     }
+
     return null;
 }
 
@@ -150,9 +153,28 @@ file sealed class NullSchemaProvider : ISchemaProvider
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
 
-    public XmlTagDefinition? GetTag(string t) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t) => [];
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t) => [];
-    public EnumDefinition? GetEnum(string e) => null;
-    public GameObjectTypeDefinition? GetObjectType(string t) => null;
+    public XmlTagDefinition? GetTag(string t)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
+    {
+        return [];
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string e)
+    {
+        return null;
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string t)
+    {
+        return null;
+    }
 }

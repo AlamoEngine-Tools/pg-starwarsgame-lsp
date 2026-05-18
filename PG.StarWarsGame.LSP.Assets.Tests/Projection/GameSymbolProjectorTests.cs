@@ -1,7 +1,7 @@
+using PG.StarWarsGame.Files.XML;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Tests.Fakes;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.Files.XML;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -10,10 +10,16 @@ public sealed class GameSymbolProjectorTests
     private static readonly FakeSchemaProvider Schema = new(
         "CombatBonusAbility", "SFXEvent", "GameObjectType", "SpawnAbility");
 
-    private static GameSymbolProjector Build() => new(Schema);
+    private static GameSymbolProjector Build()
+    {
+        return new GameSymbolProjector(Schema);
+    }
 
-    private static ProjectableEntry Entry(string name, string classification, string xmlFile = "DATA\\XML\\UNITS.XML", int? line = 5) =>
-        new(name, classification, new XmlLocationInfo(xmlFile, line));
+    private static ProjectableEntry Entry(string name, string classification, string xmlFile = "DATA\\XML\\UNITS.XML",
+        int? line = 5)
+    {
+        return new ProjectableEntry(name, classification, new XmlLocationInfo(xmlFile, line));
+    }
 
     // ── Empty ─────────────────────────────────────────────────────────────────
 
@@ -84,7 +90,7 @@ public sealed class GameSymbolProjectorTests
     [Fact]
     public void Project_EmptyXmlFile_ProducesUnknownOrigin()
     {
-        var entry = Entry("OBJ_B", "SPAWN_ABILITY", xmlFile: "", line: null);
+        var entry = Entry("OBJ_B", "SPAWN_ABILITY", "", null);
         var result = Build().Project([entry], [], null, "hash");
 
         Assert.IsType<UnknownOrigin>(result.Symbols["OBJ_B"].Origin);
@@ -93,7 +99,7 @@ public sealed class GameSymbolProjectorTests
     [Fact]
     public void Project_NullLine_FileOriginLineIsZero()
     {
-        var entry = Entry("OBJ_C", "SPAWN_ABILITY", "DATA\\XML\\X.XML", line: null);
+        var entry = Entry("OBJ_C", "SPAWN_ABILITY", "DATA\\XML\\X.XML", null);
         var result = Build().Project([entry], [], null, "hash");
 
         var origin = Assert.IsType<FileOrigin>(result.Symbols["OBJ_C"].Origin);
@@ -106,7 +112,7 @@ public sealed class GameSymbolProjectorTests
     public void Project_MultipleEntries_AllSymbolsPresent()
     {
         var objs = new[] { Entry("A", "COMBAT_BONUS_ABILITY"), Entry("B", "SPAWN_ABILITY") };
-        var sfx  = new[] { Entry("SFX_X", "SFXEVENT") };
+        var sfx = new[] { Entry("SFX_X", "SFXEVENT") };
         var result = Build().Project(objs, sfx, null, "hash");
 
         Assert.Equal(3, result.Symbols.Count);
@@ -130,21 +136,21 @@ public sealed class GameSymbolProjectorTests
     public void Project_GameConstantsXml_ExtractsDamageAndArmorTypes()
     {
         const string xml = """
-            <GameConstants>
-              <Damage_Types>EXPLOSIVE ENERGY GRENADE</Damage_Types>
-              <Armor_Types>ARMOR_INFANTRY ARMOR_VEHICLE</Armor_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>EXPLOSIVE ENERGY GRENADE</Damage_Types>
+                             <Armor_Types>ARMOR_INFANTRY ARMOR_VEHICLE</Armor_Types>
+                           </GameConstants>
+                           """;
 
         var result = Build().Project([], [], xml, "hash");
 
         Assert.Collection(result.DynamicEnumValues["DamageType"],
             v => Assert.Equal("EXPLOSIVE", v),
-            v => Assert.Equal("ENERGY",    v),
-            v => Assert.Equal("GRENADE",   v));
+            v => Assert.Equal("ENERGY", v),
+            v => Assert.Equal("GRENADE", v));
         Assert.Collection(result.DynamicEnumValues["ArmorType"],
             v => Assert.Equal("ARMOR_INFANTRY", v),
-            v => Assert.Equal("ARMOR_VEHICLE",  v));
+            v => Assert.Equal("ARMOR_VEHICLE", v));
     }
 
     [Fact]
@@ -168,10 +174,10 @@ public sealed class GameSymbolProjectorTests
     public void Project_GameConstantsXml_NoBoundaryComment_HardcodedEnumValuesEmpty()
     {
         const string xml = """
-            <GameConstants>
-              <Damage_Types>EXPLOSIVE ENERGY GRENADE</Damage_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>EXPLOSIVE ENERGY GRENADE</Damage_Types>
+                           </GameConstants>
+                           """;
         var result = Build().Project([], [], xml, "hash");
 
         Assert.Empty(result.HardcodedEnumValues);
@@ -182,17 +188,17 @@ public sealed class GameSymbolProjectorTests
     public void Project_GameConstantsXml_WithBoundaryComment_SplitsHardcodedValues()
     {
         const string xml = """
-            <GameConstants>
-              <Damage_Types>MOD_TYPE_A MOD_TYPE_B
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-            EXPLOSIVE ENERGY GRENADE
-              </Damage_Types>
-              <Armor_Types>MOD_ARMOR
-            <!-- PLEASE add your new armor types ABOVE this point. -->
-            ARMOR_INFANTRY ARMOR_VEHICLE
-              </Armor_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>MOD_TYPE_A MOD_TYPE_B
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           EXPLOSIVE ENERGY GRENADE
+                             </Damage_Types>
+                             <Armor_Types>MOD_ARMOR
+                           <!-- PLEASE add your new armor types ABOVE this point. -->
+                           ARMOR_INFANTRY ARMOR_VEHICLE
+                             </Armor_Types>
+                           </GameConstants>
+                           """;
         var result = Build().Project([], [], xml, "hash");
 
         // DynamicEnumValues contains ALL values (above + below boundary)
@@ -202,23 +208,23 @@ public sealed class GameSymbolProjectorTests
         // HardcodedEnumValues contains only the below-boundary values
         Assert.Collection(result.HardcodedEnumValues["DamageType"],
             v => Assert.Equal("EXPLOSIVE", v),
-            v => Assert.Equal("ENERGY",    v),
-            v => Assert.Equal("GRENADE",   v));
+            v => Assert.Equal("ENERGY", v),
+            v => Assert.Equal("GRENADE", v));
         Assert.Collection(result.HardcodedEnumValues["ArmorType"],
             v => Assert.Equal("ARMOR_INFANTRY", v),
-            v => Assert.Equal("ARMOR_VEHICLE",  v));
+            v => Assert.Equal("ARMOR_VEHICLE", v));
     }
 
     [Fact]
     public void Project_GameConstantsXml_BoundaryCommentAtEnd_HardcodedEmpty()
     {
         const string xml = """
-            <GameConstants>
-              <Damage_Types>EXPLOSIVE ENERGY
-            <!-- PLEASE add your new damage types ABOVE this point. -->
-              </Damage_Types>
-            </GameConstants>
-            """;
+                           <GameConstants>
+                             <Damage_Types>EXPLOSIVE ENERGY
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                             </Damage_Types>
+                           </GameConstants>
+                           """;
         var result = Build().Project([], [], xml, "hash");
 
         Assert.False(result.HardcodedEnumValues.ContainsKey("DamageType"));

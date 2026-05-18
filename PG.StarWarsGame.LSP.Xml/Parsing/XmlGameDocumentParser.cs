@@ -8,8 +8,8 @@ namespace PG.StarWarsGame.LSP.Xml.Parsing;
 
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
-    private readonly ISchemaProvider _schema;
     private readonly ILogger<XmlGameDocumentParser> _logger;
+    private readonly ISchemaProvider _schema;
 
     public XmlGameDocumentParser(ISchemaProvider schema, ILogger<XmlGameDocumentParser> logger)
     {
@@ -17,8 +17,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         _logger = logger;
     }
 
-    public bool CanParse(string fileExtension) =>
-        fileExtension.Equals(".xml", StringComparison.OrdinalIgnoreCase);
+    public bool CanParse(string fileExtension)
+    {
+        return fileExtension.Equals(".xml", StringComparison.OrdinalIgnoreCase);
+    }
 
     public ValueTask<DocumentIndex> ParseAsync(
         string documentUri, string text, int version, CancellationToken ct)
@@ -26,7 +28,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var doc = new HtmlDocument();
         doc.LoadHtml(text);
 
-        var symbols    = new List<GameSymbol>();
+        var symbols = new List<GameSymbol>();
         var references = new List<GameReference>();
 
         foreach (var node in doc.DocumentNode.Descendants()
@@ -50,16 +52,12 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var id = attr?.Value?.Trim() ?? string.Empty;
 
                 if (string.IsNullOrEmpty(id))
-                {
                     _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
                         typeDef.TypeName, node.Line);
-                }
                 else
-                {
                     // HAP line numbers are 1-based; LSP coordinates are 0-based.
                     symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
                         new FileOrigin(documentUri, node.Line - 1, null), null));
-                }
             }
 
             // Emit references for direct child tags with ReferenceKind.XmlObject.
@@ -72,10 +70,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var innerText = child.InnerText;
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
-                    var absPos    = child.InnerStartIndex + tokenOffset;
+                    var absPos = child.InnerStartIndex + tokenOffset;
                     var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
-                    var line      = child.Line - 1 + CountNewlines(innerText, tokenOffset);
-                    var column    = absPos - lineStart;
+                    var line = child.Line - 1 + CountNewlines(innerText, tokenOffset);
+                    var column = absPos - lineStart;
 
                     references.Add(new GameReference(
                         name,
@@ -104,18 +102,18 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         if (tagDef.SemanticType == TagSemanticType.PrerequisiteExpression)
         {
             separators = ['|', ',', ' ', '\t', '\r', '\n'];
-            skipFirst  = false;
+            skipFirst = false;
         }
         else if (tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
-                                  or XmlValueType.TypeReferenceList)
+                 or XmlValueType.TypeReferenceList)
         {
             separators = [',', ' ', '\t', '\r', '\n'];
-            skipFirst  = false;
+            skipFirst = false;
         }
         else if (tagDef.ValueType == XmlValueType.PerFactionObjectList)
         {
             separators = [',', ' ', '\t', '\r', '\n'];
-            skipFirst  = true;
+            skipFirst = true;
         }
         else
         {
@@ -153,7 +151,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     {
         var count = 0;
         for (var i = 0; i < upToOffset && i < text.Length; i++)
-            if (text[i] == '\n') count++;
+            if (text[i] == '\n')
+                count++;
         return count;
     }
 }

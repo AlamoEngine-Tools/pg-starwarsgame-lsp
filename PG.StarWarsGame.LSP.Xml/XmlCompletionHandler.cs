@@ -11,9 +11,9 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCompletionHandler : CompletionHandlerBase
 {
-    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlCompletionHandler(
         IGameWorkspaceHost workspaceHost,

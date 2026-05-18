@@ -9,10 +9,10 @@ public interface IGameIndexService
     void ApplyBaseline(BaselineIndex baseline);
 
     /// <summary>
-    /// Suppresses <see cref="IndexChanged"/> while the returned scope is alive.
-    /// Fires exactly one <see cref="IndexChanged"/> on <see cref="IDisposable.Dispose"/>
-    /// if at least one update occurred. Used by the workspace scanner to avoid
-    /// O(N²) diagnostic republishing during bulk initial indexing.
+    ///     Suppresses <see cref="IndexChanged" /> while the returned scope is alive.
+    ///     Fires exactly one <see cref="IndexChanged" /> on <see cref="IDisposable.Dispose" />
+    ///     if at least one update occurred. Used by the workspace scanner to avoid
+    ///     O(N²) diagnostic republishing during bulk initial indexing.
     /// </summary>
     IDisposable BeginBulkUpdate();
 

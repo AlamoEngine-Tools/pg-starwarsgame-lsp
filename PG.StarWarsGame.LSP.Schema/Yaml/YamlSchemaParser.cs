@@ -93,7 +93,7 @@ internal static class YamlSchemaParser
                 Description = v.Description,
                 Deprecated = v.Deprecated,
                 AvailableSince = v.AvailableSince,
-                Groups = v.Groups,
+                Groups = v.Groups
             });
         return new EnumDefinition
         {

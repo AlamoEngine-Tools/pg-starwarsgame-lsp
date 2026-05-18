@@ -35,11 +35,13 @@ public sealed class LocalFileSchemaProviderTests : IDisposable
             Directory.CreateDirectory(tagsDir);
             File.WriteAllText(Path.Combine(tagsDir, tagsFileName!), tagsYaml);
         }
+
         if (tagsYaml2 is not null)
         {
             Directory.CreateDirectory(tagsDir);
             File.WriteAllText(Path.Combine(tagsDir, tagsFileName2!), tagsYaml2);
         }
+
         if (typesYaml is not null)
             File.WriteAllText(Path.Combine(_tempDir, "types.yaml"), typesYaml);
         // Constructor calls Load(); explicit call here ensures we re-read after all files are written

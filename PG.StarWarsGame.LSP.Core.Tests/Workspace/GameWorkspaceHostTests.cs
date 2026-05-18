@@ -4,7 +4,10 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Workspace;
 
 public sealed class GameWorkspaceHostTests
 {
-    private static IGameWorkspaceHost Build() => new GameWorkspaceHost();
+    private static IGameWorkspaceHost Build()
+    {
+        return new GameWorkspaceHost();
+    }
 
     // ── AddOrUpdate ──────────────────────────────────────────────────────────
 

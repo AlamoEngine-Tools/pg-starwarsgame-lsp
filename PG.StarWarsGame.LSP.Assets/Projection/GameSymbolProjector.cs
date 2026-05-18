@@ -18,8 +18,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
     public BaselineIndex Project(
         IEnumerable<ProjectableEntry> gameObjects,
         IEnumerable<ProjectableEntry> sfxEvents,
-        string?                       gameConstantsXml,
-        string                        sourceManifestHash)
+        string? gameConstantsXml,
+        string sourceManifestHash)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
 
@@ -51,15 +51,19 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
     }
 
     // "COMBAT_BONUS_ABILITY" → "CombatBonusAbility"
-    internal static string ClassificationToTypeName(string classification) =>
-        string.Concat(
+    internal static string ClassificationToTypeName(string classification)
+    {
+        return string.Concat(
             classification.Split('_')
                 .Where(w => w.Length > 0)
                 .Select(w => char.ToUpperInvariant(w[0]) + w[1..].ToLowerInvariant()));
+    }
 
     // "CombatBonusAbility" → "COMBAT_BONUS_ABILITY"  (used in BaselineBuilder adapter)
-    internal static string TypeNameToClassification(string typeName) =>
-        PascalWordBoundary.Replace(typeName, "_").ToUpperInvariant();
+    internal static string TypeNameToClassification(string typeName)
+    {
+        return PascalWordBoundary.Replace(typeName, "_").ToUpperInvariant();
+    }
 
     private static SymbolOrigin ResolveOrigin(in XmlLocationInfo location)
     {
@@ -71,25 +75,31 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
     private static (
         ImmutableDictionary<string, ImmutableArray<string>> dynamic,
         ImmutableDictionary<string, ImmutableArray<string>> hardcoded
-    ) ExtractDynamicEnums(string? gameConstantsXml)
+        ) ExtractDynamicEnums(string? gameConstantsXml)
     {
         var empty = ImmutableDictionary<string, ImmutableArray<string>>.Empty;
         if (string.IsNullOrEmpty(gameConstantsXml))
             return (empty, empty);
 
         XDocument doc;
-        try { doc = XDocument.Parse(gameConstantsXml); }
-        catch { return (empty, empty); }
+        try
+        {
+            doc = XDocument.Parse(gameConstantsXml);
+        }
+        catch
+        {
+            return (empty, empty);
+        }
 
-        var dyn  = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
+        var dyn = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
         var hard = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
 
         var (dmgAll, dmgHard) = ParseNameListWithBoundary(doc, "Damage_Types");
-        if (dmgAll.Length  > 0) dyn["DamageType"]  = dmgAll;
+        if (dmgAll.Length > 0) dyn["DamageType"] = dmgAll;
         if (dmgHard.Length > 0) hard["DamageType"] = dmgHard;
 
         var (armorAll, armorHard) = ParseNameListWithBoundary(doc, "Armor_Types");
-        if (armorAll.Length  > 0) dyn["ArmorType"]  = armorAll;
+        if (armorAll.Length > 0) dyn["ArmorType"] = armorAll;
         if (armorHard.Length > 0) hard["ArmorType"] = armorHard;
 
         return (dyn.ToImmutable(), hard.ToImmutable());
@@ -101,7 +111,7 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         var el = doc.Descendants(tagName).FirstOrDefault();
         if (el is null) return ([], []);
 
-        var all      = new List<string>();
+        var all = new List<string>();
         var hardcoded = new List<string>();
         var pastBoundary = false;
 
@@ -122,9 +132,12 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             else if (node is XElement child)
             {
                 var v = child.Value.Trim();
-                tokens = v.Length > 0 ? (IEnumerable<string>)[v] : [];
+                tokens = v.Length > 0 ? [v] : [];
             }
-            else continue;
+            else
+            {
+                continue;
+            }
 
             foreach (var t in tokens)
             {
@@ -136,6 +149,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         return ([..all], [..hardcoded]);
     }
 
-    internal static bool IsBoundaryComment(string commentText) =>
-        commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+    internal static bool IsBoundaryComment(string commentText)
+    {
+        return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+    }
 }

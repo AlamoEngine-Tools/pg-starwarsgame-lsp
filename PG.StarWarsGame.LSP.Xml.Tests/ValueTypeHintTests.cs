@@ -148,7 +148,7 @@ public sealed class ValueTypeHintTests
     public void NameReference_XmlObject_WithReferenceType_ContainsTypeName()
     {
         var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference,
-            ReferenceKind.XmlObject, referenceType: "Faction"));
+            ReferenceKind.XmlObject, "Faction"));
         Assert.NotNull(hint);
         Assert.Contains("Faction", hint);
         Assert.DoesNotContain("space-separated", hint);
@@ -214,7 +214,7 @@ public sealed class ValueTypeHintTests
     [Fact]
     public void NameReference_None_ReturnsNull()
     {
-        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference, ReferenceKind.None));
+        var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReference));
         Assert.Null(hint);
     }
 
@@ -231,7 +231,7 @@ public sealed class ValueTypeHintTests
     public void NameReferenceList_XmlObject_WithReferenceType_ContainsSpaceSeparatedAndTypeName()
     {
         var hint = ValueTypeHint.Build(Tag(XmlValueType.NameReferenceList,
-            ReferenceKind.XmlObject, referenceType: "SFXEvent"));
+            ReferenceKind.XmlObject, "SFXEvent"));
         Assert.NotNull(hint);
         Assert.Contains("space-separated", hint, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("SFXEvent", hint);

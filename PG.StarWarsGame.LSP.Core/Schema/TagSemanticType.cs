@@ -16,5 +16,5 @@ public enum TagSemanticType
     ///     Applies to GameObjectTypeReferenceList tags that support AND/OR/NOT operators.
     ///     Validator implementation deferred until expression syntax is confirmed.
     /// </summary>
-    PrerequisiteExpression,
+    PrerequisiteExpression
 }

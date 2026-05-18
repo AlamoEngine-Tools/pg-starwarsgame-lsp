@@ -9,37 +9,47 @@ public sealed class XmlGameDocumentParserTests
 {
     // ── helpers / fakes ──────────────────────────────────────────────────────
 
-    private static XmlGameDocumentParser Build(FakeSchemaProvider? schema = null) =>
-        new(schema ?? new FakeSchemaProvider(),
+    private static XmlGameDocumentParser Build(FakeSchemaProvider? schema = null)
+    {
+        return new XmlGameDocumentParser(schema ?? new FakeSchemaProvider(),
             NullLogger<XmlGameDocumentParser>.Instance);
+    }
 
-    private static GameObjectTypeDefinition Type(string name, string? nameTag = "Name") =>
-        new() { TypeName = name, NameTag = nameTag };
+    private static GameObjectTypeDefinition Type(string name, string? nameTag = "Name")
+    {
+        return new GameObjectTypeDefinition { TypeName = name, NameTag = nameTag };
+    }
 
-    private static XmlTagDefinition RefTag(string tag, string referenceType) =>
-        new()
+    private static XmlTagDefinition RefTag(string tag, string referenceType)
+    {
+        return new XmlTagDefinition
         {
             Tag = tag,
             ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.XmlObject,
             ReferenceType = referenceType
         };
+    }
 
     private static XmlTagDefinition ListRefTag(
         string tag, string referenceType,
         XmlValueType valueType = XmlValueType.GameObjectTypeReferenceList,
-        TagSemanticType semanticType = TagSemanticType.Default) =>
-        new()
+        TagSemanticType semanticType = TagSemanticType.Default)
+    {
+        return new XmlTagDefinition
         {
             Tag = tag,
             ValueType = valueType,
             ReferenceKind = ReferenceKind.XmlObject,
             ReferenceType = referenceType,
-            SemanticType = semanticType,
+            SemanticType = semanticType
         };
+    }
 
-    private static XmlTagDefinition PlainTag(string tag) =>
-        new() { Tag = tag, ValueType = XmlValueType.Float };
+    private static XmlTagDefinition PlainTag(string tag)
+    {
+        return new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.Float };
+    }
 
     // ── CanParse ─────────────────────────────────────────────────────────────
 
@@ -93,7 +103,7 @@ public sealed class XmlGameDocumentParserTests
     public async Task ParseAsync_Singleton_Type_With_No_NameTag_Emits_No_Symbol()
     {
         var schema = new FakeSchemaProvider();
-        schema.AddType(Type("GameConstants", nameTag: null)); // singleton: no Name attribute
+        schema.AddType(Type("GameConstants", null)); // singleton: no Name attribute
 
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
@@ -351,20 +361,55 @@ public sealed class XmlGameDocumentParserTests
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags =
             new(StringComparer.OrdinalIgnoreCase);
+
         private readonly Dictionary<string, GameObjectTypeDefinition> _types =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void AddTag(XmlTagDefinition tag) => _tags[tag.Tag] = tag;
-        public void AddType(GameObjectTypeDefinition type) => _types[type.TypeName] = type;
+        public XmlTagDefinition? GetTag(string name)
+        {
+            return _tags.GetValueOrDefault(name);
+        }
 
-        public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void AddTag(XmlTagDefinition tag)
+        {
+            _tags[tag.Tag] = tag;
+        }
+
+        public void AddType(GameObjectTypeDefinition type)
+        {
+            _types[type.TypeName] = type;
+        }
     }
 }

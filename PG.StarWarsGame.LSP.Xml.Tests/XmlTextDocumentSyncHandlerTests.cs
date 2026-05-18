@@ -10,10 +10,10 @@ public sealed class XmlTextDocumentSyncHandlerTests
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlTextDocumentSyncHandler handler,
-                    FakeGameWorkspaceHost host,
-                    FakeGameIndexService index) Build()
+        FakeGameWorkspaceHost host,
+        FakeGameIndexService index) Build()
     {
-        var host  = new FakeGameWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         var index = new FakeGameIndexService();
         return (new XmlTextDocumentSyncHandler(host, index), host, index);
     }
@@ -166,14 +166,18 @@ public sealed class XmlTextDocumentSyncHandlerTests
 
     internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
     {
-        public record Call(string Uri, string Text, int Version);
         public List<Call> AddOrUpdateCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => AddOrUpdateCalls.Add(new Call(uri, text, version));
+        {
+            AddOrUpdateCalls.Add(new Call(uri, text, version));
+        }
 
-        public void Remove(string uri) => RemoveCalls.Add(uri);
+        public void Remove(string uri)
+        {
+            RemoveCalls.Add(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
         {
@@ -182,16 +186,22 @@ public sealed class XmlTextDocumentSyncHandlerTests
         }
 
         public IEnumerable<TrackedDocument> All => [];
+
+        public record Call(string Uri, string Text, int Version);
     }
 
     internal sealed class FakeGameIndexService : IGameIndexService
     {
-        public record UpdateCall(string Uri, string Text, int Version);
         public List<UpdateCall> UpdateCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
 
         public GameIndex Current => GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged { add { } remove { } }
+
+        public event Action<GameIndex>? IndexChanged
+        {
+            add { }
+            remove { }
+        }
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -199,14 +209,29 @@ public sealed class XmlTextDocumentSyncHandlerTests
             return Task.CompletedTask;
         }
 
-        public void RemoveDocument(string uri) => RemoveCalls.Add(uri);
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void RemoveDocument(string uri)
+        {
+            RemoveCalls.Add(uri);
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
+
+        public record UpdateCall(string Uri, string Text, int Version);
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

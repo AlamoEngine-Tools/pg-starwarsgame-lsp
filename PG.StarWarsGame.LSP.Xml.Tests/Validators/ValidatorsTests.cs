@@ -7,7 +7,8 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validators;
 
 file static class TagOf
 {
-    public static XmlTagDefinition Make(string name, XmlValueType type, TagSemanticType semanticType = TagSemanticType.Default)
+    public static XmlTagDefinition Make(string name, XmlValueType type,
+        TagSemanticType semanticType = TagSemanticType.Default)
     {
         return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
     }
@@ -107,7 +108,9 @@ public sealed class DynamicEnumValueValidatorTests
 {
     private static readonly DynamicEnumValueValidator Sut = new();
     private static readonly XmlTagDefinition Tag = TagOf.Make("MovementClass", XmlValueType.DynamicEnumValue);
-    private static readonly XmlTagDefinition FlagTag = TagOf.Make("CategoryMask", XmlValueType.DynamicEnumValue, TagSemanticType.FlagList);
+
+    private static readonly XmlTagDefinition FlagTag = TagOf.Make("CategoryMask", XmlValueType.DynamicEnumValue,
+        TagSemanticType.FlagList);
 
     [Theory]
     [InlineData("Infantry")]
@@ -153,8 +156,10 @@ public sealed class DynamicEnumValueValidatorTests
 public sealed class PrerequisiteExpressionValidatorTests
 {
     private static readonly PrerequisiteExpressionValidator Sut = new();
+
     private static readonly XmlTagDefinition Tag =
-        TagOf.Make("Required_Special_Structures", XmlValueType.GameObjectTypeReferenceList, TagSemanticType.PrerequisiteExpression);
+        TagOf.Make("Required_Special_Structures", XmlValueType.GameObjectTypeReferenceList,
+            TagSemanticType.PrerequisiteExpression);
 
     [Theory]
     [InlineData("U_Ground_Barracks")]

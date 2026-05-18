@@ -3,9 +3,9 @@ using System.Collections.Immutable;
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public sealed record GameIndex(
-    BaselineIndex                                              Baseline,
-    ImmutableDictionary<string, DocumentIndex>                 Documents,
-    ImmutableDictionary<string, ImmutableArray<GameSymbol>>    WorkspaceDefinitions,
+    BaselineIndex Baseline,
+    ImmutableDictionary<string, DocumentIndex> Documents,
+    ImmutableDictionary<string, ImmutableArray<GameSymbol>> WorkspaceDefinitions,
     ImmutableDictionary<string, ImmutableArray<GameReference>> WorkspaceReferences
 )
 {
@@ -27,7 +27,8 @@ public sealed record GameIndex(
     public IEnumerable<GameSymbol> ResolveAll(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws))
-            foreach (var s in ws) yield return s;
+            foreach (var s in ws)
+                yield return s;
         if (Baseline.Symbols.TryGetValue(id, out var b))
             yield return b;
     }

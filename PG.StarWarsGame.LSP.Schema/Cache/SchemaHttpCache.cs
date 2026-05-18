@@ -61,6 +61,7 @@ public sealed class SchemaHttpCache
                 var typeName = _fs.Path.GetFileNameWithoutExtension(rel);
                 tagsByType.Add((typeName, YamlSchemaParser.ParseTagFile(contents[i++])));
             }
+
             foreach (var _ in manifest.Types)
                 types.AddRange(YamlSchemaParser.ParseTypeFile(contents[i++]));
             foreach (var _ in manifest.Enums)

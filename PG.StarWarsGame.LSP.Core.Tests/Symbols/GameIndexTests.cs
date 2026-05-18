@@ -7,35 +7,45 @@ public sealed class GameIndexTests
 {
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private static GameSymbol Symbol(string id, string typeName = "Unit") =>
-        new(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///f.xml", 1, null), null);
+    private static GameSymbol Symbol(string id, string typeName = "Unit")
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///f.xml", 1, null), null);
+    }
 
-    private static BaselineIndex Baseline(params GameSymbol[] symbols) =>
-        new(symbols.ToImmutableDictionary(s => s.Id),
+    private static BaselineIndex Baseline(params GameSymbol[] symbols)
+    {
+        return new BaselineIndex(symbols.ToImmutableDictionary(s => s.Id),
             DateTimeOffset.UtcNow,
             "hash-abc",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+    }
 
-    private static GameIndex WithBaseline(params GameSymbol[] symbols) =>
-        GameIndex.Empty with { Baseline = Baseline(symbols) };
+    private static GameIndex WithBaseline(params GameSymbol[] symbols)
+    {
+        return GameIndex.Empty with { Baseline = Baseline(symbols) };
+    }
 
-    private static GameIndex WithWorkspace(params GameSymbol[] symbols) =>
-        GameIndex.Empty with
+    private static GameIndex WithWorkspace(params GameSymbol[] symbols)
+    {
+        return GameIndex.Empty with
         {
             WorkspaceDefinitions = symbols
                 .GroupBy(s => s.Id)
                 .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray())
         };
+    }
 
-    private static GameIndex WithBoth(GameSymbol[] baselineSymbols, GameSymbol[] workspaceSymbols) =>
-        GameIndex.Empty with
+    private static GameIndex WithBoth(GameSymbol[] baselineSymbols, GameSymbol[] workspaceSymbols)
+    {
+        return GameIndex.Empty with
         {
             Baseline = Baseline(baselineSymbols),
             WorkspaceDefinitions = workspaceSymbols
                 .GroupBy(s => s.Id)
                 .ToImmutableDictionary(g => g.Key, g => g.ToImmutableArray())
         };
+    }
 
     // ── BaselineIndex ────────────────────────────────────────────────────────
 

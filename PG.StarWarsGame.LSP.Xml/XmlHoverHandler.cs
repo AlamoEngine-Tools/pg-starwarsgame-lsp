@@ -12,10 +12,10 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlHoverHandler : HoverHandlerBase
 {
-    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILspConfigurationProvider _config;
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly ISchemaProvider _schema;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlHoverHandler(
         IGameWorkspaceHost workspaceHost,

@@ -16,7 +16,7 @@ public sealed class XmlHoverHandlerTests
     private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
         FakeConfigProvider config) Build()
     {
-        var host   = new FakeGameWorkspaceHost();
+        var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var config = new FakeConfigProvider();
         return (new XmlHoverHandler(host, schema, config, NullLogger<XmlHoverHandler>.Instance), host, schema, config);
@@ -317,12 +317,19 @@ public sealed class XmlHoverHandlerTests
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
@@ -332,21 +339,51 @@ public sealed class XmlHoverHandlerTests
         public XmlTagDefinition? TagToReturn { get; set; }
         public GameObjectTypeDefinition? TypeToReturn { get; set; }
 
-        public XmlTagDefinition? GetTag(string _) => TagToReturn;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return TagToReturn;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string _) => TypeToReturn;
+
+        public GameObjectTypeDefinition? GetObjectType(string _)
+        {
+            return TypeToReturn;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
     }
 
     private sealed class FakeConfigProvider : ILspConfigurationProvider
     {
         public string Locale { get; set; } = "en";
         public LspConfiguration Current => new() { Locale = Locale };
-        public void LoadFrom(object? _) { }
+
+        public void LoadFrom(object? _)
+        {
+        }
     }
 }

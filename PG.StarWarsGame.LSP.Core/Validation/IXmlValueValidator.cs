@@ -7,8 +7,8 @@ public interface IXmlValueValidator
     XmlValueType ValueType { get; }
 
     /// <summary>
-    /// Optional semantic refinement that routes this validator ahead of the base-type validator.
-    /// <see cref="TagSemanticType.Default" /> (the default) means "dispatch by <see cref="ValueType" /> only."
+    ///     Optional semantic refinement that routes this validator ahead of the base-type validator.
+    ///     <see cref="TagSemanticType.Default" /> (the default) means "dispatch by <see cref="ValueType" /> only."
     /// </summary>
     TagSemanticType SemanticType => TagSemanticType.Default;
 
