@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions;
 using System.Security.Cryptography;
+using System.Xml.Linq;
 using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -94,6 +96,52 @@ var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider
 var baseline = projector.Project(gameObjects, sfxEvents, gameConstantsXml, manifestHash);
 Console.WriteLine(
     $"Projected {baseline.Symbols.Count} symbols, {baseline.DynamicEnumValues.Count} dynamic enum(s), {baseline.HardcodedEnumValues.Sum(kv => kv.Value.Length)} hardcoded enum value(s)");
+
+// Build file-type registry from game metafiles
+var fileTypeMapBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+if (schemaProvider is not null)
+{
+    foreach (var def in schemaProvider.AllMetafiles)
+    {
+        if (def.MetafileType == MetafileType.Special) continue;
+
+        if (def.MetafileType == MetafileType.FileRegistry)
+        {
+            var enginePath = def.Path.ToUpperInvariant().Replace('/', '\\');
+            using var stream = engine.GameRepository.TryOpenFile(enginePath);
+            if (stream is not null)
+            {
+                try
+                {
+                    var xmlContent = await new StreamReader(stream).ReadToEndAsync();
+                    var xdoc = XDocument.Parse(xmlContent);
+                    foreach (var elem in xdoc.Descendants()
+                                 .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
+                    {
+                        var filename = elem.Attributes()
+                            .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
+                        if (!string.IsNullOrEmpty(filename))
+                        {
+                            var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+                            fileTypeMapBuilder[normalizedPath] = [.. def.Types];
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"Warning: Failed to parse metafile '{def.Path}': {ex.Message}");
+                }
+            }
+        }
+        else // DirectContent — the file itself is the content
+        {
+            fileTypeMapBuilder[def.Path] = [.. def.Types];
+        }
+    }
+}
+
+baseline = baseline with { FileTypeMap = fileTypeMapBuilder.ToImmutable() };
+Console.WriteLine($"File type registry: {baseline.FileTypeMap.Count} file(s) registered");
 
 // Serialize
 var data = BaselineSerializer.Serialize(baseline);

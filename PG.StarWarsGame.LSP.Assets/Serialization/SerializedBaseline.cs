@@ -14,4 +14,5 @@ public sealed class SerializedBaseline
     [Key(2)] public string SourceManifestHash { get; set; } = string.Empty;
     [Key(3)] public SerializedEnumValues[] DynamicEnumValues { get; set; } = [];
     [Key(4)] public SerializedEnumValues[] HardcodedEnumValues { get; set; } = [];
+    [Key(5)] public SerializedEnumValues[] FileTypeMap { get; set; } = [];
 }

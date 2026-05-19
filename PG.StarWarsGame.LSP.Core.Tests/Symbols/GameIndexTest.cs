@@ -21,6 +21,7 @@ public sealed class GameIndexTest
             DateTimeOffset.UtcNow,
             "hash-abc",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
     }
 

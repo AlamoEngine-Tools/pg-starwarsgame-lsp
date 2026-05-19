@@ -44,6 +44,7 @@ public sealed class GameIndexServiceTest
             ImmutableDictionary<string, GameSymbol>.Empty.Add("A", Symbol("A")),
             DateTimeOffset.UtcNow, "h",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
         svc.ApplyBaseline(baseline);

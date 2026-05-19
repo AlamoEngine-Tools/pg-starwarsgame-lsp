@@ -110,6 +110,7 @@ public sealed class BaselineSerializerTest
             ImmutableDictionary<string, GameSymbol>.Empty,
             TestDate, "abc123hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
         var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
@@ -141,6 +142,7 @@ public sealed class BaselineSerializerTest
             ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("DamageType", ["EXPLOSIVE", "ENERGY", "GRENADE"])
                 .Add("ArmorType", ["ARMOR_INFANTRY", "ARMOR_VEHICLE"]),
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
         var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
@@ -173,7 +175,8 @@ public sealed class BaselineSerializerTest
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("DamageType", ["EXPLOSIVE", "ENERGY"])
-                .Add("ArmorType", ["ARMOR_INFANTRY"]));
+                .Add("ArmorType", ["ARMOR_INFANTRY"]),
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
         var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
 
@@ -192,11 +195,41 @@ public sealed class BaselineSerializerTest
         Assert.Empty(result.HardcodedEnumValues);
     }
 
+    // ── FileTypeMap ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_FileTypeMap()
+    {
+        var baseline = new BaselineIndex(
+            ImmutableDictionary<string, GameSymbol>.Empty,
+            TestDate, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("data/xml/hardpoints.xml", ["GameObjectType"])
+                .Add("data/xml/movies.xml", ["BinkMovie"]));
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(2, result.FileTypeMap.Count);
+        Assert.Equal(["GameObjectType"], result.FileTypeMap["data/xml/hardpoints.xml"].ToArray());
+        Assert.Equal(["BinkMovie"], result.FileTypeMap["data/xml/movies.xml"].ToArray());
+    }
+
+    [Fact]
+    public void RoundTrip_EmptyFileTypeMap()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+
+        Assert.Empty(result.FileTypeMap);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols)
     {
         return new BaselineIndex(symbols.ToImmutableDictionary(s => s.Id), TestDate, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
     }

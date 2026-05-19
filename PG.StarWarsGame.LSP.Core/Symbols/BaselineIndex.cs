@@ -10,13 +10,15 @@ public sealed record BaselineIndex(
     DateTimeOffset BuiltAt,
     string SourceManifestHash,
     ImmutableDictionary<string, ImmutableArray<string>> DynamicEnumValues,
-    ImmutableDictionary<string, ImmutableArray<string>> HardcodedEnumValues
+    ImmutableDictionary<string, ImmutableArray<string>> HardcodedEnumValues,
+    ImmutableDictionary<string, ImmutableArray<string>> FileTypeMap
 )
 {
     public static readonly BaselineIndex Empty = new(
         ImmutableDictionary<string, GameSymbol>.Empty,
         DateTimeOffset.MinValue,
         string.Empty,
+        ImmutableDictionary<string, ImmutableArray<string>>.Empty,
         ImmutableDictionary<string, ImmutableArray<string>>.Empty,
         ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 }

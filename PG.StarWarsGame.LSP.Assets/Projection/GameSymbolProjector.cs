@@ -44,7 +44,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         var (dynamicEnums, hardcodedEnums) = ExtractDynamicEnums(gameConstantsXml);
 
         return new BaselineIndex(builder.ToImmutable(), DateTimeOffset.UtcNow,
-            sourceManifestHash, dynamicEnums, hardcodedEnums);
+            sourceManifestHash, dynamicEnums, hardcodedEnums,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
     }
 
     private string ResolveTypeName(string classificationName)

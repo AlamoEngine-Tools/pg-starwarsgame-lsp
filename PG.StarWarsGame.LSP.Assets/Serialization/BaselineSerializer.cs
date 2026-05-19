@@ -18,7 +18,8 @@ public static class BaselineSerializer
             BuiltAtMs = baseline.BuiltAt.ToUnixTimeMilliseconds(),
             SourceManifestHash = baseline.SourceManifestHash,
             DynamicEnumValues = ToSerializedArray(baseline.DynamicEnumValues),
-            HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues)
+            HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues),
+            FileTypeMap = ToSerializedArray(baseline.FileTypeMap)
         };
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
@@ -41,7 +42,8 @@ public static class BaselineSerializer
         var symbols = dto.Symbols.ToImmutableDictionary(s => s.Id);
         var enums = FromSerializedArray(dto.DynamicEnumValues);
         var hardcoded = FromSerializedArray(dto.HardcodedEnumValues);
-        return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded);
+        var fileTypeMap = FromSerializedArray(dto.FileTypeMap);
+        return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap);
     }
 
     private static SerializedEnumValues[] ToSerializedArray(

@@ -409,6 +409,7 @@ public sealed class XmlDiagnosticsPublisherTest
                 DateTimeOffset.UtcNow,
                 "hash",
                 ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+                ImmutableDictionary<string, ImmutableArray<string>>.Empty,
                 ImmutableDictionary<string, ImmutableArray<string>>.Empty)
         };
 
@@ -447,7 +448,8 @@ public sealed class XmlDiagnosticsPublisherTest
             ImmutableDictionary<string, GameSymbol>.Empty,
             DateTimeOffset.UtcNow, "hash",
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
-            hardcoded);
+            hardcoded,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
         return GameIndex.Empty with { Baseline = baseline };
     }
 
