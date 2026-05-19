@@ -177,6 +177,7 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
     public IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
     public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
     public GameObjectTypeDefinition? GetObjectType(string _) => null;

@@ -21,6 +21,7 @@ file sealed class StubEnumSchemaProvider : ISchemaProvider
     public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
     public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public XmlTagDefinition? GetTag(string _) => null;

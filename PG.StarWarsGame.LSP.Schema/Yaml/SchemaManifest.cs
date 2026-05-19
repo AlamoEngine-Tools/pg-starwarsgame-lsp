@@ -10,4 +10,5 @@ public sealed class SchemaManifest
     public List<string> Types { get; set; } = [];
     public List<string> Enums { get; set; } = [];
     public List<string> Hardcoded { get; set; } = [];
+    public List<string> Meta { get; set; } = [];
 }

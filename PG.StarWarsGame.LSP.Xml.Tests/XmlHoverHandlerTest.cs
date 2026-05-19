@@ -374,6 +374,7 @@ public sealed class XmlHoverHandlerTest
         public IReadOnlyList<EnumDefinition> AllEnums => [];
 
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
         public event EventHandler? SchemaRefreshed
         {

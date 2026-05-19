@@ -294,4 +294,41 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
 
         Assert.Equal(2, provider.GetAllTagDefinitions("Text_ID").Count);
     }
+
+    [Fact]
+    public void AllMetafiles_WithMetaYaml_PopulatedAfterLoad()
+    {
+        const string metaYaml = """
+                                metafiles:
+                                  - path: data/xml/gameobjectfiles.xml
+                                    metaFileType: fileRegistry
+                                    types:
+                                      - GameObjectType
+                                  - path: data/xml/movies.xml
+                                    metaFileType: directContent
+                                    types:
+                                      - BinkMovie
+                                """;
+        var metaDir = Path.Combine(_tempDir, "meta");
+        Directory.CreateDirectory(metaDir);
+        File.WriteAllText(Path.Combine(metaDir, "metafiles.yaml"), metaYaml);
+
+        using var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
+        provider.Load();
+
+        Assert.Equal(2, provider.AllMetafiles.Count);
+        var first = provider.AllMetafiles[0];
+        Assert.Equal("data/xml/gameobjectfiles.xml", first.Path);
+        Assert.Equal(MetafileType.FileRegistry, first.MetafileType);
+        Assert.Equal(["GameObjectType"], first.Types);
+    }
+
+    [Fact]
+    public void AllMetafiles_WithoutMetaYaml_ReturnsEmpty()
+    {
+        using var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
+        provider.Load();
+
+        Assert.Empty(provider.AllMetafiles);
+    }
 }

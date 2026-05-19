@@ -77,6 +77,8 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
 
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
 
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
+
     public void Load()
     {
         _logger.LogDebug("Loading schema from {Path}", _rootPath);
@@ -110,7 +112,12 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
             }
         }
 
-        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets);
+        var metaPath = Path.Combine(_rootPath, "meta", "metafiles.yaml");
+        var metafiles = File.Exists(metaPath)
+            ? YamlSchemaParser.ParseMetafileFile(File.ReadAllText(metaPath))
+            : (IReadOnlyList<MetafileDefinition>)[];
+
+        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
 
         _logger.LogInformation(

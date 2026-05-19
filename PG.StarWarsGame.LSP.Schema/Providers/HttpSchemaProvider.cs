@@ -69,6 +69,8 @@ public sealed class HttpSchemaProvider : ISchemaProvider
 
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
 
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
+
     public async Task LoadAsync(CancellationToken ct = default)
     {
         _logger.LogInformation("Fetching schema manifest from {BaseUrl}", _baseUrl);
@@ -98,6 +100,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
         var types = new List<GameObjectTypeDefinition>();
         var enums = new List<EnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
+        var metafiles = new List<MetafileDefinition>();
         var fetchedFiles = new List<(string relativePath, string content)>();
 
         foreach (var path in manifest.Tags)
@@ -183,7 +186,24 @@ public sealed class HttpSchemaProvider : ISchemaProvider
                 fetchedFiles.Add((path, raw));
         }
 
-        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets);
+        foreach (var path in manifest.Meta)
+        {
+            var (parsed, raw) = await FetchYamlAsync<MetafileDefinition>(
+                path, yaml => [.. YamlSchemaParser.ParseMetafileFile(yaml)], ct);
+            if (parsed is null)
+            {
+                metafiles.AddRange(_current.AllMetafiles);
+            }
+            else
+            {
+                metafiles.AddRange(parsed);
+            }
+
+            if (raw is not null)
+                fetchedFiles.Add((path, raw));
+        }
+
+        _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
 
         _cache.Update(indexJson, fetchedFiles);

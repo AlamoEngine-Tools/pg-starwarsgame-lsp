@@ -133,4 +133,20 @@ internal static class YamlSchemaParser
             Values = values
         };
     }
+
+    public static IReadOnlyList<MetafileDefinition> ParseMetafileFile(string yaml)
+    {
+        var file = Deserializer.Deserialize<YamlMetafileFile>(yaml);
+        var result = new List<MetafileDefinition>(file.Metafiles.Count);
+        foreach (var entry in file.Metafiles)
+        {
+            if (!Enum.TryParse<MetafileType>(entry.MetaFileType, true, out var metafileType))
+                continue;
+
+            var normalizedPath = entry.Path.Replace('\\', '/').ToLowerInvariant();
+            result.Add(new MetafileDefinition(normalizedPath, metafileType, entry.Types));
+        }
+
+        return result;
+    }
 }

@@ -257,4 +257,99 @@ public sealed class YamlSchemaParserTest
         Assert.Equal("BehaviorModule", set.Name);
         Assert.Empty(set.Values);
     }
+
+    // ── ParseMetafileFile ───────────────────────────────────────────────────
+
+    [Fact]
+    public void ParseMetafileFile_FileRegistryEntry_MappedCorrectly()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/gameobjectfiles.xml
+                                metaFileType: fileRegistry
+                                types:
+                                  - GameObjectType
+                            """;
+
+        var metafiles = YamlSchemaParser.ParseMetafileFile(yaml);
+
+        var entry = Assert.Single(metafiles);
+        Assert.Equal("data/xml/gameobjectfiles.xml", entry.Path);
+        Assert.Equal(MetafileType.FileRegistry, entry.MetafileType);
+        Assert.Equal(["GameObjectType"], entry.Types);
+    }
+
+    [Fact]
+    public void ParseMetafileFile_DirectContentEntry_MappedCorrectly()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/movies.xml
+                                metaFileType: directContent
+                                types:
+                                  - BinkMovie
+                            """;
+
+        var metafiles = YamlSchemaParser.ParseMetafileFile(yaml);
+
+        var entry = Assert.Single(metafiles);
+        Assert.Equal(MetafileType.DirectContent, entry.MetafileType);
+    }
+
+    [Fact]
+    public void ParseMetafileFile_SpecialEntry_MappedCorrectly()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/campaignfiles.xml
+                                metaFileType: special
+                                types:
+                                  - StoryParser
+                            """;
+
+        var metafiles = YamlSchemaParser.ParseMetafileFile(yaml);
+
+        var entry = Assert.Single(metafiles);
+        Assert.Equal(MetafileType.Special, entry.MetafileType);
+    }
+
+    [Fact]
+    public void ParseMetafileFile_UpperCaseBackslashPath_NormalisedToLowercaseForwardSlash()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: DATA\XML\GameObjectFiles.xml
+                                metaFileType: fileRegistry
+                                types:
+                                  - GameObjectType
+                            """;
+
+        var metafiles = YamlSchemaParser.ParseMetafileFile(yaml);
+
+        Assert.Equal("data/xml/gameobjectfiles.xml", metafiles[0].Path);
+    }
+
+    [Fact]
+    public void ParseMetafileFile_MultipleEntries_AllParsed()
+    {
+        const string yaml = """
+                            metafiles:
+                              - path: data/xml/gameobjectfiles.xml
+                                metaFileType: fileRegistry
+                                types:
+                                  - GameObjectType
+                              - path: data/xml/movies.xml
+                                metaFileType: directContent
+                                types:
+                                  - BinkMovie
+                              - path: data/xml/musicevents.xml
+                                metaFileType: directContent
+                                types:
+                                  - MusicEvent
+                            """;
+
+        var metafiles = YamlSchemaParser.ParseMetafileFile(yaml);
+
+        Assert.Equal(3, metafiles.Count);
+    }
 }

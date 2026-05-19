@@ -16,6 +16,8 @@ public interface ISchemaProvider
 
     IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets { get; }
 
+    IReadOnlyList<MetafileDefinition> AllMetafiles { get; }
+
     /// <summary>Returns the first definition found for this tag across all types. Use when context type is unknown.</summary>
     XmlTagDefinition? GetTag(string tagName);
 
