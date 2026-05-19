@@ -74,7 +74,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         // is technically inside a bracket (the opening '<' has no paired '>').
         if (IsTagNameContext(line, character))
         {
-            var (enclosingType, _) = FindEnclosingTagName(lines, lineIndex, character);
+            var (enclosingType, enclosingTagDepth) = FindEnclosingTagName(lines, lineIndex, character);
             if (enclosingType is null)
                 return Task.FromResult(new CompletionList());
 
@@ -87,7 +87,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
                 return Task.FromResult(new CompletionList(storyItems));
             }
 
-            var tagItems = BuildTagNameCompletions(text, enclosingType, ExtractPartialTagName(line, character));
+            var tagItems = BuildTagNameCompletions(uri, text, enclosingType, enclosingTagDepth,
+                ExtractPartialTagName(line, character));
             return Task.FromResult(new CompletionList(tagItems));
         }
 
@@ -100,9 +101,16 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         if (enclosingTag is null)
             return Task.FromResult(new CompletionList());
 
-        // Depth 1 = cursor directly inside the root element (a file container, never a field tag).
-        // Type containers at any depth are also not field tags.
-        if (enclosingDepth == 1 || _schema.GetObjectType(enclosingTag) is not null)
+        // Depth 1 = cursor directly inside the file-level container — never a field tag.
+        if (enclosingDepth == 1)
+            return Task.FromResult(new CompletionList());
+
+        // Depth 2 in a multi-instance file = cursor inside a type container, not a field tag.
+        if (enclosingDepth == 2 && IsMultiInstanceFile(uri))
+            return Task.FromResult(new CompletionList());
+
+        // Fallback for unregistered files: element-name-based type detection.
+        if (_schema.GetObjectType(enclosingTag) is not null)
             return Task.FromResult(new CompletionList());
 
         // StoryParser context: value completion for Event_Param* / Reward_Param* tags
@@ -135,6 +143,13 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     {
         var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
         return _fileTypeRegistry.GetTypesForFile(normalized).Contains("StoryParser");
+    }
+
+    private bool IsMultiInstanceFile(string documentUri)
+    {
+        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
+        return fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
     }
 
     private IEnumerable<CompletionItem> BuildStoryEventTagCompletions(
@@ -226,13 +241,34 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return result;
     }
 
-    private IEnumerable<CompletionItem> BuildTagNameCompletions(string text, string parentName, string prefix)
+    private IEnumerable<CompletionItem> BuildTagNameCompletions(
+        string uri, string text, string parentName, int depth, string prefix)
     {
-        var typeDef = _schema.GetObjectType(parentName);
-        if (typeDef is null)
-            return [];
+        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(uri);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
 
-        var candidates = _schema.GetTagsForType(parentName);
+        IReadOnlyList<XmlTagDefinition> candidates;
+        if (!fileTypes.IsEmpty)
+        {
+            // Only offer field-tag completions at the correct depth for the file's type structure.
+            var isMultiInstance = fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
+            var expectedDepth = isMultiInstance ? 2 : 1;
+            if (depth != expectedDepth)
+                return [];
+
+            var tagsList = new List<XmlTagDefinition>();
+            foreach (var typeName in fileTypes)
+                tagsList.AddRange(_schema.GetTagsForType(typeName));
+            candidates = tagsList;
+        }
+        else
+        {
+            // Fallback for unregistered files: use element name as type name.
+            var typeDef = _schema.GetObjectType(parentName);
+            if (typeDef is null)
+                return [];
+            candidates = _schema.GetTagsForType(parentName);
+        }
 
         // Find already-present direct children of the parent element in the current document
         var existingTags = CollectExistingChildTagNames(text, parentName);

@@ -185,6 +185,49 @@ public sealed class XmlCompletionHandlerTest
         Assert.Empty(result.Items);
     }
 
+    // ── registry-based completions ───────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_TagNameContext_RegistryMappedMultiInstance_ArbitraryElementName_OffersTypeFieldTags()
+    {
+        // "Fighter_Mk2" is an arbitrary XML element name; the actual type is "SpaceUnit".
+        // Tag-name completion must use the registry type, not the element name.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", MakeTag("Max_Speed"));
+        schema.AddTagForType("SpaceUnit", MakeTag("Armor_Type"));
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<GameObjectFiles>\n  <Fighter_Mk2>\n    <\n  </Fighter_Mk2>\n</GameObjectFiles>", 1);
+        var result = await handler.Handle(At(2, 5), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("Max_Speed", labels);
+        Assert.Contains("Armor_Type", labels);
+    }
+
+    [Fact]
+    public async Task Handle_ValueCompletion_RegistryMappedMultiInstance_TypeContainerNameMatchesTagName_ReturnsEmpty()
+    {
+        // "Faction" is both a schema tag name and the element name for type containers.
+        // The actual type name is "FactionType" (differs from element name).
+        // Cursor at depth 2 (inside the type container) must not offer value completions.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("FactionType"));
+        var (handler, host, schema, proposals) = Build(registry);
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "FactionType", NameTag = "Name" });
+        schema.AddTagForType("SomeType", MakeTag("Faction"));
+        proposals.ProposalsToReturn = [new ValueProposal { Label = "EMPIRE" }];
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<FactionDefs>\n  <Faction Name=\"EMPIRE\">\n    \n  </Faction>\n</FactionDefs>", 1);
+        var result = await handler.Handle(At(2, 4), CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
     // ── fakes ───────────────────────────────────────────────────────────────
 
     private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
