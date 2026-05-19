@@ -36,14 +36,16 @@ public sealed class XmlDiagnosticsPublisherTest
             schema,
             new FakeValidatorRegistry(),
             new StoryParserDiagnosticCollector(schema),
-            NullLogger<XmlDiagnosticsPublisher>.Instance);
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            new FakeFileTypeRegistry());
     }
 
     // Subscription / routing tests use this builder so they can control the index service.
     private static (XmlDiagnosticsPublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
-        FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null)
+        FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
+        FakeFileTypeRegistry? registry = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -56,7 +58,8 @@ public sealed class XmlDiagnosticsPublisherTest
             effectiveSchema,
             new FakeValidatorRegistry(),
             new StoryParserDiagnosticCollector(effectiveSchema),
-            NullLogger<XmlDiagnosticsPublisher>.Instance);
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            registry ?? new FakeFileTypeRegistry());
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -593,9 +596,11 @@ public sealed class XmlDiagnosticsPublisherTest
     public void OnIndexChanged_StoryParserDocument_EmitsStoryDiagnostics()
     {
         // ZOOM_IN has 0 params; Reward_Param1 is spurious → story collector emits a warning.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
         var schema = new FakeSchemaProvider();
         schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
-        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema, registry);
 
         const string uri = "file:///StoryPlots.xml";
         const string xml = "<StoryParser><Event>" +
@@ -631,6 +636,56 @@ public sealed class XmlDiagnosticsPublisherTest
         var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
         Assert.NotNull(storyDiags);
         Assert.DoesNotContain(storyDiags, d => d.Message.Contains("is not used by") || d.Message.Contains("requires"));
+    }
+
+    // ── StoryParser registry-based detection ─────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_StoryParserDocument_RegistryMatch_ArbitraryRootElement_EmitsStoryDiagnostics()
+    {
+        // Detection must use the registry, not the root element name.
+        var registry = new FakeFileTypeRegistry();
+        const string uri = "file:///StoryPlots.xml";
+        registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
+        var schema = new FakeSchemaProvider();
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema, registry);
+
+        const string xml = "<SomeContainer><Event>" +
+                           "<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
+                           "<Reward_Type>ZOOM_IN</Reward_Type>" +
+                           "<Reward_Param1>extra</Reward_Param1>" +
+                           "</Event></SomeContainer>";
+
+        workspaceHost.Set(uri, xml);
+        indexService.Fire(IndexWithDoc(uri));
+
+        var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
+        Assert.NotNull(storyDiags);
+        Assert.Contains(storyDiags, d => d.Message.Contains("Reward_Param1") && d.Message.Contains("ZOOM_IN"));
+    }
+
+    [Fact]
+    public void OnIndexChanged_StoryParserRootElement_NotInRegistry_NoStoryDiagnostics()
+    {
+        // Root element named "StoryParser" but the file is not registered → no story diagnostics.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
+
+        const string uri = "file:///StoryPlots.xml";
+        const string xml = "<StoryParser><Event>" +
+                           "<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
+                           "<Reward_Type>ZOOM_IN</Reward_Type>" +
+                           "<Reward_Param1>extra</Reward_Param1>" +
+                           "</Event></StoryParser>";
+
+        workspaceHost.Set(uri, xml);
+        indexService.Fire(IndexWithDoc(uri));
+
+        var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
+        Assert.NotNull(storyDiags);
+        Assert.DoesNotContain(storyDiags, d => d.Message.Contains("Reward_Param1"));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
@@ -735,6 +790,24 @@ public sealed class XmlDiagnosticsPublisherTest
             {
             }
         }
+    }
+
+    private sealed class FakeFileTypeRegistry : IFileTypeRegistry
+    {
+        private readonly Dictionary<string, ImmutableArray<string>> _map =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
+
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
+            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
+            _map[normalizedPath] = typeNames;
+
+        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
+
+        public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
     }
 
     private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost

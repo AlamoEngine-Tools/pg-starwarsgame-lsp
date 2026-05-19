@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
@@ -18,14 +19,15 @@ public sealed class XmlCompletionHandlerTest
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlCompletionHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
-        FakeProposalRegistry proposals) Build()
+        FakeProposalRegistry proposals) Build(FakeFileTypeRegistry? registry = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var proposals = new FakeProposalRegistry();
         var indexService = new FakeIndexService();
         var storyProposals = new StoryParamValueProposalProvider(schema);
-        return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals), host, schema, proposals);
+        return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
+            registry ?? new FakeFileTypeRegistry()), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -293,13 +295,33 @@ public sealed class XmlCompletionHandlerTest
         }
     }
 
+    private sealed class FakeFileTypeRegistry : IFileTypeRegistry
+    {
+        private readonly Dictionary<string, ImmutableArray<string>> _map =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
+
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
+            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
+            _map[normalizedPath] = typeNames;
+
+        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
+
+        public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
+    }
+
     // ── StoryParser tag-name completions ──────────────────────────────────────
 
     [Fact]
     public async Task StoryParser_TagNameInsideEvent_KnownEventType_OffersOnlyUsedParamTags()
     {
         // STORY_ACCUMULATE has exactly 1 param; Event_Param2 must not appear.
-        var (handler, host, schema, _) = Build();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -315,7 +337,9 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task StoryParser_TagNameInsideEvent_UnknownEventType_OffersNoParamTags()
     {
-        var (handler, host, schema, _) = Build();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>NOT_A_REAL_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -329,7 +353,9 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task StoryParser_TagNameInsideEvent_AlwaysOffersEventTypeTag()
     {
-        var (handler, host, schema, _) = Build();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -345,7 +371,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task StoryParser_TagNameInsideEvent_KnownRewardType_OffersRewardParamTags()
     {
         // CREDITS has 1 reward param; Reward_Param2 must not appear.
-        var (handler, host, schema, _) = Build();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>CREDITS</Reward_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -363,7 +391,9 @@ public sealed class XmlCompletionHandlerTest
     public async Task StoryParser_ValueOnEventParam_BooleanInt_ReturnsZeroAndOne()
     {
         // LOCK_CONTROLS Reward_Param1 is BooleanInt
-        var (handler, host, schema, _) = Build();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -374,5 +404,37 @@ public sealed class XmlCompletionHandlerTest
         var labels = result.Items.Select(i => i.Label).ToList();
         Assert.Contains("0", labels);
         Assert.Contains("1", labels);
+    }
+
+    // ── StoryParser registry-based detection ─────────────────────────────────
+
+    [Fact]
+    public async Task StoryParser_RegistryMatch_ArbitraryRootElement_OffersStoryEventCompletions()
+    {
+        // Detection must use the registry, not the root element name.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryPlots>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryPlots>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "Event_Type");
+    }
+
+    [Fact]
+    public async Task StoryParser_RootElementMatchesTypeName_NotInRegistry_NoStoryCompletions()
+    {
+        // Root element named "StoryParser" but the file is not registered → no story completions.
+        var (handler, host, schema, _) = Build();
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        Assert.Empty(result.Items);
     }
 }

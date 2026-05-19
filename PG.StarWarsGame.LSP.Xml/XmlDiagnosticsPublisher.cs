@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Validation;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Parsing;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -26,6 +27,7 @@ public sealed class XmlDiagnosticsPublisher
     private readonly StoryParserDiagnosticCollector _storyCollector;
     private readonly IXmlValueValidatorRegistry _validators;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IFileTypeRegistry _fileTypeRegistry;
 
     private HashSet<string> _lastPublishedUris = [];
 
@@ -36,9 +38,10 @@ public sealed class XmlDiagnosticsPublisher
         ISchemaProvider schema,
         IXmlValueValidatorRegistry validators,
         StoryParserDiagnosticCollector storyCollector,
-        ILogger<XmlDiagnosticsPublisher> logger)
+        ILogger<XmlDiagnosticsPublisher> logger,
+        IFileTypeRegistry fileTypeRegistry)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
-            schema, validators, storyCollector, logger)
+            schema, validators, storyCollector, logger, fileTypeRegistry)
     {
     }
 
@@ -49,7 +52,8 @@ public sealed class XmlDiagnosticsPublisher
         ISchemaProvider schema,
         IXmlValueValidatorRegistry validators,
         StoryParserDiagnosticCollector storyCollector,
-        ILogger<XmlDiagnosticsPublisher> logger)
+        ILogger<XmlDiagnosticsPublisher> logger,
+        IFileTypeRegistry fileTypeRegistry)
     {
         _publish = publish;
         _workspaceHost = workspaceHost;
@@ -57,6 +61,7 @@ public sealed class XmlDiagnosticsPublisher
         _validators = validators;
         _storyCollector = storyCollector;
         _logger = logger;
+        _fileTypeRegistry = fileTypeRegistry;
 
         indexService.IndexChanged += OnIndexChanged;
     }
@@ -74,7 +79,7 @@ public sealed class XmlDiagnosticsPublisher
                 allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
                 allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
                 allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
-                if (IsStoryParserDocument(doc.Text))
+                if (IsStoryParserDocument(uri))
                     allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
             }
 
@@ -480,13 +485,10 @@ public sealed class XmlDiagnosticsPublisher
         };
     }
 
-    private bool IsStoryParserDocument(string documentText)
+    private bool IsStoryParserDocument(string documentUri)
     {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(documentText);
-        var root = doc.DocumentNode.ChildNodes.FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
-        return root is not null &&
-               _schema.GetObjectType(root.Name) is { TypeName: "StoryParser" };
+        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
+        return _fileTypeRegistry.GetTypesForFile(normalized).Contains("StoryParser");
     }
 
     private static DiagnosticSeverity? MapSeverity(XmlValidationSeverity resultSeverity)

@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Completion;
+using PG.StarWarsGame.LSP.Xml.Parsing;
 using PG.StarWarsGame.LSP.Xml.StoryScripting;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -35,19 +36,22 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private readonly IGameWorkspaceHost _workspaceHost;
     private readonly IGameIndexService _indexService;
     private readonly StoryParamValueProposalProvider _storyProposals;
+    private readonly IFileTypeRegistry _fileTypeRegistry;
 
     public XmlCompletionHandler(
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         IXmlValueProposalRegistry proposals,
         IGameIndexService indexService,
-        StoryParamValueProposalProvider storyProposals)
+        StoryParamValueProposalProvider storyProposals,
+        IFileTypeRegistry fileTypeRegistry)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
         _proposals = proposals;
         _indexService = indexService;
         _storyProposals = storyProposals;
+        _fileTypeRegistry = fileTypeRegistry;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
@@ -76,7 +80,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
             // StoryParser context: cursor inside <Event> — use context-aware tag list
             if (string.Equals(enclosingType, "Event", StringComparison.OrdinalIgnoreCase) &&
-                IsStoryParserDocument(text))
+                IsStoryParserDocument(uri))
             {
                 var prefix = ExtractPartialTagName(line, character);
                 var storyItems = BuildStoryEventTagCompletions(text, lineIndex, character, prefix);
@@ -103,7 +107,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
         // StoryParser context: value completion for Event_Param* / Reward_Param* tags
         var paramMatch = ParamTagPattern.Match(enclosingTag);
-        if (paramMatch.Success && IsStoryParserDocument(text))
+        if (paramMatch.Success && IsStoryParserDocument(uri))
         {
             var storyValueItems = BuildStoryParamValueCompletions(text, enclosingTag, paramMatch, lineIndex, character);
             return Task.FromResult(new CompletionList(storyValueItems));
@@ -127,14 +131,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return Task.FromResult(new CompletionList(valueItems));
     }
 
-    private bool IsStoryParserDocument(string text)
+    private bool IsStoryParserDocument(string documentUri)
     {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-        var root = doc.DocumentNode.ChildNodes
-            .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
-        return root is not null &&
-               _schema.GetObjectType(root.Name) is { TypeName: "StoryParser" };
+        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
+        return _fileTypeRegistry.GetTypesForFile(normalized).Contains("StoryParser");
     }
 
     private IEnumerable<CompletionItem> BuildStoryEventTagCompletions(

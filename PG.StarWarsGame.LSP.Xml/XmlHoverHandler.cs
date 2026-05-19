@@ -72,6 +72,8 @@ public sealed class XmlHoverHandler : HoverHandlerBase
             return Task.FromResult<Hover?>(BuildTagHover(tagDef, tagName, lineIndex, tagStart, locale));
         }
 
+        _logger.LogDebug("Hover request at {Line}:{Character} produced no result.",
+            request.Position.Line, request.Position.Character);
         return Task.FromResult<Hover?>(null);
     }
 
