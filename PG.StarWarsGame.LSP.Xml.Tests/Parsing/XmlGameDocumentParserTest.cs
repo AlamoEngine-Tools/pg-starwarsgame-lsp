@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -12,9 +13,11 @@ public sealed class XmlGameDocumentParserTest
 {
     // ── helpers / fakes ──────────────────────────────────────────────────────
 
-    private static XmlGameDocumentParser Build(FakeSchemaProvider? schema = null)
+    private static XmlGameDocumentParser Build(FakeSchemaProvider? schema = null,
+        FakeFileTypeRegistry? registry = null)
     {
         return new XmlGameDocumentParser(schema ?? new FakeSchemaProvider(),
+            registry ?? new FakeFileTypeRegistry(),
             NullLogger<XmlGameDocumentParser>.Instance);
     }
 
@@ -358,6 +361,83 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("UNIT_B", reference.TargetId);
     }
 
+    // ── registry-first type detection ───────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_ArbitraryContainerName_WithRegisteredType_EmitsSymbol()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("HardPoint"));
+
+        // "f.xml" is the key produced by NormalizeDocumentUri("file:///f.xml")
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("f.xml", ["HardPoint"]);
+
+        var result = await Build(schema, registry).ParseAsync(
+            "file:///f.xml",
+            """<WhateverWrapper><SomeTag Name="HP_A"/></WhateverWrapper>""",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("HP_A", sym.Id);
+        Assert.Equal("HardPoint", sym.TypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NoRegistry_FallsBackToElementNameMatching()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///units.xml",
+            """<Units><Unit Name="UNIT_A"/></Units>""",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("UNIT_A", sym.Id);
+        Assert.Equal("Unit", sym.TypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_RegisteredSingletonType_EmitsNoSymbol_NoException()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("BinkMovie", null)); // singleton: no NameTag
+
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("movies.xml", ["BinkMovie"]);
+
+        var result = await Build(schema, registry).ParseAsync(
+            "file:///movies.xml",
+            "<BinkMovies><BinkMovie/></BinkMovies>",
+            1, default);
+
+        Assert.Empty(result.Symbols);
+    }
+
+    [Fact]
+    public async Task ParseAsync_References_Collected_WithArbitraryContainerName()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("HardPoint"));
+        schema.AddTag(RefTag("Attached_To", "Bone"));
+
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("f.xml", ["HardPoint"]);
+
+        var result = await Build(schema, registry).ParseAsync(
+            "file:///f.xml",
+            """<WhateverWrapper><SomeTag Name="HP_A"><Attached_To>BONE_X</Attached_To></SomeTag></WhateverWrapper>""",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("HP_A", sym.Id);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("BONE_X", reference.TargetId);
+    }
+
     // ── FakeSchemaProvider ───────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider
@@ -417,5 +497,23 @@ public sealed class XmlGameDocumentParserTest
         {
             _types[type.TypeName] = type;
         }
+    }
+
+    private sealed class FakeFileTypeRegistry : IFileTypeRegistry
+    {
+        private readonly Dictionary<string, ImmutableArray<string>> _map =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
+
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
+            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
+            _map[normalizedPath] = typeNames;
+
+        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
+
+        public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
     }
 }

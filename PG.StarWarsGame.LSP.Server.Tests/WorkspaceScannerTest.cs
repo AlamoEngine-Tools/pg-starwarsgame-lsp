@@ -148,7 +148,9 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        Assert.Equal(["GameObjectType"], registry.GetTypesForFile("data/xml/hardpoints.xml").ToArray());
+        var expectedKey = Path.Combine(root, "data", "xml", "hardpoints.xml")
+            .Replace('\\', '/').ToLowerInvariant();
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
     [Fact]
@@ -175,7 +177,9 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        Assert.Equal(["GameObjectType"], registry.GetTypesForFile("data/xml/hardpoints.xml").ToArray());
+        var expectedKey = Path.Combine(root, "data", "xml", "hardpoints.xml")
+            .Replace('\\', '/').ToLowerInvariant();
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
     [Fact]
@@ -194,7 +198,9 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        Assert.Equal(["BinkMovie"], registry.GetTypesForFile("data/xml/movies.xml").ToArray());
+        var expectedKey = Path.Combine(root, "data", "xml", "movies.xml")
+            .Replace('\\', '/').ToLowerInvariant();
+        Assert.Equal(["BinkMovie"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
     [Fact]

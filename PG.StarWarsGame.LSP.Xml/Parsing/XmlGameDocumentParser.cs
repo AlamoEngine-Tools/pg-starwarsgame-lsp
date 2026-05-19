@@ -11,12 +11,15 @@ namespace PG.StarWarsGame.LSP.Xml.Parsing;
 
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
+    private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
     private readonly ISchemaProvider _schema;
 
-    public XmlGameDocumentParser(ISchemaProvider schema, ILogger<XmlGameDocumentParser> logger)
+    public XmlGameDocumentParser(ISchemaProvider schema, IFileTypeRegistry fileTypeRegistry,
+        ILogger<XmlGameDocumentParser> logger)
     {
         _schema = schema;
+        _fileTypeRegistry = fileTypeRegistry;
         _logger = logger;
     }
 
@@ -31,41 +34,86 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var doc = new HtmlDocument();
         doc.LoadHtml(text);
 
-        var symbols = new List<GameSymbol>();
-        var references = new List<GameReference>();
+        var normalizedPath = NormalizeDocumentUri(documentUri);
+        var registeredTypes = _fileTypeRegistry.GetTypesForFile(normalizedPath);
 
+        var symbols = registeredTypes.IsEmpty
+            ? CollectSymbolsLegacy(doc, documentUri, ct)
+            : CollectSymbolsFromRegistry(doc, documentUri, registeredTypes, ct);
+
+        var references = CollectReferences(doc, documentUri, text, ct);
+
+        return ValueTask.FromResult(new DocumentIndex(
+            documentUri, version,
+            symbols.ToImmutableArray(),
+            references.ToImmutableArray()));
+    }
+
+    private List<GameSymbol> CollectSymbolsLegacy(HtmlDocument doc, string documentUri, CancellationToken ct)
+    {
+        var symbols = new List<GameSymbol>();
         foreach (var node in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
         {
             ct.ThrowIfCancellationRequested();
-
             var typeDef = _schema.GetObjectType(node.Name);
-            if (typeDef is null)
+            if (typeDef?.NameTag is null)
             {
-                _logger.LogDebug("Unknown element type '{Name}' — skipped", node.Name);
+                if (typeDef is null)
+                    _logger.LogDebug("Unknown element type '{Name}' — skipped", node.Name);
                 continue;
             }
 
-            // Emit symbol only for named types (singletons have no NameTag).
-            if (typeDef.NameTag is not null)
-            {
-                // HAP lowercases attribute names; match case-insensitively.
-                var attr = node.Attributes.FirstOrDefault(a =>
-                    a.Name.Equals(typeDef.NameTag, StringComparison.OrdinalIgnoreCase));
-                var id = attr?.Value?.Trim() ?? string.Empty;
+            var id = GetNameAttribute(node, typeDef.NameTag);
+            if (string.IsNullOrEmpty(id))
+                _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
+                    typeDef.TypeName, node.Line);
+            else
+                symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
+                    new FileOrigin(documentUri, node.Line - 1, null), null));
+        }
 
-                if (string.IsNullOrEmpty(id))
-                    _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
-                        typeDef.TypeName, node.Line);
-                else
-                    // HAP line numbers are 1-based; LSP coordinates are 0-based.
-                    symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
-                        new FileOrigin(documentUri, node.Line - 1, null), null));
-            }
+        return symbols;
+    }
 
-            // Emit references for direct child tags with ReferenceKind.XmlObject.
-            foreach (var child in node.ChildNodes
-                         .Where(n => n.NodeType == HtmlNodeType.Element))
+    private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,
+        ImmutableArray<string> registeredTypes, CancellationToken ct)
+    {
+        var typeDef = registeredTypes
+            .Select(t => _schema.GetObjectType(t))
+            .FirstOrDefault(t => t is not null);
+
+        if (typeDef?.NameTag is null) return [];
+
+        var symbols = new List<GameSymbol>();
+        var rootContainer = doc.DocumentNode.ChildNodes
+            .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        if (rootContainer is null) return symbols;
+
+        foreach (var node in rootContainer.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            ct.ThrowIfCancellationRequested();
+            var id = GetNameAttribute(node, typeDef.NameTag);
+            if (string.IsNullOrEmpty(id))
+                _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
+                    typeDef.TypeName, node.Line);
+            else
+                symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
+                    new FileOrigin(documentUri, node.Line - 1, null), null));
+        }
+
+        return symbols;
+    }
+
+    private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, string text,
+        CancellationToken ct)
+    {
+        var references = new List<GameReference>();
+        foreach (var node in doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            ct.ThrowIfCancellationRequested();
+            foreach (var child in node.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
             {
                 var tagDef = _schema.GetTag(child.Name);
                 if (tagDef?.ReferenceKind != ReferenceKind.XmlObject) continue;
@@ -90,10 +138,27 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             }
         }
 
-        return ValueTask.FromResult(new DocumentIndex(
-            documentUri, version,
-            symbols.ToImmutableArray(),
-            references.ToImmutableArray()));
+        return references;
+    }
+
+    private static string GetNameAttribute(HtmlNode node, string nameTag)
+    {
+        // HAP lowercases attribute names; match case-insensitively.
+        var attr = node.Attributes.FirstOrDefault(a =>
+            a.Name.Equals(nameTag, StringComparison.OrdinalIgnoreCase));
+        return attr?.Value?.Trim() ?? string.Empty;
+    }
+
+    // Strip file:/// scheme then normalise for registry lookup.
+    // file:///C:/path → C:/path → c:/path (Windows)
+    // file:///f.xml   → f.xml   (test URIs)
+    internal static string NormalizeDocumentUri(string uri)
+    {
+        if (uri.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
+            uri = uri[8..];
+        else if (uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            uri = uri[7..];
+        return uri.Replace('\\', '/').ToLowerInvariant();
     }
 
     private static IEnumerable<(string Name, int Offset)> SplitReferenceNames(

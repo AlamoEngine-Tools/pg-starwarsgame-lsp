@@ -98,25 +98,23 @@ public sealed class WorkspaceScanner
             {
                 var metafilePath = FindInWorkspace(roots, def.Path);
                 if (metafilePath is not null)
-                    RegisterFromMetafile(metafilePath, def);
+                    RegisterFromMetafile(metafilePath, def, roots);
                 else
-                    FallbackFromBaseline(baseline, def);
+                    FallbackFromBaseline(baseline, def, roots);
             }
             else // DirectContent
             {
                 var contentPath = FindInWorkspace(roots, def.Path);
                 if (contentPath is not null)
-                {
-                    var relative = GetRelativeNormalized(roots[0], contentPath);
-                    _fileTypeRegistry.RegisterFile(relative, def.Types.ToImmutableArray());
-                }
+                    _fileTypeRegistry.RegisterFile(NormalizeAbsolutePath(contentPath),
+                        def.Types.ToImmutableArray());
                 else
-                    FallbackFromBaseline(baseline, def);
+                    FallbackFromBaseline(baseline, def, roots);
             }
         }
     }
 
-    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def)
+    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def, IList<string> roots)
     {
         string xmlContent;
         try
@@ -146,17 +144,24 @@ public sealed class WorkspaceScanner
         {
             var filename = elem.Attributes()
                 .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
-            if (!string.IsNullOrEmpty(filename))
-                _fileTypeRegistry.RegisterFile(NormalizeGamePath(filename), types);
+            if (string.IsNullOrEmpty(filename)) continue;
+            var normalizedRel = NormalizeGamePath(filename);
+            var relSystemPath = normalizedRel.Replace('/', Path.DirectorySeparatorChar);
+            foreach (var root in roots)
+                _fileTypeRegistry.RegisterFile(
+                    NormalizeAbsolutePath(_fs.Path.Combine(root, relSystemPath)), types);
         }
     }
 
-    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def)
+    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def, IList<string> roots)
     {
-        foreach (var (path, types) in baseline.FileTypeMap)
+        foreach (var (relativePath, types) in baseline.FileTypeMap)
         {
-            if (types.Any(t => def.Types.Contains(t, StringComparer.OrdinalIgnoreCase)))
-                _fileTypeRegistry.RegisterFile(path, types);
+            if (!types.Any(t => def.Types.Contains(t, StringComparer.OrdinalIgnoreCase))) continue;
+            var relSystemPath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+            foreach (var root in roots)
+                _fileTypeRegistry.RegisterFile(
+                    NormalizeAbsolutePath(_fs.Path.Combine(root, relSystemPath)), types);
         }
     }
 
@@ -176,6 +181,6 @@ public sealed class WorkspaceScanner
     private static string NormalizeGamePath(string raw) =>
         raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
 
-    private static string GetRelativeNormalized(string workspaceRoot, string absolutePath) =>
-        Path.GetRelativePath(workspaceRoot, absolutePath).Replace('\\', '/').ToLowerInvariant();
+    private static string NormalizeAbsolutePath(string path) =>
+        path.Replace('\\', '/').ToLowerInvariant();
 }
