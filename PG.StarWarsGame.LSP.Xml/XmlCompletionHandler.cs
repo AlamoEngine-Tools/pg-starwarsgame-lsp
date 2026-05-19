@@ -2,30 +2,52 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text;
+using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Completion;
+using PG.StarWarsGame.LSP.Xml.StoryScripting;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCompletionHandler : CompletionHandlerBase
 {
+    private static readonly string[] StoryEventStructuralTags =
+    [
+        "Event_Type", "Event_Filter", "Reward_Type", "Reward_Position",
+        "Prereq", "Branch", "Perpetual", "Multiplayer",
+        "Story_Dialog", "Story_Chapter", "Story_Tag", "Story_Var",
+        "Story_Dialog_Popup", "Story_Dialog_SFX",
+        "Inactive_Delay", "Timeout"
+    ];
+
+    private static readonly Regex ParamTagPattern =
+        new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IGameIndexService _indexService;
+    private readonly StoryParamValueProposalProvider _storyProposals;
 
     public XmlCompletionHandler(
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
-        IXmlValueProposalRegistry proposals)
+        IXmlValueProposalRegistry proposals,
+        IGameIndexService indexService,
+        StoryParamValueProposalProvider storyProposals)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
         _proposals = proposals;
+        _indexService = indexService;
+        _storyProposals = storyProposals;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
@@ -51,6 +73,16 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             var (enclosingType, _) = FindEnclosingTagName(lines, lineIndex, character);
             if (enclosingType is null)
                 return Task.FromResult(new CompletionList());
+
+            // StoryParser context: cursor inside <Event> — use context-aware tag list
+            if (string.Equals(enclosingType, "Event", StringComparison.OrdinalIgnoreCase) &&
+                IsStoryParserDocument(text))
+            {
+                var prefix = ExtractPartialTagName(line, character);
+                var storyItems = BuildStoryEventTagCompletions(text, lineIndex, character, prefix);
+                return Task.FromResult(new CompletionList(storyItems));
+            }
+
             var tagItems = BuildTagNameCompletions(text, enclosingType, ExtractPartialTagName(line, character));
             return Task.FromResult(new CompletionList(tagItems));
         }
@@ -69,6 +101,14 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         if (enclosingDepth == 1 || _schema.GetObjectType(enclosingTag) is not null)
             return Task.FromResult(new CompletionList());
 
+        // StoryParser context: value completion for Event_Param* / Reward_Param* tags
+        var paramMatch = ParamTagPattern.Match(enclosingTag);
+        if (paramMatch.Success && IsStoryParserDocument(text))
+        {
+            var storyValueItems = BuildStoryParamValueCompletions(text, enclosingTag, paramMatch, lineIndex, character);
+            return Task.FromResult(new CompletionList(storyValueItems));
+        }
+
         var tagDef = _schema.GetTag(enclosingTag);
         if (tagDef is null)
             return Task.FromResult(new CompletionList());
@@ -85,6 +125,105 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         });
 
         return Task.FromResult(new CompletionList(valueItems));
+    }
+
+    private bool IsStoryParserDocument(string text)
+    {
+        var doc = new HtmlDocument();
+        doc.LoadHtml(text);
+        var root = doc.DocumentNode.ChildNodes
+            .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        return root is not null &&
+               _schema.GetObjectType(root.Name) is { TypeName: "StoryParser" };
+    }
+
+    private IEnumerable<CompletionItem> BuildStoryEventTagCompletions(
+        string text, int lineIndex, int character, string prefix)
+    {
+        var doc = new HtmlDocument();
+        doc.LoadHtml(text);
+
+        var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
+        var eventDef = ctx.EventType is not null ? StoryScriptingIndex.GetEvent(ctx.EventType) : null;
+        var rewardDef = ctx.RewardType is not null ? StoryScriptingIndex.GetReward(ctx.RewardType) : null;
+
+        var candidates = new List<string>(StoryEventStructuralTags);
+        for (var i = 1; i <= (eventDef?.Params.Count ?? 0); i++)
+            candidates.Add($"Event_Param{i}");
+        for (var i = 1; i <= (rewardDef?.Params.Count ?? 0); i++)
+            candidates.Add($"Reward_Param{i}");
+
+        var existing = CollectExistingEventChildTagNames(doc, lineIndex, character);
+
+        return candidates
+            .Where(t => !existing.Contains(t))
+            .Where(t => prefix.Length == 0 || t.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            .Select(t => new CompletionItem
+            {
+                Label = t,
+                Kind = CompletionItemKind.Property,
+                InsertText = $"{t}></{t}>"
+            });
+    }
+
+    private IEnumerable<CompletionItem> BuildStoryParamValueCompletions(
+        string text, string enclosingTag, Match paramMatch, int lineIndex, int character)
+    {
+        var doc = new HtmlDocument();
+        doc.LoadHtml(text);
+
+        var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
+        var side = paramMatch.Groups[1].Value;
+        var position = int.Parse(paramMatch.Groups[2].Value);
+
+        StoryParamDefinition? paramDef;
+        if (string.Equals(side, "Event", StringComparison.OrdinalIgnoreCase))
+        {
+            var def = ctx.EventType is not null ? StoryScriptingIndex.GetEvent(ctx.EventType) : null;
+            paramDef = def?.Params.FirstOrDefault(p => p.Position == position);
+        }
+        else
+        {
+            var def = ctx.RewardType is not null ? StoryScriptingIndex.GetReward(ctx.RewardType) : null;
+            paramDef = def?.Params.FirstOrDefault(p => p.Position == position);
+        }
+
+        if (paramDef is null)
+            return [];
+
+        var partialValue = ExtractPartialValue(text.Split('\n')[lineIndex].TrimEnd('\r'), character);
+        var proposals = _storyProposals.GetProposals(paramDef, partialValue, _indexService.Current);
+
+        return proposals.Select(p => new CompletionItem
+        {
+            Label = p.Label,
+            Detail = p.Detail,
+            InsertText = p.InsertText ?? p.Label,
+            Kind = CompletionItemKind.Value
+        });
+    }
+
+    private static HashSet<string> CollectExistingEventChildTagNames(HtmlDocument doc, int lineIndex, int character)
+    {
+        var cursorLine = lineIndex + 1; // 1-based
+        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        HtmlNode? enclosingEvent = null;
+        foreach (var node in doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element &&
+                                 string.Equals(n.Name, "event", StringComparison.OrdinalIgnoreCase)))
+        {
+            if (node.Line <= cursorLine)
+                enclosingEvent = node;
+            else
+                break;
+        }
+
+        if (enclosingEvent is null) return result;
+        foreach (var child in enclosingEvent.ChildNodes)
+            if (child.NodeType == HtmlNodeType.Element)
+                result.Add(child.Name);
+        return result;
     }
 
     private IEnumerable<CompletionItem> BuildTagNameCompletions(string text, string parentName, string prefix)

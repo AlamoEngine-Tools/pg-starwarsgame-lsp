@@ -74,7 +74,7 @@ public sealed class XmlDiagnosticsPublisher
                 allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
                 allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
                 allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
-                if (IsStoryParserDocument(uri, newIndex))
+                if (IsStoryParserDocument(doc.Text))
                     allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
             }
 
@@ -480,10 +480,13 @@ public sealed class XmlDiagnosticsPublisher
         };
     }
 
-    private static bool IsStoryParserDocument(string uri, GameIndex index)
+    private bool IsStoryParserDocument(string documentText)
     {
-        return index.Documents.TryGetValue(uri, out var doc) &&
-               doc.Symbols.Any(s => string.Equals(s.TypeName, "StoryParser", StringComparison.OrdinalIgnoreCase));
+        var doc = new HtmlDocument();
+        doc.LoadHtml(documentText);
+        var root = doc.DocumentNode.ChildNodes.FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        return root is not null &&
+               _schema.GetObjectType(root.Name) is { TypeName: "StoryParser" };
     }
 
     private static DiagnosticSeverity? MapSeverity(XmlValidationSeverity resultSeverity)

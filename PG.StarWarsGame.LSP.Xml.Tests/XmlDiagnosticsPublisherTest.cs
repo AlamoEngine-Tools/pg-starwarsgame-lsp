@@ -585,6 +585,52 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Contains(diags, d => d.Message.Contains("MOD_ARMOR_BELOW"));
     }
 
+    // ── story parser guard (root-element detection) ───────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_StoryParserDocument_EmitsStoryDiagnostics()
+    {
+        // ZOOM_IN has 0 params; Reward_Param1 is spurious → story collector emits a warning.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
+
+        const string uri = "file:///StoryPlots.xml";
+        const string xml = "<StoryParser><Event>" +
+                           "<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
+                           "<Reward_Type>ZOOM_IN</Reward_Type>" +
+                           "<Reward_Param1>extra</Reward_Param1>" +
+                           "</Event></StoryParser>";
+
+        workspaceHost.Set(uri, xml);
+        indexService.Fire(IndexWithDoc(uri));
+
+        var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
+        Assert.NotNull(storyDiags);
+        Assert.Contains(storyDiags, d => d.Message.Contains("Reward_Param1") && d.Message.Contains("ZOOM_IN"));
+    }
+
+    [Fact]
+    public void OnIndexChanged_NonStoryParserDocument_EmitsNoStoryDiagnostics()
+    {
+        // Faction root — should never trigger story validation even if it has <Event_Type> children.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction" });
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
+
+        const string uri = "file:///Factions.xml";
+        const string xml = "<Faction>" +
+                           "<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
+                           "</Faction>";
+
+        workspaceHost.Set(uri, xml);
+        indexService.Fire(IndexWithDoc(uri));
+
+        var storyDiags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
+        Assert.NotNull(storyDiags);
+        Assert.DoesNotContain(storyDiags, d => d.Message.Contains("is not used by") || d.Message.Contains("requires"));
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider

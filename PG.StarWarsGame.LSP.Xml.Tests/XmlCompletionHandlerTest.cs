@@ -5,7 +5,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Completion;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -21,7 +23,9 @@ public sealed class XmlCompletionHandlerTest
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var proposals = new FakeProposalRegistry();
-        return (new XmlCompletionHandler(host, schema, proposals), host, schema, proposals);
+        var indexService = new FakeIndexService();
+        var storyProposals = new StoryParamValueProposalProvider(schema);
+        return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -270,5 +274,104 @@ public sealed class XmlCompletionHandlerTest
         {
             return ProposalsToReturn;
         }
+    }
+
+    private sealed class FakeIndexService : IGameIndexService
+    {
+        public GameIndex Current { get; set; } = GameIndex.Empty;
+        public event Action<GameIndex>? IndexChanged;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
+        public void RemoveDocument(string uri) { }
+        public void ApplyBaseline(BaselineIndex baseline) { }
+        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+            public void Dispose() { }
+        }
+    }
+
+    // ── StoryParser tag-name completions ──────────────────────────────────────
+
+    [Fact]
+    public async Task StoryParser_TagNameInsideEvent_KnownEventType_OffersOnlyUsedParamTags()
+    {
+        // STORY_ACCUMULATE has exactly 1 param; Event_Param2 must not appear.
+        var (handler, host, schema, _) = Build();
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        // cursor on line 3 after '<'
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("Event_Param1", labels);
+        Assert.DoesNotContain("Event_Param2", labels);
+    }
+
+    [Fact]
+    public async Task StoryParser_TagNameInsideEvent_UnknownEventType_OffersNoParamTags()
+    {
+        var (handler, host, schema, _) = Build();
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>NOT_A_REAL_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.DoesNotContain(labels, l => l.StartsWith("Event_Param", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task StoryParser_TagNameInsideEvent_AlwaysOffersEventTypeTag()
+    {
+        var (handler, host, schema, _) = Build();
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryParser>\n<Event>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(2, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("Event_Type", labels);
+        Assert.Contains("Reward_Type", labels);
+    }
+
+    [Fact]
+    public async Task StoryParser_TagNameInsideEvent_KnownRewardType_OffersRewardParamTags()
+    {
+        // CREDITS has 1 reward param; Reward_Param2 must not appear.
+        var (handler, host, schema, _) = Build();
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>CREDITS</Reward_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(4, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("Reward_Param1", labels);
+        Assert.DoesNotContain("Reward_Param2", labels);
+    }
+
+    // ── StoryParser value completions ─────────────────────────────────────────
+
+    [Fact]
+    public async Task StoryParser_ValueOnEventParam_BooleanInt_ReturnsZeroAndOne()
+    {
+        // LOCK_CONTROLS Reward_Param1 is BooleanInt
+        var (handler, host, schema, _) = Build();
+        schema.AddType(MakeType("StoryParser"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        // cursor on line 4 inside <Reward_Param1> body
+        var result = await handler.Handle(At(4, 15), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("0", labels);
+        Assert.Contains("1", labels);
     }
 }

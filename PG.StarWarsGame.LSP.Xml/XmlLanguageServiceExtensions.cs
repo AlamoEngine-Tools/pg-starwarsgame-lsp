@@ -62,6 +62,8 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlValueProposalProvider, BooleanValueProposalProvider>();
         services.AddSingleton<IXmlValueProposalProvider, DynamicEnumValueProposalProvider>();
 
+        services.AddSingleton<StoryParamValueProposalProvider>();
+
         return services;
     }
 }
