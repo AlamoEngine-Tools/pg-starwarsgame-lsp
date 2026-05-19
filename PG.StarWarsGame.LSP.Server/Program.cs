@@ -57,6 +57,7 @@ var server = await LanguageServer.From(options => options
         services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
         services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
         services.AddSingleton<IGameIndexService, GameIndexService>();
+        services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
         services.AddSingleton<WorkspaceScanner>();
 
         services.AddHttpClient(nameof(HttpSchemaProvider));
