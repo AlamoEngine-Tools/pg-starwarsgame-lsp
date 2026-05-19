@@ -59,6 +59,7 @@ public static class XmlLanguageServiceExtensions
         // Proposal system — add IXmlValueProposalProvider implementations here to register new providers
         services.AddSingleton<IXmlValueProposalRegistry, XmlValueProposalRegistry>();
         services.AddSingleton<IXmlValueProposalProvider, BooleanValueProposalProvider>();
+        services.AddSingleton<IXmlValueProposalProvider, DynamicEnumValueProposalProvider>();
 
         return services;
     }
