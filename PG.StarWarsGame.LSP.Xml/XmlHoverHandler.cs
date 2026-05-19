@@ -8,7 +8,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Parsing;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -16,6 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlHoverHandler : HoverHandlerBase
 {
     private readonly ILspConfigurationProvider _config;
+    private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
@@ -24,12 +27,14 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         ILspConfigurationProvider config,
-        ILogger<XmlHoverHandler> logger)
+        ILogger<XmlHoverHandler> logger,
+        IFileTypeRegistry fileTypeRegistry)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
         _config = config;
         _logger = logger;
+        _fileTypeRegistry = fileTypeRegistry;
     }
 
     public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
@@ -54,7 +59,25 @@ public sealed class XmlHoverHandler : HoverHandlerBase
 
         var locale = _config.Current.Locale;
 
+        // Try element-name-based type lookup first (works when element name = type name).
         var typeDef = _schema.GetObjectType(tagName);
+
+        // Registry-based fallback: for files with arbitrary element names, look up the type
+        // via the registry and confirm the cursor is on a depth-1 type-container element.
+        if (typeDef is null)
+        {
+            var normalized = XmlGameDocumentParser.NormalizeDocumentUri(uri);
+            var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
+            if (!fileTypes.IsEmpty)
+            {
+                var registeredType = fileTypes
+                    .Select(t => _schema.GetObjectType(t))
+                    .FirstOrDefault(t => t?.NameTag is not null);
+                if (registeredType is not null && IsDepthOneElement(lines, lineIndex, tagStart))
+                    typeDef = registeredType;
+            }
+        }
+
         if (typeDef is not null)
         {
             _logger.LogDebug("Hover resolved: type {TagName}", tagName);
@@ -229,5 +252,41 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         }
 
         return depth == (isClosing ? 1 : 0);
+    }
+
+    /// <summary>
+    ///     Returns true when the tag is a depth-1 element (one level below the document root).
+    ///     In multi-instance files this identifies type-container elements.
+    /// </summary>
+    private static bool IsDepthOneElement(string[] lines, int lineIdx, int tagNameStart)
+    {
+        var line = lineIdx < lines.Length ? lines[lineIdx] : string.Empty;
+        var isClosing = tagNameStart >= 1 && line[tagNameStart - 1] == '/';
+        var ltCol = isClosing ? tagNameStart - 2 : tagNameStart - 1;
+
+        var depth = 0;
+        for (var li = 0; li <= lineIdx; li++)
+        {
+            var l = (li < lines.Length ? lines[li] : string.Empty).TrimEnd('\r');
+            var colLimit = li < lineIdx ? l.Length : ltCol;
+            var pos = 0;
+            while (pos < colLimit)
+            {
+                var open = l.IndexOf('<', pos);
+                if (open < 0 || open >= colLimit) break;
+                var close = l.IndexOf('>', open);
+                if (close < 0) break;
+                var inner = l[(open + 1)..Math.Min(close, l.Length)].Trim();
+                var sc = inner.EndsWith('/');
+                if (sc) inner = inner[..^1].Trim();
+                if (inner.StartsWith('/'))
+                    depth = Math.Max(0, depth - 1);
+                else if (!inner.StartsWith('!') && !inner.StartsWith('?') && !sc)
+                    depth++;
+                pos = close + 1;
+            }
+        }
+
+        return depth == (isClosing ? 2 : 1);
     }
 }

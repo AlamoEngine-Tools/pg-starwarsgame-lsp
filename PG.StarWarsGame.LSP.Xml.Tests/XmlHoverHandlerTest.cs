@@ -1,11 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -17,12 +19,13 @@ public sealed class XmlHoverHandlerTest
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
-        FakeConfigProvider config) Build()
+        FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var config = new FakeConfigProvider();
-        return (new XmlHoverHandler(host, schema, config, NullLogger<XmlHoverHandler>.Instance), host, schema, config);
+        return (new XmlHoverHandler(host, schema, config, NullLogger<XmlHoverHandler>.Instance,
+            registry ?? new FakeFileTypeRegistry()), host, schema, config);
     }
 
     private static HoverParams At(int line, int character)
@@ -271,6 +274,55 @@ public sealed class XmlHoverHandlerTest
         Assert.DoesNotContain("Float", md); // tag hover includes value type; type hover does not
     }
 
+    // ── registry-based type-container hover ────────────────────────────────
+
+    [Fact]
+    public async Task Handle_RegistryMappedMultiInstance_TypeContainerArbitraryName_ReturnsTypeHover()
+    {
+        // "Fighter_Mk2" is an arbitrary element name; the actual type is "SpaceUnit".
+        // Hovering on the type container must show the SpaceUnit type hover.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(new GameObjectTypeDefinition
+        {
+            TypeName = "SpaceUnit",
+            NameTag = "Name",
+            Description = new Dictionary<string, string> { ["en"] = "A space unit." }
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<GameObjectFiles>\n<Fighter_Mk2/>\n</GameObjectFiles>", 1);
+        // cursor on 'F' of Fighter_Mk2 (line 1, col 1)
+        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.Contains("name tag", md, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Float", md); // must be type hover, not tag hover
+    }
+
+    [Fact]
+    public async Task Handle_RegistryMappedMultiInstance_FieldTagInsideTypeContainer_ReturnsTagHover()
+    {
+        // Depth-2 tags (field tags inside type containers) must still show tag hover, not type hover.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.TagToReturn = MakeTag("Max_Speed");
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<GameObjectFiles>\n<Fighter_Mk2>\n<Max_Speed/>\n</Fighter_Mk2>\n</GameObjectFiles>", 1);
+        // cursor on 'M' of Max_Speed (line 2, col 1)
+        var result = await handler.Handle(At(2, 2), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.Contains("Float", md); // tag hover includes value type
+        Assert.DoesNotContain("name tag", md, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── type hover ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -339,8 +391,13 @@ public sealed class XmlHoverHandlerTest
 
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
+        private readonly Dictionary<string, GameObjectTypeDefinition> _typesByName =
+            new(StringComparer.OrdinalIgnoreCase);
+
         public XmlTagDefinition? TagToReturn { get; set; }
         public GameObjectTypeDefinition? TypeToReturn { get; set; }
+
+        public void AddType(GameObjectTypeDefinition type) => _typesByName[type.TypeName] = type;
 
         public XmlTagDefinition? GetTag(string _)
         {
@@ -354,9 +411,9 @@ public sealed class XmlHoverHandlerTest
 
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
 
-        public GameObjectTypeDefinition? GetObjectType(string _)
+        public GameObjectTypeDefinition? GetObjectType(string name)
         {
-            return TypeToReturn;
+            return _typesByName.TryGetValue(name, out var def) ? def : TypeToReturn;
         }
 
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
@@ -381,6 +438,24 @@ public sealed class XmlHoverHandlerTest
             add { }
             remove { }
         }
+    }
+
+    private sealed class FakeFileTypeRegistry : IFileTypeRegistry
+    {
+        private readonly Dictionary<string, ImmutableArray<string>> _map =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
+
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
+            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
+            _map[normalizedPath] = typeNames;
+
+        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
+
+        public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
     }
 
     private sealed class FakeConfigProvider : ILspConfigurationProvider
