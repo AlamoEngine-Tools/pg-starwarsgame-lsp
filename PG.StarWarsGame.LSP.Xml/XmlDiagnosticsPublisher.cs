@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Validation;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -22,6 +23,7 @@ public sealed class XmlDiagnosticsPublisher
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly ISchemaProvider _schema;
+    private readonly StoryParserDiagnosticCollector _storyCollector;
     private readonly IXmlValueValidatorRegistry _validators;
     private readonly IGameWorkspaceHost _workspaceHost;
 
@@ -33,8 +35,10 @@ public sealed class XmlDiagnosticsPublisher
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         IXmlValueValidatorRegistry validators,
+        StoryParserDiagnosticCollector storyCollector,
         ILogger<XmlDiagnosticsPublisher> logger)
-        : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, schema, validators, logger)
+        : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
+            schema, validators, storyCollector, logger)
     {
     }
 
@@ -44,12 +48,14 @@ public sealed class XmlDiagnosticsPublisher
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
         IXmlValueValidatorRegistry validators,
+        StoryParserDiagnosticCollector storyCollector,
         ILogger<XmlDiagnosticsPublisher> logger)
     {
         _publish = publish;
         _workspaceHost = workspaceHost;
         _schema = schema;
         _validators = validators;
+        _storyCollector = storyCollector;
         _logger = logger;
 
         indexService.IndexChanged += OnIndexChanged;
@@ -68,6 +74,8 @@ public sealed class XmlDiagnosticsPublisher
                 allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
                 allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
                 allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
+                if (IsStoryParserDocument(uri, newIndex))
+                    allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
             }
 
             allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
@@ -470,6 +478,12 @@ public sealed class XmlDiagnosticsPublisher
                 new Position(endLine, endCol)),
             Source = "pg-swg-lsp"
         };
+    }
+
+    private static bool IsStoryParserDocument(string uri, GameIndex index)
+    {
+        return index.Documents.TryGetValue(uri, out var doc) &&
+               doc.Symbols.Any(s => string.Equals(s.TypeName, "StoryParser", StringComparison.OrdinalIgnoreCase));
     }
 
     private static DiagnosticSeverity? MapSeverity(XmlValidationSeverity resultSeverity)

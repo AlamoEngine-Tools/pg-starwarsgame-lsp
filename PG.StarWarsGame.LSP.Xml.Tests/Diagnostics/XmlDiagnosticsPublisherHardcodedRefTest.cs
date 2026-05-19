@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Validation;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
 
@@ -21,6 +22,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             new StubWorkspaceHost(),
             schema,
             new StubValidatorRegistry(),
+            new StoryParserDiagnosticCollector(schema),
             NullLogger<XmlDiagnosticsPublisher>.Instance);
     }
 

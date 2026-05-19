@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Validation;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -34,6 +35,7 @@ public sealed class XmlDiagnosticsPublisherTest
             new FakeGameWorkspaceHost(),
             schema,
             new FakeValidatorRegistry(),
+            new StoryParserDiagnosticCollector(schema),
             NullLogger<XmlDiagnosticsPublisher>.Instance);
     }
 
@@ -46,12 +48,14 @@ public sealed class XmlDiagnosticsPublisherTest
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
         var workspaceHost = new FakeGameWorkspaceHost();
+        var effectiveSchema = schema ?? new FakeSchemaProvider();
         var publisher = new XmlDiagnosticsPublisher(
             p => published.Add(p),
             indexService,
             workspaceHost,
-            schema ?? new FakeSchemaProvider(),
+            effectiveSchema,
             new FakeValidatorRegistry(),
+            new StoryParserDiagnosticCollector(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance);
         return (publisher, published, indexService, workspaceHost);
     }

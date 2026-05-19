@@ -16,6 +16,7 @@ public static class XmlLanguageServiceExtensions
     public static IServiceCollection AddXmlLanguageServices(this IServiceCollection services)
     {
         services.AddSingleton<XmlDiagnosticsPublisher>();
+        services.AddSingleton<StoryParserDiagnosticCollector>();
 
         // Validator system — add IXmlValueValidator implementations here to register new validators
         services.AddSingleton<IXmlValueValidatorRegistry, XmlValueValidatorRegistry>();
