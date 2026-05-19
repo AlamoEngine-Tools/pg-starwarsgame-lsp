@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -27,7 +28,8 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     // CollectDiagnostics-only tests still use a no-op publish action.
-    private static XmlDiagnosticsPublisher BuildPublisher(FakeSchemaProvider schema)
+    private static XmlDiagnosticsPublisher BuildPublisher(FakeSchemaProvider schema,
+        FakeFileTypeRegistry? registry = null)
     {
         return new XmlDiagnosticsPublisher(
             _ => { },
@@ -37,7 +39,7 @@ public sealed class XmlDiagnosticsPublisherTest
             new FakeValidatorRegistry(),
             new StoryParserDiagnosticCollector(schema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
-            new FakeFileTypeRegistry());
+            registry ?? new FakeFileTypeRegistry());
     }
 
     // Subscription / routing tests use this builder so they can control the index service.
@@ -188,10 +190,13 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         var schema = new FakeSchemaProvider();
         schema.AddTag(MakeTag("Max_Speed"));
-        schema.AddType(MakeType("SpaceUnit"));
-        var publisher = BuildPublisher(schema);
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
 
-        // Two separate SpaceUnit objects, each with one Max_Speed — not duplicates
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var publisher = BuildPublisher(schema, registry);
+
+        // Two separate SpaceUnit type containers, each with one Max_Speed — not duplicates
         var diags = publisher.CollectDiagnostics("""
                                                  <GameObjectFiles>
                                                    <SpaceUnit Name="UnitA">
@@ -201,7 +206,7 @@ public sealed class XmlDiagnosticsPublisherTest
                                                      <Max_Speed>300</Max_Speed>
                                                    </SpaceUnit>
                                                  </GameObjectFiles>
-                                                 """);
+                                                 """, DocumentUri.From("file:///test.xml"));
 
         Assert.Empty(diags);
     }
@@ -229,10 +234,9 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         var schema = new FakeSchemaProvider();
         schema.AddTag(MakeTag("Faction")); // Faction is also a singleton tag elsewhere
-        schema.AddType(MakeType("Faction")); // but here it is a type container
         var publisher = BuildPublisher(schema);
 
-        // Two Faction instances at root level — must not be flagged as duplicate singleton tags
+        // Two Faction elements at document root — individually iterated, never compared against each other
         var diags = publisher.CollectDiagnostics("""
                                                  <Faction Name="EMPIRE">
                                                    <Rank>1</Rank>
@@ -243,6 +247,57 @@ public sealed class XmlDiagnosticsPublisherTest
                                                  """);
 
         Assert.Empty(diags);
+    }
+
+    // ── depth-based type-container detection ────────────────────────────────────
+
+    [Fact]
+    public void CollectDiagnostics_MultiInstance_TypeContainerNameMatchesFieldTag_NoDuplicateFalsePositive()
+    {
+        // "Faction" is registered as a field tag AND appears as a type-container element name.
+        // Two type containers with the same element name must not be flagged as duplicate singletons.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(MakeTag("Faction")); // not MultipleAllowed
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "FactionType", NameTag = "Name" });
+
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("FactionType"));
+        var publisher = BuildPublisher(schema, registry);
+
+        var diags = publisher.CollectDiagnostics("""
+                                                 <GameObjectFiles>
+                                                   <Faction Name="EMPIRE"><Name>EMPIRE</Name></Faction>
+                                                   <Faction Name="REBEL"><Name>REBEL</Name></Faction>
+                                                 </GameObjectFiles>
+                                                 """, DocumentUri.From("file:///test.xml"));
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void CollectDiagnostics_MultiInstance_FieldTagsInsideTypeContainer_StillValidated()
+    {
+        // Even though depth-1 elements are type containers, their children (field tags) are still validated.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTag(MakeTag("Max_Speed"));
+
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var publisher = BuildPublisher(schema, registry);
+
+        // Two Max_Speed tags inside a single type container — duplicate singleton error expected.
+        var diags = publisher.CollectDiagnostics("""
+                                                 <GameObjectFiles>
+                                                   <SpaceUnit Name="UnitA">
+                                                     <Max_Speed>100</Max_Speed>
+                                                     <Max_Speed>200</Max_Speed>
+                                                   </SpaceUnit>
+                                                 </GameObjectFiles>
+                                                 """, DocumentUri.From("file:///test.xml"));
+
+        Assert.Equal(2, diags.Count);
+        Assert.All(diags, d => Assert.Contains("Max_Speed", d.Message));
     }
 
     [Fact]

@@ -170,11 +170,23 @@ public sealed class XmlDiagnosticsPublisher
             var doc = new HtmlDocument();
             doc.LoadHtml(text);
             var lines = text.Split('\n');
+
+            // Determine whether depth-1 elements are type containers (multi-instance types)
+            // or field tags directly (singleton types or unregistered files).
+            var isTypeContainerLevel = false;
+            if (uri is not null)
+            {
+                var normalized = XmlGameDocumentParser.NormalizeDocumentUri(uri.ToString());
+                var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
+                isTypeContainerLevel = !fileTypes.IsEmpty &&
+                                       fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
+            }
+
             // Iterate root elements directly so the file-level container is never treated as a tag.
             foreach (var root in doc.DocumentNode.ChildNodes)
             {
                 if (root.NodeType != HtmlNodeType.Element) continue;
-                WalkNodes(root, diagnostics, lines);
+                WalkNodes(root, diagnostics, lines, isTypeContainerLevel);
             }
         }
         catch (Exception ex)
@@ -185,8 +197,20 @@ public sealed class XmlDiagnosticsPublisher
         return diagnostics;
     }
 
-    private void WalkNodes(HtmlNode node, List<Diagnostic> diagnostics, string[] lines)
+    private void WalkNodes(HtmlNode node, List<Diagnostic> diagnostics, string[] lines, bool isTypeContainerLevel)
     {
+        if (isTypeContainerLevel)
+        {
+            // Children are game object instances (type containers). Skip field-tag validation
+            // and recurse into each to validate their contents as field tags.
+            foreach (var child in node.ChildNodes)
+            {
+                if (child.NodeType == HtmlNodeType.Element)
+                    WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
+            }
+            return;
+        }
+
         // Pass 1: group direct child elements by name
         var childGroups = new Dictionary<string, List<HtmlNode>>(StringComparer.OrdinalIgnoreCase);
         foreach (var child in node.ChildNodes)
@@ -198,12 +222,10 @@ public sealed class XmlDiagnosticsPublisher
         }
 
         // Identify singleton tags that appear more than once under this parent.
-        // Type containers (e.g. <Faction>) are skipped — multiple instances are always valid.
         var duplicatedSingletons = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, nodes) in childGroups)
         {
             if (nodes.Count <= 1) continue;
-            if (_schema.GetObjectType(name) is not null) continue;
             var tagDef = _schema.GetTag(name);
             if (tagDef is not null && !tagDef.MultipleAllowed)
                 duplicatedSingletons.Add(name);
@@ -216,17 +238,10 @@ public sealed class XmlDiagnosticsPublisher
 
             var name = child.Name;
 
-            // Skip type-container elements (e.g. <GameObjectType>, <Faction>)
-            if (_schema.GetObjectType(name) is not null)
-            {
-                WalkNodes(child, diagnostics, lines);
-                continue;
-            }
-
             var tagDef = _schema.GetTag(name);
             if (tagDef is null)
             {
-                WalkNodes(child, diagnostics, lines);
+                WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
                 continue;
             }
 
@@ -244,7 +259,7 @@ public sealed class XmlDiagnosticsPublisher
                     XmlValidationResult.Failure(
                         $"Duplicate tag '{definedName}': only one occurrence is allowed per object.{othersText}"),
                     lines, true));
-                WalkNodes(child, diagnostics, lines);
+                WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
                 continue;
             }
 
@@ -256,7 +271,7 @@ public sealed class XmlDiagnosticsPublisher
             if (!result.IsValid)
                 diagnostics.Add(BuildDiagnostic(child, result, lines));
 
-            WalkNodes(child, diagnostics, lines);
+            WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
         }
     }
 

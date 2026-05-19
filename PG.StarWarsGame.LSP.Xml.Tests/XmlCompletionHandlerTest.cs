@@ -416,12 +416,14 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
+        // Root is <StoryPlots>, not <StoryParser> — registry detection must still trigger story completions.
+        // STORY_ACCUMULATE has 1 param, so Event_Param1 should appear (Event_Type is already present).
         var xml = "<StoryPlots>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryPlots>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
         var result = await handler.Handle(At(3, 1), CancellationToken.None);
 
-        Assert.Contains(result.Items, i => i.Label == "Event_Type");
+        Assert.Contains(result.Items, i => i.Label == "Event_Param1");
     }
 
     [Fact]

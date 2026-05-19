@@ -23,7 +23,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             schema,
             new StubValidatorRegistry(),
             new StoryParserDiagnosticCollector(schema),
-            NullLogger<XmlDiagnosticsPublisher>.Instance);
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            new StubFileTypeRegistry());
     }
 
     private static HardcodedReferenceSet BehaviorModuleSet(params HardcodedReferenceSetValue[] values)
@@ -207,6 +208,14 @@ file sealed class StubIndexService : IGameIndexService
         public static readonly NullDisposable Instance = new();
         public void Dispose() { }
     }
+}
+
+file sealed class StubFileTypeRegistry : IFileTypeRegistry
+{
+    public ImmutableArray<string> GetTypesForFile(string normalizedPath) => ImmutableArray<string>.Empty;
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) { }
+    public void UnregisterFile(string normalizedPath) { }
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All => new Dictionary<string, ImmutableArray<string>>();
 }
 
 file sealed class StubWorkspaceHost : IGameWorkspaceHost
