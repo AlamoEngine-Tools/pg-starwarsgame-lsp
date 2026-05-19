@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
@@ -17,7 +19,16 @@ public sealed class WorkspaceScannerTest
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         params IGameDocumentParser[] parsers)
     {
-        return new WorkspaceScanner(fs, parsers, svc, NullLogger<WorkspaceScanner>.Instance, null);
+        return new WorkspaceScanner(fs, parsers, svc, NullLogger<WorkspaceScanner>.Instance, null,
+            new FileTypeRegistry(), new FakeSchemaProvider());
+    }
+
+    private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
+        IFileTypeRegistry registry, ISchemaProvider schema,
+        params IGameDocumentParser[] parsers)
+    {
+        return new WorkspaceScanner(fs, parsers, svc, NullLogger<WorkspaceScanner>.Instance, null,
+            registry, schema);
     }
 
     // ── tests ────────────────────────────────────────────────────────────────
@@ -119,6 +130,92 @@ public sealed class WorkspaceScannerTest
 
         Assert.Empty(svc.Calls);
     }
+    // ── PreScanMetafiles ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task PreScan_FileRegistry_RegistersFilesFromMetafile()
+    {
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "DATA", "XML", "GameObjectFiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new MockFileData("<Files><File filename=\"DATA\\XML\\HARDPOINTS.XML\"/></Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
+
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile("data/xml/hardpoints.xml").ToArray());
+    }
+
+    [Fact]
+    public async Task PreScan_FileRegistry_FallsBackToBaseline_WhenMetafileAbsent()
+    {
+        var root = Root("ws");
+        var fs = new MockFileSystem();
+        fs.AddDirectory(root);
+        var fileTypeMap = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("data/xml/hardpoints.xml", ImmutableArray.Create("GameObjectType"));
+        var baseline = new BaselineIndex(
+            ImmutableDictionary<string, GameSymbol>.Empty,
+            DateTimeOffset.UtcNow, "",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            fileTypeMap);
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var svc = new FakeIndexService(new GameIndex(baseline,
+            ImmutableDictionary<string, DocumentIndex>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty));
+
+        await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
+
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile("data/xml/hardpoints.xml").ToArray());
+    }
+
+    [Fact]
+    public async Task PreScan_DirectContent_RegistersMetafilePath()
+    {
+        var root = Root("ws");
+        var moviesPath = Path.Combine(root, "DATA", "XML", "MOVIES.XML");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [moviesPath] = new MockFileData("<Movies/>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/movies.xml", MetafileType.DirectContent, ["BinkMovie"]));
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
+
+        Assert.Equal(["BinkMovie"], registry.GetTypesForFile("data/xml/movies.xml").ToArray());
+    }
+
+    [Fact]
+    public async Task PreScan_Special_IsSkipped()
+    {
+        var root = Root("ws");
+        var campaignPath = Path.Combine(root, "DATA", "XML", "CAMPAIGNS.XML");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [campaignPath] = new MockFileData("<Campaigns/>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/campaigns.xml", MetafileType.Special, ["StoryParser"]));
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
+
+        Assert.Empty(registry.All);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeParser : IGameDocumentParser
@@ -141,12 +238,41 @@ public sealed class WorkspaceScannerTest
         }
     }
 
+    private sealed class FakeSchemaProvider : ISchemaProvider
+    {
+        private readonly MetafileDefinition[] _metafiles;
+
+        public FakeSchemaProvider(params MetafileDefinition[] metafiles) => _metafiles = metafiles;
+
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => _metafiles;
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public XmlTagDefinition? GetTag(string tagName) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
+        public EnumDefinition? GetEnum(string enumName) => null;
+    }
+
     private sealed class FakeIndexService : IGameIndexService
     {
+        private readonly GameIndex _current;
         private readonly object _lock = new();
         public readonly List<(string Uri, int Version)> Calls = [];
         public int BeginBulkUpdateCallCount;
-        public GameIndex Current => GameIndex.Empty;
+
+        public FakeIndexService(GameIndex? current = null) => _current = current ?? GameIndex.Empty;
+
+        public GameIndex Current => _current;
 
         public event Action<GameIndex>? IndexChanged
         {

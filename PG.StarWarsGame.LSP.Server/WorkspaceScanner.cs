@@ -1,10 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions;
+using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -12,25 +15,33 @@ namespace PG.StarWarsGame.LSP.Server;
 public sealed class WorkspaceScanner
 {
     private readonly IFileSystem _fs;
+    private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceScanner> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
+    private readonly ISchemaProvider _schema;
     private readonly IServerWorkDoneManager? _workDone;
 
     public WorkspaceScanner(IFileSystem fs, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, ILogger<WorkspaceScanner> logger,
-        IServerWorkDoneManager? workDone)
+        IServerWorkDoneManager? workDone,
+        IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema)
     {
         _fs = fs;
         _parsers = parsers;
         _indexService = indexService;
         _logger = logger;
         _workDone = workDone;
+        _fileTypeRegistry = fileTypeRegistry;
+        _schema = schema;
     }
 
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
     {
-        var files = workspaceFolders
+        var roots = workspaceFolders.ToList();
+        PreScanMetafiles(roots);
+
+        var files = roots
             .SelectMany(folder => _fs.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
             .Where(f => _parsers.Any(p => p.CanParse(_fs.Path.GetExtension(f))))
             .ToList();
@@ -74,4 +85,97 @@ public sealed class WorkspaceScanner
             progress?.Dispose();
         }
     }
+
+    private void PreScanMetafiles(IList<string> roots)
+    {
+        var baseline = _indexService.Current.Baseline;
+
+        foreach (var def in _schema.AllMetafiles)
+        {
+            if (def.MetafileType == MetafileType.Special) continue;
+
+            if (def.MetafileType == MetafileType.FileRegistry)
+            {
+                var metafilePath = FindInWorkspace(roots, def.Path);
+                if (metafilePath is not null)
+                    RegisterFromMetafile(metafilePath, def);
+                else
+                    FallbackFromBaseline(baseline, def);
+            }
+            else // DirectContent
+            {
+                var contentPath = FindInWorkspace(roots, def.Path);
+                if (contentPath is not null)
+                {
+                    var relative = GetRelativeNormalized(roots[0], contentPath);
+                    _fileTypeRegistry.RegisterFile(relative, def.Types.ToImmutableArray());
+                }
+                else
+                    FallbackFromBaseline(baseline, def);
+            }
+        }
+    }
+
+    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def)
+    {
+        string xmlContent;
+        try
+        {
+            xmlContent = _fs.File.ReadAllText(metafilePath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not read metafile '{Path}': {Message}", metafilePath, ex.Message);
+            return;
+        }
+
+        XDocument xdoc;
+        try
+        {
+            xdoc = XDocument.Parse(xmlContent);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not parse metafile '{Path}': {Message}", metafilePath, ex.Message);
+            return;
+        }
+
+        var types = def.Types.ToImmutableArray();
+        foreach (var elem in xdoc.Descendants()
+                     .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
+        {
+            var filename = elem.Attributes()
+                .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
+            if (!string.IsNullOrEmpty(filename))
+                _fileTypeRegistry.RegisterFile(NormalizeGamePath(filename), types);
+        }
+    }
+
+    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def)
+    {
+        foreach (var (path, types) in baseline.FileTypeMap)
+        {
+            if (types.Any(t => def.Types.Contains(t, StringComparer.OrdinalIgnoreCase)))
+                _fileTypeRegistry.RegisterFile(path, types);
+        }
+    }
+
+    private string? FindInWorkspace(IList<string> roots, string normalizedRelPath)
+    {
+        var relPath = normalizedRelPath.Replace('/', Path.DirectorySeparatorChar);
+        foreach (var root in roots)
+        {
+            var candidate = _fs.Path.Combine(root, relPath);
+            if (_fs.File.Exists(candidate))
+                return candidate;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeGamePath(string raw) =>
+        raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+
+    private static string GetRelativeNormalized(string workspaceRoot, string absolutePath) =>
+        Path.GetRelativePath(workspaceRoot, absolutePath).Replace('\\', '/').ToLowerInvariant();
 }
