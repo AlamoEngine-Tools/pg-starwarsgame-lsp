@@ -36,10 +36,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
         var normalizedPath = NormalizeDocumentUri(documentUri);
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(normalizedPath);
-
-        var symbols = registeredTypes.IsEmpty
-            ? CollectSymbolsLegacy(doc, documentUri, ct)
-            : CollectSymbolsFromRegistry(doc, documentUri, registeredTypes, ct);
+        var symbols = CollectSymbolsFromRegistry(doc, documentUri, registeredTypes, ct);
 
         var references = CollectReferences(doc, documentUri, text, ct);
 
@@ -47,33 +44,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri, version,
             symbols.ToImmutableArray(),
             references.ToImmutableArray()));
-    }
-
-    private List<GameSymbol> CollectSymbolsLegacy(HtmlDocument doc, string documentUri, CancellationToken ct)
-    {
-        var symbols = new List<GameSymbol>();
-        foreach (var node in doc.DocumentNode.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element))
-        {
-            ct.ThrowIfCancellationRequested();
-            var typeDef = _schema.GetObjectType(node.Name);
-            if (typeDef?.NameTag is null)
-            {
-                if (typeDef is null)
-                    _logger.LogDebug("Unknown element type '{Name}' — skipped", node.Name);
-                continue;
-            }
-
-            var id = GetNameAttribute(node, typeDef.NameTag);
-            if (string.IsNullOrEmpty(id))
-                _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
-                    typeDef.TypeName, node.Line);
-            else
-                symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
-                    new FileOrigin(documentUri, node.Line - 1, null), null));
-        }
-
-        return symbols;
     }
 
     private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,

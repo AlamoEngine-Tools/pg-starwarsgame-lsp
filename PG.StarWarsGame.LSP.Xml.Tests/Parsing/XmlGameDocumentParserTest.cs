@@ -81,10 +81,12 @@ public sealed class XmlGameDocumentParserTest
     {
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Unit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("units.xml", ["Unit"]);
 
-        var result = await Build(schema).ParseAsync(
+        var result = await Build(schema, registry).ParseAsync(
             "file:///units.xml",
-            """<Unit Name="UNIT_REBEL"><Max_Health>200</Max_Health></Unit>""",
+            """<GameObjectFiles><Unit Name="UNIT_REBEL"><Max_Health>200</Max_Health></Unit></GameObjectFiles>""",
             1, default);
 
         var sym = Assert.Single(result.Symbols);
@@ -138,12 +140,16 @@ public sealed class XmlGameDocumentParserTest
     {
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Unit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("f.xml", ["Unit"]);
 
-        var result = await Build(schema).ParseAsync(
+        var result = await Build(schema, registry).ParseAsync(
             "file:///f.xml",
             """
-            <Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit>
-            <Unit Name="UNIT_B"><Max_Health>200</Max_Health></Unit>
+            <Units>
+              <Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit>
+              <Unit Name="UNIT_B"><Max_Health>200</Max_Health></Unit>
+            </Units>
             """,
             1, default);
 
@@ -157,10 +163,12 @@ public sealed class XmlGameDocumentParserTest
     {
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("SFXEvent"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("sfx.xml", ["SFXEvent"]);
 
-        var result = await Build(schema).ParseAsync(
+        var result = await Build(schema, registry).ParseAsync(
             "file:///sfx.xml",
-            """<SFXEvent Name="SFX_LASER"/>""",
+            """<SFXEvents><SFXEvent Name="SFX_LASER"/></SFXEvents>""",
             1, default);
 
         var sym = Assert.Single(result.Symbols);
@@ -361,6 +369,24 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("UNIT_B", reference.TargetId);
     }
 
+    // ── no-registry-no-symbols ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_UnregisteredFile_EmitsNoSymbols_EvenWhenElementNameMatchesType()
+    {
+        // Files not registered in IFileTypeRegistry must produce no symbols.
+        // The legacy element-name fallback must be gone.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit")); // element name matches type name — old code would emit a symbol
+
+        var result = await Build(schema).ParseAsync( // no registry
+            "file:///units.xml",
+            """<Units><Unit Name="UNIT_A"/></Units>""",
+            1, default);
+
+        Assert.Empty(result.Symbols);
+    }
+
     // ── registry-first type detection ───────────────────────────────────────
 
     [Fact]
@@ -381,22 +407,6 @@ public sealed class XmlGameDocumentParserTest
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("HP_A", sym.Id);
         Assert.Equal("HardPoint", sym.TypeName);
-    }
-
-    [Fact]
-    public async Task ParseAsync_NoRegistry_FallsBackToElementNameMatching()
-    {
-        var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit"));
-
-        var result = await Build(schema).ParseAsync(
-            "file:///units.xml",
-            """<Units><Unit Name="UNIT_A"/></Units>""",
-            1, default);
-
-        var sym = Assert.Single(result.Symbols);
-        Assert.Equal("UNIT_A", sym.Id);
-        Assert.Equal("Unit", sym.TypeName);
     }
 
     [Fact]
