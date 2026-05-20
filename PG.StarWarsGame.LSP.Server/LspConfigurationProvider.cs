@@ -77,7 +77,9 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var gamePath = TryGetString(elem, "gamePath");
         var locale = TryGetString(elem, "locale");
         var schemaUrl = TryGetString(elem, "schemaUrl");
+        var schemaLocalPath = TryGetString(elem, "schemaLocalPath");
         var baselineLocalPath = TryGetString(elem, "baselineLocalPath");
+        var baselineType = TryGetString(elem, "baselineType");
 
         var modPaths = new List<string>();
         if (elem.TryGetProperty("modPaths", out var modPathsElem) &&
@@ -91,16 +93,16 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             GamePath = gamePath,
             ModPaths = modPaths,
             Locale = locale ?? "en",
-            SchemaSource = string.IsNullOrWhiteSpace(schemaUrl)
-                ? new SchemaSourceConfig()
-                : new SchemaSourceConfig { Url = schemaUrl },
-            BaselineSource = string.IsNullOrWhiteSpace(baselineLocalPath)
-                ? new BaselineSourceConfig()
-                : new BaselineSourceConfig
-                {
-                    Type = BaselineSourceType.Local,
-                    LocalPath = baselineLocalPath
-                }
+            SchemaSource = !string.IsNullOrWhiteSpace(schemaLocalPath)
+                ? new SchemaSourceConfig { Type = SchemaSourceType.Local, LocalPath = schemaLocalPath }
+                : string.IsNullOrWhiteSpace(schemaUrl)
+                    ? new SchemaSourceConfig()
+                    : new SchemaSourceConfig { Url = schemaUrl },
+            BaselineSource = string.Equals(baselineType, "None", StringComparison.OrdinalIgnoreCase)
+                ? new BaselineSourceConfig { Type = BaselineSourceType.None }
+                : !string.IsNullOrWhiteSpace(baselineLocalPath)
+                    ? new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = baselineLocalPath }
+                    : new BaselineSourceConfig()
         };
     }
 
@@ -111,7 +113,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             GamePath = overlay.GamePath ?? file.GamePath,
             ModPaths = overlay.ModPaths.Count > 0 ? overlay.ModPaths : file.ModPaths,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,
-            SchemaSource = overlay.SchemaSource.Url != new SchemaSourceConfig().Url
+            SchemaSource = overlay.SchemaSource.Type == SchemaSourceType.Local
+                           || overlay.SchemaSource.Url != new SchemaSourceConfig().Url
                 ? overlay.SchemaSource
                 : file.SchemaSource,
             BaselineSource = overlay.BaselineSource.Type != BaselineSourceType.Http

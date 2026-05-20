@@ -10,6 +10,7 @@ internal sealed class YamlEnumFile
     public bool IsBitfield { get; set; }
     public string? SourceFile { get; set; }
     public Dictionary<string, string> Description { get; set; } = [];
+    public Dictionary<string, string> Notes { get; set; } = [];
     public bool Deprecated { get; set; }
     public string? AvailableSince { get; set; }
     public List<YamlEnumValueEntry> Values { get; set; } = [];

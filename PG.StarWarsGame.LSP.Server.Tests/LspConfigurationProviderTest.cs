@@ -72,12 +72,29 @@ public sealed class LspConfigurationProviderTest : IDisposable
     }
 
     [Fact]
+    public void LoadFrom_WithSchemaLocalPath_SetsLocalType()
+    {
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { schemaLocalPath = "/path/to/schema" }));
+        Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
+        Assert.Equal("/path/to/schema", provider.Current.SchemaSource.LocalPath);
+    }
+
+    [Fact]
     public void LoadFrom_WithBaselineLocalPath_SetsLocalType()
     {
         var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(Json(new { baselineLocalPath = "/baselines/eaw.json" }));
         Assert.Equal(BaselineSourceType.Local, provider.Current.BaselineSource.Type);
         Assert.Equal("/baselines/eaw.json", provider.Current.BaselineSource.LocalPath);
+    }
+
+    [Fact]
+    public void LoadFrom_WithBaselineTypeNone_SetsNoneType()
+    {
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { baselineType = "None" }));
+        Assert.Equal(BaselineSourceType.None, provider.Current.BaselineSource.Type);
     }
 
     [Fact]

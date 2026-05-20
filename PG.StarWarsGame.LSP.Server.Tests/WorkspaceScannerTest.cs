@@ -136,10 +136,12 @@ public sealed class WorkspaceScannerTest
     public async Task PreScan_FileRegistry_RegistersFilesFromMetafile()
     {
         var root = Root("ws");
-        var metafilePath = Path.Combine(root, "DATA", "XML", "GameObjectFiles.xml");
+        // Lowercase path — MockFileSystem uses case-sensitive keys; FindInWorkspace
+        // searches with the normalised (lowercase) relative path from MetafileDefinition.
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [metafilePath] = new MockFileData("<Files><File filename=\"DATA\\XML\\HARDPOINTS.XML\"/></Files>")
+            [metafilePath] = new("<Game_Object_Files><File>DATA\\XML\\HARDPOINTS.XML</File></Game_Object_Files>")
         });
         var registry = new FileTypeRegistry();
         var schema = new FakeSchemaProvider(
@@ -189,7 +191,7 @@ public sealed class WorkspaceScannerTest
         var moviesPath = Path.Combine(root, "DATA", "XML", "MOVIES.XML");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [moviesPath] = new MockFileData("<Movies/>")
+            [moviesPath] = new("<Movies/>")
         });
         var registry = new FileTypeRegistry();
         var schema = new FakeSchemaProvider(
@@ -210,7 +212,7 @@ public sealed class WorkspaceScannerTest
         var campaignPath = Path.Combine(root, "DATA", "XML", "CAMPAIGNS.XML");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [campaignPath] = new MockFileData("<Campaigns/>")
+            [campaignPath] = new("<Campaigns/>")
         });
         var registry = new FileTypeRegistry();
         var schema = new FakeSchemaProvider(
@@ -220,6 +222,61 @@ public sealed class WorkspaceScannerTest
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
         Assert.Empty(registry.All);
+    }
+
+    [Fact]
+    public async Task PreScan_FileRegistry_WorkspaceIsXmlDirectory_RegistersFilesFromMetafile()
+    {
+        // Workspace root IS the XML directory: metafile lives at root/<name>.xml
+        // (no data/xml/ prefix in the key). Files inside the metafile are listed
+        // as DATA\XML\FOO.XML — they resolve to root/<foo>.xml.
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Game_Object_Files><File>DATA\\XML\\HARDPOINTS.XML</File></Game_Object_Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
+
+        var expectedKey = Path.Combine(root, "hardpoints.xml")
+            .Replace('\\', '/').ToLowerInvariant();
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
+    }
+
+    [Fact]
+    public async Task ScanAsync_WaitsForSchema_WhenAllMetafilesEmptyAtStart()
+    {
+        // Simulate HttpSchemaProvider: schema is empty at scan start and fires
+        // SchemaRefreshed after the background HTTP download completes.
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files><File>DATA\\XML\\HARDPOINTS.XML</File></Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new DelayedSchemaProvider();
+        var svc = new FakeIndexService();
+        var scanner = Build(fs, svc, registry, schema);
+
+        // ScanAsync will yield at WaitForSchemaAsync since AllMetafiles is empty.
+        var scanTask = scanner.ScanAsync([root], CancellationToken.None);
+
+        // Simulate schema load completing and firing SchemaRefreshed.
+        schema.LoadMetafiles(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry,
+                ["GameObjectType"]));
+
+        await scanTask;
+
+        var expectedKey = Path.Combine(root, "data", "xml", "hardpoints.xml")
+            .Replace('\\', '/').ToLowerInvariant();
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
@@ -244,11 +301,12 @@ public sealed class WorkspaceScannerTest
         }
     }
 
-    private sealed class FakeSchemaProvider : ISchemaProvider
+    // Schema provider that starts empty and fires SchemaRefreshed when LoadMetafiles is called,
+    // mimicking HttpSchemaProvider's background-load behaviour.
+    private sealed class DelayedSchemaProvider : ISchemaProvider
     {
-        private readonly MetafileDefinition[] _metafiles;
-
-        public FakeSchemaProvider(params MetafileDefinition[] metafiles) => _metafiles = metafiles;
+        private MetafileDefinition[] _metafiles = [];
+        public event EventHandler? SchemaRefreshed;
 
         public IReadOnlyList<MetafileDefinition> AllMetafiles => _metafiles;
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
@@ -256,9 +314,39 @@ public sealed class WorkspaceScannerTest
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
 
+        public void LoadMetafiles(params MetafileDefinition[] metafiles)
+        {
+            _metafiles = metafiles;
+            SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+        }
+
+        public XmlTagDefinition? GetTag(string t) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t) => [];
+        public GameObjectTypeDefinition? GetObjectType(string t) => null;
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t) => [];
+        public EnumDefinition? GetEnum(string e) => null;
+    }
+
+    private sealed class FakeSchemaProvider : ISchemaProvider
+    {
+        private readonly MetafileDefinition[] _metafiles;
+
+        public FakeSchemaProvider(params MetafileDefinition[] metafiles)
+        {
+            _metafiles = metafiles;
+        }
+
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => _metafiles;
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
+        // Fire immediately on subscription: simulates a schema that is already loaded
+        // so that WaitForSchemaAsync in WorkspaceScanner does not time out in tests.
         public event EventHandler? SchemaRefreshed
         {
-            add { }
+            add { value?.Invoke(this, EventArgs.Empty); }
             remove { }
         }
 
@@ -271,14 +359,16 @@ public sealed class WorkspaceScannerTest
 
     private sealed class FakeIndexService : IGameIndexService
     {
-        private readonly GameIndex _current;
         private readonly object _lock = new();
         public readonly List<(string Uri, int Version)> Calls = [];
         public int BeginBulkUpdateCallCount;
 
-        public FakeIndexService(GameIndex? current = null) => _current = current ?? GameIndex.Empty;
+        public FakeIndexService(GameIndex? current = null)
+        {
+            Current = current ?? GameIndex.Empty;
+        }
 
-        public GameIndex Current => _current;
+        public GameIndex Current { get; }
 
         public event Action<GameIndex>? IndexChanged
         {

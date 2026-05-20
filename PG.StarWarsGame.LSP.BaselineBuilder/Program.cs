@@ -118,8 +118,11 @@ if (schemaProvider is not null)
                     foreach (var elem in xdoc.Descendants()
                                  .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
                     {
-                        var filename = elem.Attributes()
-                            .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
+                        // Game files use element text content: <File>path</File>.
+                        var filename = elem.Value?.Trim();
+                        if (string.IsNullOrEmpty(filename))
+                            filename = elem.Attributes()
+                                .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
                         if (!string.IsNullOrEmpty(filename))
                         {
                             var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');

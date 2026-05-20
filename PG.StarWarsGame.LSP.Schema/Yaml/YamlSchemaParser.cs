@@ -50,6 +50,7 @@ internal static class YamlSchemaParser
                 Deprecated = entry.Deprecated,
                 AvailableSince = entry.AvailableSince,
                 Description = entry.Description,
+                Notes = entry.Notes,
                 MultipleAllowed = entry.MultipleAllowed
             });
         }
@@ -66,7 +67,8 @@ internal static class YamlSchemaParser
             {
                 TypeName = entry.TypeName,
                 NameTag = entry.NameTag,
-                Description = entry.Description
+                Description = entry.Description,
+                Notes = entry.Notes
             });
         return result;
     }
@@ -80,6 +82,7 @@ internal static class YamlSchemaParser
             {
                 Name = v.Name,
                 Description = v.Description,
+                Notes = v.Notes,
                 Deprecated = v.Deprecated,
                 AvailableSince = v.AvailableSince,
                 Groups = v.Groups
@@ -88,6 +91,7 @@ internal static class YamlSchemaParser
         {
             Name = file.Name,
             Description = file.Description,
+            Notes = file.Notes,
             Deprecated = file.Deprecated,
             AvailableSince = file.AvailableSince,
             Values = values
@@ -113,14 +117,53 @@ internal static class YamlSchemaParser
 
         var values = new List<EnumValueDefinition>(file.Values.Count);
         foreach (var v in file.Values)
+        {
+            List<ParamDefinition>? paramDefs = null;
+            if (v.Params is { Count: > 0 })
+            {
+                paramDefs = new List<ParamDefinition>(v.Params.Count);
+                foreach (var p in v.Params)
+                {
+                    if (!Enum.TryParse<XmlValueType>(p.Type, true, out var paramValueType))
+                    {
+                        logger?.LogWarning(
+                            "Unknown param type '{Type}' at position {Position} for enum value '{Value}' — skipping",
+                            p.Type, p.Position, v.Name);
+                        continue;
+                    }
+
+                    var prk = ReferenceKind.None;
+                    if (p.ReferenceKind is not null && !Enum.TryParse(p.ReferenceKind, true, out prk))
+                        logger?.LogWarning(
+                            "Unknown referenceKind '{Kind}' for param at position {Position} for enum value '{Value}' — defaulting to None",
+                            p.ReferenceKind, p.Position, v.Name);
+
+                    paramDefs.Add(new ParamDefinition
+                    {
+                        Position = p.Position,
+                        ValueType = paramValueType,
+                        ReferenceKind = prk,
+                        ReferenceType = p.ReferenceType,
+                        EnumName = p.EnumName,
+                        Optional = p.Optional,
+                        Description = p.Description,
+                        Notes = p.Notes
+                    });
+                }
+            }
+
             values.Add(new EnumValueDefinition
             {
                 Name = v.Name,
                 Description = v.Description,
+                Notes = v.Notes,
                 Deprecated = v.Deprecated,
                 AvailableSince = v.AvailableSince,
-                Groups = v.Groups
+                Groups = v.Groups,
+                Params = paramDefs?.Count > 0 ? paramDefs : null
             });
+        }
+
         return new EnumDefinition
         {
             Name = file.Name,
@@ -128,6 +171,7 @@ internal static class YamlSchemaParser
             IsBitfield = file.IsBitfield,
             SourceFile = file.SourceFile,
             Description = file.Description,
+            Notes = file.Notes,
             Deprecated = file.Deprecated,
             AvailableSince = file.AvailableSince,
             Values = values

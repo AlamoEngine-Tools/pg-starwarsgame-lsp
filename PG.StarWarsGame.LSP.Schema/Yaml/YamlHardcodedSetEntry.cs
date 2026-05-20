@@ -7,6 +7,7 @@ internal sealed class YamlHardcodedSetEntry
 {
     public string Name { get; set; } = string.Empty;
     public Dictionary<string, string> Description { get; set; } = [];
+    public Dictionary<string, string> Notes { get; set; } = [];
     public bool Deprecated { get; set; }
     public string? AvailableSince { get; set; }
     public List<string> Groups { get; set; } = [];

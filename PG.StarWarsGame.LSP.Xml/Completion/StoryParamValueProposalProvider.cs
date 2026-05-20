@@ -4,20 +4,21 @@
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.StoryScripting;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion;
 
 public sealed class StoryParamValueProposalProvider(ISchemaProvider schema)
 {
     public IReadOnlyList<ValueProposal> GetProposals(
-        StoryParamDefinition def, string partialValue, GameIndex index)
+        ParamDefinition? def, string partialValue, GameIndex index)
     {
-        return def.Kind switch
+        if (def is null) return [];
+        return def.ValueType switch
         {
-            StoryParamKind.Enum or StoryParamKind.EnumList => GetEnumProposals(def.EnumName, partialValue),
-            StoryParamKind.BooleanInt => GetBooleanIntProposals(partialValue),
-            _ when def.ReferenceType is not null => GetRefProposals(def.ReferenceType, partialValue, index),
+            XmlValueType.DynamicEnumValue => GetEnumProposals(def.EnumName, partialValue),
+            XmlValueType.Boolean => GetBooleanIntProposals(partialValue),
+            XmlValueType.NameReference or XmlValueType.NameReferenceList =>
+                GetRefProposals(def.ReferenceType, partialValue, index),
             _ => []
         };
     }
@@ -45,8 +46,9 @@ public sealed class StoryParamValueProposalProvider(ISchemaProvider schema)
     }
 
     private static IReadOnlyList<ValueProposal> GetRefProposals(
-        string referenceType, string partialValue, GameIndex index)
+        string? referenceType, string partialValue, GameIndex index)
     {
+        if (referenceType is null) return [];
         var workspaceSymbols = index.WorkspaceDefinitions.Values
             .SelectMany(arr => arr);
         var baselineSymbols = index.Baseline.Symbols.Values;

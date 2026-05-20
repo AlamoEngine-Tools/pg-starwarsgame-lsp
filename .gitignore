@@ -493,6 +493,10 @@ fabric.properties
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,rider,visualstudiocode
 
-# ignore the schema dir
+# ignore the schema dir and shcema generator scripts
 /schema
-GenerateSchemaYaml.ps1
+*.ps1
+# Ignore the base game
+/eaw
+# ignore foc
+/foc

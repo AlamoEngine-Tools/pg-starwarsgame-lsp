@@ -16,4 +16,17 @@ public sealed record EnumValueDefinition
     ///     carries a <c>valueGroup</c> annotation.
     /// </summary>
     public IReadOnlyList<string> Groups { get; init; } = [];
+
+    /// <summary>
+    ///     Ordered parameter slot definitions for this event/reward value, keyed by position.
+    ///     Null = unconstrained (all param positions accept arbitrary input).
+    ///     Gaps between positions mean those slots are not used by this event.
+    /// </summary>
+    public IReadOnlyList<ParamDefinition>? Params { get; init; }
+
+    /// <summary>
+    ///     Secondary display text for caveats — "Never used in vanilla", "Disabled in engine", etc.
+    ///     Shown alongside description in hover/completion tooltips.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
 }

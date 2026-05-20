@@ -329,6 +329,228 @@ public sealed class YamlSchemaParserTest
         Assert.Equal("data/xml/gameobjectfiles.xml", metafiles[0].Path);
     }
 
+    // ── ParseEnumFile ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void ParseEnumFile_AllFields_MappedCorrectly()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            description:
+                              en: "Trigger condition type."
+                            deprecated: false
+                            availableSince: "FoC 1.0"
+                            values:
+                              - name: STORY_CONQUER
+                                description:
+                                  en: "Fires when control of a planet changes."
+                                deprecated: false
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+
+        Assert.Equal("StoryEventType", def.Name);
+        Assert.Equal("Trigger condition type.", def.Description["en"]);
+        Assert.Equal("FoC 1.0", def.AvailableSince);
+
+        var value = Assert.Single(def.Values);
+        Assert.Equal("STORY_CONQUER", value.Name);
+        Assert.Equal("Fires when control of a planet changes.", value.Description["en"]);
+    }
+
+    [Fact]
+    public void ParseEnumFile_WithPositionedParams_ReturnsParamDefinitionsAtCorrectPositions()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            values:
+                              - name: STORY_CONQUER
+                                params:
+                                  - position: 0
+                                    type: NameReferenceList
+                                    referenceType: Planet
+                                    description:
+                                      en: "Planet(s) to watch."
+                                  - position: 2
+                                    type: DynamicEnumValue
+                                    enumName: StoryEventFilter
+                                    optional: true
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+        var value = Assert.Single(def.Values);
+
+        Assert.NotNull(value.Params);
+        Assert.Equal(2, value.Params!.Count);
+
+        var p0 = value.Params.Single(p => p.Position == 0);
+        Assert.Equal(XmlValueType.NameReferenceList, p0.ValueType);
+        Assert.Equal("Planet", p0.ReferenceType);
+        Assert.Equal("Planet(s) to watch.", p0.Description["en"]);
+        Assert.False(p0.Optional);
+
+        var p2 = value.Params.Single(p => p.Position == 2);
+        Assert.Equal(XmlValueType.DynamicEnumValue, p2.ValueType);
+        Assert.Equal("StoryEventFilter", p2.EnumName);
+        Assert.True(p2.Optional);
+    }
+
+    [Fact]
+    public void ParseEnumFile_WithoutParams_ReturnsNullParams()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            values:
+                              - name: STORY_TRIGGER
+                                description:
+                                  en: "Fires immediately when prerequisites are met."
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+        var value = Assert.Single(def.Values);
+
+        Assert.Null(value.Params);
+    }
+
+    [Fact]
+    public void ParseEnumFile_WithUnknownParamType_LogsWarningAndSkipsParam()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            values:
+                              - name: STORY_CONQUER
+                                params:
+                                  - position: 0
+                                    type: NameReferenceList
+                                  - position: 1
+                                    type: NotARealType
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+        var value = Assert.Single(def.Values);
+
+        Assert.NotNull(value.Params);
+        var param = Assert.Single(value.Params!);
+        Assert.Equal(0, param.Position);
+        Assert.Equal(XmlValueType.NameReferenceList, param.ValueType);
+    }
+
+    [Fact]
+    public void ParseEnumFile_WithValueNotes_ReturnsNotes()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            values:
+                              - name: STORY_GARRISON_UNIT
+                                description:
+                                  en: "Fires when the specified unit is garrisoned."
+                                notes:
+                                  en: "Never used in vanilla. Parameters 2 and 3 are probably non-functional."
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+        var value = Assert.Single(def.Values);
+
+        Assert.Equal("Never used in vanilla. Parameters 2 and 3 are probably non-functional.",
+            value.Notes["en"]);
+    }
+
+    [Fact]
+    public void ParseEnumFile_WithEnumLevelNotes_ReturnsNotes()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            notes:
+                              en: "FoC-only enum."
+                            values: []
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+
+        Assert.Equal("FoC-only enum.", def.Notes["en"]);
+    }
+
+    [Fact]
+    public void ParseEnumFile_WithoutNotes_ReturnsEmptyNotes()
+    {
+        const string yaml = """
+                            name: StoryEventType
+                            values:
+                              - name: STORY_TRIGGER
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+        var value = Assert.Single(def.Values);
+
+        Assert.Empty(value.Notes);
+        Assert.Empty(def.Notes);
+    }
+
+    [Fact]
+    public void ParseTagFile_WithNotes_ReturnsNotes()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Event_Type
+                                type: DynamicEnumValue
+                                enumName: StoryEventType
+                                notes:
+                                  en: "Determines the trigger condition for this event block."
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal("Determines the trigger condition for this event block.", tag.Notes["en"]);
+    }
+
+    [Fact]
+    public void ParseTagFile_WithoutNotes_ReturnsEmptyNotes()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Speed
+                                type: Float
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Empty(tag.Notes);
+    }
+
+    [Fact]
+    public void ParseHardcodedSetFile_WithValueNotes_ReturnsNotes()
+    {
+        const string yaml = """
+                            name: BehaviorModule
+                            values:
+                              - name: GenericTransport
+                                notes:
+                                  en: "Only available in space tactical mode."
+                            """;
+
+        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
+        var value = Assert.Single(set.Values);
+
+        Assert.Equal("Only available in space tactical mode.", value.Notes["en"]);
+    }
+
+    [Fact]
+    public void ParseHardcodedSetFile_WithSetLevelNotes_ReturnsNotes()
+    {
+        const string yaml = """
+                            name: BehaviorModule
+                            notes:
+                              en: "Deprecated module list."
+                            values: []
+                            """;
+
+        var set = YamlSchemaParser.ParseHardcodedSetFile(yaml);
+
+        Assert.Equal("Deprecated module list.", set.Notes["en"]);
+    }
+
+    // ── ParseMetafileFile ───────────────────────────────────────────────────
+
     [Fact]
     public void ParseMetafileFile_MultipleEntries_AllParsed()
     {

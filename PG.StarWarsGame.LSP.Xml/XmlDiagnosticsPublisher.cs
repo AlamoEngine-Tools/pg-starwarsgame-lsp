@@ -79,6 +79,7 @@ public sealed class XmlDiagnosticsPublisher
                 allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
                 allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
                 allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
+                allDiags.AddRange(CollectTagNotesHints(doc.Text));
                 if (IsStoryParserDocument(uri))
                     allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
             }
@@ -498,6 +499,33 @@ public sealed class XmlDiagnosticsPublisher
                 new Position(endLine, endCol)),
             Source = "pg-swg-lsp"
         };
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectTagNotesHints(string documentText)
+    {
+        var diagnostics = new List<Diagnostic>();
+        var doc = new HtmlDocument();
+        doc.LoadHtml(documentText);
+
+        foreach (var node in doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            var tag = _schema.GetTag(node.Name);
+            if (tag is null || tag.Notes.Count == 0) continue;
+            if (!tag.Notes.TryGetValue("en", out var note)) continue;
+
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Hint,
+                Message = note,
+                Range = new Range(
+                    new Position(Math.Max(0, node.Line - 1), 0),
+                    new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
+                Source = "pg-swg-lsp"
+            });
+        }
+
+        return diagnostics;
     }
 
     private bool IsStoryParserDocument(string documentUri)

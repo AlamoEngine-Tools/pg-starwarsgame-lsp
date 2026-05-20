@@ -6,7 +6,6 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.StoryScripting;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
@@ -15,6 +14,7 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
 {
     private const int MaxEventParamSlots = 7;
     private const int MaxRewardParamSlots = 14;
+    private const string Locale = "en";
 
     public IReadOnlyList<Diagnostic> Collect(string xmlContent, GameIndex gameIndex)
     {
@@ -34,22 +34,38 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
 
     private void CollectForEvent(HtmlNode eventNode, GameIndex gameIndex, List<Diagnostic> diagnostics)
     {
-        var eventType = GetChildText(eventNode, "Event_Type");
+        var eventTypeNode = FindChild(eventNode, "Event_Type");
+        var eventType = eventTypeNode?.InnerText.Trim();
         if (eventType is not null)
         {
-            var eventDef = StoryScriptingIndex.GetEvent(eventType);
+            var eventDef = GetEventDef(eventType);
             if (eventDef is not null)
+            {
+                if (eventDef.Deprecated)
+                    diagnostics.Add(Warn(eventTypeNode!, $"'{eventType}' is deprecated."));
+                if (eventDef.Notes.TryGetValue(Locale, out var en))
+                    diagnostics.Add(Hint(eventTypeNode!, en));
+
                 CheckParams(eventNode, "Event_Param", MaxEventParamSlots,
                     eventDef.Params, eventType, gameIndex, diagnostics);
+            }
         }
 
-        var rewardType = GetChildText(eventNode, "Reward_Type");
+        var rewardTypeNode = FindChild(eventNode, "Reward_Type");
+        var rewardType = rewardTypeNode?.InnerText.Trim();
         if (rewardType is not null)
         {
-            var rewardDef = StoryScriptingIndex.GetReward(rewardType);
+            var rewardDef = GetRewardDef(rewardType);
             if (rewardDef is not null)
+            {
+                if (rewardDef.Deprecated)
+                    diagnostics.Add(Warn(rewardTypeNode!, $"'{rewardType}' is deprecated."));
+                if (rewardDef.Notes.TryGetValue(Locale, out var en))
+                    diagnostics.Add(Hint(rewardTypeNode!, en));
+
                 CheckParams(eventNode, "Reward_Param", MaxRewardParamSlots,
                     rewardDef.Params, rewardType, gameIndex, diagnostics);
+            }
         }
     }
 
@@ -57,11 +73,15 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
         HtmlNode eventNode,
         string paramPrefix,
         int maxSlots,
-        IReadOnlyList<StoryParamDefinition> paramDefs,
+        IReadOnlyList<ParamDefinition>? paramDefs,
         string typeName,
         GameIndex gameIndex,
         List<Diagnostic> diagnostics)
     {
+        if (paramDefs is null) return;
+
+        var maxDefinedPos = paramDefs.Count > 0 ? paramDefs.Max(p => p.Position) : -1;
+
         for (var n = 1; n <= maxSlots; n++)
         {
             var tagName = $"{paramPrefix}{n}";
@@ -70,59 +90,54 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
             var value = child.InnerText.Trim();
             if (value.Length == 0) continue;
 
-            if (n > paramDefs.Count)
+            var schemaPos = n - 1;
+
+            if (schemaPos > maxDefinedPos)
             {
                 diagnostics.Add(Warn(child, $"'{tagName}' is not used by {typeName}."));
+                continue;
             }
-            else
-            {
-                var msg = ValidateParamValue(paramDefs[n - 1], value, gameIndex);
-                if (msg is not null)
-                    diagnostics.Add(Warn(child, msg));
-            }
+
+            var paramDef = paramDefs.FirstOrDefault(p => p.Position == schemaPos);
+            if (paramDef is null) continue;
+
+            if (paramDef.Notes.TryGetValue(Locale, out var pn))
+                diagnostics.Add(Hint(child, pn));
+
+            var msg = ValidateParamValue(paramDef, value, gameIndex);
+            if (msg is not null)
+                diagnostics.Add(Warn(child, msg));
         }
 
-        for (var n = 1; n <= paramDefs.Count; n++)
+        foreach (var p in paramDefs.Where(pd => !pd.Optional))
         {
-            if (!paramDefs[n - 1].Required) continue;
-            var tagName = $"{paramPrefix}{n}";
+            var tagName = $"{paramPrefix}{p.Position + 1}";
             var child = FindChild(eventNode, tagName);
             if (child is not null && child.InnerText.Trim().Length > 0) continue;
-
-            var def = paramDefs[n - 1];
-            var msg = def.Description is not null
-                ? $"{typeName} requires {tagName} ({def.Description})."
-                : $"{typeName} requires {tagName}.";
-            diagnostics.Add(Warn(eventNode, msg));
+            diagnostics.Add(Warn(eventNode, $"{typeName} requires {tagName}."));
         }
     }
 
-    private string? ValidateParamValue(StoryParamDefinition def, string value, GameIndex gameIndex)
+    private string? ValidateParamValue(ParamDefinition def, string value, GameIndex gameIndex)
     {
-        return def.Kind switch
+        return def.ValueType switch
         {
-            StoryParamKind.Integer =>
-                int.TryParse(value, out _) ? null : $"'{value}' is not a valid integer.",
-            StoryParamKind.PositiveInteger =>
-                int.TryParse(value, out var pi) && pi > 0 ? null : $"'{value}' is not a valid positive integer.",
-            StoryParamKind.FloatSeconds =>
+            XmlValueType.Int or XmlValueType.UInt =>
+                int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)
+                    ? null : $"'{value}' is not a valid integer.",
+            XmlValueType.Float =>
                 float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
                     ? null : $"'{value}' is not a valid number.",
-            StoryParamKind.BooleanInt =>
+            XmlValueType.Boolean =>
                 IsBooleanInt(value) ? null : $"'{value}' is not a valid boolean value. Use 0, 1, true, or false.",
-            StoryParamKind.EraNumber =>
-                int.TryParse(value, out var e) && e >= 1 && e <= 5 ? null
-                    : $"'{value}' is not a valid era number (expected 1–5).",
-            StoryParamKind.TechLevel =>
-                int.TryParse(value, out var t) && t >= 1 && t <= 5 ? null
-                    : $"'{value}' is not a valid tech level (expected 1–5).",
-            StoryParamKind.Enum =>
-                ValidateEnum(def.EnumName, value),
-            StoryParamKind.EnumList =>
+            XmlValueType.DynamicEnumValue =>
                 ValidateEnumList(def.EnumName, value),
-            _ when def.ReferenceType is not null =>
-                gameIndex.Resolve(value) is not null ? null
-                    : $"'{value}' is not a recognized {def.ReferenceType}.",
+            XmlValueType.NameReference =>
+                ValidateSingleRef(def.ReferenceType, value, gameIndex),
+            XmlValueType.NameReferenceList =>
+                ValidateRefList(def.ReferenceType, value, gameIndex),
+            XmlValueType.FloatVector3 =>
+                ValidateFloatVector3(value),
             _ => null
         };
     }
@@ -133,38 +148,79 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
            value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
            value.Equals("false", StringComparison.OrdinalIgnoreCase);
 
-    private string? ValidateEnum(string? enumName, string value)
+    private string? ValidateEnumList(string? enumName, string value)
     {
         if (enumName is null) return null;
         var enumDef = schema.GetEnum(enumName);
         if (enumDef is null) return null;
-        return enumDef.Values.Any(v => string.Equals(v.Name, value, StringComparison.OrdinalIgnoreCase))
-            ? null
-            : $"'{value}' is not a valid {enumName} value.";
-    }
-
-    private string? ValidateEnumList(string? enumName, string value)
-    {
-        if (enumName is null) return null;
         foreach (var token in value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
         {
-            var msg = ValidateEnum(enumName, token);
-            if (msg is not null) return msg;
+            if (!enumDef.Values.Any(v => string.Equals(v.Name, token, StringComparison.OrdinalIgnoreCase)))
+                return $"'{token}' is not a valid {enumName} value.";
         }
         return null;
     }
+
+    private static string? ValidateSingleRef(string? referenceType, string value, GameIndex gameIndex)
+    {
+        if (referenceType is null) return null;
+        var sym = gameIndex.Resolve(value);
+        if (sym is null)
+            return $"'{value}' is not a recognized {referenceType}.";
+        return null;
+    }
+
+    private static string? ValidateRefList(string? referenceType, string value, GameIndex gameIndex)
+    {
+        if (referenceType is null) return null;
+        foreach (var token in value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var sym = gameIndex.Resolve(token);
+            if (sym is null)
+                return $"'{token}' is not a recognized {referenceType}.";
+        }
+        return null;
+    }
+
+    private static string? ValidateFloatVector3(string value)
+    {
+        var parts = value.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length != 3)
+            return $"'{value}' is not a valid 3D vector. Expected three space- or comma-separated numbers.";
+        foreach (var part in parts)
+        {
+            if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+                return $"'{part}' is not a valid number in vector '{value}'.";
+        }
+        return null;
+    }
+
+    private EnumValueDefinition? GetEventDef(string eventType)
+        => schema.GetEnum("StoryEventType")?.Values
+                 .FirstOrDefault(v => string.Equals(v.Name, eventType, StringComparison.OrdinalIgnoreCase));
+
+    private EnumValueDefinition? GetRewardDef(string rewardType)
+        => schema.GetEnum("StoryRewardType")?.Values
+                 .FirstOrDefault(v => string.Equals(v.Name, rewardType, StringComparison.OrdinalIgnoreCase));
 
     private static HtmlNode? FindChild(HtmlNode parent, string tagName)
         => parent.ChildNodes.FirstOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             string.Equals(n.Name, tagName, StringComparison.OrdinalIgnoreCase));
 
-    private static string? GetChildText(HtmlNode parent, string tagName)
-        => FindChild(parent, tagName)?.InnerText.Trim();
-
     private static Diagnostic Warn(HtmlNode node, string message) => new()
     {
         Severity = DiagnosticSeverity.Warning,
+        Message = message,
+        Range = new Range(
+            new Position(Math.Max(0, node.Line - 1), 0),
+            new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
+        Source = "pg-swg-lsp"
+    };
+
+    private static Diagnostic Hint(HtmlNode node, string message) => new()
+    {
+        Severity = DiagnosticSeverity.Hint,
         Message = message,
         Range = new Range(
             new Position(Math.Max(0, node.Line - 1), 0),

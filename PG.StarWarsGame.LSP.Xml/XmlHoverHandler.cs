@@ -140,6 +140,8 @@ public sealed class XmlHoverHandler : HoverHandlerBase
             sb.Append(hint);
         }
 
+        AppendNotes(sb, tag.Notes, locale);
+
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -164,6 +166,8 @@ public sealed class XmlHoverHandler : HoverHandlerBase
 
         sb.Append(DescriptionResolver.Resolve(type.Description, locale));
 
+        AppendNotes(sb, type.Notes, locale);
+
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -173,6 +177,16 @@ public sealed class XmlHoverHandler : HoverHandlerBase
             }),
             Range = MakeRange(line, colStart, tagName.Length)
         };
+    }
+
+    private static void AppendNotes(StringBuilder sb, IReadOnlyDictionary<string, string> notes, string locale)
+    {
+        if (!notes.TryGetValue(locale, out var note) && !notes.TryGetValue("en", out note))
+            return;
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.Append($"> **Note:** *{note}*");
     }
 
     private static LspRange MakeRange(int line, int colStart, int length)

@@ -39,6 +39,9 @@ public record XmlTagDefinition
     /// <summary>Locale → description text (e.g. "en" → "Max hit points…").</summary>
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
 
+    /// <summary>Locale → secondary caveat text (e.g. "en" → "Deprecated; use Foo instead.").</summary>
+    public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
+
     /// <summary>If true, this tag may appear more than once under the same parent element; the engine merges all occurrences.</summary>
     public bool MultipleAllowed { get; init; }
 }

@@ -56,6 +56,40 @@ public sealed class XmlCompletionHandlerTest
         return new GameObjectTypeDefinition { TypeName = name };
     }
 
+    private static ParamDefinition Param(int position, XmlValueType type = XmlValueType.Int,
+        string? enumName = null, string? refType = null) => new()
+    {
+        Position = position, ValueType = type, EnumName = enumName, ReferenceType = refType
+    };
+
+    private static EnumValueDefinition StoryEvent(string name, params ParamDefinition[] paramDefs) => new()
+    {
+        Name = name,
+        Params = paramDefs.Length > 0 ? [.. paramDefs] : null
+    };
+
+    private static EnumValueDefinition StoryReward(string name, params ParamDefinition[] paramDefs) => new()
+    {
+        Name = name,
+        Params = paramDefs.Length > 0 ? [.. paramDefs] : null
+    };
+
+    private static EnumDefinition StoryEventTypeWith(params EnumValueDefinition[] values) => new()
+    {
+        Name = "StoryEventType", Kind = EnumKind.SchemaFixed, Values = [.. values]
+    };
+
+    private static EnumDefinition StoryRewardTypeWith(params EnumValueDefinition[] values) => new()
+    {
+        Name = "StoryRewardType", Kind = EnumKind.SchemaFixed, Values = [.. values]
+    };
+
+    private static EnumDefinition FlagEnum(string name, params string[] values) => new()
+    {
+        Name = name, Kind = EnumKind.SchemaFixed,
+        Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
+    };
+
     // ── tag-name completions ────────────────────────────────────────────────
 
     [Fact]
@@ -257,6 +291,7 @@ public sealed class XmlCompletionHandlerTest
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
 
         public XmlTagDefinition? GetTag(string name)
         {
@@ -282,12 +317,9 @@ public sealed class XmlCompletionHandlerTest
             return _tagsByType.TryGetValue(name, out var list) ? list : [];
         }
 
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
+        public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
 
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
 
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
@@ -310,6 +342,8 @@ public sealed class XmlCompletionHandlerTest
                 _tagsByType[typeName] = list = [];
             list.Add(tag);
         }
+
+        public void AddEnum(EnumDefinition enumDef) => _enums[enumDef.Name] = enumDef;
     }
 
     private sealed class FakeProposalRegistry : IXmlValueProposalRegistry
@@ -366,6 +400,7 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -418,6 +453,7 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryRewardTypeWith(StoryReward("CREDITS", Param(0))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>CREDITS</Reward_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -433,11 +469,12 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task StoryParser_ValueOnEventParam_BooleanInt_ReturnsZeroAndOne()
     {
-        // LOCK_CONTROLS Reward_Param1 is BooleanInt
+        // LOCK_CONTROLS Reward_Param1 is Boolean
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryRewardTypeWith(StoryReward("LOCK_CONTROLS", Param(0, XmlValueType.Boolean))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -459,6 +496,7 @@ public sealed class XmlCompletionHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
         // Root is <StoryPlots>, not <StoryParser> — registry detection must still trigger story completions.
         // STORY_ACCUMULATE has 1 param, so Event_Param1 should appear (Event_Type is already present).
         var xml = "<StoryPlots>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryPlots>";
@@ -479,6 +517,165 @@ public sealed class XmlCompletionHandlerTest
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
         var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
+    // ── Schema-driven tag-name completions ────────────────────────────────────
+
+    [Fact]
+    public async Task BuildStoryEventTagCompletions_ConstrainedEvent_OffersOnlyDefinedParamTags()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(StoryEvent("MY_EVENT", Param(0), Param(1))));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>MY_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("Event_Param1", labels);
+        Assert.Contains("Event_Param2", labels);
+        Assert.DoesNotContain("Event_Param3", labels);
+    }
+
+    [Fact]
+    public async Task BuildStoryEventTagCompletions_UnconstrainedEvent_OffersAllSevenParamTags()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        // StoryEvent with no params → Params = null → unconstrained
+        schema.AddEnum(StoryEventTypeWith(StoryEvent("UNCONSTRAINED_EVENT")));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>UNCONSTRAINED_EVENT</Event_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        for (var i = 1; i <= 7; i++)
+            Assert.Contains($"Event_Param{i}", labels);
+    }
+
+    [Fact]
+    public async Task BuildStoryParamValueCompletions_DynamicEnumParam_ReturnsEnumValues()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(StoryEvent("MY_EVENT",
+            Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>MY_EVENT</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        // cursor on line 3 after '<Event_Param1>' (char 14 is past the closing '>')
+        var result = await handler.Handle(At(3, 14), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("GREATER_THAN", labels);
+        Assert.Contains("LESS_THAN", labels);
+    }
+
+    // ── Type-change scenarios ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task BuildStoryEventTagCompletions_EventTypeChanged_OffersTagsForCurrentType()
+    {
+        // Schema has TYPE_A (1 param) and TYPE_B (3 params); doc uses TYPE_B.
+        // Completions must reflect TYPE_B's param slots, not TYPE_A's.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(
+            StoryEvent("TYPE_A", Param(0)),
+            StoryEvent("TYPE_B", Param(0), Param(1), Param(2))));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("Event_Param1", labels);
+        Assert.Contains("Event_Param2", labels);
+        Assert.Contains("Event_Param3", labels);
+        Assert.DoesNotContain("Event_Param4", labels);
+    }
+
+    [Fact]
+    public async Task BuildStoryParamValueCompletions_EventTypeChanged_ReturnsProposalsForCurrentType()
+    {
+        // TYPE_A: Param0 = NameReference "Planet"; TYPE_B: Param0 = DynamicEnumValue "FlagCmp".
+        // Doc has Event_Type = TYPE_B; completions for Event_Param1 must use FlagCmp values.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(
+            StoryEvent("TYPE_A", Param(0, XmlValueType.NameReference, refType: "Planet")),
+            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        // cursor after '<Event_Param1>' closing '>' (char 14)
+        var result = await handler.Handle(At(3, 14), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("GREATER_THAN", labels);
+        Assert.Contains("LESS_THAN", labels);
+        Assert.DoesNotContain("Planet", labels);
+    }
+
+    [Fact]
+    public async Task BuildStoryParamValueCompletions_RewardTypeChanged_ReturnsProposalsForCurrentRewardType()
+    {
+        // REWARD_A: Param0 = Boolean; REWARD_B: Param0 = DynamicEnumValue "FlagCmp".
+        // Doc has Reward_Type = REWARD_B; completions for Reward_Param1 must use FlagCmp values.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryRewardTypeWith(
+            StoryReward("REWARD_A", Param(0, XmlValueType.Boolean)),
+            StoryReward("REWARD_B", Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+        var xml = "<StoryParser>\n<Event>\n<Reward_Type>REWARD_B</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        // cursor after '<Reward_Param1>' closing '>' (char 15, since Reward_Param1 is 15 chars)
+        var result = await handler.Handle(At(3, 15), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("GREATER_THAN", labels);
+        Assert.Contains("LESS_THAN", labels);
+        Assert.DoesNotContain("0", labels);
+        Assert.DoesNotContain("1", labels);
+    }
+
+    [Fact]
+    public async Task BuildStoryParamValueCompletions_ParamIndexExistsForOldTypeNotNew_ReturnsEmpty()
+    {
+        // TYPE_B only defines param at position 0; doc has Event_Param2 (position 1) → no proposals.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var (handler, host, schema, _) = Build(registry);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryEventTypeWith(
+            StoryEvent("TYPE_A", Param(0), Param(1)),
+            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+        // TYPE_B is the current type; Event_Param2 references position 1 which TYPE_B doesn't define
+        var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<Event_Param2>\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(3, 14), CancellationToken.None);
 
         Assert.Empty(result.Items);
     }

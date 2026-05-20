@@ -13,12 +13,14 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Parsing;
-using PG.StarWarsGame.LSP.Xml.StoryScripting;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCompletionHandler : CompletionHandlerBase
 {
+    private const int MaxEventParamSlots = 7;
+    private const int MaxRewardParamSlots = 14;
+
     private static readonly string[] StoryEventStructuralTags =
     [
         "Event_Type", "Event_Filter", "Reward_Type", "Reward_Position",
@@ -159,14 +161,34 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         doc.LoadHtml(text);
 
         var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
-        var eventDef = ctx.EventType is not null ? StoryScriptingIndex.GetEvent(ctx.EventType) : null;
-        var rewardDef = ctx.RewardType is not null ? StoryScriptingIndex.GetReward(ctx.RewardType) : null;
+        var eventDef = ctx.EventType is not null
+            ? _schema.GetEnum("StoryEventType")?.Values
+                     .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
+            : null;
+        var rewardDef = ctx.RewardType is not null
+            ? _schema.GetEnum("StoryRewardType")?.Values
+                     .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
+            : null;
 
         var candidates = new List<string>(StoryEventStructuralTags);
-        for (var i = 1; i <= (eventDef?.Params.Count ?? 0); i++)
-            candidates.Add($"Event_Param{i}");
-        for (var i = 1; i <= (rewardDef?.Params.Count ?? 0); i++)
-            candidates.Add($"Reward_Param{i}");
+
+        if (eventDef is not null)
+        {
+            var paramCount = eventDef.Params is null
+                ? MaxEventParamSlots
+                : (eventDef.Params.Count > 0 ? eventDef.Params.Max(p => p.Position) + 1 : 0);
+            for (var i = 1; i <= paramCount; i++)
+                candidates.Add($"Event_Param{i}");
+        }
+
+        if (rewardDef is not null)
+        {
+            var paramCount = rewardDef.Params is null
+                ? MaxRewardParamSlots
+                : (rewardDef.Params.Count > 0 ? rewardDef.Params.Max(p => p.Position) + 1 : 0);
+            for (var i = 1; i <= paramCount; i++)
+                candidates.Add($"Reward_Param{i}");
+        }
 
         var existing = CollectExistingEventChildTagNames(doc, lineIndex, character);
 
@@ -190,17 +212,24 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
         var side = paramMatch.Groups[1].Value;
         var position = int.Parse(paramMatch.Groups[2].Value);
+        var schemaPos = position - 1;  // Event_Param1 → position 0
 
-        StoryParamDefinition? paramDef;
+        ParamDefinition? paramDef;
         if (string.Equals(side, "Event", StringComparison.OrdinalIgnoreCase))
         {
-            var def = ctx.EventType is not null ? StoryScriptingIndex.GetEvent(ctx.EventType) : null;
-            paramDef = def?.Params.FirstOrDefault(p => p.Position == position);
+            var typeDef = ctx.EventType is not null
+                ? _schema.GetEnum("StoryEventType")?.Values
+                         .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
+                : null;
+            paramDef = typeDef?.Params?.FirstOrDefault(p => p.Position == schemaPos);
         }
         else
         {
-            var def = ctx.RewardType is not null ? StoryScriptingIndex.GetReward(ctx.RewardType) : null;
-            paramDef = def?.Params.FirstOrDefault(p => p.Position == position);
+            var typeDef = ctx.RewardType is not null
+                ? _schema.GetEnum("StoryRewardType")?.Values
+                         .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
+                : null;
+            paramDef = typeDef?.Params?.FirstOrDefault(p => p.Position == schemaPos);
         }
 
         if (paramDef is null)

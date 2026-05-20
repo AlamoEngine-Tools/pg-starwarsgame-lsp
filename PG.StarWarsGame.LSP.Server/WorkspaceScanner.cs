@@ -14,8 +14,8 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class WorkspaceScanner
 {
-    private readonly IFileSystem _fs;
     private readonly IFileTypeRegistry _fileTypeRegistry;
+    private readonly IFileSystem _fs;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceScanner> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
@@ -39,6 +39,7 @@ public sealed class WorkspaceScanner
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
     {
         var roots = workspaceFolders.ToList();
+        await WaitForSchemaAsync(ct);
         PreScanMetafiles(roots);
 
         var files = roots
@@ -86,6 +87,36 @@ public sealed class WorkspaceScanner
         }
     }
 
+    // Waits until the schema provider has metafile definitions available.
+    // For LocalFileSchemaProvider the check passes immediately (schema is loaded synchronously).
+    // For HttpSchemaProvider this yields until SchemaRefreshed fires, with a 30-second timeout.
+    private async Task WaitForSchemaAsync(CancellationToken ct)
+    {
+        if (_schema.AllMetafiles.Count > 0) return;
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void OnRefreshed(object? sender, EventArgs e) => tcs.TrySetResult();
+        _schema.SchemaRefreshed += OnRefreshed;
+        try
+        {
+            // Double-check: schema may have loaded between the first check and the subscription.
+            if (_schema.AllMetafiles.Count > 0) return;
+
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(30));
+            await tcs.Task.WaitAsync(timeout.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            _logger.LogWarning("Schema not available after 30 s; proceeding without metafile pre-scan");
+        }
+        finally
+        {
+            _schema.SchemaRefreshed -= OnRefreshed;
+        }
+    }
+
     private void PreScanMetafiles(IList<string> roots)
     {
         var baseline = _indexService.Current.Baseline;
@@ -98,7 +129,7 @@ public sealed class WorkspaceScanner
             {
                 var metafilePath = FindInWorkspace(roots, def.Path);
                 if (metafilePath is not null)
-                    RegisterFromMetafile(metafilePath, def, roots);
+                    RegisterFromMetafile(metafilePath, def);
                 else
                     FallbackFromBaseline(baseline, def, roots);
             }
@@ -114,7 +145,7 @@ public sealed class WorkspaceScanner
         }
     }
 
-    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def, IList<string> roots)
+    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def)
     {
         string xmlContent;
         try
@@ -138,18 +169,21 @@ public sealed class WorkspaceScanner
             return;
         }
 
+        // All game entries live in the same directory as the metafile (e.g. DATA\XML\).
+        // Resolving relative to the metafile's directory works whether the workspace root
+        // is the game root (…/data/xml/foo.xml) or is the XML directory itself (…/foo.xml).
+        var metafileDir = _fs.Path.GetDirectoryName(metafilePath) ?? string.Empty;
+
         var types = def.Types.ToImmutableArray();
         foreach (var elem in xdoc.Descendants()
                      .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
         {
-            var filename = elem.Attributes()
-                .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
+            var filename = elem.Value.Trim();
             if (string.IsNullOrEmpty(filename)) continue;
             var normalizedRel = NormalizeGamePath(filename);
-            var relSystemPath = normalizedRel.Replace('/', Path.DirectorySeparatorChar);
-            foreach (var root in roots)
-                _fileTypeRegistry.RegisterFile(
-                    NormalizeAbsolutePath(_fs.Path.Combine(root, relSystemPath)), types);
+            var entryName = _fs.Path.GetFileName(normalizedRel.Replace('/', _fs.Path.DirectorySeparatorChar));
+            _fileTypeRegistry.RegisterFile(
+                NormalizeAbsolutePath(_fs.Path.Combine(metafileDir, entryName)), types);
         }
     }
 
@@ -167,20 +201,54 @@ public sealed class WorkspaceScanner
 
     private string? FindInWorkspace(IList<string> roots, string normalizedRelPath)
     {
-        var relPath = normalizedRelPath.Replace('/', Path.DirectorySeparatorChar);
+        var parts = normalizedRelPath.Split('/');
         foreach (var root in roots)
         {
-            var candidate = _fs.Path.Combine(root, relPath);
-            if (_fs.File.Exists(candidate))
-                return candidate;
+            var found = TraverseCaseInsensitive(root, parts);
+            if (found is not null) return found;
+        }
+
+        // XML-dir fallback: workspace root IS the data/xml/ directory — strip the prefix.
+        const string xmlPrefix = "data/xml/";
+        if (normalizedRelPath.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            var tail = normalizedRelPath[xmlPrefix.Length..].Split('/');
+            foreach (var root in roots)
+            {
+                var found = TraverseCaseInsensitive(root, tail);
+                if (found is not null) return found;
+            }
         }
 
         return null;
     }
 
-    private static string NormalizeGamePath(string raw) =>
-        raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    // Case-insensitive path traversal so game files with mixed case work on Linux too.
+    private string? TraverseCaseInsensitive(string dir, string[] parts)
+    {
+        var current = dir;
+        for (var i = 0; i < parts.Length; i++)
+        {
+            if (!_fs.Directory.Exists(current)) return null;
+            var match = _fs.Directory.EnumerateFileSystemEntries(current)
+                .FirstOrDefault(e => string.Equals(
+                    _fs.Path.GetFileName(e), parts[i], StringComparison.OrdinalIgnoreCase));
+            if (match is null) return null;
+            if (i == parts.Length - 1)
+                return _fs.File.Exists(match) ? match : null;
+            current = match;
+        }
 
-    private static string NormalizeAbsolutePath(string path) =>
-        path.Replace('\\', '/').ToLowerInvariant();
+        return null;
+    }
+
+    private static string NormalizeGamePath(string raw)
+    {
+        return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    }
+
+    private static string NormalizeAbsolutePath(string path)
+    {
+        return path.Replace('\\', '/').ToLowerInvariant();
+    }
 }

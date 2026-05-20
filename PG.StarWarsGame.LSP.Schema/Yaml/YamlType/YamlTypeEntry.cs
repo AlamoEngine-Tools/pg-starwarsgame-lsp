@@ -9,4 +9,5 @@ internal sealed class YamlTypeEntry
     public string TypeName { get; set; } = string.Empty;
     public string? NameTag { get; set; }
     public Dictionary<string, string> Description { get; set; } = [];
+    public Dictionary<string, string> Notes { get; set; } = [];
 }

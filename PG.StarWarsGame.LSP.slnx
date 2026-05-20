@@ -15,4 +15,5 @@
     <Project Path="PG.StarWarsGame.LSP.Schema.Tests/PG.StarWarsGame.LSP.Schema.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Server.Tests/PG.StarWarsGame.LSP.Server.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Xml.Tests/PG.StarWarsGame.LSP.Xml.Tests.csproj"/>
+    <Project Path="PG.StarWarsGame.LSP.E2E.Tests/PG.StarWarsGame.LSP.E2E.Tests.csproj"/>
 </Solution>

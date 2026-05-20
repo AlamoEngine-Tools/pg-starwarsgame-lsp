@@ -365,6 +365,62 @@ public sealed class XmlHoverHandlerTest
         Assert.Contains("singleton", md, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ── Notes display ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_TagWithNotes_IncludesNotesSection()
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Old_Tag/>\n</Root>", 1);
+        schema.TagToReturn = new XmlTagDefinition
+        {
+            Tag = "Old_Tag",
+            ValueType = XmlValueType.Float,
+            Description = new Dictionary<string, string> { ["en"] = "A tag." },
+            Notes = new Dictionary<string, string> { ["en"] = "Never used in vanilla." }
+        };
+
+        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.Contains("Never used in vanilla.", md);
+        Assert.Contains("Note", md, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_TagWithoutNotes_DoesNotIncludeNotesSeparator()
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed/>\n</Root>", 1);
+        schema.TagToReturn = MakeTag("Max_Speed");
+
+        var result = await handler.Handle(At(1, 2), CancellationToken.None);
+
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.DoesNotContain("**Note:**", md);
+    }
+
+    [Fact]
+    public async Task Handle_TypeWithNotes_IncludesNotesSection()
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<GameConstants/>", 1);
+        schema.TagToReturn = null;
+        schema.TypeToReturn = new GameObjectTypeDefinition
+        {
+            TypeName = "GameConstants",
+            NameTag = null,
+            Description = new Dictionary<string, string> { ["en"] = "Global constants." },
+            Notes = new Dictionary<string, string> { ["en"] = "Legacy type, rarely needed." }
+        };
+
+        var result = await handler.Handle(At(0, 2), CancellationToken.None);
+
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.Contains("Legacy type, rarely needed.", md);
+        Assert.Contains("Note", md, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── fakes ───────────────────────────────────────────────────────────────
 
     private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost

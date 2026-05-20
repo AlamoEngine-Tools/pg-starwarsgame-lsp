@@ -655,6 +655,11 @@ public sealed class XmlDiagnosticsPublisherTest
         registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
         var schema = new FakeSchemaProvider();
         schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        schema.AddEnum(new EnumDefinition
+        {
+            Name = "StoryRewardType", Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "ZOOM_IN", Params = [] }]
+        });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema, registry);
 
         const string uri = "file:///StoryPlots.xml";
@@ -704,6 +709,11 @@ public sealed class XmlDiagnosticsPublisherTest
         registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
         var schema = new FakeSchemaProvider();
         schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
+        schema.AddEnum(new EnumDefinition
+        {
+            Name = "StoryRewardType", Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "ZOOM_IN", Params = [] }]
+        });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema, registry);
 
         const string xml = "<SomeContainer><Event>" +
@@ -743,12 +753,39 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.DoesNotContain(storyDiags, d => d.Message.Contains("Reward_Param1"));
     }
 
+    // ── tag Notes hints ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_TagWithNotes_EmitsHintDiagnostic()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Old_Tag",
+            ValueType = XmlValueType.Float,
+            Notes = new Dictionary<string, string> { ["en"] = "Never used in vanilla." }
+        });
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
+
+        const string uri = "file:///test.xml";
+        const string xml = "<Root><Old_Tag>500</Old_Tag></Root>";
+
+        workspaceHost.Set(uri, xml);
+        indexService.Fire(IndexWithDoc(uri));
+
+        var diags = published.FirstOrDefault(p => p.Uri.ToString() == uri)?.Diagnostics;
+        Assert.NotNull(diags);
+        Assert.Contains(diags,
+            d => d.Severity == DiagnosticSeverity.Hint && d.Message.Contains("Never used in vanilla."));
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
 
         public XmlTagDefinition? GetTag(string name)
         {
@@ -774,12 +811,9 @@ public sealed class XmlDiagnosticsPublisherTest
             return [];
         }
 
-        public EnumDefinition? GetEnum(string _)
-        {
-            return null;
-        }
+        public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
 
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
 
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
@@ -799,6 +833,8 @@ public sealed class XmlDiagnosticsPublisherTest
         {
             _types[type.TypeName] = type;
         }
+
+        public void AddEnum(EnumDefinition enumDef) => _enums[enumDef.Name] = enumDef;
     }
 
     private sealed class FakeValidatorRegistry : IXmlValueValidatorRegistry

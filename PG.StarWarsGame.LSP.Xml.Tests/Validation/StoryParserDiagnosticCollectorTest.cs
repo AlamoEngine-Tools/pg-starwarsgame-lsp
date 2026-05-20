@@ -9,11 +9,11 @@ using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 
-file sealed class StubEnumSchemaProvider : ISchemaProvider
+file sealed class StubSchemaProvider : ISchemaProvider
 {
     private readonly Dictionary<string, EnumDefinition> _enums;
 
-    public StubEnumSchemaProvider(params EnumDefinition[] enums)
+    public StubSchemaProvider(params EnumDefinition[] enums)
     {
         _enums = enums.ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
     }
@@ -33,360 +33,581 @@ file sealed class StubEnumSchemaProvider : ISchemaProvider
 
 public sealed class StoryParserDiagnosticCollectorTest
 {
-    // -----------------------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------------------
+    // ── XML helpers ──────────────────────────────────────────────────────────
 
     private static string Xml(string inner) =>
         $"<StoryParser><Event>{inner}</Event></StoryParser>";
 
-    private static EnumDefinition MakeEnum(string name, params string[] values) => new()
+    // ── Schema builder helpers ───────────────────────────────────────────────
+
+    private static ISchemaProvider SchemaWithEvent(
+        string eventName,
+        bool deprecated = false,
+        Dictionary<string, string>? notes = null,
+        ParamDefinition[]? paramDefs = null)
+    {
+        var value = new EnumValueDefinition
+        {
+            Name = eventName,
+            Deprecated = deprecated,
+            Notes = notes ?? new Dictionary<string, string>(),
+            Params = paramDefs is { Length: > 0 } ? [.. paramDefs] : null
+        };
+        return new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [value]
+        });
+    }
+
+    private static ISchemaProvider SchemaWithReward(
+        string rewardName,
+        bool deprecated = false,
+        Dictionary<string, string>? notes = null,
+        ParamDefinition[]? paramDefs = null)
+    {
+        var value = new EnumValueDefinition
+        {
+            Name = rewardName,
+            Deprecated = deprecated,
+            Notes = notes ?? new Dictionary<string, string>(),
+            Params = paramDefs is { Length: > 0 } ? [.. paramDefs] : null
+        };
+        return new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryRewardType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [value]
+        });
+    }
+
+    private static ISchemaProvider SchemaWithTwoEventTypes(
+        string eventA, ParamDefinition[] paramsA,
+        string eventB, ParamDefinition[] paramsB,
+        params EnumDefinition[] extra)
+    {
+        var eventEnum = new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values =
+            [
+                new EnumValueDefinition { Name = eventA, Params = paramsA },
+                new EnumValueDefinition { Name = eventB, Params = paramsB }
+            ]
+        };
+        return new StubSchemaProvider([eventEnum, .. extra]);
+    }
+
+    private static ISchemaProvider SchemaWithTwoRewardTypes(
+        string rewardA, ParamDefinition[] paramsA,
+        string rewardB, ParamDefinition[] paramsB)
+    {
+        return new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryRewardType",
+            Kind = EnumKind.SchemaFixed,
+            Values =
+            [
+                new EnumValueDefinition { Name = rewardA, Params = paramsA },
+                new EnumValueDefinition { Name = rewardB, Params = paramsB }
+            ]
+        });
+    }
+
+    // ── Param definition factories ───────────────────────────────────────────
+
+    private static ParamDefinition IntParam(int position, bool optional = false) => new()
+    {
+        Position = position,
+        ValueType = XmlValueType.Int,
+        Optional = optional
+    };
+
+    private static ParamDefinition BoolParam(int position, bool optional = false) => new()
+    {
+        Position = position,
+        ValueType = XmlValueType.Boolean,
+        Optional = optional
+    };
+
+    private static ParamDefinition EnumParam(int position, string enumName, bool optional = false) => new()
+    {
+        Position = position,
+        ValueType = XmlValueType.DynamicEnumValue,
+        EnumName = enumName,
+        Optional = optional
+    };
+
+    private static ParamDefinition RefParam(int position, string referenceType, bool optional = false) => new()
+    {
+        Position = position,
+        ValueType = XmlValueType.NameReference,
+        ReferenceType = referenceType,
+        Optional = optional
+    };
+
+    private static ParamDefinition RefListParam(int position, string referenceType, bool optional = false) => new()
+    {
+        Position = position,
+        ValueType = XmlValueType.NameReferenceList,
+        ReferenceType = referenceType,
+        Optional = optional
+    };
+
+    private static EnumDefinition ValueEnum(string name, params string[] values) => new()
     {
         Name = name,
         Kind = EnumKind.SchemaFixed,
         Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
     };
 
-    private static StoryParserDiagnosticCollector BuildCollector(params EnumDefinition[] enums)
-        => new(new StubEnumSchemaProvider(enums));
+    // ── Game index helpers ───────────────────────────────────────────────────
 
-    private static GameIndex IndexWithSymbol(string id, string typeName)
+    private static GameIndex IndexWithSymbols(params (string id, string typeName)[] symbols)
     {
-        var sym = new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new UnknownOrigin("test"), null);
+        var dict = ImmutableDictionary.CreateRange(
+            StringComparer.OrdinalIgnoreCase,
+            symbols.Select(s => KeyValuePair.Create(s.id,
+                new GameSymbol(s.id, GameSymbolKind.XmlObject, s.typeName, new UnknownOrigin("test"), null))));
         return GameIndex.Empty with
         {
-            Baseline = BaselineIndex.Empty with
-            {
-                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(id, sym)
-            }
+            Baseline = BaselineIndex.Empty with { Symbols = dict }
         };
     }
 
-    // StoryFlagCompareMethod for STORY_FLAG tests
-    private static EnumDefinition FlagCompareMethod => MakeEnum("StoryFlagCompareMethod",
-        "GREATER_THAN", "LESS_THAN", "EQUAL_TO", "GREATER_THAN_EQUAL_TO", "LESS_THAN_EQUAL_TO");
-
-    // StoryGenericTriggerType for STORY_GENERIC tests
-    private static EnumDefinition GenericTriggerType => MakeEnum("StoryGenericTriggerType",
-        "END_SETUP", "CLOSE_STORY_DIALOG", "CLICK");
-
-    // -----------------------------------------------------------------------
-    // Unused param — warning
-    // -----------------------------------------------------------------------
+    // ── Int param validation ─────────────────────────────────────────────────
 
     [Fact]
-    public void Unused_event_param_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesIntParam()
     {
-        // STORY_ACCUMULATE has only 1 param; Event_Param2 is spurious
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_ACCUMULATE</Event_Type>" +
-                      "<Event_Param1>1000</Event_Param1>" +
-                      "<Event_Param2>extra</Event_Param2>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>not_an_int</Event_Param1>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
 
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("Event_Param2") &&
-                                     d.Message.Contains("STORY_ACCUMULATE"));
+                                     d.Message.Contains("not_an_int"));
     }
 
     [Fact]
-    public void Unused_reward_param_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesIntParam_NoWarningForValidInt()
     {
-        // ZOOM_IN has 0 params; Reward_Param1 is spurious
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>" +
-                      "<Reward_Param1>extra</Reward_Param1>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>42</Event_Param1>");
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("Reward_Param1") &&
-                                     d.Message.Contains("ZOOM_IN"));
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
     }
 
-    // -----------------------------------------------------------------------
-    // Absent required param — warning
-    // -----------------------------------------------------------------------
+    // ── Enum param validation ────────────────────────────────────────────────
 
     [Fact]
-    public void Missing_required_event_param_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesEnumParam()
     {
-        // STORY_FLAG requires Param1 (FlagName), Param2 (Integer), Param3 (Enum)
-        var sut = BuildCollector(FlagCompareMethod);
-        var xml = Xml("<Event_Type>STORY_FLAG</Event_Type>" +
-                      "<Event_Param1>MY_FLAG</Event_Param1>" +
-                      "<Event_Param2>5</Event_Param2>" +
-                      // Param3 (required Enum) is intentionally absent
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var provider = new StubSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "StoryEventType",
+                Kind = EnumKind.SchemaFixed,
+                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "ColorEnum")] }]
+            },
+            ValueEnum("ColorEnum", "RED", "GREEN", "BLUE"));
+        var sut = new StoryParserDiagnosticCollector(provider);
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
+        var badXml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>YELLOW</Event_Param1>");
+        Assert.Contains(sut.Collect(badXml, GameIndex.Empty),
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("YELLOW"));
 
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("STORY_FLAG") &&
-                                     d.Message.Contains("Event_Param3"));
+        var goodXml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>RED</Event_Param1>");
+        Assert.Empty(sut.Collect(goodXml, GameIndex.Empty));
     }
 
     [Fact]
-    public void Missing_required_reward_param_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesEnumParam_CaseInsensitive()
     {
-        // CREDITS requires Reward_Param1 (PositiveInteger)
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>CREDITS</Reward_Type>");
+        var provider = new StubSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "StoryEventType",
+                Kind = EnumKind.SchemaFixed,
+                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "ColorEnum")] }]
+            },
+            ValueEnum("ColorEnum", "RED", "GREEN"));
+        var sut = new StoryParserDiagnosticCollector(provider);
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("CREDITS") &&
-                                     d.Message.Contains("Reward_Param1"));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>red</Event_Param1>");
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
     }
 
-    // -----------------------------------------------------------------------
-    // Enum validation
-    // -----------------------------------------------------------------------
+    // ── Enum list validation (space-separated tokens) ────────────────────────
 
     [Fact]
-    public void Enum_param_with_wrong_value_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesEnumListParam_AllValidTokens()
     {
-        var sut = BuildCollector(FlagCompareMethod);
-        var xml = Xml("<Event_Type>STORY_FLAG</Event_Type>" +
-                      "<Event_Param1>MY_FLAG</Event_Param1>" +
-                      "<Event_Param2>5</Event_Param2>" +
-                      "<Event_Param3>NOT_A_COMPARE_METHOD</Event_Param3>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var provider = new StubSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "StoryEventType",
+                Kind = EnumKind.SchemaFixed,
+                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "Triggers")] }]
+            },
+            ValueEnum("Triggers", "END_SETUP", "CLICK", "CLOSE_DIALOG"));
+        var sut = new StoryParserDiagnosticCollector(provider);
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("NOT_A_COMPARE_METHOD"));
-    }
-
-    [Fact]
-    public void Enum_param_with_correct_value_produces_no_diagnostic()
-    {
-        var sut = BuildCollector(FlagCompareMethod);
-        var xml = Xml("<Event_Type>STORY_FLAG</Event_Type>" +
-                      "<Event_Param1>MY_FLAG</Event_Param1>" +
-                      "<Event_Param2>5</Event_Param2>" +
-                      "<Event_Param3>EQUAL_TO</Event_Param3>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
-
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.DoesNotContain(diags, d => d.Message.Contains("EQUAL_TO"));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>END_SETUP CLICK</Event_Param1>");
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
     }
 
     [Fact]
-    public void Enum_param_with_correct_value_case_insensitive_produces_no_diagnostic()
+    public void Collect_EventWithSchemaParams_ValidatesEnumListParam_InvalidToken()
     {
-        var sut = BuildCollector(FlagCompareMethod);
-        var xml = Xml("<Event_Type>STORY_FLAG</Event_Type>" +
-                      "<Event_Param1>MY_FLAG</Event_Param1>" +
-                      "<Event_Param2>5</Event_Param2>" +
-                      "<Event_Param3>equal_to</Event_Param3>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var provider = new StubSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "StoryEventType",
+                Kind = EnumKind.SchemaFixed,
+                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "Triggers")] }]
+            },
+            ValueEnum("Triggers", "END_SETUP", "CLICK"));
+        var sut = new StoryParserDiagnosticCollector(provider);
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.DoesNotContain(diags, d => d.Message.Contains("equal_to"));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>END_SETUP INVALID_TOKEN</Event_Param1>");
+        Assert.Contains(sut.Collect(xml, GameIndex.Empty),
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("INVALID_TOKEN"));
     }
 
-    // -----------------------------------------------------------------------
-    // EnumList validation
-    // -----------------------------------------------------------------------
-
-    [Fact]
-    public void EnumList_valid_tokens_produce_no_diagnostic()
-    {
-        var sut = BuildCollector(GenericTriggerType);
-        var xml = Xml("<Event_Type>STORY_GENERIC</Event_Type>" +
-                      "<Event_Param1>END_SETUP CLICK</Event_Param1>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
-
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void EnumList_invalid_token_produces_warning()
-    {
-        var sut = BuildCollector(GenericTriggerType);
-        var xml = Xml("<Event_Type>STORY_GENERIC</Event_Type>" +
-                      "<Event_Param1>END_SETUP INVALID_TOKEN</Event_Param1>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
-
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("INVALID_TOKEN"));
-    }
-
-    // -----------------------------------------------------------------------
-    // BooleanInt validation
-    // -----------------------------------------------------------------------
+    // ── Boolean param validation ─────────────────────────────────────────────
 
     [Theory]
     [InlineData("0")]
     [InlineData("1")]
     [InlineData("true")]
     [InlineData("false")]
-    [InlineData("True")]
+    [InlineData("TRUE")]
     [InlineData("FALSE")]
-    public void BooleanInt_valid_values_produce_no_diagnostic(string value)
+    public void Collect_EventWithSchemaParams_ValidatesBooleanParam_AcceptsValidValues(string value)
     {
-        // LOCK_CONTROLS Reward_Param1 is BooleanInt required
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>LOCK_CONTROLS</Reward_Type>" +
-                      $"<Reward_Param1>{value}</Reward_Param1>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [BoolParam(0)]));
+        var xml = Xml($"<Event_Type>MY_EVENT</Event_Type><Event_Param1>{value}</Event_Param1>");
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.DoesNotContain(diags, d => d.Message.Contains(value));
+        Assert.DoesNotContain(sut.Collect(xml, GameIndex.Empty), d => d.Message.Contains(value));
     }
 
     [Fact]
-    public void BooleanInt_invalid_value_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesBooleanParam_RejectsInvalid()
     {
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>LOCK_CONTROLS</Reward_Type>" +
-                      "<Reward_Param1>yes</Reward_Param1>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [BoolParam(0)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>yes</Event_Param1>");
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("yes"));
+        Assert.Contains(sut.Collect(xml, GameIndex.Empty),
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("yes"));
     }
 
-    // -----------------------------------------------------------------------
-    // Integer / PositiveInteger validation
-    // -----------------------------------------------------------------------
+    // ── Reference param validation ───────────────────────────────────────────
 
     [Fact]
-    public void Integer_invalid_value_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesReferenceParam_ResolvedProducesNoDiag()
     {
-        // STORY_FLAG Param2 is Integer required
-        var sut = BuildCollector(FlagCompareMethod);
-        var xml = Xml("<Event_Type>STORY_FLAG</Event_Type>" +
-                      "<Event_Param1>MY_FLAG</Event_Param1>" +
-                      "<Event_Param2>not_a_number</Event_Param2>" +
-                      "<Event_Param3>EQUAL_TO</Event_Param3>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [RefParam(0, "Planet")]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>Coruscant</Event_Param1>");
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("not_a_number"));
+        Assert.Empty(sut.Collect(xml, IndexWithSymbols(("Coruscant", "Planet"))));
     }
 
     [Fact]
-    public void PositiveInteger_invalid_value_produces_warning()
+    public void Collect_EventWithSchemaParams_ValidatesReferenceParam_UnresolvedProducesWarning()
     {
-        // STORY_ACCUMULATE Param1 is PositiveInteger required
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_ACCUMULATE</Event_Type>" +
-                      "<Event_Param1>-5</Event_Param1>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [RefParam(0, "Planet")]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>NotAPlanet</Event_Param1>");
 
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("-5"));
+        Assert.Contains(sut.Collect(xml, GameIndex.Empty),
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("NotAPlanet"));
     }
 
-    // -----------------------------------------------------------------------
-    // Ref kind validation
-    // -----------------------------------------------------------------------
-
     [Fact]
-    public void GameObjectTypeRef_resolved_in_index_produces_no_diagnostic()
+    public void Collect_EventWithSchemaParams_ValidatesReferenceListParam()
     {
-        // REMOVE_UNIT Reward_Param1 is GameObjectTypeRef required
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>REMOVE_UNIT</Reward_Type>" +
-                      "<Reward_Param1>X_Wing</Reward_Param1>");
-        var index = IndexWithSymbol("X_Wing", "GameObjectType");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [RefListParam(0, "GameObjectType")]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type>" +
+                      "<Event_Param1>X_Wing TIE_Fighter Missing_Unit</Event_Param1>");
+        var index = IndexWithSymbols(("X_Wing", "GameObjectType"), ("TIE_Fighter", "GameObjectType"));
 
         var diags = sut.Collect(xml, index);
-
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("Missing_Unit"));
         Assert.DoesNotContain(diags, d => d.Message.Contains("X_Wing"));
+        Assert.DoesNotContain(diags, d => d.Message.Contains("TIE_Fighter"));
     }
 
+    // ── Unconstrained event (Params == null) ─────────────────────────────────
+
     [Fact]
-    public void GameObjectTypeRef_not_in_index_produces_warning()
+    public void Collect_EventWithNullParams_AllowsAnyParamSlot()
     {
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>REMOVE_UNIT</Reward_Type>" +
-                      "<Reward_Param1>Unknown_Unit</Reward_Param1>");
+        var provider = new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "UNCONSTRAINED", Params = null }]
+        });
+        var sut = new StoryParserDiagnosticCollector(provider);
+        var xml = Xml("<Event_Type>UNCONSTRAINED</Event_Type>" +
+                      "<Event_Param1>anything</Event_Param1>" +
+                      "<Event_Param7>more_stuff</Event_Param7>");
+
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
+    }
+
+    // ── Excess / unused params ───────────────────────────────────────────────
+
+    [Fact]
+    public void Collect_EventWithDefinedParams_WarnsOnExcessParam()
+    {
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type>" +
+                      "<Event_Param1>1</Event_Param1>" +
+                      "<Event_Param2>extra</Event_Param2>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
-
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("Unknown_Unit"));
-    }
-
-    // -----------------------------------------------------------------------
-    // Clean cases
-    // -----------------------------------------------------------------------
-
-    [Fact]
-    public void STORY_MOVIE_DONE_with_no_params_produces_no_diagnostic()
-    {
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
-
-        var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Empty(diags);
+                                     d.Message.Contains("Event_Param2") &&
+                                     d.Message.Contains("MY_EVENT"));
     }
 
     [Fact]
-    public void Unknown_event_type_produces_no_story_diagnostics()
+    public void Collect_EventWithGapParams_WarnsOnParamBeyondMaxPosition()
     {
-        // Unknown type is handled by DynamicEnumValueValidator; we must not double-report
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_NOT_REAL</Event_Type>" +
-                      "<Event_Param1>something</Event_Param1>");
+        // Positions 0 and 2 are defined; position 1 is a gap; position 3+ is excess
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0), IntParam(2)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type>" +
+                      "<Event_Param1>1</Event_Param1>" +
+                      "<Event_Param3>2</Event_Param3>" +
+                      "<Event_Param4>extra</Event_Param4>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("Event_Param4"));
+        Assert.DoesNotContain(diags, d => d.Message.Contains("Event_Param2"));
+    }
 
-        Assert.Empty(diags);
+    // ── Missing required params ──────────────────────────────────────────────
+
+    [Fact]
+    public void Collect_EventWithDefinedParams_WarnsOnMissingRequired()
+    {
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, optional: false)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
+
+        var diags = sut.Collect(xml, GameIndex.Empty);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
+                                     d.Message.Contains("MY_EVENT") &&
+                                     d.Message.Contains("Event_Param1"));
     }
 
     [Fact]
-    public void Unknown_reward_type_produces_no_story_diagnostics()
+    public void Collect_EventWithDefinedParams_NoWarningForAbsentOptionalParam()
     {
-        var sut = BuildCollector();
-        var xml = Xml("<Event_Type>STORY_MOVIE_DONE</Event_Type>" +
-                      "<Reward_Type>NOT_A_REWARD</Reward_Type>" +
-                      "<Reward_Param1>something</Reward_Param1>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, optional: true)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
+
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
+    }
+
+    // ── Notes → Hint diagnostics ─────────────────────────────────────────────
+
+    [Fact]
+    public void Collect_EventWithNotes_EmitsHintOnEventTypeNode()
+    {
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", notes: new() { ["en"] = "Never used in vanilla." }));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
-
-        Assert.Empty(diags);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Hint &&
+                                     d.Message.Contains("Never used in vanilla."));
     }
 
     [Fact]
-    public void Empty_param_value_is_not_validated()
+    public void Collect_RewardWithNotes_EmitsHintOnRewardTypeNode()
     {
-        // Empty values are treated as absent — no "wrong type" error, just potential "missing required"
-        var sut = BuildCollector(FlagCompareMethod);
-        var xml = Xml("<Event_Type>STORY_ACCUMULATE</Event_Type>" +
-                      "<Event_Param1></Event_Param1>" +
-                      "<Reward_Type>ZOOM_IN</Reward_Type>");
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithReward("MY_REWARD", notes: new() { ["en"] = "Causes crashes." }));
+        var xml = Xml("<Event_Type>ANYTHING</Event_Type><Reward_Type>MY_REWARD</Reward_Type>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Hint &&
+                                     d.Message.Contains("Causes crashes."));
+    }
 
-        // Missing required param warning only (not a "type" error on the empty value)
+    [Fact]
+    public void Collect_ParamDefinitionWithNotes_EmitsHintOnParamNode()
+    {
+        var paramWithNote = new ParamDefinition
+        {
+            Position = 0,
+            ValueType = XmlValueType.Int,
+            Optional = true,
+            Notes = new Dictionary<string, string> { ["en"] = "Param note here." }
+        };
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [paramWithNote]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>5</Event_Param1>");
+
+        var diags = sut.Collect(xml, GameIndex.Empty);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Hint &&
+                                     d.Message.Contains("Param note here."));
+    }
+
+    // ── Deprecated event/reward ──────────────────────────────────────────────
+
+    [Fact]
+    public void Collect_DeprecatedEvent_EmitsWarning()
+    {
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("OLD_EVENT", deprecated: true));
+        var xml = Xml("<Event_Type>OLD_EVENT</Event_Type>");
+
+        var diags = sut.Collect(xml, GameIndex.Empty);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
+                                     d.Message.Contains("OLD_EVENT") &&
+                                     d.Message.Contains("deprecated", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ── Event type changed — same param slot, different type semantics ────────
+
+    [Fact]
+    public void Collect_EventTypeChanged_SameParam1_RevalidatesAgainstNewType()
+    {
+        // EVENT_A: Param1 = DynamicEnumValue (ColorEnum) — "RED" is valid
+        // EVENT_B: Param1 = Int — "RED" is invalid
+        var provider = new StubSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "StoryEventType",
+                Kind = EnumKind.SchemaFixed,
+                Values =
+                [
+                    new EnumValueDefinition { Name = "EVENT_A", Params = [EnumParam(0, "ColorEnum")] },
+                    new EnumValueDefinition { Name = "EVENT_B", Params = [IntParam(0)] }
+                ]
+            },
+            ValueEnum("ColorEnum", "RED", "GREEN"));
+        var sut = new StoryParserDiagnosticCollector(provider);
+
+        // With EVENT_A: "RED" is a valid ColorEnum → no warning
+        var xmlA = Xml("<Event_Type>EVENT_A</Event_Type><Event_Param1>RED</Event_Param1>");
+        Assert.Empty(sut.Collect(xmlA, GameIndex.Empty));
+
+        // With EVENT_B: "RED" is not a valid Int → warning
+        var xmlB = Xml("<Event_Type>EVENT_B</Event_Type><Event_Param1>RED</Event_Param1>");
+        Assert.Contains(sut.Collect(xmlB, GameIndex.Empty),
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("RED"));
+    }
+
+    [Fact]
+    public void Collect_EventTypeChanged_ParamValidForOldTypeNotNew_WarnsUnused()
+    {
+        // EVENT_A has 3 params; EVENT_B has only 1
+        // Document uses EVENT_B with Event_Param2, Event_Param3 → "not used by EVENT_B"
+        var sut = new StoryParserDiagnosticCollector(new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values =
+            [
+                new EnumValueDefinition { Name = "EVENT_A", Params = [IntParam(0), IntParam(1), IntParam(2)] },
+                new EnumValueDefinition { Name = "EVENT_B", Params = [IntParam(0)] }
+            ]
+        }));
+
+        var xml = Xml("<Event_Type>EVENT_B</Event_Type>" +
+                      "<Event_Param1>1</Event_Param1>" +
+                      "<Event_Param2>2</Event_Param2>" +
+                      "<Event_Param3>3</Event_Param3>");
+
+        var diags = sut.Collect(xml, GameIndex.Empty);
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
+                                     d.Message.Contains("Event_Param2") && d.Message.Contains("EVENT_B"));
+        Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
+                                     d.Message.Contains("Event_Param3") && d.Message.Contains("EVENT_B"));
+    }
+
+    [Fact]
+    public void Collect_EventTypeChanged_ParamValidForNewTypeNotOld_NoError()
+    {
+        // EVENT_A: Param1 = Int. EVENT_B: Param1 = NameReference("Planet").
+        // With EVENT_B and a valid planet → no error
+        var sut = new StoryParserDiagnosticCollector(new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values =
+            [
+                new EnumValueDefinition { Name = "EVENT_A", Params = [IntParam(0)] },
+                new EnumValueDefinition { Name = "EVENT_B", Params = [RefParam(0, "Planet")] }
+            ]
+        }));
+
+        var xml = Xml("<Event_Type>EVENT_B</Event_Type><Event_Param1>Coruscant</Event_Param1>");
+        Assert.Empty(sut.Collect(xml, IndexWithSymbols(("Coruscant", "Planet"))));
+    }
+
+    [Fact]
+    public void Collect_RewardTypeChanged_SameParam_RevalidatesAgainstNewType()
+    {
+        // REWARD_A: Param1 = Boolean — "true" is valid
+        // REWARD_B: Param1 = Int — "true" is invalid
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithTwoRewardTypes("REWARD_A", [BoolParam(0)], "REWARD_B", [IntParam(0)]));
+
+        var xml = Xml("<Event_Type>ANY</Event_Type><Reward_Type>REWARD_B</Reward_Type>" +
+                      "<Reward_Param1>true</Reward_Param1>");
+
+        Assert.Contains(sut.Collect(xml, GameIndex.Empty),
+            d => d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("true"));
+    }
+
+    // ── Unknown types produce no story diagnostics ───────────────────────────
+
+    [Fact]
+    public void Collect_UnknownEventType_ProducesNoStoryDiagnostics()
+    {
+        var sut = new StoryParserDiagnosticCollector(new StubSchemaProvider());
+        var xml = Xml("<Event_Type>STORY_NOT_REAL</Event_Type><Event_Param1>something</Event_Param1>");
+
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
+    }
+
+    [Fact]
+    public void Collect_UnknownRewardType_ProducesNoStoryDiagnostics()
+    {
+        var sut = new StoryParserDiagnosticCollector(new StubSchemaProvider());
+        var xml = Xml("<Event_Type>ANY</Event_Type><Reward_Type>NOT_A_REWARD</Reward_Type>" +
+                      "<Reward_Param1>x</Reward_Param1>");
+
+        Assert.Empty(sut.Collect(xml, GameIndex.Empty));
+    }
+
+    // ── Empty param value ────────────────────────────────────────────────────
+
+    [Fact]
+    public void Collect_EmptyParamValue_IsNotTypeValidated()
+    {
+        var sut = new StoryParserDiagnosticCollector(
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, optional: true)]));
+        var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1></Event_Param1>");
+
+        var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.All(diags, d => Assert.DoesNotContain("is not a valid", d.Message));
     }
 }
