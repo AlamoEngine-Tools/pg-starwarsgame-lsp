@@ -779,6 +779,48 @@ public sealed class XmlDiagnosticsPublisherTest
             d => d.Severity == DiagnosticSeverity.Hint && d.Message.Contains("Never used in vanilla."));
     }
 
+    // ── closed-file suppression ──────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_ClosedFileWithDuplicateId_PublishesEmptyDiagnostics()
+    {
+        // workspaceHost has NO open files — cross-file diagnostics must be suppressed
+        var (_, published, indexService, _) = BuildSubscribed();
+        var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
+
+        indexService.Fire(index);
+
+        Assert.Equal(2, published.Count);
+        Assert.All(published, p => Assert.Empty(p.Diagnostics!));
+    }
+
+    [Fact]
+    public void OnIndexChanged_OpenFileWithDuplicateId_PublishesDuplicateIdDiagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
+
+        workspaceHost.Set("file:///a.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        workspaceHost.Set("file:///b.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+
+        indexService.Fire(index);
+
+        Assert.Equal(2, published.Count);
+        Assert.All(published, p => Assert.Contains(p.Diagnostics!, d => d.Message.Contains("UNIT_A")));
+    }
+
+    [Fact]
+    public void OnIndexChanged_ClosedFileWithUnresolvedRef_PublishesEmptyDiagnostics()
+    {
+        var (_, published, indexService, _) = BuildSubscribed();
+        var index = IndexWithRef("file:///a.xml", "UNIT_MISSING");
+
+        indexService.Fire(index);
+
+        var notification = Assert.Single(published);
+        Assert.Empty(notification.Diagnostics!);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider

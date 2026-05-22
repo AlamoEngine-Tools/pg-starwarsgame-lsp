@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.IO.Abstractions;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
@@ -38,16 +39,24 @@ public sealed class WorkspaceScanner
 
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
     {
+        var sw = Stopwatch.StartNew();
         var roots = workspaceFolders.ToList();
+        _logger.LogInformation(
+            "Workspace scan starting. Roots: [{Roots}]. AllMetafiles={MetafileCount}, AllTags={TagCount}",
+            string.Join(", ", roots), _schema.AllMetafiles.Count, _schema.AllTags.Count);
+
         await WaitForSchemaAsync(ct);
+        _logger.LogInformation("WaitForSchemaAsync complete at {Elapsed} ms", sw.ElapsedMilliseconds);
+
         PreScanMetafiles(roots);
+        _logger.LogInformation("PreScanMetafiles complete at {Elapsed} ms", sw.ElapsedMilliseconds);
 
         var files = roots
             .SelectMany(folder => _fs.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
             .Where(f => _parsers.Any(p => p.CanParse(_fs.Path.GetExtension(f))))
             .ToList();
 
-        _logger.LogInformation("Workspace scan: {Count} parseable file(s) found", files.Count);
+        _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count, sw.ElapsedMilliseconds);
 
         IWorkDoneObserver? progress = null;
         if (_workDone?.IsSupported == true)
@@ -67,6 +76,7 @@ public sealed class WorkspaceScanner
         var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
         try
         {
+            _logger.LogInformation("Bulk-index starting at {Elapsed} ms", sw.ElapsedMilliseconds);
             using (_indexService.BeginBulkUpdate())
             {
                 await Parallel.ForEachAsync(files, options, async (file, token) =>
@@ -79,6 +89,7 @@ public sealed class WorkspaceScanner
                 });
             } // fires one IndexChanged with the complete final state
 
+            _logger.LogInformation("Bulk-index complete: {Indexed} file(s) at {Elapsed} ms", indexed, sw.ElapsedMilliseconds);
             progress?.OnNext($"Indexed {indexed} file(s)", 100, null);
         }
         finally
@@ -87,33 +98,26 @@ public sealed class WorkspaceScanner
         }
     }
 
-    // Waits until the schema provider has metafile definitions available.
-    // For LocalFileSchemaProvider the check passes immediately (schema is loaded synchronously).
-    // For HttpSchemaProvider this yields until SchemaRefreshed fires, with a 30-second timeout.
     private async Task WaitForSchemaAsync(CancellationToken ct)
     {
-        if (_schema.AllMetafiles.Count > 0) return;
+        _logger.LogInformation(
+            "WaitForSchemaAsync: awaiting ReadyAsync (AllTags={TagCount}, AllMetafiles={MetafileCount})",
+            _schema.AllTags.Count, _schema.AllMetafiles.Count);
 
-        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        void OnRefreshed(object? sender, EventArgs e) => tcs.TrySetResult();
-        _schema.SchemaRefreshed += OnRefreshed;
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(30));
         try
         {
-            // Double-check: schema may have loaded between the first check and the subscription.
-            if (_schema.AllMetafiles.Count > 0) return;
-
-            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeout.CancelAfter(TimeSpan.FromSeconds(30));
-            await tcs.Task.WaitAsync(timeout.Token);
+            await _schema.ReadyAsync.WaitAsync(timeout.Token);
+            _logger.LogInformation(
+                "WaitForSchemaAsync: ready (AllTags={TagCount}, AllMetafiles={MetafileCount})",
+                _schema.AllTags.Count, _schema.AllMetafiles.Count);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
-            _logger.LogWarning("Schema not available after 30 s; proceeding without metafile pre-scan");
-        }
-        finally
-        {
-            _schema.SchemaRefreshed -= OnRefreshed;
+            _logger.LogWarning(
+                "Schema not ready after 30 s (AllTags={TagCount}); proceeding without metafile pre-scan",
+                _schema.AllTags.Count);
         }
     }
 

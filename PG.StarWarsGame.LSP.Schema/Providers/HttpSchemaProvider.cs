@@ -23,6 +23,8 @@ public sealed class HttpSchemaProvider : ISchemaProvider
     private readonly Dictionary<string, string> _etags = new();
     private readonly HttpClient _http;
     private readonly ILogger<HttpSchemaProvider> _logger;
+    private readonly TaskCompletionSource _readyTcs =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
     private volatile SchemaIndex _current = SchemaIndex.Empty;
 
     public HttpSchemaProvider(HttpClient http, string baseUrl, SchemaHttpCache cache,
@@ -35,6 +37,9 @@ public sealed class HttpSchemaProvider : ISchemaProvider
     }
 
     public event EventHandler? SchemaRefreshed;
+
+    /// <inheritdoc />
+    public Task ReadyAsync => _readyTcs.Task;
 
     public XmlTagDefinition? GetTag(string tagName)
     {
@@ -84,6 +89,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             _logger.LogInformation("Schema loaded from local cache");
             _current = cached;
             SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+            _readyTcs.TrySetResult();
             return;
         }
 
@@ -205,6 +211,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
 
         _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+        _readyTcs.TrySetResult();
 
         _cache.Update(indexJson, fetchedFiles);
 

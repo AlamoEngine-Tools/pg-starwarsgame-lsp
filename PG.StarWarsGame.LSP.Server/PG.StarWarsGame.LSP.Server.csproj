@@ -22,10 +22,26 @@
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Xml\PG.StarWarsGame.LSP.Xml.csproj"/>
     </ItemGroup>
 
+    <PropertyGroup>
+        <!-- Set via CI secret: dotnet publish -p:SentryDsn=<secret>
+             Falls back to the SENTRY_DSN env var if the MSBuild property is not supplied. -->
+        <SentryDsn Condition="'$(SentryDsn)' == ''">$(SENTRY_DSN)</SentryDsn>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+            <_Parameter1>SentryDsn</_Parameter1>
+            <_Parameter2>$(SentryDsn)</_Parameter2>
+        </AssemblyAttribute>
+    </ItemGroup>
+
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
         <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0"/>
         <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
+        <PackageReference Include="Sentry" Version="6.5.0"/>
+        <PackageReference Include="Sentry.Extensions.Logging" Version="6.5.0"/>
     </ItemGroup>
 
 </Project>

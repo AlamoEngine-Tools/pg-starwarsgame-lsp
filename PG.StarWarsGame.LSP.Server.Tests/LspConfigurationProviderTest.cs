@@ -98,6 +98,25 @@ public sealed class LspConfigurationProviderTest : IDisposable
     }
 
     [Fact]
+    public void LoadFrom_WithNonJsonElementWhoseToStringIsJson_ParsesCorrectly()
+    {
+        // Simulate OmniSharp delivering initializationOptions as a Newtonsoft JToken.
+        // JToken.ToString() returns the raw JSON string, so our fallback path handles it.
+        var fakeToken = new FakeJsonToken("""{"baselineType":"None","schemaLocalPath":"/schema"}""");
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(fakeToken);
+        Assert.Equal(BaselineSourceType.None, provider.Current.BaselineSource.Type);
+        Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
+    }
+
+    private sealed class FakeJsonToken
+    {
+        private readonly string _json;
+        public FakeJsonToken(string json) => _json = json;
+        public override string ToString() => _json;
+    }
+
+    [Fact]
     public void LoadFrom_WithModPaths_Extracted()
     {
         var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);

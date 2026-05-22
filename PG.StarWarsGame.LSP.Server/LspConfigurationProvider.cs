@@ -70,9 +70,32 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         }
     }
 
-    private static LspConfiguration ParseInitOptions(object? initOptions)
+    private LspConfiguration ParseInitOptions(object? initOptions)
     {
-        if (initOptions is not JsonElement elem) return new LspConfiguration();
+        if (initOptions is null) return new LspConfiguration();
+
+        JsonElement elem;
+        if (initOptions is JsonElement je)
+        {
+            elem = je;
+        }
+        else
+        {
+            // OmniSharp may deliver initializationOptions as a Newtonsoft JToken or other type.
+            // Round-trip through the object's string representation to obtain a JsonElement.
+            _logger.LogDebug("InitializationOptions type is {Type}; converting via ToString()", initOptions.GetType().Name);
+            try
+            {
+                var json = initOptions.ToString() ?? "{}";
+                elem = JsonSerializer.Deserialize<JsonElement>(json);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to convert InitializationOptions of type {Type}; using defaults",
+                    initOptions.GetType().Name);
+                return new LspConfiguration();
+            }
+        }
 
         var gamePath = TryGetString(elem, "gamePath");
         var locale = TryGetString(elem, "locale");
@@ -87,6 +110,10 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             foreach (var item in modPathsElem.EnumerateArray())
                 if (item.ValueKind == JsonValueKind.String && item.GetString() is { } s)
                     modPaths.Add(s);
+
+        _logger.LogInformation(
+            "ParseInitOptions: schemaLocalPath={LocalPath}, schemaUrl={Url}, baselineType={BaselineType}",
+            schemaLocalPath ?? "<null>", schemaUrl ?? "<null>", baselineType ?? "<null>");
 
         return new LspConfiguration
         {

@@ -68,6 +68,10 @@ public sealed class XmlDiagnosticsPublisher
 
     private void OnIndexChanged(GameIndex newIndex)
     {
+        _logger.LogInformation(
+            "OnIndexChanged fired: {DocCount} document(s), {DefCount} definition(s), {RefCount} reference(s)",
+            newIndex.Documents.Count, newIndex.WorkspaceDefinitions.Count, newIndex.WorkspaceReferences.Count);
+
         var currentUris = new HashSet<string>(newIndex.Documents.Keys);
 
         foreach (var uri in currentUris)
@@ -82,10 +86,9 @@ public sealed class XmlDiagnosticsPublisher
                 allDiags.AddRange(CollectTagNotesHints(doc.Text));
                 if (IsStoryParserDocument(uri))
                     allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
+                allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
+                allDiags.AddRange(CollectUnresolvedRefDiagnostics(uri, newIndex));
             }
-
-            allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
-            allDiags.AddRange(CollectUnresolvedRefDiagnostics(uri, newIndex));
 
             _publish(new PublishDiagnosticsParams
             {

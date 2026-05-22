@@ -301,13 +301,16 @@ public sealed class WorkspaceScannerTest
         }
     }
 
-    // Schema provider that starts empty and fires SchemaRefreshed when LoadMetafiles is called,
+    // Schema provider that starts empty and completes ReadyAsync when LoadMetafiles is called,
     // mimicking HttpSchemaProvider's background-load behaviour.
     private sealed class DelayedSchemaProvider : ISchemaProvider
     {
+        private readonly TaskCompletionSource _readyTcs =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         private MetafileDefinition[] _metafiles = [];
         public event EventHandler? SchemaRefreshed;
 
+        public Task ReadyAsync => _readyTcs.Task;
         public IReadOnlyList<MetafileDefinition> AllMetafiles => _metafiles;
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
@@ -318,6 +321,7 @@ public sealed class WorkspaceScannerTest
         {
             _metafiles = metafiles;
             SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+            _readyTcs.TrySetResult();
         }
 
         public XmlTagDefinition? GetTag(string t) => null;

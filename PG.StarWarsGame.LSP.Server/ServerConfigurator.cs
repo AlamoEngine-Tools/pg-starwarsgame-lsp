@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
@@ -13,7 +15,6 @@ using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Parsing;
-using System.IO.Abstractions;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -22,7 +23,16 @@ public static class ServerConfigurator
     public static LanguageServerOptions Apply(LanguageServerOptions options) => options
         .ConfigureLogging(x => x
             .AddLanguageProtocolLogging()
-            .SetMinimumLevel(LogLevel.Information))
+            .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace)
+            .SetMinimumLevel(LogLevel.Debug)
+            .AddSentry(o =>
+            {
+                o.Dsn = GetSentryDsn();
+                o.Debug = true;
+                o.AutoSessionTracking = true;
+                o.TracesSampleRate = 1.0;
+                o.EnableLogs = true;
+            }))
         .WithHandler<XmlTextDocumentSyncHandler>()
         .WithHandler<XmlHoverHandler>()
         .WithHandler<XmlCompletionHandler>()
@@ -32,18 +42,11 @@ public static class ServerConfigurator
             services.AddSingleton<IFileSystem, FileSystem>();
             services.AddSingleton<SchemaHttpCache>();
 
-            services.AddSingleton<ISchemaProvider>(sp =>
-            {
-                var config = sp.GetRequiredService<ILspConfigurationProvider>();
-                var src = config.Current.SchemaSource;
-                if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
-                    return new LocalFileSchemaProvider(src.LocalPath,
-                        sp.GetRequiredService<ILogger<LocalFileSchemaProvider>>());
-                var http = sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(HttpSchemaProvider));
-                return new HttpSchemaProvider(http, src.Url,
-                    sp.GetRequiredService<SchemaHttpCache>(),
-                    sp.GetRequiredService<ILogger<HttpSchemaProvider>>());
-            });
+            // Late-binding proxy: OmniSharp resolves ISchemaProvider at handler-registration time
+            // (before OnInitialize). The proxy starts empty; Configure() is called in OnInitialize
+            // once the schema source is known from initializationOptions.
+            services.AddSingleton<SchemaProviderProxy>();
+            services.AddSingleton<ISchemaProvider>(sp => sp.GetRequiredService<SchemaProviderProxy>());
 
             services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
             services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
@@ -69,34 +72,42 @@ public static class ServerConfigurator
             configProvider.LoadFrom(request.InitializationOptions);
             logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
 
-            var schemaProvider = server.Services.GetRequiredService<ISchemaProvider>();
-            switch (schemaProvider)
+            var src = configProvider.Current.SchemaSource;
+            ISchemaProvider realProvider;
+            if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
             {
-                case HttpSchemaProvider http:
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await http.LoadAsync(CancellationToken.None);
-                        }
-                        catch (Exception ex)
-                        {
-                            logger.LogError(ex, "HTTP schema load failed");
-                        }
-                    });
-                    break;
-                case LocalFileSchemaProvider local:
+                realProvider = new LocalFileSchemaProvider(src.LocalPath,
+                    server.Services.GetRequiredService<ILogger<LocalFileSchemaProvider>>());
+            }
+            else
+            {
+                var http = server.Services.GetRequiredService<IHttpClientFactory>()
+                    .CreateClient(nameof(HttpSchemaProvider));
+                realProvider = new HttpSchemaProvider(http, src.Url,
+                    server.Services.GetRequiredService<SchemaHttpCache>(),
+                    server.Services.GetRequiredService<ILogger<HttpSchemaProvider>>());
+            }
+
+            var proxy = server.Services.GetRequiredService<SchemaProviderProxy>();
+            proxy.Configure(realProvider);
+
+            if (realProvider is HttpSchemaProvider httpProvider)
+            {
+                _ = Task.Run(async () =>
+                {
                     try
                     {
-                        local.Load();
+                        await httpProvider.LoadAsync(CancellationToken.None);
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Local schema load failed");
+                        logger.LogError(ex, "HTTP schema load failed");
                     }
-
-                    break;
+                });
             }
+            // LocalFileSchemaProvider already loads synchronously in its constructor.
+
+            await Task.CompletedTask;
         })
         .OnInitialized(async (server, request, response, ct) =>
         {
@@ -119,14 +130,43 @@ public static class ServerConfigurator
 
             indexService.ApplyBaseline(baseline);
 
-            var folders = request.WorkspaceFolders?.Select(f => f.Uri.GetFileSystemPath()).ToList()
-                          ?? (request.RootUri is not null ? [request.RootUri.GetFileSystemPath()] : []);
+            var workspaceFolderPaths = request.WorkspaceFolders
+                ?.Select(f => f.Uri.GetFileSystemPath())
+                .Where(p => !string.IsNullOrEmpty(p))
+                .ToList();
+            var folders = workspaceFolderPaths is { Count: > 0 }
+                ? workspaceFolderPaths
+                : (request.RootUri is not null ? [request.RootUri.GetFileSystemPath()] : []);
             if (folders.Count > 0)
             {
                 var scanner = server.Services.GetRequiredService<WorkspaceScanner>();
-                _ = Task.Run(() => scanner.ScanAsync(folders, CancellationToken.None), CancellationToken.None);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await scanner.ScanAsync(folders, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        initLogger.LogError(ex, "Workspace scan failed");
+                    }
+                }, CancellationToken.None);
             }
 
             await Task.CompletedTask;
         });
+
+    private static string? GetSentryDsn()
+    {
+        // Preferred: baked in at publish time via -p:SentryDsn=<CI secret>
+        var fromMetadata = typeof(ServerConfigurator).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .FirstOrDefault(a => a.Key == "SentryDsn")?.Value;
+        if (!string.IsNullOrEmpty(fromMetadata))
+            return fromMetadata;
+
+        // Local dev fallback: set via SENTRY_DSN in .env.sentry loaded by the run configuration
+        var fromEnv = Environment.GetEnvironmentVariable("SENTRY_DSN");
+        return string.IsNullOrEmpty(fromEnv) ? null : fromEnv;
+    }
 }
