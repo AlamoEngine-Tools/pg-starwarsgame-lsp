@@ -5,6 +5,7 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 
 public enum MetafileType
 {
+    Singleton,
     FileRegistry,
     DirectContent,
     Special

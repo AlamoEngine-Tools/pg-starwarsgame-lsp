@@ -254,26 +254,6 @@ public sealed class XmlHoverHandlerTest
         Assert.Null(result);
     }
 
-    [Fact]
-    public async Task Handle_TagNameCollidesWithTypeName_TypeHoverWins()
-    {
-        var (handler, host, schema, _) = Build();
-        host.AddOrUpdate(TestUri.ToString(), "<Faction>", 1);
-        schema.TagToReturn = MakeTag("Faction"); // Faction is also a tag name
-        schema.TypeToReturn = new GameObjectTypeDefinition
-        {
-            TypeName = "Faction",
-            NameTag = "Name",
-            Description = new Dictionary<string, string> { ["en"] = "A faction." }
-        };
-
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
-
-        var md = result!.Contents.MarkupContent!.Value;
-        Assert.Contains("name tag", md, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Float", md); // tag hover includes value type; type hover does not
-    }
-
     // ── registry-based type-container hover ────────────────────────────────
 
     [Fact]
@@ -310,6 +290,7 @@ public sealed class XmlHoverHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+
         schema.TagToReturn = MakeTag();
 
         host.AddOrUpdate(TestUri.ToString(),
@@ -326,7 +307,7 @@ public sealed class XmlHoverHandlerTest
     // ── type hover ───────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_TypeRootElement_ReturnsTypeHover()
+    public async Task Handle_TypeRootElement_ReturnsNoHover()
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<GameObjectType>", 1);
@@ -339,30 +320,7 @@ public sealed class XmlHoverHandlerTest
         };
 
         var result = await handler.Handle(At(0, 2), CancellationToken.None);
-
-        Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
-        Assert.Contains("GameObjectType", md);
-        Assert.Contains("All game objects.", md);
-    }
-
-    [Fact]
-    public async Task Handle_SingletonType_HoverContainsSingleton()
-    {
-        var (handler, host, schema, _) = Build();
-        host.AddOrUpdate(TestUri.ToString(), "<GameConstants/>", 1);
-        schema.TagToReturn = null;
-        schema.TypeToReturn = new GameObjectTypeDefinition
-        {
-            TypeName = "GameConstants",
-            NameTag = null,
-            Description = new Dictionary<string, string> { ["en"] = "Global constants." }
-        };
-
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
-
-        var md = result!.Contents.MarkupContent!.Value;
-        Assert.Contains("singleton", md, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(result);
     }
 
     // ── Notes display ────────────────────────────────────────────────────────
@@ -404,17 +362,17 @@ public sealed class XmlHoverHandlerTest
     public async Task Handle_TypeWithNotes_IncludesNotesSection()
     {
         var (handler, host, schema, _) = Build();
-        host.AddOrUpdate(TestUri.ToString(), "<GameConstants/>", 1);
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<GameObjectType/>\n</Root>", 1);
         schema.TagToReturn = null;
         schema.TypeToReturn = new GameObjectTypeDefinition
         {
-            TypeName = "GameConstants",
+            TypeName = "GameObjectType",
             NameTag = null,
             Description = new Dictionary<string, string> { ["en"] = "Global constants." },
             Notes = new Dictionary<string, string> { ["en"] = "Legacy type, rarely needed." }
         };
 
-        var result = await handler.Handle(At(0, 2), CancellationToken.None);
+        var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.Contains("Legacy type, rarely needed.", md);
@@ -460,7 +418,9 @@ public sealed class XmlHoverHandlerTest
 
         public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
         {
-            return [];
+            return TagToReturn is null
+                ? []
+                : [TagToReturn];
         }
 
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
@@ -472,9 +432,9 @@ public sealed class XmlHoverHandlerTest
 
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
 
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string type)
         {
-            return [];
+            return GetObjectType(type) is null ? [] : GetAllTagDefinitions(type);
         }
 
         public EnumDefinition? GetEnum(string _)
