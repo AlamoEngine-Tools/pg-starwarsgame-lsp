@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using Sentry;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -39,62 +40,79 @@ public sealed class WorkspaceScanner
 
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
     {
-        var sw = Stopwatch.StartNew();
-        var roots = workspaceFolders.ToList();
-        _logger.LogInformation(
-            "Workspace scan starting. Roots: [{Roots}]. AllMetafiles={MetafileCount}, AllTags={TagCount}",
-            string.Join(", ", roots), _schema.AllMetafiles.Count, _schema.AllTags.Count);
-
-        await WaitForSchemaAsync(ct);
-        _logger.LogInformation("WaitForSchemaAsync complete at {Elapsed} ms", sw.ElapsedMilliseconds);
-
-        PreScanMetafiles(roots);
-        _logger.LogInformation("PreScanMetafiles complete at {Elapsed} ms", sw.ElapsedMilliseconds);
-
-        var files = roots
-            .SelectMany(folder => _fs.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
-            .Where(f => _parsers.Any(p => p.CanParse(_fs.Path.GetExtension(f))))
-            .ToList();
-
-        _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count, sw.ElapsedMilliseconds);
-
-        IWorkDoneObserver? progress = null;
-        if (_workDone?.IsSupported == true)
-            progress = await _workDone.Create(
-                new WorkDoneProgressBegin
-                {
-                    Title = "Indexing workspace",
-                    Message = $"Scanning {files.Count} file(s)…",
-                    Cancellable = false,
-                    Percentage = 0
-                },
-                null!,
-                null!,
-                ct);
-
-        var indexed = 0;
-        var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
+        var tx = SentrySdk.StartTransaction("lsp.workspace.scan", "workspace.index");
         try
         {
-            _logger.LogInformation("Bulk-index starting at {Elapsed} ms", sw.ElapsedMilliseconds);
-            using (_indexService.BeginBulkUpdate())
-            {
-                await Parallel.ForEachAsync(files, options, async (file, token) =>
-                {
-                    var text = await _fs.File.ReadAllTextAsync(file, token);
-                    await _indexService.UpdateDocumentAsync(file, text, 0, token);
-                    var done = Interlocked.Increment(ref indexed);
-                    _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
-                    progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
-                });
-            } // fires one IndexChanged with the complete final state
+            var sw = Stopwatch.StartNew();
+            var roots = workspaceFolders.ToList();
+            _logger.LogInformation(
+                "Workspace scan starting. Roots: [{Roots}]. AllMetafiles={MetafileCount}, AllTags={TagCount}",
+                string.Join(", ", roots), _schema.AllMetafiles.Count, _schema.AllTags.Count);
 
-            _logger.LogInformation("Bulk-index complete: {Indexed} file(s) at {Elapsed} ms", indexed, sw.ElapsedMilliseconds);
-            progress?.OnNext($"Indexed {indexed} file(s)", 100, null);
+            var schemaWaitSpan = tx.StartChild("lsp.schema.wait", "Wait for schema to be ready");
+            await WaitForSchemaAsync(ct);
+            schemaWaitSpan.Finish(SpanStatus.Ok);
+            _logger.LogInformation("WaitForSchemaAsync complete at {Elapsed} ms", sw.ElapsedMilliseconds);
+
+            var preScanSpan = tx.StartChild("lsp.workspace.prescan", "Pre-scan metafiles and register file types");
+            PreScanMetafiles(roots);
+            preScanSpan.Finish(SpanStatus.Ok);
+            _logger.LogInformation("PreScanMetafiles complete at {Elapsed} ms", sw.ElapsedMilliseconds);
+
+            var files = roots
+                .SelectMany(folder => _fs.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+                .Where(f => _parsers.Any(p => p.CanParse(_fs.Path.GetExtension(f))))
+                .ToList();
+
+            _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count, sw.ElapsedMilliseconds);
+
+            IWorkDoneObserver? progress = null;
+            if (_workDone?.IsSupported == true)
+                progress = await _workDone.Create(
+                    new WorkDoneProgressBegin
+                    {
+                        Title = "Indexing workspace",
+                        Message = $"Scanning {files.Count} file(s)…",
+                        Cancellable = false,
+                        Percentage = 0
+                    },
+                    null!,
+                    null!,
+                    ct);
+
+            var indexed = 0;
+            var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
+            var indexSpan = tx.StartChild("lsp.workspace.index", $"Bulk-index {files.Count} file(s)");
+            try
+            {
+                _logger.LogInformation("Bulk-index starting at {Elapsed} ms", sw.ElapsedMilliseconds);
+                using (_indexService.BeginBulkUpdate())
+                {
+                    await Parallel.ForEachAsync(files, options, async (file, token) =>
+                    {
+                        var text = await _fs.File.ReadAllTextAsync(file, token);
+                        await _indexService.UpdateDocumentAsync(file, text, 0, token);
+                        var done = Interlocked.Increment(ref indexed);
+                        _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
+                        progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
+                    });
+                } // fires one IndexChanged with the complete final state
+
+                _logger.LogInformation("Bulk-index complete: {Indexed} file(s) at {Elapsed} ms", indexed, sw.ElapsedMilliseconds);
+                progress?.OnNext($"Indexed {indexed} file(s)", 100, null);
+                indexSpan.Finish(SpanStatus.Ok);
+            }
+            finally
+            {
+                progress?.Dispose();
+            }
+
+            tx.Finish(SpanStatus.Ok);
         }
-        finally
+        catch (Exception)
         {
-            progress?.Dispose();
+            tx.Finish(SpanStatus.InternalError);
+            throw;
         }
     }
 

@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+using Sentry;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -67,90 +68,124 @@ public static class ServerConfigurator
         })
         .OnInitialize(async (server, request, ct) =>
         {
-            var logger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
-            var configProvider = server.Services.GetRequiredService<ILspConfigurationProvider>();
-            configProvider.LoadFrom(request.InitializationOptions);
-            logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
-
-            var src = configProvider.Current.SchemaSource;
-            ISchemaProvider realProvider;
-            if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
+            var tx = SentrySdk.StartTransaction("lsp.initialize", "server.lifecycle");
+            try
             {
-                realProvider = new LocalFileSchemaProvider(src.LocalPath,
-                    server.Services.GetRequiredService<ILogger<LocalFileSchemaProvider>>());
-            }
-            else
-            {
-                var http = server.Services.GetRequiredService<IHttpClientFactory>()
-                    .CreateClient(nameof(HttpSchemaProvider));
-                realProvider = new HttpSchemaProvider(http, src.Url,
-                    server.Services.GetRequiredService<SchemaHttpCache>(),
-                    server.Services.GetRequiredService<ILogger<HttpSchemaProvider>>());
-            }
+                var logger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
+                var configProvider = server.Services.GetRequiredService<ILspConfigurationProvider>();
 
-            var proxy = server.Services.GetRequiredService<SchemaProviderProxy>();
-            proxy.Configure(realProvider);
+                var configSpan = tx.StartChild("config.load", "Load initialization options");
+                configProvider.LoadFrom(request.InitializationOptions);
+                logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
+                configSpan.Finish(SpanStatus.Ok);
 
-            if (realProvider is HttpSchemaProvider httpProvider)
-            {
-                _ = Task.Run(async () =>
+                var schemaSpan = tx.StartChild("schema.setup", "Configure schema provider");
+                var src = configProvider.Current.SchemaSource;
+                ISchemaProvider realProvider;
+                if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
                 {
-                    try
+                    realProvider = new LocalFileSchemaProvider(src.LocalPath,
+                        server.Services.GetRequiredService<ILogger<LocalFileSchemaProvider>>());
+                }
+                else
+                {
+                    var http = server.Services.GetRequiredService<IHttpClientFactory>()
+                        .CreateClient(nameof(HttpSchemaProvider));
+                    realProvider = new HttpSchemaProvider(http, src.Url,
+                        server.Services.GetRequiredService<SchemaHttpCache>(),
+                        server.Services.GetRequiredService<ILogger<HttpSchemaProvider>>());
+                }
+
+                var proxy = server.Services.GetRequiredService<SchemaProviderProxy>();
+                proxy.Configure(realProvider);
+                schemaSpan.Finish(SpanStatus.Ok);
+
+                if (realProvider is HttpSchemaProvider httpProvider)
+                {
+                    _ = Task.Run(async () =>
                     {
-                        await httpProvider.LoadAsync(CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        logger.LogError(ex, "HTTP schema load failed");
-                    }
-                });
+                        var fetchTx = SentrySdk.StartTransaction("lsp.schema.http-fetch", "schema.load");
+                        try
+                        {
+                            await httpProvider.LoadAsync(CancellationToken.None);
+                            fetchTx.Finish(SpanStatus.Ok);
+                        }
+                        catch (Exception ex)
+                        {
+                            logger.LogError(ex, "HTTP schema load failed");
+                            fetchTx.Finish(SpanStatus.InternalError);
+                        }
+                    });
+                }
+                // LocalFileSchemaProvider already loads synchronously in its constructor.
+
+                tx.Finish(SpanStatus.Ok);
             }
-            // LocalFileSchemaProvider already loads synchronously in its constructor.
+            catch (Exception)
+            {
+                tx.Finish(SpanStatus.InternalError);
+                throw;
+            }
 
             await Task.CompletedTask;
         })
         .OnInitialized(async (server, request, response, ct) =>
         {
-            server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
-
-            var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
-            var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
-            var indexService = server.Services.GetRequiredService<IGameIndexService>();
-            var baselineLoader = server.Services.GetRequiredService<BaselineLoader>();
-            BaselineIndex baseline;
+            var tx = SentrySdk.StartTransaction("lsp.initialized", "server.lifecycle");
             try
             {
-                baseline = await baselineLoader.LoadAsync(config.Current.BaselineSource, ct);
-            }
-            catch (Exception ex)
-            {
-                initLogger.LogError(ex, "Baseline load failed; using empty baseline");
-                baseline = BaselineIndex.Empty;
-            }
+                server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
 
-            indexService.ApplyBaseline(baseline);
+                var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
+                var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
+                var indexService = server.Services.GetRequiredService<IGameIndexService>();
+                var baselineLoader = server.Services.GetRequiredService<BaselineLoader>();
 
-            var workspaceFolderPaths = request.WorkspaceFolders
-                ?.Select(f => f.Uri.GetFileSystemPath())
-                .Where(p => !string.IsNullOrEmpty(p))
-                .ToList();
-            var folders = workspaceFolderPaths is { Count: > 0 }
-                ? workspaceFolderPaths
-                : (request.RootUri is not null ? [request.RootUri.GetFileSystemPath()] : []);
-            if (folders.Count > 0)
-            {
-                var scanner = server.Services.GetRequiredService<WorkspaceScanner>();
-                _ = Task.Run(async () =>
+                var baselineSpan = tx.StartChild("baseline.load", "Load baseline index");
+                BaselineIndex baseline;
+                try
                 {
-                    try
+                    baseline = await baselineLoader.LoadAsync(config.Current.BaselineSource, ct);
+                    baselineSpan.Finish(SpanStatus.Ok);
+                }
+                catch (Exception ex)
+                {
+                    initLogger.LogError(ex, "Baseline load failed; using empty baseline");
+                    baselineSpan.Finish(SpanStatus.InternalError);
+                    baseline = BaselineIndex.Empty;
+                }
+
+                indexService.ApplyBaseline(baseline);
+
+                var workspaceFolderPaths = request.WorkspaceFolders
+                    ?.Select(f => f.Uri.GetFileSystemPath())
+                    .Where(p => !string.IsNullOrEmpty(p))
+                    .ToList();
+                var folders = workspaceFolderPaths is { Count: > 0 }
+                    ? workspaceFolderPaths
+                    : (request.RootUri is not null ? [request.RootUri.GetFileSystemPath()] : []);
+                if (folders.Count > 0)
+                {
+                    var scanner = server.Services.GetRequiredService<WorkspaceScanner>();
+                    _ = Task.Run(async () =>
                     {
-                        await scanner.ScanAsync(folders, CancellationToken.None);
-                    }
-                    catch (Exception ex)
-                    {
-                        initLogger.LogError(ex, "Workspace scan failed");
-                    }
-                }, CancellationToken.None);
+                        try
+                        {
+                            await scanner.ScanAsync(folders, CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            initLogger.LogError(ex, "Workspace scan failed");
+                        }
+                    }, CancellationToken.None);
+                }
+
+                tx.Finish(SpanStatus.Ok);
+            }
+            catch (Exception)
+            {
+                tx.Finish(SpanStatus.InternalError);
+                throw;
             }
 
             await Task.CompletedTask;
