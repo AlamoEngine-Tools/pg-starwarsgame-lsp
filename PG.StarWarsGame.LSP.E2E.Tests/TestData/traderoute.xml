@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <TradeRouteFiles>
-  <TradeRoute>
-    <Point_A>PLANET_CORUSCANT</Point_A>
-  </TradeRoute>
+    <TradeRoute>
+        <Point_A>PLANET_CORUSCANT</Point_A>
+    </TradeRoute>
 </TradeRouteFiles>

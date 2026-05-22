@@ -13,25 +13,6 @@ public sealed class SchemaIndex
     /// <summary>An <see cref="ISchemaProvider" /> that returns empty collections for all queries and is always ready.</summary>
     public static readonly ISchemaProvider EmptyProvider = new EmptySchemaProviderImpl();
 
-    private sealed class EmptySchemaProviderImpl : ISchemaProvider
-    {
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-    }
     private readonly Dictionary<string, List<XmlTagDefinition>> _allByTagName;
     private readonly Dictionary<string, EnumDefinition> _enums;
     private readonly Dictionary<string, XmlTagDefinition> _tags;
@@ -110,5 +91,47 @@ public sealed class SchemaIndex
     public EnumDefinition? GetEnum(string enumName)
     {
         return _enums.TryGetValue(enumName, out var def) ? def : null;
+    }
+
+    private sealed class EmptySchemaProviderImpl : ISchemaProvider
+    {
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     }
 }

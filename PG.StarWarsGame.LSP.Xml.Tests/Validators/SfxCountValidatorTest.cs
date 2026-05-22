@@ -10,7 +10,9 @@ file static class TagOf
 {
     public static XmlTagDefinition Make(string name, XmlValueType type,
         TagSemanticType semanticType = TagSemanticType.Default)
-        => new() { Tag = name, ValueType = type, SemanticType = semanticType };
+    {
+        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
+    }
 }
 
 public sealed class SfxCountValidatorTest
@@ -24,7 +26,9 @@ public sealed class SfxCountValidatorTest
     [InlineData("1")]
     [InlineData("100")]
     public void Valid_sfx_counts_pass(string value)
-        => Assert.True(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
 
     [Theory]
     [InlineData("-2")]
@@ -32,5 +36,7 @@ public sealed class SfxCountValidatorTest
     [InlineData("")]
     [InlineData("1.5")]
     public void Invalid_sfx_counts_fail(string value)
-        => Assert.False(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
 }

@@ -18,6 +18,47 @@ internal sealed class SchemaProviderProxy : ISchemaProvider
 
     private ISchemaProvider _inner = SchemaIndex.EmptyProvider;
 
+    public Task ReadyAsync => _readyTcs.Task;
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add => _inner.SchemaRefreshed += value;
+        remove => _inner.SchemaRefreshed -= value;
+    }
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return _inner.GetTag(tagName);
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+    {
+        return _inner.GetAllTagDefinitions(tagName);
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => _inner.AllTags;
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        return _inner.GetObjectType(typeName);
+    }
+
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _inner.AllObjectTypes;
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        return _inner.GetTagsForType(typeName);
+    }
+
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return _inner.GetEnum(enumName);
+    }
+
+    public IReadOnlyList<EnumDefinition> AllEnums => _inner.AllEnums;
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _inner.AllHardcodedSets;
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => _inner.AllMetafiles;
+
     /// <summary>
     ///     Called from <c>OnInitialize</c> once the schema source configuration is known.
     ///     Replaces the placeholder inner provider and signals <see cref="ISchemaProvider.ReadyAsync" />.
@@ -34,23 +75,4 @@ internal sealed class SchemaProviderProxy : ISchemaProvider
         if (inner.ReadyAsync.IsCompleted)
             _readyTcs.TrySetResult();
     }
-
-    public Task ReadyAsync => _readyTcs.Task;
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add => _inner.SchemaRefreshed += value;
-        remove => _inner.SchemaRefreshed -= value;
-    }
-
-    public XmlTagDefinition? GetTag(string tagName) => _inner.GetTag(tagName);
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => _inner.GetAllTagDefinitions(tagName);
-    public IReadOnlyList<XmlTagDefinition> AllTags => _inner.AllTags;
-    public GameObjectTypeDefinition? GetObjectType(string typeName) => _inner.GetObjectType(typeName);
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _inner.AllObjectTypes;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => _inner.GetTagsForType(typeName);
-    public EnumDefinition? GetEnum(string enumName) => _inner.GetEnum(enumName);
-    public IReadOnlyList<EnumDefinition> AllEnums => _inner.AllEnums;
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _inner.AllHardcodedSets;
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => _inner.AllMetafiles;
 }

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <CommandBarComponentFiles>
-  <CommandBarComponent>
-    <Selected_Texture_Name>PLACEHOLDER</Selected_Texture_Name>
-  </CommandBarComponent>
+    <CommandBarComponent>
+        <Selected_Texture_Name>PLACEHOLDER</Selected_Texture_Name>
+    </CommandBarComponent>
 </CommandBarComponentFiles>

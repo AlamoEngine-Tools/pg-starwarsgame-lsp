@@ -63,7 +63,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             BehaviorModuleSet(Value("GenericTransport")));
         var publisher = BuildPublisher(schema);
 
-        const string xml = "<GameObjectFiles><GameObject><Behavior>GenericTransport, TYPO_MODULE</Behavior></GameObject></GameObjectFiles>";
+        const string xml =
+            "<GameObjectFiles><GameObject><Behavior>GenericTransport, TYPO_MODULE</Behavior></GameObject></GameObjectFiles>";
 
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
@@ -80,7 +81,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             BehaviorModuleSet(Value("GenericTransport"), Value("SlaveCraftBehavior")));
         var publisher = BuildPublisher(schema);
 
-        const string xml = "<GameObjectFiles><GameObject><Behavior>GenericTransport SlaveCraftBehavior</Behavior></GameObject></GameObjectFiles>";
+        const string xml =
+            "<GameObjectFiles><GameObject><Behavior>GenericTransport SlaveCraftBehavior</Behavior></GameObject></GameObjectFiles>";
 
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
@@ -93,10 +95,11 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         // Tag references "BehaviorModule" but schema has no such set
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("Behavior"),
-            hardcodedSets: []);
+            []);
         var publisher = BuildPublisher(schema);
 
-        const string xml = "<GameObjectFiles><GameObject><Behavior>SOME_UNKNOWN_MODULE</Behavior></GameObject></GameObjectFiles>";
+        const string xml =
+            "<GameObjectFiles><GameObject><Behavior>SOME_UNKNOWN_MODULE</Behavior></GameObject></GameObjectFiles>";
 
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
@@ -109,11 +112,12 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     public void ValueGroup_on_tag_filters_valid_tokens_to_matching_group()
     {
         var schema = new StubHardcodedSchemaProvider(
-            BehaviorTag("SpaceBehavior", valueGroup: "space"),
+            BehaviorTag("SpaceBehavior", "space"),
             BehaviorModuleSet(Value("SpaceFighter", "space"), Value("InfantryUnit", "land")));
         var publisher = BuildPublisher(schema);
 
-        const string xml = "<GameObjectFiles><GameObject><SpaceBehavior>InfantryUnit</SpaceBehavior></GameObject></GameObjectFiles>";
+        const string xml =
+            "<GameObjectFiles><GameObject><SpaceBehavior>InfantryUnit</SpaceBehavior></GameObject></GameObjectFiles>";
 
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
@@ -125,11 +129,12 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     public void Token_with_empty_groups_is_valid_for_any_ValueGroup()
     {
         var schema = new StubHardcodedSchemaProvider(
-            BehaviorTag("SpaceBehavior", valueGroup: "space"),
+            BehaviorTag("SpaceBehavior", "space"),
             BehaviorModuleSet(Value("GenericTransport" /* no groups — valid everywhere */)));
         var publisher = BuildPublisher(schema);
 
-        const string xml = "<GameObjectFiles><GameObject><SpaceBehavior>GenericTransport</SpaceBehavior></GameObject></GameObjectFiles>";
+        const string xml =
+            "<GameObjectFiles><GameObject><SpaceBehavior>GenericTransport</SpaceBehavior></GameObject></GameObjectFiles>";
 
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
@@ -140,11 +145,12 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     public void Matching_group_token_is_valid()
     {
         var schema = new StubHardcodedSchemaProvider(
-            BehaviorTag("SpaceBehavior", valueGroup: "space"),
+            BehaviorTag("SpaceBehavior", "space"),
             BehaviorModuleSet(Value("SpaceFighter", "space"), Value("InfantryUnit", "land")));
         var publisher = BuildPublisher(schema);
 
-        const string xml = "<GameObjectFiles><GameObject><SpaceBehavior>SpaceFighter</SpaceBehavior></GameObject></GameObjectFiles>";
+        const string xml =
+            "<GameObjectFiles><GameObject><SpaceBehavior>SpaceFighter</SpaceBehavior></GameObject></GameObjectFiles>";
 
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
@@ -156,8 +162,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
 
 file sealed class StubHardcodedSchemaProvider : ISchemaProvider
 {
-    private readonly Dictionary<string, XmlTagDefinition> _tags;
     private readonly List<HardcodedReferenceSet> _hardcodedSets;
+    private readonly Dictionary<string, XmlTagDefinition> _tags;
 
     public StubHardcodedSchemaProvider(
         XmlTagDefinition tag,
@@ -179,18 +185,45 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
     public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-    public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public EnumDefinition? GetEnum(string _) => null;
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public XmlTagDefinition? GetTag(string name)
+    {
+        return _tags.GetValueOrDefault(name);
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 file sealed class StubValidatorRegistry : IXmlValueValidatorRegistry
 {
     public XmlValidationResult Validate(XmlValueType _, string __, XmlTagDefinition ___)
-        => XmlValidationResult.Valid();
+    {
+        return XmlValidationResult.Valid();
+    }
 }
 
 file sealed class StubIndexService : IGameIndexService
@@ -198,23 +231,49 @@ file sealed class StubIndexService : IGameIndexService
     public GameIndex Current => GameIndex.Empty;
     public event Action<GameIndex>? IndexChanged;
 
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-    public void RemoveDocument(string uri) { }
-    public void ApplyBaseline(BaselineIndex baseline) { }
-    public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return Task.CompletedTask;
+    }
+
+    public void RemoveDocument(string uri)
+    {
+    }
+
+    public void ApplyBaseline(BaselineIndex baseline)
+    {
+    }
+
+    public IDisposable BeginBulkUpdate()
+    {
+        return NullDisposable.Instance;
+    }
 
     private sealed class NullDisposable : IDisposable
     {
         public static readonly NullDisposable Instance = new();
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }
 
 file sealed class StubFileTypeRegistry : IFileTypeRegistry
 {
-    public ImmutableArray<string> GetTypesForFile(string normalizedPath) => ImmutableArray<string>.Empty;
-    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) { }
-    public void UnregisterFile(string normalizedPath) { }
+    public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+    {
+        return ImmutableArray<string>.Empty;
+    }
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string normalizedPath)
+    {
+    }
+
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => new Dictionary<string, ImmutableArray<string>>();
 }
 
@@ -223,9 +282,14 @@ file sealed class StubWorkspaceHost : IGameWorkspaceHost
     private readonly Dictionary<string, TrackedDocument> _docs = [];
 
     public void AddOrUpdate(string uri, string text, int version)
-        => _docs[uri] = new TrackedDocument(uri, text, version);
+    {
+        _docs[uri] = new TrackedDocument(uri, text, version);
+    }
 
-    public void Remove(string uri) => _docs.Remove(uri);
+    public void Remove(string uri)
+    {
+        _docs.Remove(uri);
+    }
 
     public bool TryGet(string uri, out TrackedDocument doc)
     {

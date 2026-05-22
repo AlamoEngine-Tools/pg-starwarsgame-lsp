@@ -310,7 +310,7 @@ public sealed class XmlHoverHandlerTest
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.TagToReturn = MakeTag("Max_Speed");
+        schema.TagToReturn = MakeTag();
 
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n<Fighter_Mk2>\n<Max_Speed/>\n</Fighter_Mk2>\n</GameObjectFiles>", 1);
@@ -392,7 +392,7 @@ public sealed class XmlHoverHandlerTest
     {
         var (handler, host, schema, _) = Build();
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed/>\n</Root>", 1);
-        schema.TagToReturn = MakeTag("Max_Speed");
+        schema.TagToReturn = MakeTag();
 
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
@@ -453,8 +453,6 @@ public sealed class XmlHoverHandlerTest
         public XmlTagDefinition? TagToReturn { get; set; }
         public GameObjectTypeDefinition? TypeToReturn { get; set; }
 
-        public void AddType(GameObjectTypeDefinition type) => _typesByName[type.TypeName] = type;
-
         public XmlTagDefinition? GetTag(string _)
         {
             return TagToReturn;
@@ -494,6 +492,11 @@ public sealed class XmlHoverHandlerTest
             add { }
             remove { }
         }
+
+        public void AddType(GameObjectTypeDefinition type)
+        {
+            _typesByName[type.TypeName] = type;
+        }
     }
 
     private sealed class FakeFileTypeRegistry : IFileTypeRegistry
@@ -501,17 +504,27 @@ public sealed class XmlHoverHandlerTest
         private readonly Dictionary<string, ImmutableArray<string>> _map =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+        {
+            return _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+        }
 
-        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
-            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
-
-        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+        {
             _map[normalizedPath] = typeNames;
+        }
 
-        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
+        public void UnregisterFile(string normalizedPath)
+        {
+            _map.Remove(normalizedPath);
+        }
 
         public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
+
+        public void Register(string key, ImmutableArray<string> types)
+        {
+            _map[key] = types;
+        }
     }
 
     private sealed class FakeConfigProvider : ILspConfigurationProvider

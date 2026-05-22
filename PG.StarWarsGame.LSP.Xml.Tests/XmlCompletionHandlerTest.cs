@@ -57,38 +57,56 @@ public sealed class XmlCompletionHandlerTest
     }
 
     private static ParamDefinition Param(int position, XmlValueType type = XmlValueType.Int,
-        string? enumName = null, string? refType = null) => new()
+        string? enumName = null, string? refType = null)
     {
-        Position = position, ValueType = type, EnumName = enumName, ReferenceType = refType
-    };
+        return new ParamDefinition
+        {
+            Position = position, ValueType = type, EnumName = enumName, ReferenceType = refType
+        };
+    }
 
-    private static EnumValueDefinition StoryEvent(string name, params ParamDefinition[] paramDefs) => new()
+    private static EnumValueDefinition StoryEvent(string name, params ParamDefinition[] paramDefs)
     {
-        Name = name,
-        Params = paramDefs.Length > 0 ? [.. paramDefs] : null
-    };
+        return new EnumValueDefinition
+        {
+            Name = name,
+            Params = paramDefs.Length > 0 ? [.. paramDefs] : null
+        };
+    }
 
-    private static EnumValueDefinition StoryReward(string name, params ParamDefinition[] paramDefs) => new()
+    private static EnumValueDefinition StoryReward(string name, params ParamDefinition[] paramDefs)
     {
-        Name = name,
-        Params = paramDefs.Length > 0 ? [.. paramDefs] : null
-    };
+        return new EnumValueDefinition
+        {
+            Name = name,
+            Params = paramDefs.Length > 0 ? [.. paramDefs] : null
+        };
+    }
 
-    private static EnumDefinition StoryEventTypeWith(params EnumValueDefinition[] values) => new()
+    private static EnumDefinition StoryEventTypeWith(params EnumValueDefinition[] values)
     {
-        Name = "StoryEventType", Kind = EnumKind.SchemaFixed, Values = [.. values]
-    };
+        return new EnumDefinition
+        {
+            Name = "StoryEventType", Kind = EnumKind.SchemaFixed, Values = [.. values]
+        };
+    }
 
-    private static EnumDefinition StoryRewardTypeWith(params EnumValueDefinition[] values) => new()
+    private static EnumDefinition StoryRewardTypeWith(params EnumValueDefinition[] values)
     {
-        Name = "StoryRewardType", Kind = EnumKind.SchemaFixed, Values = [.. values]
-    };
+        return new EnumDefinition
+        {
+            Name = "StoryRewardType", Kind = EnumKind.SchemaFixed, Values = [.. values]
+        };
+    }
 
-    private static EnumDefinition FlagEnum(string name, params string[] values) => new()
+    private static EnumDefinition FlagEnum(string name, params string[] values)
     {
-        Name = name, Kind = EnumKind.SchemaFixed,
-        Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
-    };
+        return new EnumDefinition
+        {
+            Name = name, Kind = EnumKind.SchemaFixed,
+            Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
+        };
+    }
 
     // ── tag-name completions ────────────────────────────────────────────────
 
@@ -262,134 +280,6 @@ public sealed class XmlCompletionHandlerTest
         Assert.Empty(result.Items);
     }
 
-    // ── fakes ───────────────────────────────────────────────────────────────
-
-    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
-    {
-        private readonly Dictionary<string, TrackedDocument> _docs = [];
-
-        public void AddOrUpdate(string uri, string text, int version)
-        {
-            _docs[uri] = new TrackedDocument(uri, text, version);
-        }
-
-        public void Remove(string uri)
-        {
-            _docs.Remove(uri);
-        }
-
-        public bool TryGet(string uri, out TrackedDocument doc)
-        {
-            return _docs.TryGetValue(uri, out doc!);
-        }
-
-        public IEnumerable<TrackedDocument> All => _docs.Values;
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
-
-        public XmlTagDefinition? GetTag(string name)
-        {
-            return _tags.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-
-        public GameObjectTypeDefinition? GetObjectType(string name)
-        {
-            return _types.GetValueOrDefault(name);
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string name)
-        {
-            return _tagsByType.TryGetValue(name, out var list) ? list : [];
-        }
-
-        public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-
-        public void AddType(GameObjectTypeDefinition type)
-        {
-            _types[type.TypeName] = type;
-        }
-
-        public void AddTagForType(string typeName, XmlTagDefinition tag)
-        {
-            _tags[tag.Tag] = tag;
-            if (!_tagsByType.TryGetValue(typeName, out var list))
-                _tagsByType[typeName] = list = [];
-            list.Add(tag);
-        }
-
-        public void AddEnum(EnumDefinition enumDef) => _enums[enumDef.Name] = enumDef;
-    }
-
-    private sealed class FakeProposalRegistry : IXmlValueProposalRegistry
-    {
-        public IReadOnlyList<ValueProposal> ProposalsToReturn { get; set; } = [];
-
-        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition __, string ___)
-        {
-            return ProposalsToReturn;
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
-        }
-    }
-
-    private sealed class FakeFileTypeRegistry : IFileTypeRegistry
-    {
-        private readonly Dictionary<string, ImmutableArray<string>> _map =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
-
-        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
-            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
-
-        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
-            _map[normalizedPath] = typeNames;
-
-        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
-
-        public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
-    }
-
     // ── StoryParser tag-name completions ──────────────────────────────────────
 
     [Fact]
@@ -454,7 +344,8 @@ public sealed class XmlCompletionHandlerTest
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryRewardTypeWith(StoryReward("CREDITS", Param(0))));
-        var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>CREDITS</Reward_Type>\n<\n</Event>\n</StoryParser>";
+        var xml =
+            "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>CREDITS</Reward_Type>\n<\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
         var result = await handler.Handle(At(4, 1), CancellationToken.None);
@@ -475,7 +366,8 @@ public sealed class XmlCompletionHandlerTest
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryRewardTypeWith(StoryReward("LOCK_CONTROLS", Param(0, XmlValueType.Boolean))));
-        var xml = "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
+        var xml =
+            "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
         // cursor on line 4 inside <Reward_Param1> body
@@ -569,7 +461,7 @@ public sealed class XmlCompletionHandlerTest
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(StoryEvent("MY_EVENT",
-            Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+            Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
         schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>MY_EVENT</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -619,7 +511,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0, XmlValueType.NameReference, refType: "Planet")),
-            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
         schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -644,9 +536,10 @@ public sealed class XmlCompletionHandlerTest
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryRewardTypeWith(
             StoryReward("REWARD_A", Param(0, XmlValueType.Boolean)),
-            StoryReward("REWARD_B", Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+            StoryReward("REWARD_B", Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
         schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
-        var xml = "<StoryParser>\n<Event>\n<Reward_Type>REWARD_B</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
+        var xml =
+            "<StoryParser>\n<Event>\n<Reward_Type>REWARD_B</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
         // cursor after '<Reward_Param1>' closing '>' (char 15, since Reward_Param1 is 15 chars)
@@ -669,7 +562,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0), Param(1)),
-            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, enumName: "FlagCmp"))));
+            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
         schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
         // TYPE_B is the current type; Event_Param2 references position 1 which TYPE_B doesn't define
         var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<Event_Param2>\n</Event>\n</StoryParser>";
@@ -678,5 +571,166 @@ public sealed class XmlCompletionHandlerTest
         var result = await handler.Handle(At(3, 14), CancellationToken.None);
 
         Assert.Empty(result.Items);
+    }
+
+    // ── fakes ───────────────────────────────────────────────────────────────
+
+    private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
+    {
+        private readonly Dictionary<string, TrackedDocument> _docs = [];
+
+        public void AddOrUpdate(string uri, string text, int version)
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
+
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
+
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
+
+        public IEnumerable<TrackedDocument> All => _docs.Values;
+    }
+
+    private sealed class FakeSchemaProvider : ISchemaProvider
+    {
+        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
+
+        public XmlTagDefinition? GetTag(string name)
+        {
+            return _tags.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [.. _types.Values];
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string name)
+        {
+            return _tagsByType.TryGetValue(name, out var list) ? list : [];
+        }
+
+        public EnumDefinition? GetEnum(string name)
+        {
+            return _enums.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
+
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void AddType(GameObjectTypeDefinition type)
+        {
+            _types[type.TypeName] = type;
+        }
+
+        public void AddTagForType(string typeName, XmlTagDefinition tag)
+        {
+            _tags[tag.Tag] = tag;
+            if (!_tagsByType.TryGetValue(typeName, out var list))
+                _tagsByType[typeName] = list = [];
+            list.Add(tag);
+        }
+
+        public void AddEnum(EnumDefinition enumDef)
+        {
+            _enums[enumDef.Name] = enumDef;
+        }
+    }
+
+    private sealed class FakeProposalRegistry : IXmlValueProposalRegistry
+    {
+        public IReadOnlyList<ValueProposal> ProposalsToReturn { get; set; } = [];
+
+        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition __, string ___)
+        {
+            return ProposalsToReturn;
+        }
+    }
+
+    private sealed class FakeIndexService : IGameIndexService
+    {
+        public GameIndex Current { get; } = GameIndex.Empty;
+        public event Action<GameIndex>? IndexChanged;
+
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed class FakeFileTypeRegistry : IFileTypeRegistry
+    {
+        private readonly Dictionary<string, ImmutableArray<string>> _map =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+        {
+            return _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+        }
+
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+        {
+            _map[normalizedPath] = typeNames;
+        }
+
+        public void UnregisterFile(string normalizedPath)
+        {
+            _map.Remove(normalizedPath);
+        }
+
+        public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
+
+        public void Register(string key, ImmutableArray<string> types)
+        {
+            _map[key] = types;
+        }
     }
 }

@@ -10,24 +10,32 @@ file static class TagOf
 {
     public static XmlTagDefinition Make(string name, XmlValueType type,
         TagSemanticType semanticType = TagSemanticType.Default)
-        => new() { Tag = name, ValueType = type, SemanticType = semanticType };
+    {
+        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
+    }
 }
 
 public sealed class GameObjectTypeReferenceListValidatorTest
 {
     private static readonly GameObjectTypeReferenceListValidator Sut = new();
-    private static readonly XmlTagDefinition Tag = TagOf.Make("Required_Plans", XmlValueType.GameObjectTypeReferenceList);
+
+    private static readonly XmlTagDefinition Tag = TagOf.Make("Required_Plans",
+        XmlValueType.GameObjectTypeReferenceList);
 
     [Theory]
     [InlineData("PLAN_GARRISON")]
     [InlineData("PLAN_GARRISON PLAN_TURRET")]
     [InlineData("ObjectTypeA ObjectTypeB")]
     public void Valid_game_object_type_reference_lists_pass(string value)
-        => Assert.True(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
     public void Empty_value_fails(string value)
-        => Assert.False(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
 }

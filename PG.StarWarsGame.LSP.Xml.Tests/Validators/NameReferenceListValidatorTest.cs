@@ -10,7 +10,9 @@ file static class TagOf
 {
     public static XmlTagDefinition Make(string name, XmlValueType type,
         TagSemanticType semanticType = TagSemanticType.Default)
-        => new() { Tag = name, ValueType = type, SemanticType = semanticType };
+    {
+        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
+    }
 }
 
 public sealed class NameReferenceListValidatorTest
@@ -23,11 +25,15 @@ public sealed class NameReferenceListValidatorTest
     [InlineData("UNIT_VADER UNIT_STORMTROOPER")]
     [InlineData("Unit_A Unit_B Unit_C")]
     public void Valid_name_reference_lists_pass(string value)
-        => Assert.True(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
     public void Empty_value_fails(string value)
-        => Assert.False(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
 }

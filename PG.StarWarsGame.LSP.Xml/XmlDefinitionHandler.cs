@@ -1,0 +1,59 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+
+namespace PG.StarWarsGame.LSP.Xml;
+
+public sealed class XmlDefinitionHandler : DefinitionHandlerBase
+{
+    private readonly IGameIndexService _indexService;
+    private readonly ILogger<XmlDefinitionHandler> _logger;
+
+    public XmlDefinitionHandler(IGameIndexService indexService, ILogger<XmlDefinitionHandler> logger)
+    {
+        _indexService = indexService;
+        _logger = logger;
+    }
+
+    public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
+    {
+        var uri = request.TextDocument.Uri.ToString();
+        var index = _indexService.Current;
+
+        if (!index.Documents.TryGetValue(uri, out var docIndex))
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
+        var hit = XmlPositionResolver.FindAtPosition(docIndex, request.Position.Line, request.Position.Character);
+        if (hit is null)
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
+        var symbol = index.Resolve(hit.Value.Id);
+        if (symbol is null || symbol.Origin is not FileOrigin fo)
+        {
+            _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin", hit.Value.Id);
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+        }
+
+        var location = new Location
+        {
+            Uri = fo.Uri,
+            Range = new LspRange(new Position(fo.Line, fo.Column ?? 0), new Position(fo.Line, fo.Column ?? 0))
+        };
+
+        _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
+        return Task.FromResult<LocationOrLocationLinks?>(
+            new LocationOrLocationLinks(new LocationOrLocationLink(location)));
+    }
+
+    protected override DefinitionRegistrationOptions CreateRegistrationOptions(
+        DefinitionCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new DefinitionRegistrationOptions { DocumentSelector = TextDocumentSelector.ForLanguage("xml") };
+    }
+}

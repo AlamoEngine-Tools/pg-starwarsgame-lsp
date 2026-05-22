@@ -322,6 +322,7 @@ public sealed class WorkspaceScannerTest
     {
         private readonly TaskCompletionSource _readyTcs =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         private MetafileDefinition[] _metafiles = [];
         public event EventHandler? SchemaRefreshed;
 
@@ -332,18 +333,37 @@ public sealed class WorkspaceScannerTest
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
 
+        public XmlTagDefinition? GetTag(string t)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string t)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string e)
+        {
+            return null;
+        }
+
         public void LoadMetafiles(params MetafileDefinition[] metafiles)
         {
             _metafiles = metafiles;
             SchemaRefreshed?.Invoke(this, EventArgs.Empty);
             _readyTcs.TrySetResult();
         }
-
-        public XmlTagDefinition? GetTag(string t) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t) => [];
-        public GameObjectTypeDefinition? GetObjectType(string t) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t) => [];
-        public EnumDefinition? GetEnum(string e) => null;
     }
 
     private sealed class FakeSchemaProvider : ISchemaProvider
@@ -369,11 +389,30 @@ public sealed class WorkspaceScannerTest
             remove { }
         }
 
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
     }
 
     private sealed class FakeIndexService : IGameIndexService

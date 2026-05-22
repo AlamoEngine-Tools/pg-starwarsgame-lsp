@@ -10,17 +10,42 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 
 file sealed class StubSchemaProvider : ISchemaProvider
 {
-    public EnumDefinition? GetEnum(string _) => null;
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
     public IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public XmlTagDefinition? GetTag(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public XmlTagDefinition? GetTag(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 public sealed class XmlValueValidatorRegistryTest

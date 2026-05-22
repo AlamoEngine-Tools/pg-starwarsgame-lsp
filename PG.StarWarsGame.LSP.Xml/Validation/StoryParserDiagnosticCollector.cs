@@ -4,6 +4,7 @@
 using System.Globalization;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -25,9 +26,7 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
         foreach (var eventNode in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  string.Equals(n.Name, "Event", StringComparison.OrdinalIgnoreCase)))
-        {
             CollectForEvent(eventNode, gameIndex, diagnostics);
-        }
 
         return diagnostics;
     }
@@ -124,10 +123,12 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
         {
             XmlValueType.Int or XmlValueType.UInt =>
                 int.TryParse(value, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)
-                    ? null : $"'{value}' is not a valid integer.",
+                    ? null
+                    : $"'{value}' is not a valid integer.",
             XmlValueType.Float =>
                 float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out _)
-                    ? null : $"'{value}' is not a valid number.",
+                    ? null
+                    : $"'{value}' is not a valid number.",
             XmlValueType.Boolean =>
                 IsBooleanInt(value) ? null : $"'{value}' is not a valid boolean value. Use 0, 1, true, or false.",
             XmlValueType.DynamicEnumValue =>
@@ -143,10 +144,12 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
     }
 
     private static bool IsBooleanInt(string value)
-        => value.Equals("0", StringComparison.OrdinalIgnoreCase) ||
-           value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
-           value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
-           value.Equals("false", StringComparison.OrdinalIgnoreCase);
+    {
+        return value.Equals("0", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+               value.Equals("false", StringComparison.OrdinalIgnoreCase);
+    }
 
     private string? ValidateEnumList(string? enumName, string value)
     {
@@ -154,10 +157,8 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
         var enumDef = schema.GetEnum(enumName);
         if (enumDef is null) return null;
         foreach (var token in value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-        {
             if (!enumDef.Values.Any(v => string.Equals(v.Name, token, StringComparison.OrdinalIgnoreCase)))
                 return $"'{token}' is not a valid {enumName} value.";
-        }
         return null;
     }
 
@@ -179,6 +180,7 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
             if (sym is null)
                 return $"'{token}' is not a recognized {referenceType}.";
         }
+
         return null;
     }
 
@@ -188,43 +190,53 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
         if (parts.Length != 3)
             return $"'{value}' is not a valid 3D vector. Expected three space- or comma-separated numbers.";
         foreach (var part in parts)
-        {
             if (!float.TryParse(part, NumberStyles.Float, CultureInfo.InvariantCulture, out _))
                 return $"'{part}' is not a valid number in vector '{value}'.";
-        }
         return null;
     }
 
     private EnumValueDefinition? GetEventDef(string eventType)
-        => schema.GetEnum("StoryEventType")?.Values
-                 .FirstOrDefault(v => string.Equals(v.Name, eventType, StringComparison.OrdinalIgnoreCase));
+    {
+        return schema.GetEnum("StoryEventType")?.Values
+            .FirstOrDefault(v => string.Equals(v.Name, eventType, StringComparison.OrdinalIgnoreCase));
+    }
 
     private EnumValueDefinition? GetRewardDef(string rewardType)
-        => schema.GetEnum("StoryRewardType")?.Values
-                 .FirstOrDefault(v => string.Equals(v.Name, rewardType, StringComparison.OrdinalIgnoreCase));
+    {
+        return schema.GetEnum("StoryRewardType")?.Values
+            .FirstOrDefault(v => string.Equals(v.Name, rewardType, StringComparison.OrdinalIgnoreCase));
+    }
 
     private static HtmlNode? FindChild(HtmlNode parent, string tagName)
-        => parent.ChildNodes.FirstOrDefault(n =>
+    {
+        return parent.ChildNodes.FirstOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             string.Equals(n.Name, tagName, StringComparison.OrdinalIgnoreCase));
+    }
 
-    private static Diagnostic Warn(HtmlNode node, string message) => new()
+    private static Diagnostic Warn(HtmlNode node, string message)
     {
-        Severity = DiagnosticSeverity.Warning,
-        Message = message,
-        Range = new Range(
-            new Position(Math.Max(0, node.Line - 1), 0),
-            new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
-        Source = "pg-swg-lsp"
-    };
+        return new Diagnostic
+        {
+            Severity = DiagnosticSeverity.Warning,
+            Message = message,
+            Range = new Range(
+                new Position(Math.Max(0, node.Line - 1), 0),
+                new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
+            Source = AppProperties.LspServerId
+        };
+    }
 
-    private static Diagnostic Hint(HtmlNode node, string message) => new()
+    private static Diagnostic Hint(HtmlNode node, string message)
     {
-        Severity = DiagnosticSeverity.Hint,
-        Message = message,
-        Range = new Range(
-            new Position(Math.Max(0, node.Line - 1), 0),
-            new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
-        Source = "pg-swg-lsp"
-    };
+        return new Diagnostic
+        {
+            Severity = DiagnosticSeverity.Hint,
+            Message = message,
+            Range = new Range(
+                new Position(Math.Max(0, node.Line - 1), 0),
+                new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
+            Source = AppProperties.LspServerId
+        };
+    }
 }

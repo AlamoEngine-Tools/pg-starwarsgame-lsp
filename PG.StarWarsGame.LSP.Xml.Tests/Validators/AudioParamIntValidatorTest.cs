@@ -10,7 +10,9 @@ file static class TagOf
 {
     public static XmlTagDefinition Make(string name, XmlValueType type,
         TagSemanticType semanticType = TagSemanticType.Default)
-        => new() { Tag = name, ValueType = type, SemanticType = semanticType };
+    {
+        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
+    }
 }
 
 public sealed class AudioParamIntValidatorTest
@@ -24,7 +26,9 @@ public sealed class AudioParamIntValidatorTest
     [InlineData("100")]
     [InlineData("127")]
     public void Valid_audio_param_ints_pass(string value)
-        => Assert.True(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
 
     [Theory]
     [InlineData("-1")]
@@ -32,5 +36,7 @@ public sealed class AudioParamIntValidatorTest
     [InlineData("")]
     [InlineData("128")]
     public void Invalid_audio_param_ints_fail(string value)
-        => Assert.False(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
 }

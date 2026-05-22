@@ -88,9 +88,11 @@ public sealed class SchemaHttpCache
             foreach (var rel in manifest.Enums)
                 enums.Add(YamlSchemaParser.ParseEnumFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Hardcoded)
-                hardcodedSets.Add(YamlSchemaParser.ParseHardcodedSetFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+                hardcodedSets.Add(
+                    YamlSchemaParser.ParseHardcodedSetFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Meta)
-                metafiles.AddRange(YamlSchemaParser.ParseMetafileFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+                metafiles.AddRange(
+                    YamlSchemaParser.ParseMetafileFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
 
             index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
             return true;

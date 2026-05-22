@@ -15,17 +15,42 @@ file sealed class StubSchemaProvider : ISchemaProvider
         _enums = (enums ?? []).ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
     }
 
-    public EnumDefinition? GetEnum(string enumName) => _enums.GetValueOrDefault(enumName);
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return _enums.GetValueOrDefault(enumName);
+    }
+
     public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public XmlTagDefinition? GetTag(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public XmlTagDefinition? GetTag(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 public sealed class DynamicEnumValueProposalProviderTest
@@ -36,15 +61,33 @@ public sealed class DynamicEnumValueProposalProviderTest
         Kind = EnumKind.SchemaFixed,
         Values =
         [
-            new() { Name = "STORY_ACCUMULATE", Description = new Dictionary<string, string> { ["en"] = "Fires when credits reach threshold." } },
-            new() { Name = "STORY_CONQUER",    Description = new Dictionary<string, string> { ["en"] = "Fires when a planet is conquered." } },
-            new() { Name = "STORY_CONSTRUCT",  Description = new Dictionary<string, string> { ["en"] = "Fires when an object is constructed." } },
-            new() { Name = "STORY_ELAPSED",    Description = new Dictionary<string, string> { ["en"] = "Fires after a delay." } },
+            new EnumValueDefinition
+            {
+                Name = "STORY_ACCUMULATE",
+                Description = new Dictionary<string, string> { ["en"] = "Fires when credits reach threshold." }
+            },
+            new EnumValueDefinition
+            {
+                Name = "STORY_CONQUER",
+                Description = new Dictionary<string, string> { ["en"] = "Fires when a planet is conquered." }
+            },
+            new EnumValueDefinition
+            {
+                Name = "STORY_CONSTRUCT",
+                Description = new Dictionary<string, string> { ["en"] = "Fires when an object is constructed." }
+            },
+            new EnumValueDefinition
+            {
+                Name = "STORY_ELAPSED", Description = new Dictionary<string, string> { ["en"] = "Fires after a delay." }
+            }
         ]
     };
 
-    private static XmlTagDefinition TagWith(string? enumName, TagSemanticType sem = TagSemanticType.Default) =>
-        new() { Tag = "Event_Type", ValueType = XmlValueType.DynamicEnumValue, EnumName = enumName, SemanticType = sem };
+    private static XmlTagDefinition TagWith(string? enumName, TagSemanticType sem = TagSemanticType.Default)
+    {
+        return new XmlTagDefinition
+            { Tag = "Event_Type", ValueType = XmlValueType.DynamicEnumValue, EnumName = enumName, SemanticType = sem };
+    }
 
     [Fact]
     public void ValueType_is_DynamicEnumValue()
@@ -90,7 +133,7 @@ public sealed class DynamicEnumValueProposalProviderTest
         var bare = new EnumDefinition
         {
             Name = "Bare", Kind = EnumKind.SchemaFixed,
-            Values = [new() { Name = "VAL" }]
+            Values = [new EnumValueDefinition { Name = "VAL" }]
         };
         var sut = new DynamicEnumValueProposalProvider(new StubSchemaProvider([bare]));
         var proposals = sut.GetProposals(TagWith("Bare"), "");

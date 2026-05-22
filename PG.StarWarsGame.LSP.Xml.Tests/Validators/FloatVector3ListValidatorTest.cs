@@ -10,7 +10,9 @@ file static class TagOf
 {
     public static XmlTagDefinition Make(string name, XmlValueType type,
         TagSemanticType semanticType = TagSemanticType.Default)
-        => new() { Tag = name, ValueType = type, SemanticType = semanticType };
+    {
+        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType };
+    }
 }
 
 public sealed class FloatVector3ListValidatorTest
@@ -23,7 +25,9 @@ public sealed class FloatVector3ListValidatorTest
     [InlineData("1.0 2.0 3.0 4.0 5.0 6.0")]
     [InlineData("-1.0 0 1.0 2.0 -2.0 0.5")]
     public void Valid_float3_lists_pass(string value)
-        => Assert.True(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.True(Sut.Validate(value, Tag).IsValid);
+    }
 
     [Theory]
     [InlineData("")]
@@ -32,5 +36,7 @@ public sealed class FloatVector3ListValidatorTest
     [InlineData("1.0 2.0 3.0 4.0")]
     [InlineData("a b c")]
     public void Invalid_float3_lists_fail(string value)
-        => Assert.False(Sut.Validate(value, Tag).IsValid);
+    {
+        Assert.False(Sut.Validate(value, Tag).IsValid);
+    }
 }

@@ -18,25 +18,52 @@ file sealed class StubSchemaProvider : ISchemaProvider
         _enums = enums.ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
     }
 
-    public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
+    public EnumDefinition? GetEnum(string name)
+    {
+        return _enums.GetValueOrDefault(name);
+    }
+
     public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public XmlTagDefinition? GetTag(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public XmlTagDefinition? GetTag(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 public sealed class StoryParserDiagnosticCollectorTest
 {
     // ── XML helpers ──────────────────────────────────────────────────────────
 
-    private static string Xml(string inner) =>
-        $"<StoryParser><Event>{inner}</Event></StoryParser>";
+    private static string Xml(string inner)
+    {
+        return $"<StoryParser><Event>{inner}</Event></StoryParser>";
+    }
 
     // ── Schema builder helpers ───────────────────────────────────────────────
 
@@ -118,50 +145,68 @@ public sealed class StoryParserDiagnosticCollectorTest
 
     // ── Param definition factories ───────────────────────────────────────────
 
-    private static ParamDefinition IntParam(int position, bool optional = false) => new()
+    private static ParamDefinition IntParam(int position, bool optional = false)
     {
-        Position = position,
-        ValueType = XmlValueType.Int,
-        Optional = optional
-    };
+        return new ParamDefinition
+        {
+            Position = position,
+            ValueType = XmlValueType.Int,
+            Optional = optional
+        };
+    }
 
-    private static ParamDefinition BoolParam(int position, bool optional = false) => new()
+    private static ParamDefinition BoolParam(int position, bool optional = false)
     {
-        Position = position,
-        ValueType = XmlValueType.Boolean,
-        Optional = optional
-    };
+        return new ParamDefinition
+        {
+            Position = position,
+            ValueType = XmlValueType.Boolean,
+            Optional = optional
+        };
+    }
 
-    private static ParamDefinition EnumParam(int position, string enumName, bool optional = false) => new()
+    private static ParamDefinition EnumParam(int position, string enumName, bool optional = false)
     {
-        Position = position,
-        ValueType = XmlValueType.DynamicEnumValue,
-        EnumName = enumName,
-        Optional = optional
-    };
+        return new ParamDefinition
+        {
+            Position = position,
+            ValueType = XmlValueType.DynamicEnumValue,
+            EnumName = enumName,
+            Optional = optional
+        };
+    }
 
-    private static ParamDefinition RefParam(int position, string referenceType, bool optional = false) => new()
+    private static ParamDefinition RefParam(int position, string referenceType, bool optional = false)
     {
-        Position = position,
-        ValueType = XmlValueType.NameReference,
-        ReferenceType = referenceType,
-        Optional = optional
-    };
+        return new ParamDefinition
+        {
+            Position = position,
+            ValueType = XmlValueType.NameReference,
+            ReferenceType = referenceType,
+            Optional = optional
+        };
+    }
 
-    private static ParamDefinition RefListParam(int position, string referenceType, bool optional = false) => new()
+    private static ParamDefinition RefListParam(int position, string referenceType, bool optional = false)
     {
-        Position = position,
-        ValueType = XmlValueType.NameReferenceList,
-        ReferenceType = referenceType,
-        Optional = optional
-    };
+        return new ParamDefinition
+        {
+            Position = position,
+            ValueType = XmlValueType.NameReferenceList,
+            ReferenceType = referenceType,
+            Optional = optional
+        };
+    }
 
-    private static EnumDefinition ValueEnum(string name, params string[] values) => new()
+    private static EnumDefinition ValueEnum(string name, params string[] values)
     {
-        Name = name,
-        Kind = EnumKind.SchemaFixed,
-        Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
-    };
+        return new EnumDefinition
+        {
+            Name = name,
+            Kind = EnumKind.SchemaFixed,
+            Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
+        };
+    }
 
     // ── Game index helpers ───────────────────────────────────────────────────
 
@@ -189,7 +234,7 @@ public sealed class StoryParserDiagnosticCollectorTest
         var diags = sut.Collect(xml, GameIndex.Empty);
 
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("not_an_int"));
+                                    d.Message.Contains("not_an_int"));
     }
 
     [Fact]
@@ -378,8 +423,8 @@ public sealed class StoryParserDiagnosticCollectorTest
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("Event_Param2") &&
-                                     d.Message.Contains("MY_EVENT"));
+                                    d.Message.Contains("Event_Param2") &&
+                                    d.Message.Contains("MY_EVENT"));
     }
 
     [Fact]
@@ -404,20 +449,20 @@ public sealed class StoryParserDiagnosticCollectorTest
     public void Collect_EventWithDefinedParams_WarnsOnMissingRequired()
     {
         var sut = new StoryParserDiagnosticCollector(
-            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, optional: false)]));
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, false)]));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("MY_EVENT") &&
-                                     d.Message.Contains("Event_Param1"));
+                                    d.Message.Contains("MY_EVENT") &&
+                                    d.Message.Contains("Event_Param1"));
     }
 
     [Fact]
     public void Collect_EventWithDefinedParams_NoWarningForAbsentOptionalParam()
     {
         var sut = new StoryParserDiagnosticCollector(
-            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, optional: true)]));
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, true)]));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
 
         Assert.Empty(sut.Collect(xml, GameIndex.Empty));
@@ -429,24 +474,24 @@ public sealed class StoryParserDiagnosticCollectorTest
     public void Collect_EventWithNotes_EmitsHintOnEventTypeNode()
     {
         var sut = new StoryParserDiagnosticCollector(
-            SchemaWithEvent("MY_EVENT", notes: new() { ["en"] = "Never used in vanilla." }));
+            SchemaWithEvent("MY_EVENT", notes: new Dictionary<string, string> { ["en"] = "Never used in vanilla." }));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Hint &&
-                                     d.Message.Contains("Never used in vanilla."));
+                                    d.Message.Contains("Never used in vanilla."));
     }
 
     [Fact]
     public void Collect_RewardWithNotes_EmitsHintOnRewardTypeNode()
     {
         var sut = new StoryParserDiagnosticCollector(
-            SchemaWithReward("MY_REWARD", notes: new() { ["en"] = "Causes crashes." }));
+            SchemaWithReward("MY_REWARD", notes: new Dictionary<string, string> { ["en"] = "Causes crashes." }));
         var xml = Xml("<Event_Type>ANYTHING</Event_Type><Reward_Type>MY_REWARD</Reward_Type>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Hint &&
-                                     d.Message.Contains("Causes crashes."));
+                                    d.Message.Contains("Causes crashes."));
     }
 
     [Fact]
@@ -465,7 +510,7 @@ public sealed class StoryParserDiagnosticCollectorTest
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Hint &&
-                                     d.Message.Contains("Param note here."));
+                                    d.Message.Contains("Param note here."));
     }
 
     // ── Deprecated event/reward ──────────────────────────────────────────────
@@ -474,13 +519,13 @@ public sealed class StoryParserDiagnosticCollectorTest
     public void Collect_DeprecatedEvent_EmitsWarning()
     {
         var sut = new StoryParserDiagnosticCollector(
-            SchemaWithEvent("OLD_EVENT", deprecated: true));
+            SchemaWithEvent("OLD_EVENT", true));
         var xml = Xml("<Event_Type>OLD_EVENT</Event_Type>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("OLD_EVENT") &&
-                                     d.Message.Contains("deprecated", StringComparison.OrdinalIgnoreCase));
+                                    d.Message.Contains("OLD_EVENT") &&
+                                    d.Message.Contains("deprecated", StringComparison.OrdinalIgnoreCase));
     }
 
     // ── Event type changed — same param slot, different type semantics ────────
@@ -537,9 +582,9 @@ public sealed class StoryParserDiagnosticCollectorTest
 
         var diags = sut.Collect(xml, GameIndex.Empty);
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("Event_Param2") && d.Message.Contains("EVENT_B"));
+                                    d.Message.Contains("Event_Param2") && d.Message.Contains("EVENT_B"));
         Assert.Contains(diags, d => d.Severity == DiagnosticSeverity.Warning &&
-                                     d.Message.Contains("Event_Param3") && d.Message.Contains("EVENT_B"));
+                                    d.Message.Contains("Event_Param3") && d.Message.Contains("EVENT_B"));
     }
 
     [Fact]
@@ -604,7 +649,7 @@ public sealed class StoryParserDiagnosticCollectorTest
     public void Collect_EmptyParamValue_IsNotTypeValidated()
     {
         var sut = new StoryParserDiagnosticCollector(
-            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, optional: true)]));
+            SchemaWithEvent("MY_EVENT", paramDefs: [IntParam(0, true)]));
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1></Event_Param1>");
 
         var diags = sut.Collect(xml, GameIndex.Empty);

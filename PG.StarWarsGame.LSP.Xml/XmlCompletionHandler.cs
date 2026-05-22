@@ -33,12 +33,13 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private readonly IFileTypeRegistry _fileTypeRegistry;
+    private readonly IGameIndexService _indexService;
+
     private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
-    private readonly IGameIndexService _indexService;
     private readonly StoryParamValueProposalProvider _storyProposals;
-    private readonly IFileTypeRegistry _fileTypeRegistry;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlCompletionHandler(
         IGameWorkspaceHost workspaceHost,
@@ -163,11 +164,11 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
         var eventDef = ctx.EventType is not null
             ? _schema.GetEnum("StoryEventType")?.Values
-                     .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
             : null;
         var rewardDef = ctx.RewardType is not null
             ? _schema.GetEnum("StoryRewardType")?.Values
-                     .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
             : null;
 
         var candidates = new List<string>(StoryEventStructuralTags);
@@ -176,7 +177,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         {
             var paramCount = eventDef.Params is null
                 ? MaxEventParamSlots
-                : (eventDef.Params.Count > 0 ? eventDef.Params.Max(p => p.Position) + 1 : 0);
+                : eventDef.Params.Count > 0
+                    ? eventDef.Params.Max(p => p.Position) + 1
+                    : 0;
             for (var i = 1; i <= paramCount; i++)
                 candidates.Add($"Event_Param{i}");
         }
@@ -185,7 +188,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         {
             var paramCount = rewardDef.Params is null
                 ? MaxRewardParamSlots
-                : (rewardDef.Params.Count > 0 ? rewardDef.Params.Max(p => p.Position) + 1 : 0);
+                : rewardDef.Params.Count > 0
+                    ? rewardDef.Params.Max(p => p.Position) + 1
+                    : 0;
             for (var i = 1; i <= paramCount; i++)
                 candidates.Add($"Reward_Param{i}");
         }
@@ -212,14 +217,14 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
         var side = paramMatch.Groups[1].Value;
         var position = int.Parse(paramMatch.Groups[2].Value);
-        var schemaPos = position - 1;  // Event_Param1 → position 0
+        var schemaPos = position - 1; // Event_Param1 → position 0
 
         ParamDefinition? paramDef;
         if (string.Equals(side, "Event", StringComparison.OrdinalIgnoreCase))
         {
             var typeDef = ctx.EventType is not null
                 ? _schema.GetEnum("StoryEventType")?.Values
-                         .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
                 : null;
             paramDef = typeDef?.Params?.FirstOrDefault(p => p.Position == schemaPos);
         }
@@ -227,7 +232,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         {
             var typeDef = ctx.RewardType is not null
                 ? _schema.GetEnum("StoryRewardType")?.Values
-                         .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
+                    .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
                 : null;
             paramDef = typeDef?.Params?.FirstOrDefault(p => p.Position == schemaPos);
         }
@@ -256,12 +261,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         foreach (var node in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  string.Equals(n.Name, "event", StringComparison.OrdinalIgnoreCase)))
-        {
             if (node.Line <= cursorLine)
                 enclosingEvent = node;
             else
                 break;
-        }
 
         if (enclosingEvent is null) return result;
         foreach (var child in enclosingEvent.ChildNodes)

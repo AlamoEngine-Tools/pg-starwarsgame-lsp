@@ -8,12 +8,12 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 /// <summary>
-/// Smoke tests for every game object type declared in metafiles.yaml.
-/// Each type gets three tests: type hover (schema description), tag hover (field markdown),
-/// and diagnostics publication on open.
-/// Tests require LSP_SCHEMA_LOCAL_PATH; none require a real game workspace.
-/// Test data files use the type name as the depth-1 element so the schema resolves the type
-/// via element-name lookup without needing the FileTypeRegistry.
+///     Smoke tests for every game object type declared in metafiles.yaml.
+///     Each type gets three tests: type hover (schema description), tag hover (field markdown),
+///     and diagnostics publication on open.
+///     Tests require LSP_SCHEMA_LOCAL_PATH; none require a real game workspace.
+///     Test data files use the type name as the depth-1 element so the schema resolves the type
+///     via element-name lookup without needing the FileTypeRegistry.
 /// </summary>
 [Trait("Category", "E2E")]
 public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>

@@ -17,12 +17,10 @@ public static class StoryEventCompletionContextReader
         foreach (var node in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  string.Equals(n.Name, "event", StringComparison.OrdinalIgnoreCase)))
-        {
             if (node.Line <= cursorLine)
                 enclosingEvent = node;
             else
                 break;
-        }
 
         if (enclosingEvent is null)
             return new StoryEventCompletionContext(null, null);

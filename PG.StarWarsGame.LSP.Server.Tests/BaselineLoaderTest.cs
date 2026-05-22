@@ -17,8 +17,9 @@ public sealed class BaselineLoaderTest
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".pg-swg-lsp", "baselines");
 
-    private static BaselineIndex MakeBaseline() =>
-        new(
+    private static BaselineIndex MakeBaseline()
+    {
+        return new BaselineIndex(
             ImmutableDictionary<string, GameSymbol>.Empty
                 .Add("UNIT_A", new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "GameObjectType",
                     new FileOrigin("f.xml", 0, null), null)),
@@ -28,8 +29,12 @@ public sealed class BaselineLoaderTest
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty
                 .Add("data/xml/units.xml", ImmutableArray.Create("GameObjectType")));
+    }
 
-    private static byte[] Serialize(BaselineIndex b) => BaselineSerializer.Serialize(b);
+    private static byte[] Serialize(BaselineIndex b)
+    {
+        return BaselineSerializer.Serialize(b);
+    }
 
     // ── None ────────────────────────────────────────────────────────────────
 

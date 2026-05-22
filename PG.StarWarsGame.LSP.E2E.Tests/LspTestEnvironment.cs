@@ -22,12 +22,12 @@ public static class LspTestEnvironment
 
     public static IReadOnlyList<string> ModPaths =>
         (Environment.GetEnvironmentVariable("LSP_MOD_PATHS") ?? string.Empty)
-            .Split(';', StringSplitOptions.RemoveEmptyEntries);
+        .Split(';', StringSplitOptions.RemoveEmptyEntries);
 
     /// <summary>
-    /// When set, the fixture connects to an already-running server on this TCP port
-    /// instead of spawning a child process. Useful for attaching a debugger.
-    /// Start the server with: dotnet run -- --tcp=&lt;port&gt; [--wait-for-debugger]
+    ///     When set, the fixture connects to an already-running server on this TCP port
+    ///     instead of spawning a child process. Useful for attaching a debugger.
+    ///     Start the server with: dotnet run -- --tcp=&lt;port&gt; [--wait-for-debugger]
     /// </summary>
     public static int? ExternalServerPort =>
         Environment.GetEnvironmentVariable("LSP_SERVER_TCP_PORT") is { } val

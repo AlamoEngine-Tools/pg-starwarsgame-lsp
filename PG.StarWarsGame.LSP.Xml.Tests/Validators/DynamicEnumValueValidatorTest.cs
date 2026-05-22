@@ -24,17 +24,42 @@ file sealed class StubSchemaProvider : ISchemaProvider
         _enums = (enums ?? []).ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
     }
 
-    public EnumDefinition? GetEnum(string enumName) => _enums.GetValueOrDefault(enumName);
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return _enums.GetValueOrDefault(enumName);
+    }
+
     public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public XmlTagDefinition? GetTag(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public XmlTagDefinition? GetTag(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 public sealed class DynamicEnumValueValidatorTest
@@ -83,18 +108,25 @@ public sealed class DynamicEnumValueValidatorTest
         Assert.False(Sut.Validate(value, FlagTag).IsValid);
     }
 
-    private static EnumDefinition SchemaFixed(string name, bool isBitfield, params string[] values) =>
-        new()
+    private static EnumDefinition SchemaFixed(string name, bool isBitfield, params string[] values)
+    {
+        return new EnumDefinition
         {
             Name = name, Kind = EnumKind.SchemaFixed, IsBitfield = isBitfield,
             Values = values.Select(v => new EnumValueDefinition { Name = v }).ToList()
         };
+    }
 
-    private static EnumDefinition DynamicXml(string name) =>
-        new() { Name = name, Kind = EnumKind.DynamicXml, Values = [] };
+    private static EnumDefinition DynamicXml(string name)
+    {
+        return new EnumDefinition { Name = name, Kind = EnumKind.DynamicXml, Values = [] };
+    }
 
-    private static XmlTagDefinition EnumTag(string enumName, TagSemanticType sem = TagSemanticType.Default) =>
-        new() { Tag = "Tag", ValueType = XmlValueType.DynamicEnumValue, EnumName = enumName, SemanticType = sem };
+    private static XmlTagDefinition EnumTag(string enumName, TagSemanticType sem = TagSemanticType.Default)
+    {
+        return new XmlTagDefinition
+            { Tag = "Tag", ValueType = XmlValueType.DynamicEnumValue, EnumName = enumName, SemanticType = sem };
+    }
 
     [Fact]
     public void Known_value_passes_for_schema_fixed_enum()

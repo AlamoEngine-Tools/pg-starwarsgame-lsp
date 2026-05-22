@@ -23,8 +23,10 @@ public sealed class HttpSchemaProvider : ISchemaProvider
     private readonly Dictionary<string, string> _etags = new();
     private readonly HttpClient _http;
     private readonly ILogger<HttpSchemaProvider> _logger;
+
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+
     private volatile SchemaIndex _current = SchemaIndex.Empty;
 
     public HttpSchemaProvider(HttpClient http, string baseUrl, SchemaHttpCache cache,
@@ -197,13 +199,9 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             var (parsed, raw) = await FetchYamlAsync<MetafileDefinition>(
                 path, yaml => [.. YamlSchemaParser.ParseMetafileFile(yaml)], ct);
             if (parsed is null)
-            {
                 metafiles.AddRange(_current.AllMetafiles);
-            }
             else
-            {
                 metafiles.AddRange(parsed);
-            }
 
             if (raw is not null)
                 fetchedFiles.Add((path, raw));

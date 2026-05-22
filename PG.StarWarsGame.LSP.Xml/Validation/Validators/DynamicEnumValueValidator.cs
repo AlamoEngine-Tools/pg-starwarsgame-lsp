@@ -13,7 +13,10 @@ public sealed partial class DynamicEnumValueValidator : IXmlValueValidator
 
     private readonly ISchemaProvider _schema;
 
-    public DynamicEnumValueValidator(ISchemaProvider schema) => _schema = schema;
+    public DynamicEnumValueValidator(ISchemaProvider schema)
+    {
+        _schema = schema;
+    }
 
     public XmlValueType ValueType => XmlValueType.DynamicEnumValue;
 
@@ -47,12 +50,11 @@ public sealed partial class DynamicEnumValueValidator : IXmlValueValidator
                     .Select(v => v.Name)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var seg in trimmed.Split(ValueSeparators, StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                {
+                foreach (var seg in trimmed.Split(ValueSeparators,
+                             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
                     if (!known.Contains(seg))
                         return XmlValidationResult.Failure(
                             $"'{seg}' is not a known value for enum '{tag.EnumName}' on <{tag.Tag}>.");
-                }
             }
         }
 

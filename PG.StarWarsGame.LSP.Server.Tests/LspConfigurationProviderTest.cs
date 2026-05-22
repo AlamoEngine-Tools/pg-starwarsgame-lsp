@@ -109,13 +109,6 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
     }
 
-    private sealed class FakeJsonToken
-    {
-        private readonly string _json;
-        public FakeJsonToken(string json) => _json = json;
-        public override string ToString() => _json;
-    }
-
     [Fact]
     public void LoadFrom_WithModPaths_Extracted()
     {
@@ -220,5 +213,20 @@ public sealed class LspConfigurationProviderTest : IDisposable
 
         Assert.Single(provider.Current.ModPaths);
         Assert.Equal("/from-file", provider.Current.ModPaths[0]);
+    }
+
+    private sealed class FakeJsonToken
+    {
+        private readonly string _json;
+
+        public FakeJsonToken(string json)
+        {
+            _json = json;
+        }
+
+        public override string ToString()
+        {
+            return _json;
+        }
     }
 }

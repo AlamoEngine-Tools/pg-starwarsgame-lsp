@@ -18,6 +18,15 @@ public interface ISchemaProvider
 
     IReadOnlyList<MetafileDefinition> AllMetafiles { get; }
 
+    /// <summary>
+    ///     A task that completes when the provider has finished its initial load and is ready for queries.
+    ///     Providers that load synchronously (e.g. <c>LocalFileSchemaProvider</c>) return
+    ///     <see cref="Task.CompletedTask" /> so callers can await without blocking.
+    ///     Providers that load asynchronously (e.g. <c>HttpSchemaProvider</c>) return a task that
+    ///     completes after the first successful fetch.
+    /// </summary>
+    Task ReadyAsync => Task.CompletedTask;
+
     /// <summary>Returns the first definition found for this tag across all types. Use when context type is unknown.</summary>
     XmlTagDefinition? GetTag(string tagName);
 
@@ -34,13 +43,4 @@ public interface ISchemaProvider
 
     /// <summary>Fired when the schema index has been refreshed from the source.</summary>
     event EventHandler? SchemaRefreshed;
-
-    /// <summary>
-    ///     A task that completes when the provider has finished its initial load and is ready for queries.
-    ///     Providers that load synchronously (e.g. <c>LocalFileSchemaProvider</c>) return
-    ///     <see cref="Task.CompletedTask"/> so callers can await without blocking.
-    ///     Providers that load asynchronously (e.g. <c>HttpSchemaProvider</c>) return a task that
-    ///     completes after the first successful fetch.
-    /// </summary>
-    Task ReadyAsync => Task.CompletedTask;
 }

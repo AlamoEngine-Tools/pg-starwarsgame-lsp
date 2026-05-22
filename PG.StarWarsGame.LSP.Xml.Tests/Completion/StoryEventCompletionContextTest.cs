@@ -23,7 +23,7 @@ public sealed class StoryEventCompletionContextTest
         var xml = "<StoryParser><Event><Event_Type>STORY_FLAG</Event_Type>\n<cursor/>\n</Event></StoryParser>";
         var doc = Parse(xml);
 
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 1, character: 0);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 1, 0);
 
         Assert.Equal("STORY_FLAG", ctx.EventType);
     }
@@ -34,7 +34,7 @@ public sealed class StoryEventCompletionContextTest
         var xml = "<StoryParser><Event>\n<cursor/>\n</Event></StoryParser>";
         var doc = Parse(xml);
 
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 1, character: 0);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 1, 0);
 
         Assert.Null(ctx.EventType);
     }
@@ -47,7 +47,7 @@ public sealed class StoryEventCompletionContextTest
         var xml = "<StoryParser><Event><Reward_Type>CREDITS</Reward_Type>\n<cursor/>\n</Event></StoryParser>";
         var doc = Parse(xml);
 
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 1, character: 0);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 1, 0);
 
         Assert.Equal("CREDITS", ctx.RewardType);
     }
@@ -62,7 +62,7 @@ public sealed class StoryEventCompletionContextTest
                   "</Event></StoryParser>";
         var doc = Parse(xml);
 
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 1, character: 0);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 1, 0);
 
         Assert.Equal("STORY_FLAG", ctx.EventType);
         Assert.Equal("CREDITS", ctx.RewardType);
@@ -81,7 +81,7 @@ public sealed class StoryEventCompletionContextTest
         var doc = Parse(xml);
 
         // Line 1 is the start of the second event; line 2 is where cursor is
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 2, character: 0);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 2, 0);
 
         Assert.Equal("SECOND_EVENT", ctx.EventType);
     }
@@ -94,7 +94,7 @@ public sealed class StoryEventCompletionContextTest
         var xml = "<StoryParser>\n<cursor/>\n<Event><Event_Type>STORY_FLAG</Event_Type></Event></StoryParser>";
         var doc = Parse(xml);
 
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 1, character: 0);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 1, 0);
 
         Assert.Null(ctx.EventType);
         Assert.Null(ctx.RewardType);
@@ -105,7 +105,7 @@ public sealed class StoryEventCompletionContextTest
     {
         var doc = Parse("<StoryParser></StoryParser>");
 
-        var ctx = StoryEventCompletionContextReader.Read(doc, line: 0, character: 5);
+        var ctx = StoryEventCompletionContextReader.Read(doc, 0, 5);
 
         Assert.Null(ctx.EventType);
         Assert.Null(ctx.RewardType);

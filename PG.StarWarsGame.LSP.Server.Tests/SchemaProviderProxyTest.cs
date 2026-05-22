@@ -92,18 +92,43 @@ public sealed class SchemaProviderProxyTest
 
         public event EventHandler? SchemaRefreshed;
 
-        public void Fire() => SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return tagName == Tag?.Tag ? Tag : null;
+        }
 
-        public XmlTagDefinition? GetTag(string tagName) => tagName == Tag?.Tag ? Tag : null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+        public void Fire()
+        {
+            SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+        }
     }
 
     private sealed class DeferredReadyProvider : ISchemaProvider
@@ -111,18 +136,45 @@ public sealed class SchemaProviderProxyTest
         private readonly TaskCompletionSource _tcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public Task ReadyAsync => _tcs.Task;
-        public void MarkReady() => _tcs.TrySetResult();
 
         public event EventHandler? SchemaRefreshed;
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+        public void MarkReady()
+        {
+            _tcs.TrySetResult();
+        }
     }
 }

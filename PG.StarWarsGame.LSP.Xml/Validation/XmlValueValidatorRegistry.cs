@@ -26,9 +26,7 @@ public sealed class XmlValueValidatorRegistry : IXmlValueValidatorRegistry
     {
         if (tag.SemanticType != TagSemanticType.Default
             && _semanticValidators.TryGetValue(tag.SemanticType, out var semanticValidator))
-        {
             return semanticValidator.Validate(rawValue, tag);
-        }
 
         if (!_validators.TryGetValue(valueType, out var validator))
             return new XmlValidationResult

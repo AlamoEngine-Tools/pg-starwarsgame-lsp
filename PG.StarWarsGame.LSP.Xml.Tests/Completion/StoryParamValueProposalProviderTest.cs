@@ -17,56 +17,96 @@ file sealed class StubProposalSchema : ISchemaProvider
         _enums = enums.ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
     }
 
-    public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
+    public EnumDefinition? GetEnum(string name)
+    {
+        return _enums.GetValueOrDefault(name);
+    }
+
     public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-    public XmlTagDefinition? GetTag(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public XmlTagDefinition? GetTag(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 public sealed class StoryParamValueProposalProviderTest
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static EnumDefinition MakeEnum(string name, params string[] values) => new()
+    private static EnumDefinition MakeEnum(string name, params string[] values)
     {
-        Name = name,
-        Kind = EnumKind.SchemaFixed,
-        Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
-    };
+        return new EnumDefinition
+        {
+            Name = name,
+            Kind = EnumKind.SchemaFixed,
+            Values = [.. values.Select(v => new EnumValueDefinition { Name = v })]
+        };
+    }
 
-    private static ParamDefinition EnumParam(string enumName) => new()
+    private static ParamDefinition EnumParam(string enumName)
     {
-        Position = 0,
-        ValueType = XmlValueType.DynamicEnumValue,
-        EnumName = enumName
-    };
+        return new ParamDefinition
+        {
+            Position = 0,
+            ValueType = XmlValueType.DynamicEnumValue,
+            EnumName = enumName
+        };
+    }
 
-    private static ParamDefinition BoolParam() => new()
+    private static ParamDefinition BoolParam()
     {
-        Position = 0,
-        ValueType = XmlValueType.Boolean
-    };
+        return new ParamDefinition
+        {
+            Position = 0,
+            ValueType = XmlValueType.Boolean
+        };
+    }
 
     private static ParamDefinition RefParam(string referenceType,
-        XmlValueType valueType = XmlValueType.NameReference) => new()
+        XmlValueType valueType = XmlValueType.NameReference)
     {
-        Position = 0,
-        ValueType = valueType,
-        ReferenceType = referenceType
-    };
+        return new ParamDefinition
+        {
+            Position = 0,
+            ValueType = valueType,
+            ReferenceType = referenceType
+        };
+    }
 
-    private static ParamDefinition ScalarParam(XmlValueType valueType) => new()
+    private static ParamDefinition ScalarParam(XmlValueType valueType)
     {
-        Position = 0,
-        ValueType = valueType
-    };
+        return new ParamDefinition
+        {
+            Position = 0,
+            ValueType = valueType
+        };
+    }
 
     private static GameIndex IndexWithSymbols(params (string id, string typeName)[] symbols)
     {
@@ -195,7 +235,7 @@ public sealed class StoryParamValueProposalProviderTest
     [InlineData(XmlValueType.Int)]
     [InlineData(XmlValueType.Float)]
     [InlineData(XmlValueType.FloatVector3)]
-    [InlineData(XmlValueType.NameReference)]   // no ReferenceType set → no proposals
+    [InlineData(XmlValueType.NameReference)] // no ReferenceType set → no proposals
     public void GetProposals_ScalarOrUnconstrainedRef_ReturnsEmpty(XmlValueType valueType)
     {
         var sut = new StoryParamValueProposalProvider(new StubProposalSchema());

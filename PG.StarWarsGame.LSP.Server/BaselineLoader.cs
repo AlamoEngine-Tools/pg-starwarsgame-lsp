@@ -15,10 +15,6 @@ public sealed class BaselineLoader
     private readonly HttpClient _httpClient;
     private readonly ILogger<BaselineLoader> _logger;
 
-    private string CacheDir => _fs.Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".pg-swg-lsp", "baselines");
-
     public BaselineLoader(HttpClient httpClient, IFileSystem fs, ILogger<BaselineLoader> logger)
     {
         _httpClient = httpClient;
@@ -26,13 +22,19 @@ public sealed class BaselineLoader
         _logger = logger;
     }
 
-    public Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct) =>
-        config.Type switch
+    private string CacheDir => _fs.Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+        ".pg-swg-lsp", "baselines");
+
+    public Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
+    {
+        return config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
             BaselineSourceType.Http => LoadHttpAsync(config.FocUrl, ct),
             _ => Task.FromResult(BaselineIndex.Empty)
         };
+    }
 
     private async Task<BaselineIndex> LoadLocalAsync(string? path, CancellationToken ct)
     {
@@ -68,7 +70,6 @@ public sealed class BaselineLoader
         }
 
         if (_fs.File.Exists(cacheFile))
-        {
             try
             {
                 var cached = await _fs.File.ReadAllBytesAsync(cacheFile, ct);
@@ -78,7 +79,6 @@ public sealed class BaselineLoader
             {
                 _logger.LogWarning(ex, "Failed to load cached baseline from '{Path}'", cacheFile);
             }
-        }
 
         return BaselineIndex.Empty;
     }

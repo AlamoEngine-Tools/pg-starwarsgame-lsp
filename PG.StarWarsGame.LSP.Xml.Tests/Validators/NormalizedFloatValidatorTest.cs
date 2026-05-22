@@ -18,6 +18,7 @@ file static class TagOf
 public sealed class NormalizedFloatValidatorTest
 {
     private static readonly NormalizedFloatValidator Sut = new();
+
     private static readonly XmlTagDefinition Tag =
         TagOf.Make("Squadron_Refill_Threshold", XmlValueType.NormalizedFloat);
 

@@ -2,13 +2,15 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
 public sealed class FileTypeRegistryTest
 {
-    private static FileTypeRegistry Build() => new();
+    private static FileTypeRegistry Build()
+    {
+        return new FileTypeRegistry();
+    }
 
     [Fact]
     public void GetTypesForFile_UnknownPath_ReturnsEmpty()

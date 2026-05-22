@@ -83,7 +83,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         {
             // OmniSharp may deliver initializationOptions as a Newtonsoft JToken or other type.
             // Round-trip through the object's string representation to obtain a JsonElement.
-            _logger.LogDebug("InitializationOptions type is {Type}; converting via ToString()", initOptions.GetType().Name);
+            _logger.LogDebug("InitializationOptions type is {Type}; converting via ToString()",
+                initOptions.GetType().Name);
             try
             {
                 var json = initOptions.ToString() ?? "{}";

@@ -18,16 +18,17 @@ public sealed class LspServerFixture : IAsyncLifetime
     private readonly TaskCompletionSource _scanStartedTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
+    private LanguageClient? _client;
+
     private Process? _process;
     private TcpClient? _tcpClient;
-    private LanguageClient? _client;
 
     public LanguageClient Client => _client!;
     public string TestDataDirectory { get; private set; } = string.Empty;
 
     /// <summary>
-    /// Completes when the server has published its first diagnostics notification,
-    /// which signals that the workspace scan has started and the FileTypeRegistry is populated.
+    ///     Completes when the server has published its first diagnostics notification,
+    ///     which signals that the workspace scan has started and the FileTypeRegistry is populated.
     /// </summary>
     public Task ScanStarted => _scanStartedTcs.Task;
 
@@ -40,13 +41,34 @@ public sealed class LspServerFixture : IAsyncLifetime
         var workspacePath = LspTestEnvironment.WorkspacePath ?? TestDataDirectory;
 
         if (LspTestEnvironment.ExternalServerPort is { } port)
-        {
             await InitializeExternalAsync(workspacePath, port);
-        }
         else
-        {
             await InitializeSpawnedAsync(workspacePath);
-        }
+    }
+
+    public async Task DisposeAsync()
+    {
+        if (_client is IAsyncDisposable asyncClient)
+            await asyncClient.DisposeAsync();
+        else
+            (_client as IDisposable)?.Dispose();
+
+        _tcpClient?.Dispose();
+
+        if (_process is not null)
+            try
+            {
+                if (!_process.HasExited)
+                    _process.Kill(true);
+            }
+            catch
+            {
+                // ignore cleanup errors
+            }
+            finally
+            {
+                _process.Dispose();
+            }
     }
 
     private async Task InitializeExternalAsync(string workspacePath, int port)
@@ -127,33 +149,6 @@ public sealed class LspServerFixture : IAsyncLifetime
         options.OnPublishDiagnostics(_ => _scanStartedTcs.TrySetResult());
     }
 
-    public async Task DisposeAsync()
-    {
-        if (_client is IAsyncDisposable asyncClient)
-            await asyncClient.DisposeAsync();
-        else
-            (_client as IDisposable)?.Dispose();
-
-        _tcpClient?.Dispose();
-
-        if (_process is not null)
-        {
-            try
-            {
-                if (!_process.HasExited)
-                    _process.Kill(entireProcessTree: true);
-            }
-            catch
-            {
-                // ignore cleanup errors
-            }
-            finally
-            {
-                _process.Dispose();
-            }
-        }
-    }
-
     private static object BuildInitOptions()
     {
         return new
@@ -161,11 +156,11 @@ public sealed class LspServerFixture : IAsyncLifetime
             schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
             gamePath = LspTestEnvironment.GamePath,
             baselineLocalPath = LspTestEnvironment.BaselineLocalPath,
-            baselineType = LspTestEnvironment.BaselineLocalPath is null ? "None" : (string?)null,
+            baselineType = LspTestEnvironment.BaselineLocalPath is null ? "None" : null,
             locale = LspTestEnvironment.Locale,
             modPaths = LspTestEnvironment.ModPaths.Count > 0
                 ? LspTestEnvironment.ModPaths.ToArray()
-                : (string[]?)null
+                : null
         };
     }
 }

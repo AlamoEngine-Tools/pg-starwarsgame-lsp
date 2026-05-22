@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Validation;
@@ -137,7 +138,7 @@ public sealed class XmlDiagnosticsPublisher
                     Message = $"Duplicate object ID '{id}': IDs must be globally unique.{othersText}",
                     Range = new Range(new Position(fo.Line, fo.Column ?? 0),
                         new Position(fo.Line, int.MaxValue)),
-                    Source = "pg-swg-lsp"
+                    Source = AppProperties.LspServerId
                 });
             }
         }
@@ -162,7 +163,7 @@ public sealed class XmlDiagnosticsPublisher
                     Severity = DiagnosticSeverity.Error,
                     Message = msg,
                     Range = new Range(new Position(r.Line, r.Column), new Position(r.Line, r.Column + r.Length)),
-                    Source = "pg-swg-lsp"
+                    Source = AppProperties.LspServerId
                 });
             }
         }
@@ -362,7 +363,7 @@ public sealed class XmlDiagnosticsPublisher
                     Range = new Range(
                         new Position(tokenLine0, tokenCol0),
                         new Position(tokenLine0, tokenCol0 + token.Length)),
-                    Source = "pg-swg-lsp"
+                    Source = AppProperties.LspServerId
                 });
             }
         }
@@ -451,7 +452,7 @@ public sealed class XmlDiagnosticsPublisher
                 Range = new Range(
                     new Position(line0, col0),
                     new Position(line0, col0 + token.Length)),
-                Source = "pg-swg-lsp"
+                Source = AppProperties.LspServerId
             });
         }
     }
@@ -503,7 +504,7 @@ public sealed class XmlDiagnosticsPublisher
             Range = new Range(
                 new Position(startLine, startCol),
                 new Position(endLine, endCol)),
-            Source = "pg-swg-lsp"
+            Source = AppProperties.LspServerId
         };
     }
 
@@ -527,7 +528,7 @@ public sealed class XmlDiagnosticsPublisher
                 Range = new Range(
                     new Position(Math.Max(0, node.Line - 1), 0),
                     new Position(Math.Max(0, node.Line - 1), int.MaxValue)),
-                Source = "pg-swg-lsp"
+                Source = AppProperties.LspServerId
             });
         }
 

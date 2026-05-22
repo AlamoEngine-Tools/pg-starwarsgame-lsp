@@ -104,8 +104,8 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
     }
 
     /// <summary>
-    /// Returns the position of the first indented child element in an XML file.
-    /// Root elements and XML declarations (col 0) are skipped.
+    ///     Returns the position of the first indented child element in an XML file.
+    ///     Root elements and XML declarations (col 0) are skipped.
     /// </summary>
     private static (int line, int col) FindFirstChildElementPosition(string[] lines)
     {
@@ -113,12 +113,13 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
         {
             var s = lines[i];
             var lt = s.IndexOf('<');
-            if (lt <= 0) continue;                     // skip root (lt==0) and blank lines
+            if (lt <= 0) continue; // skip root (lt==0) and blank lines
             if (s.Length <= lt + 1) continue;
             var next = s[lt + 1];
             if (next == '/' || next == '?' || next == '!') continue;
-            return (i, lt + 1);                        // col on first char of tag name
+            return (i, lt + 1); // col on first char of tag name
         }
+
         return (1, 1);
     }
 }

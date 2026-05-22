@@ -23,6 +23,7 @@ public enum XmlValueType
     /// <summary>General signed integer (credits, priorities, frame numbers).</summary>
     Int = 6,
     Float = 8,
+
     /// <summary>Floating-point value constrained to [0.0, 1.0] (fractions, multipliers, probabilities).</summary>
     NormalizedFloat = 9,
 

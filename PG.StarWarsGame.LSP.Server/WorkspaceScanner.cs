@@ -10,7 +10,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using Sentry;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -64,7 +63,8 @@ public sealed class WorkspaceScanner
                 .Where(f => _parsers.Any(p => p.CanParse(_fs.Path.GetExtension(f))))
                 .ToList();
 
-            _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count, sw.ElapsedMilliseconds);
+            _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count,
+                sw.ElapsedMilliseconds);
 
             IWorkDoneObserver? progress = null;
             if (_workDone?.IsSupported == true)
@@ -94,11 +94,13 @@ public sealed class WorkspaceScanner
                         await _indexService.UpdateDocumentAsync(PathToFileUri(file), text, 0, token);
                         var done = Interlocked.Increment(ref indexed);
                         _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
-                        progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
+                        progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null,
+                            null);
                     });
                 } // fires one IndexChanged with the complete final state
 
-                _logger.LogInformation("Bulk-index complete: {Indexed} file(s) at {Elapsed} ms", indexed, sw.ElapsedMilliseconds);
+                _logger.LogInformation("Bulk-index complete: {Indexed} file(s) at {Elapsed} ms", indexed,
+                    sw.ElapsedMilliseconds);
                 progress?.OnNext($"Indexed {indexed} file(s)", 100, null);
                 indexSpan.Finish(SpanStatus.Ok);
             }

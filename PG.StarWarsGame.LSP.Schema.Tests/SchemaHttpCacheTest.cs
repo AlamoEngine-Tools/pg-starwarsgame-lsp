@@ -10,17 +10,20 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 
 public sealed class SchemaHttpCacheTest
 {
+    private const string TagYaml = "tags:\n  - tag: Mass\n    type: Float\n";
+    private const string HardcodedYaml = "name: TestModule\nvalues:\n  - name: TEST_VALUE\n";
+
+    private const string MetaYaml =
+        "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    types:\n      - GameObjectType\n";
+
     private static readonly string CacheDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".pg-swg-lsp", "schema");
 
     private static SchemaHttpCache BuildCache(MockFileSystem fs)
-        => new(fs, NullLogger<SchemaHttpCache>.Instance);
-
-    private const string TagYaml = "tags:\n  - tag: Mass\n    type: Float\n";
-    private const string HardcodedYaml = "name: TestModule\nvalues:\n  - name: TEST_VALUE\n";
-    private const string MetaYaml =
-        "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    types:\n      - GameObjectType\n";
+    {
+        return new SchemaHttpCache(fs, NullLogger<SchemaHttpCache>.Instance);
+    }
 
     // ── TryLoad ──────────────────────────────────────────────────────────────
 
@@ -104,7 +107,7 @@ public sealed class SchemaHttpCacheTest
         var cache = BuildCache(fs);
         const string expected = "abc123def456";
 
-        cache.Update("{}", [("tags/Unit.yaml", TagYaml)], baselineHash: expected);
+        cache.Update("{}", [("tags/Unit.yaml", TagYaml)], expected);
 
         var stored = fs.File.ReadAllText(Path.Combine(CacheDir, "_index.sha256")).Trim();
         Assert.Equal(expected, stored);
@@ -144,7 +147,7 @@ public sealed class SchemaHttpCacheTest
             ("tags/Unit.yaml", TagYaml),
             ("hardcoded/TestModule.yaml", HardcodedYaml),
             ("meta/test.yaml", MetaYaml)
-        ], baselineHash: baselineHash);
+        ], baselineHash);
 
         var result = cache.TryLoad("{}", manifest, out var index);
 

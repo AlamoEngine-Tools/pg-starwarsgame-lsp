@@ -161,10 +161,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     {
         var tcs = new TaskCompletionSource<bool>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        var subscription = _fixture.Client.Register(r => r.OnPublishDiagnostics(_ =>
-        {
-            tcs.TrySetResult(true);
-        }));
+        var subscription = _fixture.Client.Register(r => r.OnPublishDiagnostics(_ => { tcs.TrySetResult(true); }));
         using var cts = new CancellationTokenSource(timeout);
         cts.Token.Register(() =>
         {

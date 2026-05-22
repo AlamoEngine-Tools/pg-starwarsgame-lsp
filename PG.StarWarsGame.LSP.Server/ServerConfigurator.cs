@@ -39,6 +39,9 @@ public static class ServerConfigurator
             .WithHandler<XmlTextDocumentSyncHandler>()
             .WithHandler<XmlHoverHandler>()
             .WithHandler<XmlCompletionHandler>()
+            .WithHandler<XmlDefinitionHandler>()
+            .WithHandler<XmlReferencesHandler>()
+            .WithHandler<XmlRenameHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();

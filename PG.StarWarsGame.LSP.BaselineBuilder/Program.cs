@@ -98,9 +98,9 @@ Console.WriteLine(
     $"Projected {baseline.Symbols.Count} symbols, {baseline.DynamicEnumValues.Count} dynamic enum(s), {baseline.HardcodedEnumValues.Sum(kv => kv.Value.Length)} hardcoded enum value(s)");
 
 // Build file-type registry from game metafiles
-var fileTypeMapBuilder = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+var fileTypeMapBuilder =
+    ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 if (schemaProvider is not null)
-{
     foreach (var def in schemaProvider.AllMetafiles)
     {
         if (def.MetafileType == MetafileType.Special) continue;
@@ -110,7 +110,6 @@ if (schemaProvider is not null)
             var enginePath = def.Path.ToUpperInvariant().Replace('/', '\\');
             using var stream = engine.GameRepository.TryOpenFile(enginePath);
             if (stream is not null)
-            {
                 try
                 {
                     var xmlContent = await new StreamReader(stream).ReadToEndAsync();
@@ -122,7 +121,8 @@ if (schemaProvider is not null)
                         var filename = elem.Value?.Trim();
                         if (string.IsNullOrEmpty(filename))
                             filename = elem.Attributes()
-                                .FirstOrDefault(a => a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
+                                .FirstOrDefault(a =>
+                                    a.Name.LocalName.Equals("filename", StringComparison.OrdinalIgnoreCase))?.Value;
                         if (!string.IsNullOrEmpty(filename))
                         {
                             var normalizedPath = filename.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
@@ -134,14 +134,12 @@ if (schemaProvider is not null)
                 {
                     Console.Error.WriteLine($"Warning: Failed to parse metafile '{def.Path}': {ex.Message}");
                 }
-            }
         }
         else // DirectContent — the file itself is the content
         {
             fileTypeMapBuilder[def.Path] = [.. def.Types];
         }
     }
-}
 
 baseline = baseline with { FileTypeMap = fileTypeMapBuilder.ToImmutable() };
 Console.WriteLine($"File type registry: {baseline.FileTypeMap.Count} file(s) registered");

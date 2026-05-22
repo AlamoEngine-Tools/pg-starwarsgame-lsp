@@ -47,7 +47,7 @@ public sealed class XmlDiagnosticsPublisherTest
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
-        FakeFileTypeRegistry? registry = null)
+            FakeFileTypeRegistry? registry = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -417,7 +417,7 @@ public sealed class XmlDiagnosticsPublisherTest
         // Second fire (scan equivalent): only the filesystem-path key is in the index.
         var scanIndex = GameIndex.Empty with
         {
-            Documents = System.Collections.Immutable.ImmutableDictionary<string, DocumentIndex>.Empty
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add("a.xml", new DocumentIndex("a.xml", 0, [], []))
         };
         indexService.Fire(scanIndex);
@@ -882,9 +882,9 @@ public sealed class XmlDiagnosticsPublisherTest
 
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
+        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
 
         public XmlTagDefinition? GetTag(string name)
         {
@@ -910,7 +910,10 @@ public sealed class XmlDiagnosticsPublisherTest
             return [];
         }
 
-        public EnumDefinition? GetEnum(string name) => _enums.GetValueOrDefault(name);
+        public EnumDefinition? GetEnum(string name)
+        {
+            return _enums.GetValueOrDefault(name);
+        }
 
         public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
 
@@ -933,7 +936,10 @@ public sealed class XmlDiagnosticsPublisherTest
             _types[type.TypeName] = type;
         }
 
-        public void AddEnum(EnumDefinition enumDef) => _enums[enumDef.Name] = enumDef;
+        public void AddEnum(EnumDefinition enumDef)
+        {
+            _enums[enumDef.Name] = enumDef;
+        }
     }
 
     private sealed class FakeValidatorRegistry : IXmlValueValidatorRegistry
@@ -987,17 +993,27 @@ public sealed class XmlDiagnosticsPublisherTest
         private readonly Dictionary<string, ImmutableArray<string>> _map =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void Register(string key, ImmutableArray<string> types) => _map[key] = types;
+        public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+        {
+            return _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+        }
 
-        public ImmutableArray<string> GetTypesForFile(string normalizedPath) =>
-            _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
-
-        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) =>
+        public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+        {
             _map[normalizedPath] = typeNames;
+        }
 
-        public void UnregisterFile(string normalizedPath) => _map.Remove(normalizedPath);
+        public void UnregisterFile(string normalizedPath)
+        {
+            _map.Remove(normalizedPath);
+        }
 
         public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
+
+        public void Register(string key, ImmutableArray<string> types)
+        {
+            _map[key] = types;
+        }
     }
 
     private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
