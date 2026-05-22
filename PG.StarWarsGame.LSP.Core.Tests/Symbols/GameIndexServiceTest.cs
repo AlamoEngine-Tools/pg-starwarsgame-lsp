@@ -67,6 +67,19 @@ public sealed class GameIndexServiceTest
     // ── UpdateDocumentAsync — basic ──────────────────────────────────────────
 
     [Fact]
+    public async Task UpdateDocumentAsync_BarePathAndFileUri_TreatedAsSameDocument()
+    {
+        var sym = Symbol("UNIT_A");
+        var svc = Build(new FakeParser(Doc("", 0, [sym])));
+
+        await svc.UpdateDocumentAsync(@"d:\data\units.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///d:/data/units.xml", "<X/>", 2, default);
+
+        Assert.Single(svc.Current.Documents);
+        Assert.Single(svc.Current.WorkspaceDefinitions["UNIT_A"]);
+    }
+
+    [Fact]
     public async Task UpdateDocumentAsync_Populates_WorkspaceDefinitions()
     {
         var sym = Symbol("UNIT_A");

@@ -14,6 +14,7 @@ using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+using Serilog;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -25,6 +26,7 @@ public static class ServerConfigurator
             .ConfigureLogging(x => x
                 .AddLanguageProtocolLogging()
                 .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace)
+                .AddSerilog(dispose: true)
                 .SetMinimumLevel(LogLevel.Debug)
                 .AddSentry(o =>
                 {

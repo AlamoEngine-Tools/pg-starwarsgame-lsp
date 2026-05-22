@@ -34,6 +34,21 @@ public sealed class WorkspaceScannerTest
     // ── tests ────────────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task ScanAsync_IndexedUri_HasFileScheme()
+    {
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "a.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        Assert.StartsWith("file://", svc.Calls[0].Uri, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task ScanAsync_ParseableFiles_AreIndexedWithVersionZero()
     {
         var root = Root("ws");

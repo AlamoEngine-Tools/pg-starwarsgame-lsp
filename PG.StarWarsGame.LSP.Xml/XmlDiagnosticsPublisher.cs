@@ -21,13 +21,13 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlDiagnosticsPublisher
 {
+    private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly ISchemaProvider _schema;
     private readonly StoryParserDiagnosticCollector _storyCollector;
     private readonly IXmlValueValidatorRegistry _validators;
     private readonly IGameWorkspaceHost _workspaceHost;
-    private readonly IFileTypeRegistry _fileTypeRegistry;
 
     private HashSet<string> _lastPublishedUris = [];
 
@@ -124,18 +124,19 @@ public sealed class XmlDiagnosticsPublisher
 
                 var otherUris = symbols
                     .Where(s => !ReferenceEquals(s, sym))
-                    .Select(s => s.Origin is FileOrigin f ? f.Uri : "unknown")
+                    .Select(s => s.Origin is FileOrigin f ? Tuple.Create(f.Uri, f.Line) : Tuple.Create("archived", -1))
                     .Distinct()
                     .ToList();
                 var othersText = otherUris.Count == 1
-                    ? $" Also defined in: {otherUris[0]}."
-                    : $" Also defined in: {string.Join(", ", otherUris)}.";
+                    ? $" Also defined in: {otherUris[0].Item1}, line: {otherUris[0].Item2 + 1}"
+                    : $" Also defined in:\n{string.Join(",\n", otherUris.Select(t => $"{t.Item1}, line: {t.Item2 + 1}"))}.";
 
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
                     Message = $"Duplicate object ID '{id}': IDs must be globally unique.{othersText}",
-                    Range = new Range(new Position(fo.Line, 0), new Position(fo.Line, int.MaxValue)),
+                    Range = new Range(new Position(fo.Line, fo.Column ?? 0),
+                        new Position(fo.Line, int.MaxValue)),
                     Source = "pg-swg-lsp"
                 });
             }
@@ -211,10 +212,8 @@ public sealed class XmlDiagnosticsPublisher
             // Children are game object instances (type containers). Skip field-tag validation
             // and recurse into each to validate their contents as field tags.
             foreach (var child in node.ChildNodes)
-            {
                 if (child.NodeType == HtmlNodeType.Element)
-                    WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
-            }
+                    WalkNodes(child, diagnostics, lines, false);
             return;
         }
 
@@ -248,7 +247,7 @@ public sealed class XmlDiagnosticsPublisher
             var tagDef = _schema.GetTag(name);
             if (tagDef is null)
             {
-                WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
+                WalkNodes(child, diagnostics, lines, false);
                 continue;
             }
 
@@ -266,7 +265,7 @@ public sealed class XmlDiagnosticsPublisher
                     XmlValidationResult.Failure(
                         $"Duplicate tag '{definedName}': only one occurrence is allowed per object.{othersText}"),
                     lines, true));
-                WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
+                WalkNodes(child, diagnostics, lines, false);
                 continue;
             }
 
@@ -278,7 +277,7 @@ public sealed class XmlDiagnosticsPublisher
             if (!result.IsValid)
                 diagnostics.Add(BuildDiagnostic(child, result, lines));
 
-            WalkNodes(child, diagnostics, lines, isTypeContainerLevel: false);
+            WalkNodes(child, diagnostics, lines, false);
         }
     }
 
@@ -392,7 +391,7 @@ public sealed class XmlDiagnosticsPublisher
             if (child.NodeType != HtmlNodeType.Element) continue;
 
             var tagDef = _schema.GetTag(child.Name);
-            if (tagDef?.ReferenceKind == ReferenceKind.HardcodedSet && tagDef.ReferenceType is not null)
+            if (tagDef is { ReferenceKind: ReferenceKind.HardcodedSet, ReferenceType: not null })
             {
                 var set = hardcodedSets.FirstOrDefault(s =>
                     string.Equals(s.Name, tagDef.ReferenceType, StringComparison.OrdinalIgnoreCase));
@@ -439,7 +438,8 @@ public sealed class XmlDiagnosticsPublisher
             var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
             var newlineCount = 0;
             for (var j = 0; j < tokenStart && j < innerText.Length; j++)
-                if (innerText[j] == '\n') newlineCount++;
+                if (innerText[j] == '\n')
+                    newlineCount++;
             var line0 = child.Line - 1 + newlineCount;
             var col0 = absPos - lineStart;
 

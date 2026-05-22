@@ -32,6 +32,7 @@ public sealed class GameIndexService : IGameIndexService
 
     public async Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
     {
+        uri = NormalizeUri(uri);
         var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
         if (parser is null) return;
 
@@ -62,6 +63,7 @@ public sealed class GameIndexService : IGameIndexService
 
     public void RemoveDocument(string uri)
     {
+        uri = NormalizeUri(uri);
         GameIndex snapshot, updated;
         do
         {
@@ -161,6 +163,15 @@ public sealed class GameIndexService : IGameIndexService
             WorkspaceDefinitions = defs,
             WorkspaceReferences = refs
         };
+    }
+
+    private static string NormalizeUri(string uri)
+    {
+        if (uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            return uri;
+        var forward = uri.Replace('\\', '/');
+        var prefix = forward.StartsWith('/') ? "file://" : "file:///";
+        return prefix + forward;
     }
 
     private sealed class BulkUpdateScope : IDisposable

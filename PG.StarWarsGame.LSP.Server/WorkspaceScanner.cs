@@ -91,7 +91,7 @@ public sealed class WorkspaceScanner
                     await Parallel.ForEachAsync(files, options, async (file, token) =>
                     {
                         var text = await _fs.File.ReadAllTextAsync(file, token);
-                        await _indexService.UpdateDocumentAsync(file, text, 0, token);
+                        await _indexService.UpdateDocumentAsync(PathToFileUri(file), text, 0, token);
                         var done = Interlocked.Increment(ref indexed);
                         _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
                         progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null, null);
@@ -272,5 +272,11 @@ public sealed class WorkspaceScanner
     private static string NormalizeAbsolutePath(string path)
     {
         return path.Replace('\\', '/').ToLowerInvariant();
+    }
+
+    private static string PathToFileUri(string path)
+    {
+        var forward = path.Replace('\\', '/');
+        return forward.StartsWith('/') ? "file://" + forward : "file:///" + forward;
     }
 }

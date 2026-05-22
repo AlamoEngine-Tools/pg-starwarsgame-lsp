@@ -19,6 +19,6 @@ public sealed class BooleanValueValidator : IXmlValueValidator
         return ValidValues.Contains(trimmed)
             ? XmlValidationResult.Valid()
             : XmlValidationResult.Failure(
-                $"'{trimmed}' is not a valid Boolean for <{tag.Tag}>. Expected: True or False.");
+                $"'{trimmed}' is not a valid Boolean for <{tag.Tag}>. Expected: True, False, Yes or No.");
     }
 }
