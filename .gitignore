@@ -500,3 +500,5 @@ fabric.properties
 /eaw
 # ignore foc
 /foc
+# Local secrets — copy .env.sentry.example and fill in your DSN
+.env.sentry
