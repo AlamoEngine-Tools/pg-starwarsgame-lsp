@@ -122,13 +122,27 @@ public sealed class HttpSchemaProviderTest
     {
         // When _index.json content hasn't changed the cache checksum matches,
         // so the second load skips all YAML downloads and serves from disk.
-        var manifest = new { tags = new[] { "tags/Unit.yaml" }, types = Array.Empty<string>() };
-        const string yaml = "tags:\n  - tag: Foo\n    type: Float\n";
+        // Include hardcoded and meta to exercise all five categories.
+        var manifest = new
+        {
+            tags = new[] { "tags/Unit.yaml" },
+            types = Array.Empty<string>(),
+            hardcoded = new[] { "hardcoded/BehaviorModule.yaml" },
+            meta = new[] { "meta/metafiles.yaml" }
+        };
+        const string tagYaml = "tags:\n  - tag: Foo\n    type: Float\n";
+        const string hardcodedYaml = "name: BehaviorModule\nvalues:\n  - name: TEST_VALUE\n";
+        const string metaYaml =
+            "metafiles:\n  - path: data/xml/test.xml\n    metaFileType: fileRegistry\n    types:\n      - GameObjectType\n";
 
         var (provider, fake) = Build(req =>
-            req.RequestUri!.AbsolutePath.EndsWith("_index.json")
-                ? JsonResponse(manifest)
-                : YamlResponse(yaml, "v1"));
+        {
+            var path = req.RequestUri!.AbsolutePath;
+            if (path.EndsWith("_index.json")) return JsonResponse(manifest);
+            if (path.Contains("hardcoded")) return YamlResponse(hardcodedYaml, "v1");
+            if (path.Contains("meta")) return YamlResponse(metaYaml, "v1");
+            return YamlResponse(tagYaml, "v1");
+        });
 
         await provider.LoadAsync(); // first load — downloads + populates cache
         fake.Requests.Clear();

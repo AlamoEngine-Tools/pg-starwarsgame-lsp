@@ -320,9 +320,10 @@ public sealed class XmlDiagnosticsPublisherTest
     // ── subscription / routing ───────────────────────────────────────────────
 
     [Fact]
-    public void IndexChanged_Fires_Publishes_For_Each_Document_In_Index()
+    public void IndexChanged_Fires_Publishes_For_Each_OpenDocument()
     {
-        var (_, published, indexService, _) = BuildSubscribed();
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///a.xml", "<Root/>");
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
@@ -331,9 +332,11 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
-    public void IndexChanged_TwoDocuments_PublishesTwice()
+    public void IndexChanged_TwoOpenDocuments_PublishesTwice()
     {
-        var (_, published, indexService, _) = BuildSubscribed();
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+        workspaceHost.Set("file:///b.xml", "<Root/>");
 
         var index = IndexWithDoc("file:///a.xml") with
         {
@@ -346,7 +349,7 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
-    public void IndexChanged_Empty_Index_Publishes_Nothing()
+    public void IndexChanged_NoOpenDocuments_PublishesNothing()
     {
         var (_, published, indexService, _) = BuildSubscribed();
 
@@ -356,20 +359,74 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
-    public void IndexChanged_DocumentRemoved_ClearsDiagnostics_For_That_Uri()
+    public void IndexChanged_DocumentClosed_ClearsDiagnostics_For_That_Uri()
     {
-        var (_, published, indexService, _) = BuildSubscribed();
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///a.xml", "<Root/>");
 
-        // First fire: a.xml is present
+        // First fire while the file is open: diagnostics published.
         indexService.Fire(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
-        // Second fire: a.xml is gone
+        // Simulate DidClose: remove from workspace host, then IndexChanged fires.
+        workspaceHost.Remove("file:///a.xml");
         indexService.Fire(GameIndex.Empty);
 
         var clear = Assert.Single(published);
         Assert.Equal("file:///a.xml", clear.Uri.ToString());
         Assert.Empty(clear.Diagnostics!);
+    }
+
+    [Fact]
+    public void IndexChanged_OnlyPublishesForOpenFiles_NotForIndexOnlyEntries()
+    {
+        // Regression: WorkspaceScanner stores filesystem paths as index keys while the
+        // LSP sync handler stores file:// URIs. The two can coexist as separate keys.
+        // OnIndexChanged must publish only for files open in the workspace host;
+        // scanner-only entries must not generate any publication (including empty).
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+
+        // Fire with two index keys: the workspace-host file:// URI plus a "scanner path"
+        // key that represents the same file under a different string.
+        var indexWithBoth = IndexWithDoc("file:///a.xml") with
+        {
+            Documents = IndexWithDoc("file:///a.xml").Documents
+                .Add("a.xml", new DocumentIndex("a.xml", 0, [], []))
+        };
+        indexService.Fire(indexWithBoth);
+
+        // Only one publish — for the open file. The scanner-path key must not generate
+        // a second (empty) publication that would clear the editor's diagnostics.
+        Assert.Single(published);
+        Assert.Equal("file:///a.xml", published[0].Uri.ToString());
+    }
+
+    [Fact]
+    public void IndexChanged_ScannerFiresAfterOpen_StillPublishesForOpenFile()
+    {
+        // Regression: scanner fires IndexChanged with filesystem-path keys only; the
+        // editor's file:// URI must still be published after the scan (not silently dropped).
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+
+        // First fire (DidOpen equivalent): only the file:// URI is in the index.
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        published.Clear();
+
+        // Second fire (scan equivalent): only the filesystem-path key is in the index.
+        var scanIndex = GameIndex.Empty with
+        {
+            Documents = System.Collections.Immutable.ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("a.xml", new DocumentIndex("a.xml", 0, [], []))
+        };
+        indexService.Fire(scanIndex);
+
+        // The open file must still be published — diagnostics for open files are always
+        // refreshed on every IndexChanged regardless of whether the index uses a different
+        // key for the same physical file.
+        var pub = Assert.Single(published);
+        Assert.Equal("file:///a.xml", pub.Uri.ToString());
     }
 
     // ── duplicate-ID (index-level) ────────────────────────────────────────────
@@ -782,16 +839,16 @@ public sealed class XmlDiagnosticsPublisherTest
     // ── closed-file suppression ──────────────────────────────────────────────
 
     [Fact]
-    public void OnIndexChanged_ClosedFileWithDuplicateId_PublishesEmptyDiagnostics()
+    public void OnIndexChanged_ClosedFileWithDuplicateId_PublishesNothing()
     {
-        // workspaceHost has NO open files — cross-file diagnostics must be suppressed
+        // Files not open in the workspace host must never receive any publication —
+        // not even an empty one. The editor only knows about open files.
         var (_, published, indexService, _) = BuildSubscribed();
         var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
 
         indexService.Fire(index);
 
-        Assert.Equal(2, published.Count);
-        Assert.All(published, p => Assert.Empty(p.Diagnostics!));
+        Assert.Empty(published);
     }
 
     [Fact]
@@ -810,15 +867,15 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
-    public void OnIndexChanged_ClosedFileWithUnresolvedRef_PublishesEmptyDiagnostics()
+    public void OnIndexChanged_ClosedFileWithUnresolvedRef_PublishesNothing()
     {
+        // Same reasoning as the duplicate-ID case: closed files must not be published.
         var (_, published, indexService, _) = BuildSubscribed();
         var index = IndexWithRef("file:///a.xml", "UNIT_MISSING");
 
         indexService.Fire(index);
 
-        var notification = Assert.Single(published);
-        Assert.Empty(notification.Diagnostics!);
+        Assert.Empty(published);
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

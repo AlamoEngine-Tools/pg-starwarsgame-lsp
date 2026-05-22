@@ -213,7 +213,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);
         _readyTcs.TrySetResult();
 
-        _cache.Update(indexJson, fetchedFiles);
+        _cache.Update(indexJson, fetchedFiles, manifest.BaselineHash);
 
         _logger.LogInformation(
             "Schema index built: {TagCount} tags, {TypeCount} types, {EnumCount} enums, {HardcodedCount} hardcoded set(s)",

@@ -72,23 +72,26 @@ public sealed class XmlDiagnosticsPublisher
             "OnIndexChanged fired: {DocCount} document(s), {DefCount} definition(s), {RefCount} reference(s)",
             newIndex.Documents.Count, newIndex.WorkspaceDefinitions.Count, newIndex.WorkspaceReferences.Count);
 
-        var currentUris = new HashSet<string>(newIndex.Documents.Keys);
+        // Iterate open documents from the workspace host rather than the index keys.
+        // The workspace scanner stores files by filesystem path while the LSP sync handler
+        // stores them by file:// URI — both coexist as separate keys in the index. Iterating
+        // index keys would publish an empty notification for the scanner's path key, which
+        // VS Code resolves to the same file as the editor's URI, clearing real diagnostics.
+        var openDocs = _workspaceHost.All.ToList();
+        var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
 
-        foreach (var uri in currentUris)
+        foreach (var doc in openDocs)
         {
+            var uri = doc.Uri;
             var allDiags = new List<Diagnostic>();
-
-            if (_workspaceHost.TryGet(uri, out var doc))
-            {
-                allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
-                allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
-                allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
-                allDiags.AddRange(CollectTagNotesHints(doc.Text));
-                if (IsStoryParserDocument(uri))
-                    allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
-                allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
-                allDiags.AddRange(CollectUnresolvedRefDiagnostics(uri, newIndex));
-            }
+            allDiags.AddRange(CollectDiagnostics(doc.Text, DocumentUri.From(uri)));
+            allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
+            allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
+            allDiags.AddRange(CollectTagNotesHints(doc.Text));
+            if (IsStoryParserDocument(uri))
+                allDiags.AddRange(_storyCollector.Collect(doc.Text, newIndex));
+            allDiags.AddRange(CollectDuplicateIdDiagnostics(uri, newIndex));
+            allDiags.AddRange(CollectUnresolvedRefDiagnostics(uri, newIndex));
 
             _publish(new PublishDiagnosticsParams
             {
@@ -97,16 +100,16 @@ public sealed class XmlDiagnosticsPublisher
             });
         }
 
-        // Clear diagnostics for URIs that are no longer in the index.
+        // Clear diagnostics for files that are no longer open in the editor.
         foreach (var uri in _lastPublishedUris)
-            if (!currentUris.Contains(uri))
+            if (!openUris.Contains(uri))
                 _publish(new PublishDiagnosticsParams
                 {
                     Uri = DocumentUri.From(uri),
                     Diagnostics = new Container<Diagnostic>()
                 });
 
-        _lastPublishedUris = currentUris;
+        _lastPublishedUris = openUris;
     }
 
     internal IReadOnlyList<Diagnostic> CollectDuplicateIdDiagnostics(string documentUri, GameIndex index)

@@ -29,7 +29,8 @@ public sealed class SchemaHttpCache
 
     /// <summary>
     ///     Returns true and populates <paramref name="index" /> when the stored checksum matches
-    ///     <paramref name="indexJson" /> plus the contents of every file listed in the manifest.
+    ///     the manifest's <see cref="SchemaManifest.BaselineHash" /> (fast path) or the
+    ///     SHA-256 of every file listed in the manifest (slow path).
     /// </summary>
     public bool TryLoad(string indexJson, SchemaManifest manifest, out SchemaIndex index)
     {
@@ -39,38 +40,59 @@ public sealed class SchemaHttpCache
             if (!_fs.File.Exists(ChecksumPath))
                 return false;
 
-            var allRels = manifest.Tags.Concat(manifest.Types).Concat(manifest.Enums).ToList();
+            var stored = _fs.File.ReadAllText(ChecksumPath).Trim();
+
+            var allRels = manifest.Tags
+                .Concat(manifest.Types)
+                .Concat(manifest.Enums)
+                .Concat(manifest.Hardcoded)
+                .Concat(manifest.Meta)
+                .ToList();
 
             foreach (var rel in allRels)
                 if (!_fs.File.Exists(_fs.Path.Combine(_dir, rel)))
                     return false;
 
-            // Read all files once; reuse strings for both checksum and parsing.
-            var contents = allRels
-                .Select(rel => _fs.File.ReadAllText(_fs.Path.Combine(_dir, rel)))
-                .ToList();
+            if (manifest.BaselineHash is not null)
+            {
+                // Fast path: the manifest carries a pre-computed hash — compare directly.
+                if (!string.Equals(stored, manifest.BaselineHash, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            else
+            {
+                // Slow path: re-hash every file from disk.
+                var contents = allRels
+                    .Select(rel => _fs.File.ReadAllText(_fs.Path.Combine(_dir, rel)))
+                    .ToList();
+                if (!string.Equals(stored, ComputeYamlHash(contents), StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
 
-            var stored = _fs.File.ReadAllText(ChecksumPath).Trim();
-            if (!string.Equals(stored, ComputeChecksum(indexJson, contents), StringComparison.OrdinalIgnoreCase))
-                return false;
-
+            // Parse all five categories from disk.
             var tagsByType = new List<(string, IReadOnlyList<XmlTagDefinition>)>();
             var types = new List<GameObjectTypeDefinition>();
             var enums = new List<EnumDefinition>();
+            var hardcodedSets = new List<HardcodedReferenceSet>();
+            var metafiles = new List<MetafileDefinition>();
 
-            var i = 0;
             foreach (var rel in manifest.Tags)
             {
                 var typeName = _fs.Path.GetFileNameWithoutExtension(rel);
-                tagsByType.Add((typeName, YamlSchemaParser.ParseTagFile(contents[i++])));
+                var content = _fs.File.ReadAllText(_fs.Path.Combine(_dir, rel));
+                tagsByType.Add((typeName, YamlSchemaParser.ParseTagFile(content)));
             }
 
-            foreach (var _ in manifest.Types)
-                types.AddRange(YamlSchemaParser.ParseTypeFile(contents[i++]));
-            foreach (var _ in manifest.Enums)
-                enums.Add(YamlSchemaParser.ParseEnumFile(contents[i++]));
+            foreach (var rel in manifest.Types)
+                types.AddRange(YamlSchemaParser.ParseTypeFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+            foreach (var rel in manifest.Enums)
+                enums.Add(YamlSchemaParser.ParseEnumFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+            foreach (var rel in manifest.Hardcoded)
+                hardcodedSets.Add(YamlSchemaParser.ParseHardcodedSetFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+            foreach (var rel in manifest.Meta)
+                metafiles.AddRange(YamlSchemaParser.ParseMetafileFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
 
-            index = new SchemaIndex(tagsByType, types, enums);
+            index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
             return true;
         }
         catch (Exception ex)
@@ -81,10 +103,12 @@ public sealed class SchemaHttpCache
     }
 
     /// <summary>
-    ///     Writes <paramref name="indexJson" />, all YAML files, and the new checksum to disk,
-    ///     mirroring the manifest's relative paths under the cache directory.
+    ///     Writes <paramref name="indexJson" />, all YAML files, and the checksum to disk.
+    ///     When <paramref name="baselineHash" /> is supplied it is stored directly; otherwise
+    ///     the checksum is computed as SHA-256 of all YAML file contents in order.
     /// </summary>
-    public void Update(string indexJson, IReadOnlyList<(string relativePath, string content)> yamlFiles)
+    public void Update(string indexJson, IReadOnlyList<(string relativePath, string content)> yamlFiles,
+        string? baselineHash = null)
     {
         _fs.Directory.CreateDirectory(_dir);
         _fs.File.WriteAllText(_fs.Path.Combine(_dir, "_index.json"), indexJson);
@@ -98,15 +122,15 @@ public sealed class SchemaHttpCache
             _fs.File.WriteAllText(fullPath, content);
         }
 
-        _fs.File.WriteAllText(ChecksumPath, ComputeChecksum(indexJson, yamlFiles.Select(f => f.content)));
+        var hash = baselineHash ?? ComputeYamlHash(yamlFiles.Select(f => f.content));
+        _fs.File.WriteAllText(ChecksumPath, hash);
     }
 
-    // Hashes indexJson followed by each file's content in manifest order so that
-    // any change to any individual file invalidates the cached snapshot.
-    private static string ComputeChecksum(string indexJson, IEnumerable<string> fileContents)
+    // Hashes each YAML file's content in manifest order — indexJson is excluded so
+    // the formula is compatible with the pre-computed baselineHash in _index.json.
+    private static string ComputeYamlHash(IEnumerable<string> fileContents)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        hash.AppendData(Encoding.UTF8.GetBytes(indexJson));
         foreach (var content in fileContents)
             hash.AppendData(Encoding.UTF8.GetBytes(content));
         return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
