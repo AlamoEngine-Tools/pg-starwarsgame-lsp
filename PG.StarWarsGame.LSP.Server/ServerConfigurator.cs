@@ -24,10 +24,9 @@ public static class ServerConfigurator
     {
         return options
             .ConfigureLogging(x => x
+                .SetMinimumLevel(LogLevel.Information)
                 .AddLanguageProtocolLogging()
-                .AddConsole(o => o.LogToStandardErrorThreshold = LogLevel.Trace)
                 .AddSerilog(dispose: true)
-                .SetMinimumLevel(LogLevel.Debug)
                 .AddSentry(o =>
                 {
                     o.Dsn = GetSentryDsn();

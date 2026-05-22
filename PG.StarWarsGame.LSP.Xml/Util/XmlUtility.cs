@@ -20,6 +20,12 @@ public static class XmlUtility
         return node.Line - 1;
     }
 
+    public static int GetPrintableLine(HtmlNode? node)
+    {
+        if (node is null) return -1;
+        return node.Line;
+    }
+
     public static int GetOpeningTagStartColumn(HtmlNode? node)
     {
         if (node is null) return -1;
