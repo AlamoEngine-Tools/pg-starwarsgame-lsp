@@ -6,7 +6,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 
-public sealed class DynamicEnumValueProposalProvider(ISchemaProvider schema) : IXmlValueProposalProvider
+public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
 {
     private static readonly char[] FlagSeparators = ['|', ','];
 
@@ -14,11 +14,7 @@ public sealed class DynamicEnumValueProposalProvider(ISchemaProvider schema) : I
 
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue)
     {
-        if (string.IsNullOrEmpty(tag.EnumName))
-            return [];
-
-        var enumDef = schema.GetEnum(tag.EnumName);
-        if (enumDef is null)
+        if (tag.Enum is not { } enumDef)
             return [];
 
         var isFlagList = tag.SemanticType == TagSemanticType.FlagList;

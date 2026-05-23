@@ -25,7 +25,7 @@ public sealed class XmlCompletionHandlerTest
         var schema = new FakeSchemaProvider();
         var proposals = new FakeProposalRegistry();
         var indexService = new FakeIndexService();
-        var storyProposals = new StoryParamValueProposalProvider(schema);
+        var storyProposals = new StoryParamValueProposalProvider();
         return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
             registry ?? new FakeFileTypeRegistry()), host, schema, proposals);
     }
@@ -57,11 +57,13 @@ public sealed class XmlCompletionHandlerTest
     }
 
     private static ParamDefinition Param(int position, XmlValueType type = XmlValueType.Int,
-        string? enumName = null, string? refType = null)
+        EnumDefinition? enumDef = null, string? refType = null)
     {
         return new ParamDefinition
         {
-            Position = position, ValueType = type, EnumName = enumName, ReferenceType = refType
+            Position = position, ValueType = type,
+            Enum = enumDef,
+            ObjectType = refType is not null ? new GameObjectTypeDefinition { TypeName = refType } : null
         };
     }
 
@@ -461,8 +463,7 @@ public sealed class XmlCompletionHandlerTest
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(StoryEvent("MY_EVENT",
-            Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
-        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+            Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>MY_EVENT</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -511,8 +512,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0, XmlValueType.NameReference, refType: "Planet")),
-            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
-        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
         var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<Event_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
@@ -536,8 +536,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryRewardTypeWith(
             StoryReward("REWARD_A", Param(0, XmlValueType.Boolean)),
-            StoryReward("REWARD_B", Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
-        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+            StoryReward("REWARD_B", Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
         var xml =
             "<StoryParser>\n<Event>\n<Reward_Type>REWARD_B</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -562,8 +561,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(
             StoryEvent("TYPE_A", Param(0), Param(1)),
-            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, "FlagCmp"))));
-        schema.AddEnum(FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN"));
+            StoryEvent("TYPE_B", Param(0, XmlValueType.DynamicEnumValue, FlagEnum("FlagCmp", "GREATER_THAN", "LESS_THAN")))));
         // TYPE_B is the current type; Event_Param2 references position 1 which TYPE_B doesn't define
         var xml = "<StoryParser>\n<Event>\n<Event_Type>TYPE_B</Event_Type>\n<Event_Param2>\n</Event>\n</StoryParser>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);

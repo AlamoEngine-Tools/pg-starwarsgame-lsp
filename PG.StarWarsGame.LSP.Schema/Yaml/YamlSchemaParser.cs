@@ -16,10 +16,10 @@ internal static class YamlSchemaParser
         .IgnoreUnmatchedProperties()
         .Build();
 
-    public static List<XmlTagDefinition> ParseTagFile(string yaml, ILogger? logger = null)
+    public static List<RawTagDefinition> ParseTagFile(string yaml, ILogger? logger = null)
     {
         var file = Deserializer.Deserialize<YamlTagFile>(yaml);
-        var result = new List<XmlTagDefinition>(file.Tags.Count);
+        var result = new List<RawTagDefinition>(file.Tags.Count);
         foreach (var entry in file.Tags)
         {
             if (!Enum.TryParse<XmlValueType>(entry.Type, true, out var valueType))
@@ -38,7 +38,7 @@ internal static class YamlSchemaParser
                 logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' — defaulting to Default",
                     entry.SemanticType, entry.Tag);
 
-            result.Add(new XmlTagDefinition
+            result.Add(new RawTagDefinition
             {
                 Tag = entry.Tag,
                 ValueType = valueType,
@@ -98,7 +98,7 @@ internal static class YamlSchemaParser
         };
     }
 
-    public static EnumDefinition ParseEnumFile(string yaml, ILogger? logger = null)
+    public static RawEnumDefinition ParseEnumFile(string yaml, ILogger? logger = null)
     {
         var file = Deserializer.Deserialize<YamlEnumFile>(yaml);
         var kind = Enum.TryParse<EnumKind>(file.Kind, true, out var k)
@@ -115,13 +115,13 @@ internal static class YamlSchemaParser
                     file.Name, file.Values.Count);
         }
 
-        var values = new List<EnumValueDefinition>(file.Values.Count);
+        var values = new List<RawEnumValueDefinition>(file.Values.Count);
         foreach (var v in file.Values)
         {
-            List<ParamDefinition>? paramDefs = null;
+            List<RawParamDefinition>? paramDefs = null;
             if (v.Params is { Count: > 0 })
             {
-                paramDefs = new List<ParamDefinition>(v.Params.Count);
+                paramDefs = new List<RawParamDefinition>(v.Params.Count);
                 foreach (var p in v.Params)
                 {
                     if (!Enum.TryParse<XmlValueType>(p.Type, true, out var paramValueType))
@@ -138,7 +138,7 @@ internal static class YamlSchemaParser
                             "Unknown referenceKind '{Kind}' for param at position {Position} for enum value '{Value}' — defaulting to None",
                             p.ReferenceKind, p.Position, v.Name);
 
-                    paramDefs.Add(new ParamDefinition
+                    paramDefs.Add(new RawParamDefinition
                     {
                         Position = p.Position,
                         ValueType = paramValueType,
@@ -152,7 +152,7 @@ internal static class YamlSchemaParser
                 }
             }
 
-            values.Add(new EnumValueDefinition
+            values.Add(new RawEnumValueDefinition
             {
                 Name = v.Name,
                 Description = v.Description,
@@ -164,7 +164,7 @@ internal static class YamlSchemaParser
             });
         }
 
-        return new EnumDefinition
+        return new RawEnumDefinition
         {
             Name = file.Name,
             Kind = kind,

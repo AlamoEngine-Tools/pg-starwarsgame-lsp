@@ -11,11 +11,14 @@ public record XmlTagDefinition
     /// <summary>What this tag semantically references. <see cref="ReferenceKind.None" /> for non-reference types.</summary>
     public ReferenceKind ReferenceKind { get; init; }
 
-    /// <summary>Non-null when ReferenceKind is XmlObject — identifies the specific target type (e.g. "Faction", "SFXEvent").</summary>
-    public string? ReferenceType { get; init; }
+    /// <summary>Non-null when ReferenceKind is XmlObject — the resolved target type (e.g. Faction, SFXEvent).</summary>
+    public GameObjectTypeDefinition? ObjectType { get; init; }
 
-    /// <summary>Non-null when ReferenceKind is Enum — names the enum definition to validate against.</summary>
-    public string? EnumName { get; init; }
+    /// <summary>Non-null when ReferenceKind is HardcodedSet — the resolved hardcoded reference set.</summary>
+    public HardcodedReferenceSet? HardcodedSet { get; init; }
+
+    /// <summary>Non-null when ReferenceKind is Enum — the resolved enum definition.</summary>
+    public EnumDefinition? Enum { get; init; }
 
     /// <summary>
     ///     Optional semantic refinement of the base <see cref="ValueType" />.

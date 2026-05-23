@@ -9,8 +9,8 @@ public enum ReferenceKind
     None,
 
     /// <summary>
-    ///     Name attribute of an XML-defined object. See <see cref="XmlTagDefinition.ReferenceType" /> for the specific
-    ///     target pool (e.g. "SFXEvent", "Faction", "GameObjectType").
+    ///     Name attribute of an XML-defined object. See <see cref="XmlTagDefinition.ObjectType" /> for the resolved
+    ///     target pool (e.g. Faction, SFXEvent, GameObjectType).
     /// </summary>
     XmlObject,
 
@@ -29,13 +29,12 @@ public enum ReferenceKind
     /// <summary>Localisation string key (TEXT_xxx format).</summary>
     LocalisationKey,
 
-    /// <summary>Enum value — either a dynamic XML enum (see <see cref="XmlTagDefinition.EnumName" />) or a hardcoded C++ enum.</summary>
+    /// <summary>Enum value — either a dynamic XML enum (see <see cref="XmlTagDefinition.Enum" />) or a hardcoded C++ enum.</summary>
     Enum,
 
     /// <summary>
-    ///     Each space/comma-separated token must exist in a <see cref="HardcodedReferenceSet" />
-    ///     exposed by <see cref="ISchemaProvider.AllHardcodedSets" />, keyed by
-    ///     <see cref="XmlTagDefinition.ReferenceType" />.
+    ///     Each space/comma-separated token must exist in a <see cref="HardcodedReferenceSet" />.
+    ///     See <see cref="XmlTagDefinition.HardcodedSet" /> for the resolved set.
     /// </summary>
     HardcodedSet,
 

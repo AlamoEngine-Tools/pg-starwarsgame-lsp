@@ -15,56 +15,9 @@ file static class TagOf
     }
 }
 
-file sealed class StubSchemaProvider : ISchemaProvider
-{
-    private readonly Dictionary<string, EnumDefinition> _enums;
-
-    public StubSchemaProvider(IEnumerable<EnumDefinition>? enums = null)
-    {
-        _enums = (enums ?? []).ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return _enums.GetValueOrDefault(enumName);
-    }
-
-    public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
-
 public sealed class DynamicEnumValueValidatorTest
 {
-    private static readonly DynamicEnumValueValidator Sut = new(new StubSchemaProvider());
+    private static readonly DynamicEnumValueValidator Sut = new();
     private static readonly XmlTagDefinition Tag = TagOf.Make("MovementClass", XmlValueType.DynamicEnumValue);
 
     private static readonly XmlTagDefinition FlagTag = TagOf.Make("CategoryMask", XmlValueType.DynamicEnumValue,
@@ -122,80 +75,75 @@ public sealed class DynamicEnumValueValidatorTest
         return new EnumDefinition { Name = name, Kind = EnumKind.DynamicXml, Values = [] };
     }
 
-    private static XmlTagDefinition EnumTag(string enumName, TagSemanticType sem = TagSemanticType.Default)
+    private static XmlTagDefinition EnumTag(EnumDefinition? enumDef = null, TagSemanticType sem = TagSemanticType.Default)
     {
         return new XmlTagDefinition
-            { Tag = "Tag", ValueType = XmlValueType.DynamicEnumValue, EnumName = enumName, SemanticType = sem };
+            { Tag = "Tag", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef, SemanticType = sem };
     }
 
     [Fact]
     public void Known_value_passes_for_schema_fixed_enum()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("ShipClass", false, "Frigate", "Capital")]));
-        Assert.True(sut.Validate("Frigate", EnumTag("ShipClass")).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.True(sut.Validate("Frigate", EnumTag(SchemaFixed("ShipClass", false, "Frigate", "Capital"))).IsValid);
     }
 
     [Fact]
     public void Unknown_value_fails_for_schema_fixed_enum()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("ShipClass", false, "Frigate", "Capital")]));
-        Assert.False(sut.Validate("INVALID_VALUE", EnumTag("ShipClass")).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.False(sut.Validate("INVALID_VALUE", EnumTag(SchemaFixed("ShipClass", false, "Frigate", "Capital"))).IsValid);
     }
 
     [Fact]
     public void Value_lookup_is_case_insensitive()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("ShipClass", false, "Frigate")]));
-        Assert.True(sut.Validate("FRIGATE", EnumTag("ShipClass")).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.True(sut.Validate("FRIGATE", EnumTag(SchemaFixed("ShipClass", false, "Frigate"))).IsValid);
     }
 
     [Fact]
     public void FlagList_each_segment_validated_against_enum()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("Cat", true, "Infantry", "Vehicle", "Air")]));
-        Assert.True(sut.Validate("Infantry | Vehicle", EnumTag("Cat", TagSemanticType.FlagList)).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.True(sut.Validate("Infantry | Vehicle",
+            EnumTag(SchemaFixed("Cat", true, "Infantry", "Vehicle", "Air"), TagSemanticType.FlagList)).IsValid);
     }
 
     [Fact]
     public void FlagList_unknown_segment_fails()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("Cat", true, "Infantry", "Vehicle")]));
-        Assert.False(sut.Validate("Infantry | BOGUS", EnumTag("Cat", TagSemanticType.FlagList)).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.False(sut.Validate("Infantry | BOGUS",
+            EnumTag(SchemaFixed("Cat", true, "Infantry", "Vehicle"), TagSemanticType.FlagList)).IsValid);
     }
 
     [Fact]
     public void Comma_separated_values_validated_agnostically()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("Cat", true, "Infantry", "Vehicle")]));
-        Assert.True(sut.Validate("Infantry, Vehicle", EnumTag("Cat", TagSemanticType.FlagList)).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.True(sut.Validate("Infantry, Vehicle",
+            EnumTag(SchemaFixed("Cat", true, "Infantry", "Vehicle"), TagSemanticType.FlagList)).IsValid);
     }
 
     [Fact]
     public void Dynamic_xml_enum_skips_value_check()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([DynamicXml("GameObjectCategoryType")]));
-        Assert.True(sut.Validate("AnyValue123", EnumTag("GameObjectCategoryType")).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.True(sut.Validate("AnyValue123", EnumTag(DynamicXml("GameObjectCategoryType"))).IsValid);
     }
 
     [Fact]
     public void Unknown_enum_name_falls_back_to_format_only()
     {
-        var sut = new DynamicEnumValueValidator(new StubSchemaProvider());
-        Assert.True(sut.Validate("AnyValidIdent", EnumTag("UnknownEnum")).IsValid);
+        var sut = new DynamicEnumValueValidator();
+        Assert.True(sut.Validate("AnyValidIdent", EnumTag(null)).IsValid);
     }
 
     [Fact]
     public void No_enum_name_on_tag_falls_back_to_format_only()
     {
-        var sut = new DynamicEnumValueValidator(
-            new StubSchemaProvider([SchemaFixed("ShipClass", false, "Frigate")]));
+        var sut = new DynamicEnumValueValidator();
         var tag = new XmlTagDefinition { Tag = "Tag", ValueType = XmlValueType.DynamicEnumValue };
         Assert.True(sut.Validate("AnyValidIdent", tag).IsValid);
     }

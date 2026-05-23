@@ -132,11 +132,11 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
             XmlValueType.Boolean =>
                 IsBooleanInt(value) ? null : $"'{value}' is not a valid boolean value. Use 0, 1, true, or false.",
             XmlValueType.DynamicEnumValue =>
-                ValidateEnumList(def.EnumName, value),
+                ValidateEnumList(def.Enum, value),
             XmlValueType.NameReference =>
-                ValidateSingleRef(def.ReferenceType, value, gameIndex),
+                ValidateSingleRef(def.ObjectType?.TypeName, value, gameIndex),
             XmlValueType.NameReferenceList =>
-                ValidateRefList(def.ReferenceType, value, gameIndex),
+                ValidateRefList(def.ObjectType?.TypeName, value, gameIndex),
             XmlValueType.FloatVector3 =>
                 ValidateFloatVector3(value),
             _ => null
@@ -151,14 +151,12 @@ public sealed class StoryParserDiagnosticCollector(ISchemaProvider schema)
                value.Equals("false", StringComparison.OrdinalIgnoreCase);
     }
 
-    private string? ValidateEnumList(string? enumName, string value)
+    private static string? ValidateEnumList(EnumDefinition? enumDef, string value)
     {
-        if (enumName is null) return null;
-        var enumDef = schema.GetEnum(enumName);
         if (enumDef is null) return null;
         foreach (var token in value.Split(' ', StringSplitOptions.RemoveEmptyEntries))
             if (!enumDef.Values.Any(v => string.Equals(v.Name, token, StringComparison.OrdinalIgnoreCase)))
-                return $"'{token}' is not a valid {enumName} value.";
+                return $"'{token}' is not a valid {enumDef.Name} value.";
         return null;
     }
 

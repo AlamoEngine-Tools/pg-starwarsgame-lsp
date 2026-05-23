@@ -210,7 +210,7 @@ public sealed class XmlHoverHandlerTest
             Tag = "Affiliation",
             ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.XmlObject,
-            ReferenceType = "Faction"
+            ObjectType = new GameObjectTypeDefinition { TypeName = "Faction" }
         };
 
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
@@ -230,7 +230,7 @@ public sealed class XmlHoverHandlerTest
             Tag = "Armor_Type",
             ValueType = XmlValueType.DynamicEnumValue,
             ReferenceKind = ReferenceKind.Enum,
-            EnumName = "ArmorType"
+            Enum = new EnumDefinition { Name = "ArmorType", Kind = EnumKind.DynamicXml, Values = [] }
         };
 
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
@@ -257,10 +257,9 @@ public sealed class XmlHoverHandlerTest
     // ── registry-based type-container hover ────────────────────────────────
 
     [Fact]
-    public async Task Handle_RegistryMappedMultiInstance_TypeContainerArbitraryName_ReturnsTypeHover()
+    public async Task Handle_RegistryMappedMultiInstance_TypeContainerArbitraryName_ReturnsNoHover()
     {
-        // "Fighter_Mk2" is an arbitrary element name; the actual type is "SpaceUnit".
-        // Hovering on the type container must show the SpaceUnit type hover.
+        // "Fighter_Mk2" is an arbitrary element name — not a registered tag, so no hover.
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
@@ -273,13 +272,10 @@ public sealed class XmlHoverHandlerTest
 
         host.AddOrUpdate(TestUri.ToString(),
             "<GameObjectFiles>\n<Fighter_Mk2/>\n</GameObjectFiles>", 1);
-        // cursor on 'F' of Fighter_Mk2 (line 1, col 1)
+        // cursor on 'F' of Fighter_Mk2 (line 1, col 2)
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
-        Assert.NotNull(result);
-        var md = result!.Contents.MarkupContent!.Value;
-        Assert.Contains("name tag", md, StringComparison.OrdinalIgnoreCase);
-        Assert.DoesNotContain("Float", md); // must be type hover, not tag hover
+        Assert.Null(result);
     }
 
     [Fact]
@@ -356,27 +352,6 @@ public sealed class XmlHoverHandlerTest
 
         var md = result!.Contents.MarkupContent!.Value;
         Assert.DoesNotContain("**Note:**", md);
-    }
-
-    [Fact]
-    public async Task Handle_TypeWithNotes_IncludesNotesSection()
-    {
-        var (handler, host, schema, _) = Build();
-        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<GameObjectType/>\n</Root>", 1);
-        schema.TagToReturn = null;
-        schema.TypeToReturn = new GameObjectTypeDefinition
-        {
-            TypeName = "GameObjectType",
-            NameTag = null,
-            Description = new Dictionary<string, string> { ["en"] = "Global constants." },
-            Notes = new Dictionary<string, string> { ["en"] = "Legacy type, rarely needed." }
-        };
-
-        var result = await handler.Handle(At(1, 2), CancellationToken.None);
-
-        var md = result!.Contents.MarkupContent!.Value;
-        Assert.Contains("Legacy type, rarely needed.", md);
-        Assert.Contains("Note", md, StringComparison.OrdinalIgnoreCase);
     }
 
     // ── fakes ───────────────────────────────────────────────────────────────

@@ -2,10 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema.Yaml;
 
 namespace PG.StarWarsGame.LSP.Schema;
 
-/// <summary>Immutable in-memory snapshot of the schema repository.</summary>
+/// <summary>Immutable in-memory snapshot of the schema repository with all cross-references fully resolved.</summary>
 public sealed class SchemaIndex
 {
     public static readonly SchemaIndex Empty = new([], [], []);
@@ -19,10 +20,10 @@ public sealed class SchemaIndex
     private readonly Dictionary<string, IReadOnlyList<XmlTagDefinition>> _tagsByType;
     private readonly Dictionary<string, GameObjectTypeDefinition> _types;
 
-    public SchemaIndex(
-        IEnumerable<(string typeName, IReadOnlyList<XmlTagDefinition> tags)> tagsByType,
+    internal SchemaIndex(
+        IEnumerable<(string typeName, IReadOnlyList<RawTagDefinition> tags)> tagsByType,
         IEnumerable<GameObjectTypeDefinition> types,
-        IEnumerable<EnumDefinition> enums,
+        IEnumerable<RawEnumDefinition> enums,
         IEnumerable<HardcodedReferenceSet>? hardcodedSets = null,
         IEnumerable<MetafileDefinition>? metafiles = null)
     {
@@ -32,9 +33,21 @@ public sealed class SchemaIndex
         _types = new Dictionary<string, GameObjectTypeDefinition>(StringComparer.OrdinalIgnoreCase);
         _enums = new Dictionary<string, EnumDefinition>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (typeName, tags) in tagsByType)
+        foreach (var type in types)
+            _types[type.TypeName] = type;
+
+        AllHardcodedSets = hardcodedSets?.ToArray() ?? [];
+        var hardcodedByName = AllHardcodedSets.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
+
+        // Phase 1: resolve enums (params may reference types — types are already indexed above)
+        foreach (var rawEnum in enums)
+            _enums[rawEnum.Name] = ResolveEnum(rawEnum);
+
+        // Phase 2: resolve tags (may reference types, hardcoded sets, and enums — all indexed above)
+        foreach (var (typeName, rawTags) in tagsByType)
         {
-            foreach (var tag in tags)
+            var resolved = rawTags.Select(raw => ResolveTag(raw, hardcodedByName)).ToArray();
+            foreach (var tag in resolved)
             {
                 _tags.TryAdd(tag.Tag, tag);
                 if (!_allByTagName.TryGetValue(tag.Tag, out var all))
@@ -42,19 +55,12 @@ public sealed class SchemaIndex
                 all.Add(tag);
             }
 
-            _tagsByType[typeName] = tags;
+            _tagsByType[typeName] = resolved;
         }
-
-        foreach (var type in types)
-            _types[type.TypeName] = type;
-
-        foreach (var e in enums)
-            _enums[e.Name] = e;
 
         AllTags = [.. _tags.Values];
         AllObjectTypes = [.. _types.Values];
         AllEnums = [.. _enums.Values];
-        AllHardcodedSets = hardcodedSets?.ToArray() ?? [];
         AllMetafiles = metafiles?.ToArray() ?? [];
     }
 
@@ -91,6 +97,78 @@ public sealed class SchemaIndex
     public EnumDefinition? GetEnum(string enumName)
     {
         return _enums.TryGetValue(enumName, out var def) ? def : null;
+    }
+
+    private XmlTagDefinition ResolveTag(RawTagDefinition raw, Dictionary<string, HardcodedReferenceSet> hardcodedByName)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = raw.Tag,
+            ValueType = raw.ValueType,
+            ReferenceKind = raw.ReferenceKind,
+            ObjectType = raw.ReferenceKind == ReferenceKind.XmlObject && raw.ReferenceType is not null
+                ? _types.GetValueOrDefault(raw.ReferenceType)
+                : null,
+            HardcodedSet = raw.ReferenceKind == ReferenceKind.HardcodedSet && raw.ReferenceType is not null
+                ? hardcodedByName.GetValueOrDefault(raw.ReferenceType)
+                : null,
+            Enum = raw.ReferenceKind == ReferenceKind.Enum && raw.EnumName is not null
+                ? _enums.GetValueOrDefault(raw.EnumName)
+                : null,
+            SemanticType = raw.SemanticType,
+            ValueGroup = raw.ValueGroup,
+            Deprecated = raw.Deprecated,
+            AvailableSince = raw.AvailableSince,
+            Description = raw.Description,
+            Notes = raw.Notes,
+            MultipleAllowed = raw.MultipleAllowed
+        };
+    }
+
+    private EnumDefinition ResolveEnum(RawEnumDefinition raw)
+    {
+        var values = raw.Values.Select(rawVal => new EnumValueDefinition
+        {
+            Name = rawVal.Name,
+            Description = rawVal.Description,
+            Notes = rawVal.Notes,
+            Deprecated = rawVal.Deprecated,
+            AvailableSince = rawVal.AvailableSince,
+            Groups = rawVal.Groups,
+            Params = rawVal.Params?.Select(ResolveParam).ToList()
+        }).ToList();
+
+        return new EnumDefinition
+        {
+            Name = raw.Name,
+            Kind = raw.Kind,
+            IsBitfield = raw.IsBitfield,
+            SourceFile = raw.SourceFile,
+            Description = raw.Description,
+            Notes = raw.Notes,
+            Deprecated = raw.Deprecated,
+            AvailableSince = raw.AvailableSince,
+            Values = values
+        };
+    }
+
+    private ParamDefinition ResolveParam(RawParamDefinition raw)
+    {
+        return new ParamDefinition
+        {
+            Position = raw.Position,
+            ValueType = raw.ValueType,
+            ReferenceKind = raw.ReferenceKind,
+            ObjectType = raw.ReferenceKind == ReferenceKind.XmlObject && raw.ReferenceType is not null
+                ? _types.GetValueOrDefault(raw.ReferenceType)
+                : null,
+            Enum = raw.ReferenceKind == ReferenceKind.Enum && raw.EnumName is not null
+                ? _enums.GetValueOrDefault(raw.EnumName)
+                : null,
+            Optional = raw.Optional,
+            Description = raw.Description,
+            Notes = raw.Notes
+        };
     }
 
     private sealed class EmptySchemaProviderImpl : ISchemaProvider

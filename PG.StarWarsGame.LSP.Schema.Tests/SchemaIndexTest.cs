@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema.Yaml;
 
 namespace PG.StarWarsGame.LSP.Schema.Tests;
 
@@ -9,9 +10,9 @@ public sealed class SchemaIndexTest
 {
     // ── helpers ────────────────────────────────────────────────────────────
 
-    private static XmlTagDefinition Tag(string name)
+    private static RawTagDefinition Tag(string name)
     {
-        return new XmlTagDefinition { Tag = name, ValueType = XmlValueType.Float };
+        return new RawTagDefinition { Tag = name, ValueType = XmlValueType.Float };
     }
 
     private static GameObjectTypeDefinition Type(string name, string? nameTag = "Name")
@@ -20,9 +21,9 @@ public sealed class SchemaIndexTest
     }
 
     private static SchemaIndex Build(
-        IEnumerable<(string type, IReadOnlyList<XmlTagDefinition> tags)> tagsByType,
+        IEnumerable<(string type, IReadOnlyList<RawTagDefinition> tags)> tagsByType,
         IEnumerable<GameObjectTypeDefinition>? types = null,
-        IEnumerable<EnumDefinition>? enums = null)
+        IEnumerable<RawEnumDefinition>? enums = null)
     {
         return new SchemaIndex(tagsByType, types ?? [], enums ?? []);
     }
@@ -54,8 +55,8 @@ public sealed class SchemaIndexTest
     [Fact]
     public void GetTag_SameTagInTwoTypes_ReturnsFirst()
     {
-        var a = new XmlTagDefinition { Tag = "Text_ID", ValueType = XmlValueType.NameReference };
-        var b = new XmlTagDefinition { Tag = "Text_ID", ValueType = XmlValueType.Float };
+        var a = new RawTagDefinition { Tag = "Text_ID", ValueType = XmlValueType.NameReference };
+        var b = new RawTagDefinition { Tag = "Text_ID", ValueType = XmlValueType.Float };
         var index = Build([("TypeA", [a]), ("TypeB", [b])]);
         // First one encountered is TypeA's
         Assert.Equal(XmlValueType.NameReference, index.GetTag("Text_ID")!.ValueType);
@@ -169,5 +170,105 @@ public sealed class SchemaIndexTest
         Assert.Empty(SchemaIndex.Empty.AllObjectTypes);
         Assert.Null(SchemaIndex.Empty.GetTag("Anything"));
         Assert.Null(SchemaIndex.Empty.GetObjectType("Anything"));
+    }
+
+    // ── Resolution ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SchemaIndex_ResolvesXmlObjectType()
+    {
+        var faction = Type("Faction");
+        var raw = new RawTagDefinition
+        {
+            Tag = "Affiliation",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceType = "Faction"
+        };
+
+        var index = Build([("SomeType", [raw])], [faction]);
+
+        Assert.Same(faction, index.GetTag("Affiliation")!.ObjectType);
+        Assert.Null(index.GetTag("Affiliation")!.HardcodedSet);
+        Assert.Null(index.GetTag("Affiliation")!.Enum);
+    }
+
+    [Fact]
+    public void SchemaIndex_ResolvesHardcodedSet()
+    {
+        var set = new HardcodedReferenceSet { Name = "PlayerSide" };
+        var raw = new RawTagDefinition
+        {
+            Tag = "Side",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.HardcodedSet,
+            ReferenceType = "PlayerSide"
+        };
+
+        var index = new SchemaIndex([("SomeType", [raw])], [], [], [set]);
+
+        Assert.Same(set, index.GetTag("Side")!.HardcodedSet);
+        Assert.Null(index.GetTag("Side")!.ObjectType);
+        Assert.Null(index.GetTag("Side")!.Enum);
+    }
+
+    [Fact]
+    public void SchemaIndex_ResolvesEnum()
+    {
+        var rawEnum = new RawEnumDefinition
+        {
+            Name = "SFXEventType",
+            Values = []
+        };
+        var rawTag = new RawTagDefinition
+        {
+            Tag = "Event_Type",
+            ValueType = XmlValueType.DynamicEnumValue,
+            ReferenceKind = ReferenceKind.Enum,
+            EnumName = "SFXEventType"
+        };
+
+        var index = Build([("SomeType", [rawTag])], enums: [rawEnum]);
+
+        Assert.Equal("SFXEventType", index.GetTag("Event_Type")!.Enum?.Name);
+        Assert.Null(index.GetTag("Event_Type")!.ObjectType);
+        Assert.Null(index.GetTag("Event_Type")!.HardcodedSet);
+    }
+
+    [Fact]
+    public void SchemaIndex_UnresolvableReference_LeavesPropertyNull()
+    {
+        var raw = new RawTagDefinition
+        {
+            Tag = "Unknown",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceType = "DoesNotExist"
+        };
+
+        var index = Build([("SomeType", [raw])]);
+
+        Assert.Null(index.GetTag("Unknown")!.ObjectType);
+    }
+
+    [Fact]
+    public void SchemaIndex_ResolvesEnumParamsInEnumValues()
+    {
+        var planetType = Type("Planet");
+        var rawParam = new RawParamDefinition
+        {
+            Position = 0,
+            ValueType = XmlValueType.NameReferenceList,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceType = "Planet"
+        };
+        var rawEnumVal = new RawEnumValueDefinition { Name = "STORY_WATCH_PLANET", Params = [rawParam] };
+        var rawEnum = new RawEnumDefinition { Name = "StoryEventType", Values = [rawEnumVal] };
+
+        var index = Build([], [planetType], [rawEnum]);
+
+        var enumDef = index.GetEnum("StoryEventType")!;
+        var param = enumDef.Values.Single().Params!.Single();
+        Assert.Same(planetType, param.ObjectType);
     }
 }

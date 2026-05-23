@@ -83,9 +83,9 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
     {
         _logger.LogDebug("Loading schema from {Path}", _rootPath);
 
-        var tagsByType = new List<(string, IReadOnlyList<XmlTagDefinition>)>();
+        var tagsByType = new List<(string, IReadOnlyList<RawTagDefinition>)>();
         var types = new List<GameObjectTypeDefinition>();
-        var enums = new List<EnumDefinition>();
+        var enums = new List<RawEnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
 
         foreach (var file in Directory.EnumerateFiles(_rootPath, "*.yaml", SearchOption.AllDirectories))

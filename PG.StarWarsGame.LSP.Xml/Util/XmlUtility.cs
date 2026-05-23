@@ -1,6 +1,7 @@
 ﻿// // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 
 namespace PG.StarWarsGame.LSP.Xml.Util;
@@ -78,5 +79,27 @@ public static class XmlUtility
         }
 
         return depth;
+    }
+
+    public static List<string> SplitList(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input))
+            return new List<string>();
+
+        // 1. Remove XML comments
+        input = Regex.Replace(input, "<!--.*?-->", "", RegexOptions.Singleline);
+
+        // 2. Normalize whitespace
+        input = Regex.Replace(input, @"\s+", " ");
+
+        // 3. Normalize separators
+        string[] seps = { ",", ";", "|", "/", "\\" };
+        foreach (var sep in seps)
+            input = input.Replace(sep, ",");
+
+        // 4. Split into values
+        return input
+            .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
     }
 }

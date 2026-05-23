@@ -8,53 +8,6 @@ using PG.StarWarsGame.LSP.Xml.Completion;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Completion;
 
-file sealed class StubProposalSchema : ISchemaProvider
-{
-    private readonly Dictionary<string, EnumDefinition> _enums;
-
-    public StubProposalSchema(params EnumDefinition[] enums)
-    {
-        _enums = enums.ToDictionary(e => e.Name, StringComparer.OrdinalIgnoreCase);
-    }
-
-    public EnumDefinition? GetEnum(string name)
-    {
-        return _enums.GetValueOrDefault(name);
-    }
-
-    public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-    public IReadOnlyList<XmlTagDefinition> AllTags => [];
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-    public XmlTagDefinition? GetTag(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
-    {
-        return [];
-    }
-
-    public GameObjectTypeDefinition? GetObjectType(string _)
-    {
-        return null;
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
-    {
-        return [];
-    }
-
-    public event EventHandler? SchemaRefreshed
-    {
-        add { }
-        remove { }
-    }
-}
-
 public sealed class StoryParamValueProposalProviderTest
 {
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -69,13 +22,13 @@ public sealed class StoryParamValueProposalProviderTest
         };
     }
 
-    private static ParamDefinition EnumParam(string enumName)
+    private static ParamDefinition EnumParam(EnumDefinition? enumDef = null)
     {
         return new ParamDefinition
         {
             Position = 0,
             ValueType = XmlValueType.DynamicEnumValue,
-            EnumName = enumName
+            Enum = enumDef
         };
     }
 
@@ -95,7 +48,7 @@ public sealed class StoryParamValueProposalProviderTest
         {
             Position = 0,
             ValueType = valueType,
-            ReferenceType = referenceType
+            ObjectType = new GameObjectTypeDefinition { TypeName = referenceType }
         };
     }
 
@@ -132,10 +85,9 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_DynamicEnumValue_ReturnsAllValuesWhenPartialEmpty()
     {
-        var sut = new StoryParamValueProposalProvider(
-            new StubProposalSchema(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")));
+        var sut = new StoryParamValueProposalProvider();
 
-        var proposals = sut.GetProposals(EnumParam("FlagCmp"), "", GameIndex.Empty);
+        var proposals = sut.GetProposals(EnumParam(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")), "", GameIndex.Empty);
 
         Assert.Equal(3, proposals.Count);
     }
@@ -143,10 +95,9 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_DynamicEnumValue_FiltersByPartialPrefix()
     {
-        var sut = new StoryParamValueProposalProvider(
-            new StubProposalSchema(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")));
+        var sut = new StoryParamValueProposalProvider();
 
-        var proposals = sut.GetProposals(EnumParam("FlagCmp"), "G", GameIndex.Empty);
+        var proposals = sut.GetProposals(EnumParam(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")), "G", GameIndex.Empty);
 
         Assert.Single(proposals);
         Assert.Equal("GREATER_THAN", proposals[0].Label);
@@ -155,9 +106,9 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_DynamicEnumValue_ReturnsEmptyWhenEnumNotInSchema()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
 
-        Assert.Empty(sut.GetProposals(EnumParam("UnknownEnum"), "", GameIndex.Empty));
+        Assert.Empty(sut.GetProposals(EnumParam(null), "", GameIndex.Empty));
     }
 
     // ── Boolean proposals ────────────────────────────────────────────────────
@@ -165,7 +116,7 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_Boolean_Returns0And1()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
 
         var proposals = sut.GetProposals(BoolParam(), "", GameIndex.Empty);
 
@@ -177,7 +128,7 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_Boolean_FiltersByPartialPrefix()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
 
         var proposals = sut.GetProposals(BoolParam(), "1", GameIndex.Empty);
 
@@ -190,7 +141,7 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_NameReference_ReturnsMatchingBaselineSymbols()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
         var index = IndexWithSymbols(("Coruscant", "Planet"), ("Tatooine", "Planet"), ("Yavin_4", "StarBase"));
 
         var proposals = sut.GetProposals(RefParam("Planet"), "", index);
@@ -204,7 +155,7 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_NameReference_FiltersByPartialPrefix()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
         var index = IndexWithSymbols(("Coruscant", "Planet"), ("Tatooine", "Planet"));
 
         var proposals = sut.GetProposals(RefParam("Planet"), "C", index);
@@ -218,7 +169,7 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_NameReferenceList_ReturnsMatchingIndexSymbols()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
         var index = IndexWithWorkspaceSymbols(("X_Wing", "GameObjectType"), ("TIE_Fighter", "GameObjectType"));
 
         var proposals = sut.GetProposals(
@@ -235,11 +186,11 @@ public sealed class StoryParamValueProposalProviderTest
     [InlineData(XmlValueType.Int)]
     [InlineData(XmlValueType.Float)]
     [InlineData(XmlValueType.FloatVector3)]
-    [InlineData(XmlValueType.NameReference)] // no ReferenceType set → no proposals
+    [InlineData(XmlValueType.NameReference)] // no ObjectType set → no proposals
     public void GetProposals_ScalarOrUnconstrainedRef_ReturnsEmpty(XmlValueType valueType)
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
-        // For NameReference with null ReferenceType: no filter → empty
+        var sut = new StoryParamValueProposalProvider();
+        // For NameReference with null ObjectType: no filter → empty
         var param = new ParamDefinition { Position = 0, ValueType = valueType };
 
         Assert.Empty(sut.GetProposals(param, "", GameIndex.Empty));
@@ -250,7 +201,7 @@ public sealed class StoryParamValueProposalProviderTest
     [Fact]
     public void GetProposals_NullParam_ReturnsEmpty()
     {
-        var sut = new StoryParamValueProposalProvider(new StubProposalSchema());
+        var sut = new StoryParamValueProposalProvider();
 
         Assert.Empty(sut.GetProposals(null, "", GameIndex.Empty));
     }

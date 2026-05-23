@@ -99,7 +99,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     references.Add(new GameReference(
                         name,
                         GameSymbolKind.XmlObject,
-                        tagDef.ReferenceType,
+                        tagDef.ObjectType?.TypeName,
                         documentUri,
                         line,
                         column,

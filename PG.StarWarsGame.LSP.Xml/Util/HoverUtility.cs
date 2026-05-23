@@ -45,7 +45,7 @@ internal static class HoverUtility
         if (tag.ReferenceKind != ReferenceKind.None && tag.ReferenceKind != ReferenceKind.Unknown)
         {
             if (tag.ReferenceKind == ReferenceKind.Enum)
-                sb.Append($"::{tag.EnumName}");
+                sb.Append($"::{tag.Enum?.Name}");
             else
                 sb.Append($"::{tag.ReferenceKind}");
         }
@@ -72,32 +72,6 @@ internal static class HoverUtility
         }
 
         AppendNotes(sb, tag.Notes, locale);
-
-        return new Hover
-        {
-            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
-            {
-                Kind = MarkupKind.Markdown,
-                Value = sb.ToString()
-            }),
-            Range = MakeRange(XmlUtility.GetLine(node), XmlUtility.GetOpeningTagStartColumn(node), node.Name.Length)
-        };
-    }
-
-
-    public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale)
-    {
-        var sb = new StringBuilder();
-        sb.AppendLine($"### `{type.TypeName}`");
-
-        sb.AppendLine(type.NameTag is not null
-            ? $"*name tag: `{type.NameTag}`*"
-            : "*singleton type*");
-        sb.AppendLine();
-
-        sb.Append(Resolve(type.Description, locale));
-
-        AppendNotes(sb, type.Notes, locale);
 
         return new Hover
         {

@@ -30,7 +30,8 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
     private LocalFileSchemaProvider CreateAndLoad(
         string? tagsYaml = null, string? tagsFileName = "tags.yaml",
         string? tagsYaml2 = null, string? tagsFileName2 = null,
-        string? typesYaml = null)
+        string? typesYaml = null,
+        string? enumsYaml = null, string? enumsFileName = "enum.yaml")
     {
         var tagsDir = Path.Combine(_tempDir, "tags");
         if (tagsYaml is not null)
@@ -47,6 +48,14 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
 
         if (typesYaml is not null)
             File.WriteAllText(Path.Combine(_tempDir, "types.yaml"), typesYaml);
+
+        if (enumsYaml is not null)
+        {
+            var enumsDir = Path.Combine(_tempDir, "enums");
+            Directory.CreateDirectory(enumsDir);
+            File.WriteAllText(Path.Combine(enumsDir, enumsFileName!), enumsYaml);
+        }
+
         // Constructor calls Load(); explicit call here ensures we re-read after all files are written
         var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
@@ -54,61 +63,79 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
     }
 
     [Fact]
-    public void ParseTagFile_NameReferenceWithReferenceType_Parsed()
+    public void ParseTagFile_NameReferenceWithReferenceType_Resolved()
     {
-        const string yaml = """
-                            tags:
-                              - tag: Affiliation
-                                type: NameReferenceList
-                                referenceType: Faction
-                            """;
+        const string tagsYaml = """
+                                tags:
+                                  - tag: Affiliation
+                                    type: NameReferenceList
+                                    referenceKind: xmlObject
+                                    referenceType: Faction
+                                """;
+        const string typesYaml = """
+                                 types:
+                                   - typeName: Faction
+                                     nameTag: Name
+                                 """;
 
-        using var provider = CreateAndLoad(yaml);
+        using var provider = CreateAndLoad(tagsYaml, typesYaml: typesYaml);
 
         var tag = provider.GetTag("Affiliation");
 
         Assert.NotNull(tag);
         Assert.Equal("Affiliation", tag.Tag);
         Assert.Equal(XmlValueType.NameReferenceList, tag.ValueType);
-        Assert.Equal("Faction", tag.ReferenceType);
+        Assert.Equal("Faction", tag.ObjectType?.TypeName);
     }
 
     [Fact]
-    public void ParseTagFile_SFXEventReference_Parsed()
+    public void ParseTagFile_SFXEventReference_Resolved()
     {
-        const string yaml = """
-                            tags:
-                              - tag: SFXEvent_Select
-                                type: SFXEventReference
-                                referenceType: SFXEvent
-                            """;
+        const string tagsYaml = """
+                                tags:
+                                  - tag: SFXEvent_Select
+                                    type: SFXEventReference
+                                    referenceKind: xmlObject
+                                    referenceType: SFXEvent
+                                """;
+        const string typesYaml = """
+                                 types:
+                                   - typeName: SFXEvent
+                                     nameTag: Name
+                                 """;
 
-        using var provider = CreateAndLoad(yaml);
+        using var provider = CreateAndLoad(tagsYaml, typesYaml: typesYaml);
 
         var tag = provider.GetTag("SFXEvent_Select");
 
         Assert.NotNull(tag);
         Assert.Equal(XmlValueType.SFXEventReference, tag.ValueType);
-        Assert.Equal("SFXEvent", tag.ReferenceType);
+        Assert.Equal("SFXEvent", tag.ObjectType?.TypeName);
     }
 
     [Fact]
-    public void ParseTagFile_DynamicEnumValue_EnumNamePreserved()
+    public void ParseTagFile_DynamicEnumValue_EnumResolved()
     {
-        const string yaml = """
-                            tags:
-                              - tag: CategoryMask
-                                type: DynamicEnumValue
-                                enumName: GameObjectCategoryType
-                            """;
+        const string tagsYaml = """
+                                tags:
+                                  - tag: CategoryMask
+                                    type: DynamicEnumValue
+                                    referenceKind: enum
+                                    enumName: GameObjectCategoryType
+                                """;
+        const string enumsYaml = """
+                                 name: GameObjectCategoryType
+                                 values:
+                                   - name: GAMEOBJECT_WALKABLE
+                                 """;
 
-        using var provider = CreateAndLoad(yaml);
+        using var provider = CreateAndLoad(tagsYaml, enumsYaml: enumsYaml);
 
         var tag = provider.GetTag("CategoryMask");
 
         Assert.NotNull(tag);
         Assert.Equal(XmlValueType.DynamicEnumValue, tag.ValueType);
-        Assert.Equal("GameObjectCategoryType", tag.EnumName);
+        Assert.Equal("GameObjectCategoryType", tag.Enum?.Name);
     }
 
     [Fact]

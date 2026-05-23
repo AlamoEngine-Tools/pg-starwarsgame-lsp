@@ -165,13 +165,13 @@ public sealed class StoryParserDiagnosticCollectorTest
         };
     }
 
-    private static ParamDefinition EnumParam(int position, string enumName, bool optional = false)
+    private static ParamDefinition EnumParam(int position, EnumDefinition? enumDef = null, bool optional = false)
     {
         return new ParamDefinition
         {
             Position = position,
             ValueType = XmlValueType.DynamicEnumValue,
-            EnumName = enumName,
+            Enum = enumDef,
             Optional = optional
         };
     }
@@ -182,7 +182,7 @@ public sealed class StoryParserDiagnosticCollectorTest
         {
             Position = position,
             ValueType = XmlValueType.NameReference,
-            ReferenceType = referenceType,
+            ObjectType = new GameObjectTypeDefinition { TypeName = referenceType },
             Optional = optional
         };
     }
@@ -193,7 +193,7 @@ public sealed class StoryParserDiagnosticCollectorTest
         {
             Position = position,
             ValueType = XmlValueType.NameReferenceList,
-            ReferenceType = referenceType,
+            ObjectType = new GameObjectTypeDefinition { TypeName = referenceType },
             Optional = optional
         };
     }
@@ -252,14 +252,12 @@ public sealed class StoryParserDiagnosticCollectorTest
     [Fact]
     public void Collect_EventWithSchemaParams_ValidatesEnumParam()
     {
-        var provider = new StubSchemaProvider(
-            new EnumDefinition
-            {
-                Name = "StoryEventType",
-                Kind = EnumKind.SchemaFixed,
-                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "ColorEnum")] }]
-            },
-            ValueEnum("ColorEnum", "RED", "GREEN", "BLUE"));
+        var provider = new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, ValueEnum("ColorEnum", "RED", "GREEN", "BLUE"))] }]
+        });
         var sut = new StoryParserDiagnosticCollector(provider);
 
         var badXml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>YELLOW</Event_Param1>");
@@ -273,14 +271,12 @@ public sealed class StoryParserDiagnosticCollectorTest
     [Fact]
     public void Collect_EventWithSchemaParams_ValidatesEnumParam_CaseInsensitive()
     {
-        var provider = new StubSchemaProvider(
-            new EnumDefinition
-            {
-                Name = "StoryEventType",
-                Kind = EnumKind.SchemaFixed,
-                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "ColorEnum")] }]
-            },
-            ValueEnum("ColorEnum", "RED", "GREEN"));
+        var provider = new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, ValueEnum("ColorEnum", "RED", "GREEN"))] }]
+        });
         var sut = new StoryParserDiagnosticCollector(provider);
 
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>red</Event_Param1>");
@@ -292,14 +288,12 @@ public sealed class StoryParserDiagnosticCollectorTest
     [Fact]
     public void Collect_EventWithSchemaParams_ValidatesEnumListParam_AllValidTokens()
     {
-        var provider = new StubSchemaProvider(
-            new EnumDefinition
-            {
-                Name = "StoryEventType",
-                Kind = EnumKind.SchemaFixed,
-                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "Triggers")] }]
-            },
-            ValueEnum("Triggers", "END_SETUP", "CLICK", "CLOSE_DIALOG"));
+        var provider = new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, ValueEnum("Triggers", "END_SETUP", "CLICK", "CLOSE_DIALOG"))] }]
+        });
         var sut = new StoryParserDiagnosticCollector(provider);
 
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>END_SETUP CLICK</Event_Param1>");
@@ -309,14 +303,12 @@ public sealed class StoryParserDiagnosticCollectorTest
     [Fact]
     public void Collect_EventWithSchemaParams_ValidatesEnumListParam_InvalidToken()
     {
-        var provider = new StubSchemaProvider(
-            new EnumDefinition
-            {
-                Name = "StoryEventType",
-                Kind = EnumKind.SchemaFixed,
-                Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, "Triggers")] }]
-            },
-            ValueEnum("Triggers", "END_SETUP", "CLICK"));
+        var provider = new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "MY_EVENT", Params = [EnumParam(0, ValueEnum("Triggers", "END_SETUP", "CLICK"))] }]
+        });
         var sut = new StoryParserDiagnosticCollector(provider);
 
         var xml = Xml("<Event_Type>MY_EVENT</Event_Type><Event_Param1>END_SETUP INVALID_TOKEN</Event_Param1>");
@@ -535,18 +527,17 @@ public sealed class StoryParserDiagnosticCollectorTest
     {
         // EVENT_A: Param1 = DynamicEnumValue (ColorEnum) — "RED" is valid
         // EVENT_B: Param1 = Int — "RED" is invalid
-        var provider = new StubSchemaProvider(
-            new EnumDefinition
-            {
-                Name = "StoryEventType",
-                Kind = EnumKind.SchemaFixed,
-                Values =
-                [
-                    new EnumValueDefinition { Name = "EVENT_A", Params = [EnumParam(0, "ColorEnum")] },
-                    new EnumValueDefinition { Name = "EVENT_B", Params = [IntParam(0)] }
-                ]
-            },
-            ValueEnum("ColorEnum", "RED", "GREEN"));
+        var colorEnum = ValueEnum("ColorEnum", "RED", "GREEN");
+        var provider = new StubSchemaProvider(new EnumDefinition
+        {
+            Name = "StoryEventType",
+            Kind = EnumKind.SchemaFixed,
+            Values =
+            [
+                new EnumValueDefinition { Name = "EVENT_A", Params = [EnumParam(0, colorEnum)] },
+                new EnumValueDefinition { Name = "EVENT_B", Params = [IntParam(0)] }
+            ]
+        });
         var sut = new StoryParserDiagnosticCollector(provider);
 
         // With EVENT_A: "RED" is a valid ColorEnum → no warning

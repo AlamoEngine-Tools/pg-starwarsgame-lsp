@@ -378,29 +378,21 @@ public sealed class XmlDiagnosticsPublisher
         var diagnostics = new List<Diagnostic>();
         var doc = new HtmlDocument();
         doc.LoadHtml(text);
-        WalkForHardcodedRefs(doc.DocumentNode, text, hardcodedSets, diagnostics);
+        WalkForHardcodedRefs(doc.DocumentNode, text, diagnostics);
         return diagnostics;
     }
 
-    private void WalkForHardcodedRefs(
-        HtmlNode node, string text,
-        IReadOnlyList<HardcodedReferenceSet> hardcodedSets,
-        List<Diagnostic> diagnostics)
+    private void WalkForHardcodedRefs(HtmlNode node, string text, List<Diagnostic> diagnostics)
     {
         foreach (var child in node.ChildNodes)
         {
             if (child.NodeType != HtmlNodeType.Element) continue;
 
             var tagDef = _schema.GetTag(child.Name);
-            if (tagDef is { ReferenceKind: ReferenceKind.HardcodedSet, ReferenceType: not null })
-            {
-                var set = hardcodedSets.FirstOrDefault(s =>
-                    string.Equals(s.Name, tagDef.ReferenceType, StringComparison.OrdinalIgnoreCase));
-                if (set is not null)
-                    EmitHardcodedRefDiagnostics(child, tagDef, set, text, diagnostics);
-            }
+            if (tagDef is { ReferenceKind: ReferenceKind.HardcodedSet, HardcodedSet: not null })
+                EmitHardcodedRefDiagnostics(child, tagDef, tagDef.HardcodedSet, text, diagnostics);
 
-            WalkForHardcodedRefs(child, text, hardcodedSets, diagnostics);
+            WalkForHardcodedRefs(child, text, diagnostics);
         }
     }
 
@@ -448,7 +440,7 @@ public sealed class XmlDiagnosticsPublisher
             {
                 Severity = DiagnosticSeverity.Error,
                 Message =
-                    $"'{token}' is not a known {tagDef.ReferenceType}. Check the schema for valid names.",
+                    $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
                 Range = new Range(
                     new Position(line0, col0),
                     new Position(line0, col0 + token.Length)),

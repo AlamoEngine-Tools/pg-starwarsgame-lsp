@@ -48,7 +48,6 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             Tag = tagName,
             ValueType = XmlValueType.TypeReferenceList,
             ReferenceKind = ReferenceKind.HardcodedSet,
-            ReferenceType = "BehaviorModule",
             ValueGroup = valueGroup
         };
     }
@@ -176,8 +175,11 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
         XmlTagDefinition tag,
         List<HardcodedReferenceSet> hardcodedSets)
     {
-        _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase) { [tag.Tag] = tag };
         _hardcodedSets = hardcodedSets;
+        var wiredTag = tag.ReferenceKind == ReferenceKind.HardcodedSet && hardcodedSets.Count > 0
+            ? tag with { HardcodedSet = hardcodedSets[0] }
+            : tag;
+        _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase) { [wiredTag.Tag] = wiredTag };
     }
 
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _hardcodedSets;

@@ -140,8 +140,8 @@ internal static class ValueTypeHint
         var suffix = plural ? " names" : string.Empty;
         return tag.ReferenceKind switch
         {
-            ReferenceKind.XmlObject when tag.ReferenceType is not null =>
-                $"**Reference:** {sep}`{tag.ReferenceType}`{suffix}",
+            ReferenceKind.XmlObject when tag.ObjectType is not null =>
+                $"**Reference:** {sep}`{tag.ObjectType.TypeName}`{suffix}",
 
             ReferenceKind.XmlObject =>
                 $"**Reference:** {sep}XML object name{(plural ? "s" : string.Empty)}",
@@ -171,10 +171,10 @@ internal static class ValueTypeHint
                     ? "**Reference:** space-separated localisation string keys (`TEXT_xxx`)"
                     : "**Reference:** localisation string key (`TEXT_xxx` format)",
 
-            ReferenceKind.Enum when tag.EnumName is not null =>
+            ReferenceKind.Enum when tag.Enum is not null =>
                 plural
-                    ? $"**Enum:** space-separated values from `{tag.EnumName}`"
-                    : $"**Enum:** one of the values in `{tag.EnumName}`",
+                    ? $"**Enum:** space-separated values from `{tag.Enum.Name}`"
+                    : $"**Enum:** one of the values in `{tag.Enum.Name}`",
 
             ReferenceKind.Enum =>
                 plural
@@ -187,8 +187,8 @@ internal static class ValueTypeHint
 
     private static string BuildEnumHint(XmlTagDefinition tag)
     {
-        return tag.EnumName is not null
-            ? $"**Enum:** one of the values in `{tag.EnumName}`"
+        return tag.Enum is not null
+            ? $"**Enum:** one of the values in `{tag.Enum.Name}`"
             : "**Enum:** predefined enum value";
     }
 }

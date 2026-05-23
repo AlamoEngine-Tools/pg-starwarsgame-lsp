@@ -33,7 +33,7 @@ public sealed class XmlGameDocumentParserTest
             Tag = tag,
             ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.XmlObject,
-            ReferenceType = referenceType
+            ObjectType = new GameObjectTypeDefinition { TypeName = referenceType }
         };
     }
 
@@ -47,7 +47,7 @@ public sealed class XmlGameDocumentParserTest
             Tag = tag,
             ValueType = valueType,
             ReferenceKind = ReferenceKind.XmlObject,
-            ReferenceType = referenceType,
+            ObjectType = new GameObjectTypeDefinition { TypeName = referenceType },
             SemanticType = semanticType
         };
     }

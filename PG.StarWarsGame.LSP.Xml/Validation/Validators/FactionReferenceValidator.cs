@@ -14,6 +14,7 @@ public sealed class FactionReferenceValidator : IXmlValueValidator
     {
         if (rawValue.Trim().Length == 0)
             return XmlValidationResult.Failure($"'' is not a valid faction reference for <{tag.Tag}>.");
+
         return XmlValidationResult.Valid();
     }
 }

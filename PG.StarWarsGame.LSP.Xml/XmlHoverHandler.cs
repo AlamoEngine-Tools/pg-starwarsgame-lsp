@@ -94,15 +94,10 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         {
             var typedTagDef = _schema.GetTagsForType(typeDef.TypeName).FirstOrDefault(t =>
                 string.Equals(t.Tag, node.Name, StringComparison.OrdinalIgnoreCase));
-            if (typedTagDef is null)
+
+            if (typedTagDef is not null)
             {
-                _logger.LogWarning(
-                    "Hover request at {Line}:{Character} produced half a result. Figured out the game object type but failed tag resolution.",
-                    XmlUtility.GetPrintableLine(node), request.Position.Character);
-            }
-            else
-            {
-                _logger.LogDebug("Hover resolved: type {TagName}::{tag}", typeDef.TypeName, typedTagDef?.Tag);
+                _logger.LogDebug("Hover resolved: type {TagName}::{tag}", typeDef.TypeName, typedTagDef.Tag);
                 return Task.FromResult<Hover?>(HoverUtility.BuildTagHover(typeDef, typedTagDef, node, locale));
             }
         }

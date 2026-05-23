@@ -7,7 +7,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion;
 
-public sealed class StoryParamValueProposalProvider(ISchemaProvider schema)
+public sealed class StoryParamValueProposalProvider
 {
     public IReadOnlyList<ValueProposal> GetProposals(
         ParamDefinition? def, string partialValue, GameIndex index)
@@ -15,18 +15,16 @@ public sealed class StoryParamValueProposalProvider(ISchemaProvider schema)
         if (def is null) return [];
         return def.ValueType switch
         {
-            XmlValueType.DynamicEnumValue => GetEnumProposals(def.EnumName, partialValue),
+            XmlValueType.DynamicEnumValue => GetEnumProposals(def.Enum, partialValue),
             XmlValueType.Boolean => GetBooleanIntProposals(partialValue),
             XmlValueType.NameReference or XmlValueType.NameReferenceList =>
-                GetRefProposals(def.ReferenceType, partialValue, index),
+                GetRefProposals(def.ObjectType?.TypeName, partialValue, index),
             _ => []
         };
     }
 
-    private IReadOnlyList<ValueProposal> GetEnumProposals(string? enumName, string partialValue)
+    private static IReadOnlyList<ValueProposal> GetEnumProposals(EnumDefinition? enumDef, string partialValue)
     {
-        if (enumName is null) return [];
-        var enumDef = schema.GetEnum(enumName);
         if (enumDef is null) return [];
         return enumDef.Values
             .Where(v => partialValue.Length == 0 ||

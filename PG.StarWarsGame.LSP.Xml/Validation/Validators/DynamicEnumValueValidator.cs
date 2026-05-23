@@ -11,13 +11,6 @@ public sealed partial class DynamicEnumValueValidator : IXmlValueValidator
 {
     private static readonly char[] ValueSeparators = ['|', ','];
 
-    private readonly ISchemaProvider _schema;
-
-    public DynamicEnumValueValidator(ISchemaProvider schema)
-    {
-        _schema = schema;
-    }
-
     public XmlValueType ValueType => XmlValueType.DynamicEnumValue;
 
     public XmlValidationResult Validate(string rawValue, XmlTagDefinition tag)
@@ -41,21 +34,17 @@ public sealed partial class DynamicEnumValueValidator : IXmlValueValidator
                     $"'{trimmed}' is not a valid enum identifier for <{tag.Tag}>.");
         }
 
-        if (!string.IsNullOrEmpty(tag.EnumName))
+        if (tag.Enum is { Kind: EnumKind.SchemaFixed, Values.Count: > 0 } enumDef)
         {
-            var enumDef = _schema.GetEnum(tag.EnumName);
-            if (enumDef is { Kind: EnumKind.SchemaFixed, Values.Count: > 0 })
-            {
-                var known = enumDef.Values
-                    .Select(v => v.Name)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var known = enumDef.Values
+                .Select(v => v.Name)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                foreach (var seg in trimmed.Split(ValueSeparators,
-                             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                    if (!known.Contains(seg))
-                        return XmlValidationResult.Failure(
-                            $"'{seg}' is not a known value for enum '{tag.EnumName}' on <{tag.Tag}>.");
-            }
+            foreach (var seg in trimmed.Split(ValueSeparators,
+                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                if (!known.Contains(seg))
+                    return XmlValidationResult.Failure(
+                        $"'{seg}' is not a known value for enum '{enumDef.Name}' on <{tag.Tag}>.");
         }
 
         return XmlValidationResult.Valid();

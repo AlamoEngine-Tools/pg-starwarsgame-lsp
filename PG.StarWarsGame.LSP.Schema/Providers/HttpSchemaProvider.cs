@@ -28,6 +28,8 @@ public sealed class HttpSchemaProvider : ISchemaProvider
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private volatile SchemaIndex _current = SchemaIndex.Empty;
+    private readonly Dictionary<string, IReadOnlyList<RawTagDefinition>> _rawTagFallbacks = new(StringComparer.OrdinalIgnoreCase);
+    private IReadOnlyList<RawEnumDefinition> _rawEnumFallbacks = [];
 
     public HttpSchemaProvider(HttpClient http, string baseUrl, SchemaHttpCache cache,
         ILogger<HttpSchemaProvider> logger)
@@ -104,9 +106,9 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             "Building schema index: {TagFileCount} tag files, {TypeFileCount} type files, {EnumFileCount} enum files",
             manifest.Tags.Count, manifest.Types.Count, manifest.Enums.Count);
 
-        var tagsByType = new List<(string, IReadOnlyList<XmlTagDefinition>)>();
+        var tagsByType = new List<(string, IReadOnlyList<RawTagDefinition>)>();
         var types = new List<GameObjectTypeDefinition>();
-        var enums = new List<EnumDefinition>();
+        var enums = new List<RawEnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
         var metafiles = new List<MetafileDefinition>();
         var fetchedFiles = new List<(string relativePath, string content)>();
@@ -117,11 +119,11 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             var (parsed, raw) = await FetchYamlAsync(path, yaml => YamlSchemaParser.ParseTagFile(yaml), ct);
             if (parsed is null)
             {
-                var fallback = _current.GetTagsForType(typeName);
-                if (fallback.Count == 0)
+                _rawTagFallbacks.TryGetValue(typeName, out var fallback);
+                if (fallback is null || fallback.Count == 0)
                     _logger.LogWarning(
                         "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
-                tagsByType.Add((typeName, fallback.ToList()));
+                tagsByType.Add((typeName, fallback ?? []));
             }
             else
             {
@@ -154,15 +156,14 @@ public sealed class HttpSchemaProvider : ISchemaProvider
 
         foreach (var path in manifest.Enums)
         {
-            var (parsed, raw) = await FetchYamlAsync<EnumDefinition>(
+            var (parsed, raw) = await FetchYamlAsync<RawEnumDefinition>(
                 path, yaml => [YamlSchemaParser.ParseEnumFile(yaml)], ct);
             if (parsed is null)
             {
-                var fallback = _current.AllEnums;
-                if (fallback.Count == 0)
+                if (_rawEnumFallbacks.Count == 0)
                     _logger.LogWarning(
                         "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
-                enums.AddRange(fallback);
+                enums.AddRange(_rawEnumFallbacks);
             }
             else
             {
@@ -206,6 +207,11 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             if (raw is not null)
                 fetchedFiles.Add((path, raw));
         }
+
+        _rawTagFallbacks.Clear();
+        foreach (var (tn, tags) in tagsByType)
+            _rawTagFallbacks[tn] = tags;
+        _rawEnumFallbacks = [.. enums];
 
         _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
         SchemaRefreshed?.Invoke(this, EventArgs.Empty);

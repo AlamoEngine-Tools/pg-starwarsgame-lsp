@@ -18,8 +18,12 @@ public sealed class ValueTypeHintTest
             Tag = "Test",
             ValueType = type,
             ReferenceKind = referenceKind,
-            ReferenceType = referenceType,
-            EnumName = enumName
+            ObjectType = referenceType is not null
+                ? new GameObjectTypeDefinition { TypeName = referenceType }
+                : null,
+            Enum = enumName is not null
+                ? new EnumDefinition { Name = enumName, Kind = EnumKind.DynamicXml, Values = [] }
+                : null
         };
     }
 

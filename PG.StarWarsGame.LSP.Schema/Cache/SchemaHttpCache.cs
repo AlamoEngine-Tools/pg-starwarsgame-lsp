@@ -70,9 +70,9 @@ public sealed class SchemaHttpCache
             }
 
             // Parse all five categories from disk.
-            var tagsByType = new List<(string, IReadOnlyList<XmlTagDefinition>)>();
+            var tagsByType = new List<(string, IReadOnlyList<RawTagDefinition>)>();
             var types = new List<GameObjectTypeDefinition>();
-            var enums = new List<EnumDefinition>();
+            var enums = new List<RawEnumDefinition>();
             var hardcodedSets = new List<HardcodedReferenceSet>();
             var metafiles = new List<MetafileDefinition>();
 
