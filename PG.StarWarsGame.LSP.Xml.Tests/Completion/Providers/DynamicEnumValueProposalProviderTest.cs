@@ -36,7 +36,8 @@ public sealed class DynamicEnumValueProposalProviderTest
         ]
     };
 
-    private static XmlTagDefinition TagWith(EnumDefinition? enumDef = null, TagSemanticType sem = TagSemanticType.Default)
+    private static XmlTagDefinition TagWith(EnumDefinition? enumDef = null,
+        TagSemanticType sem = TagSemanticType.Default)
     {
         return new XmlTagDefinition
             { Tag = "Event_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef, SemanticType = sem };
@@ -98,7 +99,7 @@ public sealed class DynamicEnumValueProposalProviderTest
     public void Returns_empty_when_tag_has_no_enum()
     {
         var sut = new DynamicEnumValueProposalProvider();
-        var proposals = sut.GetProposals(TagWith(null), "");
+        var proposals = sut.GetProposals(TagWith(), "");
         Assert.Empty(proposals);
     }
 
@@ -106,7 +107,7 @@ public sealed class DynamicEnumValueProposalProviderTest
     public void Returns_empty_when_enum_not_in_schema()
     {
         var sut = new DynamicEnumValueProposalProvider();
-        var proposals = sut.GetProposals(TagWith(null), "");
+        var proposals = sut.GetProposals(TagWith(), "");
         Assert.Empty(proposals);
     }
 

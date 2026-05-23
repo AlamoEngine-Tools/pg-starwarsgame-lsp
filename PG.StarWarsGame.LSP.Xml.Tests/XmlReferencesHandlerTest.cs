@@ -189,7 +189,7 @@ public sealed class XmlReferencesHandlerTest
             "UNIT_A", ImmutableArray.Create(SymbolAt("UNIT_A", OtherUri, 5)));
         var handler = BuildHandler(BuildIndex(callerDoc, refs, defs));
 
-        var result = await handler.Handle(At(0, 5, false), CancellationToken.None);
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
 
         Assert.NotNull(result);
         var locations = result!.ToList();

@@ -3,13 +3,13 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
-using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Validation;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
+using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -17,55 +17,6 @@ public sealed class XmlDiagnosticsPublisherTest
 {
     // ── helpers ─────────────────────────────────────────────────────────────
 
-    private static XmlTagDefinition MakeTag(string name, bool multipleAllowed = false)
-    {
-        return new XmlTagDefinition { Tag = name, ValueType = XmlValueType.Float, MultipleAllowed = multipleAllowed };
-    }
-
-    private static GameObjectTypeDefinition MakeType(string name)
-    {
-        return new GameObjectTypeDefinition { TypeName = name };
-    }
-
-    // CollectDiagnostics-only tests still use a no-op publish action.
-    private static XmlDiagnosticsPublisher BuildPublisher(FakeSchemaProvider schema,
-        FakeFileTypeRegistry? registry = null)
-    {
-        return new XmlDiagnosticsPublisher(
-            _ => { },
-            new FakeGameIndexService(),
-            new FakeGameWorkspaceHost(),
-            schema,
-            new FakeValidatorRegistry(),
-            new StoryParserDiagnosticCollector(schema),
-            NullLogger<XmlDiagnosticsPublisher>.Instance,
-            registry ?? new FakeFileTypeRegistry());
-    }
-
-    // Subscription / routing tests use this builder so they can control the index service.
-    private static (XmlDiagnosticsPublisher publisher,
-        List<PublishDiagnosticsParams> published,
-        FakeGameIndexService indexService,
-        FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
-            FakeFileTypeRegistry? registry = null)
-    {
-        var published = new List<PublishDiagnosticsParams>();
-        var indexService = new FakeGameIndexService();
-        var workspaceHost = new FakeGameWorkspaceHost();
-        var effectiveSchema = schema ?? new FakeSchemaProvider();
-        var publisher = new XmlDiagnosticsPublisher(
-            p => published.Add(p),
-            indexService,
-            workspaceHost,
-            effectiveSchema,
-            new FakeValidatorRegistry(),
-            new StoryParserDiagnosticCollector(effectiveSchema),
-            NullLogger<XmlDiagnosticsPublisher>.Instance,
-            registry ?? new FakeFileTypeRegistry());
-        return (publisher, published, indexService, workspaceHost);
-    }
-
-    // Builds a GameIndex containing exactly one empty document.
     private static GameIndex IndexWithDoc(string uri, int version = 1)
     {
         var doc = new DocumentIndex(uri, version,
@@ -77,7 +28,6 @@ public sealed class XmlDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
-    // Builds a GameIndex where two files both declare the same ID.
     private static GameIndex IndexWithDuplicateId(string id, string uri1, string uri2)
     {
         var sym1 = new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri1, 0, null), null);
@@ -92,7 +42,6 @@ public sealed class XmlDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
-    // Builds a GameIndex with one document that has a single reference to targetId.
     private static GameIndex IndexWithRef(string documentUri, string targetId, string? targetType = null)
     {
         var reference = new GameReference(targetId, GameSymbolKind.XmlObject, targetType,
@@ -106,215 +55,59 @@ public sealed class XmlDiagnosticsPublisherTest
                 .Add(targetId, ImmutableArray.Create(reference)));
     }
 
-    // ── duplicate detection (per-tag) ────────────────────────────────────────
-
-    [Fact]
-    public void CollectDiagnostics_SingleOccurrence_NoDiagnostics()
+    private static GameIndex IndexWithHardcodedEnums(
+        ImmutableDictionary<string, ImmutableArray<string>> hardcoded)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("Max_Speed"));
-        var publisher = BuildPublisher(schema);
-
-        var diags = publisher.CollectDiagnostics("""
-                                                 <SpaceUnit>
-                                                   <Max_Speed>500</Max_Speed>
-                                                 </SpaceUnit>
-                                                 """);
-
-        Assert.Empty(diags);
+        var baseline = new BaselineIndex(
+            ImmutableDictionary<string, GameSymbol>.Empty,
+            DateTimeOffset.UtcNow, "hash",
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            hardcoded,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+        return GameIndex.Empty with { Baseline = baseline };
     }
 
-    [Fact]
-    public void CollectDiagnostics_TwoDuplicateSingletons_BothFlaggedWithCrossReferences()
+    private static (XmlDiagnosticsPublisher publisher,
+        List<PublishDiagnosticsParams> published,
+        FakeGameIndexService indexService,
+        FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
+            FakeFileTypeRegistry? registry = null)
     {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("Max_Speed"));
-        var publisher = BuildPublisher(schema);
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
+        var effectiveSchema = schema ?? new FakeSchemaProvider();
+        var effectiveRegistry = registry ?? new FakeFileTypeRegistry();
 
-        // Lines 2 and 3 (1-based) in the raw string below
-        var diags = publisher.CollectDiagnostics("""
-                                                 <SpaceUnit>
-                                                   <Max_Speed>500</Max_Speed>
-                                                   <Max_Speed>600</Max_Speed>
-                                                 </SpaceUnit>
-                                                 """);
+        IXmlDiagnosticsHandler[] handlers =
+        [
+            new XmlDuplicateTagHandler(),
+            new XmlNotesHandler(),
+            new DuplicateSymbolHandler(),
+            new UnresolvedReferenceHandler(),
+            new TypeMismatchHandler(),
+            new DeprecatedEventTypeHandler(),
+            new EventTypeNotesHandler(),
+            new StoryParamRequiredHandler(),
+            new StoryParamNotesHandler(),
+            new StoryParamValueHandler(),
+            new StoryParamEnumHandler(),
+            new StoryParamReferenceHandler(),
+            new StoryParamUnknownSlotHandler()
+        ];
 
-        Assert.Equal(2, diags.Count);
-        Assert.All(diags, d => Assert.Contains("Max_Speed", d.Message));
-        Assert.All(diags, d => Assert.Equal(DiagnosticSeverity.Error, d.Severity));
-        // Each diagnostic must mention the other occurrence's line
-        Assert.Contains("3", diags[0].Message); // first occurrence references line 3
-        Assert.Contains("2", diags[1].Message); // second occurrence references line 2
-    }
-
-    [Fact]
-    public void CollectDiagnostics_ThreeDuplicateSingletons_EachReferencesOtherTwo()
-    {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("Max_Speed"));
-        var publisher = BuildPublisher(schema);
-
-        var diags = publisher.CollectDiagnostics("""
-                                                 <SpaceUnit>
-                                                   <Max_Speed>100</Max_Speed>
-                                                   <Max_Speed>200</Max_Speed>
-                                                   <Max_Speed>300</Max_Speed>
-                                                 </SpaceUnit>
-                                                 """);
-
-        Assert.Equal(3, diags.Count);
-        // First occurrence: "Also at lines 3, 4."
-        Assert.Contains("3", diags[0].Message);
-        Assert.Contains("4", diags[0].Message);
-    }
-
-    [Fact]
-    public void CollectDiagnostics_MultipleAllowedTag_NoDiagnostics()
-    {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("SFXEvent_Attack_Hardpoint", true));
-        var publisher = BuildPublisher(schema);
-
-        var diags = publisher.CollectDiagnostics("""
-                                                 <HardPoint>
-                                                   <SFXEvent_Attack_Hardpoint>Sfx_A</SFXEvent_Attack_Hardpoint>
-                                                   <SFXEvent_Attack_Hardpoint>Sfx_B</SFXEvent_Attack_Hardpoint>
-                                                 </HardPoint>
-                                                 """);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectDiagnostics_SameSingletonInTwoDifferentObjects_NoDiagnostics()
-    {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("Max_Speed"));
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-
-        var registry = new FakeFileTypeRegistry();
-        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var publisher = BuildPublisher(schema, registry);
-
-        // Two separate SpaceUnit type containers, each with one Max_Speed — not duplicates
-        var diags = publisher.CollectDiagnostics("""
-                                                 <GameObjectFiles>
-                                                   <SpaceUnit Name="UnitA">
-                                                     <Max_Speed>500</Max_Speed>
-                                                   </SpaceUnit>
-                                                   <SpaceUnit Name="UnitB">
-                                                     <Max_Speed>300</Max_Speed>
-                                                   </SpaceUnit>
-                                                 </GameObjectFiles>
-                                                 """, DocumentUri.From("file:///test.xml"));
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectDiagnostics_NonTypeRootMatchingTagName_NotValidatedAsTag()
-    {
-        var schema = new FakeSchemaProvider();
-        // Hardpoints is a singleton tag in the schema but NOT a registered type
-        schema.AddTag(MakeTag("Hardpoints"));
-        var publisher = BuildPublisher(schema);
-
-        // Root <Hardpoints> must not be validated as a singleton tag field
-        var diags = publisher.CollectDiagnostics("""
-                                                 <Hardpoints>
-                                                   <Hardpoint></Hardpoint>
-                                                 </Hardpoints>
-                                                 """);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectDiagnostics_RootTypeCollidesWithTagName_NoFalsePositiveDuplicate()
-    {
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("Faction")); // Faction is also a singleton tag elsewhere
-        var publisher = BuildPublisher(schema);
-
-        // Two Faction elements at document root — individually iterated, never compared against each other
-        var diags = publisher.CollectDiagnostics("""
-                                                 <Faction Name="EMPIRE">
-                                                   <Rank>1</Rank>
-                                                 </Faction>
-                                                 <Faction Name="REBEL">
-                                                   <Rank>2</Rank>
-                                                 </Faction>
-                                                 """);
-
-        Assert.Empty(diags);
-    }
-
-    // ── depth-based type-container detection ────────────────────────────────────
-
-    [Fact]
-    public void CollectDiagnostics_MultiInstance_TypeContainerNameMatchesFieldTag_NoDuplicateFalsePositive()
-    {
-        // "Faction" is registered as a field tag AND appears as a type-container element name.
-        // Two type containers with the same element name must not be flagged as duplicate singletons.
-        var schema = new FakeSchemaProvider();
-        schema.AddTag(MakeTag("Faction")); // not MultipleAllowed
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "FactionType", NameTag = "Name" });
-
-        var registry = new FakeFileTypeRegistry();
-        registry.Register("test.xml", ImmutableArray.Create("FactionType"));
-        var publisher = BuildPublisher(schema, registry);
-
-        var diags = publisher.CollectDiagnostics("""
-                                                 <GameObjectFiles>
-                                                   <Faction Name="EMPIRE"><Name>EMPIRE</Name></Faction>
-                                                   <Faction Name="REBEL"><Name>REBEL</Name></Faction>
-                                                 </GameObjectFiles>
-                                                 """, DocumentUri.From("file:///test.xml"));
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectDiagnostics_MultiInstance_FieldTagsInsideTypeContainer_StillValidated()
-    {
-        // Even though depth-1 elements are type containers, their children (field tags) are still validated.
-        var schema = new FakeSchemaProvider();
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        schema.AddTag(MakeTag("Max_Speed"));
-
-        var registry = new FakeFileTypeRegistry();
-        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var publisher = BuildPublisher(schema, registry);
-
-        // Two Max_Speed tags inside a single type container — duplicate singleton error expected.
-        var diags = publisher.CollectDiagnostics("""
-                                                 <GameObjectFiles>
-                                                   <SpaceUnit Name="UnitA">
-                                                     <Max_Speed>100</Max_Speed>
-                                                     <Max_Speed>200</Max_Speed>
-                                                   </SpaceUnit>
-                                                 </GameObjectFiles>
-                                                 """, DocumentUri.From("file:///test.xml"));
-
-        Assert.Equal(2, diags.Count);
-        Assert.All(diags, d => Assert.Contains("Max_Speed", d.Message));
-    }
-
-    [Fact]
-    public void CollectDiagnostics_DuplicateUnknownTag_NoDiagnostics()
-    {
-        var schema = new FakeSchemaProvider();
-        // Tag not registered → unknown → no duplicate error
-        var publisher = BuildPublisher(schema);
-
-        var diags = publisher.CollectDiagnostics("""
-                                                 <SpaceUnit>
-                                                   <Unknown_Tag>1</Unknown_Tag>
-                                                   <Unknown_Tag>2</Unknown_Tag>
-                                                 </SpaceUnit>
-                                                 """);
-
-        Assert.Empty(diags);
+        var publisher = new XmlDiagnosticsPublisher(
+            p => published.Add(p),
+            indexService,
+            workspaceHost,
+            effectiveSchema,
+            new XmlDiagnosticsHandlerRegistry(handlers),
+            new XmlDocumentFactProducer(effectiveSchema, effectiveRegistry),
+            new XmlIndexFactProducer(),
+            new StoryFactProducer(effectiveSchema),
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            effectiveRegistry);
+        return (publisher, published, indexService, workspaceHost);
     }
 
     // ── subscription / routing ───────────────────────────────────────────────
@@ -364,11 +157,9 @@ public sealed class XmlDiagnosticsPublisherTest
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         workspaceHost.Set("file:///a.xml", "<Root/>");
 
-        // First fire while the file is open: diagnostics published.
         indexService.Fire(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
-        // Simulate DidClose: remove from workspace host, then IndexChanged fires.
         workspaceHost.Remove("file:///a.xml");
         indexService.Fire(GameIndex.Empty);
 
@@ -380,15 +171,9 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void IndexChanged_OnlyPublishesForOpenFiles_NotForIndexOnlyEntries()
     {
-        // Regression: WorkspaceScanner stores filesystem paths as index keys while the
-        // LSP sync handler stores file:// URIs. The two can coexist as separate keys.
-        // OnIndexChanged must publish only for files open in the workspace host;
-        // scanner-only entries must not generate any publication (including empty).
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         workspaceHost.Set("file:///a.xml", "<Root/>");
 
-        // Fire with two index keys: the workspace-host file:// URI plus a "scanner path"
-        // key that represents the same file under a different string.
         var indexWithBoth = IndexWithDoc("file:///a.xml") with
         {
             Documents = IndexWithDoc("file:///a.xml").Documents
@@ -396,8 +181,6 @@ public sealed class XmlDiagnosticsPublisherTest
         };
         indexService.Fire(indexWithBoth);
 
-        // Only one publish — for the open file. The scanner-path key must not generate
-        // a second (empty) publication that would clear the editor's diagnostics.
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
     }
@@ -405,16 +188,12 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void IndexChanged_ScannerFiresAfterOpen_StillPublishesForOpenFile()
     {
-        // Regression: scanner fires IndexChanged with filesystem-path keys only; the
-        // editor's file:// URI must still be published after the scan (not silently dropped).
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         workspaceHost.Set("file:///a.xml", "<Root/>");
 
-        // First fire (DidOpen equivalent): only the file:// URI is in the index.
         indexService.Fire(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
-        // Second fire (scan equivalent): only the filesystem-path key is in the index.
         var scanIndex = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
@@ -422,151 +201,11 @@ public sealed class XmlDiagnosticsPublisherTest
         };
         indexService.Fire(scanIndex);
 
-        // The open file must still be published — diagnostics for open files are always
-        // refreshed on every IndexChanged regardless of whether the index uses a different
-        // key for the same physical file.
         var pub = Assert.Single(published);
         Assert.Equal("file:///a.xml", pub.Uri.ToString());
     }
 
-    // ── duplicate-ID (index-level) ────────────────────────────────────────────
-
-    [Fact]
-    public void CollectDuplicateIdDiagnostics_SameId_TwoFiles_EmitsDiagnostic_For_RequestedFile()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
-
-        var diags = publisher.CollectDuplicateIdDiagnostics("file:///a.xml", index);
-
-        var d = Assert.Single(diags);
-        Assert.Equal(DiagnosticSeverity.Error, d.Severity);
-        Assert.Contains("UNIT_A", d.Message);
-    }
-
-    [Fact]
-    public void CollectDuplicateIdDiagnostics_SameId_TwoFiles_BothFilesGetDiagnostic()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
-
-        var diagsA = publisher.CollectDuplicateIdDiagnostics("file:///a.xml", index);
-        var diagsB = publisher.CollectDuplicateIdDiagnostics("file:///b.xml", index);
-
-        Assert.Single(diagsA);
-        Assert.Single(diagsB);
-    }
-
-    [Fact]
-    public void CollectDuplicateIdDiagnostics_UniqueId_NoDiagnostic()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
-            new FileOrigin("file:///a.xml", 0, null), null);
-        var doc = new DocumentIndex("file:///a.xml", 1, [sym], []);
-        var index = new GameIndex(
-            BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add("file:///a.xml", doc),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
-                .Add("UNIT_A", ImmutableArray.Create(sym)),
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-
-        var diags = publisher.CollectDuplicateIdDiagnostics("file:///a.xml", index);
-
-        Assert.Empty(diags);
-    }
-
-    // ── unresolved-reference (index-level) ───────────────────────────────────
-
-    [Fact]
-    public void CollectUnresolvedRefDiagnostics_MissingTarget_EmitsDiagnostic()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var index = IndexWithRef("file:///a.xml", "UNIT_MISSING", "Unit");
-
-        var diags = publisher.CollectUnresolvedRefDiagnostics("file:///a.xml", index);
-
-        var d = Assert.Single(diags);
-        Assert.Equal(DiagnosticSeverity.Error, d.Severity);
-        Assert.Contains("UNIT_MISSING", d.Message);
-    }
-
-    [Fact]
-    public void CollectUnresolvedRefDiagnostics_Workspace_Resolved_NoDiagnostic()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var baseIndex = IndexWithRef("file:///a.xml", "UNIT_TARGET", "Unit");
-        // Add the target to workspace definitions so Resolve returns it
-        var resolvedSym = new GameSymbol("UNIT_TARGET", GameSymbolKind.XmlObject, "Unit",
-            new FileOrigin("file:///b.xml", 0, null), null);
-        var index = baseIndex with
-        {
-            WorkspaceDefinitions = baseIndex.WorkspaceDefinitions
-                .Add("UNIT_TARGET", ImmutableArray.Create(resolvedSym))
-        };
-
-        var diags = publisher.CollectUnresolvedRefDiagnostics("file:///a.xml", index);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectUnresolvedRefDiagnostics_Baseline_Resolved_NoDiagnostic()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var baseIndex = IndexWithRef("file:///a.xml", "UNIT_BASELINE");
-        var baselineSym = new GameSymbol("UNIT_BASELINE", GameSymbolKind.XmlObject, "Unit",
-            new UnknownOrigin("baseline"), null);
-        var index = baseIndex with
-        {
-            Baseline = new BaselineIndex(
-                ImmutableDictionary<string, GameSymbol>.Empty.Add("UNIT_BASELINE", baselineSym),
-                DateTimeOffset.UtcNow,
-                "hash",
-                ImmutableDictionary<string, ImmutableArray<string>>.Empty,
-                ImmutableDictionary<string, ImmutableArray<string>>.Empty,
-                ImmutableDictionary<string, ImmutableArray<string>>.Empty)
-        };
-
-        var diags = publisher.CollectUnresolvedRefDiagnostics("file:///a.xml", index);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectUnresolvedRefDiagnostics_OtherDocument_NotReported_For_RequestedUri()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        // Reference is in b.xml, not a.xml
-        var reference = new GameReference("UNIT_MISSING", GameSymbolKind.XmlObject, null,
-            "file:///b.xml", 0, 0, 12);
-        var docB = new DocumentIndex("file:///b.xml", 1, [], [reference]);
-        var index = new GameIndex(
-            BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add("file:///b.xml", docB),
-            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
-                .Add("UNIT_MISSING", ImmutableArray.Create(reference)));
-
-        // Asking for a.xml — should have no diagnostics
-        var diags = publisher.CollectUnresolvedRefDiagnostics("file:///a.xml", index);
-
-        Assert.Empty(diags);
-    }
-
     // ── enum boundary diagnostics ────────────────────────────────────────────
-
-    private static GameIndex IndexWithHardcodedEnums(
-        ImmutableDictionary<string, ImmutableArray<string>> hardcoded)
-    {
-        var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty,
-            DateTimeOffset.UtcNow, "hash",
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
-            hardcoded,
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
-        return GameIndex.Empty with { Baseline = baseline };
-    }
 
     [Fact]
     public void CollectEnumBoundaryDiagnostics_NonGameConstantsFile_NoWarning()
@@ -656,7 +295,6 @@ public sealed class XmlDiagnosticsPublisherTest
             .Add("DamageType", ["EXPLOSIVE", "ENERGY"]);
         var index = IndexWithHardcodedEnums(hardcoded);
 
-        // SABER_SLASH was added below the boundary — not in the hardcoded set
         const string xml = """
                            <GameConstants>
                              <Damage_Types>CUSTOM_TYPE
@@ -702,12 +340,11 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Contains(diags, d => d.Message.Contains("MOD_ARMOR_BELOW"));
     }
 
-    // ── story parser guard (root-element detection) ───────────────────────────
+    // ── story parser guard ───────────────────────────────────────────────────
 
     [Fact]
     public void OnIndexChanged_StoryParserDocument_EmitsStoryDiagnostics()
     {
-        // ZOOM_IN has 0 params; Reward_Param1 is spurious → story collector emits a warning.
         var registry = new FakeFileTypeRegistry();
         registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
         var schema = new FakeSchemaProvider();
@@ -737,7 +374,6 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_NonStoryParserDocument_EmitsNoStoryDiagnostics()
     {
-        // Faction root — should never trigger story validation even if it has <Event_Type> children.
         var schema = new FakeSchemaProvider();
         schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction" });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
@@ -755,12 +391,9 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.DoesNotContain(storyDiags, d => d.Message.Contains("is not used by") || d.Message.Contains("requires"));
     }
 
-    // ── StoryParser registry-based detection ─────────────────────────────────
-
     [Fact]
     public void OnIndexChanged_StoryParserDocument_RegistryMatch_ArbitraryRootElement_EmitsStoryDiagnostics()
     {
-        // Detection must use the registry, not the root element name.
         var registry = new FakeFileTypeRegistry();
         const string uri = "file:///StoryPlots.xml";
         registry.Register("storyplots.xml", ImmutableArray.Create("StoryParser"));
@@ -790,7 +423,6 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_StoryParserRootElement_NotInRegistry_NoStoryDiagnostics()
     {
-        // Root element named "StoryParser" but the file is not registered → no story diagnostics.
         var schema = new FakeSchemaProvider();
         schema.AddType(new GameObjectTypeDefinition { TypeName = "StoryParser" });
         var (_, published, indexService, workspaceHost) = BuildSubscribed(schema);
@@ -841,8 +473,6 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_ClosedFileWithDuplicateId_PublishesNothing()
     {
-        // Files not open in the workspace host must never receive any publication —
-        // not even an empty one. The editor only knows about open files.
         var (_, published, indexService, _) = BuildSubscribed();
         var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
 
@@ -869,7 +499,6 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_ClosedFileWithUnresolvedRef_PublishesNothing()
     {
-        // Same reasoning as the duplicate-ID case: closed files must not be published.
         var (_, published, indexService, _) = BuildSubscribed();
         var index = IndexWithRef("file:///a.xml", "UNIT_MISSING");
 
@@ -939,14 +568,6 @@ public sealed class XmlDiagnosticsPublisherTest
         public void AddEnum(EnumDefinition enumDef)
         {
             _enums[enumDef.Name] = enumDef;
-        }
-    }
-
-    private sealed class FakeValidatorRegistry : IXmlValueValidatorRegistry
-    {
-        public XmlValidationResult Validate(XmlValueType _, string __, XmlTagDefinition ___)
-        {
-            return XmlValidationResult.Valid();
         }
     }
 

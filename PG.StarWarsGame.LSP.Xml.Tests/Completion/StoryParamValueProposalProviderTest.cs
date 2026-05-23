@@ -87,7 +87,8 @@ public sealed class StoryParamValueProposalProviderTest
     {
         var sut = new StoryParamValueProposalProvider();
 
-        var proposals = sut.GetProposals(EnumParam(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")), "", GameIndex.Empty);
+        var proposals = sut.GetProposals(EnumParam(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")), "",
+            GameIndex.Empty);
 
         Assert.Equal(3, proposals.Count);
     }
@@ -97,7 +98,8 @@ public sealed class StoryParamValueProposalProviderTest
     {
         var sut = new StoryParamValueProposalProvider();
 
-        var proposals = sut.GetProposals(EnumParam(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")), "G", GameIndex.Empty);
+        var proposals = sut.GetProposals(EnumParam(MakeEnum("FlagCmp", "GREATER_THAN", "LESS_THAN", "EQUAL_TO")), "G",
+            GameIndex.Empty);
 
         Assert.Single(proposals);
         Assert.Equal("GREATER_THAN", proposals[0].Label);
@@ -108,7 +110,7 @@ public sealed class StoryParamValueProposalProviderTest
     {
         var sut = new StoryParamValueProposalProvider();
 
-        Assert.Empty(sut.GetProposals(EnumParam(null), "", GameIndex.Empty));
+        Assert.Empty(sut.GetProposals(EnumParam(), "", GameIndex.Empty));
     }
 
     // ── Boolean proposals ────────────────────────────────────────────────────

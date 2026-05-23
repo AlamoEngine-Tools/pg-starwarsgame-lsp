@@ -5,7 +5,10 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Schema.Yaml;
 
-/// <summary>Pre-resolution enum definition. Values use <see cref="RawEnumValueDefinition"/> with unresolved param references.</summary>
+/// <summary>
+///     Pre-resolution enum definition. Values use <see cref="RawEnumValueDefinition" /> with unresolved param
+///     references.
+/// </summary>
 internal sealed record RawEnumDefinition
 {
     public required string Name { get; init; }

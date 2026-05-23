@@ -4,9 +4,9 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Validation;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -21,8 +21,10 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             new StubIndexService(),
             new StubWorkspaceHost(),
             schema,
-            new StubValidatorRegistry(),
-            new StoryParserDiagnosticCollector(schema),
+            new XmlDiagnosticsHandlerRegistry([]),
+            new StubDocumentFactProducer(),
+            new StubIndexFactProducer(),
+            new StubStoryFactProducer(),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             new StubFileTypeRegistry());
     }
@@ -179,7 +181,8 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
         var wiredTag = tag.ReferenceKind == ReferenceKind.HardcodedSet && hardcodedSets.Count > 0
             ? tag with { HardcodedSet = hardcodedSets[0] }
             : tag;
-        _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase) { [wiredTag.Tag] = wiredTag };
+        _tags = new Dictionary<string, XmlTagDefinition>(StringComparer.OrdinalIgnoreCase)
+            { [wiredTag.Tag] = wiredTag };
     }
 
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _hardcodedSets;
@@ -220,11 +223,27 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
     }
 }
 
-file sealed class StubValidatorRegistry : IXmlValueValidatorRegistry
+file sealed class StubDocumentFactProducer : IXmlDocumentFactProducer
 {
-    public XmlValidationResult Validate(XmlValueType _, string __, XmlTagDefinition ___)
+    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
     {
-        return XmlValidationResult.Valid();
+        return [];
+    }
+}
+
+file sealed class StubIndexFactProducer : IXmlIndexFactProducer
+{
+    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+    {
+        return [];
+    }
+}
+
+file sealed class StubStoryFactProducer : IStoryFactProducer
+{
+    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
+    {
+        return [];
     }
 }
 

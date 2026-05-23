@@ -3,7 +3,7 @@
 
 namespace PG.StarWarsGame.LSP.Schema.Yaml;
 
-/// <summary>Pre-resolution enum value definition. Params are unresolved <see cref="RawParamDefinition"/> entries.</summary>
+/// <summary>Pre-resolution enum value definition. Params are unresolved <see cref="RawParamDefinition" /> entries.</summary>
 internal sealed record RawEnumValueDefinition
 {
     public required string Name { get; init; }

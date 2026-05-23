@@ -33,6 +33,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private readonly IXmlCompletionRegistry _completionRegistry;
+
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
 
@@ -47,6 +49,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IXmlValueProposalRegistry proposals,
         IGameIndexService indexService,
         StoryParamValueProposalProvider storyProposals,
+        IXmlCompletionRegistry completionRegistry,
         IFileTypeRegistry fileTypeRegistry)
     {
         _workspaceHost = workspaceHost;
@@ -54,6 +57,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _proposals = proposals;
         _indexService = indexService;
         _storyProposals = storyProposals;
+        _completionRegistry = completionRegistry;
         _fileTypeRegistry = fileTypeRegistry;
     }
 
@@ -129,7 +133,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             return Task.FromResult(new CompletionList());
 
         var partialValue = ExtractPartialValue(line, character);
-        var valueProposals = _proposals.GetProposals(tagDef.ValueType, tagDef, partialValue);
+        var valueProposals = _proposals.GetProposals(tagDef.ValueType, tagDef, partialValue)
+            .Concat(_completionRegistry.GetProposals(tagDef, partialValue, _indexService.Current));
 
         var valueItems = valueProposals.Select(p => new CompletionItem
         {

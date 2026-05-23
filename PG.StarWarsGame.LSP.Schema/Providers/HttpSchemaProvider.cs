@@ -24,11 +24,13 @@ public sealed class HttpSchemaProvider : ISchemaProvider
     private readonly HttpClient _http;
     private readonly ILogger<HttpSchemaProvider> _logger;
 
+    private readonly Dictionary<string, IReadOnlyList<RawTagDefinition>> _rawTagFallbacks =
+        new(StringComparer.OrdinalIgnoreCase);
+
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private volatile SchemaIndex _current = SchemaIndex.Empty;
-    private readonly Dictionary<string, IReadOnlyList<RawTagDefinition>> _rawTagFallbacks = new(StringComparer.OrdinalIgnoreCase);
     private IReadOnlyList<RawEnumDefinition> _rawEnumFallbacks = [];
 
     public HttpSchemaProvider(HttpClient http, string baseUrl, SchemaHttpCache cache,
