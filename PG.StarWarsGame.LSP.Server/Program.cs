@@ -15,16 +15,13 @@ if (args.Contains("--wait-for-debugger") || Environment.GetEnvironmentVariable("
         Thread.Sleep(100);
     Console.Error.WriteLine("[LSP] Debugger attached, continuing startup.");
 }
-
+#if DEBUG
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .WriteTo.File("pg-swg-lsp-.log", rollingInterval: RollingInterval.Hour)
-#if DEBUG
+    .WriteTo.File("pg-swg-lsp-.log", rollingInterval: RollingInterval.Day)
     .MinimumLevel.Debug()
-#else
-    .MinimumLevel.Information()
-#endif
     .CreateLogger();
+#endif
 
 var tcpPortArg = args.FirstOrDefault(a => a.StartsWith("--tcp=", StringComparison.Ordinal));
 if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out var tcpPort))

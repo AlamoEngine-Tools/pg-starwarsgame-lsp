@@ -27,7 +27,9 @@ public static class ServerConfigurator
             .ConfigureLogging(x => x
                 .SetMinimumLevel(LogLevel.Information)
                 .AddLanguageProtocolLogging()
+#if DEBUG
                 .AddSerilog(dispose: true)
+#endif
                 .AddSentry(o =>
                 {
                     o.Dsn = GetSentryDsn();
