@@ -14,6 +14,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Xml;
+using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
 using Serilog;
 
@@ -44,6 +45,9 @@ public static class ServerConfigurator
             .WithHandler<XmlDefinitionHandler>()
             .WithHandler<XmlReferencesHandler>()
             .WithHandler<XmlRenameHandler>()
+            .WithHandler<XmlCodeActionHandler>()
+            .WithHandler<RevalidateWorkspaceCommandHandler>()
+            .WithHandler<RevalidateDocumentCommandHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();

@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
+using Newtonsoft.Json.Linq;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -110,6 +111,32 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryFactProducer(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             effectiveRegistry,
+            fileHelper);
+        return (publisher, published, indexService, workspaceHost);
+    }
+
+    private static (XmlDiagnosticsPublisher publisher,
+        List<PublishDiagnosticsParams> published,
+        FakeGameIndexService indexService,
+        FakeGameWorkspaceHost workspaceHost) BuildSubscribedWithHandlers(
+            FakeSchemaProvider schema, IXmlDiagnosticsHandler[] handlers)
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
+        var registry = new FakeFileTypeRegistry();
+        var fileHelper = new FileHelper(new MockFileSystem());
+        var publisher = new XmlDiagnosticsPublisher(
+            p => published.Add(p),
+            indexService,
+            workspaceHost,
+            schema,
+            new XmlDiagnosticsHandlerRegistry(handlers),
+            new XmlDocumentFactProducer(fileHelper, schema, registry, new XmlStructuralValidator()),
+            new XmlIndexFactProducer(),
+            new StoryFactProducer(schema),
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            registry,
             fileHelper);
         return (publisher, published, indexService, workspaceHost);
     }
@@ -531,6 +558,141 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Empty(published);
     }
 
+    // ── SuggestedFix → Diagnostic.Data pipeline ─────────────────────────────
+
+    [Fact]
+    public void ToLspDiagnostic_WhenHandlerReturnsSuggestedFix_EmbedsFix_In_DiagnosticData()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribedWithHandlers(schema, [new SuggestedFixStubHandler()]);
+
+        workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diags = published.Single().Diagnostics!.ToList();
+        var diag = Assert.Single(diags);
+        Assert.Equal("42", diag.Data?["fix"]?.Value<string>());
+    }
+
+    [Fact]
+    public void ToLspDiagnostic_WhenHandlerReturnsNoFix_DiagnosticDataIsNull()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribedWithHandlers(schema, [new NoFixStubHandler()]);
+
+        workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diag = Assert.Single(published.Single().Diagnostics!);
+        Assert.Null(diag.Data);
+    }
+
+    // ── revalidation ────────────────────────────────────────────────────────────
+
+    private static (XmlDiagnosticsPublisher publisher,
+        List<PublishDiagnosticsParams> published,
+        FakeGameIndexService indexService,
+        FakeGameWorkspaceHost workspaceHost) BuildSubscribedWithFs(MockFileSystem fs)
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
+        var schema = new FakeSchemaProvider();
+        var registry = new FakeFileTypeRegistry();
+        var fileHelper = new FileHelper(fs);
+
+        IXmlDiagnosticsHandler[] handlers = [];
+        var publisher = new XmlDiagnosticsPublisher(
+            p => published.Add(p),
+            indexService,
+            workspaceHost,
+            schema,
+            new XmlDiagnosticsHandlerRegistry(handlers),
+            new XmlDocumentFactProducer(fileHelper, schema, registry, new XmlStructuralValidator()),
+            new XmlIndexFactProducer(),
+            new StoryFactProducer(schema),
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            registry,
+            fileHelper);
+        return (publisher, published, indexService, workspaceHost);
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_OpenFile_PublishesUsingInMemoryText()
+    {
+        const string uri = "file:///test.xml";
+        var fs = new MockFileSystem();
+        var (publisher, published, indexService, workspaceHost) = BuildSubscribedWithFs(fs);
+        indexService.Current = IndexWithDoc(uri);
+        workspaceHost.Set(uri, "<Root/>");
+
+        await publisher.RevalidateDocumentAsync(uri, CancellationToken.None);
+
+        var pub = Assert.Single(published);
+        Assert.Equal(uri, pub.Uri.ToString());
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_ClosedFile_ReadsFromDiskAndPublishes()
+    {
+        const string uri = "file:///test.xml";
+        const string path = "/test.xml";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [path] = new MockFileData("<Root/>")
+        });
+        var (publisher, published, indexService, _) = BuildSubscribedWithFs(fs);
+        indexService.Current = IndexWithDoc(uri);
+
+        await publisher.RevalidateDocumentAsync(uri, CancellationToken.None);
+
+        var pub = Assert.Single(published);
+        Assert.Equal(uri, pub.Uri.ToString());
+    }
+
+    [Fact]
+    public async Task RevalidateWorkspace_PublishesForAllIndexedUris()
+    {
+        const string uri1 = "file:///a.xml";
+        const string uri2 = "file:///b.xml";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/a.xml"] = new MockFileData("<Root/>"),
+            ["/b.xml"] = new MockFileData("<Root/>")
+        });
+        var (publisher, published, indexService, _) = BuildSubscribedWithFs(fs);
+
+        var docA = new DocumentIndex(uri1, 1, [], []);
+        var docB = new DocumentIndex(uri2, 1, [], []);
+        indexService.Current = new GameIndex(
+            BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(uri1, docA).Add(uri2, docB),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        await publisher.RevalidateWorkspaceAsync(CancellationToken.None);
+
+        Assert.Equal(2, published.Count);
+        Assert.Contains(published, p => p.Uri.ToString() == uri1);
+        Assert.Contains(published, p => p.Uri.ToString() == uri2);
+    }
+
+    private sealed class SuggestedFixStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+            => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning", SuggestedFix: "42")];
+    }
+
+    private sealed class NoFixStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+            => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning no fix")];
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider
@@ -597,7 +759,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
     private sealed class FakeGameIndexService : IGameIndexService
     {
-        public GameIndex Current => GameIndex.Empty;
+        public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)

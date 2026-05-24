@@ -23,15 +23,25 @@ public sealed class SfxPercentageHandlerTest
     }
 
     [Theory]
-    [InlineData("-1")]
-    [InlineData("101")]
     [InlineData("abc")]
     [InlineData("")]
-    public void Invalid_sfx_percentage_values_return_error(string value)
+    public void Non_numeric_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("-1", "0")]
+    [InlineData("101", "100")]
+    [InlineData("50.7", "50")]
+    public void Out_of_range_or_float_returns_warning_with_clamped_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

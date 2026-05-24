@@ -27,15 +27,25 @@ public sealed class NormalizedFloatHandlerTest
     }
 
     [Theory]
-    [InlineData("-0.1")]
-    [InlineData("1.1")]
     [InlineData("abc")]
     [InlineData("")]
-    public void Invalid_normalized_float_values_return_error(string value)
+    public void Non_numeric_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("-0.1", "0")]
+    [InlineData("1.1", "1")]
+    [InlineData("-5.0", "0")]
+    public void Out_of_range_returns_warning_with_clamped_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

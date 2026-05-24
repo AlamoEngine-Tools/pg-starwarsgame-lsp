@@ -25,14 +25,25 @@ public sealed class SfxCountHandlerTest
     }
 
     [Theory]
-    [InlineData("-2")]
     [InlineData("abc")]
     [InlineData("")]
-    public void Invalid_sfx_count_values_return_error(string value)
+    public void Non_numeric_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("-2", "-1")]
+    [InlineData("-1.5f", "-1")]
+    [InlineData("-5", "-1")]
+    public void Below_minus_one_returns_warning_with_clamped_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

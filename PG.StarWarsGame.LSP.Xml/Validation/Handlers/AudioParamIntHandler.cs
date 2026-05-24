@@ -6,21 +6,22 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class AudioParamIntHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class AudioParamIntHandler : NumberValueHandlerBase
 {
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override XmlValueType TargetType => XmlValueType.AudioParamInt;
+
+    protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
+        XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.AudioParamInt)
+        if (int.TryParse(trimmed, out var value) && value >= 0 && value <= 127)
             return [];
 
-        var trimmed = fact.RawValue.Trim();
-        if (!int.TryParse(trimmed, out var value) || value < 0 || value > 127)
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid audio parameter integer for <{fact.Tag.Tag}>. Expected an integer in [0, 127].")
-            ];
-
-        return [];
+        var corrected = ((int)Math.Clamp(Math.Truncate(floatVal), 0.0, 127.0)).ToString();
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"'{trimmed}' is not a valid audio parameter integer for <{fact.Tag.Tag}>. Expected [0, 127]. Did you mean {corrected}?",
+                SuggestedFix: corrected)
+        ];
     }
 }

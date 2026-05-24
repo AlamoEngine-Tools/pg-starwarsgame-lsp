@@ -13,4 +13,5 @@ public record XmlDiagnosticResult(
     string Message,
     int? OverrideLine = null,
     int? OverrideColumn = null,
-    int? OverrideLength = null);
+    int? OverrideLength = null,
+    string? SuggestedFix = null);

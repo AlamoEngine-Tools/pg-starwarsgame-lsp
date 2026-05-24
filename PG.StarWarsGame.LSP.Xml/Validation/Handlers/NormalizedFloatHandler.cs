@@ -23,11 +23,15 @@ public sealed class NormalizedFloatHandler : XmlDiagnosticsHandler<XmlTagValueFa
             ];
 
         if (d is < 0.0 or > 1.0)
+        {
+            var clamped = Math.Clamp(d, 0.0, 1.0).ToString("G", CultureInfo.InvariantCulture);
             return
             [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"Value {d} is out of range [0, 1] for <{fact.Tag.Tag}>.")
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                    $"Value {d} is out of range [0, 1] for <{fact.Tag.Tag}>. Did you mean {clamped}?",
+                    SuggestedFix: clamped)
             ];
+        }
 
         return [];
     }

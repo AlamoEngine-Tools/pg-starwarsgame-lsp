@@ -23,14 +23,34 @@ public sealed partial class IntListHandler : XmlDiagnosticsHandler<XmlTagValueFa
             ];
 
         var parts = Separator().Split(trimmed);
-        if (parts.Any(p => !int.TryParse(p, out _)))
+
+        // Any token that is not a valid float at all → error
+        if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'{trimmed}' is not a valid integer list for <{fact.Tag.Tag}>. Expected space-separated integers.")
             ];
 
-        return [];
+        // All tokens are valid floats and also valid ints → OK
+        if (parts.All(p => int.TryParse(p, out _)))
+            return [];
+
+        // Some tokens are floats but not ints → warning with corrected list
+        var corrected = string.Join(" ", parts.Select(p =>
+        {
+            if (int.TryParse(p, out var iv))
+                return iv.ToString();
+            LenientFloatParser.TryParse(p, out var fv);
+            return ((int)fv).ToString();
+        }));
+
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"'{trimmed}' contains float values but <{fact.Tag.Tag}> expects integers. Did you mean '{corrected}'?",
+                SuggestedFix: corrected)
+        ];
     }
 
     [GeneratedRegex(@"[\s,]+")]

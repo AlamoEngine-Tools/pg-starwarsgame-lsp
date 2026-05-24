@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Completion.Providers;
 using PG.StarWarsGame.LSP.Xml.Validation;
@@ -16,6 +17,10 @@ public static class XmlLanguageServiceExtensions
     public static IServiceCollection AddXmlLanguageServices(this IServiceCollection services)
     {
         services.AddSingleton<XmlDiagnosticsPublisher>();
+        services.AddSingleton<IXmlDiagnosticsRevalidator>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
+        services.AddSingleton<IXmlFixCache>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
+        services.AddSingleton<RevalidateWorkspaceCommandHandler>();
+        services.AddSingleton<RevalidateDocumentCommandHandler>();
 
         // Handler registry
         services.AddSingleton<IXmlDiagnosticsHandlerRegistry, XmlDiagnosticsHandlerRegistry>();

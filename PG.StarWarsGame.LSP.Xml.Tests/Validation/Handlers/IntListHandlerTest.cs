@@ -26,12 +26,22 @@ public sealed class IntListHandlerTest
     [InlineData("")]
     [InlineData("abc def")]
     [InlineData("1 abc 3")]
-    [InlineData("1.5 2.5")]
-    public void Invalid_int_list_values_return_error(string value)
+    public void Non_numeric_tokens_return_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("1.5 2.5", "1 2")]
+    [InlineData("1.0f 3.7", "1 3")]
+    public void Float_tokens_return_warning_with_truncated_corrected_list(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

@@ -6,21 +6,23 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class HardwareUIntHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class HardwareUIntHandler : NumberValueHandlerBase
 {
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override XmlValueType TargetType => XmlValueType.HardwareUInt;
+
+    protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
+        XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.HardwareUInt)
+        if (uint.TryParse(trimmed, out _))
             return [];
 
-        var trimmed = fact.RawValue.Trim();
-        if (!uint.TryParse(trimmed, out _))
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid hardware unsigned integer for <{fact.Tag.Tag}>. Expected a non-negative integer.")
-            ];
-
-        return [];
+        var clamped = Math.Clamp(Math.Truncate(floatVal), 0.0, uint.MaxValue);
+        var corrected = ((uint)clamped).ToString();
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"'{trimmed}' is not a valid hardware unsigned integer for <{fact.Tag.Tag}>. Did you mean {corrected}?",
+                SuggestedFix: corrected)
+        ];
     }
 }

@@ -26,15 +26,28 @@ public sealed class IntValueHandlerTest
 
     [Theory]
     [InlineData("abc")]
-    [InlineData("1.5")]
     [InlineData("")]
     [InlineData("9999999999999")]
-    public void Invalid_int_values_return_error(string value)
+    public void Non_numeric_or_overflow_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(IntTag, value), XmlHandlerTestFixtures.EmptyCtx)
             .ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("1.5", "1")]
+    [InlineData("1.5f", "1")]
+    [InlineData("-2.9", "-2")]
+    [InlineData("0.9", "0")]
+    public void Float_in_int_field_returns_warning_with_truncated_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(IntTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

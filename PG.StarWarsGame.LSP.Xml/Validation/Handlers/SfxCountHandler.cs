@@ -6,21 +6,22 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class SfxCountHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class SfxCountHandler : NumberValueHandlerBase
 {
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override XmlValueType TargetType => XmlValueType.SfxCount;
+
+    protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
+        XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.SfxCount)
+        if (int.TryParse(trimmed, out var value) && value >= -1)
             return [];
 
-        var trimmed = fact.RawValue.Trim();
-        if (!int.TryParse(trimmed, out var value) || value < -1)
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid SFX count for <{fact.Tag.Tag}>. Expected -1 or a non-negative integer.")
-            ];
-
-        return [];
+        var corrected = ((int)Math.Clamp(Math.Truncate(floatVal), -1.0, (double)int.MaxValue)).ToString();
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"'{trimmed}' is not a valid SFX count for <{fact.Tag.Tag}>. Expected -1 or a non-negative integer. Did you mean {corrected}?",
+                SuggestedFix: corrected)
+        ];
     }
 }

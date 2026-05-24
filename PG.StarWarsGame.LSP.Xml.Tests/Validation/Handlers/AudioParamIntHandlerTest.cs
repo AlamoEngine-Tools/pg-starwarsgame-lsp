@@ -25,15 +25,26 @@ public sealed class AudioParamIntHandlerTest
     }
 
     [Theory]
-    [InlineData("-1")]
-    [InlineData("128")]
     [InlineData("abc")]
     [InlineData("")]
-    public void Invalid_audio_param_int_values_return_error(string value)
+    public void Non_numeric_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("-1", "0")]
+    [InlineData("128", "127")]
+    [InlineData("1.5", "1")]
+    [InlineData("200.9", "127")]
+    public void Out_of_range_or_float_returns_warning_with_clamped_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

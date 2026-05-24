@@ -6,21 +6,31 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class IntValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class IntValueHandler : NumberValueHandlerBase
 {
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override XmlValueType TargetType => XmlValueType.Int;
+
+    protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
+        XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.Int)
+        if (int.TryParse(trimmed, out _))
             return [];
 
-        var trimmed = fact.RawValue.Trim();
-        if (!int.TryParse(trimmed, out _))
+        if (floatVal is >= int.MinValue and <= int.MaxValue)
+        {
+            var corrected = ((int)floatVal).ToString();
             return
             [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid integer for <{fact.Tag.Tag}>. Expected a valid integer.")
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                    $"'{trimmed}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {corrected}?",
+                    SuggestedFix: corrected)
             ];
+        }
 
-        return [];
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+                $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a valid integer.")
+        ];
     }
 }

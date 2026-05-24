@@ -33,7 +33,7 @@ public sealed class XmlDocumentFactProducer(
         foreach (var root in doc.DocumentNode.ChildNodes)
         {
             if (root.NodeType != HtmlNodeType.Element) continue;
-            WalkNodes(root, facts, lines, isTypeContainerLevel, documentUri);
+            WalkNodes(root, facts, xmlText, lines, isTypeContainerLevel, documentUri);
         }
 
         // Collect notes hints for every element in the document
@@ -56,13 +56,13 @@ public sealed class XmlDocumentFactProducer(
     }
 
     private void WalkNodes(
-        HtmlNode node, List<XmlFact> facts, string[] lines, bool isTypeContainerLevel, string documentUri)
+        HtmlNode node, List<XmlFact> facts, string text, string[] lines, bool isTypeContainerLevel, string documentUri)
     {
         if (isTypeContainerLevel)
         {
             foreach (var child in node.ChildNodes)
                 if (child.NodeType == HtmlNodeType.Element)
-                    WalkNodes(child, facts, lines, false, documentUri);
+                    WalkNodes(child, facts, text, lines, false, documentUri);
             return;
         }
 
@@ -94,7 +94,7 @@ public sealed class XmlDocumentFactProducer(
 
             if (tagDef is null)
             {
-                WalkNodes(child, facts, lines, false, documentUri);
+                WalkNodes(child, facts, text, lines, false, documentUri);
                 continue;
             }
 
@@ -108,18 +108,20 @@ public sealed class XmlDocumentFactProducer(
                     .ToList();
                 var openLen = ComputeOpeningTagLength(child, col0, line0 < lines.Length ? lines[line0] : string.Empty);
                 facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines));
-                WalkNodes(child, facts, lines, false, documentUri);
+                WalkNodes(child, facts, text, lines, false, documentUri);
                 continue;
             }
 
             var rawValue = child.InnerText.Trim();
             if (!string.IsNullOrEmpty(rawValue))
             {
-                var outerLen = child.OuterHtml.Length;
-                facts.Add(new XmlTagValueFact(documentUri, line0, col0, outerLen, tagDef, rawValue));
+                var innerHtml = child.InnerHtml;
+                var leadingWs = innerHtml.Length - innerHtml.TrimStart().Length;
+                var (valLine, valCol) = ComputeOffsetToLineCol(text, child.InnerStartIndex + leadingWs);
+                facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, rawValue.Length, tagDef, rawValue));
             }
 
-            WalkNodes(child, facts, lines, false, documentUri);
+            WalkNodes(child, facts, text, lines, false, documentUri);
         }
     }
 
@@ -130,6 +132,21 @@ public sealed class XmlDocumentFactProducer(
         var col0 = sourceLine.IndexOf('<');
         if (col0 < 0) col0 = 0;
         return (line0, col0);
+    }
+
+    private static (int line, int col) ComputeOffsetToLineCol(string text, int offset)
+    {
+        var line = 0;
+        var lineStart = 0;
+        for (var i = 0; i < offset && i < text.Length; i++)
+        {
+            if (text[i] == '\n')
+            {
+                line++;
+                lineStart = i + 1;
+            }
+        }
+        return (line, offset - lineStart);
     }
 
     private static int ComputeOpeningTagLength(HtmlNode node, int col0, string sourceLine)

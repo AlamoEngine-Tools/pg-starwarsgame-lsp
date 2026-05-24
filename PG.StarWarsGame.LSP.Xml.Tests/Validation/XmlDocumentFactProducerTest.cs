@@ -136,6 +136,35 @@ public sealed class XmlDocumentFactProducerTest
         Assert.True(tvf.Column >= 0);
     }
 
+    [Fact]
+    public void XmlTagValueFact_InlineValue_PointsToValueStart()
+    {
+        // <Root><Max_Speed>90.0</Max_Speed></Root>
+        //                  ^ col 17 (0-based), length 4
+        const string xml = "<Root><Max_Speed>90.0</Max_Speed></Root>";
+        var facts = Build().Produce(xml, Uri);
+        var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal(0, tvf.Line);
+        Assert.Equal(17, tvf.Column);
+        Assert.Equal(4, tvf.Length);
+    }
+
+    [Fact]
+    public void XmlTagValueFact_MultiLineValue_PointsToValueLine()
+    {
+        // Line 0: <Root>
+        // Line 1: <Max_Speed>
+        // Line 2:     90.0     ← value at col 4, length 4
+        // Line 3: </Max_Speed>
+        // Line 4: </Root>
+        const string xml = "<Root>\n<Max_Speed>\n    90.0\n</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+        var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal(2, tvf.Line);
+        Assert.Equal(4, tvf.Column);
+        Assert.Equal(4, tvf.Length);
+    }
+
     // ── structural validation ─────────────────────────────────────────────────
 
     [Fact]

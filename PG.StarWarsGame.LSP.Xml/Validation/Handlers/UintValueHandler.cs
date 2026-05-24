@@ -6,22 +6,29 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class UintValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class UintValueHandler : NumberValueHandlerBase
 {
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override XmlValueType TargetType => XmlValueType.UInt;
+
+    protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
+        XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.UInt)
+        if (int.TryParse(trimmed, out var value) && value >= 0)
             return [];
 
-        var trimmed = fact.RawValue.Trim();
-
-        if (!int.TryParse(trimmed, out var value) || value < 0)
+        if (floatVal > int.MaxValue)
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid unsigned integer for <{fact.Tag.Tag}>. Expected a non-negative integer.")
+                    $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a non-negative integer.")
             ];
 
-        return [];
+        var corrected = ((int)Math.Max(0.0, Math.Truncate(floatVal))).ToString();
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"'{trimmed}' is not a valid non-negative integer for <{fact.Tag.Tag}>. Did you mean {corrected}?",
+                SuggestedFix: corrected)
+        ];
     }
 }

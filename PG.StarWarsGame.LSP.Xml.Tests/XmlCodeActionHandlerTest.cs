@@ -1,0 +1,105 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using Newtonsoft.Json.Linq;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+
+namespace PG.StarWarsGame.LSP.Xml.Tests;
+
+public sealed class XmlCodeActionHandlerTest
+{
+    private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null)
+        => new(cache ?? new EmptyFixCache());
+
+    private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)
+        => new()
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },
+            Range = new LspRange(new Position(0, 0), new Position(0, 0)),
+            Context = new CodeActionContext { Diagnostics = new Container<Diagnostic>(diagnostics) }
+        };
+
+    private static Diagnostic DiagWithFix(LspRange range, string fix)
+        => new() { Range = range, Data = JToken.FromObject(new { fix }) };
+
+    private static Diagnostic DiagWithoutFix(LspRange range)
+        => new() { Range = range, Data = null };
+
+    [Fact]
+    public async Task DiagnosticWithFix_ReturnsSingleCodeActionWithEdit()
+    {
+        const string uri = "file:///test.xml";
+        var range = new LspRange(new Position(0, 10), new Position(0, 13));
+        var request = ParamsWithDiagnostics(uri, DiagWithFix(range, "42"));
+
+        var result = await MakeSut().Handle(request, CancellationToken.None);
+
+        var action = Assert.Single(result!).CodeAction;
+        Assert.NotNull(action);
+        Assert.Equal(CodeActionKind.QuickFix, action.Kind);
+        Assert.Equal("Replace with '42'", action.Title);
+        Assert.True(action.IsPreferred);
+
+        var docUri = DocumentUri.From(uri);
+        var edit = Assert.Single(action.Edit!.Changes![docUri].ToList());
+        Assert.Equal("42", edit.NewText);
+        Assert.Equal(range, edit.Range);
+    }
+
+    [Fact]
+    public async Task DiagnosticWithoutFix_NoCache_ReturnsEmpty()
+    {
+        var range = new LspRange(new Position(1, 5), new Position(1, 8));
+        var request = ParamsWithDiagnostics("file:///test.xml", DiagWithoutFix(range));
+
+        var result = await MakeSut().Handle(request, CancellationToken.None);
+
+        Assert.Empty(result!);
+    }
+
+    [Fact]
+    public async Task DiagnosticDataAbsent_CacheFallback_ReturnsAction()
+    {
+        const string uri = "file:///test.xml";
+        var range = new LspRange(new Position(0, 10), new Position(0, 13));
+        var cache = new StubFixCache(uri, 0, 10, "99");
+        var request = ParamsWithDiagnostics(uri, DiagWithoutFix(range));
+
+        var result = await MakeSut(cache).Handle(request, CancellationToken.None);
+
+        var action = Assert.Single(result!).CodeAction;
+        Assert.Equal("Replace with '99'", action!.Title);
+    }
+
+    [Fact]
+    public async Task MultipleFixableDiagnostics_ReturnsOneActionEach()
+    {
+        const string uri = "file:///test.xml";
+        var range1 = new LspRange(new Position(0, 5), new Position(0, 8));
+        var range2 = new LspRange(new Position(2, 3), new Position(2, 6));
+        var request = ParamsWithDiagnostics(uri,
+            DiagWithFix(range1, "1"),
+            DiagWithFix(range2, "2"));
+
+        var result = await MakeSut().Handle(request, CancellationToken.None);
+
+        var actions = result!.ToList();
+        Assert.Equal(2, actions.Count);
+        var docUri = DocumentUri.From(uri);
+        Assert.Equal("1", actions[0].CodeAction!.Edit!.Changes![docUri].Single().NewText);
+        Assert.Equal("2", actions[1].CodeAction!.Edit!.Changes![docUri].Single().NewText);
+    }
+
+    private sealed class EmptyFixCache : IXmlFixCache
+    {
+        public string? GetSuggestedFix(string uri, int startLine, int startChar) => null;
+    }
+
+    private sealed class StubFixCache(string uri, int line, int ch, string fix) : IXmlFixCache
+    {
+        public string? GetSuggestedFix(string u, int l, int c)
+            => u == uri && l == line && c == ch ? fix : null;
+    }
+}

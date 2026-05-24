@@ -26,16 +26,27 @@ public sealed class UintValueHandlerTest
     }
 
     [Theory]
-    [InlineData("-1")]
     [InlineData("abc")]
     [InlineData("")]
-    [InlineData("1.5")]
-    public void Invalid_uint_values_return_error(string value)
+    public void Non_numeric_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(UintTag, value), XmlHandlerTestFixtures.EmptyCtx)
             .ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("-1", "0")]
+    [InlineData("1.5", "1")]
+    [InlineData("-0.7", "0")]
+    public void Float_or_negative_in_uint_field_returns_warning_with_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(UintTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]
