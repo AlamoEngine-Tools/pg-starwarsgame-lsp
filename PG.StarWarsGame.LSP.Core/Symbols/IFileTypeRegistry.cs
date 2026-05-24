@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 public interface IFileTypeRegistry
 {
     IReadOnlyDictionary<string, ImmutableArray<string>> All { get; }
-    ImmutableArray<string> GetTypesForFile(string normalizedPath);
-    void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames);
-    void UnregisterFile(string normalizedPath);
+    ImmutableArray<string> GetTypesForFile(string fileUri);
+    void RegisterFile(string fileUri, ImmutableArray<string> typeNames);
+    void UnregisterFile(string fileUri);
 }

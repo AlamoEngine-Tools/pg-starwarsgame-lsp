@@ -10,9 +10,9 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Completion;
-using PG.StarWarsGame.LSP.Xml.Parsing;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -35,6 +35,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
     private readonly IXmlCompletionRegistry _completionRegistry;
 
+    private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
 
@@ -50,7 +51,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IGameIndexService indexService,
         StoryParamValueProposalProvider storyProposals,
         IXmlCompletionRegistry completionRegistry,
-        IFileTypeRegistry fileTypeRegistry)
+        IFileTypeRegistry fileTypeRegistry,
+        IFileHelper fileHelper)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
@@ -59,6 +61,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _storyProposals = storyProposals;
         _completionRegistry = completionRegistry;
         _fileTypeRegistry = fileTypeRegistry;
+        _fileHelper = fileHelper;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
@@ -148,15 +151,11 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     }
 
     private bool IsStoryParserDocument(string documentUri)
-    {
-        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
-        return _fileTypeRegistry.GetTypesForFile(normalized).Contains("StoryParser");
-    }
+        => _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
 
     private bool IsMultiInstanceFile(string documentUri)
     {
-        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
-        var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri));
         return fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
     }
 
@@ -281,8 +280,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private IEnumerable<CompletionItem> BuildTagNameCompletions(
         string uri, string text, string parentName, int depth, string prefix)
     {
-        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(uri);
-        var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
 
         IReadOnlyList<XmlTagDefinition> candidates;
         if (!fileTypes.IsEmpty)

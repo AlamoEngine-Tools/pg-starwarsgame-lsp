@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -96,17 +98,19 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryParamUnknownSlotHandler()
         ];
 
+        var fileHelper = new FileHelper(new MockFileSystem());
         var publisher = new XmlDiagnosticsPublisher(
             p => published.Add(p),
             indexService,
             workspaceHost,
             effectiveSchema,
             new XmlDiagnosticsHandlerRegistry(handlers),
-            new XmlDocumentFactProducer(effectiveSchema, effectiveRegistry),
+            new XmlDocumentFactProducer(fileHelper, effectiveSchema, effectiveRegistry),
             new XmlIndexFactProducer(),
             new StoryFactProducer(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
-            effectiveRegistry);
+            effectiveRegistry,
+            fileHelper);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -468,6 +472,26 @@ public sealed class XmlDiagnosticsPublisherTest
             d => d.Severity == DiagnosticSeverity.Hint && d.Message.Contains("Never used in vanilla."));
     }
 
+    // ── URI normalization ────────────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_MixedCaseWorkspaceUri_IndexProducerStillEmitsDuplicateDiagnostic()
+    {
+        // Workspace host stores the raw LSP URI — VS Code may send mixed case on Windows.
+        // The index (from GameIndexService) stores canonical lowercase URIs. The publisher
+        // must normalize before looking up in the index.
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///A.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        workspaceHost.Set("file:///b.xml", "<Unit><Name>UNIT_A</Name></Unit>");
+        var index = IndexWithDuplicateId("UNIT_A", "file:///a.xml", "file:///b.xml");
+
+        indexService.Fire(index);
+
+        var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///A.xml");
+        Assert.NotNull(pub);
+        Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
+    }
+
     // ── closed-file suppression ──────────────────────────────────────────────
 
     [Fact]
@@ -633,7 +657,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         public void Register(string key, ImmutableArray<string> types)
         {
-            _map[key] = types;
+            _map["file:///" + key] = types;
         }
     }
 

@@ -5,18 +5,20 @@ using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Parsing;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
-public sealed class XmlDocumentFactProducer(ISchemaProvider schema, IFileTypeRegistry fileTypeRegistry)
+public sealed class XmlDocumentFactProducer(
+    IFileHelper fileHelper, ISchemaProvider schema, IFileTypeRegistry fileTypeRegistry)
     : IXmlDocumentFactProducer
 {
     public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
     {
         var facts = new List<XmlFact>();
-        var doc = new HtmlDocument();
-        doc.LoadHtml(xmlText);
+        var doc = XmlUtility.CreateHtmlDocument(xmlText);
+        var lineNum = doc.DocumentNode.EndNode.Line;
         var lines = xmlText.Split('\n');
 
         var isTypeContainerLevel = IsTypeContainerDocument(documentUri);
@@ -42,8 +44,7 @@ public sealed class XmlDocumentFactProducer(ISchemaProvider schema, IFileTypeReg
 
     private bool IsTypeContainerDocument(string documentUri)
     {
-        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
-        var fileTypes = fileTypeRegistry.GetTypesForFile(normalized);
+        var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
         return !fileTypes.IsEmpty && fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
     }
 

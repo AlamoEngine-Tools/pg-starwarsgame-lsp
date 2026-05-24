@@ -5,14 +5,28 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 public static class LspTestEnvironment
 {
+    // Walk up from the test assembly to find the solution root (directory containing *.slnx).
+    private static readonly string? SolutionRoot = FindSolutionRoot(
+        Path.GetDirectoryName(typeof(LspTestEnvironment).Assembly.Location)!);
+
+    /// <summary>
+    ///     Schema directory.  Prefers <c>LSP_SCHEMA_LOCAL_PATH</c> env var; falls back to
+    ///     <c>schema/eaw</c> inside the repository.  Returns <c>null</c> if neither exists.
+    /// </summary>
     public static string? SchemaLocalPath =>
-        Environment.GetEnvironmentVariable("LSP_SCHEMA_LOCAL_PATH");
+        ExistingPath(Environment.GetEnvironmentVariable("LSP_SCHEMA_LOCAL_PATH"))
+        ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "schema", "eaw") : null);
+
+    /// <summary>
+    ///     Workspace root.  Prefers <c>LSP_WORKSPACE_PATH</c> env var; falls back to
+    ///     <c>foc/</c> inside the repository.  Returns <c>null</c> if neither exists.
+    /// </summary>
+    public static string? WorkspacePath =>
+        ExistingPath(Environment.GetEnvironmentVariable("LSP_WORKSPACE_PATH"))
+        ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "foc") : null);
 
     public static string? GamePath =>
         Environment.GetEnvironmentVariable("LSP_GAME_PATH");
-
-    public static string? WorkspacePath =>
-        Environment.GetEnvironmentVariable("LSP_WORKSPACE_PATH");
 
     public static string? BaselineLocalPath =>
         Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH");
@@ -34,4 +48,19 @@ public static class LspTestEnvironment
         && int.TryParse(val, out var port)
             ? port
             : null;
+
+    private static string? ExistingPath(string? path) =>
+        path is not null && Directory.Exists(path) ? path : null;
+
+    private static string? FindSolutionRoot(string start)
+    {
+        var dir = new DirectoryInfo(start);
+        while (dir is not null)
+        {
+            if (dir.EnumerateFiles("*.slnx").Any())
+                return dir.FullName;
+            dir = dir.Parent;
+        }
+        return null;
+    }
 }

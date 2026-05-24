@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Completion;
 
@@ -27,7 +29,8 @@ public sealed class XmlCompletionHandlerTest
         var indexService = new FakeIndexService();
         var storyProposals = new StoryParamValueProposalProvider();
         return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
-            new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry()), host, schema, proposals);
+            new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry(),
+            new FileHelper(new MockFileSystem())), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -739,7 +742,7 @@ public sealed class XmlCompletionHandlerTest
 
         public void Register(string key, ImmutableArray<string> types)
         {
-            _map[key] = types;
+            _map["file:///" + key] = types;
         }
     }
 }

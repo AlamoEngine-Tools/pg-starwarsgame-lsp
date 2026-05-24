@@ -9,8 +9,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Parsing;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -18,6 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlHoverHandler : HoverHandlerBase
 {
     private readonly ILspConfigurationProvider _config;
+    private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly ISchemaProvider _schema;
@@ -28,13 +29,15 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         ISchemaProvider schema,
         ILspConfigurationProvider config,
         ILogger<XmlHoverHandler> logger,
-        IFileTypeRegistry fileTypeRegistry)
+        IFileTypeRegistry fileTypeRegistry,
+        IFileHelper fileHelper)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
         _config = config;
         _logger = logger;
         _fileTypeRegistry = fileTypeRegistry;
+        _fileHelper = fileHelper;
     }
 
     public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
@@ -53,6 +56,8 @@ public sealed class XmlHoverHandler : HoverHandlerBase
             XmlUtility.GetLine(rootNode) == request.Position.Line)
             return Task.FromResult<Hover?>(null);
 
+        // TODO: ensure that we don't hover over node content, but only the node tag itself should emit hovers.
+        // TODO: inject hover over references here, so hovers over values don't show the tag but the peek of the target.
 
         var lines = text.Split('\n');
         var lineIndex = request.Position.Line;
@@ -78,8 +83,7 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         // via the registry and confirm the cursor is on a depth-1 type-container element.
         if (typeDef is null)
         {
-            var normalized = XmlGameDocumentParser.NormalizeDocumentUri(uri);
-            var fileTypes = _fileTypeRegistry.GetTypesForFile(normalized);
+            var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
             if (!fileTypes.IsEmpty)
             {
                 var registeredType = fileTypes
@@ -100,6 +104,12 @@ public sealed class XmlHoverHandler : HoverHandlerBase
                 _logger.LogDebug("Hover resolved: type {TagName}::{tag}", typeDef.TypeName, typedTagDef.Tag);
                 return Task.FromResult<Hover?>(HoverUtility.BuildTagHover(typeDef, typedTagDef, node, locale));
             }
+
+            // we assume we're hovering over an XmlObject definition.
+            if (node.ParentNode == rootNode)
+                _logger.LogDebug("Hover resolved: type {TagName}::{id}", typeDef.TypeName,
+                    XmlUtility.GetXmlObjectId(typeDef, node));
+            return Task.FromResult<Hover?>(HoverUtility.BuildTypeHover(typeDef, node, locale));
         }
 
         // fallback if no type could be resolved.

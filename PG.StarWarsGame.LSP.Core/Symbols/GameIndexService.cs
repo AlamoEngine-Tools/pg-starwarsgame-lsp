@@ -3,19 +3,23 @@
 
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public sealed class GameIndexService : IGameIndexService
 {
+    private readonly IFileHelper _fileHelper;
     private readonly ILogger<GameIndexService> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private GameIndex _current = GameIndex.Empty;
     private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
     private int _suppressionDepth;
 
-    public GameIndexService(IEnumerable<IGameDocumentParser> parsers, ILogger<GameIndexService> logger)
+    public GameIndexService(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
+        ILogger<GameIndexService> logger)
     {
+        _fileHelper = fileHelper;
         _parsers = parsers;
         _logger = logger;
     }
@@ -44,9 +48,12 @@ public sealed class GameIndexService : IGameIndexService
         {
             snapshot = Volatile.Read(ref _current);
 
-            // Drop stale parses: another task may have committed a newer version already.
+            // Drop stale parses: a strictly newer version has already been committed.
+            // Using strict > (not >=) so that re-opening the same file at the same version
+            // (e.g. DidOpen after a workspace scan at v0, then again at v1) still fires
+            // IndexChanged and re-publishes diagnostics.
             var existing = snapshot.Documents.GetValueOrDefault(uri);
-            if (existing is not null && existing.Version >= newDoc.Version)
+            if (existing is not null && existing.Version > newDoc.Version)
             {
                 _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri,
                     newDoc.Version, existing.Version);
@@ -165,14 +172,7 @@ public sealed class GameIndexService : IGameIndexService
         };
     }
 
-    private static string NormalizeUri(string uri)
-    {
-        if (uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            return uri;
-        var forward = uri.Replace('\\', '/');
-        var prefix = forward.StartsWith('/') ? "file://" : "file:///";
-        return prefix + forward;
-    }
+    private string NormalizeUri(string uri) => _fileHelper.NormalizeUri(uri);
 
     private sealed class BulkUpdateScope : IDisposable
     {

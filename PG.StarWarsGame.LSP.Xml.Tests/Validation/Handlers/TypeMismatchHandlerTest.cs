@@ -54,4 +54,22 @@ public sealed class TypeMismatchHandlerTest
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
+
+    [Fact]
+    public void GameObjectType_expected_emits_no_diagnostics()
+    {
+        var sym = MakeSymbol("X_Wing", "SpaceUnit");
+        var fact = new XmlReferenceFact("file:///test.xml", 1, 0, 6, "X_Wing", sym, "GameObjectType");
+        var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void GameObjectType_expected_caseInsensitive_emits_no_diagnostics()
+    {
+        var sym = MakeSymbol("X_Wing", "SpaceUnit");
+        var fact = new XmlReferenceFact("file:///test.xml", 1, 0, 6, "X_Wing", sym, "gameobjecttype");
+        var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
 }

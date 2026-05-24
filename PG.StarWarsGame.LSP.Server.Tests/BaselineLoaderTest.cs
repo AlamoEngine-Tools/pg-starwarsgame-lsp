@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -197,7 +198,7 @@ public sealed class BaselineLoaderTest
     private static BaselineLoader Build(MockFileSystem fs, FakeHttpHandler handler)
     {
         var client = new HttpClient(handler);
-        return new BaselineLoader(client, fs, NullLogger<BaselineLoader>.Instance);
+        return new BaselineLoader(client, new FileHelper(fs), NullLogger<BaselineLoader>.Instance);
     }
 
     private sealed class FakeHttpHandler(Func<HttpRequestMessage, HttpResponseMessage> respond)

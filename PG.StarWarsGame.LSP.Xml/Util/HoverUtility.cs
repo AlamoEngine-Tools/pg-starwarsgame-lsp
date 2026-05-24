@@ -26,6 +26,25 @@ internal static class HoverUtility
         return NoneMessage;
     }
 
+    public static Hover BuildTypeHover(GameObjectTypeDefinition type, HtmlNode node, string locale)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"### `{type.TypeName}::{node.Name}`");
+        var id = XmlUtility.GetXmlObjectId(type, node);
+        if (!string.IsNullOrWhiteSpace(id)) sb.Append($" *\"{id}\"*");
+        sb.AppendLine();
+        sb.Append(Resolve(type.Description, locale));
+        AppendNotes(sb, type.Notes, locale);
+        return new Hover
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = sb.ToString()
+            }),
+            Range = MakeRange(XmlUtility.GetLine(node), XmlUtility.GetOpeningTagStartColumn(node), node.Name.Length)
+        };
+    }
 
     public static Hover BuildTagHover(XmlTagDefinition tag, HtmlNode node, string locale)
     {

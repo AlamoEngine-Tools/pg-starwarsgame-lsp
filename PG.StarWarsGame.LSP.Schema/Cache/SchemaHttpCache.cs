@@ -1,11 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions;
 using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Schema.Yaml;
 
 namespace PG.StarWarsGame.LSP.Schema.Cache;
@@ -13,19 +13,19 @@ namespace PG.StarWarsGame.LSP.Schema.Cache;
 public sealed class SchemaHttpCache
 {
     private readonly string _dir;
-    private readonly IFileSystem _fs;
+    private readonly IFileHelper _fileHelper;
     private readonly ILogger<SchemaHttpCache> _logger;
 
-    public SchemaHttpCache(IFileSystem fs, ILogger<SchemaHttpCache> logger)
+    public SchemaHttpCache(IFileHelper fileHelper, ILogger<SchemaHttpCache> logger)
     {
-        _fs = fs;
+        _fileHelper = fileHelper;
         _logger = logger;
-        _dir = _fs.Path.Combine(
+        _dir = _fileHelper.FileSystem.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
             ".pg-swg-lsp", "schema");
     }
 
-    private string ChecksumPath => _fs.Path.Combine(_dir, "_index.sha256");
+    private string ChecksumPath => _fileHelper.FileSystem.Path.Combine(_dir, "_index.sha256");
 
     /// <summary>
     ///     Returns true and populates <paramref name="index" /> when the stored checksum matches
@@ -37,10 +37,10 @@ public sealed class SchemaHttpCache
         index = SchemaIndex.Empty;
         try
         {
-            if (!_fs.File.Exists(ChecksumPath))
+            if (!_fileHelper.FileSystem.File.Exists(ChecksumPath))
                 return false;
 
-            var stored = _fs.File.ReadAllText(ChecksumPath).Trim();
+            var stored = _fileHelper.FileSystem.File.ReadAllText(ChecksumPath).Trim();
 
             var allRels = manifest.Tags
                 .Concat(manifest.Types)
@@ -50,7 +50,7 @@ public sealed class SchemaHttpCache
                 .ToList();
 
             foreach (var rel in allRels)
-                if (!_fs.File.Exists(_fs.Path.Combine(_dir, rel)))
+                if (!_fileHelper.FileSystem.File.Exists(_fileHelper.FileSystem.Path.Combine(_dir, rel)))
                     return false;
 
             if (manifest.BaselineHash is not null)
@@ -63,7 +63,7 @@ public sealed class SchemaHttpCache
             {
                 // Slow path: re-hash every file from disk.
                 var contents = allRels
-                    .Select(rel => _fs.File.ReadAllText(_fs.Path.Combine(_dir, rel)))
+                    .Select(rel => _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel)))
                     .ToList();
                 if (!string.Equals(stored, ComputeYamlHash(contents), StringComparison.OrdinalIgnoreCase))
                     return false;
@@ -78,21 +78,21 @@ public sealed class SchemaHttpCache
 
             foreach (var rel in manifest.Tags)
             {
-                var typeName = _fs.Path.GetFileNameWithoutExtension(rel);
-                var content = _fs.File.ReadAllText(_fs.Path.Combine(_dir, rel));
+                var typeName = _fileHelper.FileSystem.Path.GetFileNameWithoutExtension(rel);
+                var content = _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel));
                 tagsByType.Add((typeName, YamlSchemaParser.ParseTagFile(content)));
             }
 
             foreach (var rel in manifest.Types)
-                types.AddRange(YamlSchemaParser.ParseTypeFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+                types.AddRange(YamlSchemaParser.ParseTypeFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Enums)
-                enums.Add(YamlSchemaParser.ParseEnumFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+                enums.Add(YamlSchemaParser.ParseEnumFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Hardcoded)
                 hardcodedSets.Add(
-                    YamlSchemaParser.ParseHardcodedSetFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+                    YamlSchemaParser.ParseHardcodedSetFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Meta)
                 metafiles.AddRange(
-                    YamlSchemaParser.ParseMetafileFile(_fs.File.ReadAllText(_fs.Path.Combine(_dir, rel))));
+                    YamlSchemaParser.ParseMetafileFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
 
             index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
             return true;
@@ -112,20 +112,20 @@ public sealed class SchemaHttpCache
     public void Update(string indexJson, IReadOnlyList<(string relativePath, string content)> yamlFiles,
         string? baselineHash = null)
     {
-        _fs.Directory.CreateDirectory(_dir);
-        _fs.File.WriteAllText(_fs.Path.Combine(_dir, "_index.json"), indexJson);
+        _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
+        _fileHelper.FileSystem.File.WriteAllText(_fileHelper.FileSystem.Path.Combine(_dir, "_index.json"), indexJson);
 
         foreach (var (rel, content) in yamlFiles)
         {
-            var fullPath = _fs.Path.Combine(_dir, rel);
-            var parentDir = _fs.Path.GetDirectoryName(fullPath);
+            var fullPath = _fileHelper.FileSystem.Path.Combine(_dir, rel);
+            var parentDir = _fileHelper.FileSystem.Path.GetDirectoryName(fullPath);
             if (!string.IsNullOrEmpty(parentDir))
-                _fs.Directory.CreateDirectory(parentDir);
-            _fs.File.WriteAllText(fullPath, content);
+                _fileHelper.FileSystem.Directory.CreateDirectory(parentDir);
+            _fileHelper.FileSystem.File.WriteAllText(fullPath, content);
         }
 
         var hash = baselineHash ?? ComputeYamlHash(yamlFiles.Select(f => f.content));
-        _fs.File.WriteAllText(ChecksumPath, hash);
+        _fileHelper.FileSystem.File.WriteAllText(ChecksumPath, hash);
     }
 
     // Hashes each YAML file's content in manifest order — indexJson is excluded so

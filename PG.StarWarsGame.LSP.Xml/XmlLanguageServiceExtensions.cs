@@ -82,6 +82,7 @@ public static class XmlLanguageServiceExtensions
         // Completion registry — add IXmlCompletionProvider implementations here for index-aware completion
         services.AddSingleton<IXmlCompletionRegistry, XmlCompletionRegistry>();
         services.AddSingleton<IXmlCompletionProvider, GameObjectReferenceCompletionProvider>();
+        services.AddSingleton<IXmlCompletionProvider, HardcodedSetCompletionProvider>();
 
         return services;
     }

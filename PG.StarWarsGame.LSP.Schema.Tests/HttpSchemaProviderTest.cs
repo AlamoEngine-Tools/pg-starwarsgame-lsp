@@ -7,6 +7,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 
@@ -48,7 +49,7 @@ public sealed class HttpSchemaProviderTest
 
     private static SchemaHttpCache NoOpCache()
     {
-        return new SchemaHttpCache(new MockFileSystem(), NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(new MockFileSystem()), NullLogger<SchemaHttpCache>.Instance);
     }
 
     private static (HttpSchemaProvider provider, FakeHttpMessageHandler fake) Build(

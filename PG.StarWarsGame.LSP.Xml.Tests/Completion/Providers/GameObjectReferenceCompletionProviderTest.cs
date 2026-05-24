@@ -39,15 +39,50 @@ public sealed class GameObjectReferenceCompletionProviderTest
     [Fact]
     public void CanHandle_NameReference_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReference };
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_NameReferenceList_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReferenceList };
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReferenceList, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
+    }
+
+    [Fact]
+    public void CanHandle_SFXEventReference_True()
+    {
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.SFXEventReference, ReferenceKind = ReferenceKind.XmlObject };
+        Assert.True(Provider.CanHandle(tag));
+    }
+
+    [Fact]
+    public void CanHandle_FactionReference_True()
+    {
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.FactionReference, ReferenceKind = ReferenceKind.XmlObject };
+        Assert.True(Provider.CanHandle(tag));
+    }
+
+    [Fact]
+    public void CanHandle_TypeReference_True()
+    {
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.TypeReference, ReferenceKind = ReferenceKind.XmlObject };
+        Assert.True(Provider.CanHandle(tag));
+    }
+
+    [Fact]
+    public void CanHandle_TypeReferenceList_True()
+    {
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.TypeReferenceList, ReferenceKind = ReferenceKind.XmlObject };
+        Assert.True(Provider.CanHandle(tag));
+    }
+
+    [Fact]
+    public void CanHandle_ReferenceKind_None_False()
+    {
+        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.None };
+        Assert.False(Provider.CanHandle(tag));
     }
 
     [Fact]
@@ -180,5 +215,41 @@ public sealed class GameObjectReferenceCompletionProviderTest
 
         Assert.Single(result);
         Assert.Equal("Rebel starfighter", result[0].Detail);
+    }
+
+    // ── GetProposals — GameObjectType wildcard ───────────────────────────────
+
+    [Fact]
+    public void GetProposals_GameObjectType_ReturnsAllSymbolsRegardlessOfType()
+    {
+        var tag = RefTag("GameObjectType");
+        var index = IndexWith(("X_Wing", "SpaceUnit"), ("AT_AT", "GroundCompanyUnit"), ("REBEL_ALLIANCE", "Faction"));
+
+        var result = Provider.GetProposals(tag, "", index);
+
+        Assert.Equal(3, result.Count);
+    }
+
+    [Fact]
+    public void GetProposals_GameObjectType_StillFiltersOnPartialValue()
+    {
+        var tag = RefTag("GameObjectType");
+        var index = IndexWith(("X_Wing", "SpaceUnit"), ("AT_AT", "GroundCompanyUnit"));
+
+        var result = Provider.GetProposals(tag, "X", index);
+
+        Assert.Single(result);
+        Assert.Equal("X_Wing", result[0].Label);
+    }
+
+    [Fact]
+    public void GetProposals_GameObjectType_CaseInsensitive()
+    {
+        var tag = RefTag("gameobjecttype");
+        var index = IndexWith(("X_Wing", "SpaceUnit"), ("AT_AT", "GroundCompanyUnit"));
+
+        var result = Provider.GetProposals(tag, "", index);
+
+        Assert.Equal(2, result.Count);
     }
 }

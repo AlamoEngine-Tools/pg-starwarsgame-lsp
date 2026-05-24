@@ -98,7 +98,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             }
         }
 
-        var gamePath = TryGetString(elem, "gamePath");
+        var baseGamePath = TryGetString(elem, "baseGamePath");
+        var expansionGamePath = TryGetString(elem, "expansionGamePath");
         var locale = TryGetString(elem, "locale");
         var schemaUrl = TryGetString(elem, "schemaUrl");
         var schemaLocalPath = TryGetString(elem, "schemaLocalPath");
@@ -118,7 +119,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 
         return new LspConfiguration
         {
-            GamePath = gamePath,
+            GamePath = baseGamePath,
             ModPaths = modPaths,
             Locale = locale ?? "en",
             SchemaSource = !string.IsNullOrWhiteSpace(schemaLocalPath)

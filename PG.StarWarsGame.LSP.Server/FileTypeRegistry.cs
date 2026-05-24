@@ -12,20 +12,14 @@ public sealed class FileTypeRegistry : IFileTypeRegistry
     private readonly ConcurrentDictionary<string, ImmutableArray<string>> _map =
         new(StringComparer.OrdinalIgnoreCase);
 
-    public ImmutableArray<string> GetTypesForFile(string normalizedPath)
-    {
-        return _map.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
-    }
+    public ImmutableArray<string> GetTypesForFile(string fileUri)
+        => _map.TryGetValue(fileUri, out var types) ? types : ImmutableArray<string>.Empty;
 
-    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
-    {
-        _map[normalizedPath] = typeNames;
-    }
+    public void RegisterFile(string fileUri, ImmutableArray<string> typeNames)
+        => _map[fileUri] = typeNames;
 
-    public void UnregisterFile(string normalizedPath)
-    {
-        _map.TryRemove(normalizedPath, out _);
-    }
+    public void UnregisterFile(string fileUri)
+        => _map.TryRemove(fileUri, out _);
 
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
 }

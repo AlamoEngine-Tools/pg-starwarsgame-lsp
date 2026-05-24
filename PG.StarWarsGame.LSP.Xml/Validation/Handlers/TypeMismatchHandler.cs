@@ -12,6 +12,9 @@ public sealed class TypeMismatchHandler : XmlDiagnosticsHandler<XmlReferenceFact
         if (fact.Resolved is null || fact.ExpectedTypeName is null)
             return [];
 
+        if (string.Equals(fact.ExpectedTypeName, "GameObjectType", StringComparison.OrdinalIgnoreCase))
+            return [];
+
         if (fact.Resolved.TypeName == fact.ExpectedTypeName)
             return [];
 

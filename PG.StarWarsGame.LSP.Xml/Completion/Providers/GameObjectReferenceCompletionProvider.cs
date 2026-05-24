@@ -11,7 +11,7 @@ public sealed class GameObjectReferenceCompletionProvider : IXmlCompletionProvid
 {
     public bool CanHandle(XmlTagDefinition tag)
     {
-        return tag.ValueType is XmlValueType.NameReference or XmlValueType.NameReferenceList;
+        return tag.ReferenceKind == ReferenceKind.XmlObject;
     }
 
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)
@@ -21,9 +21,10 @@ public sealed class GameObjectReferenceCompletionProvider : IXmlCompletionProvid
 
         var workspaceSymbols = index.WorkspaceDefinitions.Values.SelectMany(arr => arr);
         var baselineSymbols = index.Baseline.Symbols.Values;
+        var isWildcard = string.Equals(typeName, "GameObjectType", StringComparison.OrdinalIgnoreCase);
 
         return workspaceSymbols.Concat(baselineSymbols)
-            .Where(s => string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
+            .Where(s => isWildcard || string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
             .Where(s => partialValue.Length == 0 ||
                         s.Id.StartsWith(partialValue, StringComparison.OrdinalIgnoreCase))
             .Select(s => new ValueProposal { Label = s.Id, Detail = s.Description })

@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
@@ -45,6 +46,7 @@ public static class ServerConfigurator
             {
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
                 services.AddSingleton<IFileSystem, FileSystem>();
+                services.AddSingleton<IFileHelper, FileHelper>();
                 services.AddSingleton<SchemaHttpCache>();
 
                 // Late-binding proxy: OmniSharp resolves ISchemaProvider at handler-registration time
@@ -62,7 +64,7 @@ public static class ServerConfigurator
                 services.AddSingleton<BaselineLoader>(sp =>
                     new BaselineLoader(
                         sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(BaselineLoader)),
-                        sp.GetRequiredService<IFileSystem>(),
+                        sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<BaselineLoader>>()));
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
@@ -180,6 +182,10 @@ public static class ServerConfigurator
                             catch (Exception ex)
                             {
                                 initLogger.LogError(ex, "Workspace scan failed");
+                            }
+                            finally
+                            {
+                                server.SendNotification("$/workspaceScanComplete");
                             }
                         }, CancellationToken.None);
                     }

@@ -74,4 +74,33 @@ public sealed class FileTypeRegistryTest
 
         Assert.Equal(2, registry.All.Count);
     }
+
+    // ── canonical file:/// URI contract ──────────────────────────────────────
+    // WorkspaceScanner always calls IFileHelper.PathToFileUri() before registering,
+    // so real keys are canonical file:/// URIs (lowercase, forward-slash).
+
+    [Fact]
+    public void RegisterFile_CanonicalUri_ThenGet_ReturnsTypes()
+    {
+        var registry = Build();
+
+        registry.RegisterFile("file:///c:/game/data/xml/units.xml", ImmutableArray.Create("GameObjectType"));
+        var result = registry.GetTypesForFile("file:///c:/game/data/xml/units.xml");
+
+        Assert.Equal(["GameObjectType"], result.ToArray());
+    }
+
+    [Fact]
+    public void GetTypesForFile_CanonicalKey_MixedCaseLookup_ReturnsTypes()
+    {
+        // The registry is OrdinalIgnoreCase so a caller that has not yet normalized
+        // the URI will still get a match. (IsStoryParserDocument normalizes first,
+        // but a defensive lookup with mixed case must not silently return empty.)
+        var registry = Build();
+        registry.RegisterFile("file:///c:/game/data/xml/units.xml", ImmutableArray.Create("GameObjectType"));
+
+        var result = registry.GetTypesForFile("file:///C:/Game/Data/XML/Units.xml");
+
+        Assert.Equal(["GameObjectType"], result.ToArray());
+    }
 }

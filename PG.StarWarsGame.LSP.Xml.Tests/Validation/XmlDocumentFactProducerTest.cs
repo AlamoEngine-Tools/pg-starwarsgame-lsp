@@ -2,9 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
@@ -18,6 +20,7 @@ public sealed class XmlDocumentFactProducerTest
         IFileTypeRegistry? registry = null)
     {
         return new XmlDocumentFactProducer(
+            new FileHelper(new MockFileSystem()),
             schema ?? new SingleTagSchemaProvider(),
             registry ?? new EmptyFileTypeRegistry());
     }

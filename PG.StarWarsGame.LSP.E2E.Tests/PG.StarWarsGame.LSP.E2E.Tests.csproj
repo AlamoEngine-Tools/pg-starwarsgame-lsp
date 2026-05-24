@@ -25,6 +25,7 @@
 
     <ItemGroup>
         <Content Include="TestData\**\*" CopyToOutputDirectory="PreserveNewest"/>
+        <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
 </Project>

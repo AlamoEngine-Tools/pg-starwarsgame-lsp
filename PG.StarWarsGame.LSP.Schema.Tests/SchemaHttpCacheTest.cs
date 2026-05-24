@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Yaml;
 
@@ -22,7 +23,7 @@ public sealed class SchemaHttpCacheTest
 
     private static SchemaHttpCache BuildCache(MockFileSystem fs)
     {
-        return new SchemaHttpCache(fs, NullLogger<SchemaHttpCache>.Instance);
+        return new SchemaHttpCache(new FileHelper(fs), NullLogger<SchemaHttpCache>.Instance);
     }
 
     // ── TryLoad ──────────────────────────────────────────────────────────────

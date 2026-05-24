@@ -2,11 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -26,7 +28,8 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
             new StubIndexFactProducer(),
             new StubStoryFactProducer(),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
-            new StubFileTypeRegistry());
+            new StubFileTypeRegistry(),
+            new FileHelper(new MockFileSystem()));
     }
 
     private static HardcodedReferenceSet BehaviorModuleSet(params HardcodedReferenceSetValue[] values)

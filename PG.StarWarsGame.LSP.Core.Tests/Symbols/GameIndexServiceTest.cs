@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
@@ -31,7 +33,8 @@ public sealed class GameIndexServiceTest
 
     private static IGameIndexService Build(params IGameDocumentParser[] parsers)
     {
-        return new GameIndexService(parsers, NullLogger<GameIndexService>.Instance);
+        return new GameIndexService(new FileHelper(new MockFileSystem()), parsers,
+            NullLogger<GameIndexService>.Instance);
     }
 
     // ── ApplyBaseline ────────────────────────────────────────────────────────
@@ -62,6 +65,47 @@ public sealed class GameIndexServiceTest
         svc.ApplyBaseline(BaselineIndex.Empty);
 
         Assert.NotNull(fired);
+    }
+
+    // ── URI normalization — canonical form at the index boundary ────────────
+
+    [Fact]
+    public async Task UpdateDocumentAsync_MixedCaseUri_DocumentKeyIsCanonicalLowercase()
+    {
+        // The index must store the canonical (lowercase file:///) key regardless of
+        // what case the LSP client or scanner sends.
+        var svc = Build(new FakeParser(Doc("", 0)));
+
+        await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, default);
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///c:/data/units.xml"));
+        Assert.False(svc.Current.Documents.ContainsKey("file:///C:/Data/Units.xml"));
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_SameFileDifferentUriCase_SingleDocument()
+    {
+        // An LSP sync event (mixed case) followed by a scanner re-index (canonical) must
+        // not create two entries for the same file.
+        var svc = Build(new FakeParser(Doc("", 0)));
+
+        await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///c:/data/units.xml", "<Y/>", 2, default);
+
+        Assert.Single(svc.Current.Documents);
+    }
+
+    [Fact]
+    public async Task RemoveDocument_MixedCaseUri_RemovesCanonicalEntry()
+    {
+        var sym = Symbol("UNIT_A");
+        var svc = Build(new FakeParser(Doc("", 0, [sym])));
+        await svc.UpdateDocumentAsync("file:///c:/data/units.xml", "<X/>", 1, default);
+
+        svc.RemoveDocument("file:///C:/DATA/UNITS.XML");
+
+        Assert.False(svc.Current.Documents.ContainsKey("file:///c:/data/units.xml"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
     }
 
     // ── UpdateDocumentAsync — basic ──────────────────────────────────────────
@@ -128,28 +172,30 @@ public sealed class GameIndexServiceTest
     // ── UpdateDocumentAsync — stale-version guard ────────────────────────────
 
     [Fact]
-    public async Task UpdateDocumentAsync_Drops_Stale_Version()
+    public async Task UpdateDocumentAsync_Drops_Strictly_Older_Version()
     {
-        var symV2 = Symbol("UNIT_V2");
-        var symV1 = Symbol("UNIT_V1");
-
-        var svc = Build(new FakeParser(Doc("", 0, [symV2])));
-        // Commit version 2 first
+        var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_V2")])));
         await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, default);
 
-        // Now swap to a parser returning a different symbol and try to commit version 1
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, [symV1]))], NullLogger<GameIndexService>.Instance);
-        // Manually set state: apply the v2 document
-        // Instead, test it directly: after committing v2, version 1 must not overwrite.
-        // We verify this by checking the symbol from v2 is still present after a v1 attempt.
-        var symAfterV2 = svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_V2");
-
-        // Attempt a v1 parse on the same service — version guard should drop it
-        // (FakeParser always returns the same symbol, so we verify the Document.Version stays 2)
+        // A strictly older version must not overwrite a newer committed version.
         await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
 
         Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
-        Assert.True(symAfterV2);
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_Same_Version_Fires_IndexChanged()
+    {
+        // Re-opening the same file at the same version (e.g. DidOpen after a scan at v0,
+        // then DidOpen again at v1) must still fire IndexChanged so diagnostics are published.
+        var svc = Build(new FakeParser(Doc("", 0)));
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        var fired = false;
+        svc.IndexChanged += _ => fired = true;
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.True(fired);
     }
 
     // ── UpdateDocumentAsync — document replacement ───────────────────────────
@@ -168,7 +214,8 @@ public sealed class GameIndexServiceTest
 
         // Second parse of same URI: FakeParser still returns OLD_UNIT but with version 2;
         // swap the parser to return NEW_UNIT
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, [updated]))], NullLogger<GameIndexService>.Instance);
+        var svc2 = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0, [updated]))], NullLogger<GameIndexService>.Instance);
         // Apply the first document manually then update
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
@@ -188,8 +235,8 @@ public sealed class GameIndexServiceTest
 
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("OLD_TARGET"));
 
-        var svc2 = new GameIndexService([new FakeParser(Doc("", 0, refs: [newRef]))],
-            NullLogger<GameIndexService>.Instance);
+        var svc2 = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0, refs: [newRef]))], NullLogger<GameIndexService>.Instance);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
         await svc2.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
 
@@ -259,7 +306,8 @@ public sealed class GameIndexServiceTest
         var svcA = Build(new FakeParser(Doc("", 0, [symA])));
         await svcA.UpdateDocumentAsync("file:///a.xml", "", 1, default);
 
-        var svcB = new GameIndexService([new FakeParser(Doc("", 0, [symB]))], NullLogger<GameIndexService>.Instance);
+        var svcB = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0, [symB]))], NullLogger<GameIndexService>.Instance);
         await svcB.UpdateDocumentAsync("file:///a.xml", "", 1, default);
         await svcB.UpdateDocumentAsync("file:///b.xml", "", 1, default);
 

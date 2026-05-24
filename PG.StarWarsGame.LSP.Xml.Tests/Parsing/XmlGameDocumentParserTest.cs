@@ -2,9 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Parsing;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Parsing;
@@ -16,7 +18,8 @@ public sealed class XmlGameDocumentParserTest
     private static XmlGameDocumentParser Build(FakeSchemaProvider? schema = null,
         FakeFileTypeRegistry? registry = null)
     {
-        return new XmlGameDocumentParser(schema ?? new FakeSchemaProvider(),
+        return new XmlGameDocumentParser(new FileHelper(new MockFileSystem()),
+            schema ?? new FakeSchemaProvider(),
             registry ?? new FakeFileTypeRegistry(),
             NullLogger<XmlGameDocumentParser>.Instance);
     }
@@ -448,6 +451,58 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("BONE_X", reference.TargetId);
     }
 
+    // ── NameReferenceList splitting ───────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_NameReferenceList_TwoTokens_CreatesTwoReferences()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="UNIT_A"><Garrison_Units>X_Wing Y_Wing</Garrison_Units></Unit>""",
+            1, default);
+
+        Assert.Equal(2, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "X_Wing");
+        Assert.Contains(result.References, r => r.TargetId == "Y_Wing");
+    }
+
+    [Fact]
+    public async Task ParseAsync_NameReferenceList_SingleToken_CreatesOneReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="UNIT_A"><Garrison_Units>X_Wing</Garrison_Units></Unit>""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("X_Wing", reference.TargetId);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NameReferenceList_CommaSeparated_SplitsCorrectly()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(ListRefTag("Garrison_Units", "Unit", XmlValueType.NameReferenceList));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="UNIT_A"><Garrison_Units>X_Wing,Y_Wing</Garrison_Units></Unit>""",
+            1, default);
+
+        Assert.Equal(2, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "X_Wing");
+        Assert.Contains(result.References, r => r.TargetId == "Y_Wing");
+    }
+
     // ── FakeSchemaProvider ───────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider
@@ -533,7 +588,7 @@ public sealed class XmlGameDocumentParserTest
 
         public void Register(string key, ImmutableArray<string> types)
         {
-            _map[key] = types;
+            _map["file:///" + key] = types;
         }
     }
 }

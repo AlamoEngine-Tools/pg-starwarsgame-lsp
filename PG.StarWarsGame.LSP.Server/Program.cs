@@ -18,7 +18,12 @@ if (args.Contains("--wait-for-debugger") || Environment.GetEnvironmentVariable("
 
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .WriteTo.File("pg-swg-lsp.log", rollingInterval: RollingInterval.Day)
+    .WriteTo.File("pg-swg-lsp-.log", rollingInterval: RollingInterval.Hour)
+#if DEBUG
+    .MinimumLevel.Debug()
+#else
+    .MinimumLevel.Information()
+#endif
     .CreateLogger();
 
 var tcpPortArg = args.FirstOrDefault(a => a.StartsWith("--tcp=", StringComparison.Ordinal));

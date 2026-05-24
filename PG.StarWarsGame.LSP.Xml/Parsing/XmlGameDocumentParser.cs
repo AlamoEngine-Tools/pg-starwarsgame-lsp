@@ -6,18 +6,22 @@ using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Parsing;
 
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
+    private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
     private readonly ISchemaProvider _schema;
 
-    public XmlGameDocumentParser(ISchemaProvider schema, IFileTypeRegistry fileTypeRegistry,
-        ILogger<XmlGameDocumentParser> logger)
+    public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
+        IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger)
     {
+        _fileHelper = fileHelper;
         _schema = schema;
         _fileTypeRegistry = fileTypeRegistry;
         _logger = logger;
@@ -31,17 +35,17 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     public ValueTask<DocumentIndex> ParseAsync(
         string documentUri, string text, int version, CancellationToken ct)
     {
+        var canonicalUri = _fileHelper.NormalizeUri(documentUri);
         var doc = new HtmlDocument();
         doc.LoadHtml(text);
 
-        var normalizedPath = NormalizeDocumentUri(documentUri);
-        var registeredTypes = _fileTypeRegistry.GetTypesForFile(normalizedPath);
-        var symbols = CollectSymbolsFromRegistry(doc, documentUri, registeredTypes, ct);
+        var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
+        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, registeredTypes, ct);
 
-        var references = CollectReferences(doc, documentUri, text, ct);
+        var references = CollectReferences(doc, canonicalUri, text, ct);
 
         return ValueTask.FromResult(new DocumentIndex(
-            documentUri, version,
+            canonicalUri, version,
             symbols.ToImmutableArray(),
             references.ToImmutableArray()));
     }
@@ -119,9 +123,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return attr?.Value?.Trim() ?? string.Empty;
     }
 
-    // Strip file:/// scheme then normalise for registry lookup.
-    // file:///C:/path → C:/path → c:/path (Windows)
-    // file:///f.xml   → f.xml   (test URIs)
+    // Kept for tests that call it directly. Production code now routes through IFileHelper.NormalizeUri.
+    [Obsolete("Use IFileHelper.NormalizeUri instead.")]
     internal static string NormalizeDocumentUri(string uri)
     {
         if (uri.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
@@ -134,54 +137,25 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private static IEnumerable<(string Name, int Offset)> SplitReferenceNames(
         XmlTagDefinition tagDef, string innerText)
     {
-        char[]? separators;
-        bool skipFirst;
+        bool multiValue = tagDef.SemanticType == TagSemanticType.PrerequisiteExpression
+                       || tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
+                                           or XmlValueType.TypeReferenceList
+                                           or XmlValueType.NameReferenceList;
+        bool skipFirst = tagDef.ValueType == XmlValueType.PerFactionObjectList;
 
-        if (tagDef.SemanticType == TagSemanticType.PrerequisiteExpression)
+        if (!multiValue && !skipFirst)
         {
-            separators = ['|', ',', ' ', '\t', '\r', '\n'];
-            skipFirst = false;
-        }
-        else if (tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
-                 or XmlValueType.TypeReferenceList)
-        {
-            separators = [',', ' ', '\t', '\r', '\n'];
-            skipFirst = false;
-        }
-        else if (tagDef.ValueType == XmlValueType.PerFactionObjectList)
-        {
-            separators = [',', ' ', '\t', '\r', '\n'];
-            skipFirst = true;
-        }
-        else
-        {
-            // Single-value tag — no splitting
             var trimmed = innerText.Trim();
             if (trimmed.Length > 0)
                 yield return (trimmed, innerText.IndexOf(trimmed, StringComparison.Ordinal));
             yield break;
         }
 
-        var isFirst = skipFirst;
-        var i = 0;
-        while (i < innerText.Length)
+        var first = skipFirst;
+        foreach (var (token, offset) in XmlUtility.SplitListWithOffsets(innerText))
         {
-            while (i < innerText.Length && Array.IndexOf(separators, innerText[i]) >= 0)
-                i++;
-            if (i >= innerText.Length) break;
-
-            var tokenStart = i;
-            while (i < innerText.Length && Array.IndexOf(separators, innerText[i]) < 0)
-                i++;
-
-            var token = innerText[tokenStart..i];
-            if (token.Length > 0)
-            {
-                if (isFirst)
-                    isFirst = false;
-                else
-                    yield return (token, tokenStart);
-            }
+            if (first) { first = false; continue; }
+            yield return (token, offset);
         }
     }
 

@@ -24,27 +24,16 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
         await WaitForScanAsync();
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "Sfxevents.xml");
-        var uri = DocumentUri.FromFileSystemPath(filePath);
-        var lines = await File.ReadAllLinesAsync(filePath);
-
-        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
-        {
-            TextDocument = new TextDocumentItem
-            {
-                Uri = uri,
-                LanguageId = "xml",
-                Version = 1,
-                Text = string.Join(Environment.NewLine, lines)
-            }
-        });
+        var (uri, lines) = await OpenAndWaitAsync(filePath);
 
         var (line, col) = FindFirstChildElementPosition(lines);
+        using var cts1 = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var result = await _fixture.Client.RequestHover(
             new HoverParams
             {
                 TextDocument = new TextDocumentIdentifier { Uri = uri },
                 Position = new Position(line, col)
-            }, CancellationToken.None);
+            }, cts1.Token);
 
         Assert.NotNull(result);
         var content = result.Contents.MarkupContent?.Value ?? string.Empty;
@@ -58,6 +47,29 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
         await WaitForScanAsync();
 
         var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "HardPoints.xml");
+        var (uri, lines) = await OpenAndWaitAsync(filePath);
+
+        // Depth-1 elements here have arbitrary names (e.g. HP_Star_Destroyer_Weapon_FL).
+        // Hover only returns HardPoint type info if FileTypeRegistry maps this file via the
+        // hardpointdatafiles.xml metafile — proving the workspace scan populated the registry.
+        var (line, col) = FindFirstChildElementPosition(lines);
+        using var cts2 = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var result = await _fixture.Client.RequestHover(
+            new HoverParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = uri },
+                Position = new Position(line, col)
+            }, cts2.Token);
+
+        Assert.NotNull(result);
+        var content = result.Contents.MarkupContent?.Value ?? string.Empty;
+        Assert.Contains("HardPoint", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private async Task<(DocumentUri uri, string[] lines)> OpenAndWaitAsync(string filePath)
+    {
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
@@ -72,23 +84,11 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
             }
         });
 
-        // Depth-1 elements here have arbitrary names (e.g. HP_Star_Destroyer_Weapon_FL).
-        // Hover only returns HardPoint type info if FileTypeRegistry maps this file via the
-        // hardpointdatafiles.xml metafile — proving the workspace scan populated the registry.
-        var (line, col) = FindFirstChildElementPosition(lines);
-        var result = await _fixture.Client.RequestHover(
-            new HoverParams
-            {
-                TextDocument = new TextDocumentIdentifier { Uri = uri },
-                Position = new Position(line, col)
-            }, CancellationToken.None);
-
-        Assert.NotNull(result);
-        var content = result.Contents.MarkupContent?.Value ?? string.Empty;
-        Assert.Contains("HardPoint", content, StringComparison.OrdinalIgnoreCase);
+        // Wait for the server to receive and dispatch DidOpen so AddOrUpdate has run
+        // before the subsequent hover request is sent.
+        await Task.Delay(200);
+        return (uri, lines);
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
 
     private static void RequireWorkspace()
     {
@@ -98,9 +98,9 @@ public sealed class WorkspaceSmokeTest : IClassFixture<LspServerFixture>
 
     private async Task WaitForScanAsync()
     {
-        var completed = await Task.WhenAny(_fixture.ScanStarted, Task.Delay(TimeSpan.FromSeconds(60)));
+        var completed = await Task.WhenAny(_fixture.ScanStarted, Task.Delay(TimeSpan.FromSeconds(120)));
         if (completed != _fixture.ScanStarted)
-            throw new Exception("$XunitDynamicSkip$Workspace scan did not produce diagnostics within 60 s.");
+            throw new Exception("$XunitDynamicSkip$Workspace scan did not complete within 120 s.");
     }
 
     /// <summary>

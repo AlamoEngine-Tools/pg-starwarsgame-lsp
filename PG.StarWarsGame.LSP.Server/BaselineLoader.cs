@@ -1,28 +1,28 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class BaselineLoader
 {
-    private readonly IFileSystem _fs;
+    private readonly IFileHelper _fileHelper;
     private readonly HttpClient _httpClient;
     private readonly ILogger<BaselineLoader> _logger;
 
-    public BaselineLoader(HttpClient httpClient, IFileSystem fs, ILogger<BaselineLoader> logger)
+    public BaselineLoader(HttpClient httpClient, IFileHelper fileHelper, ILogger<BaselineLoader> logger)
     {
         _httpClient = httpClient;
-        _fs = fs;
+        _fileHelper = fileHelper;
         _logger = logger;
     }
 
-    private string CacheDir => _fs.Path.Combine(
+    private string CacheDir => _fileHelper.FileSystem.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
         ".pg-swg-lsp", "baselines");
 
@@ -43,7 +43,7 @@ public sealed class BaselineLoader
 
         try
         {
-            var bytes = await _fs.File.ReadAllBytesAsync(path, ct);
+            var bytes = await _fileHelper.FileSystem.File.ReadAllBytesAsync(path, ct);
             return BaselineSerializer.Deserialize(bytes);
         }
         catch (Exception ex)
@@ -55,13 +55,13 @@ public sealed class BaselineLoader
 
     private async Task<BaselineIndex> LoadHttpAsync(string url, CancellationToken ct)
     {
-        var cacheFile = _fs.Path.Combine(CacheDir, _fs.Path.GetFileName(url));
+        var cacheFile = _fileHelper.FileSystem.Path.Combine(CacheDir, _fileHelper.FileSystem.Path.GetFileName(url));
 
         try
         {
             var bytes = await _httpClient.GetByteArrayAsync(url, ct);
-            _fs.Directory.CreateDirectory(CacheDir);
-            await _fs.File.WriteAllBytesAsync(cacheFile, bytes, ct);
+            _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
+            await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
             return BaselineSerializer.Deserialize(bytes);
         }
         catch (Exception ex)
@@ -69,10 +69,10 @@ public sealed class BaselineLoader
             _logger.LogWarning(ex, "Failed to download baseline from '{Url}'; trying cache", url);
         }
 
-        if (_fs.File.Exists(cacheFile))
+        if (_fileHelper.FileSystem.File.Exists(cacheFile))
             try
             {
-                var cached = await _fs.File.ReadAllBytesAsync(cacheFile, ct);
+                var cached = await _fileHelper.FileSystem.File.ReadAllBytesAsync(cacheFile, ct);
                 return BaselineSerializer.Deserialize(cached);
             }
             catch (Exception ex)

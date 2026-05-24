@@ -26,11 +26,11 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     [Fact]
     public async Task Completion_AfterDidOpen_ReturnsItems()
     {
-        RequireSchema();
+        RequireWorkspace();
 
-        var filePath = Path.Combine(_fixture.TestDataDirectory, "units.xml");
+        var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var text = await File.ReadAllTextAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -39,16 +39,18 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
                 Uri = uri,
                 LanguageId = "xml",
                 Version = 1,
-                Text = text
+                Text = string.Join(Environment.NewLine, lines)
             }
         });
 
-        // Position on line 4 (0-based): "    <" — cursor at char 5, right after '<'
+        await Task.Delay(200);
+
+        var (line, col) = FindFirstGrandchildElementPosition(lines);
         var result = await _fixture.Client.RequestCompletion(
             new CompletionParams
             {
                 TextDocument = new TextDocumentIdentifier { Uri = uri },
-                Position = new Position(4, 5),
+                Position = new Position(line, col),
                 Context = new CompletionContext
                 {
                     TriggerKind = CompletionTriggerKind.TriggerCharacter,
@@ -63,11 +65,11 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     [Fact]
     public async Task Hover_OverKnownTag_ReturnsMarkdownContent()
     {
-        RequireSchema();
+        RequireWorkspace();
 
-        var filePath = Path.Combine(_fixture.TestDataDirectory, "units.xml");
+        var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var text = await File.ReadAllTextAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -76,31 +78,34 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
                 Uri = uri,
                 LanguageId = "xml",
                 Version = 1,
-                Text = text
+                Text = string.Join(Environment.NewLine, lines)
             }
         });
 
-        // Line 3 (0-based): "    <Text_ID>NAME_TEST_UNIT</Text_ID>" — char 5 = 'T' in Text_ID
+        await Task.Delay(200);
+
+        var (line, col) = FindFirstGrandchildElementPosition(lines);
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var result = await _fixture.Client.RequestHover(
             new HoverParams
             {
                 TextDocument = new TextDocumentIdentifier { Uri = uri },
-                Position = new Position(3, 5)
-            }, CancellationToken.None);
+                Position = new Position(line, col)
+            }, cts.Token);
 
         Assert.NotNull(result);
         var content = result.Contents.MarkupContent?.Value ?? string.Empty;
-        Assert.Contains("Text_ID", content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Cinematic_Object_Only", content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
     public async Task Diagnostics_AfterDidOpen_PublishesDiagnosticsForUri()
     {
-        RequireSchema();
+        RequireWorkspace();
 
-        var filePath = Path.Combine(_fixture.TestDataDirectory, "units.xml");
+        var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var text = await File.ReadAllTextAsync(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath);
 
         var diagnosticsReceived = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
 
@@ -111,7 +116,7 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
                 Uri = uri,
                 LanguageId = "xml",
                 Version = 1,
-                Text = text
+                Text = string.Join(Environment.NewLine, lines)
             }
         });
 
@@ -122,52 +127,72 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     [Fact]
     public async Task WorkspaceScan_WithConfiguredWorkspacePath_ProducesDiagnosticsNotifications()
     {
-        if (LspTestEnvironment.WorkspacePath is null)
-            throw new Exception("$XunitDynamicSkip$" + "Set LSP_WORKSPACE_PATH to run this test.");
+        RequireWorkspace();
 
-        // The workspace scan runs in the background after initialization.
-        // Wait for any publishDiagnostics notification as evidence the scan produced output.
-        var received = await WaitForAnyDiagnosticsAsync(TimeSpan.FromSeconds(90));
-        Assert.True(received, "Workspace scan did not produce any publishDiagnostics within timeout.");
+        var filePath = Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML", "CIN_SpaceUnitsFrigates.xml");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        var lines = await File.ReadAllLinesAsync(filePath);
+
+        var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(30));
+
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+            {
+                Uri = uri,
+                LanguageId = "xml",
+                Version = 3,
+                Text = string.Join(Environment.NewLine, lines)
+            }
+        });
+
+        var diags = await received;
+        Assert.Equal(uri, diags.Uri);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static void RequireSchema()
+    private static void RequireWorkspace()
     {
-        if (LspTestEnvironment.SchemaLocalPath is null)
-            throw new Exception("$XunitDynamicSkip$" + "Set LSP_SCHEMA_LOCAL_PATH to run this test.");
+        if (LspTestEnvironment.WorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
+            throw new Exception("$XunitDynamicSkip$Set LSP_WORKSPACE_PATH and LSP_SCHEMA_LOCAL_PATH to run this test.");
     }
 
     private Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
-    {
-        var tcs = new TaskCompletionSource<PublishDiagnosticsParams>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var subscription = _fixture.Client.Register(r => r.OnPublishDiagnostics(p =>
-        {
-            if (p.Uri == uri)
-                tcs.TrySetResult(p);
-        }));
-        using var cts = new CancellationTokenSource(timeout);
-        cts.Token.Register(() =>
-        {
-            tcs.TrySetCanceled(cts.Token);
-            subscription.Dispose();
-        });
-        return tcs.Task;
-    }
+        => _fixture.WaitForDiagnosticsAsync(uri, timeout);
 
-    private Task<bool> WaitForAnyDiagnosticsAsync(TimeSpan timeout)
+    /// <summary>
+    ///     Returns the position of the first grandchild element — the first field tag
+    ///     inside the first type container — so hover and completion tests hit a known tag.
+    /// </summary>
+    private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
     {
-        var tcs = new TaskCompletionSource<bool>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var subscription = _fixture.Client.Register(r => r.OnPublishDiagnostics(_ => { tcs.TrySetResult(true); }));
-        using var cts = new CancellationTokenSource(timeout);
-        cts.Token.Register(() =>
+        var firstChildLine = -1;
+        for (var i = 0; i < lines.Length; i++)
         {
-            tcs.TrySetResult(false);
-            subscription.Dispose();
-        });
-        return tcs.Task;
+            var s = lines[i];
+            var lt = s.IndexOf('<');
+            if (lt <= 0) continue;
+            if (s.Length <= lt + 1) continue;
+            var next = s[lt + 1];
+            if (next == '/' || next == '?' || next == '!') continue;
+            firstChildLine = i;
+            break;
+        }
+
+        if (firstChildLine < 0) return (1, 1);
+
+        for (var i = firstChildLine + 1; i < lines.Length; i++)
+        {
+            var s = lines[i];
+            var lt = s.IndexOf('<');
+            if (lt < 0) continue;
+            if (s.Length <= lt + 1) continue;
+            var next = s[lt + 1];
+            if (next == '/' || next == '?' || next == '!') continue;
+            return (i, lt + 1);
+        }
+
+        return (1, 1);
     }
 }

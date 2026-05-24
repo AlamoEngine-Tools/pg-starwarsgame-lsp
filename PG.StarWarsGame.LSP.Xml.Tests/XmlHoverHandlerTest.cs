@@ -2,12 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -25,7 +27,8 @@ public sealed class XmlHoverHandlerTest
         var schema = new FakeSchemaProvider();
         var config = new FakeConfigProvider();
         return (new XmlHoverHandler(host, schema, config, NullLogger<XmlHoverHandler>.Instance,
-            registry ?? new FakeFileTypeRegistry()), host, schema, config);
+                registry ?? new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem())),
+            host, schema, config);
     }
 
     private static HoverParams At(int line, int character)
@@ -257,7 +260,7 @@ public sealed class XmlHoverHandlerTest
     // ── registry-based type-container hover ────────────────────────────────
 
     [Fact]
-    public async Task Handle_RegistryMappedMultiInstance_TypeContainerArbitraryName_ReturnsNoHover()
+    public async Task Handle_RegistryMappedMultiInstance_TypeContainerArbitraryName_ReturnsTypeHover()
     {
         // "Fighter_Mk2" is an arbitrary element name — not a registered tag, so no hover.
         var registry = new FakeFileTypeRegistry();
@@ -275,7 +278,9 @@ public sealed class XmlHoverHandlerTest
         // cursor on 'F' of Fighter_Mk2 (line 1, col 2)
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.NotNull(result);
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.Contains("fighter_mk2", md);
     }
 
     [Fact]
@@ -458,7 +463,7 @@ public sealed class XmlHoverHandlerTest
 
         public void Register(string key, ImmutableArray<string> types)
         {
-            _map[key] = types;
+            _map["file:///" + key] = types;
         }
     }
 

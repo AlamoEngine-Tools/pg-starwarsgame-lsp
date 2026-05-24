@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- E2E test fixture: exercises tags whose reference kind was previously wrong or missing.
+     Synthetic names (LSP_TEST_*) are intentionally absent from the workspace so
+     UnresolvedReference errors are expected.  What must NOT appear is a TypeMismatch
+     warning — that would mean the GameObjectType wildcard fix regressed. -->
+<GameObjectFiles>
+    <GameObjectType Name="LSP_TEST_SQUADRON">
+        <!-- Squadron_Units: type=GameObjectTypeReferenceList, referenceType=GameObjectType -->
+        <Squadron_Units>LSP_TEST_FIGHTER_A LSP_TEST_FIGHTER_B</Squadron_Units>
+        <!-- Encyclopedia_Good_Against: type=TypeReferenceList, referenceType=GameObjectType (added in fix) -->
+        <Encyclopedia_Good_Against>LSP_TEST_ENEMY_A LSP_TEST_ENEMY_B</Encyclopedia_Good_Against>
+        <!-- Encyclopedia_Vulnerable_To: same fix applied -->
+        <Encyclopedia_Vulnerable_To>LSP_TEST_COUNTER_A</Encyclopedia_Vulnerable_To>
+    </GameObjectType>
+</GameObjectFiles>

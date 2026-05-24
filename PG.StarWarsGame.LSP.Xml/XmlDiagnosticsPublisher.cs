@@ -13,8 +13,8 @@ using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Parsing;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -22,6 +22,7 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlDiagnosticsPublisher
 {
     private readonly IXmlDocumentFactProducer _documentProducer;
+    private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
     private readonly IXmlIndexFactProducer _indexProducer;
@@ -43,9 +44,11 @@ public sealed class XmlDiagnosticsPublisher
         IXmlIndexFactProducer indexProducer,
         IStoryFactProducer storyProducer,
         ILogger<XmlDiagnosticsPublisher> logger,
-        IFileTypeRegistry fileTypeRegistry)
+        IFileTypeRegistry fileTypeRegistry,
+        IFileHelper fileHelper)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
-            schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger, fileTypeRegistry)
+            schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
+            fileTypeRegistry, fileHelper)
     {
     }
 
@@ -59,7 +62,8 @@ public sealed class XmlDiagnosticsPublisher
         IXmlIndexFactProducer indexProducer,
         IStoryFactProducer storyProducer,
         ILogger<XmlDiagnosticsPublisher> logger,
-        IFileTypeRegistry fileTypeRegistry)
+        IFileTypeRegistry fileTypeRegistry,
+        IFileHelper fileHelper)
     {
         _publish = publish;
         _workspaceHost = workspaceHost;
@@ -70,6 +74,7 @@ public sealed class XmlDiagnosticsPublisher
         _storyProducer = storyProducer;
         _logger = logger;
         _fileTypeRegistry = fileTypeRegistry;
+        _fileHelper = fileHelper;
 
         indexService.IndexChanged += OnIndexChanged;
     }
@@ -80,22 +85,21 @@ public sealed class XmlDiagnosticsPublisher
             "OnIndexChanged fired: {DocCount} document(s), {DefCount} definition(s), {RefCount} reference(s)",
             newIndex.Documents.Count, newIndex.WorkspaceDefinitions.Count, newIndex.WorkspaceReferences.Count);
 
-        // Iterate open documents from the workspace host rather than the index keys.
-        // The workspace scanner stores files by filesystem path while the LSP sync handler
-        // stores them by file:// URI — both coexist as separate keys in the index. Iterating
-        // index keys would publish an empty notification for the scanner's path key, which
-        // VS Code resolves to the same file as the editor's URI, clearing real diagnostics.
+        // Iterate open documents from the workspace host so we publish only for editor-open
+        // files. The workspace host stores raw LSP URIs (potentially mixed case on Windows);
+        // the index stores canonical lowercase URIs. Normalize before index lookups.
         var openDocs = _workspaceHost.All.ToList();
         var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
 
         foreach (var doc in openDocs)
         {
             var uri = doc.Uri;
-            var ctx = new DiagnosticsContext(_schema, newIndex, uri, "en");
+            var canonicalUri = _fileHelper.NormalizeUri(uri);
+            var ctx = new DiagnosticsContext(_schema, newIndex, canonicalUri, "en");
 
             var facts = new List<XmlFact>();
             facts.AddRange(_documentProducer.Produce(doc.Text, uri));
-            facts.AddRange(_indexProducer.Produce(uri, newIndex));
+            facts.AddRange(_indexProducer.Produce(canonicalUri, newIndex));
             if (IsStoryParserDocument(uri))
                 facts.AddRange(_storyProducer.Produce(doc.Text, uri));
 
@@ -107,9 +111,10 @@ public sealed class XmlDiagnosticsPublisher
             allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, doc.Text, newIndex));
             allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, doc.Text, newIndex));
 
+            var publishUri = DocumentUri.From(uri);
             _publish(new PublishDiagnosticsParams
             {
-                Uri = DocumentUri.From(uri),
+                Uri = publishUri,
                 Diagnostics = new Container<Diagnostic>(allDiags)
             });
         }
@@ -131,7 +136,8 @@ public sealed class XmlDiagnosticsPublisher
     {
         var hardcoded = index.Baseline.HardcodedEnumValues;
         if (hardcoded.IsEmpty) return [];
-        if (!documentUri.EndsWith("GameConstants.xml", StringComparison.OrdinalIgnoreCase)) return [];
+        var uriPath = _fileHelper.NormalizeUri(documentUri);
+        if (!Path.GetFileName(uriPath).Equals("gameconstants.xml", StringComparison.OrdinalIgnoreCase)) return [];
 
         XDocument doc;
         try
@@ -299,10 +305,7 @@ public sealed class XmlDiagnosticsPublisher
     }
 
     private bool IsStoryParserDocument(string documentUri)
-    {
-        var normalized = XmlGameDocumentParser.NormalizeDocumentUri(documentUri);
-        return _fileTypeRegistry.GetTypesForFile(normalized).Contains("StoryParser");
-    }
+        => _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
 
     private static Diagnostic ToLspDiagnostic(XmlFact fact, XmlDiagnosticResult result)
     {

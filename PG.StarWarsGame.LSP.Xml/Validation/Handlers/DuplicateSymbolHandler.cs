@@ -11,7 +11,9 @@ public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlSymbolFact fact, DiagnosticsContext ctx)
     {
         var others = fact.AllDefinitions
-            .Where(s => s.Origin is FileOrigin fo && !(fo.Uri == fact.DocumentUri && fo.Line == fact.Line))
+            .Where(s => s.Origin is FileOrigin fo &&
+                        !(string.Equals(fo.Uri, fact.DocumentUri, StringComparison.OrdinalIgnoreCase) &&
+                          fo.Line == fact.Line))
             .ToList();
 
         if (others.Count == 0)

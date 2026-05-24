@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -19,7 +20,8 @@ public sealed class WorkspaceScannerTest
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         params IGameDocumentParser[] parsers)
     {
-        return new WorkspaceScanner(fs, parsers, svc, NullLogger<WorkspaceScanner>.Instance, null,
+        return new WorkspaceScanner(new FileHelper(fs), parsers, svc,
+            NullLogger<WorkspaceScanner>.Instance, null,
             new FileTypeRegistry(), new FakeSchemaProvider());
     }
 
@@ -27,7 +29,8 @@ public sealed class WorkspaceScannerTest
         IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return new WorkspaceScanner(fs, parsers, svc, NullLogger<WorkspaceScanner>.Instance, null,
+        return new WorkspaceScanner(new FileHelper(fs), parsers, svc,
+            NullLogger<WorkspaceScanner>.Instance, null,
             registry, schema);
     }
 
@@ -46,6 +49,27 @@ public sealed class WorkspaceScannerTest
         await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         Assert.StartsWith("file://", svc.Calls[0].Uri, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ScanAsync_IndexedUri_IsCanonicalLowercase()
+    {
+        // Scanner must produce canonical file:/// URIs (lowercase, forward-slash) so that
+        // index lookups and file-type registry lookups always use the same key format as
+        // the LSP client URIs after normalization.
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "Units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        var uri = svc.Calls[0].Uri;
+        Assert.StartsWith("file:///", uri, StringComparison.Ordinal);
+        Assert.Equal(uri, uri.ToLowerInvariant());
+        Assert.DoesNotContain('\\', uri);
     }
 
     [Fact]
@@ -165,8 +189,8 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        var expectedKey = Path.Combine(root, "data", "xml", "hardpoints.xml")
-            .Replace('\\', '/').ToLowerInvariant();
+        var expectedKey = new FileHelper(fs).PathToFileUri(
+            Path.Combine(root, "data", "xml", "hardpoints.xml"));
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
@@ -194,8 +218,8 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        var expectedKey = Path.Combine(root, "data", "xml", "hardpoints.xml")
-            .Replace('\\', '/').ToLowerInvariant();
+        var expectedKey = new FileHelper(fs).PathToFileUri(
+            Path.Combine(root, "data", "xml", "hardpoints.xml"));
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
@@ -215,8 +239,8 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        var expectedKey = Path.Combine(root, "data", "xml", "movies.xml")
-            .Replace('\\', '/').ToLowerInvariant();
+        var expectedKey = new FileHelper(fs).PathToFileUri(
+            Path.Combine(root, "data", "xml", "movies.xml"));
         Assert.Equal(["BinkMovie"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
@@ -258,8 +282,8 @@ public sealed class WorkspaceScannerTest
 
         await Build(fs, svc, registry, schema).ScanAsync([root], CancellationToken.None);
 
-        var expectedKey = Path.Combine(root, "hardpoints.xml")
-            .Replace('\\', '/').ToLowerInvariant();
+        var expectedKey = new FileHelper(fs).PathToFileUri(
+            Path.Combine(root, "hardpoints.xml"));
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
@@ -289,8 +313,8 @@ public sealed class WorkspaceScannerTest
 
         await scanTask;
 
-        var expectedKey = Path.Combine(root, "data", "xml", "hardpoints.xml")
-            .Replace('\\', '/').ToLowerInvariant();
+        var expectedKey = new FileHelper(fs).PathToFileUri(
+            Path.Combine(root, "data", "xml", "hardpoints.xml"));
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 

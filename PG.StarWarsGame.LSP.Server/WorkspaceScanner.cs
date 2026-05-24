@@ -3,32 +3,32 @@
 
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.IO.Abstractions;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class WorkspaceScanner
 {
+    private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
-    private readonly IFileSystem _fs;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceScanner> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
     private readonly IServerWorkDoneManager? _workDone;
 
-    public WorkspaceScanner(IFileSystem fs, IEnumerable<IGameDocumentParser> parsers,
+    public WorkspaceScanner(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, ILogger<WorkspaceScanner> logger,
         IServerWorkDoneManager? workDone,
         IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema)
     {
-        _fs = fs;
+        _fileHelper = fileHelper;
         _parsers = parsers;
         _indexService = indexService;
         _logger = logger;
@@ -59,8 +59,9 @@ public sealed class WorkspaceScanner
             _logger.LogInformation("PreScanMetafiles complete at {Elapsed} ms", sw.ElapsedMilliseconds);
 
             var files = roots
-                .SelectMany(folder => _fs.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
-                .Where(f => _parsers.Any(p => p.CanParse(_fs.Path.GetExtension(f))))
+                .SelectMany(folder =>
+                    _fileHelper.FileSystem.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+                .Where(f => _parsers.Any(p => p.CanParse(_fileHelper.FileSystem.Path.GetExtension(f))))
                 .ToList();
 
             _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count,
@@ -68,7 +69,11 @@ public sealed class WorkspaceScanner
 
             IWorkDoneObserver? progress = null;
             if (_workDone?.IsSupported == true)
-                progress = await _workDone.Create(
+            {
+                // window/workDoneProgress/create awaits a client response. Some clients (e.g. VSCode)
+                // delay or never respond, which would block the entire scan. Cap at 2 s and skip the
+                // progress indicator rather than stalling the indexer.
+                var createTask = _workDone.Create(
                     new WorkDoneProgressBegin
                     {
                         Title = "Indexing workspace",
@@ -79,6 +84,10 @@ public sealed class WorkspaceScanner
                     null!,
                     null!,
                     ct);
+                var winner = await Task.WhenAny(createTask, Task.Delay(TimeSpan.FromSeconds(2), ct));
+                if (winner == createTask && createTask.IsCompletedSuccessfully)
+                    progress = await createTask; // task is already completed — await is non-blocking
+            }
 
             var indexed = 0;
             var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
@@ -90,8 +99,8 @@ public sealed class WorkspaceScanner
                 {
                     await Parallel.ForEachAsync(files, options, async (file, token) =>
                     {
-                        var text = await _fs.File.ReadAllTextAsync(file, token);
-                        await _indexService.UpdateDocumentAsync(PathToFileUri(file), text, 0, token);
+                        var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
+                        await _indexService.UpdateDocumentAsync(_fileHelper.PathToFileUri(file), text, 0, token);
                         var done = Interlocked.Increment(ref indexed);
                         _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
                         progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null,
@@ -151,7 +160,7 @@ public sealed class WorkspaceScanner
 
             if (def.MetafileType == MetafileType.FileRegistry)
             {
-                var metafilePath = FindInWorkspace(roots, def.Path);
+                var metafilePath = _fileHelper.FindInWorkspace(roots, def.Path);
                 if (metafilePath is not null)
                     RegisterFromMetafile(metafilePath, def);
                 else
@@ -159,9 +168,9 @@ public sealed class WorkspaceScanner
             }
             else // DirectContent
             {
-                var contentPath = FindInWorkspace(roots, def.Path);
+                var contentPath = _fileHelper.FindInWorkspace(roots, def.Path);
                 if (contentPath is not null)
-                    _fileTypeRegistry.RegisterFile(NormalizeAbsolutePath(contentPath),
+                    _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(contentPath),
                         def.Types.ToImmutableArray());
                 else
                     FallbackFromBaseline(baseline, def, roots);
@@ -174,7 +183,7 @@ public sealed class WorkspaceScanner
         string xmlContent;
         try
         {
-            xmlContent = _fs.File.ReadAllText(metafilePath);
+            xmlContent = _fileHelper.FileSystem.File.ReadAllText(metafilePath);
         }
         catch (Exception ex)
         {
@@ -196,7 +205,7 @@ public sealed class WorkspaceScanner
         // All game entries live in the same directory as the metafile (e.g. DATA\XML\).
         // Resolving relative to the metafile's directory works whether the workspace root
         // is the game root (…/data/xml/foo.xml) or is the XML directory itself (…/foo.xml).
-        var metafileDir = _fs.Path.GetDirectoryName(metafilePath) ?? string.Empty;
+        var metafileDir = _fileHelper.FileSystem.Path.GetDirectoryName(metafilePath) ?? string.Empty;
 
         var types = def.Types.ToImmutableArray();
         foreach (var elem in xdoc.Descendants()
@@ -204,10 +213,11 @@ public sealed class WorkspaceScanner
         {
             var filename = elem.Value.Trim();
             if (string.IsNullOrEmpty(filename)) continue;
-            var normalizedRel = NormalizeGamePath(filename);
-            var entryName = _fs.Path.GetFileName(normalizedRel.Replace('/', _fs.Path.DirectorySeparatorChar));
+            var normalizedRel = _fileHelper.NormalizeGamePath(filename);
+            var entryName = _fileHelper.FileSystem.Path.GetFileName(
+                normalizedRel.Replace('/', _fileHelper.FileSystem.Path.DirectorySeparatorChar));
             _fileTypeRegistry.RegisterFile(
-                NormalizeAbsolutePath(_fs.Path.Combine(metafileDir, entryName)), types);
+                _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(metafileDir, entryName)), types);
         }
     }
 
@@ -219,66 +229,7 @@ public sealed class WorkspaceScanner
             var relSystemPath = relativePath.Replace('/', Path.DirectorySeparatorChar);
             foreach (var root in roots)
                 _fileTypeRegistry.RegisterFile(
-                    NormalizeAbsolutePath(_fs.Path.Combine(root, relSystemPath)), types);
+                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(root, relSystemPath)), types);
         }
-    }
-
-    private string? FindInWorkspace(IList<string> roots, string normalizedRelPath)
-    {
-        var parts = normalizedRelPath.Split('/');
-        foreach (var root in roots)
-        {
-            var found = TraverseCaseInsensitive(root, parts);
-            if (found is not null) return found;
-        }
-
-        // XML-dir fallback: workspace root IS the data/xml/ directory — strip the prefix.
-        const string xmlPrefix = "data/xml/";
-        if (normalizedRelPath.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase))
-        {
-            var tail = normalizedRelPath[xmlPrefix.Length..].Split('/');
-            foreach (var root in roots)
-            {
-                var found = TraverseCaseInsensitive(root, tail);
-                if (found is not null) return found;
-            }
-        }
-
-        return null;
-    }
-
-    // Case-insensitive path traversal so game files with mixed case work on Linux too.
-    private string? TraverseCaseInsensitive(string dir, string[] parts)
-    {
-        var current = dir;
-        for (var i = 0; i < parts.Length; i++)
-        {
-            if (!_fs.Directory.Exists(current)) return null;
-            var match = _fs.Directory.EnumerateFileSystemEntries(current)
-                .FirstOrDefault(e => string.Equals(
-                    _fs.Path.GetFileName(e), parts[i], StringComparison.OrdinalIgnoreCase));
-            if (match is null) return null;
-            if (i == parts.Length - 1)
-                return _fs.File.Exists(match) ? match : null;
-            current = match;
-        }
-
-        return null;
-    }
-
-    private static string NormalizeGamePath(string raw)
-    {
-        return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
-    }
-
-    private static string NormalizeAbsolutePath(string path)
-    {
-        return path.Replace('\\', '/').ToLowerInvariant();
-    }
-
-    private static string PathToFileUri(string path)
-    {
-        var forward = path.Replace('\\', '/');
-        return forward.StartsWith('/') ? "file://" + forward : "file:///" + forward;
     }
 }
