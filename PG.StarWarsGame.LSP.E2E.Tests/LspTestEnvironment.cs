@@ -49,8 +49,10 @@ public static class LspTestEnvironment
             ? port
             : null;
 
-    private static string? ExistingPath(string? path) =>
-        path is not null && Directory.Exists(path) ? path : null;
+    private static string? ExistingPath(string? path)
+    {
+        return path is not null && Directory.Exists(path) ? path : null;
+    }
 
     private static string? FindSolutionRoot(string start)
     {
@@ -61,6 +63,7 @@ public static class LspTestEnvironment
                 return dir.FullName;
             dir = dir.Parent;
         }
+
         return null;
     }
 }

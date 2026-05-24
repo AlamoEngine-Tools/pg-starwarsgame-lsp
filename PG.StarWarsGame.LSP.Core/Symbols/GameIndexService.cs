@@ -172,7 +172,10 @@ public sealed class GameIndexService : IGameIndexService
         };
     }
 
-    private string NormalizeUri(string uri) => _fileHelper.NormalizeUri(uri);
+    private string NormalizeUri(string uri)
+    {
+        return _fileHelper.NormalizeUri(uri);
+    }
 
     private sealed class BulkUpdateScope : IDisposable
     {

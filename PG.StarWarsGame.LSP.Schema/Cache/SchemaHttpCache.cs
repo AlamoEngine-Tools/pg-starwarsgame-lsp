@@ -63,7 +63,8 @@ public sealed class SchemaHttpCache
             {
                 // Slow path: re-hash every file from disk.
                 var contents = allRels
-                    .Select(rel => _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel)))
+                    .Select(rel =>
+                        _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel)))
                     .ToList();
                 if (!string.Equals(stored, ComputeYamlHash(contents), StringComparison.OrdinalIgnoreCase))
                     return false;
@@ -84,15 +85,19 @@ public sealed class SchemaHttpCache
             }
 
             foreach (var rel in manifest.Types)
-                types.AddRange(YamlSchemaParser.ParseTypeFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+                types.AddRange(YamlSchemaParser.ParseTypeFile(
+                    _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Enums)
-                enums.Add(YamlSchemaParser.ParseEnumFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+                enums.Add(YamlSchemaParser.ParseEnumFile(
+                    _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Hardcoded)
                 hardcodedSets.Add(
-                    YamlSchemaParser.ParseHardcodedSetFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+                    YamlSchemaParser.ParseHardcodedSetFile(
+                        _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
             foreach (var rel in manifest.Meta)
                 metafiles.AddRange(
-                    YamlSchemaParser.ParseMetafileFile(_fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
+                    YamlSchemaParser.ParseMetafileFile(
+                        _fileHelper.FileSystem.File.ReadAllText(_fileHelper.FileSystem.Path.Combine(_dir, rel))));
 
             index = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);
             return true;

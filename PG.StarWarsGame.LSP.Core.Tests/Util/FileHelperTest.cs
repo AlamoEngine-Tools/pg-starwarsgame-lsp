@@ -8,7 +8,10 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Util;
 
 public sealed class FileHelperTest
 {
-    private static IFileHelper Build() => new FileHelper(new MockFileSystem());
+    private static IFileHelper Build()
+    {
+        return new FileHelper(new MockFileSystem());
+    }
 
     // ── PathToFileUri ─────────────────────────────────────────────────────────
 

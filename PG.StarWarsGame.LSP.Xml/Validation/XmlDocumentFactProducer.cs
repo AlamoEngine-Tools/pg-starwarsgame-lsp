@@ -11,7 +11,9 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public sealed class XmlDocumentFactProducer(
-    IFileHelper fileHelper, ISchemaProvider schema, IFileTypeRegistry fileTypeRegistry)
+    IFileHelper fileHelper,
+    ISchemaProvider schema,
+    IFileTypeRegistry fileTypeRegistry)
     : IXmlDocumentFactProducer
 {
     public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)

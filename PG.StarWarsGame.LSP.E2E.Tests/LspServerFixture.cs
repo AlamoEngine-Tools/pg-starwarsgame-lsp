@@ -32,41 +32,6 @@ public sealed class LspServerFixture : IAsyncLifetime
     /// </summary>
     public Task ScanStarted => _scanStartedTcs.Task;
 
-    /// <summary>
-    ///     Fired on every <c>publishDiagnostics</c> notification received from the server.
-    ///     Use this instead of <c>client.Register(r => r.OnPublishDiagnostics(...))</c>,
-    ///     which does not reliably receive server-push notifications in OmniSharp 0.19.x.
-    /// </summary>
-    public event Action<PublishDiagnosticsParams>? DiagnosticsReceived;
-
-    /// <summary>
-    ///     Returns a task that completes with the first <c>publishDiagnostics</c> notification
-    ///     for <paramref name="uri" />, or faults with <see cref="TaskCanceledException" />
-    ///     after <paramref name="timeout" />.
-    /// </summary>
-    public Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
-    {
-        var tcs = new TaskCompletionSource<PublishDiagnosticsParams>(
-            TaskCreationOptions.RunContinuationsAsynchronously);
-        var uriStr = uri.ToString();
-
-        void Handler(PublishDiagnosticsParams p)
-        {
-            if (!string.Equals(p.Uri.ToString(), uriStr, StringComparison.OrdinalIgnoreCase)) return;
-            DiagnosticsReceived -= Handler;
-            tcs.TrySetResult(p);
-        }
-
-        DiagnosticsReceived += Handler;
-        _ = Task.Delay(timeout).ContinueWith(_ =>
-        {
-            DiagnosticsReceived -= Handler;
-            tcs.TrySetCanceled();
-        }, TaskScheduler.Default);
-
-        return tcs.Task;
-    }
-
     public async Task InitializeAsync()
     {
         TestDataDirectory = Path.Combine(
@@ -104,6 +69,41 @@ public sealed class LspServerFixture : IAsyncLifetime
             {
                 _process.Dispose();
             }
+    }
+
+    /// <summary>
+    ///     Fired on every <c>publishDiagnostics</c> notification received from the server.
+    ///     Use this instead of <c>client.Register(r => r.OnPublishDiagnostics(...))</c>,
+    ///     which does not reliably receive server-push notifications in OmniSharp 0.19.x.
+    /// </summary>
+    public event Action<PublishDiagnosticsParams>? DiagnosticsReceived;
+
+    /// <summary>
+    ///     Returns a task that completes with the first <c>publishDiagnostics</c> notification
+    ///     for <paramref name="uri" />, or faults with <see cref="TaskCanceledException" />
+    ///     after <paramref name="timeout" />.
+    /// </summary>
+    public Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
+    {
+        var tcs = new TaskCompletionSource<PublishDiagnosticsParams>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var uriStr = uri.ToString();
+
+        void Handler(PublishDiagnosticsParams p)
+        {
+            if (!string.Equals(p.Uri.ToString(), uriStr, StringComparison.OrdinalIgnoreCase)) return;
+            DiagnosticsReceived -= Handler;
+            tcs.TrySetResult(p);
+        }
+
+        DiagnosticsReceived += Handler;
+        _ = Task.Delay(timeout).ContinueWith(_ =>
+        {
+            DiagnosticsReceived -= Handler;
+            tcs.TrySetCanceled();
+        }, TaskScheduler.Default);
+
+        return tcs.Task;
     }
 
     private async Task InitializeExternalAsync(string workspacePath, int port)

@@ -159,7 +159,9 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     }
 
     private Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
-        => _fixture.WaitForDiagnosticsAsync(uri, timeout);
+    {
+        return _fixture.WaitForDiagnosticsAsync(uri, timeout);
+    }
 
     /// <summary>
     ///     Returns the position of the first grandchild element — the first field tag

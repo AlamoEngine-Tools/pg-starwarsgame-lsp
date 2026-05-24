@@ -73,7 +73,7 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
     {
         if (LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception("$XunitDynamicSkip$" +
-                "Schema not found. Ensure schema/eaw/ submodule is checked out or set LSP_SCHEMA_LOCAL_PATH.");
+                                "Schema not found. Ensure schema/eaw/ submodule is checked out or set LSP_SCHEMA_LOCAL_PATH.");
     }
 
     private async Task<IReadOnlyList<Diagnostic>> OpenAndCollectDiagnosticsAsync(string fileName)
@@ -100,9 +100,11 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
         return result?.Diagnostics?.ToList() ?? [];
     }
 
-    private static IReadOnlyList<Diagnostic> TypeMismatchDiagnostics(IReadOnlyList<Diagnostic> diags) =>
-        diags.Where(d =>
+    private static IReadOnlyList<Diagnostic> TypeMismatchDiagnostics(IReadOnlyList<Diagnostic> diags)
+    {
+        return diags.Where(d =>
             d.Message.Contains("Type mismatch", StringComparison.OrdinalIgnoreCase)).ToList();
+    }
 
     /// <summary>
     ///     Waits for diagnostics for the given URI, then keeps replacing the result with any

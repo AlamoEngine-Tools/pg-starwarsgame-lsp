@@ -56,7 +56,6 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
         var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
         if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
-        {
             // File still on disk — restore the saved state so workspace-wide references
             // (cross-file go-to-def, unresolved-ref diagnostics) keep working after close.
             using (_indexService.BeginBulkUpdate())
@@ -65,12 +64,9 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, ct);
                 await _indexService.UpdateDocumentAsync(uri, text, 0, ct);
             }
-        }
         else
-        {
             // File was deleted from disk — remove it entirely from the index.
             _indexService.RemoveDocument(uri);
-        }
 
         return Unit.Value;
     }

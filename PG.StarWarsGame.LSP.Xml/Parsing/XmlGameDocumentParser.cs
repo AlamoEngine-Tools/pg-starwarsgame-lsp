@@ -137,11 +137,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private static IEnumerable<(string Name, int Offset)> SplitReferenceNames(
         XmlTagDefinition tagDef, string innerText)
     {
-        bool multiValue = tagDef.SemanticType == TagSemanticType.PrerequisiteExpression
-                       || tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
-                                           or XmlValueType.TypeReferenceList
-                                           or XmlValueType.NameReferenceList;
-        bool skipFirst = tagDef.ValueType == XmlValueType.PerFactionObjectList;
+        var multiValue = tagDef.SemanticType == TagSemanticType.PrerequisiteExpression
+                         || tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
+                             or XmlValueType.TypeReferenceList
+                             or XmlValueType.NameReferenceList;
+        var skipFirst = tagDef.ValueType == XmlValueType.PerFactionObjectList;
 
         if (!multiValue && !skipFirst)
         {
@@ -154,7 +154,12 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var first = skipFirst;
         foreach (var (token, offset) in XmlUtility.SplitListWithOffsets(innerText))
         {
-            if (first) { first = false; continue; }
+            if (first)
+            {
+                first = false;
+                continue;
+            }
+
             yield return (token, offset);
         }
     }

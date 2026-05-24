@@ -305,7 +305,9 @@ public sealed class XmlDiagnosticsPublisher
     }
 
     private bool IsStoryParserDocument(string documentUri)
-        => _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
+    {
+        return _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
+    }
 
     private static Diagnostic ToLspDiagnostic(XmlFact fact, XmlDiagnosticResult result)
     {

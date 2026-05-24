@@ -39,49 +39,56 @@ public sealed class GameObjectReferenceCompletionProviderTest
     [Fact]
     public void CanHandle_NameReference_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_NameReferenceList_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReferenceList, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.NameReferenceList, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_SFXEventReference_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.SFXEventReference, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.SFXEventReference, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_FactionReference_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.FactionReference, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.FactionReference, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_TypeReference_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.TypeReference, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.TypeReference, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_TypeReferenceList_True()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.TypeReferenceList, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.TypeReferenceList, ReferenceKind = ReferenceKind.XmlObject };
         Assert.True(Provider.CanHandle(tag));
     }
 
     [Fact]
     public void CanHandle_ReferenceKind_None_False()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.None };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.None };
         Assert.False(Provider.CanHandle(tag));
     }
 

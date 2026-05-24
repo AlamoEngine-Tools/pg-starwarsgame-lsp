@@ -12,12 +12,11 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 
 public sealed class XmlTextDocumentSyncHandlerTest
 {
-    private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
-
     // Absolute-path URI so FileUriToPath produces a real path the MockFileSystem can check.
     private const string DiskUri = "file:///c:/data/test.xml";
     private const string DiskPath = @"c:\data\test.xml";
     private const string DiskContent = "<DiskContent/>";
+    private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlTextDocumentSyncHandler handler,
         FakeGameWorkspaceHost host,
@@ -123,7 +122,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
     public async Task DidClose_Removes_Document_From_WorkspaceHost()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-            { [DiskPath] = new MockFileData(DiskContent) });
+            { [DiskPath] = new(DiskContent) });
         var (handler, host, _) = Build(fs);
 
         await handler.Handle(new DidCloseTextDocumentParams
@@ -141,7 +140,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
         // File exists on disk — close should restore the on-disk state in the index
         // rather than removing it, so cross-file references continue to resolve.
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-            { [DiskPath] = new MockFileData(DiskContent) });
+            { [DiskPath] = new(DiskContent) });
         var (handler, _, index) = Build(fs);
 
         await handler.Handle(new DidCloseTextDocumentParams

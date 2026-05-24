@@ -450,10 +450,14 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>
     }
 
     private static string MarkdownOf(Hover hover)
-        => hover.Contents.MarkupContent?.Value ?? string.Empty;
+    {
+        return hover.Contents.MarkupContent?.Value ?? string.Empty;
+    }
 
     private Task<PublishDiagnosticsParams> WaitForDiagnosticsAsync(DocumentUri uri, TimeSpan timeout)
-        => _fixture.WaitForDiagnosticsAsync(uri, timeout);
+    {
+        return _fixture.WaitForDiagnosticsAsync(uri, timeout);
+    }
 
     private static void RequireWorkspace()
     {
@@ -496,7 +500,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>
     private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
     {
         // Locate the first child (depth-1) opening element.
-        int firstChildLine = -1;
+        var firstChildLine = -1;
         for (var i = 0; i < lines.Length; i++)
         {
             var s = lines[i];

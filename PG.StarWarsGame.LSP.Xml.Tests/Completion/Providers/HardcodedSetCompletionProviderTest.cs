@@ -55,7 +55,8 @@ public sealed class HardcodedSetCompletionProviderTest
     [Fact]
     public void CanHandle_XmlObject_False()
     {
-        var tag = new XmlTagDefinition { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject };
+        var tag = new XmlTagDefinition
+            { Tag = "T", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject };
         Assert.False(Provider.CanHandle(tag));
     }
 

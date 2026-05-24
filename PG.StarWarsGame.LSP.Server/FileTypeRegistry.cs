@@ -13,13 +13,19 @@ public sealed class FileTypeRegistry : IFileTypeRegistry
         new(StringComparer.OrdinalIgnoreCase);
 
     public ImmutableArray<string> GetTypesForFile(string fileUri)
-        => _map.TryGetValue(fileUri, out var types) ? types : ImmutableArray<string>.Empty;
+    {
+        return _map.TryGetValue(fileUri, out var types) ? types : ImmutableArray<string>.Empty;
+    }
 
     public void RegisterFile(string fileUri, ImmutableArray<string> typeNames)
-        => _map[fileUri] = typeNames;
+    {
+        _map[fileUri] = typeNames;
+    }
 
     public void UnregisterFile(string fileUri)
-        => _map.TryRemove(fileUri, out _);
+    {
+        _map.TryRemove(fileUri, out _);
+    }
 
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
 }

@@ -9,19 +9,20 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Parsing;
+using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 
 /// <summary>
-/// Pipeline integration tests: parser → XmlIndexFactProducer → diagnostic handlers.
-/// These guard against regressions where a correct reference produces a false-positive diagnostic.
+///     Pipeline integration tests: parser → XmlIndexFactProducer → diagnostic handlers.
+///     These guard against regressions where a correct reference produces a false-positive diagnostic.
 /// </summary>
 public sealed class ReferenceValidationPipelineTest
 {
     private static readonly DiagnosticsContext EmptyCtx = new(
-        new Handlers.EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
+        new EmptySchemaProvider(), GameIndex.Empty, "file:///test.xml", "en");
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
@@ -72,12 +73,12 @@ public sealed class ReferenceValidationPipelineTest
         });
 
         const string xml = """
-            <GameObjectFiles>
-                <GameObjectType Name="TEST_SQUADRON">
-                    <Squadron_Units>FIGHTER_A FIGHTER_B</Squadron_Units>
-                </GameObjectType>
-            </GameObjectFiles>
-            """;
+                           <GameObjectFiles>
+                               <GameObjectType Name="TEST_SQUADRON">
+                                   <Squadron_Units>FIGHTER_A FIGHTER_B</Squadron_Units>
+                               </GameObjectType>
+                           </GameObjectFiles>
+                           """;
 
         var docIndex = await BuildParser(schema).ParseAsync("file:///test.xml", xml, 1, CancellationToken.None);
         Assert.Equal(2, docIndex.References.Length);
@@ -102,12 +103,12 @@ public sealed class ReferenceValidationPipelineTest
         });
 
         const string xml = """
-            <GameObjectFiles>
-                <GameObjectType Name="AT_AT">
-                    <Encyclopedia_Good_Against>REBEL_SOLDIER X_WING</Encyclopedia_Good_Against>
-                </GameObjectType>
-            </GameObjectFiles>
-            """;
+                           <GameObjectFiles>
+                               <GameObjectType Name="AT_AT">
+                                   <Encyclopedia_Good_Against>REBEL_SOLDIER X_WING</Encyclopedia_Good_Against>
+                               </GameObjectType>
+                           </GameObjectFiles>
+                           """;
 
         var docIndex = await BuildParser(schema).ParseAsync("file:///test.xml", xml, 1, CancellationToken.None);
         Assert.Equal(2, docIndex.References.Length);
@@ -134,12 +135,12 @@ public sealed class ReferenceValidationPipelineTest
         });
 
         const string xml = """
-            <GameObjectFiles>
-                <GameObjectType Name="SOME_UNIT">
-                    <Faction>REBEL_FIGHTER_01</Faction>
-                </GameObjectType>
-            </GameObjectFiles>
-            """;
+                           <GameObjectFiles>
+                               <GameObjectType Name="SOME_UNIT">
+                                   <Faction>REBEL_FIGHTER_01</Faction>
+                               </GameObjectType>
+                           </GameObjectFiles>
+                           """;
 
         var docIndex = await BuildParser(schema).ParseAsync("file:///test.xml", xml, 1, CancellationToken.None);
         Assert.Single(docIndex.References);
@@ -160,27 +161,67 @@ public sealed class ReferenceValidationPipelineTest
         private readonly Dictionary<string, XmlTagDefinition> _tags =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void AddTag(XmlTagDefinition tag) => _tags[tag.Tag] = tag;
+        public XmlTagDefinition? GetTag(string name)
+        {
+            return _tags.GetValueOrDefault(name);
+        }
 
-        public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-        public GameObjectTypeDefinition? GetObjectType(string _) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void AddTag(XmlTagDefinition tag)
+        {
+            _tags[tag.Tag] = tag;
+        }
     }
 
     private sealed class PipelineFakeFileTypeRegistry : IFileTypeRegistry
     {
         public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
             ImmutableDictionary<string, ImmutableArray<string>>.Empty;
-        public ImmutableArray<string> GetTypesForFile(string _) => ImmutableArray<string>.Empty;
-        public void RegisterFile(string _, ImmutableArray<string> __) { }
-        public void UnregisterFile(string _) { }
+
+        public ImmutableArray<string> GetTypesForFile(string _)
+        {
+            return ImmutableArray<string>.Empty;
+        }
+
+        public void RegisterFile(string _, ImmutableArray<string> __)
+        {
+        }
+
+        public void UnregisterFile(string _)
+        {
+        }
     }
 }
