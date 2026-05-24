@@ -5,6 +5,7 @@ using System.Text;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Util;
@@ -100,6 +101,25 @@ internal static class HoverUtility
                 Value = sb.ToString()
             }),
             Range = MakeRange(XmlUtility.GetLine(node), XmlUtility.GetOpeningTagStartColumn(node), node.Name.Length)
+        };
+    }
+
+    public static Hover BuildReferenceHover(
+        GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"### `{type.TypeName}`");
+        sb.AppendLine($" *`\"{symbolId}\"`*");
+        sb.Append(Resolve(type.Description, locale));
+        AppendNotes(sb, type.Notes, locale);
+        return new Hover
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = sb.ToString()
+            }),
+            Range = MakeRange(reference.Line, reference.Column, reference.Length)
         };
     }
 

@@ -35,6 +35,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
     private readonly IXmlCompletionRegistry _completionRegistry;
 
+    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
@@ -52,7 +53,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         StoryParamValueProposalProvider storyProposals,
         IXmlCompletionRegistry completionRegistry,
         IFileTypeRegistry fileTypeRegistry,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        IEaWXmlContext eaWXmlContext)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
@@ -62,11 +64,14 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _completionRegistry = completionRegistry;
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
+        _eaWXmlContext = eaWXmlContext;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
         var uri = request.TextDocument.Uri.ToString();
+        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+            return Task.FromResult(new CompletionList());
         if (!_workspaceHost.TryGet(uri, out var doc))
             return Task.FromResult(new CompletionList());
         var text = doc.Text;

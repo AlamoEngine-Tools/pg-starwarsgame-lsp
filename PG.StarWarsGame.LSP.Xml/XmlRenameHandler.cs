@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -15,6 +16,8 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlRenameHandler : RenameHandlerBase
 {
+    private readonly IEaWXmlContext _eaWXmlContext;
+    private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlRenameHandler> _logger;
     private readonly ISchemaProvider _schema;
@@ -24,17 +27,23 @@ public sealed class XmlRenameHandler : RenameHandlerBase
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
-        ILogger<XmlRenameHandler> logger)
+        ILogger<XmlRenameHandler> logger,
+        IEaWXmlContext eaWXmlContext,
+        IFileHelper fileHelper)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _schema = schema;
         _logger = logger;
+        _eaWXmlContext = eaWXmlContext;
+        _fileHelper = fileHelper;
     }
 
     public override Task<WorkspaceEdit?> Handle(RenameParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+            return Task.FromResult<WorkspaceEdit?>(null);
         var index = _indexService.Current;
 
         if (!index.Documents.TryGetValue(uri, out var docIndex))

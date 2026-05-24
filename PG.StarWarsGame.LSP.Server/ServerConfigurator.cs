@@ -57,6 +57,9 @@ public static class ServerConfigurator
                 services.AddSingleton<SchemaProviderProxy>();
                 services.AddSingleton<ISchemaProvider>(sp => sp.GetRequiredService<SchemaProviderProxy>());
 
+                services.AddSingleton<EaWXmlContext>();
+                services.AddSingleton<IEaWXmlContext>(sp => sp.GetRequiredService<EaWXmlContext>());
+
                 services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
@@ -86,6 +89,10 @@ public static class ServerConfigurator
                     configProvider.LoadFrom(request.InitializationOptions);
                     logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
                     configSpan.Finish(SpanStatus.Ok);
+
+                    var eaWXmlContext = server.Services.GetRequiredService<EaWXmlContext>();
+                    foreach (var dir in configProvider.Current.XmlDirectories)
+                        eaWXmlContext.AddDirectory(dir);
 
                     var schemaSpan = tx.StartChild("schema.setup", "Configure schema provider");
                     var src = configProvider.Current.SchemaSource;

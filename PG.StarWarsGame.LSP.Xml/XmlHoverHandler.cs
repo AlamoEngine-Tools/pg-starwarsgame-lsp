@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -18,26 +17,32 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlHoverHandler : HoverHandlerBase
 {
     private readonly ILspConfigurationProvider _config;
+    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
+    private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlHoverHandler(
         IGameWorkspaceHost workspaceHost,
+        IGameIndexService indexService,
         ISchemaProvider schema,
         ILspConfigurationProvider config,
         ILogger<XmlHoverHandler> logger,
         IFileTypeRegistry fileTypeRegistry,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        IEaWXmlContext eaWXmlContext)
     {
         _workspaceHost = workspaceHost;
+        _indexService = indexService;
         _schema = schema;
         _config = config;
         _logger = logger;
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
+        _eaWXmlContext = eaWXmlContext;
     }
 
     public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
@@ -46,9 +51,10 @@ public sealed class XmlHoverHandler : HoverHandlerBase
             request.Position.Line, request.Position.Character);
 
         var uri = request.TextDocument.Uri.ToString();
+        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+            return Task.FromResult<Hover?>(null);
         if (!_workspaceHost.TryGet(uri, out var doc))
             return Task.FromResult<Hover?>(null);
-        var text = doc.Text;
         var hapDoc = XmlUtility.CreateHtmlDocument(doc.Text);
 
         // The document root element is always a file container, never a field tag.
@@ -56,28 +62,27 @@ public sealed class XmlHoverHandler : HoverHandlerBase
             XmlUtility.GetLine(rootNode) == request.Position.Line)
             return Task.FromResult<Hover?>(null);
 
-        // TODO: ensure that we don't hover over node content, but only the node tag itself should emit hovers.
-        // TODO: inject hover over references here, so hovers over values don't show the tag but the peek of the target.
-
-        var lines = text.Split('\n');
         var lineIndex = request.Position.Line;
-        if (lineIndex >= lines.Length)
-            return Task.FromResult<Hover?>(null);
+        var charPos = request.Position.Character;
 
-        if (!XmlUtility.TryFindNode(hapDoc, lineIndex, out var node))
+        // Find the element whose opening or closing tag is on this line.
+        if (!XmlUtility.TryFindNode(hapDoc, lineIndex, out var node) &&
+            !XmlUtility.TryFindNodeByClosingLine(hapDoc, lineIndex, out node))
         {
             _logger.LogWarning(
                 "Hover request at {Line}:{Character} produced no result, because the tag could not be found.",
-                lineIndex, request.Position.Character);
+                lineIndex, charPos);
             return Task.FromResult<Hover?>(null);
         }
 
-        Debug.Assert(node != null, nameof(node) + " != null");
-
         var locale = _config.Current.Locale;
 
-        // Try element-name-based type lookup first (works when element name = type name).
-        var typeDef = _schema.GetObjectType(node.Name);
+        // Cursor is not on a tag name — check if it is on a reference value.
+        if (!XmlUtility.IsOnTagName(node!, lineIndex, charPos))
+            return Task.FromResult<Hover?>(TryBuildReferenceHover(uri, lineIndex, charPos, locale));
+
+        // Cursor is on a tag name — show tag or type hover.
+        var typeDef = _schema.GetObjectType(node!.Name);
 
         // Registry-based fallback: for files with arbitrary element names, look up the type
         // via the registry and confirm the cursor is on a depth-1 type-container element.
@@ -122,8 +127,32 @@ public sealed class XmlHoverHandler : HoverHandlerBase
 
         _logger.LogWarning(
             "Hover request at {Line}:{Character} produced no result, because the tag could not be found.",
-            request.Position.Line, request.Position.Character);
+            request.Position.Line, charPos);
         return Task.FromResult<Hover?>(null);
+    }
+
+    private Hover? TryBuildReferenceHover(string uri, int line, int character, string locale)
+    {
+        var normalizedUri = _fileHelper.NormalizeUri(uri);
+        var index = _indexService.Current;
+        if (!index.Documents.TryGetValue(normalizedUri, out var docIndex))
+            return null;
+
+        var reference = docIndex.References.FirstOrDefault(r =>
+            r.Line == line && character >= r.Column && character < r.Column + r.Length);
+        if (reference is null)
+            return null;
+
+        var symbol = index.Resolve(reference.TargetId);
+        if (symbol?.TypeName is null)
+            return null;
+
+        var typeDef = _schema.GetObjectType(symbol.TypeName);
+        if (typeDef is null)
+            return null;
+
+        _logger.LogDebug("Hover resolved: reference {Id} → {Type}", reference.TargetId, typeDef.TypeName);
+        return HoverUtility.BuildReferenceHover(typeDef, symbol.Id, reference, locale);
     }
 
     protected override HoverRegistrationOptions CreateRegistrationOptions(

@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -21,14 +22,45 @@ public sealed class XmlHoverHandlerTest
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
-        FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null)
+        FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null, FakeIndexService? indexService = null,
+        IEaWXmlContext? ctx = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var config = new FakeConfigProvider();
-        return (new XmlHoverHandler(host, schema, config, NullLogger<XmlHoverHandler>.Instance,
-                registry ?? new FakeFileTypeRegistry(), new FileHelper(new MockFileSystem())),
+        return (new XmlHoverHandler(host, indexService ?? new FakeIndexService(), schema, config,
+                NullLogger<XmlHoverHandler>.Instance, registry ?? new FakeFileTypeRegistry(),
+                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext()),
             host, schema, config);
+    }
+
+    private static GameIndex IndexWith(DocumentIndex callerDoc, GameSymbol? symbol = null)
+    {
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty.Add(callerDoc.DocumentUri, callerDoc);
+        var defs = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
+        if (symbol is not null)
+            defs = defs.Add(symbol.Id, ImmutableArray.Create(symbol));
+        return new GameIndex(BaselineIndex.Empty, docs, defs,
+            ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
+    }
+
+    private static DocumentIndex DocWithRef(string refId, int line, int col, int len, string? typeName = "SpaceUnit")
+    {
+        var uri = TestUri.ToString();
+        return new DocumentIndex(uri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray.Create(new GameReference(refId, GameSymbolKind.XmlObject, typeName, uri, line, col, len)));
+    }
+
+    private static DocumentIndex DocWithRefs(params GameReference[] refs)
+    {
+        var uri = TestUri.ToString();
+        return new DocumentIndex(uri, 1, ImmutableArray<GameSymbol>.Empty, refs.ToImmutableArray());
+    }
+
+    private static GameSymbol SymbolOf(string id, string typeName)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
+            new FileOrigin("file:///other.xml", 0, null), null);
     }
 
     private static HoverParams At(int line, int character)
@@ -359,6 +391,126 @@ public sealed class XmlHoverHandlerTest
         Assert.DoesNotContain("**Note:**", md);
     }
 
+    // ── tag-name gate ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CursorOnTagValue_WithProperRoot_ReturnsNull()
+    {
+        // Verifies column gating: cursor is on "500", not on the tag name.
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>500</Max_Speed>\n</Root>", 1);
+        schema.TagToReturn = MakeTag();
+
+        // '5' of "500" is at col 11 on line 1
+        var result = await handler.Handle(At(1, 11), CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnMultilineClosingTag_ReturnsTagHover()
+    {
+        // Closing tag is on a different line from the opening tag.
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Max_Speed>\n500\n</Max_Speed>\n</Root>", 1);
+        schema.TagToReturn = MakeTag();
+
+        // </Max_Speed> on line 3: '<' at 0, '/' at 1, 'M' at 2
+        var result = await handler.Handle(At(3, 2), CancellationToken.None);
+        Assert.NotNull(result);
+        Assert.Contains("Max_Speed", result!.Contents.MarkupContent!.Value);
+    }
+
+    // ── reference hover ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CursorOnReferenceValue_ReturnsTypeHover()
+    {
+        // <Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>
+        // "EMPIRE" starts at col 13 on line 1
+        var symbol = SymbolOf("EMPIRE", "Faction");
+        var index = IndexWith(DocWithRef("EMPIRE", 1, 13, 6), symbol);
+        var indexService = new FakeIndexService { Current = index };
+        var (handler, host, schema, _) = Build(indexService: indexService);
+        schema.AddType(new GameObjectTypeDefinition
+        {
+            TypeName = "Faction",
+            Description = new Dictionary<string, string> { ["en"] = "A playable faction." }
+        });
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
+
+        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var md = result!.Contents.MarkupContent!.Value;
+        Assert.Contains("Faction", md);
+        Assert.Contains("EMPIRE", md);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnReferenceValue_HoverRangeCoversToken()
+    {
+        var symbol = SymbolOf("EMPIRE", "Faction");
+        var index = IndexWith(DocWithRef("EMPIRE", 1, 13, 6), symbol);
+        var indexService = new FakeIndexService { Current = index };
+        var (handler, host, schema, _) = Build(indexService: indexService);
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", Description = new Dictionary<string, string>() });
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
+
+        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+
+        Assert.Equal(1, result!.Range!.Start.Line);
+        Assert.Equal(13, result.Range.Start.Character);
+        Assert.Equal(19, result.Range.End.Character); // 13 + 6
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnSecondListItem_ReturnsTypeHoverForThatItem()
+    {
+        // <Root>\n<Units>Alpha Beta</Units>\n</Root>
+        // "Alpha" at col 7, len 5; "Beta" at col 13, len 4
+        var uri = TestUri.ToString();
+        var refAlpha = new GameReference("Alpha", GameSymbolKind.XmlObject, "SpaceUnit", uri, 1, 7, 5);
+        var refBeta = new GameReference("Beta", GameSymbolKind.XmlObject, "SpaceUnit", uri, 1, 13, 4);
+        var doc = DocWithRefs(refAlpha, refBeta);
+        var symbol = SymbolOf("Beta", "SpaceUnit");
+        var index = IndexWith(doc, symbol);
+        var indexService = new FakeIndexService { Current = index };
+        var (handler, host, schema, _) = Build(indexService: indexService);
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", Description = new Dictionary<string, string>() });
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Units>Alpha Beta</Units>\n</Root>", 1);
+
+        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains("Beta", result!.Contents.MarkupContent!.Value);
+        Assert.DoesNotContain("Alpha", result.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnUnresolvedReference_ReturnsNull()
+    {
+        var index = IndexWith(DocWithRef("MISSING_UNIT", 1, 13, 12));
+        var indexService = new FakeIndexService { Current = index };
+        var (handler, host, _, _) = Build(indexService: indexService);
+        host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>MISSING_UNIT</Affiliation>\n</Root>", 1);
+
+        var result = await handler.Handle(At(1, 14), CancellationToken.None);
+        Assert.Null(result);
+    }
+
+    // ── EaW directory gating ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NonEaWFile_ReturnsNull()
+    {
+        var (handler, host, _, _) = Build(ctx: new DenyAllEaWContext());
+        host.AddOrUpdate(TestUri.ToString(), "<Root><Foo/></Root>", 1);
+
+        var result = await handler.Handle(At(0, 7), CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
     // ── fakes ───────────────────────────────────────────────────────────────
 
     private sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
@@ -474,6 +626,28 @@ public sealed class XmlHoverHandlerTest
 
         public void LoadFrom(object? _)
         {
+        }
+    }
+
+    private sealed class FakeIndexService : IGameIndexService
+    {
+        public GameIndex Current { get; set; } = GameIndex.Empty;
+
+        public event Action<GameIndex>? IndexChanged;
+
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
+            Task.CompletedTask;
+
+        public void RemoveDocument(string uri) { }
+
+        public void ApplyBaseline(BaselineIndex baseline) { }
+
+        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        private sealed class NullDisposable : IDisposable
+        {
+            public static readonly NullDisposable Instance = new();
+            public void Dispose() { }
         }
     }
 }

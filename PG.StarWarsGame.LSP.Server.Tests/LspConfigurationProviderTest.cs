@@ -51,7 +51,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
     public void LoadFrom_WithGamePath_Extracted()
     {
         var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { gamePath = "/game" }));
+        provider.LoadFrom(Json(new { baseGamePath = "/game" }));
         Assert.Equal("/game", provider.Current.GamePath);
     }
 
@@ -118,6 +118,24 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Contains("/mod/a", provider.Current.ModPaths);
     }
 
+    [Fact]
+    public void LoadFrom_WithXmlDirectories_Extracted()
+    {
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { xmlDirectories = new[] { "/game/data/xml", "/mod/data/xml" } }));
+        Assert.Equal(2, provider.Current.XmlDirectories.Count);
+        Assert.Contains("/game/data/xml", provider.Current.XmlDirectories);
+        Assert.Contains("/mod/data/xml", provider.Current.XmlDirectories);
+    }
+
+    [Fact]
+    public void LoadFrom_NoXmlDirectories_DefaultsToEmpty()
+    {
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(null);
+        Assert.Empty(provider.Current.XmlDirectories);
+    }
+
     // ── workspace config file ────────────────────────────────────────────────
 
     [Fact]
@@ -167,7 +185,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
             JsonSerializer.Serialize(new { GamePath = "file-value" }));
 
         var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { workspaceRoot = _tempDir, gamePath = "overlay-value" }));
+        provider.LoadFrom(Json(new { workspaceRoot = _tempDir, baseGamePath = "overlay-value" }));
 
         Assert.Equal("overlay-value", provider.Current.GamePath);
     }
@@ -213,6 +231,48 @@ public sealed class LspConfigurationProviderTest : IDisposable
 
         Assert.Single(provider.Current.ModPaths);
         Assert.Equal("/from-file", provider.Current.ModPaths[0]);
+    }
+
+    [Fact]
+    public void Merge_OverlayXmlDirectoriesOverrideFile()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".pg-lsp.json"),
+            JsonSerializer.Serialize(new { XmlDirectories = new[] { "/file-dir" } }));
+
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = _tempDir, xmlDirectories = new[] { "/overlay-dir" } }));
+
+        Assert.Single(provider.Current.XmlDirectories);
+        Assert.Equal("/overlay-dir", provider.Current.XmlDirectories[0]);
+    }
+
+    [Fact]
+    public void Merge_EmptyOverlayXmlDirectories_FileValueKept()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".pg-lsp.json"),
+            JsonSerializer.Serialize(new { XmlDirectories = new[] { "/from-file" } }));
+
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
+
+        Assert.Single(provider.Current.XmlDirectories);
+        Assert.Equal("/from-file", provider.Current.XmlDirectories[0]);
+    }
+
+    [Fact]
+    public void LoadFrom_XmlDirectoriesFromConfigFile_Loaded()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".pg-lsp.json"),
+            JsonSerializer.Serialize(new { XmlDirectories = new[] { "/file-dir-a", "/file-dir-b" } }));
+
+        var provider = new LspConfigurationProvider(NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
+
+        Assert.Equal(2, provider.Current.XmlDirectories.Count);
+        Assert.Contains("/file-dir-a", provider.Current.XmlDirectories);
     }
 
     private sealed class FakeJsonToken

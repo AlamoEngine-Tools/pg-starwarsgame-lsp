@@ -128,4 +128,37 @@ public static class XmlUtility
         return node.GetAttributes().FirstOrDefault(a =>
             string.Equals(a.Name, typeDef.NameTag, StringComparison.OrdinalIgnoreCase))?.Value;
     }
+
+    public static bool IsOnTagName(HtmlNode node, int line, int character)
+    {
+        if (GetLine(node) == line)
+        {
+            var openStart = GetOpeningTagStartColumn(node);
+            if (character >= openStart && character < openStart + node.Name.Length)
+                return true;
+        }
+
+        var endNode = node.EndNode;
+        if (endNode != null && !ReferenceEquals(endNode, node))
+        {
+            var closeNameStart = endNode.LinePosition + 2; // skip </
+            if (GetLine(endNode) == line && character >= closeNameStart &&
+                character < closeNameStart + node.Name.Length)
+                return true;
+        }
+
+        return false;
+    }
+
+    public static bool TryFindNodeByClosingLine(HtmlDocument doc, int line, out HtmlNode? node)
+    {
+        node = doc.DocumentNode
+            .Descendants()
+            .FirstOrDefault(n =>
+                n.NodeType == HtmlNodeType.Element &&
+                n.EndNode != null &&
+                !ReferenceEquals(n.EndNode, n) &&
+                GetLine(n.EndNode) == line);
+        return node is not null;
+    }
 }

@@ -6,24 +6,33 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlReferencesHandler : ReferencesHandlerBase
 {
+    private readonly IEaWXmlContext _eaWXmlContext;
+    private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlReferencesHandler> _logger;
 
-    public XmlReferencesHandler(IGameIndexService indexService, ILogger<XmlReferencesHandler> logger)
+    public XmlReferencesHandler(IGameIndexService indexService, ILogger<XmlReferencesHandler> logger,
+        IEaWXmlContext eaWXmlContext, IFileHelper fileHelper)
     {
         _indexService = indexService;
         _logger = logger;
+        _eaWXmlContext = eaWXmlContext;
+        _fileHelper = fileHelper;
     }
 
     public override Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+            return Task.FromResult<LocationContainer?>(null);
         var index = _indexService.Current;
 
         if (!index.Documents.TryGetValue(uri, out var docIndex))

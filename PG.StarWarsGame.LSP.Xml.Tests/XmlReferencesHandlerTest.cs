@@ -1,11 +1,15 @@
-// Copyright (c) Alamoeng Tools and contributors. All rights reserved.
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -56,10 +60,13 @@ public sealed class XmlReferencesHandlerTest
             allRefs ?? ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
-    private static XmlReferencesHandler BuildHandler(GameIndex index)
+    private static XmlReferencesHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
+        IFileHelper? fileHelper = null)
     {
         var svc = new FakeIndexService { Current = index };
-        return new XmlReferencesHandler(svc, NullLogger<XmlReferencesHandler>.Instance);
+        return new XmlReferencesHandler(svc, NullLogger<XmlReferencesHandler>.Instance,
+            ctx ?? new AllowAllEaWContext(),
+            fileHelper ?? new FileHelper(new MockFileSystem()));
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -195,6 +202,37 @@ public sealed class XmlReferencesHandlerTest
         var locations = result!.ToList();
         Assert.Single(locations);
         Assert.DoesNotContain(locations, l => l.Uri.ToString() == OtherUri);
+    }
+
+    // ── URI normalization ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_MixedCaseUri_NormalizesBeforeIndexLookup()
+    {
+        // Index keys are lowercase (canonical). LSP client on Windows may send uppercase drive letter.
+        const string lowercaseUri = "file:///d:/units.xml";
+        const string mixedCaseUri = "file:///D:/units.xml";
+
+        var callerDoc = DocWithRef(lowercaseUri, "UNIT_A", 0, 4, 6);
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
+            "UNIT_A", ImmutableArray.Create(MakeRef("UNIT_A", lowercaseUri, 0, 4, 6)));
+        var handler = BuildHandler(BuildIndex(callerDoc, refs));
+
+        var result = await handler.Handle(At(0, 5, uri: mixedCaseUri), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var locations = result!.ToList();
+        Assert.Single(locations);
+    }
+
+    // ── EaW directory gating ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NonEaWFile_ReturnsNull()
+    {
+        var handler = BuildHandler(GameIndex.Empty, ctx: new DenyAllEaWContext());
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
+        Assert.Null(result);
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

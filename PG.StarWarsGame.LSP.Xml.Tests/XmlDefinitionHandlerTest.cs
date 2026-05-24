@@ -8,6 +8,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -61,11 +63,12 @@ public sealed class XmlDefinitionHandlerTest
             null);
     }
 
-    private static XmlDefinitionHandler BuildHandler(GameIndex index)
+    private static XmlDefinitionHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null)
     {
         var indexService = new FakeIndexService { Current = index };
         var fileHelper = new FileHelper(new MockFileSystem());
-        return new XmlDefinitionHandler(indexService, fileHelper, NullLogger<XmlDefinitionHandler>.Instance);
+        return new XmlDefinitionHandler(indexService, fileHelper, NullLogger<XmlDefinitionHandler>.Instance,
+            ctx ?? new AllowAllEaWContext());
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -182,6 +185,16 @@ public sealed class XmlDefinitionHandlerTest
         Assert.NotNull(result);
         var link = Assert.Single(result!);
         Assert.Equal(lowercaseUri, link.Location!.Uri.ToString());
+    }
+
+    // ── EaW directory gating ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NonEaWFile_ReturnsNull()
+    {
+        var handler = BuildHandler(GameIndex.Empty, ctx: new DenyAllEaWContext());
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
+        Assert.Null(result);
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

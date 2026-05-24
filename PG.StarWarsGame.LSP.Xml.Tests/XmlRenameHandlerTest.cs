@@ -2,12 +2,15 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -67,14 +70,18 @@ public sealed class XmlRenameHandlerTest
     private static XmlRenameHandler BuildHandler(
         GameIndex index,
         FakeWorkspaceHost? host = null,
-        FakeSchemaProvider? schema = null)
+        FakeSchemaProvider? schema = null,
+        IEaWXmlContext? ctx = null,
+        IFileHelper? fileHelper = null)
     {
         var svc = new FakeIndexService { Current = index };
         return new XmlRenameHandler(
             svc,
             host ?? new FakeWorkspaceHost(),
             schema ?? new FakeSchemaProvider(),
-            NullLogger<XmlRenameHandler>.Instance);
+            NullLogger<XmlRenameHandler>.Instance,
+            ctx ?? new AllowAllEaWContext(),
+            fileHelper ?? new FileHelper(new MockFileSystem()));
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -227,6 +234,40 @@ public sealed class XmlRenameHandlerTest
         var otherEdits = result.Changes[DocumentUri.From(OtherUri)].ToList();
         Assert.Equal(2, otherEdits.Count);
         Assert.All(otherEdits, e => Assert.Equal("UNIT_Z", e.NewText));
+    }
+
+    // ── URI normalization ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_MixedCaseUri_NormalizesBeforeIndexLookup()
+    {
+        const string lowercaseUri = "file:///d:/units.xml";
+        const string mixedCaseUri = "file:///D:/units.xml";
+
+        var doc = DocWithRef(lowercaseUri, "UNIT_A", 0, 4, 6);
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_A", ImmutableArray.Create(SymbolAt("UNIT_A", lowercaseUri, 1)));
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            .Add("UNIT_A", ImmutableArray.Create(MakeRef("UNIT_A", lowercaseUri, 0, 4, 6)));
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(lowercaseUri, "<Spawn>UNIT_A</Spawn>", 1);
+        var schema = new FakeSchemaProvider();
+
+        var handler = BuildHandler(BuildIndex(doc, refs, defs), host, schema);
+        var result = await handler.Handle(RenameAt(0, 5, "UNIT_B", mixedCaseUri), CancellationToken.None);
+
+        Assert.NotNull(result);
+    }
+
+    // ── EaW directory gating ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NonEaWFile_ReturnsNull()
+    {
+        var handler = BuildHandler(GameIndex.Empty, ctx: new DenyAllEaWContext());
+        var result = await handler.Handle(RenameAt(0, 0, "NEW_NAME"), CancellationToken.None);
+        Assert.Null(result);
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

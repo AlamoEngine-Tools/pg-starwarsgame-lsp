@@ -14,6 +14,7 @@ public sealed class UintValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
             return [];
 
         var trimmed = fact.RawValue.Trim();
+
         if (!int.TryParse(trimmed, out var value) || value < 0)
             return
             [

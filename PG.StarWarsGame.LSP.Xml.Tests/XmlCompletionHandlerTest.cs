@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Completion;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -21,7 +22,7 @@ public sealed class XmlCompletionHandlerTest
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlCompletionHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
-        FakeProposalRegistry proposals) Build(FakeFileTypeRegistry? registry = null)
+        FakeProposalRegistry proposals) Build(FakeFileTypeRegistry? registry = null, IEaWXmlContext? ctx = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
@@ -30,7 +31,7 @@ public sealed class XmlCompletionHandlerTest
         var storyProposals = new StoryParamValueProposalProvider();
         return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
             new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry(),
-            new FileHelper(new MockFileSystem())), host, schema, proposals);
+            new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext()), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -573,6 +574,19 @@ public sealed class XmlCompletionHandlerTest
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
 
         var result = await handler.Handle(At(3, 14), CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
+    // ── EaW directory gating ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_NonEaWFile_ReturnsEmptyList()
+    {
+        var (handler, host, _, _) = Build(ctx: new DenyAllEaWContext());
+        host.AddOrUpdate(TestUri.ToString(), "<Root><Foo/></Root>", 1);
+
+        var result = await handler.Handle(At(0, 7), CancellationToken.None);
 
         Assert.Empty(result.Items);
     }

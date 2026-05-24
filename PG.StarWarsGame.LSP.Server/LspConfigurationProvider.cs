@@ -113,6 +113,13 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
                 if (item.ValueKind == JsonValueKind.String && item.GetString() is { } s)
                     modPaths.Add(s);
 
+        var xmlDirectories = new List<string>();
+        if (elem.TryGetProperty("xmlDirectories", out var xmlDirsElem) &&
+            xmlDirsElem.ValueKind == JsonValueKind.Array)
+            foreach (var item in xmlDirsElem.EnumerateArray())
+                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } d)
+                    xmlDirectories.Add(d);
+
         _logger.LogInformation(
             "ParseInitOptions: schemaLocalPath={LocalPath}, schemaUrl={Url}, baselineType={BaselineType}",
             schemaLocalPath ?? "<null>", schemaUrl ?? "<null>", baselineType ?? "<null>");
@@ -121,6 +128,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         {
             GamePath = baseGamePath,
             ModPaths = modPaths,
+            XmlDirectories = xmlDirectories,
             Locale = locale ?? "en",
             SchemaSource = !string.IsNullOrWhiteSpace(schemaLocalPath)
                 ? new SchemaSourceConfig { Type = SchemaSourceType.Local, LocalPath = schemaLocalPath }
@@ -141,6 +149,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         {
             GamePath = overlay.GamePath ?? file.GamePath,
             ModPaths = overlay.ModPaths.Count > 0 ? overlay.ModPaths : file.ModPaths,
+            XmlDirectories = overlay.XmlDirectories.Count > 0 ? overlay.XmlDirectories : file.XmlDirectories,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,
             SchemaSource = overlay.SchemaSource.Type == SchemaSourceType.Local
                            || overlay.SchemaSource.Url != new SchemaSourceConfig().Url

@@ -15,6 +15,7 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class WorkspaceScanner
 {
+    private readonly EaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
@@ -26,7 +27,8 @@ public sealed class WorkspaceScanner
     public WorkspaceScanner(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, ILogger<WorkspaceScanner> logger,
         IServerWorkDoneManager? workDone,
-        IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema)
+        IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
+        EaWXmlContext eaWXmlContext)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -35,6 +37,7 @@ public sealed class WorkspaceScanner
         _workDone = workDone;
         _fileTypeRegistry = fileTypeRegistry;
         _schema = schema;
+        _eaWXmlContext = eaWXmlContext;
     }
 
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
@@ -62,6 +65,7 @@ public sealed class WorkspaceScanner
                 .SelectMany(folder =>
                     _fileHelper.FileSystem.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
                 .Where(f => _parsers.Any(p => p.CanParse(_fileHelper.FileSystem.Path.GetExtension(f))))
+                .Where(f => _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f)))
                 .ToList();
 
             _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count,
@@ -162,7 +166,11 @@ public sealed class WorkspaceScanner
             {
                 var metafilePath = _fileHelper.FindInWorkspace(roots, def.Path);
                 if (metafilePath is not null)
+                {
+                    var dir = _fileHelper.FileSystem.Path.GetDirectoryName(metafilePath)!;
+                    _eaWXmlContext.AddDirectory(dir);
                     RegisterFromMetafile(metafilePath, def);
+                }
                 else
                     FallbackFromBaseline(baseline, def, roots);
             }
@@ -170,8 +178,12 @@ public sealed class WorkspaceScanner
             {
                 var contentPath = _fileHelper.FindInWorkspace(roots, def.Path);
                 if (contentPath is not null)
+                {
+                    var dir = _fileHelper.FileSystem.Path.GetDirectoryName(contentPath)!;
+                    _eaWXmlContext.AddDirectory(dir);
                     _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(contentPath),
                         def.Types.ToImmutableArray());
+                }
                 else
                     FallbackFromBaseline(baseline, def, roots);
             }

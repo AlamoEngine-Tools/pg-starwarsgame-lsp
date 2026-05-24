@@ -7,27 +7,32 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlDefinitionHandler : DefinitionHandlerBase
 {
+    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDefinitionHandler> _logger;
 
     public XmlDefinitionHandler(IGameIndexService indexService, IFileHelper fileHelper,
-        ILogger<XmlDefinitionHandler> logger)
+        ILogger<XmlDefinitionHandler> logger, IEaWXmlContext eaWXmlContext)
     {
         _indexService = indexService;
         _fileHelper = fileHelper;
         _logger = logger;
+        _eaWXmlContext = eaWXmlContext;
     }
 
     public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+            return Task.FromResult<LocationOrLocationLinks?>(null);
         var index = _indexService.Current;
 
         if (!index.Documents.TryGetValue(uri, out var docIndex))

@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -20,12 +21,13 @@ public sealed class XmlTextDocumentSyncHandlerTest
 
     private static (XmlTextDocumentSyncHandler handler,
         FakeGameWorkspaceHost host,
-        FakeGameIndexService index) Build(MockFileSystem? fs = null)
+        FakeGameIndexService index) Build(MockFileSystem? fs = null, IEaWXmlContext? ctx = null)
     {
         var host = new FakeGameWorkspaceHost();
         var index = new FakeGameIndexService();
         var fileHelper = new FileHelper(fs ?? new MockFileSystem());
-        return (new XmlTextDocumentSyncHandler(host, index, fileHelper), host, index);
+        return (new XmlTextDocumentSyncHandler(host, index, fileHelper, ctx ?? new AllowAllEaWContext()),
+            host, index);
     }
 
     // ── DidOpen ──────────────────────────────────────────────────────────────
@@ -183,6 +185,54 @@ public sealed class XmlTextDocumentSyncHandlerTest
         }, CancellationToken.None);
 
         Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Empty(index.UpdateCalls);
+    }
+
+    // ── EaW directory gating ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task DidOpen_NonEaWFile_DoesNotAddToWorkspaceHost()
+    {
+        var (handler, host, index) = Build(ctx: new DenyAllEaWContext());
+
+        await handler.Handle(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+                { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
+        }, CancellationToken.None);
+
+        Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Empty(index.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task DidChange_NonEaWFile_DoesNotUpdateWorkspaceHost()
+    {
+        var (handler, host, index) = Build(ctx: new DenyAllEaWContext());
+
+        await handler.Handle(new DidChangeTextDocumentParams
+        {
+            TextDocument = new OptionalVersionedTextDocumentIdentifier { Uri = TestUri },
+            ContentChanges = new Container<TextDocumentContentChangeEvent>(
+                new TextDocumentContentChangeEvent { Text = "<Changed/>" })
+        }, CancellationToken.None);
+
+        Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Empty(index.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task DidClose_NonEaWFile_DoesNotRemoveFromWorkspaceHost()
+    {
+        var (handler, host, index) = Build(ctx: new DenyAllEaWContext());
+
+        await handler.Handle(new DidCloseTextDocumentParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = TestUri }
+        }, CancellationToken.None);
+
+        Assert.Empty(host.RemoveCalls);
+        Assert.Empty(index.RemoveCalls);
         Assert.Empty(index.UpdateCalls);
     }
 

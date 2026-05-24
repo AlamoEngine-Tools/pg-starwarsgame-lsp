@@ -15,21 +15,25 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
+    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
         _fileHelper = fileHelper;
+        _eaWXmlContext = eaWXmlContext;
     }
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
         var uri = request.TextDocument.Uri.ToString();
+        if (!_eaWXmlContext.IsEaWXmlFile(uri)) return Unit.Value;
+
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
 
@@ -41,6 +45,8 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
     {
         var uri = request.TextDocument.Uri.ToString();
+        if (!_eaWXmlContext.IsEaWXmlFile(uri)) return Unit.Value;
+
         var text = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
         var version = request.TextDocument.Version ?? 0;
 
@@ -52,6 +58,8 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
     {
         var uri = request.TextDocument.Uri.ToString();
+        if (!_eaWXmlContext.IsEaWXmlFile(uri)) return Unit.Value;
+
         _workspaceHost.Remove(uri);
 
         var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));

@@ -17,21 +17,41 @@ public sealed class WorkspaceScannerTest
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
     }
 
+    // Builds a scanner that pre-registers the given roots as EaW XML directories, so all
+    // files inside them are treated as EaW XML files. Used by tests that only care about
+    // basic indexing mechanics, not directory-detection logic.
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
-        params IGameDocumentParser[] parsers)
+        IEnumerable<string> eawRoots, params IGameDocumentParser[] parsers)
     {
-        return new WorkspaceScanner(new FileHelper(fs), parsers, svc,
+        var fh = new FileHelper(fs);
+        var ctx = new EaWXmlContext(fh);
+        foreach (var r in eawRoots)
+            ctx.AddDirectory(r);
+        return new WorkspaceScanner(fh, parsers, svc,
             NullLogger<WorkspaceScanner>.Instance, null,
-            new FileTypeRegistry(), new FakeSchemaProvider());
+            new FileTypeRegistry(), new FakeSchemaProvider(), ctx);
     }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return new WorkspaceScanner(new FileHelper(fs), parsers, svc,
+        var fh = new FileHelper(fs);
+        return new WorkspaceScanner(fh, parsers, svc,
             NullLogger<WorkspaceScanner>.Instance, null,
-            registry, schema);
+            registry, schema, new EaWXmlContext(fh));
+    }
+
+    private static (WorkspaceScanner Scanner, EaWXmlContext Context) BuildWithContext(
+        MockFileSystem fs, FakeIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
+        params IGameDocumentParser[] parsers)
+    {
+        var fh = new FileHelper(fs);
+        var ctx = new EaWXmlContext(fh);
+        var scanner = new WorkspaceScanner(fh, parsers, svc,
+            NullLogger<WorkspaceScanner>.Instance, null,
+            registry, schema, ctx);
+        return (scanner, ctx);
     }
 
     // ── tests ────────────────────────────────────────────────────────────────
@@ -46,7 +66,7 @@ public sealed class WorkspaceScannerTest
         });
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         Assert.StartsWith("file://", svc.Calls[0].Uri, StringComparison.OrdinalIgnoreCase);
     }
@@ -64,7 +84,7 @@ public sealed class WorkspaceScannerTest
         });
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         var uri = svc.Calls[0].Uri;
         Assert.StartsWith("file:///", uri, StringComparison.Ordinal);
@@ -83,7 +103,7 @@ public sealed class WorkspaceScannerTest
         });
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         Assert.Equal(2, svc.Calls.Count);
         Assert.All(svc.Calls, c => Assert.Equal(0, c.Version));
@@ -100,7 +120,7 @@ public sealed class WorkspaceScannerTest
         });
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         Assert.Single(svc.Calls);
         Assert.EndsWith(".xml", svc.Calls[0].Uri, StringComparison.OrdinalIgnoreCase);
@@ -118,7 +138,7 @@ public sealed class WorkspaceScannerTest
         });
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root1, root2], CancellationToken.None);
+        await Build(fs, svc, [root1, root2], new FakeParser()).ScanAsync([root1, root2], CancellationToken.None);
 
         Assert.Equal(2, svc.Calls.Count);
     }
@@ -136,7 +156,7 @@ public sealed class WorkspaceScannerTest
         cts.Cancel();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            Build(fs, svc, new FakeParser()).ScanAsync([root], cts.Token));
+            Build(fs, svc, [root], new FakeParser()).ScanAsync([root], cts.Token));
 
         Assert.Empty(svc.Calls);
     }
@@ -152,7 +172,7 @@ public sealed class WorkspaceScannerTest
         });
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         Assert.Equal(1, svc.BeginBulkUpdateCallCount);
     }
@@ -165,7 +185,7 @@ public sealed class WorkspaceScannerTest
         fs.AddDirectory(root);
         var svc = new FakeIndexService();
 
-        await Build(fs, svc, new FakeParser()).ScanAsync([root], CancellationToken.None);
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
 
         Assert.Empty(svc.Calls);
     }
@@ -285,6 +305,91 @@ public sealed class WorkspaceScannerTest
         var expectedKey = new FileHelper(fs).PathToFileUri(
             Path.Combine(root, "hardpoints.xml"));
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
+    }
+
+    // ── EaWXmlContext population ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task ScanAsync_RegistersMetafileDirectory_InContext()
+    {
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files/>")
+        });
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var (scanner, ctx) = BuildWithContext(fs, new FakeIndexService(), new FileTypeRegistry(), schema);
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+
+        var xmlFileUri = new FileHelper(fs).PathToFileUri(
+            Path.Combine(root, "data", "xml", "Units.xml"));
+        Assert.True(ctx.IsEaWXmlFile(xmlFileUri));
+    }
+
+    [Fact]
+    public async Task ScanAsync_FilesOutsideEaWDirectory_NotRegisteredInContext()
+    {
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files/>")
+        });
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var (scanner, ctx) = BuildWithContext(fs, new FakeIndexService(), new FileTypeRegistry(), schema);
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+
+        var nonEaWUri = new FileHelper(fs).PathToFileUri(Path.Combine(root, "scripts", "build.xml"));
+        Assert.False(ctx.IsEaWXmlFile(nonEaWUri));
+    }
+
+    [Fact]
+    public async Task ScanAsync_OnlyIndexesFilesInEaWDirectory()
+    {
+        // Files in data/xml/ (the detected EaW XML dir) are indexed; scripts/build.xml is not.
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files/>"),
+            [Path.Combine(root, "data", "xml", "Units.xml")] = new("<Root/>"),
+            [Path.Combine(root, "scripts", "build.xml")] = new("<project/>")
+        });
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var svc = new FakeIndexService();
+        var (scanner, _) = BuildWithContext(fs, svc, new FileTypeRegistry(), schema, new FakeParser());
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+
+        // Both xml files inside the EaW directory are indexed; build.xml (outside) is not.
+        Assert.Equal(2, svc.Calls.Count);
+        Assert.DoesNotContain(svc.Calls, c => c.Uri.EndsWith("build.xml", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(svc.Calls, c => c.Uri.EndsWith("units.xml", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ScanAsync_NoMetafilesFound_IndexesNothing()
+    {
+        // No metafile found → no EaW XML dir registered → bulk scan skips everything.
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "Units.xml")] = new("<Root/>")
+        });
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var svc = new FakeIndexService();
+        var (scanner, _) = BuildWithContext(fs, svc, new FileTypeRegistry(), schema, new FakeParser());
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+
+        Assert.Empty(svc.Calls);
     }
 
     [Fact]
