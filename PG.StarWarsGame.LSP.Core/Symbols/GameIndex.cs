@@ -12,11 +12,15 @@ public sealed record GameIndex(
     ImmutableDictionary<string, ImmutableArray<GameReference>> WorkspaceReferences
 )
 {
+    // WorkspaceDefinitions and WorkspaceReferences are keyed by game object Name, which
+    // the engine resolves case-insensitively. Use OrdinalIgnoreCase so "X-wing" and
+    // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI
+    // (already lowercased by IFileHelper.NormalizeUri) and stays ordinal.
     public static readonly GameIndex Empty = new(
         BaselineIndex.Empty,
         ImmutableDictionary<string, DocumentIndex>.Empty,
-        ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-        ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+        ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
+        ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
 
     public GameSymbol? Resolve(string id)
     {

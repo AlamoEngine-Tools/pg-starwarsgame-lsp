@@ -1,9 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -12,13 +14,19 @@ public sealed class XmlTextDocumentSyncHandlerTest
 {
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
+    // Absolute-path URI so FileUriToPath produces a real path the MockFileSystem can check.
+    private const string DiskUri = "file:///c:/data/test.xml";
+    private const string DiskPath = @"c:\data\test.xml";
+    private const string DiskContent = "<DiskContent/>";
+
     private static (XmlTextDocumentSyncHandler handler,
         FakeGameWorkspaceHost host,
-        FakeGameIndexService index) Build()
+        FakeGameIndexService index) Build(MockFileSystem? fs = null)
     {
         var host = new FakeGameWorkspaceHost();
         var index = new FakeGameIndexService();
-        return (new XmlTextDocumentSyncHandler(host, index), host, index);
+        var fileHelper = new FileHelper(fs ?? new MockFileSystem());
+        return (new XmlTextDocumentSyncHandler(host, index, fileHelper), host, index);
     }
 
     // ── DidOpen ──────────────────────────────────────────────────────────────
@@ -114,29 +122,53 @@ public sealed class XmlTextDocumentSyncHandlerTest
     [Fact]
     public async Task DidClose_Removes_Document_From_WorkspaceHost()
     {
-        var (handler, host, _) = Build();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [DiskPath] = new MockFileData(DiskContent) });
+        var (handler, host, _) = Build(fs);
 
         await handler.Handle(new DidCloseTextDocumentParams
         {
-            TextDocument = new TextDocumentIdentifier { Uri = TestUri }
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
         Assert.Single(host.RemoveCalls);
-        Assert.Equal(TestUri.ToString(), host.RemoveCalls[0]);
+        Assert.Equal(DiskUri, host.RemoveCalls[0]);
     }
 
     [Fact]
-    public async Task DidClose_Removes_Document_From_Index()
+    public async Task DidClose_WhenFileExistsOnDisk_ReindexesAtVersionZero()
     {
-        var (handler, _, index) = Build();
+        // File exists on disk — close should restore the on-disk state in the index
+        // rather than removing it, so cross-file references continue to resolve.
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [DiskPath] = new MockFileData(DiskContent) });
+        var (handler, _, index) = Build(fs);
 
         await handler.Handle(new DidCloseTextDocumentParams
         {
-            TextDocument = new TextDocumentIdentifier { Uri = TestUri }
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
         Assert.Single(index.RemoveCalls);
-        Assert.Equal(TestUri.ToString(), index.RemoveCalls[0]);
+        Assert.Single(index.UpdateCalls);
+        Assert.Equal(DiskContent, index.UpdateCalls[0].Text);
+        Assert.Equal(0, index.UpdateCalls[0].Version);
+        Assert.Equal(1, index.BulkUpdateCount);
+    }
+
+    [Fact]
+    public async Task DidClose_WhenFileNotOnDisk_RemovesFromIndex()
+    {
+        // File doesn't exist on disk (was deleted) — fully remove from index.
+        var (handler, _, index) = Build(new MockFileSystem());
+
+        await handler.Handle(new DidCloseTextDocumentParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
+        }, CancellationToken.None);
+
+        Assert.Single(index.RemoveCalls);
+        Assert.Empty(index.UpdateCalls);
     }
 
     // ── DidSave ──────────────────────────────────────────────────────────────
@@ -197,6 +229,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
     {
         public List<UpdateCall> UpdateCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
+        public int BulkUpdateCount { get; private set; }
 
         public GameIndex Current => GameIndex.Empty;
 
@@ -223,6 +256,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
 
         public IDisposable BeginBulkUpdate()
         {
+            BulkUpdateCount++;
             return NullDisposable.Instance;
         }
 

@@ -2,10 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -62,7 +64,8 @@ public sealed class XmlDefinitionHandlerTest
     private static XmlDefinitionHandler BuildHandler(GameIndex index)
     {
         var indexService = new FakeIndexService { Current = index };
-        return new XmlDefinitionHandler(indexService, NullLogger<XmlDefinitionHandler>.Instance);
+        var fileHelper = new FileHelper(new MockFileSystem());
+        return new XmlDefinitionHandler(indexService, fileHelper, NullLogger<XmlDefinitionHandler>.Instance);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -158,6 +161,27 @@ public sealed class XmlDefinitionHandlerTest
         Assert.True(link.IsLocation);
         Assert.Equal(TestUri, link.Location!.Uri.ToString());
         Assert.Equal(3, link.Location.Range.Start.Line);
+    }
+
+    // ── URI normalization ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_MixedCaseUri_NormalizesBeforeIndexLookup()
+    {
+        // Index keys are lowercase (canonical). LSP client on Windows may send uppercase drive letter.
+        const string lowercaseUri = "file:///d:/units.xml";
+        const string mixedCaseUri = "file:///D:/units.xml";
+
+        var doc = DocWithRef(lowercaseUri, "UNIT_A", 0, 4, 6);
+        var sym = SymbolAt("UNIT_A", lowercaseUri, 3);
+        var index = IndexWith(doc, sym);
+        var handler = BuildHandler(index);
+
+        var result = await handler.Handle(At(0, 5, mixedCaseUri), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var link = Assert.Single(result!);
+        Assert.Equal(lowercaseUri, link.Location!.Uri.ToString());
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

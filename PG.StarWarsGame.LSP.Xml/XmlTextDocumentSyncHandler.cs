@@ -8,19 +8,23 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.Capabilities;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
+    private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly IGameWorkspaceHost _workspaceHost;
 
-    public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService)
+    public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
+        IFileHelper fileHelper)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
+        _fileHelper = fileHelper;
     }
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
@@ -45,12 +49,30 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         return Unit.Value;
     }
 
-    public override Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
+    public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
     {
         var uri = request.TextDocument.Uri.ToString();
         _workspaceHost.Remove(uri);
-        _indexService.RemoveDocument(uri);
-        return Unit.Task;
+
+        var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
+        if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
+        {
+            // File still on disk — restore the saved state so workspace-wide references
+            // (cross-file go-to-def, unresolved-ref diagnostics) keep working after close.
+            using (_indexService.BeginBulkUpdate())
+            {
+                _indexService.RemoveDocument(uri);
+                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, ct);
+                await _indexService.UpdateDocumentAsync(uri, text, 0, ct);
+            }
+        }
+        else
+        {
+            // File was deleted from disk — remove it entirely from the index.
+            _indexService.RemoveDocument(uri);
+        }
+
+        return Unit.Value;
     }
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken ct)

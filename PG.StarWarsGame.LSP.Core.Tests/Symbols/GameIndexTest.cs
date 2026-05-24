@@ -116,6 +116,19 @@ public sealed class GameIndexTest
         Assert.Equal(workspace, index.Resolve("UNIT_A"));
     }
 
+    [Fact]
+    public void Resolve_CaseInsensitive_Matches_Symbol_When_CaseDiffers()
+    {
+        // Game engine name lookups are case-insensitive.
+        // "X-wing" in a reference must resolve to "X-Wing" in the definition.
+        var sym = Symbol("X-Wing");
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("X-Wing", ImmutableArray.Create(sym))
+        };
+        Assert.Equal(sym, index.Resolve("X-wing"));
+    }
+
     // ── ResolveAll ───────────────────────────────────────────────────────────
 
     [Fact]

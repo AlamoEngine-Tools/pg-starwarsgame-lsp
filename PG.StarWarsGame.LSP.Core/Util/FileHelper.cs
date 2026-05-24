@@ -63,6 +63,15 @@ public sealed class FileHelper : IFileHelper
         return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
     }
 
+    public string? FileUriToPath(string fileUri)
+    {
+        if (string.IsNullOrEmpty(fileUri)) return null;
+        if (!fileUri.StartsWith("file://", StringComparison.OrdinalIgnoreCase)) return null;
+        var normalized = NormalizeUri(fileUri);
+        if (!normalized.StartsWith("file:///", StringComparison.Ordinal)) return null;
+        return normalized[8..].Replace('/', FileSystem.Path.DirectorySeparatorChar);
+    }
+
     // Case-insensitive path traversal so game files with mixed case work on Linux too.
     public string? TraverseCaseInsensitive(IFileSystem _fs, string dir, string[] parts)
     {

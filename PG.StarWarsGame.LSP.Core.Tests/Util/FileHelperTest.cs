@@ -116,4 +116,36 @@ public sealed class FileHelperTest
         var sut = Build();
         Assert.True(sut.UrisEqual("file:///c:/game/file.xml", "file:///c:/game/file.xml"));
     }
+
+    // ── FileUriToPath ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void FileUriToPath_WindowsFileUri_ReturnsLocalPath()
+    {
+        var sut = Build();
+        var result = sut.FileUriToPath("file:///c:/game/data/file.xml");
+        Assert.Equal(@"c:\game\data\file.xml", result, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FileUriToPath_MixedCaseFileUri_NormalizesAndReturnsPath()
+    {
+        var sut = Build();
+        var result = sut.FileUriToPath("file:///C:/Game/File.xml");
+        Assert.Equal(@"c:\game\file.xml", result, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FileUriToPath_NonFileUri_ReturnsNull()
+    {
+        var sut = Build();
+        Assert.Null(sut.FileUriToPath("https://example.com/file.xml"));
+    }
+
+    [Fact]
+    public void FileUriToPath_EmptyString_ReturnsNull()
+    {
+        var sut = Build();
+        Assert.Null(sut.FileUriToPath(""));
+    }
 }

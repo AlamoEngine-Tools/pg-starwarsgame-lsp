@@ -22,4 +22,8 @@ public interface IFileHelper
     string? FindInWorkspace(IList<string> roots, string normalizedRelPath);
 
     public string NormalizeGamePath(string raw);
+
+    // Converts a file:/// URI back to a local filesystem path (Windows: "file:///d:/foo.xml" → "d:\foo.xml").
+    // Returns null for non-file URIs or empty input.
+    string? FileUriToPath(string fileUri);
 }
