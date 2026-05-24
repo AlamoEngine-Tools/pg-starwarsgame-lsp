@@ -17,12 +17,14 @@ public sealed class XmlDocumentFactProducerTest
 
     private static XmlDocumentFactProducer Build(
         ISchemaProvider? schema = null,
-        IFileTypeRegistry? registry = null)
+        IFileTypeRegistry? registry = null,
+        IXmlStructuralValidator? validator = null)
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
             schema ?? new SingleTagSchemaProvider(),
-            registry ?? new EmptyFileTypeRegistry());
+            registry ?? new EmptyFileTypeRegistry(),
+            validator ?? new XmlStructuralValidator());
     }
 
     // ── tag value facts ───────────────────────────────────────────────────────
@@ -132,6 +134,52 @@ public sealed class XmlDocumentFactProducerTest
         var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
         Assert.True(tvf.Line >= 0);
         Assert.True(tvf.Column >= 0);
+    }
+
+    // ── structural validation ─────────────────────────────────────────────────
+
+    [Fact]
+    public void Well_formed_xml_emits_no_XmlStructureFact()
+    {
+        const string xml = "<Root><Max_Speed>5.0</Max_Speed></Root>";
+        var facts = Build().Produce(xml, Uri);
+        Assert.Empty(facts.OfType<XmlStructureFact>());
+    }
+
+    [Fact]
+    public void Mismatched_closing_tag_emits_XmlStructureFact()
+    {
+        const string xml = "<Foo><Bar></Foo>";
+        var facts = Build().Produce(xml, Uri);
+        var sf = Assert.Single(facts.OfType<XmlStructureFact>());
+        Assert.Equal(Uri, sf.DocumentUri);
+        Assert.Contains("Bar", sf.Reason);
+    }
+
+    [Fact]
+    public void Unclosed_tag_emits_XmlStructureFact()
+    {
+        const string xml = "<Foo><Bar>";
+        var facts = Build().Produce(xml, Uri);
+        Assert.NotEmpty(facts.OfType<XmlStructureFact>());
+    }
+
+    [Fact]
+    public void Malformed_attribute_emits_XmlStructureFact()
+    {
+        const string xml = "<Foo attr=value />";
+        var facts = Build().Produce(xml, Uri);
+        Assert.NotEmpty(facts.OfType<XmlStructureFact>());
+    }
+
+    [Fact]
+    public void XmlStructureFact_carries_nonnegative_line_and_column()
+    {
+        const string xml = "<Foo>\n  <Bar>\n</Foo>";
+        var facts = Build().Produce(xml, Uri);
+        var sf = Assert.Single(facts.OfType<XmlStructureFact>());
+        Assert.True(sf.Line >= 0);
+        Assert.True(sf.Column >= 0);
     }
 }
 

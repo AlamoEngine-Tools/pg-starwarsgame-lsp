@@ -105,7 +105,7 @@ public sealed class XmlDiagnosticsPublisherTest
             workspaceHost,
             effectiveSchema,
             new XmlDiagnosticsHandlerRegistry(handlers),
-            new XmlDocumentFactProducer(fileHelper, effectiveSchema, effectiveRegistry),
+            new XmlDocumentFactProducer(fileHelper, effectiveSchema, effectiveRegistry, new XmlStructuralValidator()),
             new XmlIndexFactProducer(),
             new StoryFactProducer(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,

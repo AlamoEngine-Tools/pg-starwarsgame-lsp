@@ -13,12 +13,17 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 public sealed class XmlDocumentFactProducer(
     IFileHelper fileHelper,
     ISchemaProvider schema,
-    IFileTypeRegistry fileTypeRegistry)
+    IFileTypeRegistry fileTypeRegistry,
+    IXmlStructuralValidator structuralValidator)
     : IXmlDocumentFactProducer
 {
     public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
     {
         var facts = new List<XmlFact>();
+
+        foreach (var error in structuralValidator.Validate(xmlText))
+            facts.Add(new XmlStructureFact(documentUri, error.Line, error.Column, 1, error.Reason));
+
         var doc = XmlUtility.CreateHtmlDocument(xmlText);
         var lineNum = doc.DocumentNode.EndNode.Line;
         var lines = xmlText.Split('\n');

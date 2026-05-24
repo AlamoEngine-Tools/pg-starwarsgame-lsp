@@ -40,7 +40,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         var symbol = index.Resolve(hit.Value.Id);
         if (symbol is null || symbol.Origin is not FileOrigin fo)
         {
-            _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin", hit.Value.Id);
+            _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin {origin}", hit.Value.Id, symbol?.Origin);
             return Task.FromResult<LocationOrLocationLinks?>(null);
         }
 

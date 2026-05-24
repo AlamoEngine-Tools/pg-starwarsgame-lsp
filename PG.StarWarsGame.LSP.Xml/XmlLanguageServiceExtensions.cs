@@ -48,6 +48,9 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, UvSlotIndexHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VendorIdHexHandler>();
 
+        // XmlStructureFact handler (well-formedness)
+        services.AddSingleton<IXmlDiagnosticsHandler, XmlStructureHandler>();
+
         // XmlDuplicateTagFact + XmlNotesFact handlers (document-level)
         services.AddSingleton<IXmlDiagnosticsHandler, XmlDuplicateTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, XmlNotesHandler>();
@@ -68,6 +71,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamUnknownSlotHandler>();
 
         // Fact producers
+        services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
