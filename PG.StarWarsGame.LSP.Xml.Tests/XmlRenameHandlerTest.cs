@@ -236,6 +236,38 @@ public sealed class XmlRenameHandlerTest
         Assert.All(otherEdits, e => Assert.Equal("UNIT_Z", e.NewText));
     }
 
+    // ── cross-language rename ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CrossLanguageRename_IncludesLuaReferences()
+    {
+        const string luaUri = "file:///script.lua";
+
+        var callerDoc = DocWithRef(TestUri, "UNIT_A", 0, 4, 6);
+        var xmlRef = MakeRef("UNIT_A", TestUri, 0, 4, 6);
+        var luaRef = new GameReference("UNIT_A", GameSymbolKind.XmlObject, null, luaUri, 0, 17, 6);
+
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
+            "UNIT_A", ImmutableArray.Create(xmlRef, luaRef));
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_A", ImmutableArray.Create(SymbolAt("UNIT_A", TestUri, 1)));
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(TestUri, "<Ref>UNIT_A</Ref>\n<Unit Name=\"UNIT_A\"/>", 1);
+        host.AddOrUpdate(luaUri, "Find_First_Object(\"UNIT_A\")", 1);
+
+        var schema = new FakeSchemaProvider();
+        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
+
+        var handler = BuildHandler(BuildIndex(callerDoc, refs, defs), host, schema);
+        var result = await handler.Handle(RenameAt(0, 5, "UNIT_B"), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(luaUri)));
+        var luaEdits = result.Changes[DocumentUri.From(luaUri)].ToList();
+        Assert.Contains(luaEdits, e => e.NewText == "UNIT_B" && e.Range.Start.Line == 0);
+    }
+
     // ── URI normalization ─────────────────────────────────────────────────────
 
     [Fact]

@@ -118,22 +118,25 @@ public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsRevalidator, IXmlFi
         // Iterate open documents from the workspace host so we publish only for editor-open
         // files. The workspace host stores raw LSP URIs (potentially mixed case on Windows);
         // the index stores canonical lowercase URIs. Normalize before index lookups.
-        var openDocs = _workspaceHost.All.ToList();
-        var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
+        // Only publish for XML files — Lua files are handled by LuaDiagnosticsPublisher.
+        var xmlOpenDocs = _workspaceHost.All
+            .Where(d => Path.GetExtension(d.Uri).Equals(".xml", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var xmlOpenUris = new HashSet<string>(xmlOpenDocs.Select(d => d.Uri));
 
-        foreach (var doc in openDocs)
+        foreach (var doc in xmlOpenDocs)
             PublishForDocument(doc.Uri, doc.Text, newIndex);
 
-        // Clear diagnostics for files that are no longer open in the editor.
+        // Clear diagnostics for XML files that are no longer open in the editor.
         foreach (var uri in _lastPublishedUris)
-            if (!openUris.Contains(uri))
+            if (!xmlOpenUris.Contains(uri))
                 _publish(new PublishDiagnosticsParams
                 {
                     Uri = DocumentUri.From(uri),
                     Diagnostics = new Container<Diagnostic>()
                 });
 
-        _lastPublishedUris = openUris;
+        _lastPublishedUris = xmlOpenUris;
     }
 
     private void PublishForDocument(string uri, string text, GameIndex index)

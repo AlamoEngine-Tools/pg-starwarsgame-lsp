@@ -182,4 +182,43 @@ public sealed class SchemaHttpCacheTest
         Assert.NotEmpty(index.AllHardcodedSets);
         Assert.NotEmpty(index.AllMetafiles);
     }
+
+    // ── TryLoadText / UpdateText ─────────────────────────────────────────────
+
+    [Fact]
+    public void TryLoadText_ReturnsFalse_WhenFileNotInCache()
+    {
+        var fs = new MockFileSystem();
+        var cache = BuildCache(fs);
+
+        var result = cache.TryLoadText("lua/api.d.lua", out var content);
+
+        Assert.False(result);
+        Assert.Empty(content);
+    }
+
+    [Fact]
+    public void UpdateText_ThenTryLoadText_ReturnsStoredContent()
+    {
+        var fs = new MockFileSystem();
+        var cache = BuildCache(fs);
+        const string expected = "function Foo() end\n";
+
+        cache.UpdateText("lua/api.d.lua", expected);
+        var result = cache.TryLoadText("lua/api.d.lua", out var content);
+
+        Assert.True(result);
+        Assert.Equal(expected, content);
+    }
+
+    [Fact]
+    public void UpdateText_CreatesSubdirectory_WhenRelativePathHasDirectory()
+    {
+        var fs = new MockFileSystem();
+        var cache = BuildCache(fs);
+
+        cache.UpdateText("nested/subdir/file.txt", "content");
+
+        Assert.True(fs.File.Exists(Path.Combine(CacheDir, "nested", "subdir", "file.txt")));
+    }
 }

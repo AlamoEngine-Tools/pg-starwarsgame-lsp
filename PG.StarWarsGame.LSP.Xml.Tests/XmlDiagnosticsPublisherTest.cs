@@ -200,6 +200,19 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
+    public void IndexChanged_LuaFileOpen_DoesNotPublishForLuaFile()
+    {
+        // Lua files may be in the workspace host (opened via LuaTextDocumentSyncHandler).
+        // The XML publisher must ignore them — they are handled by LuaDiagnosticsPublisher.
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        workspaceHost.Set("file:///script.lua", "function Definitions() end");
+
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
     public void IndexChanged_OnlyPublishesForOpenFiles_NotForIndexOnlyEntries()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();

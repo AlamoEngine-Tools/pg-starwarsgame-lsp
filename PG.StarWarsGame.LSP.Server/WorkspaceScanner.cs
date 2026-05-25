@@ -82,8 +82,17 @@ public sealed class WorkspaceScanner
             var files = roots
                 .SelectMany(folder =>
                     _fileHelper.FileSystem.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
-                .Where(f => _parsers.Any(p => p.CanParse(_fileHelper.FileSystem.Path.GetExtension(f))))
-                .Where(f => _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f)))
+                .Where(f =>
+                {
+                    var ext = _fileHelper.FileSystem.Path.GetExtension(f);
+                    if (!_parsers.Any(p => p.CanParse(ext))) return false;
+                    // XML files are gated to known EaW data directories to avoid indexing
+                    // unrelated XML files (e.g. project settings). Other file types (e.g. .lua)
+                    // have no such restriction — any parseable file in the workspace is a game file.
+                    if (ext.Equals(".xml", StringComparison.OrdinalIgnoreCase))
+                        return _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
+                    return true;
+                })
                 .ToList();
 
             _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count,

@@ -133,6 +133,34 @@ public sealed class SchemaHttpCache
         _fileHelper.FileSystem.File.WriteAllText(ChecksumPath, hash);
     }
 
+    /// <summary>
+    ///     Returns <c>true</c> and sets <paramref name="content" /> when the file at
+    ///     <paramref name="relativePath" /> exists in the cache directory.
+    /// </summary>
+    public bool TryLoadText(string relativePath, out string content)
+    {
+        content = "";
+        var fullPath = _fileHelper.FileSystem.Path.Combine(_dir, relativePath);
+        if (!_fileHelper.FileSystem.File.Exists(fullPath))
+            return false;
+        content = _fileHelper.FileSystem.File.ReadAllText(fullPath);
+        return true;
+    }
+
+    /// <summary>
+    ///     Writes <paramref name="content" /> to <paramref name="relativePath" /> inside
+    ///     the cache directory, creating any intermediate directories as needed.
+    /// </summary>
+    public void UpdateText(string relativePath, string content)
+    {
+        _fileHelper.FileSystem.Directory.CreateDirectory(_dir);
+        var fullPath = _fileHelper.FileSystem.Path.Combine(_dir, relativePath);
+        var parentDir = _fileHelper.FileSystem.Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrEmpty(parentDir))
+            _fileHelper.FileSystem.Directory.CreateDirectory(parentDir);
+        _fileHelper.FileSystem.File.WriteAllText(fullPath, content);
+    }
+
     // Hashes each YAML file's content in manifest order — indexJson is excluded so
     // the formula is compatible with the pre-computed baselineHash in _index.json.
     private static string ComputeYamlHash(IEnumerable<string> fileContents)

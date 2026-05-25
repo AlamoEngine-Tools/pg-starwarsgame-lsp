@@ -397,6 +397,30 @@ public sealed class WorkspaceScannerTest
     }
 
     [Fact]
+    public async Task ScanAsync_LuaFiles_IndexedRegardlessOfEaWXmlContext()
+    {
+        // Lua files live in Scripts/, which is never registered in EaWXmlContext.
+        // They must be indexed without the XML directory gate.
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var luaPath = Path.Combine(root, "data", "scripts", "story.lua");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files/>"),
+            [luaPath] = new("function Definitions() end")
+        });
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var svc = new FakeIndexService();
+        var (scanner, _) = BuildWithContext(fs, svc, new FileTypeRegistry(), schema,
+            new FakeParser(".xml"), new FakeParser(".lua"));
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+
+        Assert.Contains(svc.Calls, c => c.Uri.EndsWith("story.lua", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
     public async Task ScanAsync_NoMetafilesFound_IndexesNothing()
     {
         // No metafile found → no EaW XML dir registered → bulk scan skips everything.

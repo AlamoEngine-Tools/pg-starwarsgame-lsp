@@ -2,8 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
-using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -14,7 +12,7 @@ using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlHoverHandler : HoverHandlerBase
+public sealed class XmlHoverHandler : IXmlHoverProvider
 {
     private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
@@ -45,7 +43,7 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         _eaWXmlContext = eaWXmlContext;
     }
 
-    public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
+    public Task<Hover?> Handle(HoverParams request, CancellationToken ct)
     {
         _logger.LogDebug("Hover request at {Line}:{Character}",
             request.Position.Line, request.Position.Character);
@@ -155,9 +153,4 @@ public sealed class XmlHoverHandler : HoverHandlerBase
         return HoverUtility.BuildReferenceHover(typeDef, symbol.Id, reference, locale);
     }
 
-    protected override HoverRegistrationOptions CreateRegistrationOptions(
-        HoverCapability capability, ClientCapabilities clientCapabilities)
-    {
-        return new HoverRegistrationOptions { DocumentSelector = TextDocumentSelector.ForLanguage("xml") };
-    }
 }

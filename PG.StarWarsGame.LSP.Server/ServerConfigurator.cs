@@ -11,12 +11,16 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua;
+using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
 using Serilog;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -39,8 +43,11 @@ public static class ServerConfigurator
                     o.TracesSampleRate = 1.0;
                     o.EnableLogs = true;
                 }))
+            .WithHandler<LuaTextDocumentSyncHandler>()
+            .WithHandler<LuaCompletionHandler>()
+            .WithHandler<LuaRenameHandler>()
             .WithHandler<XmlTextDocumentSyncHandler>()
-            .WithHandler<XmlHoverHandler>()
+            .WithHandler<GameHoverHandler>()
             .WithHandler<XmlCompletionHandler>()
             .WithHandler<XmlDefinitionHandler>()
             .WithHandler<XmlReferencesHandler>()
@@ -80,8 +87,15 @@ public static class ServerConfigurator
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
                 services.AddHttpClient(nameof(BaselineLoader));
+                services.AddHttpClient("LuaSchema");
 
+                services.AddLuaLanguageServices();
                 services.AddXmlLanguageServices();
+
+                // GameHoverHandler routes by extension to one of these providers.
+                // Registered as interfaces only so DryIoc does not see them as competing IHoverHandler registrations.
+                services.AddSingleton<IXmlHoverProvider, XmlHoverHandler>();
+                services.AddSingleton<ILuaHoverProvider, LuaHoverHandler>();
             })
             .OnInitialize(async (server, request, ct) =>
             {
@@ -121,6 +135,33 @@ public static class ServerConfigurator
                     proxy.Configure(realProvider);
                     schemaSpan.Finish(SpanStatus.Ok);
 
+                    var luaProxy = server.Services.GetRequiredService<LuaApiSchemaProxy>();
+                    var cache = server.Services.GetRequiredService<SchemaHttpCache>();
+
+                    if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
+                    {
+                        var luaSchemaPath = DeriveLuaLocalPath(src.LocalPath);
+                        if (File.Exists(luaSchemaPath))
+                        {
+                            luaProxy.Configure(new LuaApiSchemaProvider([File.ReadAllText(luaSchemaPath)]));
+                            logger.LogInformation("Lua schema loaded from {Path}", luaSchemaPath);
+                        }
+                        else
+                        {
+                            logger.LogWarning("Lua schema not found at {Path}", luaSchemaPath);
+                        }
+                    }
+                    else
+                    {
+                        var luaHttp = server.Services.GetRequiredService<IHttpClientFactory>()
+                            .CreateClient("LuaSchema");
+                        _ = Task.Run(async () =>
+                        {
+                            var luaUrl = DeriveLuaHttpUrl(src.Url);
+                            await LoadLuaSchemaFromHttpAsync(luaUrl, luaProxy, cache, luaHttp, logger);
+                        });
+                    }
+
                     if (realProvider is HttpSchemaProvider httpProvider)
                         _ = Task.Run(async () =>
                         {
@@ -154,6 +195,7 @@ public static class ServerConfigurator
                 try
                 {
                     server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
+                    server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
 
                     var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
                     var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
@@ -215,6 +257,48 @@ public static class ServerConfigurator
 
                 await Task.CompletedTask;
             });
+    }
+
+    private static string DeriveLuaLocalPath(string eawLocalPath)
+    {
+        var trimmed = eawLocalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var parent = Path.GetDirectoryName(trimmed) ?? trimmed;
+        return Path.Combine(parent, "lua", "api.d.lua");
+    }
+
+    private static string DeriveLuaHttpUrl(string eawUrl)
+    {
+        // Treat eawUrl as a base URI and resolve "../lua/api.d.lua" relative to it.
+        // e.g. "https://host/main/eaw/" → "https://host/main/lua/api.d.lua"
+        var baseUri = new Uri(eawUrl.EndsWith('/') ? eawUrl : eawUrl + '/');
+        return new Uri(baseUri, "../lua/api.d.lua").ToString();
+    }
+
+    private static async Task LoadLuaSchemaFromHttpAsync(
+        string luaUrl, LuaApiSchemaProxy luaProxy, SchemaHttpCache cache,
+        HttpClient http, ILogger logger)
+    {
+        const string cacheKey = "lua/api.d.lua";
+
+        // Apply any cached version immediately so the parser has a schema while downloading.
+        if (cache.TryLoadText(cacheKey, out var cached))
+            luaProxy.Configure(new LuaApiSchemaProvider([cached]));
+
+        try
+        {
+            var fresh = await http.GetStringAsync(luaUrl);
+            cache.UpdateText(cacheKey, fresh);
+            luaProxy.Configure(new LuaApiSchemaProvider([fresh]));
+            logger.LogInformation("Lua schema loaded from {Url}", luaUrl);
+        }
+        catch (Exception ex)
+        {
+            if (cached is { Length: > 0 })
+                logger.LogWarning(ex, "Failed to download Lua schema from {Url}; using cached version", luaUrl);
+            else
+                logger.LogWarning(ex,
+                    "Failed to download Lua schema from {Url}; Lua XML references will not be validated", luaUrl);
+        }
     }
 
     private static string? GetSentryDsn()

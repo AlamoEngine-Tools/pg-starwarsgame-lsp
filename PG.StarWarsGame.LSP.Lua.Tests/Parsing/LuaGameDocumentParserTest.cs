@@ -1,0 +1,245 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Parsing;
+using PG.StarWarsGame.LSP.Lua.Schema;
+
+namespace PG.StarWarsGame.LSP.Lua.Tests.Parsing;
+
+public sealed class LuaGameDocumentParserTest
+{
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private static LuaApiSchemaProvider BuildSchema() => new LuaApiSchemaProvider(["""
+        ---@param typeName string
+        ---@xmlref XmlObject
+        function Find_First_Object(typeName) end
+        ---@param typeName string
+        ---@xmlref XmlObject
+        function Find_Object_Type(typeName) end
+        ---@param typeName string
+        ---@xmlref XmlObject
+        function Find_All_Objects_Of_Type(typeName) end
+        ---@param playerName string
+        ---@xmlref XmlObject:Faction
+        function Find_Player(playerName) end
+        """]);
+
+    private static LuaGameDocumentParser Build() =>
+        new(BuildSchema(),
+            new FileHelper(new MockFileSystem()),
+            NullLogger<LuaGameDocumentParser>.Instance);
+
+    // ── CanParse ─────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void CanParse_Returns_True_For_Lua()
+    {
+        Assert.True(Build().CanParse(".lua"));
+        Assert.True(Build().CanParse(".LUA"));
+        Assert.True(Build().CanParse(".Lua"));
+    }
+
+    [Fact]
+    public void CanParse_Returns_False_For_Non_Lua()
+    {
+        Assert.False(Build().CanParse(".xml"));
+        Assert.False(Build().CanParse(".txt"));
+        Assert.False(Build().CanParse(""));
+        Assert.False(Build().CanParse(".luac"));
+    }
+
+    // ── symbol extraction ────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_GlobalFunction_EmitsLuaGlobalSymbol()
+    {
+        var result = await Build().ParseAsync(
+            "file:///script.lua",
+            "function Definitions() end",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Definitions", sym.Id);
+        Assert.Equal(GameSymbolKind.LuaGlobal, sym.Kind);
+        Assert.Null(sym.TypeName);
+        Assert.Equal("file:///script.lua", ((FileOrigin)sym.Origin).Uri);
+    }
+
+    [Fact]
+    public async Task ParseAsync_MultipleGlobalFunctions_EmitsOneSymbolEach()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """
+            function Definitions() end
+            function State_Init(message) end
+            function main() end
+            """,
+            1, default);
+
+        Assert.Equal(3, result.Symbols.Length);
+        Assert.Contains(result.Symbols, s => s.Id == "Definitions");
+        Assert.Contains(result.Symbols, s => s.Id == "State_Init");
+        Assert.Contains(result.Symbols, s => s.Id == "main");
+    }
+
+    [Fact]
+    public async Task ParseAsync_LocalFunction_EmitsNoSymbol()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            "local function Helper() end",
+            1, default);
+
+        Assert.Empty(result.Symbols);
+    }
+
+    [Fact]
+    public async Task ParseAsync_EmptyFile_ReturnsEmptyIndex()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", "", 1, default);
+
+        Assert.Empty(result.Symbols);
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Symbol_Origin_RecordsLineNumber()
+    {
+        const string text = """
+
+            function Definitions() end
+            """;
+
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        var origin = (FileOrigin)sym.Origin;
+        Assert.Equal(1, origin.Line); // 0-based; function is on line index 1
+    }
+
+    [Fact]
+    public async Task ParseAsync_Sets_DocumentUri_And_Version()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", "", 7, default);
+
+        Assert.Equal("file:///s.lua", result.DocumentUri);
+        Assert.Equal(7, result.Version);
+    }
+
+    // ── XML reference extraction ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_Find_First_Object_Call_EmitsXmlObjectReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """Find_First_Object("UNIT_REBEL")""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("UNIT_REBEL", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Null(reference.ExpectedTypeName);
+        Assert.Equal("file:///s.lua", reference.DocumentUri);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Find_Player_Call_EmitsXmlObjectReference_WithFactionType()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """Find_Player("Rebel")""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Rebel", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Equal("Faction", reference.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Find_Object_Type_Call_EmitsXmlObjectReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """Find_Object_Type("UNIT_HEAVY_TANK")""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("UNIT_HEAVY_TANK", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+    }
+
+    [Fact]
+    public async Task ParseAsync_UnknownFunction_EmitsNoReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """SomeRandomFunction("UNIT_REBEL")""",
+            1, default);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_KnownFunction_WithVariableArg_EmitsNoReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """Find_First_Object(unit_name)""",
+            1, default);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Reference_HasCorrect_LineAndColumn()
+    {
+        const string text = """
+            Find_First_Object("UNIT_REBEL")
+            """;
+
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal(0, reference.Line);     // 0-based, first line
+        Assert.Equal(19, reference.Column);  // 0-based column of U in UNIT_REBEL (after opening quote at col 18)
+        Assert.Equal("UNIT_REBEL".Length, reference.Length);
+    }
+
+    [Fact]
+    public async Task ParseAsync_MultipleApiCalls_EmitsOneReferenceEach()
+    {
+        const string text = """
+            local x = Find_First_Object("UNIT_A")
+            local y = Find_Player("Rebel")
+            """;
+
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+
+        Assert.Equal(2, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "UNIT_A");
+        Assert.Contains(result.References, r => r.TargetId == "Rebel");
+    }
+
+    [Fact]
+    public async Task ParseAsync_CaseInsensitive_FunctionName_EmitsReference()
+    {
+        // The game's Lua functions are case-sensitive at runtime, but our registry lookup
+        // should be case-insensitive to handle any inconsistent casing in scripts.
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            """find_first_object("UNIT_REBEL")""",
+            1, default);
+
+        // Registry lookup is case-insensitive per design
+        var reference = Assert.Single(result.References);
+        Assert.Equal("UNIT_REBEL", reference.TargetId);
+    }
+}
