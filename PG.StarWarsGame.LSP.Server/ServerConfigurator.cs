@@ -46,6 +46,7 @@ public static class ServerConfigurator
             .WithHandler<XmlReferencesHandler>()
             .WithHandler<XmlRenameHandler>()
             .WithHandler<XmlCodeActionHandler>()
+            .WithHandler<XmlCodeLensHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithServices(services =>
