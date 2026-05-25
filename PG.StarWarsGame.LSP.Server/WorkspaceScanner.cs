@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -19,25 +20,30 @@ public sealed class WorkspaceScanner
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
+    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILogger<WorkspaceScanner> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
+    private readonly IPreOpenBuffer _preOpenBuffer;
     private readonly ISchemaProvider _schema;
     private readonly IServerWorkDoneManager? _workDone;
 
     public WorkspaceScanner(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
-        IGameIndexService indexService, ILogger<WorkspaceScanner> logger,
+        IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
+        ILogger<WorkspaceScanner> logger,
         IServerWorkDoneManager? workDone,
         IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
-        EaWXmlContext eaWXmlContext)
+        EaWXmlContext eaWXmlContext, IPreOpenBuffer preOpenBuffer)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
         _indexService = indexService;
+        _workspaceHost = workspaceHost;
         _logger = logger;
         _workDone = workDone;
         _fileTypeRegistry = fileTypeRegistry;
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
+        _preOpenBuffer = preOpenBuffer;
     }
 
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
@@ -60,6 +66,18 @@ public sealed class WorkspaceScanner
             PreScanMetafiles(roots);
             preScanSpan.Finish(SpanStatus.Ok);
             _logger.LogInformation("PreScanMetafiles complete at {Elapsed} ms", sw.ElapsedMilliseconds);
+
+            // Replay didOpen events that arrived before EaWXmlContext was configured.
+            // Only add files that are now recognised as EaW XML and not already in the host.
+            var preOpened = _preOpenBuffer.DrainAndClose();
+            foreach (var (preUri, preText, preVersion) in preOpened)
+            {
+                if (!_eaWXmlContext.IsEaWXmlFile(preUri)) continue;
+                if (!_workspaceHost.TryGet(preUri, out _))
+                    _workspaceHost.AddOrUpdate(preUri, preText, preVersion);
+            }
+            _logger.LogInformation("PreOpenBuffer drained: {Count} file(s) seeded at {Elapsed} ms",
+                preOpened.Count, sw.ElapsedMilliseconds);
 
             var files = roots
                 .SelectMany(folder =>
@@ -104,7 +122,8 @@ public sealed class WorkspaceScanner
                     await Parallel.ForEachAsync(files, options, async (file, token) =>
                     {
                         var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
-                        await _indexService.UpdateDocumentAsync(_fileHelper.PathToFileUri(file), text, 0, token);
+                        var uri = _fileHelper.PathToFileUri(file);
+                        await _indexService.UpdateDocumentAsync(uri, text, 0, token);
                         var done = Interlocked.Increment(ref indexed);
                         _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
                         progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null,

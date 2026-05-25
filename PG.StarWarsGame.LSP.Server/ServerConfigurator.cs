@@ -69,6 +69,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
+                services.AddSingleton<IPreOpenBuffer, PreOpenBuffer>();
                 services.AddSingleton<WorkspaceScanner>();
 
                 services.AddSingleton<BaselineLoader>(sp =>

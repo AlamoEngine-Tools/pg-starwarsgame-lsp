@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -22,24 +23,46 @@ public sealed class WorkspaceScannerTest
     // basic indexing mechanics, not directory-detection logic.
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IEnumerable<string> eawRoots, params IGameDocumentParser[] parsers)
+        => Build(fs, svc, new GameWorkspaceHost(), eawRoots, parsers);
+
+    private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
+        IGameWorkspaceHost host, IEnumerable<string> eawRoots, params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
         foreach (var r in eawRoots)
             ctx.AddDirectory(r);
-        return new WorkspaceScanner(fh, parsers, svc,
+        return new WorkspaceScanner(fh, parsers, svc, host,
             NullLogger<WorkspaceScanner>.Instance, null,
-            new FileTypeRegistry(), new FakeSchemaProvider(), ctx);
+            new FileTypeRegistry(), new FakeSchemaProvider(), ctx, new PreOpenBuffer());
+    }
+
+    private static WorkspaceScanner BuildWithBuffer(MockFileSystem fs, FakeIndexService svc,
+        IGameWorkspaceHost host, IEnumerable<string> eawRoots, IPreOpenBuffer buffer,
+        params IGameDocumentParser[] parsers)
+    {
+        var fh = new FileHelper(fs);
+        var ctx = new EaWXmlContext(fh);
+        foreach (var r in eawRoots)
+            ctx.AddDirectory(r);
+        return new WorkspaceScanner(fh, parsers, svc, host,
+            NullLogger<WorkspaceScanner>.Instance, null,
+            new FileTypeRegistry(), new FakeSchemaProvider(), ctx, buffer);
     }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
+        => Build(fs, svc, new GameWorkspaceHost(), registry, schema, parsers);
+
+    private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
+        IGameWorkspaceHost host, IFileTypeRegistry registry, ISchemaProvider schema,
+        params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
-        return new WorkspaceScanner(fh, parsers, svc,
+        return new WorkspaceScanner(fh, parsers, svc, host,
             NullLogger<WorkspaceScanner>.Instance, null,
-            registry, schema, new EaWXmlContext(fh));
+            registry, schema, new EaWXmlContext(fh), new PreOpenBuffer());
     }
 
     private static (WorkspaceScanner Scanner, EaWXmlContext Context) BuildWithContext(
@@ -48,9 +71,9 @@ public sealed class WorkspaceScannerTest
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
-        var scanner = new WorkspaceScanner(fh, parsers, svc,
+        var scanner = new WorkspaceScanner(fh, parsers, svc, new GameWorkspaceHost(),
             NullLogger<WorkspaceScanner>.Instance, null,
-            registry, schema, ctx);
+            registry, schema, ctx, new PreOpenBuffer());
         return (scanner, ctx);
     }
 
@@ -423,7 +446,79 @@ public sealed class WorkspaceScannerTest
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
+    // ── PreOpenBuffer drain ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ScanAsync_PreOpenBuffer_FilesAddedToWorkspaceHost()
+    {
+        // Buffer contains a file VS Code had open before EaWXmlContext was configured.
+        // After scan configures the context, the scanner drains the buffer and adds it.
+        var root = Root("ws");
+        var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(root, "units.xml"));
+        var fs = new MockFileSystem();
+        fs.AddDirectory(root);
+        var host = new GameWorkspaceHost();
+        var buffer = new FakePreOpenBuffer((uri, "<EditorText/>", 1));
+        var svc = new FakeIndexService();
+
+        await BuildWithBuffer(fs, svc, host, [root], buffer).ScanAsync([root], CancellationToken.None);
+
+        Assert.True(host.TryGet(uri, out var doc));
+        Assert.Equal("<EditorText/>", doc.Text);
+        Assert.Equal(1, doc.Version);
+    }
+
+    [Fact]
+    public async Task ScanAsync_PreOpenBuffer_NonEaWFilesSkipped()
+    {
+        // Buffer contains a non-EaW file (e.g. a Lua script). It must not be seeded.
+        var root = Root("ws");
+        var nonEaWUri = new FileHelper(new MockFileSystem())
+            .PathToFileUri(Path.Combine(Root("other"), "script.lua"));
+        var fs = new MockFileSystem();
+        fs.AddDirectory(root);
+        var host = new GameWorkspaceHost();
+        var buffer = new FakePreOpenBuffer((nonEaWUri, "-- lua", 1));
+        var svc = new FakeIndexService();
+
+        await BuildWithBuffer(fs, svc, host, [root], buffer).ScanAsync([root], CancellationToken.None);
+
+        Assert.False(host.TryGet(nonEaWUri, out _));
+    }
+
+    [Fact]
+    public async Task ScanAsync_PreOpenBuffer_DoesNotOverwriteAlreadyOpen()
+    {
+        // If a file is already in the workspace host (e.g. normal didOpen arrived later),
+        // the buffer drain must not overwrite it.
+        var root = Root("ws");
+        var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(root, "units.xml"));
+        var fs = new MockFileSystem();
+        fs.AddDirectory(root);
+        var host = new GameWorkspaceHost();
+        host.AddOrUpdate(uri, "<AlreadyOpen/>", 1);
+        var buffer = new FakePreOpenBuffer((uri, "<BufferVersion/>", 0));
+        var svc = new FakeIndexService();
+
+        await BuildWithBuffer(fs, svc, host, [root], buffer).ScanAsync([root], CancellationToken.None);
+
+        Assert.True(host.TryGet(uri, out var doc));
+        Assert.Equal("<AlreadyOpen/>", doc.Text);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
+
+    private sealed class FakePreOpenBuffer : IPreOpenBuffer
+    {
+        private readonly IReadOnlyList<(string Uri, string Text, int Version)> _items;
+
+        public FakePreOpenBuffer(params (string Uri, string Text, int Version)[] items)
+            => _items = items;
+
+        public void RecordOpen(string uri, string text, int version) { }
+
+        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose() => _items;
+    }
 
     private sealed class FakeParser : IGameDocumentParser
     {

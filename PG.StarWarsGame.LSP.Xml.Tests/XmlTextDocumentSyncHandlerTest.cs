@@ -26,8 +26,23 @@ public sealed class XmlTextDocumentSyncHandlerTest
         var host = new FakeGameWorkspaceHost();
         var index = new FakeGameIndexService();
         var fileHelper = new FileHelper(fs ?? new MockFileSystem());
-        return (new XmlTextDocumentSyncHandler(host, index, fileHelper, ctx ?? new AllowAllEaWContext()),
+        return (new XmlTextDocumentSyncHandler(host, index, fileHelper,
+                ctx ?? new AllowAllEaWContext(), new PreOpenBuffer()),
             host, index);
+    }
+
+    private static (XmlTextDocumentSyncHandler handler,
+        FakeGameWorkspaceHost host,
+        FakeGameIndexService index,
+        FakePreOpenBuffer buffer) BuildWithBuffer(IEaWXmlContext? ctx = null)
+    {
+        var host = new FakeGameWorkspaceHost();
+        var index = new FakeGameIndexService();
+        var buffer = new FakePreOpenBuffer();
+        var fileHelper = new FileHelper(new MockFileSystem());
+        return (new XmlTextDocumentSyncHandler(host, index, fileHelper,
+                ctx ?? new AllowAllEaWContext(), buffer),
+            host, index, buffer);
     }
 
     // ── DidOpen ──────────────────────────────────────────────────────────────
@@ -64,6 +79,25 @@ public sealed class XmlTextDocumentSyncHandlerTest
         Assert.Equal(TestUri.ToString(), index.UpdateCalls[0].Uri);
         Assert.Equal("<Foo/>", index.UpdateCalls[0].Text);
         Assert.Equal(1, index.UpdateCalls[0].Version);
+    }
+
+    [Fact]
+    public async Task DidOpen_WhenNotEaWFile_IsBuffered()
+    {
+        var (handler, host, index, buffer) = BuildWithBuffer(ctx: new DenyAllEaWContext());
+
+        await handler.Handle(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+                { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
+        }, CancellationToken.None);
+
+        Assert.Single(buffer.RecordedOpens);
+        Assert.Equal(TestUri.ToString(), buffer.RecordedOpens[0].Uri);
+        Assert.Equal("<Foo/>", buffer.RecordedOpens[0].Text);
+        Assert.Equal(1, buffer.RecordedOpens[0].Version);
+        Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Empty(index.UpdateCalls);
     }
 
     // ── DidChange ────────────────────────────────────────────────────────────
@@ -247,6 +281,16 @@ public sealed class XmlTextDocumentSyncHandlerTest
     }
 
     // ── Fakes ────────────────────────────────────────────────────────────────
+
+    internal sealed class FakePreOpenBuffer : IPreOpenBuffer
+    {
+        public List<(string Uri, string Text, int Version)> RecordedOpens { get; } = [];
+
+        public void RecordOpen(string uri, string text, int version) =>
+            RecordedOpens.Add((uri, text, version));
+
+        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose() => [];
+    }
 
     internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
     {

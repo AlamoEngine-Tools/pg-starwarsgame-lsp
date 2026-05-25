@@ -126,4 +126,43 @@ public sealed class EaWXmlContextTest
 
         Assert.False(ctx.IsEaWXmlFile("not-a-uri"));
     }
+
+    // ── AI subdirectory exclusion ─────────────────────────────────────────────
+
+    [Fact]
+    public void IsEaWXmlFile_FileInAiSubdirectory_ReturnsFalse()
+    {
+        var dir = Path.Combine(Root("game"), "data", "xml");
+        var ctx = Build();
+        ctx.AddDirectory(dir);
+
+        var uri = ToUri(Path.Combine(dir, "AI", "foo.xml"));
+
+        Assert.False(ctx.IsEaWXmlFile(uri));
+    }
+
+    [Fact]
+    public void IsEaWXmlFile_FileInNestedAiSubdirectory_ReturnsFalse()
+    {
+        var dir = Path.Combine(Root("game"), "data", "xml");
+        var ctx = Build();
+        ctx.AddDirectory(dir);
+
+        var uri = ToUri(Path.Combine(dir, "sub", "AI", "foo.xml"));
+
+        Assert.False(ctx.IsEaWXmlFile(uri));
+    }
+
+    [Fact]
+    public void IsEaWXmlFile_DirectoryWithAiPrefix_ReturnsTrue()
+    {
+        // "AI_players" is not the AI subdirectory — only an exact "AI" segment is excluded.
+        var dir = Path.Combine(Root("game"), "data", "xml");
+        var ctx = Build();
+        ctx.AddDirectory(dir);
+
+        var uri = ToUri(Path.Combine(dir, "AI_players", "foo.xml"));
+
+        Assert.True(ctx.IsEaWXmlFile(uri));
+    }
 }

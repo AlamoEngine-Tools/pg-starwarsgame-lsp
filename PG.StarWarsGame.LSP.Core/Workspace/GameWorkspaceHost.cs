@@ -7,7 +7,8 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 
 public sealed class GameWorkspaceHost : IGameWorkspaceHost
 {
-    private readonly ConcurrentDictionary<string, TrackedDocument> _docs = new();
+    private readonly ConcurrentDictionary<string, TrackedDocument> _docs =
+        new(StringComparer.OrdinalIgnoreCase);
 
     public void AddOrUpdate(string uri, string text, int version)
     {

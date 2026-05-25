@@ -18,24 +18,32 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
+    private readonly IPreOpenBuffer _preOpenBuffer;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
-        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext)
+        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IPreOpenBuffer preOpenBuffer)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
+        _preOpenBuffer = preOpenBuffer;
     }
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
         var uri = request.TextDocument.Uri.ToString();
-        if (!_eaWXmlContext.IsEaWXmlFile(uri)) return Unit.Value;
-
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
+
+        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+        {
+            // EaWXmlContext may not be configured yet (race with WorkspaceScanner).
+            // Buffer so the scanner can replay these after configuring the context.
+            _preOpenBuffer.RecordOpen(uri, text, version);
+            return Unit.Value;
+        }
 
         _workspaceHost.AddOrUpdate(uri, text, version);
         await _indexService.UpdateDocumentAsync(uri, text, version, ct);

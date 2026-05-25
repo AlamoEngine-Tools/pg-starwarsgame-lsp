@@ -22,6 +22,12 @@ public sealed class EaWXmlContext : IEaWXmlContext
         var path = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(fileUri));
         if (path is null) return false;
         var lower = path.ToLowerInvariant();
+
+        // TODO: implement proper AI XML parsing — AI files use a different format that
+        //       requires a dedicated parser; exclude them until that parser exists.
+        var sep = Path.DirectorySeparatorChar;
+        if (lower.Contains($"{sep}ai{sep}")) return false;
+
         return _directories.Any(dir => lower.StartsWith(dir, StringComparison.Ordinal));
     }
 

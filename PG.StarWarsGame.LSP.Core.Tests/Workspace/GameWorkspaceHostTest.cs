@@ -119,4 +119,39 @@ public sealed class GameWorkspaceHostTest
         Assert.Single(host.All);
         Assert.Equal("file:///b.xml", host.All.Single().Uri);
     }
+
+    // ── case-insensitive URI matching ─────────────────────────────────────────
+
+    [Fact]
+    public void TryGet_IsCaseInsensitive()
+    {
+        // Scanner stores normalized lowercase; editor requests use mixed-case drive letters.
+        var host = Build();
+        host.AddOrUpdate("file:///d:/units.xml", "<Root/>", 1);
+
+        Assert.True(host.TryGet("file:///D:/units.xml", out var doc));
+        Assert.Equal("<Root/>", doc.Text);
+    }
+
+    [Fact]
+    public void AddOrUpdate_WithCaseVariant_TreatsAsOneEntry()
+    {
+        var host = Build();
+        host.AddOrUpdate("file:///d:/units.xml", "<Old/>", 1);
+        host.AddOrUpdate("file:///D:/units.xml", "<New/>", 2);
+
+        Assert.Equal(1, host.All.Count());
+        Assert.True(host.TryGet("file:///d:/units.xml", out var doc));
+        Assert.Equal("<New/>", doc.Text);
+    }
+
+    [Fact]
+    public void Remove_WithCaseVariant_RemovesExistingEntry()
+    {
+        var host = Build();
+        host.AddOrUpdate("file:///d:/units.xml", "<Root/>", 1);
+        host.Remove("file:///D:/units.xml");
+
+        Assert.Empty(host.All);
+    }
 }
