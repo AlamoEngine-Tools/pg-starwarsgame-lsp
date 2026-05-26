@@ -26,6 +26,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandlerRegistry, XmlDiagnosticsHandlerRegistry>();
 
         // XmlTagValueFact handlers (format validators)
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BooleanValueHandler>();

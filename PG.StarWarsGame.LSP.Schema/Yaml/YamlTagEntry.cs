@@ -18,4 +18,5 @@ internal sealed class YamlTagEntry
     public Dictionary<string, string> Description { get; set; } = [];
     public Dictionary<string, string> Notes { get; set; } = [];
     public bool MultipleAllowed { get; set; }
+    public YamlTagValidationOverride? ValidationOverride { get; set; }
 }

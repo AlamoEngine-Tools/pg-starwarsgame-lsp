@@ -84,22 +84,32 @@ public sealed class HttpSchemaProvider : ISchemaProvider
 
     public async Task LoadAsync(CancellationToken ct = default)
     {
-        _logger.LogInformation("Fetching schema manifest from {BaseUrl}", _baseUrl);
-        var indexJson = await _http.GetStringAsync(_baseUrl + "_index.json", ct);
-        var manifest = JsonSerializer.Deserialize<SchemaManifest>(indexJson,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-        if (manifest is null) return;
-
-        if (_cache.TryLoad(indexJson, manifest, out var cached))
+        try
         {
-            _logger.LogInformation("Schema loaded from local cache");
-            _current = cached;
-            SchemaRefreshed?.Invoke(this, EventArgs.Empty);
-            _readyTcs.TrySetResult();
-            return;
-        }
+            _logger.LogInformation("Fetching schema manifest from {BaseUrl}", _baseUrl);
+            var indexJson = await _http.GetStringAsync(_baseUrl + "_index.json", ct);
+            var manifest = JsonSerializer.Deserialize<SchemaManifest>(indexJson,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            if (manifest is null) return;
 
-        await BuildIndexAsync(manifest, indexJson, ct);
+            if (_cache.TryLoad(indexJson, manifest, out var cached))
+            {
+                _logger.LogInformation("Schema loaded from local cache");
+                _current = cached;
+                SchemaRefreshed?.Invoke(this, EventArgs.Empty);
+                _readyTcs.TrySetResult();
+                return;
+            }
+
+            await BuildIndexAsync(manifest, indexJson, ct);
+        }
+        catch
+        {
+            // Always signal ReadyAsync so WorkspaceScanner.WaitForSchemaAsync does not
+            // block for its full 30-second timeout when the HTTP fetch fails.
+            _readyTcs.TrySetResult();
+            throw;
+        }
     }
 
     private async Task BuildIndexAsync(SchemaManifest manifest, string indexJson, CancellationToken ct)

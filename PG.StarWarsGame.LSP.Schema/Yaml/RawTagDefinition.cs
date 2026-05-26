@@ -20,4 +20,5 @@ internal sealed record RawTagDefinition
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();
     public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
     public bool MultipleAllowed { get; init; }
+    public TagValidationOverride? ValidationOverride { get; init; }
 }

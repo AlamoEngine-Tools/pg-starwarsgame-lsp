@@ -47,4 +47,10 @@ public record XmlTagDefinition
 
     /// <summary>If true, this tag may appear more than once under the same parent element; the engine merges all occurrences.</summary>
     public bool MultipleAllowed { get; init; }
+
+    /// <summary>
+    ///     Optional override that controls how custom named validation handlers compose with the default type handler.
+    ///     <c>null</c> means "run all registered handlers for this fact type" (default behaviour).
+    /// </summary>
+    public TagValidationOverride? ValidationOverride { get; init; }
 }

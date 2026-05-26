@@ -38,6 +38,33 @@ internal static class YamlSchemaParser
                 logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' — defaulting to Default",
                     entry.SemanticType, entry.Tag);
 
+            TagValidationOverride? validationOverride = null;
+            if (entry.ValidationOverride is { } vo && !string.IsNullOrEmpty(vo.ValidationId))
+            {
+                var mode = ValidationOverrideMode.Additive;
+                if (vo.Mode is not null && !Enum.TryParse(vo.Mode, true, out mode))
+                {
+                    logger?.LogWarning("Unknown validationOverride mode '{Mode}' for tag '{Tag}' — defaulting to Additive",
+                        vo.Mode, entry.Tag);
+                    mode = ValidationOverrideMode.Additive;
+                }
+
+                var order = ValidationOverrideOrder.Append;
+                if (vo.Order is not null && !Enum.TryParse(vo.Order, true, out order))
+                {
+                    logger?.LogWarning("Unknown validationOverride order '{Order}' for tag '{Tag}' — defaulting to Append",
+                        vo.Order, entry.Tag);
+                    order = ValidationOverrideOrder.Append;
+                }
+
+                validationOverride = new TagValidationOverride
+                {
+                    ValidationId = vo.ValidationId,
+                    Mode = mode,
+                    Order = order
+                };
+            }
+
             result.Add(new RawTagDefinition
             {
                 Tag = entry.Tag,
@@ -51,7 +78,8 @@ internal static class YamlSchemaParser
                 AvailableSince = entry.AvailableSince,
                 Description = entry.Description,
                 Notes = entry.Notes,
-                MultipleAllowed = entry.MultipleAllowed
+                MultipleAllowed = entry.MultipleAllowed,
+                ValidationOverride = validationOverride
             });
         }
 

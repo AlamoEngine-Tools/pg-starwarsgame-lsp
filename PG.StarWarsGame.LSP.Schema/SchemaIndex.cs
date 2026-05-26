@@ -121,7 +121,8 @@ public sealed class SchemaIndex
             AvailableSince = raw.AvailableSince,
             Description = raw.Description,
             Notes = raw.Notes,
-            MultipleAllowed = raw.MultipleAllowed
+            MultipleAllowed = raw.MultipleAllowed,
+            ValidationOverride = raw.ValidationOverride
         };
     }
 

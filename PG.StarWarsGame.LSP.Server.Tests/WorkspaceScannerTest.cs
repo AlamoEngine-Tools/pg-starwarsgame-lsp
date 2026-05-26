@@ -474,6 +474,63 @@ public sealed class WorkspaceScannerTest
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
+    // ── SchemaRefreshed after scan ───────────────────────────────────────────
+
+    [Fact]
+    public async Task SchemaRefreshed_AfterScanCompletes_UpdatesEaWXmlContext()
+    {
+        // Scenario: schema loads AFTER the initial scan has already finished
+        // (e.g. HTTP fetch completed after the 30-second WaitForSchemaAsync timeout).
+        // EaWXmlContext must be updated synchronously when SchemaRefreshed fires.
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files/>")
+        });
+        var schema = new RefreshableSchemaProvider();
+        var svc = new FakeIndexService();
+        var (scanner, ctx) = BuildWithContext(fs, svc, new FileTypeRegistry(), schema);
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+
+        var xmlFileUri = new FileHelper(fs).PathToFileUri(Path.Combine(root, "data", "xml", "Units.xml"));
+        Assert.False(ctx.IsEaWXmlFile(xmlFileUri));
+
+        schema.Refresh(new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry,
+            ["GameObjectType"]));
+
+        Assert.True(ctx.IsEaWXmlFile(xmlFileUri));
+    }
+
+    [Fact]
+    public async Task SchemaRefreshed_AfterScanCompletes_ReindexesMissedXmlFiles()
+    {
+        // Files that were excluded from the initial scan (no EaW directory registered)
+        // must be picked up and indexed when SchemaRefreshed fires after the scan.
+        var root = Root("ws");
+        var metafilePath = Path.Combine(root, "data", "xml", "gameobjectfiles.xml");
+        var xmlFilePath = Path.Combine(root, "data", "xml", "Units.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new("<Files/>"),
+            [xmlFilePath] = new("<Root/>")
+        });
+        var schema = new RefreshableSchemaProvider();
+        var svc = new FakeIndexService();
+        var (scanner, _) = BuildWithContext(fs, svc, new FileTypeRegistry(), schema, new FakeParser());
+
+        await scanner.ScanAsync([root], CancellationToken.None);
+        Assert.Empty(svc.Calls);
+
+        var waitFor = svc.WhenCallCountReaches(1);
+        schema.Refresh(new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry,
+            ["GameObjectType"]));
+        await waitFor.WaitAsync(TimeSpan.FromSeconds(5));
+
+        Assert.Contains(svc.Calls, c => c.Uri.EndsWith("units.xml", StringComparison.OrdinalIgnoreCase));
+    }
+
     // ── PreOpenBuffer drain ───────────────────────────────────────────────────
 
     [Fact]
@@ -572,6 +629,33 @@ public sealed class WorkspaceScannerTest
         public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version, CancellationToken ct)
         {
             throw new NotSupportedException();
+        }
+    }
+
+    // Schema provider that is immediately ready but starts with no metafiles.
+    // Calling Refresh() updates the metafiles and fires SchemaRefreshed, simulating a
+    // schema hot-reload or a late HTTP fetch completing after the initial scan.
+    private sealed class RefreshableSchemaProvider : ISchemaProvider
+    {
+        private MetafileDefinition[] _metafiles = [];
+        public event EventHandler? SchemaRefreshed;
+        public Task ReadyAsync => Task.CompletedTask;
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => _metafiles;
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
+        public XmlTagDefinition? GetTag(string t) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t) => [];
+        public GameObjectTypeDefinition? GetObjectType(string t) => null;
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t) => [];
+        public EnumDefinition? GetEnum(string e) => null;
+
+        public void Refresh(params MetafileDefinition[] metafiles)
+        {
+            _metafiles = metafiles;
+            SchemaRefreshed?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -693,12 +777,28 @@ public sealed class WorkspaceScannerTest
             remove { }
         }
 
+        private TaskCompletionSource? _callTcs;
+        private int _callTarget;
+
+        public Task WhenCallCountReaches(int n)
+        {
+            lock (_lock)
+            {
+                if (Calls.Count >= n) return Task.CompletedTask;
+                _callTarget = n;
+                _callTcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                return _callTcs.Task;
+            }
+        }
+
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
             lock (_lock)
             {
                 Calls.Add((uri, version));
+                if (_callTcs is not null && Calls.Count >= _callTarget)
+                    _callTcs.TrySetResult();
             }
 
             return Task.CompletedTask;

@@ -27,6 +27,11 @@ public sealed class WorkspaceScanner
     private readonly IServerWorkDoneManager? _workDone;
     private readonly IGameWorkspaceHost _workspaceHost;
 
+    // Stored after a successful ScanAsync so OnSchemaRefreshed can trigger a re-scan.
+    // Null until the first scan completes, which prevents re-scans during the initial
+    // WaitForSchemaAsync phase (the initial scan handles schema readiness itself).
+    private volatile List<string>? _lastRoots;
+
     public WorkspaceScanner(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
         ILogger<WorkspaceScanner> logger,
@@ -44,6 +49,7 @@ public sealed class WorkspaceScanner
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
         _preOpenBuffer = preOpenBuffer;
+        _schema.SchemaRefreshed += OnSchemaRefreshed;
     }
 
     public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
@@ -151,6 +157,7 @@ public sealed class WorkspaceScanner
                 progress?.Dispose();
             }
 
+            _lastRoots = roots;
             tx.Finish(SpanStatus.Ok);
         }
         catch (Exception)
@@ -158,6 +165,28 @@ public sealed class WorkspaceScanner
             tx.Finish(SpanStatus.InternalError);
             throw;
         }
+    }
+
+    private void OnSchemaRefreshed(object? sender, EventArgs e)
+    {
+        var roots = _lastRoots;
+        if (roots is null) return;
+
+        // Immediately update EaWXmlContext directories so IsEaWXmlFile is correct
+        // for any document opens that arrive before the background re-scan completes.
+        PreScanMetafiles(roots);
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await ScanAsync(roots, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Schema-refresh workspace re-scan failed");
+            }
+        });
     }
 
     private async Task WaitForSchemaAsync(CancellationToken ct)

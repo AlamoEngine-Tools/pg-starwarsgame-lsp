@@ -372,6 +372,69 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         Assert.Empty(provider.AllMetafiles);
     }
 
+    [Fact]
+    public void ValidationOverride_AllFields_Parsed()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Damage
+                                type: Float
+                                validationOverride:
+                                  validationId: damage-nonzero
+                                  mode: replace
+                                  order: prepend
+                            """;
+
+        using var provider = CreateAndLoad(yaml);
+
+        var tag = provider.GetTag("Damage");
+
+        Assert.NotNull(tag);
+        Assert.NotNull(tag.ValidationOverride);
+        Assert.Equal("damage-nonzero", tag.ValidationOverride.ValidationId);
+        Assert.Equal(ValidationOverrideMode.Replace, tag.ValidationOverride.Mode);
+        Assert.Equal(ValidationOverrideOrder.Prepend, tag.ValidationOverride.Order);
+    }
+
+    [Fact]
+    public void ValidationOverride_DefaultsApplied()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Damage
+                                type: Float
+                                validationOverride:
+                                  validationId: damage-nonzero
+                            """;
+
+        using var provider = CreateAndLoad(yaml);
+
+        var tag = provider.GetTag("Damage");
+
+        Assert.NotNull(tag);
+        Assert.NotNull(tag.ValidationOverride);
+        Assert.Equal("damage-nonzero", tag.ValidationOverride.ValidationId);
+        Assert.Equal(ValidationOverrideMode.Additive, tag.ValidationOverride.Mode);
+        Assert.Equal(ValidationOverrideOrder.Append, tag.ValidationOverride.Order);
+    }
+
+    [Fact]
+    public void ValidationOverride_Absent_IsNull()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Damage
+                                type: Float
+                            """;
+
+        using var provider = CreateAndLoad(yaml);
+
+        var tag = provider.GetTag("Damage");
+
+        Assert.NotNull(tag);
+        Assert.Null(tag.ValidationOverride);
+    }
+
     private static WatchlessMockFileSystem MakeMockFs(Dictionary<string, MockFileData>? files = null)
     {
         return files is null ? new WatchlessMockFileSystem() : new WatchlessMockFileSystem(files);

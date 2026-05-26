@@ -209,7 +209,32 @@ public sealed class HttpSchemaProviderTest
         Assert.DoesNotContain("//", indexRequest.RequestUri!.AbsolutePath.TrimStart('/'));
         Assert.EndsWith("_index.json", indexRequest.RequestUri.ToString());
     }
+    [Fact]
+    public async Task LoadAsync_WhenFetchFails_ReadyAsyncCompletes()
+    {
+        var fake = new FakeFailingHttpHandler(new HttpRequestException("network error"));
+        var client = new HttpClient(fake);
+        var provider = new HttpSchemaProvider(client, BaseUrl, NoOpCache(), NullLogger<HttpSchemaProvider>.Instance);
+
+        await Assert.ThrowsAsync<HttpRequestException>(() => provider.LoadAsync());
+
+        Assert.True(provider.ReadyAsync.IsCompleted);
+    }
+
     // ── fake HTTP handler ───────────────────────────────────────────────────
+
+    private sealed class FakeFailingHttpHandler : HttpMessageHandler
+    {
+        private readonly Exception _exception;
+
+        public FakeFailingHttpHandler(Exception exception)
+        {
+            _exception = exception;
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+            => Task.FromException<HttpResponseMessage>(_exception);
+    }
 
     private sealed class FakeHttpMessageHandler : HttpMessageHandler
     {
