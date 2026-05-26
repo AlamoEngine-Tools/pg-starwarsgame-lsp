@@ -8,11 +8,11 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Schema;
 public sealed class LuaApiSchemaProxyTest
 {
     private const string MinimalSchema = """
-        ---@param typeName string
-        ---@xmlref XmlObject
-        --- Finds the first object.
-        function Find_First_Object(typeName) end
-        """;
+                                         ---@param typeName string
+                                         ---@xmlref XmlObject
+                                         --- Finds the first object.
+                                         function Find_First_Object(typeName) end
+                                         """;
 
     [Fact]
     public void AllFunctionNames_IsEmpty_BeforeConfigure()

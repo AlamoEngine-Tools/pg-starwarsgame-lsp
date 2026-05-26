@@ -20,12 +20,12 @@ public sealed class WorkspaceScanner
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
-    private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILogger<WorkspaceScanner> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly IPreOpenBuffer _preOpenBuffer;
     private readonly ISchemaProvider _schema;
     private readonly IServerWorkDoneManager? _workDone;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public WorkspaceScanner(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
@@ -76,6 +76,7 @@ public sealed class WorkspaceScanner
                 if (!_workspaceHost.TryGet(preUri, out _))
                     _workspaceHost.AddOrUpdate(preUri, preText, preVersion);
             }
+
             _logger.LogInformation("PreOpenBuffer drained: {Count} file(s) seeded at {Elapsed} ms",
                 preOpened.Count, sw.ElapsedMilliseconds);
 
@@ -200,7 +201,9 @@ public sealed class WorkspaceScanner
                     RegisterFromMetafile(metafilePath, def);
                 }
                 else
+                {
                     FallbackFromBaseline(baseline, def, roots);
+                }
             }
             else // DirectContent
             {
@@ -213,7 +216,9 @@ public sealed class WorkspaceScanner
                         def.Types.ToImmutableArray());
                 }
                 else
+                {
                     FallbackFromBaseline(baseline, def, roots);
+                }
             }
         }
     }

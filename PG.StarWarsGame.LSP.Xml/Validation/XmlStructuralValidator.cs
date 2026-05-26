@@ -19,7 +19,9 @@ public sealed class XmlStructuralValidator : IXmlStructuralValidator
         using var reader = XmlReader.Create(new StringReader(text), Settings);
         try
         {
-            while (reader.Read()) { }
+            while (reader.Read())
+            {
+            }
         }
         catch (XmlException ex)
         {

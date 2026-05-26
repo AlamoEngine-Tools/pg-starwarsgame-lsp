@@ -71,11 +71,21 @@ public class GameHoverHandlerTest
         Assert.False(lua.WasCalled);
     }
 
-    private static HoverParams RequestFor(string uri) =>
-        new() { TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) }, Position = new Position(0, 0) };
+    private static HoverParams RequestFor(string uri)
+    {
+        return new HoverParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) }, Position = new Position(0, 0)
+        };
+    }
 
-    private static Hover MakeHover(string text) =>
-        new() { Contents = new MarkedStringsOrMarkupContent(new MarkupContent { Kind = MarkupKind.Markdown, Value = text }) };
+    private static Hover MakeHover(string text)
+    {
+        return new Hover
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent { Kind = MarkupKind.Markdown, Value = text })
+        };
+    }
 
     private sealed class FakeXmlProvider(Hover? response) : IXmlHoverProvider
     {

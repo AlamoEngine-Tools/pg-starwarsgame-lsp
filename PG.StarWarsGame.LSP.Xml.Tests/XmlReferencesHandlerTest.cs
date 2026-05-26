@@ -230,7 +230,7 @@ public sealed class XmlReferencesHandlerTest
     [Fact]
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
-        var handler = BuildHandler(GameIndex.Empty, ctx: new DenyAllEaWContext());
+        var handler = BuildHandler(GameIndex.Empty, new DenyAllEaWContext());
         var result = await handler.Handle(At(0, 5), CancellationToken.None);
         Assert.Null(result);
     }

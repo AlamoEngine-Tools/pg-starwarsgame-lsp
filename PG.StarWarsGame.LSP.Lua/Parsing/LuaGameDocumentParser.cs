@@ -30,8 +30,10 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         _logger = logger;
     }
 
-    public bool CanParse(string fileExtension) =>
-        fileExtension.Equals(".lua", StringComparison.OrdinalIgnoreCase);
+    public bool CanParse(string fileExtension)
+    {
+        return fileExtension.Equals(".lua", StringComparison.OrdinalIgnoreCase);
+    }
 
     public ValueTask<DocumentIndex> ParseAsync(
         string documentUri, string text, int version, CancellationToken ct)

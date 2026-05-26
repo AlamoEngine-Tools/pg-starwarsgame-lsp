@@ -165,4 +165,30 @@ public sealed class EaWXmlContextTest
 
         Assert.True(ctx.IsEaWXmlFile(uri));
     }
+
+    [Fact]
+    public void AddDirectory_WithForwardSlashes_MatchesFileUri()
+    {
+        // AddDirectory may receive a path with forward slashes (e.g., from cross-platform config)
+        var dir = Root("game").Replace(Path.DirectorySeparatorChar, '/') + "/data/xml";
+        var ctx = Build();
+        ctx.AddDirectory(dir);
+
+        var uri = ToUri(Path.Combine(Root("game"), "data", "xml", "foo.xml"));
+
+        Assert.True(ctx.IsEaWXmlFile(uri));
+    }
+
+    [Fact]
+    public void AddDirectory_WithFileUri_MatchesFileUri()
+    {
+        // AddDirectory may receive a file:// URI (from workspace folder URIs)
+        var dirUri = ToUri(Path.Combine(Root("game"), "data", "xml"));
+        var ctx = Build();
+        ctx.AddDirectory(dirUri);
+
+        var uri = ToUri(Path.Combine(Root("game"), "data", "xml", "foo.xml"));
+
+        Assert.True(ctx.IsEaWXmlFile(uri));
+    }
 }

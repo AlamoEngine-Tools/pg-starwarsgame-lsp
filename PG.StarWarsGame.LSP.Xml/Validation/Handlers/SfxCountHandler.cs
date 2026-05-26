@@ -16,7 +16,7 @@ public sealed class SfxCountHandler : NumberValueHandlerBase
         if (int.TryParse(trimmed, out var value) && value >= -1)
             return [];
 
-        var corrected = ((int)Math.Clamp(Math.Truncate(floatVal), -1.0, (double)int.MaxValue)).ToString();
+        var corrected = ((int)Math.Clamp(Math.Truncate(floatVal), -1.0, int.MaxValue)).ToString();
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,

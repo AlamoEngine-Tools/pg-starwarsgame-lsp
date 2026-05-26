@@ -7,10 +7,16 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 internal sealed class AllowAllEaWContext : IEaWXmlContext
 {
-    public bool IsEaWXmlFile(string fileUri) => true;
+    public bool IsEaWXmlFile(string fileUri)
+    {
+        return true;
+    }
 }
 
 internal sealed class DenyAllEaWContext : IEaWXmlContext
 {
-    public bool IsEaWXmlFile(string fileUri) => false;
+    public bool IsEaWXmlFile(string fileUri)
+    {
+        return false;
+    }
 }

@@ -152,5 +152,4 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         _logger.LogDebug("Hover resolved: reference {Id} → {Type}", reference.TargetId, typeDef.TypeName);
         return HoverUtility.BuildReferenceHover(typeDef, symbol.Id, reference, locale);
     }
-
 }

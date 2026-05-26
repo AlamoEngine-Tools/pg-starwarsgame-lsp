@@ -6,11 +6,11 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -34,7 +34,8 @@ public sealed class XmlCodeLensHandlerTest
 
     private static GameSymbol BaselineSymbol(string id)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new MegArchiveOrigin("data.meg", "units.xml", null, null), null);
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit",
+            new MegArchiveOrigin("data.meg", "units.xml", null, null), null);
     }
 
     private static GameReference MakeRef(string id, string docUri, int line, int col, int len)
@@ -81,7 +82,7 @@ public sealed class XmlCodeLensHandlerTest
     [Fact]
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
-        var handler = BuildHandler(GameIndex.Empty, ctx: new DenyAllEaWContext());
+        var handler = BuildHandler(GameIndex.Empty, new DenyAllEaWContext());
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
         Assert.Null(result);
     }
@@ -265,18 +266,30 @@ public sealed class XmlCodeLensHandlerTest
         public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
+        public void RemoveDocument(string uri)
+        {
+        }
 
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
 
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

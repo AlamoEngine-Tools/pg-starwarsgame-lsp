@@ -8,7 +8,6 @@ namespace PG.StarWarsGame.LSP.Lua.Schema;
 public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
 {
     private readonly IReadOnlyDictionary<string, FunctionEntry> _functions;
-    private readonly IReadOnlySet<string> _allFunctionNames;
 
     public LuaApiSchemaProvider(IEnumerable<string> fileContents)
     {
@@ -16,16 +15,20 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         foreach (var content in fileContents)
             ParseContent(content, functions);
         _functions = functions;
-        _allFunctionNames = new HashSet<string>(functions.Keys, StringComparer.OrdinalIgnoreCase);
+        AllFunctionNames = new HashSet<string>(functions.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
-    public IReadOnlySet<string> AllFunctionNames => _allFunctionNames;
+    public IReadOnlySet<string> AllFunctionNames { get; }
 
-    public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName) =>
-        _functions.TryGetValue(functionName, out var entry) ? entry.XmlRefs : [];
+    public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
+    {
+        return _functions.TryGetValue(functionName, out var entry) ? entry.XmlRefs : [];
+    }
 
-    public string? GetFunctionDescription(string functionName) =>
-        _functions.TryGetValue(functionName, out var entry) ? entry.Description : null;
+    public string? GetFunctionDescription(string functionName)
+    {
+        return _functions.TryGetValue(functionName, out var entry) ? entry.Description : null;
+    }
 
     private static void ParseContent(
         string content,

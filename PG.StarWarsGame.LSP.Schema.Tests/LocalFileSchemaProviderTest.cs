@@ -1,6 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using System.IO.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Schema.Providers;
@@ -9,6 +13,11 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 
 public sealed class LocalFileSchemaProviderTest : IDisposable
 {
+    // ── MockFileSystem tests ─────────────────────────────────────────────────
+
+    private static readonly string MockSchemaRoot =
+        Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "mock-schema");
+
     private readonly string _tempDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
 
     public LocalFileSchemaProviderTest()
@@ -57,7 +66,8 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         }
 
         // Constructor calls Load(); explicit call here ensures we re-read after all files are written
-        var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
+        var provider = new LocalFileSchemaProvider(_tempDir, new FileSystem(),
+            NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
         return provider;
     }
@@ -260,7 +270,8 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
     [Fact]
     public void EmptyDirectory_ReturnsEmptyCollections()
     {
-        using var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
+        using var provider =
+            new LocalFileSchemaProvider(_tempDir, new FileSystem(), NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
 
         Assert.Empty(provider.AllTags);
@@ -340,7 +351,8 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         Directory.CreateDirectory(metaDir);
         File.WriteAllText(Path.Combine(metaDir, "metafiles.yaml"), metaYaml);
 
-        using var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
+        using var provider =
+            new LocalFileSchemaProvider(_tempDir, new FileSystem(), NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
 
         Assert.Equal(2, provider.AllMetafiles.Count);
@@ -353,9 +365,169 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
     [Fact]
     public void AllMetafiles_WithoutMetaYaml_ReturnsEmpty()
     {
-        using var provider = new LocalFileSchemaProvider(_tempDir, NullLogger<LocalFileSchemaProvider>.Instance);
+        using var provider =
+            new LocalFileSchemaProvider(_tempDir, new FileSystem(), NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
 
         Assert.Empty(provider.AllMetafiles);
+    }
+
+    private static WatchlessMockFileSystem MakeMockFs(Dictionary<string, MockFileData>? files = null)
+    {
+        return files is null ? new WatchlessMockFileSystem() : new WatchlessMockFileSystem(files);
+    }
+
+    [Fact]
+    public void MockFileSystem_ValidSchema_LoadsTagsAndTypes()
+    {
+        const string tagsYaml = """
+                                tags:
+                                  - tag: Tactical_Health
+                                    type: Float
+                                """;
+        const string typesYaml = """
+                                 types:
+                                   - typeName: GameObjectType
+                                     nameTag: Name
+                                 """;
+        var fs = MakeMockFs(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(MockSchemaRoot, "tags", "GameObjectType.yaml")] = new(tagsYaml),
+            [Path.Combine(MockSchemaRoot, "types.yaml")] = new(typesYaml)
+        });
+
+        using var provider = new LocalFileSchemaProvider(MockSchemaRoot, fs,
+            NullLogger<LocalFileSchemaProvider>.Instance);
+
+        Assert.Single(provider.AllTags);
+        Assert.Equal("Tactical_Health", provider.AllTags[0].Tag);
+        Assert.Single(provider.AllObjectTypes);
+    }
+
+    [Fact]
+    public void MockFileSystem_EmptyDirectory_ReturnsEmptyCollections()
+    {
+        var fs = MakeMockFs();
+        fs.Directory.CreateDirectory(MockSchemaRoot);
+
+        using var provider = new LocalFileSchemaProvider(MockSchemaRoot, fs,
+            NullLogger<LocalFileSchemaProvider>.Instance);
+
+        Assert.Empty(provider.AllTags);
+        Assert.Empty(provider.AllObjectTypes);
+        Assert.Empty(provider.AllEnums);
+    }
+
+    // MockFileSystem.FileSystemWatcher is virtual; override it to return a no-op factory
+    // so LocalFileSchemaProvider can be constructed without a real file-system watcher.
+    private sealed class WatchlessMockFileSystem : MockFileSystem
+    {
+        private readonly NullFileSystemWatcherFactory _watcherFactory;
+
+        public WatchlessMockFileSystem()
+        {
+            _watcherFactory = new NullFileSystemWatcherFactory(this);
+        }
+
+        public WatchlessMockFileSystem(IDictionary<string, MockFileData> files) : base(files)
+        {
+            _watcherFactory = new NullFileSystemWatcherFactory(this);
+        }
+
+        public override IFileSystemWatcherFactory FileSystemWatcher => _watcherFactory;
+    }
+
+    private sealed class NullFileSystemWatcherFactory : IFileSystemWatcherFactory
+    {
+        public NullFileSystemWatcherFactory(IFileSystem fs)
+        {
+            FileSystem = fs;
+        }
+
+        public IFileSystem FileSystem { get; }
+
+        public IFileSystemWatcher New()
+        {
+            return new NullFileSystemWatcher(FileSystem);
+        }
+
+        public IFileSystemWatcher New(string path)
+        {
+            return new NullFileSystemWatcher(FileSystem);
+        }
+
+        public IFileSystemWatcher New(string path, string filter)
+        {
+            return new NullFileSystemWatcher(FileSystem);
+        }
+
+        public IFileSystemWatcher? Wrap(FileSystemWatcher? watcher)
+        {
+            return new NullFileSystemWatcher(FileSystem);
+        }
+    }
+
+    private sealed class NullFileSystemWatcher : IFileSystemWatcher
+    {
+        public NullFileSystemWatcher(IFileSystem fs)
+        {
+            FileSystem = fs;
+        }
+
+        public IFileSystem FileSystem { get; }
+        public IContainer? Container => null;
+        public bool EnableRaisingEvents { get; set; }
+        public string Filter { get; set; } = string.Empty;
+        public Collection<string> Filters { get; } = [];
+        public bool IncludeSubdirectories { get; set; }
+        public int InternalBufferSize { get; set; }
+        public NotifyFilters NotifyFilter { get; set; }
+        public string Path { get; set; } = string.Empty;
+        public ISite? Site { get; set; }
+        public ISynchronizeInvoke? SynchronizingObject { get; set; }
+
+        public void BeginInit()
+        {
+        }
+
+        public void EndInit()
+        {
+        }
+
+        public IWaitForChangedResult WaitForChanged(WatcherChangeTypes changeType)
+        {
+            return NullResult.Instance;
+        }
+
+        public IWaitForChangedResult WaitForChanged(WatcherChangeTypes changeType, int timeout)
+        {
+            return NullResult.Instance;
+        }
+
+        public IWaitForChangedResult WaitForChanged(WatcherChangeTypes changeType, TimeSpan timeout)
+        {
+            return NullResult.Instance;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private sealed class NullResult : IWaitForChangedResult
+        {
+            public static readonly NullResult Instance = new();
+            public WatcherChangeTypes ChangeType => 0;
+            public string? Name => null;
+            public string? OldName => null;
+            public bool TimedOut => true;
+        }
+
+#pragma warning disable CS0067
+        public event FileSystemEventHandler? Changed;
+        public event FileSystemEventHandler? Created;
+        public event FileSystemEventHandler? Deleted;
+        public event ErrorEventHandler? Error;
+        public event RenamedEventHandler? Renamed;
+#pragma warning restore CS0067
     }
 }

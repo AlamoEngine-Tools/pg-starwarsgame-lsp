@@ -7,7 +7,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Lua;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
@@ -200,10 +199,15 @@ public sealed class LuaTextDocumentSyncHandlerTest
         public List<Call> AddOrUpdateCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
 
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             AddOrUpdateCalls.Add(new Call(uri, text, version));
+        }
 
-        public void Remove(string uri) => RemoveCalls.Add(uri);
+        public void Remove(string uri)
+        {
+            RemoveCalls.Add(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
         {
@@ -236,9 +240,14 @@ public sealed class LuaTextDocumentSyncHandlerTest
             return Task.CompletedTask;
         }
 
-        public void RemoveDocument(string uri) => RemoveCalls.Add(uri);
+        public void RemoveDocument(string uri)
+        {
+            RemoveCalls.Add(uri);
+        }
 
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
 
         public IDisposable BeginBulkUpdate()
         {
@@ -251,7 +260,10 @@ public sealed class LuaTextDocumentSyncHandlerTest
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

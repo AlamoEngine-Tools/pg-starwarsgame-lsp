@@ -21,22 +21,20 @@ using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsRevalidator, IXmlFixCache
+public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiagnosticsRevalidator, IXmlFixCache
 {
     private readonly IXmlDocumentFactProducer _documentProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
+
+    private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
-    private readonly IGameIndexService _indexService;
     private readonly IXmlIndexFactProducer _indexProducer;
+    private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
-    private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly ISchemaProvider _schema;
     private readonly IStoryFactProducer _storyProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
-
-    private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
-    private HashSet<string> _lastPublishedUris = [];
 
     public XmlDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -68,8 +66,8 @@ public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsRevalidator, IXmlFi
         ILogger<XmlDiagnosticsPublisher> logger,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper)
+        : base(publish, indexService, workspaceHost)
     {
-        _publish = publish;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _schema = schema;
@@ -80,9 +78,9 @@ public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsRevalidator, IXmlFi
         _logger = logger;
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
-
-        indexService.IndexChanged += OnIndexChanged;
     }
+
+    protected override string FileExtension => ".xml";
 
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
@@ -109,37 +107,16 @@ public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsRevalidator, IXmlFi
         PublishForDocument(uri, text, index);
     }
 
-    private void OnIndexChanged(GameIndex newIndex)
+    public string? GetSuggestedFix(string uri, int startLine, int startChar)
     {
-        _logger.LogInformation(
-            "OnIndexChanged fired: {DocCount} document(s), {DefCount} definition(s), {RefCount} reference(s)",
-            newIndex.Documents.Count, newIndex.WorkspaceDefinitions.Count, newIndex.WorkspaceReferences.Count);
-
-        // Iterate open documents from the workspace host so we publish only for editor-open
-        // files. The workspace host stores raw LSP URIs (potentially mixed case on Windows);
-        // the index stores canonical lowercase URIs. Normalize before index lookups.
-        // Only publish for XML files — Lua files are handled by LuaDiagnosticsPublisher.
-        var xmlOpenDocs = _workspaceHost.All
-            .Where(d => Path.GetExtension(d.Uri).Equals(".xml", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var xmlOpenUris = new HashSet<string>(xmlOpenDocs.Select(d => d.Uri));
-
-        foreach (var doc in xmlOpenDocs)
-            PublishForDocument(doc.Uri, doc.Text, newIndex);
-
-        // Clear diagnostics for XML files that are no longer open in the editor.
-        foreach (var uri in _lastPublishedUris)
-            if (!xmlOpenUris.Contains(uri))
-                _publish(new PublishDiagnosticsParams
-                {
-                    Uri = DocumentUri.From(uri),
-                    Diagnostics = new Container<Diagnostic>()
-                });
-
-        _lastPublishedUris = xmlOpenUris;
+        var key = _fileHelper.NormalizeUri(uri);
+        if (_fixCache.TryGetValue(key, out var fixes) &&
+            fixes.TryGetValue((startLine, startChar), out var fix))
+            return fix;
+        return null;
     }
 
-    private void PublishForDocument(string uri, string text, GameIndex index)
+    protected override void PublishForDocument(string uri, string text, GameIndex index)
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
@@ -166,22 +143,14 @@ public sealed class XmlDiagnosticsPublisher : IXmlDiagnosticsRevalidator, IXmlFi
             if (fixToken is not null)
                 fixes[(d.Range.Start.Line, d.Range.Start.Character)] = fixToken;
         }
+
         _fixCache[normalizedUri] = fixes;
 
-        _publish(new PublishDiagnosticsParams
+        Publish(new PublishDiagnosticsParams
         {
             Uri = DocumentUri.From(uri),
             Diagnostics = new Container<Diagnostic>(allDiags)
         });
-    }
-
-    public string? GetSuggestedFix(string uri, int startLine, int startChar)
-    {
-        var key = _fileHelper.NormalizeUri(uri);
-        if (_fixCache.TryGetValue(key, out var fixes) &&
-            fixes.TryGetValue((startLine, startChar), out var fix))
-            return fix;
-        return null;
     }
 
     internal IReadOnlyList<Diagnostic> CollectEnumBoundaryDiagnostics(

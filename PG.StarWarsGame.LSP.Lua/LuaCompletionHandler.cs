@@ -67,9 +67,11 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
         XmlRefEntry? refEntry = null;
         foreach (var r in xmlRefs)
-        {
-            if (r.ParamIndex == paramIndex) { refEntry = r; break; }
-        }
+            if (r.ParamIndex == paramIndex)
+            {
+                refEntry = r;
+                break;
+            }
 
         if (refEntry is null)
             return Task.FromResult(new CompletionList());
@@ -81,7 +83,9 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     }
 
     public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
-        => Task.FromResult(request);
+    {
+        return Task.FromResult(request);
+    }
 
     protected override CompletionRegistrationOptions CreateRegistrationOptions(
         CompletionCapability capability, ClientCapabilities clientCapabilities)
@@ -123,10 +127,22 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         while (i >= 0)
         {
             var ch = line[i];
-            if (ch == ')' || ch == ']' || ch == '}') { depth++; i--; continue; }
+            if (ch == ')' || ch == ']' || ch == '}')
+            {
+                depth++;
+                i--;
+                continue;
+            }
+
             if (ch == '(' || ch == '[' || ch == '{')
             {
-                if (depth > 0) { depth--; i--; continue; }
+                if (depth > 0)
+                {
+                    depth--;
+                    i--;
+                    continue;
+                }
+
                 break; // found the enclosing opening paren
             }
 
@@ -177,22 +193,20 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     private static IEnumerable<CompletionItem> BuildXmlRefCompletions(GameIndex index, string? expectedTypeName)
     {
         foreach (var (id, symbols) in index.WorkspaceDefinitions)
+        foreach (var sym in symbols)
         {
-            foreach (var sym in symbols)
-            {
-                if (sym.Kind != GameSymbolKind.XmlObject) continue;
-                if (expectedTypeName is not null &&
-                    !string.Equals(sym.TypeName, expectedTypeName, StringComparison.OrdinalIgnoreCase))
-                    continue;
+            if (sym.Kind != GameSymbolKind.XmlObject) continue;
+            if (expectedTypeName is not null &&
+                !string.Equals(sym.TypeName, expectedTypeName, StringComparison.OrdinalIgnoreCase))
+                continue;
 
-                yield return new CompletionItem
-                {
-                    Label = id,
-                    Detail = sym.TypeName,
-                    Kind = CompletionItemKind.Reference
-                };
-                break;
-            }
+            yield return new CompletionItem
+            {
+                Label = id,
+                Detail = sym.TypeName,
+                Kind = CompletionItemKind.Reference
+            };
+            break;
         }
 
         foreach (var (id, sym) in index.Baseline.Symbols)

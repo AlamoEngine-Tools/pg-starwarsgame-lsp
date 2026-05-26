@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -25,7 +24,9 @@ public sealed class RevalidateDocumentCommandHandlerTest
         public string? LastUri { get; private set; }
 
         public Task RevalidateWorkspaceAsync(CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
         public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
         {

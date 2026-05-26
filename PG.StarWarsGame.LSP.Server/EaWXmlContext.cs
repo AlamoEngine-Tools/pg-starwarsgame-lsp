@@ -19,22 +19,22 @@ public sealed class EaWXmlContext : IEaWXmlContext
 
     public bool IsEaWXmlFile(string fileUri)
     {
-        var path = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(fileUri));
-        if (path is null) return false;
-        var lower = path.ToLowerInvariant();
+        var normalized = _fileHelper.NormalizeUri(fileUri);
+        if (!normalized.StartsWith("file:///", StringComparison.Ordinal)) return false;
 
         // TODO: implement proper AI XML parsing — AI files use a different format that
         //       requires a dedicated parser; exclude them until that parser exists.
-        var sep = Path.DirectorySeparatorChar;
-        if (lower.Contains($"{sep}ai{sep}")) return false;
+        if (normalized.Contains("/ai/", StringComparison.Ordinal)) return false;
 
-        return _directories.Any(dir => lower.StartsWith(dir, StringComparison.Ordinal));
+        return _directories.Any(dir => normalized.StartsWith(dir, StringComparison.Ordinal));
     }
 
     public void AddDirectory(string absolutePath)
     {
-        var norm = absolutePath.ToLowerInvariant().TrimEnd(Path.DirectorySeparatorChar, '/')
-                   + Path.DirectorySeparatorChar;
-        ImmutableInterlocked.Update(ref _directories, d => d.Add(norm));
+        var uri = absolutePath.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+            ? _fileHelper.NormalizeUri(absolutePath)
+            : _fileHelper.PathToFileUri(absolutePath);
+        var prefix = uri.TrimEnd('/') + '/';
+        ImmutableInterlocked.Update(ref _directories, d => d.Add(prefix));
     }
 }

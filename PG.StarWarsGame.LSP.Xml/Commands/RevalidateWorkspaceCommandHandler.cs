@@ -20,7 +20,9 @@ public sealed class RevalidateWorkspaceCommandHandler : ExecuteCommandHandlerBas
     }
 
     public async Task ExecuteAsync(CancellationToken ct)
-        => await _revalidator.RevalidateWorkspaceAsync(ct);
+    {
+        await _revalidator.RevalidateWorkspaceAsync(ct);
+    }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
@@ -30,5 +32,7 @@ public sealed class RevalidateWorkspaceCommandHandler : ExecuteCommandHandlerBas
 
     protected override ExecuteCommandRegistrationOptions CreateRegistrationOptions(
         ExecuteCommandCapability capability, ClientCapabilities clientCapabilities)
-        => new() { Commands = new Container<string>(CommandName) };
+    {
+        return new ExecuteCommandRegistrationOptions { Commands = new Container<string>(CommandName) };
+    }
 }

@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
@@ -192,8 +191,14 @@ public sealed class LuaRenameHandler : RenameHandlerBase
         var path = _fileHelper.FileUriToPath(uri);
         if (path is null) return null;
 
-        try { return _fileHelper.FileSystem.File.ReadAllText(path); }
-        catch { return null; }
+        try
+        {
+            return _fileHelper.FileSystem.File.ReadAllText(path);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static void AddEdit(Dictionary<DocumentUri, List<TextEdit>> changes, string uri, TextEdit edit)

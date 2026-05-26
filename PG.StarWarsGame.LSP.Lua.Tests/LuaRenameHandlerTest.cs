@@ -45,8 +45,10 @@ public sealed class LuaRenameHandlerTest
             NullLogger<LuaRenameHandler>.Instance);
     }
 
-    private static GameSymbol MakeGlobal(string name, string uri) =>
-        new(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, 0, null), null);
+    private static GameSymbol MakeGlobal(string name, string uri)
+    {
+        return new GameSymbol(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, 0, null), null);
+    }
 
     // ── gating ────────────────────────────────────────────────────────────────
 
@@ -187,16 +189,30 @@ public sealed class LuaRenameHandlerTest
         public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -204,13 +220,20 @@ public sealed class LuaRenameHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
-        public bool TryGet(string uri, out TrackedDocument doc) =>
-            _docs.TryGetValue(uri, out doc!);
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }

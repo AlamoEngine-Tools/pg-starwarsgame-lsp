@@ -42,7 +42,7 @@ public sealed class LorrettaParserSmokeTest
     }
 
     /// <summary>
-    ///     Explores which individual <see cref="LuaSyntaxOptions"/> flags eliminate the
+    ///     Explores which individual <see cref="LuaSyntaxOptions" /> flags eliminate the
     ///     remaining Lua51 errors so we can define a minimal custom preset for L-1.
     /// </summary>
     [Fact]
@@ -53,14 +53,14 @@ public sealed class LorrettaParserSmokeTest
 
         var presets = new (string Name, LuaSyntaxOptions Options)[]
         {
-            ("Lua51",     LuaSyntaxOptions.Lua51),
-            ("Lua52",     LuaSyntaxOptions.Lua52),
-            ("Lua53",     LuaSyntaxOptions.Lua53),
-            ("Lua54",     LuaSyntaxOptions.Lua54),
-            ("LuaJIT20",  LuaSyntaxOptions.LuaJIT20),
-            ("LuaJIT21",  LuaSyntaxOptions.LuaJIT21),
-            ("GMod",      LuaSyntaxOptions.GMod),
-            ("All",       LuaSyntaxOptions.All),
+            ("Lua51", LuaSyntaxOptions.Lua51),
+            ("Lua52", LuaSyntaxOptions.Lua52),
+            ("Lua53", LuaSyntaxOptions.Lua53),
+            ("Lua54", LuaSyntaxOptions.Lua54),
+            ("LuaJIT20", LuaSyntaxOptions.LuaJIT20),
+            ("LuaJIT21", LuaSyntaxOptions.LuaJIT21),
+            ("GMod", LuaSyntaxOptions.GMod),
+            ("All", LuaSyntaxOptions.All)
         };
 
         _output.WriteLine($"Corpus: {files.Length} files\n");
@@ -121,6 +121,7 @@ public sealed class LorrettaParserSmokeTest
                 totalErrors += fileErrorCount;
             }
         }
+
         return (filesWithErrors, totalErrors);
     }
 
@@ -145,13 +146,16 @@ public sealed class LorrettaParserSmokeTest
                     span.StartLinePosition.Character + 1));
             }
         }
+
         return errors;
     }
 
-    private static string[] GetLuaFiles(string scriptsDir) =>
-        Directory.GetFiles(scriptsDir, "*.lua", SearchOption.AllDirectories)
+    private static string[] GetLuaFiles(string scriptsDir)
+    {
+        return Directory.GetFiles(scriptsDir, "*.lua", SearchOption.AllDirectories)
             .OrderBy(f => f)
             .ToArray();
+    }
 
     private static string RequireScriptsDirectory()
     {
@@ -166,8 +170,10 @@ public sealed class LorrettaParserSmokeTest
                     return scripts;
                 break;
             }
+
             dir = dir.Parent;
         }
+
         throw new Exception("$XunitDynamicSkip$Could not find foc/Data/Scripts — is the game data in the repo?");
     }
 }

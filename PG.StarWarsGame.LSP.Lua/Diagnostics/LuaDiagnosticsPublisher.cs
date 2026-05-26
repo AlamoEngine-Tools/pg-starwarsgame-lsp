@@ -8,13 +8,15 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
-using LspDiagnosticContainer = OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>;
+using LspDiagnosticContainer = OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<
+    OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
 using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspPublishParams = OmniSharp.Extensions.LanguageServer.Protocol.Models.PublishDiagnosticsParams;
@@ -22,18 +24,13 @@ using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Diagnostics;
 
-public sealed class LuaDiagnosticsPublisher
+public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
     private readonly IFileHelper _fileHelper;
-    private readonly IGameIndexService _indexService;
-    private readonly ILuaApiSchemaProvider _schemaProvider;
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
-    private readonly Action<LspPublishParams> _publish;
-    private readonly IGameWorkspaceHost _workspaceHost;
-
-    private HashSet<string> _lastPublishedUris = [];
+    private readonly ILuaApiSchemaProvider _schemaProvider;
 
     public LuaDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -54,50 +51,25 @@ public sealed class LuaDiagnosticsPublisher
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger)
+        : base(publish, indexService, workspaceHost)
     {
-        _publish = publish;
-        _indexService = indexService;
-        _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _logger = logger;
-
-        indexService.IndexChanged += OnIndexChanged;
     }
 
-    private void OnIndexChanged(GameIndex newIndex)
-    {
-        _logger.LogDebug("LuaDiagnosticsPublisher: OnIndexChanged");
+    protected override string FileExtension => ".lua";
 
-        var luaOpenDocs = _workspaceHost.All
-            .Where(d => Path.GetExtension(d.Uri).Equals(".lua", StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        var luaOpenUris = new HashSet<string>(luaOpenDocs.Select(d => d.Uri));
-
-        foreach (var doc in luaOpenDocs)
-            PublishForDocument(doc.Uri, doc.Text, newIndex);
-
-        foreach (var uri in _lastPublishedUris)
-            if (!luaOpenUris.Contains(uri))
-                _publish(new LspPublishParams
-                {
-                    Uri = DocumentUri.From(uri),
-                    Diagnostics = new LspDiagnosticContainer()
-                });
-
-        _lastPublishedUris = luaOpenUris;
-    }
-
-    private void PublishForDocument(string uri, string text, GameIndex index)
+    protected override void PublishForDocument(string uri, string text, GameIndex index)
     {
         var diagnostics = new List<LspDiagnostic>();
 
         CollectSyntaxErrors(text, diagnostics);
         CollectReferenceErrors(uri, index, diagnostics);
-        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, text, index.Documents.Keys));
-        diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, text, index, _schemaProvider));
+        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, text, index.Documents.Keys, _fileHelper));
+        diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, text, index, _schemaProvider, _fileHelper));
 
-        _publish(new LspPublishParams
+        Publish(new LspPublishParams
         {
             Uri = DocumentUri.From(uri),
             Diagnostics = new LspDiagnosticContainer(diagnostics)
@@ -141,7 +113,6 @@ public sealed class LuaDiagnosticsPublisher
                 new LspPosition(reference.Line, reference.Column + reference.Length));
 
             if (resolved is null)
-            {
                 diagnostics.Add(new LspDiagnostic
                 {
                     Severity = LspDiagnosticSeverity.Error,
@@ -149,11 +120,9 @@ public sealed class LuaDiagnosticsPublisher
                     Range = range,
                     Source = AppProperties.LspServerId
                 });
-            }
             else if (reference.ExpectedTypeName is not null &&
                      !string.Equals(resolved.TypeName, reference.ExpectedTypeName,
                          StringComparison.OrdinalIgnoreCase))
-            {
                 diagnostics.Add(new LspDiagnostic
                 {
                     Severity = LspDiagnosticSeverity.Warning,
@@ -162,7 +131,6 @@ public sealed class LuaDiagnosticsPublisher
                     Range = range,
                     Source = AppProperties.LspServerId
                 });
-            }
         }
     }
 }

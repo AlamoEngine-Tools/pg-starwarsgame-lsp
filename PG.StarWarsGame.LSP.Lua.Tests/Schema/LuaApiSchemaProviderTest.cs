@@ -7,8 +7,10 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Schema;
 
 public sealed class LuaApiSchemaProviderTest
 {
-    private static LuaApiSchemaProvider Build(params string[] contents) =>
-        new(contents);
+    private static LuaApiSchemaProvider Build(params string[] contents)
+    {
+        return new LuaApiSchemaProvider(contents);
+    }
 
     // ── AllFunctionNames ─────────────────────────────────────────────────────
 
@@ -62,10 +64,10 @@ public sealed class LuaApiSchemaProviderTest
     public void GetXmlRefs_XmlRefOnFirstParam_ReturnsIndexZero()
     {
         const string content = """
-            ---@param typeName string
-            ---@xmlref XmlObject
-            function Find_First_Object(typeName) end
-            """;
+                               ---@param typeName string
+                               ---@xmlref XmlObject
+                               function Find_First_Object(typeName) end
+                               """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Find_First_Object"));
         Assert.Equal(0, entry.ParamIndex);
         Assert.Null(entry.ExpectedTypeName);
@@ -75,10 +77,10 @@ public sealed class LuaApiSchemaProviderTest
     public void GetXmlRefs_TypedXmlRef_ReturnsTypeConstraint()
     {
         const string content = """
-            ---@param factionName string
-            ---@xmlref XmlObject:Faction
-            function Find_Player(factionName) end
-            """;
+                               ---@param factionName string
+                               ---@xmlref XmlObject:Faction
+                               function Find_Player(factionName) end
+                               """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Find_Player"));
         Assert.Equal(0, entry.ParamIndex);
         Assert.Equal("Faction", entry.ExpectedTypeName);
@@ -88,11 +90,11 @@ public sealed class LuaApiSchemaProviderTest
     public void GetXmlRefs_XmlRefOnSecondParam_ReturnsIndexOne()
     {
         const string content = """
-            ---@param first string
-            ---@param second string
-            ---@xmlref XmlObject
-            function Foo(first, second) end
-            """;
+                               ---@param first string
+                               ---@param second string
+                               ---@xmlref XmlObject
+                               function Foo(first, second) end
+                               """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Foo"));
         Assert.Equal(1, entry.ParamIndex);
         Assert.Null(entry.ExpectedTypeName);
@@ -102,12 +104,12 @@ public sealed class LuaApiSchemaProviderTest
     public void GetXmlRefs_XmlRefOnFirstOfThree_ReturnsIndexZero()
     {
         const string content = """
-            ---@param typeName string
-            ---@xmlref XmlObject
-            ---@param pos userdata
-            ---@param player userdata
-            function Spawn_Unit(typeName, pos, player) end
-            """;
+                               ---@param typeName string
+                               ---@xmlref XmlObject
+                               ---@param pos userdata
+                               ---@param player userdata
+                               function Spawn_Unit(typeName, pos, player) end
+                               """;
         var entry = Assert.Single(Build(content).GetXmlRefs("Spawn_Unit"));
         Assert.Equal(0, entry.ParamIndex);
     }
@@ -116,12 +118,12 @@ public sealed class LuaApiSchemaProviderTest
     public void GetXmlRefs_MultipleXmlRefs_ReturnsBoth()
     {
         const string content = """
-            ---@param typeA string
-            ---@xmlref XmlObject
-            ---@param typeB string
-            ---@xmlref XmlObject:Faction
-            function Multi(typeA, typeB) end
-            """;
+                               ---@param typeA string
+                               ---@xmlref XmlObject
+                               ---@param typeB string
+                               ---@xmlref XmlObject:Faction
+                               function Multi(typeA, typeB) end
+                               """;
         var entries = Build(content).GetXmlRefs("Multi");
         Assert.Equal(2, entries.Count);
         Assert.Contains(entries, e => e.ParamIndex == 0 && e.ExpectedTypeName == null);
@@ -132,10 +134,10 @@ public sealed class LuaApiSchemaProviderTest
     public void GetXmlRefs_CaseInsensitiveLookup()
     {
         const string content = """
-            ---@param typeName string
-            ---@xmlref XmlObject
-            function Find_First_Object(typeName) end
-            """;
+                               ---@param typeName string
+                               ---@xmlref XmlObject
+                               function Find_First_Object(typeName) end
+                               """;
         var provider = Build(content);
         Assert.Single(provider.GetXmlRefs("find_first_object"));
         Assert.Single(provider.GetXmlRefs("FIND_FIRST_OBJECT"));
@@ -153,9 +155,9 @@ public sealed class LuaApiSchemaProviderTest
     public void GetFunctionDescription_FunctionWithDescription_ReturnsIt()
     {
         const string content = """
-            --- Finds the first game object of the given type.
-            function Find_First_Object(typeName) end
-            """;
+                               --- Finds the first game object of the given type.
+                               function Find_First_Object(typeName) end
+                               """;
         var desc = Build(content).GetFunctionDescription("Find_First_Object");
         Assert.NotNull(desc);
         Assert.Contains("Finds the first", desc);
@@ -172,9 +174,9 @@ public sealed class LuaApiSchemaProviderTest
     public void GetFunctionDescription_CaseInsensitiveLookup()
     {
         const string content = """
-            --- Some description.
-            function Foo() end
-            """;
+                               --- Some description.
+                               function Foo() end
+                               """;
         var provider = Build(content);
         Assert.NotNull(provider.GetFunctionDescription("foo"));
         Assert.NotNull(provider.GetFunctionDescription("FOO"));

@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Immutable;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -105,7 +105,7 @@ public sealed class HoverUtilityTest
     {
         var hover = HoverUtility.BuildReferenceHover(
             MakeType("SpaceUnit"), "X_Wing", MakeRef("X_Wing", 0, 0, 6), "en");
-        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.MarkupKind.Markdown,
+        Assert.Equal(MarkupKind.Markdown,
             hover.Contents.MarkupContent!.Kind);
     }
 }

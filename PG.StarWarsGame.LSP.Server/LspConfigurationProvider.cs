@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -15,10 +16,12 @@ namespace PG.StarWarsGame.LSP.Server;
 /// </summary>
 public sealed class LspConfigurationProvider : ILspConfigurationProvider
 {
+    private readonly IFileSystem _fileSystem;
     private readonly ILogger<LspConfigurationProvider> _logger;
 
-    public LspConfigurationProvider(ILogger<LspConfigurationProvider> logger)
+    public LspConfigurationProvider(IFileSystem fileSystem, ILogger<LspConfigurationProvider> logger)
     {
+        _fileSystem = fileSystem;
         _logger = logger;
     }
 
@@ -54,13 +57,13 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     {
         if (string.IsNullOrWhiteSpace(workspaceRoot)) return new LspConfiguration();
 
-        var path = Path.Combine(workspaceRoot, ".pg-lsp.json");
-        if (!File.Exists(path)) return new LspConfiguration();
+        var path = _fileSystem.Path.Combine(workspaceRoot, ".pg-lsp.json");
+        if (!_fileSystem.File.Exists(path)) return new LspConfiguration();
 
         _logger.LogDebug("Reading .pg-lsp.json from {WorkspaceRoot}", workspaceRoot);
         try
         {
-            var json = File.ReadAllText(path);
+            var json = _fileSystem.File.ReadAllText(path);
             return JsonSerializer.Deserialize<LspConfiguration>(json) ?? new LspConfiguration();
         }
         catch (Exception ex)

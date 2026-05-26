@@ -10,6 +10,7 @@
         <PackageReference Include="MessagePack" Version="2.5.187"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8"/>
+        <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
         <PackageReference Include="Testably.Abstractions.FileSystem.Interface" Version="10.1.0"/>
     </ItemGroup>
 

@@ -63,13 +63,13 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         var root = tree.GetRoot();
 
         // Phase 2: require() module hover.
-        var requireHover = TryBuildRequireHover(root, line, character, index);
+        var requireHover = TryBuildRequireHover(root, line, character, index, _fileHelper);
         if (requireHover is not null)
             return Task.FromResult<Hover?>(requireHover);
 
         // Phase 3: Lua identifier hover (workspace global or engine global).
         var identHover = TryBuildIdentifierHover(root, line, character, index, _schemaProvider);
-        return Task.FromResult<Hover?>(identHover);
+        return Task.FromResult(identHover);
     }
 
     private static Hover? TryBuildXmlRefHover(GameIndex index, string uri, int line, int character)
@@ -102,7 +102,8 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         return null;
     }
 
-    private static Hover? TryBuildRequireHover(SyntaxNode root, int line, int character, GameIndex index)
+    private static Hover? TryBuildRequireHover(SyntaxNode root, int line, int character, GameIndex index,
+        IFileHelper fileHelper)
     {
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
         {
@@ -129,7 +130,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(startLine, startChar),
                 new Position(endLine, endChar));
 
-            var resolved = LuaRequireResolver.Resolve(requireArg, index.Documents.Keys);
+            var resolved = LuaRequireResolver.Resolve(requireArg, index.Documents.Keys, fileHelper);
             string markdown;
             if (resolved is not null)
             {
@@ -164,7 +165,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         {
             var s = strArg.Expression.Token.GetLocation().GetLineSpan();
             return (s.StartLinePosition.Line, s.StartLinePosition.Character,
-                    s.EndLinePosition.Line, s.EndLinePosition.Character);
+                s.EndLinePosition.Line, s.EndLinePosition.Character);
         }
 
         if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
@@ -172,7 +173,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         {
             var s = lit.Token.GetLocation().GetLineSpan();
             return (s.StartLinePosition.Line, s.StartLinePosition.Character,
-                    s.EndLinePosition.Line, s.EndLinePosition.Character);
+                s.EndLinePosition.Line, s.EndLinePosition.Character);
         }
 
         return null;
@@ -199,7 +200,6 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             // Workspace LuaGlobal takes precedence over engine global.
             if (index.WorkspaceDefinitions.TryGetValue(id.Name, out var defs) &&
                 defs.Any(s => s.Kind == GameSymbolKind.LuaGlobal))
-            {
                 return new Hover
                 {
                     Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -209,7 +209,6 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                     }),
                     Range = range
                 };
-            }
 
             // Engine global: show name and description from schema.
             if (schema.AllFunctionNames.Contains(id.Name))
@@ -237,5 +236,4 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 
         return null;
     }
-
 }

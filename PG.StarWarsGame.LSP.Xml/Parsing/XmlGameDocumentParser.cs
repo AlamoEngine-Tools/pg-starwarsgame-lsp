@@ -123,17 +123,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return attr?.Value?.Trim() ?? string.Empty;
     }
 
-    // Kept for tests that call it directly. Production code now routes through IFileHelper.NormalizeUri.
-    [Obsolete("Use IFileHelper.NormalizeUri instead.")]
-    internal static string NormalizeDocumentUri(string uri)
-    {
-        if (uri.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
-            uri = uri[8..];
-        else if (uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            uri = uri[7..];
-        return uri.Replace('\\', '/').ToLowerInvariant();
-    }
-
     private static IEnumerable<(string Name, int Offset)> SplitReferenceNames(
         XmlTagDefinition tagDef, string innerText)
     {

@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
@@ -29,7 +30,8 @@ internal static class LuaGlobalScopeAnalyzer
     };
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
-        string documentUri, string text, GameIndex index, ILuaApiSchemaProvider schemaProvider)
+        string documentUri, string text, GameIndex index, ILuaApiSchemaProvider schemaProvider,
+        IFileHelper fileHelper)
     {
         var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
@@ -37,7 +39,7 @@ internal static class LuaGlobalScopeAnalyzer
         var diagnostics = new List<LspDiagnostic>();
 
         // Phase 1: collect resolved require calls.
-        var requireCalls = CollectRequireCalls(root, workspaceUris);
+        var requireCalls = CollectRequireCalls(root, workspaceUris, fileHelper);
         var requiredUris = new HashSet<string>(
             requireCalls.Where(r => r.ResolvedUri is not null).Select(r => r.ResolvedUri!),
             StringComparer.OrdinalIgnoreCase);
@@ -56,12 +58,8 @@ internal static class LuaGlobalScopeAnalyzer
         return diagnostics;
     }
 
-    // ── phase 1 ───────────────────────────────────────────────────────────────
-
-    private sealed record RequireCall(string Arg, string? ResolvedUri, FunctionCallExpressionSyntax Node);
-
     private static List<RequireCall> CollectRequireCalls(
-        SyntaxNode root, IEnumerable<string> workspaceUris)
+        SyntaxNode root, IEnumerable<string> workspaceUris, IFileHelper fileHelper)
     {
         var uriList = workspaceUris as ICollection<string> ?? workspaceUris.ToList();
         var calls = new List<RequireCall>();
@@ -75,7 +73,7 @@ internal static class LuaGlobalScopeAnalyzer
 
             if (LuaRequireResolver.IsRelative(arg)) continue;
 
-            var resolved = LuaRequireResolver.Resolve(arg, uriList);
+            var resolved = LuaRequireResolver.Resolve(arg, uriList, fileHelper);
             calls.Add(new RequireCall(arg, resolved, call));
         }
 
@@ -141,18 +139,16 @@ internal static class LuaGlobalScopeAnalyzer
     {
         var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, symbols) in index.WorkspaceDefinitions)
+        foreach (var sym in symbols)
         {
-            foreach (var sym in symbols)
-            {
-                if (sym.Kind != GameSymbolKind.LuaGlobal) continue;
-                if (sym.Origin is not FileOrigin fo) continue;
-                if (string.Equals(fo.Uri, documentUri, StringComparison.OrdinalIgnoreCase)) continue;
+            if (sym.Kind != GameSymbolKind.LuaGlobal) continue;
+            if (sym.Origin is not FileOrigin fo) continue;
+            if (string.Equals(fo.Uri, documentUri, StringComparison.OrdinalIgnoreCase)) continue;
 
-                // Last writer wins if the same name is defined in multiple files;
-                // the caller checks if ANY defining URI is required, so this is fine.
-                if (!map.ContainsKey(id))
-                    map[id] = fo.Uri;
-            }
+            // Last writer wins if the same name is defined in multiple files;
+            // the caller checks if ANY defining URI is required, so this is fine.
+            if (!map.ContainsKey(id))
+                map[id] = fo.Uri;
         }
 
         return map;
@@ -212,4 +208,8 @@ internal static class LuaGlobalScopeAnalyzer
 
         return null;
     }
+
+    // ── phase 1 ───────────────────────────────────────────────────────────────
+
+    private sealed record RequireCall(string Arg, string? ResolvedUri, FunctionCallExpressionSyntax Node);
 }

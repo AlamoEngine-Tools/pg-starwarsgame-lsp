@@ -4,7 +4,8 @@
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
-///     Observation: the document has an XML well-formedness violation (mismatched tag, unclosed tag, malformed attribute, etc.).
+///     Observation: the document has an XML well-formedness violation (mismatched tag, unclosed tag, malformed attribute,
+///     etc.).
 /// </summary>
 public sealed record XmlStructureFact(
     string DocumentUri,

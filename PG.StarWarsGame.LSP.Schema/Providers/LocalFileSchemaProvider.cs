@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Schema.Yaml;
@@ -14,21 +15,22 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 /// </summary>
 public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
 {
+    private readonly IFileSystem _fileSystem;
     private readonly ILogger<LocalFileSchemaProvider> _logger;
     private readonly string _rootPath;
-    private readonly FileSystemWatcher _watcher;
+    private readonly IFileSystemWatcher _watcher;
     private volatile SchemaIndex _current = SchemaIndex.Empty;
 
-    public LocalFileSchemaProvider(string rootPath, ILogger<LocalFileSchemaProvider> logger)
+    public LocalFileSchemaProvider(string rootPath, IFileSystem fileSystem,
+        ILogger<LocalFileSchemaProvider> logger)
     {
         _rootPath = rootPath;
+        _fileSystem = fileSystem;
         _logger = logger;
-        _watcher = new FileSystemWatcher(rootPath, "*.yaml")
-        {
-            IncludeSubdirectories = true,
-            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName,
-            EnableRaisingEvents = true
-        };
+        _watcher = _fileSystem.FileSystemWatcher.New(rootPath, "*.yaml");
+        _watcher.IncludeSubdirectories = true;
+        _watcher.NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName;
+        _watcher.EnableRaisingEvents = true;
         _watcher.Changed += OnFileChanged;
         _watcher.Created += OnFileChanged;
         _watcher.Deleted += OnFileChanged;
@@ -88,33 +90,33 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
         var enums = new List<RawEnumDefinition>();
         var hardcodedSets = new List<HardcodedReferenceSet>();
 
-        foreach (var file in Directory.EnumerateFiles(_rootPath, "*.yaml", SearchOption.AllDirectories))
+        foreach (var file in _fileSystem.Directory.EnumerateFiles(_rootPath, "*.yaml", SearchOption.AllDirectories))
         {
-            var relativePath = Path.GetRelativePath(_rootPath, file);
+            var relativePath = _fileSystem.Path.GetRelativePath(_rootPath, file);
             var parts = relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
             if (parts.Length == 2 && parts[0].Equals("tags", StringComparison.OrdinalIgnoreCase))
             {
-                var typeName = Path.GetFileNameWithoutExtension(file);
-                tagsByType.Add((typeName, YamlSchemaParser.ParseTagFile(File.ReadAllText(file), _logger)));
+                var typeName = _fileSystem.Path.GetFileNameWithoutExtension(file);
+                tagsByType.Add((typeName, YamlSchemaParser.ParseTagFile(_fileSystem.File.ReadAllText(file), _logger)));
             }
             else if (parts.Length == 2 && parts[0].Equals("enums", StringComparison.OrdinalIgnoreCase))
             {
-                enums.Add(YamlSchemaParser.ParseEnumFile(File.ReadAllText(file), _logger));
+                enums.Add(YamlSchemaParser.ParseEnumFile(_fileSystem.File.ReadAllText(file), _logger));
             }
             else if (parts.Length == 2 && parts[0].Equals("hardcoded", StringComparison.OrdinalIgnoreCase))
             {
-                hardcodedSets.Add(YamlSchemaParser.ParseHardcodedSetFile(File.ReadAllText(file)));
+                hardcodedSets.Add(YamlSchemaParser.ParseHardcodedSetFile(_fileSystem.File.ReadAllText(file)));
             }
             else if (parts.Length == 1 && parts[0].Equals("types.yaml", StringComparison.OrdinalIgnoreCase))
             {
-                types.AddRange(YamlSchemaParser.ParseTypeFile(File.ReadAllText(file)));
+                types.AddRange(YamlSchemaParser.ParseTypeFile(_fileSystem.File.ReadAllText(file)));
             }
         }
 
-        var metaPath = Path.Combine(_rootPath, "meta", "metafiles.yaml");
-        var metafiles = File.Exists(metaPath)
-            ? YamlSchemaParser.ParseMetafileFile(File.ReadAllText(metaPath))
+        var metaPath = _fileSystem.Path.Combine(_rootPath, "meta", "metafiles.yaml");
+        var metafiles = _fileSystem.File.Exists(metaPath)
+            ? YamlSchemaParser.ParseMetafileFile(_fileSystem.File.ReadAllText(metaPath))
             : (IReadOnlyList<MetafileDefinition>)[];
 
         _current = new SchemaIndex(tagsByType, types, enums, hardcodedSets, metafiles);

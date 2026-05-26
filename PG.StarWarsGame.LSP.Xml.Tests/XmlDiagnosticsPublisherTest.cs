@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -12,7 +13,6 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
-using Newtonsoft.Json.Linq;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -656,7 +656,7 @@ public sealed class XmlDiagnosticsPublisherTest
         const string path = "/test.xml";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [path] = new MockFileData("<Root/>")
+            [path] = new("<Root/>")
         });
         var (publisher, published, indexService, _) = BuildSubscribedWithFs(fs);
         indexService.Current = IndexWithDoc(uri);
@@ -674,8 +674,8 @@ public sealed class XmlDiagnosticsPublisherTest
         const string uri2 = "file:///b.xml";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/a.xml"] = new MockFileData("<Root/>"),
-            ["/b.xml"] = new MockFileData("<Root/>")
+            ["/a.xml"] = new("<Root/>"),
+            ["/b.xml"] = new("<Root/>")
         });
         var (publisher, published, indexService, _) = BuildSubscribedWithFs(fs);
 
@@ -697,13 +697,17 @@ public sealed class XmlDiagnosticsPublisherTest
     private sealed class SuggestedFixStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
     {
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
-            => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning", SuggestedFix: "42")];
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning", SuggestedFix: "42")];
+        }
     }
 
     private sealed class NoFixStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
     {
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
-            => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning no fix")];
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning no fix")];
+        }
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

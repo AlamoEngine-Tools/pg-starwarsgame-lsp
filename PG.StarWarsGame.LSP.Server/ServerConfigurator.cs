@@ -120,6 +120,7 @@ public static class ServerConfigurator
                     if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
                     {
                         realProvider = new LocalFileSchemaProvider(src.LocalPath,
+                            server.Services.GetRequiredService<IFileSystem>(),
                             server.Services.GetRequiredService<ILogger<LocalFileSchemaProvider>>());
                     }
                     else
@@ -141,9 +142,10 @@ public static class ServerConfigurator
                     if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
                     {
                         var luaSchemaPath = DeriveLuaLocalPath(src.LocalPath);
-                        if (File.Exists(luaSchemaPath))
+                        var luaFs = server.Services.GetRequiredService<IFileHelper>().FileSystem;
+                        if (luaFs.File.Exists(luaSchemaPath))
                         {
-                            luaProxy.Configure(new LuaApiSchemaProvider([File.ReadAllText(luaSchemaPath)]));
+                            luaProxy.Configure(new LuaApiSchemaProvider([luaFs.File.ReadAllText(luaSchemaPath)]));
                             logger.LogInformation("Lua schema loaded from {Path}", luaSchemaPath);
                         }
                         else

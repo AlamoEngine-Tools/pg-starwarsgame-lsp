@@ -23,7 +23,7 @@ public sealed class XmlHoverHandlerTest
 
     private static (XmlHoverHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
         FakeConfigProvider config) Build(FakeFileTypeRegistry? registry = null, FakeIndexService? indexService = null,
-        IEaWXmlContext? ctx = null)
+            IEaWXmlContext? ctx = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
@@ -453,7 +453,8 @@ public sealed class XmlHoverHandlerTest
         var index = IndexWith(DocWithRef("EMPIRE", 1, 13, 6), symbol);
         var indexService = new FakeIndexService { Current = index };
         var (handler, host, schema, _) = Build(indexService: indexService);
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", Description = new Dictionary<string, string>() });
+        schema.AddType(new GameObjectTypeDefinition
+            { TypeName = "Faction", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Affiliation>EMPIRE</Affiliation>\n</Root>", 1);
 
         var result = await handler.Handle(At(1, 14), CancellationToken.None);
@@ -476,7 +477,8 @@ public sealed class XmlHoverHandlerTest
         var index = IndexWith(doc, symbol);
         var indexService = new FakeIndexService { Current = index };
         var (handler, host, schema, _) = Build(indexService: indexService);
-        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", Description = new Dictionary<string, string>() });
+        schema.AddType(new GameObjectTypeDefinition
+            { TypeName = "SpaceUnit", Description = new Dictionary<string, string>() });
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Units>Alpha Beta</Units>\n</Root>", 1);
 
         var result = await handler.Handle(At(1, 14), CancellationToken.None);
@@ -635,19 +637,31 @@ public sealed class XmlHoverHandlerTest
 
         public event Action<GameIndex>? IndexChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
+        public void RemoveDocument(string uri)
+        {
+        }
 
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
 
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

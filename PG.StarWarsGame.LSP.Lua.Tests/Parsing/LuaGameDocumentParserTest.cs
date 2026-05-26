@@ -14,25 +14,32 @@ public sealed class LuaGameDocumentParserTest
 {
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static LuaApiSchemaProvider BuildSchema() => new LuaApiSchemaProvider(["""
-        ---@param typeName string
-        ---@xmlref XmlObject
-        function Find_First_Object(typeName) end
-        ---@param typeName string
-        ---@xmlref XmlObject
-        function Find_Object_Type(typeName) end
-        ---@param typeName string
-        ---@xmlref XmlObject
-        function Find_All_Objects_Of_Type(typeName) end
-        ---@param playerName string
-        ---@xmlref XmlObject:Faction
-        function Find_Player(playerName) end
-        """]);
+    private static LuaApiSchemaProvider BuildSchema()
+    {
+        return new LuaApiSchemaProvider([
+            """
+            ---@param typeName string
+            ---@xmlref XmlObject
+            function Find_First_Object(typeName) end
+            ---@param typeName string
+            ---@xmlref XmlObject
+            function Find_Object_Type(typeName) end
+            ---@param typeName string
+            ---@xmlref XmlObject
+            function Find_All_Objects_Of_Type(typeName) end
+            ---@param playerName string
+            ---@xmlref XmlObject:Faction
+            function Find_Player(playerName) end
+            """
+        ]);
+    }
 
-    private static LuaGameDocumentParser Build() =>
-        new(BuildSchema(),
+    private static LuaGameDocumentParser Build()
+    {
+        return new LuaGameDocumentParser(BuildSchema(),
             new FileHelper(new MockFileSystem()),
             NullLogger<LuaGameDocumentParser>.Instance);
+    }
 
     // ── CanParse ─────────────────────────────────────────────────────────────
 
@@ -113,8 +120,8 @@ public sealed class LuaGameDocumentParserTest
     {
         const string text = """
 
-            function Definitions() end
-            """;
+                            function Definitions() end
+                            """;
 
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
 
@@ -202,14 +209,14 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_Reference_HasCorrect_LineAndColumn()
     {
         const string text = """
-            Find_First_Object("UNIT_REBEL")
-            """;
+                            Find_First_Object("UNIT_REBEL")
+                            """;
 
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
 
         var reference = Assert.Single(result.References);
-        Assert.Equal(0, reference.Line);     // 0-based, first line
-        Assert.Equal(19, reference.Column);  // 0-based column of U in UNIT_REBEL (after opening quote at col 18)
+        Assert.Equal(0, reference.Line); // 0-based, first line
+        Assert.Equal(19, reference.Column); // 0-based column of U in UNIT_REBEL (after opening quote at col 18)
         Assert.Equal("UNIT_REBEL".Length, reference.Length);
     }
 
@@ -217,9 +224,9 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_MultipleApiCalls_EmitsOneReferenceEach()
     {
         const string text = """
-            local x = Find_First_Object("UNIT_A")
-            local y = Find_Player("Rebel")
-            """;
+                            local x = Find_First_Object("UNIT_A")
+                            local y = Find_Player("Rebel")
+                            """;
 
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
 

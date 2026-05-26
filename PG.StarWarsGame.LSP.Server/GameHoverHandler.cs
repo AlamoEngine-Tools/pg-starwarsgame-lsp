@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GameHoverHandler : HoverHandlerBase
 {
-    private readonly IXmlHoverProvider _xml;
     private readonly ILuaHoverProvider _lua;
+    private readonly IXmlHoverProvider _xml;
 
     public GameHoverHandler(IXmlHoverProvider xml, ILuaHoverProvider lua)
     {

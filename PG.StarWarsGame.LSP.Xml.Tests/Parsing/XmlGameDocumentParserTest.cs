@@ -398,7 +398,7 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("HardPoint"));
 
-        // "f.xml" is the key produced by NormalizeDocumentUri("file:///f.xml")
+        // "f.xml" is the key produced by IFileHelper.NormalizeUri("file:///f.xml")
         var registry = new FakeFileTypeRegistry();
         registry.Register("f.xml", ["HardPoint"]);
 

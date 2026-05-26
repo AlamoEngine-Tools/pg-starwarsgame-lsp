@@ -87,7 +87,9 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     }
 
     public override Task<CodeLens> Handle(CodeLens request, CancellationToken ct)
-        => Task.FromResult(request);
+    {
+        return Task.FromResult(request);
+    }
 
     protected override CodeLensRegistrationOptions CreateRegistrationOptions(
         CodeLensCapability capability, ClientCapabilities clientCapabilities)

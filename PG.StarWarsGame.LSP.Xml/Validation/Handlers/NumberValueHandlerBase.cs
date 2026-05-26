@@ -30,7 +30,7 @@ public abstract class NumberValueHandlerBase : XmlDiagnosticsHandler<XmlTagValue
                     $"'{trimmed}' is not a valid number for <{fact.Tag.Tag}>.")
             ];
 
-        return HandlePrecise(fact, trimmed, (double)floatVal, ctx);
+        return HandlePrecise(fact, trimmed, floatVal, ctx);
     }
 
     /// <summary>

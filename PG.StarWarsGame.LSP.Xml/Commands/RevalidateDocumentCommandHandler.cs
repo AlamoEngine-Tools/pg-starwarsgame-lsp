@@ -21,7 +21,9 @@ public sealed class RevalidateDocumentCommandHandler : ExecuteCommandHandlerBase
     }
 
     public async Task ExecuteAsync(string uri, CancellationToken ct)
-        => await _revalidator.RevalidateDocumentAsync(uri, ct);
+    {
+        await _revalidator.RevalidateDocumentAsync(uri, ct);
+    }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
@@ -32,5 +34,7 @@ public sealed class RevalidateDocumentCommandHandler : ExecuteCommandHandlerBase
 
     protected override ExecuteCommandRegistrationOptions CreateRegistrationOptions(
         ExecuteCommandCapability capability, ClientCapabilities clientCapabilities)
-        => new() { Commands = new Container<string>(CommandName) };
+    {
+        return new ExecuteCommandRegistrationOptions { Commands = new Container<string>(CommandName) };
+    }
 }

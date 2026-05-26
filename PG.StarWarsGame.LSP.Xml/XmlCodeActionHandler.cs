@@ -6,7 +6,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -29,7 +28,7 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
             {
                 // Prefer data echoed back by the client; fall back to server-side cache
                 var fix = d.Data?["fix"]?.Value<string>()
-                    ?? _fixCache.GetSuggestedFix(uriString, d.Range.Start.Line, d.Range.Start.Character);
+                          ?? _fixCache.GetSuggestedFix(uriString, d.Range.Start.Line, d.Range.Start.Character);
                 return fix is not null ? (CommandOrCodeAction?)BuildAction(uri, d, fix) : null;
             })
             .Where(a => a is not null)
@@ -39,19 +38,24 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
     }
 
     public override Task<CodeAction> Handle(CodeAction request, CancellationToken ct)
-        => Task.FromResult(request);
+    {
+        return Task.FromResult(request);
+    }
 
     protected override CodeActionRegistrationOptions CreateRegistrationOptions(
         CodeActionCapability capability, ClientCapabilities clientCapabilities)
-        => new()
+    {
+        return new CodeActionRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
             CodeActionKinds = new Container<CodeActionKind>(CodeActionKind.QuickFix),
             ResolveProvider = false
         };
+    }
 
     private static CodeAction BuildAction(DocumentUri docUri, Diagnostic d, string fix)
-        => new()
+    {
+        return new CodeAction
         {
             Title = $"Replace with '{fix}'",
             Kind = CodeActionKind.QuickFix,
@@ -65,4 +69,5 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
                 }
             }
         };
+    }
 }

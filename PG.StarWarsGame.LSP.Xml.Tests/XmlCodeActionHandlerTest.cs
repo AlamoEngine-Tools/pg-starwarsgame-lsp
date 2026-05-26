@@ -11,21 +11,29 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 public sealed class XmlCodeActionHandlerTest
 {
     private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null)
-        => new(cache ?? new EmptyFixCache());
+    {
+        return new XmlCodeActionHandler(cache ?? new EmptyFixCache());
+    }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)
-        => new()
+    {
+        return new CodeActionParams
         {
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },
             Range = new LspRange(new Position(0, 0), new Position(0, 0)),
             Context = new CodeActionContext { Diagnostics = new Container<Diagnostic>(diagnostics) }
         };
+    }
 
     private static Diagnostic DiagWithFix(LspRange range, string fix)
-        => new() { Range = range, Data = JToken.FromObject(new { fix }) };
+    {
+        return new Diagnostic { Range = range, Data = JToken.FromObject(new { fix }) };
+    }
 
     private static Diagnostic DiagWithoutFix(LspRange range)
-        => new() { Range = range, Data = null };
+    {
+        return new Diagnostic { Range = range, Data = null };
+    }
 
     [Fact]
     public async Task DiagnosticWithFix_ReturnsSingleCodeActionWithEdit()
@@ -94,12 +102,17 @@ public sealed class XmlCodeActionHandlerTest
 
     private sealed class EmptyFixCache : IXmlFixCache
     {
-        public string? GetSuggestedFix(string uri, int startLine, int startChar) => null;
+        public string? GetSuggestedFix(string uri, int startLine, int startChar)
+        {
+            return null;
+        }
     }
 
     private sealed class StubFixCache(string uri, int line, int ch, string fix) : IXmlFixCache
     {
         public string? GetSuggestedFix(string u, int l, int c)
-            => u == uri && l == line && c == ch ? fix : null;
+        {
+            return u == uri && l == line && c == ch ? fix : null;
+        }
     }
 }

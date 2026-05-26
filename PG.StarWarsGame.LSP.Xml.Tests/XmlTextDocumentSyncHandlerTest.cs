@@ -84,7 +84,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
     [Fact]
     public async Task DidOpen_WhenNotEaWFile_IsBuffered()
     {
-        var (handler, host, index, buffer) = BuildWithBuffer(ctx: new DenyAllEaWContext());
+        var (handler, host, index, buffer) = BuildWithBuffer(new DenyAllEaWContext());
 
         await handler.Handle(new DidOpenTextDocumentParams
         {
@@ -286,10 +286,15 @@ public sealed class XmlTextDocumentSyncHandlerTest
     {
         public List<(string Uri, string Text, int Version)> RecordedOpens { get; } = [];
 
-        public void RecordOpen(string uri, string text, int version) =>
+        public void RecordOpen(string uri, string text, int version)
+        {
             RecordedOpens.Add((uri, text, version));
+        }
 
-        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose() => [];
+        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose()
+        {
+            return [];
+        }
     }
 
     internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost

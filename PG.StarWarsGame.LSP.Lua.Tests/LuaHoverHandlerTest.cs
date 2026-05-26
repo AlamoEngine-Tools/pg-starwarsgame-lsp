@@ -41,8 +41,10 @@ public sealed class LuaHoverHandlerTest
             NullLogger<LuaHoverHandler>.Instance);
     }
 
-    private static string GetMarkdown(Hover hover) =>
-        hover.Contents.MarkupContent?.Value ?? string.Empty;
+    private static string GetMarkdown(Hover hover)
+    {
+        return hover.Contents.MarkupContent?.Value ?? string.Empty;
+    }
 
     // ── gating ────────────────────────────────────────────────────────────────
 
@@ -192,12 +194,14 @@ public sealed class LuaHoverHandlerTest
     [Fact]
     public async Task Handle_CursorOnEngineGlobal_ReturnsHoverWithDescription()
     {
-        var schema = new LuaApiSchemaProvider(["""
+        var schema = new LuaApiSchemaProvider([
+            """
             --- Finds the first game object with the specified type.
             ---@param objectName string
             ---@xmlref XmlObject
             function Find_First_Object(objectName) end
-            """]);
+            """
+        ]);
 
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
@@ -233,16 +237,30 @@ public sealed class LuaHoverHandlerTest
         public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -250,13 +268,20 @@ public sealed class LuaHoverHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
-        public bool TryGet(string uri, out TrackedDocument doc) =>
-            _docs.TryGetValue(uri, out doc!);
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }

@@ -63,11 +63,13 @@ public sealed class LuaCompletionHandlerTest
     [Fact]
     public async Task Handle_InsideApiStringArg_ReturnsMatchingTypeSymbols()
     {
-        var schema = new LuaApiSchemaProvider(["""
+        var schema = new LuaApiSchemaProvider([
+            """
             ---@param objectName string
             ---@xmlref XmlObject:Unit
             function Find_First_Object(objectName) end
-            """]);
+            """
+        ]);
 
         var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin("file:///units.xml", 0, null), null);
@@ -90,11 +92,13 @@ public sealed class LuaCompletionHandlerTest
     [Fact]
     public async Task Handle_InsideApiStringArg_FiltersOutNonMatchingTypes()
     {
-        var schema = new LuaApiSchemaProvider(["""
+        var schema = new LuaApiSchemaProvider([
+            """
             ---@param objectName string
             ---@xmlref XmlObject:Unit
             function Find_First_Object(objectName) end
-            """]);
+            """
+        ]);
 
         var unitSym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin("file:///units.xml", 0, null), null);
@@ -123,11 +127,13 @@ public sealed class LuaCompletionHandlerTest
     [Fact]
     public async Task Handle_InsideApiStringArg_AnyType_ReturnsAllXmlObjects()
     {
-        var schema = new LuaApiSchemaProvider(["""
+        var schema = new LuaApiSchemaProvider([
+            """
             ---@param objectName string
             ---@xmlref XmlObject
             function Find_First_Object(objectName) end
-            """]);
+            """
+        ]);
 
         var unitSym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin("file:///units.xml", 0, null), null);
@@ -200,16 +206,30 @@ public sealed class LuaCompletionHandlerTest
         public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -217,13 +237,20 @@ public sealed class LuaCompletionHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
-        public bool TryGet(string uri, out TrackedDocument doc) =>
-            _docs.TryGetValue(uri, out doc!);
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }

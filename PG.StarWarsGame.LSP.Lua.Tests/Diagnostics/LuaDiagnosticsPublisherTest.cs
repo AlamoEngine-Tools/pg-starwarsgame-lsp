@@ -24,7 +24,7 @@ public sealed class LuaDiagnosticsPublisherTest
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) Build(
-        ILuaApiSchemaProvider? schema = null)
+            ILuaApiSchemaProvider? schema = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -120,7 +120,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var symbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
         var index = IndexWithLuaRef(LuaUri, "UNIT_A",
-            expectedTypeName: "Faction", resolvedSymbol: symbol);
+            "Faction", symbol);
 
         indexService.Fire(index);
 
@@ -138,7 +138,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var symbol = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "Faction",
             new FileOrigin(XmlUri, 0, null), null);
         var index = IndexWithLuaRef(LuaUri, "REBEL",
-            expectedTypeName: "Faction", resolvedSymbol: symbol);
+            "Faction", symbol);
 
         indexService.Fire(index);
 
@@ -292,24 +292,31 @@ public sealed class LuaDiagnosticsPublisherTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = new();
 
-        public void Set(string uri, string text) =>
-            _docs[uri] = new TrackedDocument(uri, text, 1);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
-
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public bool TryGet(string uri, out TrackedDocument doc) =>
-            _docs.TryGetValue(uri, out doc!);
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
+
+        public void Set(string uri, string text)
+        {
+            _docs[uri] = new TrackedDocument(uri, text, 1);
+        }
     }
 
     internal sealed class FakeGameIndexService : IGameIndexService
     {
-        private event Action<GameIndex>? _indexChanged;
-
         public GameIndex Current { get; set; } = GameIndex.Empty;
 
         public event Action<GameIndex>? IndexChanged
@@ -318,20 +325,38 @@ public sealed class LuaDiagnosticsPublisherTest
             remove => _indexChanged -= value;
         }
 
-        public void Fire(GameIndex index) => _indexChanged?.Invoke(index);
-
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public void RemoveDocument(string uri)
+        {
+        }
 
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
+
+        private event Action<GameIndex>? _indexChanged;
+
+        public void Fire(GameIndex index)
+        {
+            _indexChanged?.Invoke(index);
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

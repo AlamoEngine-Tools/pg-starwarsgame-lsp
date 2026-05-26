@@ -23,7 +23,9 @@ public sealed class WorkspaceScannerTest
     // basic indexing mechanics, not directory-detection logic.
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IEnumerable<string> eawRoots, params IGameDocumentParser[] parsers)
-        => Build(fs, svc, new GameWorkspaceHost(), eawRoots, parsers);
+    {
+        return Build(fs, svc, new GameWorkspaceHost(), eawRoots, parsers);
+    }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IGameWorkspaceHost host, IEnumerable<string> eawRoots, params IGameDocumentParser[] parsers)
@@ -53,7 +55,9 @@ public sealed class WorkspaceScannerTest
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
-        => Build(fs, svc, new GameWorkspaceHost(), registry, schema, parsers);
+    {
+        return Build(fs, svc, new GameWorkspaceHost(), registry, schema, parsers);
+    }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IGameWorkspaceHost host, IFileTypeRegistry registry, ISchemaProvider schema,
@@ -413,7 +417,7 @@ public sealed class WorkspaceScannerTest
             new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
         var svc = new FakeIndexService();
         var (scanner, _) = BuildWithContext(fs, svc, new FileTypeRegistry(), schema,
-            new FakeParser(".xml"), new FakeParser(".lua"));
+            new FakeParser(), new FakeParser(".lua"));
 
         await scanner.ScanAsync([root], CancellationToken.None);
 
@@ -537,11 +541,18 @@ public sealed class WorkspaceScannerTest
         private readonly IReadOnlyList<(string Uri, string Text, int Version)> _items;
 
         public FakePreOpenBuffer(params (string Uri, string Text, int Version)[] items)
-            => _items = items;
+        {
+            _items = items;
+        }
 
-        public void RecordOpen(string uri, string text, int version) { }
+        public void RecordOpen(string uri, string text, int version)
+        {
+        }
 
-        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose() => _items;
+        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose()
+        {
+            return _items;
+        }
     }
 
     private sealed class FakeParser : IGameDocumentParser

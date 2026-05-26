@@ -48,7 +48,8 @@ if (schemaPath is not null && Directory.Exists(schemaPath))
     services.AddSingleton<ISchemaProvider>(sp =>
     {
         var logger = sp.GetRequiredService<ILogger<LocalFileSchemaProvider>>();
-        var provider = new LocalFileSchemaProvider(schemaPath, logger);
+        var provider = new LocalFileSchemaProvider(schemaPath,
+            sp.GetRequiredService<IFileSystem>(), logger);
         provider.Load();
         return provider;
     });
