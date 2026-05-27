@@ -8,6 +8,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class Audio3dProviderNameHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    public override XmlValueType? HandledValueType => XmlValueType.Audio3dProviderName;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ValueType != XmlValueType.Audio3dProviderName)

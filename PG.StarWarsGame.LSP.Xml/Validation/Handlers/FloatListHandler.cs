@@ -9,6 +9,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class FloatListHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    public override XmlValueType? HandledValueType => XmlValueType.FloatList;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ValueType != XmlValueType.FloatList)

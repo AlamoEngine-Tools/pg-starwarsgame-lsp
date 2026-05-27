@@ -8,6 +8,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class CableRenderModeHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    public override XmlValueType? HandledValueType => XmlValueType.CableRenderMode;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ValueType != XmlValueType.CableRenderMode)

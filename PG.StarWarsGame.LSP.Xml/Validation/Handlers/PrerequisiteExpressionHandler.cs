@@ -13,6 +13,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed partial class PrerequisiteExpressionHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    public override XmlValueType? HandledValueType => XmlValueType.GameObjectTypeReferenceList;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ValueType != XmlValueType.GameObjectTypeReferenceList ||

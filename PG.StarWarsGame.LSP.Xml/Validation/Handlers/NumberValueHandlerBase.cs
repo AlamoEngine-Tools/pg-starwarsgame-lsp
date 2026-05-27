@@ -17,6 +17,8 @@ public abstract class NumberValueHandlerBase : XmlDiagnosticsHandler<XmlTagValue
 {
     protected abstract XmlValueType TargetType { get; }
 
+    public override XmlValueType? HandledValueType => TargetType;
+
     protected sealed override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ValueType != TargetType)
