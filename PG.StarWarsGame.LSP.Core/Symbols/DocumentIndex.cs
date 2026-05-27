@@ -9,5 +9,6 @@ public sealed record DocumentIndex(
     string DocumentUri,
     int Version,
     ImmutableArray<GameSymbol> Symbols,
-    ImmutableArray<GameReference> References
+    ImmutableArray<GameReference> References,
+    ImmutableArray<string> RequireArgs = default
 );

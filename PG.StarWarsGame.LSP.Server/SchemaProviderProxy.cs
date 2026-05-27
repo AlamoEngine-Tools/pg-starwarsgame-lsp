@@ -18,12 +18,18 @@ internal sealed class SchemaProviderProxy : ISchemaProvider
 
     private ISchemaProvider _inner = SchemaIndex.EmptyProvider;
 
+    // Subscribers are stored here so they survive the _inner swap in Configure().
+    // The old forwarding pattern (add => _inner.SchemaRefreshed += value) silently
+    // subscribed to the empty placeholder, meaning events from the real provider
+    // (HTTP/local) were never delivered to the WorkspaceScanner.
+    private EventHandler? _schemaRefreshed;
+
     public Task ReadyAsync => _readyTcs.Task;
 
     public event EventHandler? SchemaRefreshed
     {
-        add => _inner.SchemaRefreshed += value;
-        remove => _inner.SchemaRefreshed -= value;
+        add => _schemaRefreshed += value;
+        remove => _schemaRefreshed -= value;
     }
 
     public XmlTagDefinition? GetTag(string tagName)
@@ -66,7 +72,9 @@ internal sealed class SchemaProviderProxy : ISchemaProvider
     public void Configure(ISchemaProvider inner)
     {
         _inner = inner;
-        // Chain: ready when both this proxy is configured AND the inner provider is ready.
+        // Forward SchemaRefreshed from the real provider to our stored delegates.
+        inner.SchemaRefreshed += (s, e) => _schemaRefreshed?.Invoke(s, e);
+        // Chain: ready when the inner provider is ready.
         _ = inner.ReadyAsync.ContinueWith(_ => _readyTcs.TrySetResult(),
             CancellationToken.None,
             TaskContinuationOptions.ExecuteSynchronously,

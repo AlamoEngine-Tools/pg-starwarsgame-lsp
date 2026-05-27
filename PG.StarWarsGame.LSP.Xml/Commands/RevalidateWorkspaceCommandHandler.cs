@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Commands;
 
 public sealed class RevalidateWorkspaceCommandHandler : ExecuteCommandHandlerBase
 {
-    public const string CommandName = "aet.revalidateWorkspace";
+    public const string CommandName = "aet-eaw-edit.lsp.revalidateWorkspace";
 
     private readonly IXmlDiagnosticsRevalidator _revalidator;
 

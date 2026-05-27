@@ -121,6 +121,38 @@ public sealed class LuaHoverHandlerTest
         Assert.Equal(25, result.Range.End.Character); // 19 + 6
     }
 
+    [Fact]
+    public async Task Handle_CursorOnXmlRef_MegArchiveOrigin_ReturnsPackagedHover()
+    {
+        const string targetId = "UNIT_VANILLA";
+        var reference = new GameReference(targetId, GameSymbolKind.XmlObject, "Unit", LuaUri, 0, 19, 12);
+        var archiveSym = new GameSymbol(targetId, GameSymbolKind.XmlObject, "Unit",
+            new MegArchiveOrigin("data.meg", "units.xml", 5, 0), null);
+
+        var docIndex = new DocumentIndex(LuaUri, 1, [], [reference]);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, docIndex),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(targetId, [archiveSym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT_VANILLA\")", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(HoverAt(0, 25), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.Contains("UNIT_VANILLA", content);
+        // Must mention the archive and explain the object is read-only.
+        Assert.Contains("data.meg", content, StringComparison.OrdinalIgnoreCase);
+        Assert.True(
+            content.Contains("read-only", StringComparison.OrdinalIgnoreCase) ||
+            content.Contains("packaged", StringComparison.OrdinalIgnoreCase) ||
+            content.Contains("archive", StringComparison.OrdinalIgnoreCase),
+            $"Hover must mention packaged/archive/read-only status. Got: {content}");
+    }
+
     // ── require hover ─────────────────────────────────────────────────────────
 
     [Fact]

@@ -13,9 +13,12 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
-public sealed class LspServerFixture : IAsyncLifetime
+public class LspServerFixture : IAsyncLifetime
 {
     private readonly TaskCompletionSource _scanStartedTcs =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private readonly TaskCompletionSource _scanCompleteTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private LanguageClient? _client;
@@ -32,19 +35,29 @@ public sealed class LspServerFixture : IAsyncLifetime
     /// </summary>
     public Task ScanStarted => _scanStartedTcs.Task;
 
+    /// <summary>
+    ///     Completes only when the server sends the <c>$/workspaceScanComplete</c> notification,
+    ///     meaning the full workspace index is populated. Use this instead of
+    ///     <see cref="ScanStarted" /> when tests depend on the complete index.
+    /// </summary>
+    public Task ScanCompleted => _scanCompleteTcs.Task;
+
     public async Task InitializeAsync()
     {
         TestDataDirectory = Path.Combine(
             Path.GetDirectoryName(typeof(LspServerFixture).Assembly.Location)!,
             "TestData");
 
-        var workspacePath = LspTestEnvironment.WorkspacePath ?? TestDataDirectory;
+        var workspacePath = ResolveWorkspacePath();
 
         if (LspTestEnvironment.ExternalServerPort is { } port)
             await InitializeExternalAsync(workspacePath, port);
         else
             await InitializeSpawnedAsync(workspacePath);
     }
+
+    protected virtual string ResolveWorkspacePath() =>
+        LspTestEnvironment.WorkspacePath ?? TestDataDirectory;
 
     public async Task DisposeAsync()
     {
@@ -182,7 +195,11 @@ public sealed class LspServerFixture : IAsyncLifetime
         };
         // Registered here (before From() returns) so the notification is never missed.
         // The typed overload fails to deserialize absent params; use the parameterless one.
-        options.OnNotification("$/workspaceScanComplete", () => _scanStartedTcs.TrySetResult());
+        options.OnNotification("$/workspaceScanComplete", () =>
+        {
+            _scanStartedTcs.TrySetResult();
+            _scanCompleteTcs.TrySetResult();
+        });
         // Route all incoming publishDiagnostics through the fixture so tests can await
         // them without fighting OmniSharp's dynamic-registration limitations.
         options.OnPublishDiagnostics(p =>

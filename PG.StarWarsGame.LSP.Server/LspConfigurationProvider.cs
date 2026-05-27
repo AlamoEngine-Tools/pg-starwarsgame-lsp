@@ -130,6 +130,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         return new LspConfiguration
         {
             GamePath = baseGamePath,
+            ExpansionPath = expansionGamePath,
             ModPaths = modPaths,
             XmlDirectories = xmlDirectories,
             Locale = locale ?? "en",
@@ -151,6 +152,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         return new LspConfiguration
         {
             GamePath = overlay.GamePath ?? file.GamePath,
+            ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             ModPaths = overlay.ModPaths.Count > 0 ? overlay.ModPaths : file.ModPaths,
             XmlDirectories = overlay.XmlDirectories.Count > 0 ? overlay.XmlDirectories : file.XmlDirectories,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,

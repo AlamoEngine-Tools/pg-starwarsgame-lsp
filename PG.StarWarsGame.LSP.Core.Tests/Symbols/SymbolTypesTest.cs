@@ -144,4 +144,23 @@ public sealed class SymbolTypesTest
         Assert.Empty(doc.Symbols);
         Assert.Empty(doc.References);
     }
+
+    [Fact]
+    public void DocumentIndex_RequireArgs_DefaultsToDefault()
+    {
+        var doc = new DocumentIndex("file:///a.lua", 1,
+            ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty);
+        Assert.True(doc.RequireArgs.IsDefault);
+    }
+
+    [Fact]
+    public void DocumentIndex_RequireArgs_CanBeSetExplicitly()
+    {
+        var doc = new DocumentIndex("file:///a.lua", 1,
+            ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            ImmutableArray.Create("PGStateMachine"));
+        Assert.Equal("PGStateMachine", doc.RequireArgs.Single());
+    }
 }

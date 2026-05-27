@@ -6,6 +6,7 @@ namespace PG.StarWarsGame.LSP.Core.Configuration;
 public record LspConfiguration
 {
     public string? GamePath { get; init; }
+    public string? ExpansionPath { get; init; }
     public IReadOnlyList<string> ModPaths { get; init; } = [];
     public string Locale { get; init; } = "en";
     public SchemaSourceConfig SchemaSource { get; init; } = new();

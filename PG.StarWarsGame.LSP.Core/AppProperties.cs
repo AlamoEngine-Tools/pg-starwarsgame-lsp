@@ -5,5 +5,5 @@ namespace PG.StarWarsGame.LSP.Core;
 
 public sealed class AppProperties
 {
-    public static string LspServerId = "PG.StarWarsGame.LSP";
+    public static string LspServerId = "aet.pg.swg.lsp";
 }

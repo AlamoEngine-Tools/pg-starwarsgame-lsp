@@ -50,7 +50,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileHelper fileHelper)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
-            fileTypeRegistry, fileHelper)
+            fileTypeRegistry, fileHelper, debounceMs: 100)
     {
     }
 
@@ -65,8 +65,9 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryFactProducer storyProducer,
         ILogger<XmlDiagnosticsPublisher> logger,
         IFileTypeRegistry fileTypeRegistry,
-        IFileHelper fileHelper)
-        : base(publish, indexService, workspaceHost)
+        IFileHelper fileHelper,
+        int debounceMs = 0)
+        : base(publish, indexService, workspaceHost, debounceMs)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;

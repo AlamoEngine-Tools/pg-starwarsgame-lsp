@@ -25,6 +25,14 @@ public static class LspTestEnvironment
         ExistingPath(Environment.GetEnvironmentVariable("LSP_WORKSPACE_PATH"))
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "foc") : null);
 
+    /// <summary>
+    ///     EaW workspace root.  Prefers <c>LSP_EAW_WORKSPACE_PATH</c> env var; falls back to
+    ///     <c>eaw/</c> inside the repository.  Returns <c>null</c> if neither exists.
+    /// </summary>
+    public static string? EawWorkspacePath =>
+        ExistingPath(Environment.GetEnvironmentVariable("LSP_EAW_WORKSPACE_PATH"))
+        ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "eaw") : null);
+
     public static string? GamePath =>
         Environment.GetEnvironmentVariable("LSP_GAME_PATH");
 

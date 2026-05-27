@@ -131,6 +131,28 @@ public sealed class LuaGameDocumentParserTest
     }
 
     [Fact]
+    public async Task ParseAsync_Symbol_Origin_ColumnPointsToFunctionName_NotKeyword()
+    {
+        // "function Foo()" — 'F' is at column 9 ("function " = 9 chars)
+        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        var origin = (FileOrigin)sym.Origin;
+        Assert.Equal(9, origin.Column); // after "function " prefix
+    }
+
+    [Fact]
+    public async Task ParseAsync_Symbol_Origin_Column_IndentedFunction()
+    {
+        // "  function Bar() end" — 'B' is at column 11 ("  function " = 11 chars)
+        var result = await Build().ParseAsync("file:///s.lua", "  function Bar() end", 1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        var origin = (FileOrigin)sym.Origin;
+        Assert.Equal(11, origin.Column); // after "  function " prefix
+    }
+
+    [Fact]
     public async Task ParseAsync_Sets_DocumentUri_And_Version()
     {
         var result = await Build().ParseAsync("file:///s.lua", "", 7, default);
@@ -184,14 +206,38 @@ public sealed class LuaGameDocumentParserTest
     }
 
     [Fact]
-    public async Task ParseAsync_UnknownFunction_EmitsNoReference()
+    public async Task ParseAsync_UnknownXmlApiFunction_EmitsLuaGlobalCallReference()
     {
+        // SomeRandomFunction is not in the EaW API schema, so no XML ref is emitted for its
+        // argument; instead, the callee itself is tracked as a LuaGlobal call reference so
+        // rename can locate all call sites via the index.
         var result = await Build().ParseAsync(
             "file:///s.lua",
             """SomeRandomFunction("UNIT_REBEL")""",
             1, default);
 
-        Assert.Empty(result.References);
+        var reference = Assert.Single(result.References);
+        Assert.Equal("SomeRandomFunction", reference.TargetId);
+        Assert.Equal(GameSymbolKind.LuaGlobal, reference.ExpectedKind);
+        Assert.Null(reference.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_FunctionCallCallee_EmitsLuaGlobalReference()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua",
+            "RunMission()",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("RunMission", reference.TargetId);
+        Assert.Equal(GameSymbolKind.LuaGlobal, reference.ExpectedKind);
+        Assert.Null(reference.ExpectedTypeName);
+        Assert.Equal("file:///s.lua", reference.DocumentUri);
+        Assert.Equal(0, reference.Line);
+        Assert.Equal(0, reference.Column);
+        Assert.Equal("RunMission".Length, reference.Length);
     }
 
     [Fact]
@@ -248,5 +294,53 @@ public sealed class LuaGameDocumentParserTest
         // Registry lookup is case-insensitive per design
         var reference = Assert.Single(result.References);
         Assert.Equal("UNIT_REBEL", reference.TargetId);
+    }
+
+    // ── RequireArgs ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_NoRequireCalls_RequireArgs_IsEmpty()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
+        Assert.False(result.RequireArgs.IsDefault);
+        Assert.Empty(result.RequireArgs);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SingleRequire_RequireArgs_ContainsRawArg()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua", """require("PGStateMachine")""", 1, default);
+        var arg = Assert.Single(result.RequireArgs);
+        Assert.Equal("PGStateMachine", arg);
+    }
+
+    [Fact]
+    public async Task ParseAsync_RelativeRequire_IsExcluded()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua", """require("./relative/path")""", 1, default);
+        Assert.Empty(result.RequireArgs);
+    }
+
+    [Fact]
+    public async Task ParseAsync_DynamicRequire_IsExcluded()
+    {
+        var result = await Build().ParseAsync(
+            "file:///s.lua", "require(someVariable)", 1, default);
+        Assert.Empty(result.RequireArgs);
+    }
+
+    [Fact]
+    public async Task ParseAsync_MultipleRequires_AllRawArgsStored()
+    {
+        const string text = """
+                            require("pgstatemachine")
+                            require("eawx-std/ModContentLoader")
+                            """;
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        Assert.Equal(2, result.RequireArgs.Length);
+        Assert.Equal("pgstatemachine", result.RequireArgs[0]);
+        Assert.Equal("eawx-std/ModContentLoader", result.RequireArgs[1]);
     }
 }

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -10,6 +11,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 public sealed class GameIndexService : IGameIndexService
 {
     private readonly IFileHelper _fileHelper;
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts = new();
     private readonly ILogger<GameIndexService> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private GameIndex _current = GameIndex.Empty;
@@ -40,8 +42,31 @@ public sealed class GameIndexService : IGameIndexService
         var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
         if (parser is null) return;
 
+        // Cancel any in-flight parse for this URI and register the new one.
+        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored.
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _inflightCts.AddOrUpdate(
+            uri,
+            addValueFactory: _ => cts,
+            updateValueFactory: (_, prior) => { prior.Cancel(); return cts; });
+
         // Parse outside the CAS loop — potentially slow, must not hold a lock.
-        var newDoc = await parser.ParseAsync(uri, text, version, ct);
+        DocumentIndex newDoc;
+        try
+        {
+            newDoc = await parser.ParseAsync(uri, text, version, cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Cancelled internally by a newer edit for the same URI — silently discard.
+            return;
+        }
+        finally
+        {
+            // Remove our slot only if it hasn't been replaced by a newer edit.
+            _inflightCts.TryRemove(new KeyValuePair<string, CancellationTokenSource>(uri, cts));
+            cts.Dispose();
+        }
 
         GameIndex snapshot, updated;
         do

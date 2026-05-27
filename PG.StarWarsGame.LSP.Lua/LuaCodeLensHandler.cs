@@ -11,28 +11,28 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
-namespace PG.StarWarsGame.LSP.Xml;
+namespace PG.StarWarsGame.LSP.Lua;
 
-public sealed class XmlCodeLensHandler : CodeLensHandlerBase
+public sealed class LuaCodeLensHandler : CodeLensHandlerBase
 {
-    private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
-    private readonly ILogger<XmlCodeLensHandler> _logger;
+    private readonly ILogger<LuaCodeLensHandler> _logger;
 
-    public XmlCodeLensHandler(IGameIndexService indexService, ILogger<XmlCodeLensHandler> logger,
-        IEaWXmlContext eaWXmlContext, IFileHelper fileHelper)
+    public LuaCodeLensHandler(
+        IGameIndexService indexService,
+        IFileHelper fileHelper,
+        ILogger<LuaCodeLensHandler> logger)
     {
         _indexService = indexService;
-        _logger = logger;
-        _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
+        _logger = logger;
     }
 
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
-        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+        if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<CodeLensContainer?>(null);
 
         var index = _indexService.Current;
@@ -42,25 +42,30 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
         var lenses = new List<CodeLens>();
         foreach (var symbol in docIndex.Symbols)
         {
-            if (symbol.Origin is not FileOrigin fo)
-                continue;
+            if (symbol.Kind != GameSymbolKind.LuaGlobal) continue;
+            if (symbol.Origin is not FileOrigin fo) continue;
 
-            var count = index.WorkspaceReferences.TryGetValue(symbol.Id, out var refs) ? refs.Length : 0;
+            var count = index.WorkspaceReferences.TryGetValue(symbol.Id, out var refs)
+                ? refs.Count(r => r.ExpectedKind == GameSymbolKind.LuaGlobal)
+                : 0;
+
             var title = count == 1 ? "1 reference" : $"{count} references";
             var range = new LspRange(new Position(fo.Line, 0), new Position(fo.Line, 0));
 
-            Command? command = null;
+            Command? command;
             if (count > 0)
             {
-                var locations = refs!.Select(r => new
-                {
-                    uri = r.DocumentUri,
-                    range = new
+                var locations = refs!
+                    .Where(r => r.ExpectedKind == GameSymbolKind.LuaGlobal)
+                    .Select(r => new
                     {
-                        start = new { line = r.Line, character = r.Column },
-                        end = new { line = r.Line, character = r.Column + r.Length }
-                    }
-                });
+                        uri = r.DocumentUri,
+                        range = new
+                        {
+                            start = new { line = r.Line, character = r.Column },
+                            end = new { line = r.Line, character = r.Column + r.Length }
+                        }
+                    });
 
                 command = new Command
                 {
@@ -80,7 +85,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
             }
 
             lenses.Add(new CodeLens { Range = range, Command = command });
-            _logger.LogDebug("CodeLens: {Id} → {Count} reference(s) at line {Line}", symbol.Id, count, fo.Line);
+            _logger.LogDebug("CodeLens (Lua): {Id} → {Count} reference(s) at line {Line}", symbol.Id, count, fo.Line);
         }
 
         return Task.FromResult<CodeLensContainer?>(new CodeLensContainer(lenses));
@@ -96,7 +101,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     {
         return new CodeLensRegistrationOptions
         {
-            DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
+            DocumentSelector = TextDocumentSelector.ForLanguage("lua"),
             ResolveProvider = false
         };
     }

@@ -1,0 +1,152 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using Loretta.CodeAnalysis.Lua;
+using Loretta.CodeAnalysis.Lua.Syntax;
+using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
+using OmniSharp.Extensions.LanguageServer.Protocol.Document;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Util;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+
+namespace PG.StarWarsGame.LSP.Lua;
+
+public sealed class LuaDefinitionHandler : DefinitionHandlerBase
+{
+    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
+
+    private readonly IFileHelper _fileHelper;
+    private readonly IGameIndexService _indexService;
+    private readonly ILogger<LuaDefinitionHandler> _logger;
+    private readonly IGameWorkspaceHost _workspaceHost;
+
+    public LuaDefinitionHandler(
+        IGameIndexService indexService,
+        IGameWorkspaceHost workspaceHost,
+        IFileHelper fileHelper,
+        ILogger<LuaDefinitionHandler> logger)
+    {
+        _indexService = indexService;
+        _workspaceHost = workspaceHost;
+        _fileHelper = fileHelper;
+        _logger = logger;
+    }
+
+    public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
+    {
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
+        var line = request.Position.Line;
+        var character = request.Position.Character;
+        var index = _indexService.Current;
+
+        // Path A: LuaGlobal symbol/reference via DocumentIndex.
+        if (index.Documents.TryGetValue(uri, out var docIndex))
+        {
+            var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
+            if (hit is not null)
+            {
+                var symbol = index.Resolve(hit.Value.Id);
+                if (symbol is null || symbol.Origin is not FileOrigin fo)
+                {
+                    _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin", hit.Value.Id);
+                    return Task.FromResult<LocationOrLocationLinks?>(null);
+                }
+
+                var location = new Location
+                {
+                    Uri = fo.Uri,
+                    Range = new LspRange(new Position(fo.Line, fo.Column ?? 0), new Position(fo.Line, fo.Column ?? 0))
+                };
+                _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
+                return Task.FromResult<LocationOrLocationLinks?>(
+                    new LocationOrLocationLinks(new LocationOrLocationLink(location)));
+            }
+        }
+
+        // Path B: require() argument — parse AST and resolve.
+        if (!_workspaceHost.TryGet(uri, out var doc))
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
+        var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);
+        var resolved = TryResolveRequireAtPosition(tree.GetRoot(), line, character, index, _fileHelper);
+        if (resolved is null)
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
+        var targetLocation = new Location
+        {
+            Uri = resolved,
+            Range = new LspRange(new Position(0, 0), new Position(0, 0))
+        };
+        _logger.LogDebug("Go-to-def (require): → {Uri}", resolved);
+        return Task.FromResult<LocationOrLocationLinks?>(
+            new LocationOrLocationLinks(new LocationOrLocationLink(targetLocation)));
+    }
+
+    private static string? TryResolveRequireAtPosition(
+        Loretta.CodeAnalysis.SyntaxNode root, int line, int character, GameIndex index, IFileHelper fileHelper)
+    {
+        foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
+        {
+            if (call.Expression is not IdentifierNameSyntax { Name: "require" }) continue;
+
+            string? requireArg = null;
+            if (call.Argument is StringFunctionArgumentSyntax strArg)
+                requireArg = strArg.Expression.Token.ValueText;
+            else if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
+                     exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
+                requireArg = lit.Token.ValueText;
+
+            if (requireArg is null) continue;
+
+            var span = GetArgSpan(call);
+            if (span is null) continue;
+
+            var (startLine, startChar, endLine, endChar) = span.Value;
+            if (line < startLine || line > endLine) continue;
+            if (line == startLine && character < startChar) continue;
+            if (line == endLine && character > endChar) continue;
+
+            if (LuaRequireResolver.IsRelative(requireArg))
+                return null;
+
+            return LuaRequireResolver.Resolve(requireArg, index.Documents.Keys, fileHelper);
+        }
+
+        return null;
+    }
+
+    private static (int StartLine, int StartChar, int EndLine, int EndChar)? GetArgSpan(
+        FunctionCallExpressionSyntax call)
+    {
+        if (call.Argument is StringFunctionArgumentSyntax strArg)
+        {
+            var s = strArg.Expression.Token.GetLocation().GetLineSpan();
+            return (s.StartLinePosition.Line, s.StartLinePosition.Character,
+                s.EndLinePosition.Line, s.EndLinePosition.Character);
+        }
+
+        if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
+            exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
+        {
+            var s = lit.Token.GetLocation().GetLineSpan();
+            return (s.StartLinePosition.Line, s.StartLinePosition.Character,
+                s.EndLinePosition.Line, s.EndLinePosition.Character);
+        }
+
+        return null;
+    }
+
+    protected override DefinitionRegistrationOptions CreateRegistrationOptions(
+        DefinitionCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new DefinitionRegistrationOptions { DocumentSelector = TextDocumentSelector.ForLanguage("lua") };
+    }
+}

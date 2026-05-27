@@ -1,10 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -287,5 +289,701 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
         Assert.Empty(result);
+    }
+
+    // ── transitive require (Bug A) ───────────────────────────────────────────
+
+    [Fact]
+    public void Analyze_TransitiveRequire_GlobalFromTransitiveDep_NoDiagnostic()
+    {
+        // A requires B (in text), B.RequireArgs = ["c"] (so B transitively requires C),
+        // C defines Foo → A calls Foo() → no warning.
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string text = """
+                            require("b")
+                            Foo()
+                            """;
+        var symFoo = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(uriC, 0, null), null);
+        var docB = new DocumentIndex(uriB, 1, [], [],
+            ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(uriC, 1, [symFoo], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, docB)
+                .Add(uriC, docC),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [symFoo])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_TransitiveRequire_GlobalFromUnreachableFile_EmitsWarning()
+    {
+        // A does NOT require B, but B requires C which defines Foo.
+        // A calls Foo() → still a warning (B not in A's require chain at all).
+        const string text = "Foo()";
+        var symFoo = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var docB = new DocumentIndex(LibUri, 1, [], [],
+            ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(OtherUri, 1, [symFoo], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, docB)
+                .Add(OtherUri, docC),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [symFoo])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Single(result);
+        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+            result[0].Severity);
+    }
+
+    [Fact]
+    public void Analyze_TransitiveRequire_Phase4_UsesDirectRequiresOnly()
+    {
+        // A requires B (direct). B requires C and exports no globals used by A.
+        // The unused-require hint should appear for B (A doesn't use B's exports),
+        // NOT be suppressed because B transitively depends on something else.
+        const string uriB = "file:///scripts/b.lua";
+        const string text = """require("b")""";
+        var symFoo = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(uriB, 0, null), null);
+        var docB = new DocumentIndex(uriB, 1, [symFoo], [],
+            ImmutableArray.Create("c"));           // B exports Foo, requires C
+        var docC = new DocumentIndex(OtherUri, 1, [], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, docB)
+                .Add(OtherUri, docC),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [symFoo])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        // Unused-require hint for require("b") since Foo is not called
+        var diag = Assert.Single(result);
+        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
+            diag.Severity);
+    }
+
+    // ── cyclic require detection (Feature C) ─────────────────────────────────
+
+    [Fact]
+    public void Analyze_DirectCycle_EmitsError()
+    {
+        // A requires B (in text), B.RequireArgs = ["a"] → B transitively requires A back → cycle.
+        const string uriA = "file:///scripts/a.lua";
+        const string uriB = "file:///scripts/b.lua";
+        const string text = """require("b")""";
+        var docB = new DocumentIndex(uriB, 1, [], [],
+            ImmutableArray.Create("a"));   // B requires "a" → resolves back to uriA
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(uriA, new DocumentIndex(uriA, 1, [], []))
+                .Add(uriB, docB),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper);
+
+        var errors = result.Where(d =>
+            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error).ToList();
+        Assert.Single(errors);
+        Assert.Contains("cyclic", errors[0].Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Analyze_IndirectCycle_EmitsError()
+    {
+        // A requires B (text), B.RequireArgs = ["c"], C.RequireArgs = ["a"] → A→B→C→A cycle.
+        const string uriA = "file:///scripts/a.lua";
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string text = """require("b")""";
+        var docB = new DocumentIndex(uriB, 1, [], [], ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(uriC, 1, [], [], ImmutableArray.Create("a"));
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(uriA, new DocumentIndex(uriA, 1, [], []))
+                .Add(uriB, docB)
+                .Add(uriC, docC),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper);
+
+        var errors = result.Where(d =>
+            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error).ToList();
+        Assert.Single(errors);
+    }
+
+    [Fact]
+    public void Analyze_NoCycle_NoCyclicError()
+    {
+        const string text = """require("b")""";
+        var docB = new DocumentIndex(LibUri, 1, [], [], ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(OtherUri, 1, [], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, docB)
+                .Add(OtherUri, docC),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.DoesNotContain(result, d =>
+            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error);
+    }
+
+    [Fact]
+    public void Analyze_UnresolvableRequire_NoCyclicError()
+    {
+        // Unresolvable require has resolvedUri = null; must not emit cyclic-require error.
+        const string text = """require("nonexistent")""";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], [])),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.DoesNotContain(result, d =>
+            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error);
+    }
+
+    // ── own-file / local-scope false positives (Bug B) ───────────────────────
+
+    [Fact]
+    public void Analyze_OwnFileGlobal_SameNameInOtherFile_NoWarning()
+    {
+        // Current file declares State_Init; another file also declares it.
+        // Calling State_Init in the current file must not warn.
+        const string text = """
+                            function State_Init() end
+                            State_Init()
+                            """;
+        var symCurrent = new GameSymbol("State_Init", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(CurrentUri, 0, null), null);
+        var symOther = new GameSymbol("State_Init", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var otherDoc = new DocumentIndex(OtherUri, 1, [symOther], []);
+        var currentDoc = new DocumentIndex(CurrentUri, 1, [symCurrent], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, currentDoc)
+                .Add(OtherUri, otherDoc),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("State_Init", [symCurrent, symOther])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_OwnFileGlobal_PassedAsValue_NoWarning()
+    {
+        // Passing a locally-declared function as a value (e.g. Define_State("x", State_Init))
+        // must not warn even when another workspace file also declares State_Init.
+        const string text = """
+                            function State_Init() end
+                            function Definitions()
+                                local _ = State_Init
+                            end
+                            """;
+        var symCurrent = new GameSymbol("State_Init", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(CurrentUri, 0, null), null);
+        var symOther = new GameSymbol("State_Init", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [symCurrent], []))
+                .Add(OtherUri, new DocumentIndex(OtherUri, 1, [symOther], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("State_Init", [symCurrent, symOther])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_LocalVariable_SameNameAsOtherFileGlobal_NoWarning()
+    {
+        const string text = """
+                            local counter = 0
+                            counter = counter + 1
+                            """;
+        var symOther = new GameSymbol("counter", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(OtherUri, new DocumentIndex(OtherUri, 1, [symOther], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("counter", [symOther])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_LocalFunction_SameNameAsOtherFileGlobal_NoWarning()
+    {
+        const string text = """
+                            local function Helper() end
+                            Helper()
+                            """;
+        var symOther = new GameSymbol("Helper", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(OtherUri, new DocumentIndex(OtherUri, 1, [symOther], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("Helper", [symOther])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_FunctionParameter_SameNameAsOtherFileGlobal_NoWarning()
+    {
+        const string text = """
+                            function Foo(counter)
+                                return counter + 1
+                            end
+                            """;
+        var symOther = new GameSymbol("counter", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(OtherUri, new DocumentIndex(OtherUri, 1, [symOther], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("counter", [symOther])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    // ── global override warning (Feature D) ─────────────────────────────────
+
+    [Fact]
+    public void Analyze_DirectlyRequiredFile_GlobalRedeclared_EmitsOverrideWarning()
+    {
+        const string text = """
+                            require("mylib")
+                            function Foo() end
+                            """;
+        var sym = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, new DocumentIndex(LibUri, 1, [sym], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var overrideWarnings = result.Where(d =>
+            d.Severity == DiagnosticSeverity.Warning &&
+            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase)).ToList();
+        var warning = Assert.Single(overrideWarnings);
+        Assert.Contains("Foo", warning.Message);
+    }
+
+    [Fact]
+    public void Analyze_TransitivelyRequiredFile_GlobalRedeclared_EmitsOverrideWarning()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string text = """
+                            require("b")
+                            function Foo() end
+                            """;
+        var sym = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(uriC, 0, null), null);
+        var docB = new DocumentIndex(uriB, 1, [], [], ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(uriC, 1, [sym], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, docB)
+                .Add(uriC, docC),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var overrideWarnings = result.Where(d =>
+            d.Severity == DiagnosticSeverity.Warning &&
+            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Single(overrideWarnings);
+    }
+
+    [Fact]
+    public void Analyze_OverrideAnnotation_SuppressesOverrideWarning()
+    {
+        const string text = """
+                            require("mylib")
+                            ---@Override
+                            function Foo() end
+                            """;
+        var sym = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, new DocumentIndex(LibUri, 1, [sym], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        Assert.DoesNotContain(result, d =>
+            d.Severity == DiagnosticSeverity.Warning &&
+            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Analyze_DeclaredGlobal_NotInRequiredFile_NoOverrideWarning()
+    {
+        const string text = """
+                            require("mylib")
+                            function Foo() end
+                            """;
+        var sym = new GameSymbol("Bar", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, new DocumentIndex(LibUri, 1, [sym], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Bar", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        Assert.DoesNotContain(result, d =>
+            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Analyze_OverrideWarning_RangeCoversNameToken()
+    {
+        // Line 0: require("mylib")
+        // Line 1: function Foo() end  ← Foo starts at col 9
+        const string text = """
+                            require("mylib")
+                            function Foo() end
+                            """;
+        var sym = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, new DocumentIndex(LibUri, 1, [sym], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("Foo", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var warning = result.Single(d =>
+            d.Severity == DiagnosticSeverity.Warning &&
+            d.Message.Contains("overrides", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(1, warning.Range.Start.Line);
+        Assert.Equal(9, warning.Range.Start.Character); // after "function "
+    }
+
+    // ── redundant require (Feature E) ───────────────────────────────────────
+
+    [Fact]
+    public void Analyze_RequiredFile_AlreadyTransitivelyRequired_EmitsRedundantWarning()
+    {
+        // A requires both B and C; B transitively requires C → require("c") is redundant.
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string text = """
+                            require("b")
+                            require("c")
+                            """;
+        var docB = new DocumentIndex(uriB, 1, [], [], ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(uriC, 1, [], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, docB)
+                .Add(uriC, docC),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var redundant = result.Where(d =>
+            d.Severity == DiagnosticSeverity.Warning &&
+            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Single(redundant);
+        Assert.Contains("\"c\"", redundant[0].Message);
+    }
+
+    [Fact]
+    public void Analyze_RequiredFiles_NoTransitiveOverlap_NoRedundantWarning()
+    {
+        // A requires B and C; neither requires the other → no redundant.
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string text = """
+                            require("b")
+                            require("c")
+                            """;
+        var docB = new DocumentIndex(uriB, 1, [], []);
+        var docC = new DocumentIndex(uriC, 1, [], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, docB)
+                .Add(uriC, docC),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        Assert.DoesNotContain(result, d =>
+            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Analyze_SingleRequire_NoRedundantWarning()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string text = """require("b")""";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], [])),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        Assert.DoesNotContain(result, d =>
+            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Analyze_RedundantRequire_MessageMentionsCoveringModule()
+    {
+        // A requires PGStateMachine and PGBase; PGStateMachine.RequireArgs=["pgbase"].
+        const string uriSm = "file:///scripts/pgstatemachine.lua";
+        const string uriBase = "file:///scripts/pgbase.lua";
+        const string text = """
+                            require("PGStateMachine")
+                            require("PGBase")
+                            """;
+        var docSm = new DocumentIndex(uriSm, 1, [], [], ImmutableArray.Create("PGBase"));
+        var docBase = new DocumentIndex(uriBase, 1, [], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriSm, docSm)
+                .Add(uriBase, docBase),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var redundant = result.Single(d =>
+            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains("PGBase", redundant.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("PGStateMachine", redundant.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Analyze_DeepTransitiveRedundant_EmitsWarning()
+    {
+        // A requires B and D; B→C→D (deep chain) → require("d") is redundant.
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string uriD = "file:///scripts/d.lua";
+        const string text = """
+                            require("b")
+                            require("d")
+                            """;
+        var docB = new DocumentIndex(uriB, 1, [], [], ImmutableArray.Create("c"));
+        var docC = new DocumentIndex(uriC, 1, [], [], ImmutableArray.Create("d"));
+        var docD = new DocumentIndex(uriD, 1, [], []);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, docB)
+                .Add(uriC, docC)
+                .Add(uriD, docD),
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var redundant = result.Where(d =>
+            d.Message.Contains("redundant", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Single(redundant);
+        Assert.Contains("\"d\"", redundant[0].Message);
+    }
+
+    // ── duplicate require (Phase 8) ───────────────────────────────────────────
+
+    [Fact]
+    public void Analyze_SameRequireTwice_EmitsDuplicateWarningOnSecond()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string text = "require(\"b\")\nrequire(\"b\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Single(dups);
+        Assert.Equal(DiagnosticSeverity.Warning, dups[0].Severity);
+        Assert.Equal(1, dups[0].Range.Start.Line); // second require is on line 1
+    }
+
+    [Fact]
+    public void Analyze_SameRequireThreeTimes_EmitsTwoDuplicateWarnings()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string text = "require(\"b\")\nrequire(\"b\")\nrequire(\"b\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Equal(2, dups.Count);
+    }
+
+    [Fact]
+    public void Analyze_SingleRequire_NoDuplicateWarning()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string text = "require(\"b\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        Assert.DoesNotContain(result, d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Analyze_DifferentRequires_NoDuplicateWarning()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string uriC = "file:///scripts/c.lua";
+        const string text = "require(\"b\")\nrequire(\"c\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
+                .Add(uriC, new DocumentIndex(uriC, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        Assert.DoesNotContain(result, d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Analyze_UnresolvableRequireDuplicated_EmitsDuplicateWarning()
+    {
+        // Even when the module cannot be resolved, two identical require calls are still duplicates.
+        const string text = "require(\"unknown_lib\")\nrequire(\"unknown_lib\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var dups = result.Where(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase)).ToList();
+        Assert.Single(dups);
+    }
+
+    [Fact]
+    public void Analyze_DuplicateRequire_DiagnosticCodeIsDuplicateRequire()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string text = "require(\"b\")\nrequire(\"b\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        Assert.True(dup.Code?.IsString == true);
+        Assert.Equal(LuaDiagnosticCodes.DuplicateRequire, dup.Code?.String);
+    }
+
+    [Fact]
+    public void Analyze_DuplicateRequire_MessageMentionsOriginalLineNumber()
+    {
+        const string uriB = "file:///scripts/b.lua";
+        const string text = "require(\"b\")\nrequire(\"b\")";
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        // Original is on line 0 (0-indexed) = line 1 for human display.
+        Assert.Contains("line 1", dup.Message, StringComparison.OrdinalIgnoreCase);
     }
 }

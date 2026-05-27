@@ -88,12 +88,24 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(reference.Line, reference.Column),
                 new Position(reference.Line, reference.Column + reference.Length));
 
+            string markdown;
+            if (sym?.Origin is MegArchiveOrigin meg)
+            {
+                var archiveName = Path.GetFileName(meg.ArchivePath);
+                markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*\n\n" +
+                           $"*Packaged in* `{archiveName}` — this object is read-only and cannot be renamed or navigated to.";
+            }
+            else
+            {
+                markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*";
+            }
+
             return new Hover
             {
                 Contents = new MarkedStringsOrMarkupContent(new MarkupContent
                 {
                     Kind = MarkupKind.Markdown,
-                    Value = $"### `{typeName}` *`\"{reference.TargetId}\"`*"
+                    Value = markdown
                 }),
                 Range = range
             };

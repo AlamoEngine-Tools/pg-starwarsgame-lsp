@@ -28,12 +28,13 @@ public sealed class DiagnosticsPublisherBaseTest
     private static (ConcretePublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeIndexService indexService,
-        FakeWorkspaceHost workspaceHost) Build(string extension = ".xml")
+        FakeWorkspaceHost workspaceHost) Build(string extension = ".xml", int debounceMs = 0)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeIndexService();
         var workspaceHost = new FakeWorkspaceHost();
-        var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, extension);
+        var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, extension,
+            debounceMs);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -95,6 +96,37 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Equal(countAfterFirst + 1, published.Count);
     }
 
+    // ── debounce tests ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task OnIndexChanged_ManyRapidChanges_BatchesToSinglePublish()
+    {
+        var (_, published, indexService, workspaceHost) = Build(debounceMs: 50);
+        workspaceHost.Add("file:///a.xml", "content");
+
+        for (var i = 0; i < 10; i++)
+            indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        await Task.Delay(250);
+
+        Assert.Equal(1, published.Count);
+    }
+
+    [Fact]
+    public async Task OnIndexChanged_SingleChange_NotPublishedImmediately_ThenPublishedAfterDebounce()
+    {
+        var (_, published, indexService, workspaceHost) = Build(debounceMs: 50);
+        workspaceHost.Add("file:///a.xml", "content");
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.Empty(published); // not yet — still within debounce window
+
+        await Task.Delay(250);
+
+        Assert.Single(published); // published after debounce
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class ConcretePublisher : DiagnosticsPublisherBase
@@ -103,8 +135,9 @@ public sealed class DiagnosticsPublisherBaseTest
             Action<PublishDiagnosticsParams> publish,
             IGameIndexService indexService,
             IGameWorkspaceHost workspaceHost,
-            string extension)
-            : base(publish, indexService, workspaceHost)
+            string extension,
+            int debounceMs = 0)
+            : base(publish, indexService, workspaceHost, debounceMs)
         {
             FileExtension = extension;
         }

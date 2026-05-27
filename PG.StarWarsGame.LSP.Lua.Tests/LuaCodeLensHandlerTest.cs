@@ -9,17 +9,15 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
-namespace PG.StarWarsGame.LSP.Xml.Tests;
+namespace PG.StarWarsGame.LSP.Lua.Tests;
 
-public sealed class XmlCodeLensHandlerTest
+public sealed class LuaCodeLensHandlerTest
 {
-    private const string TestUri = "file:///test.xml";
-    private const string OtherUri = "file:///other.xml";
+    private const string LuaUri = "file:///script.lua";
+    private const string OtherUri = "file:///other.lua";
 
-    private static CodeLensParams ForDoc(string uri = TestUri)
+    private static CodeLensParams ForDoc(string uri = LuaUri)
     {
         return new CodeLensParams
         {
@@ -27,26 +25,27 @@ public sealed class XmlCodeLensHandlerTest
         };
     }
 
-    private static GameSymbol SymbolAt(string id, string uri, int line)
+    private static GameSymbol GlobalAt(string id, string uri, int line)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri, line, null), null);
+        return new GameSymbol(id, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, line, 0), null);
     }
 
-    private static GameSymbol BaselineSymbol(string id)
+    private static GameReference MakeRef(string id, string docUri, int line)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit",
-            new MegArchiveOrigin("data.meg", "units.xml", null, null), null);
+        return new GameReference(id, GameSymbolKind.LuaGlobal, null, docUri, line, 0, id.Length);
     }
 
-    private static GameReference MakeRef(string id, string docUri, int line, int col, int len)
+    private static LuaCodeLensHandler BuildHandler(GameIndex index)
     {
-        return new GameReference(id, GameSymbolKind.XmlObject, "Unit", docUri, line, col, len);
+        return new LuaCodeLensHandler(
+            new FakeIndexService { Current = index },
+            new FileHelper(new MockFileSystem()),
+            NullLogger<LuaCodeLensHandler>.Instance);
     }
 
     private static GameIndex BuildIndex(
         DocumentIndex? doc = null,
-        ImmutableDictionary<string, ImmutableArray<GameReference>>? allRefs = null,
-        ImmutableDictionary<string, ImmutableArray<GameSymbol>>? allDefs = null)
+        ImmutableDictionary<string, ImmutableArray<GameReference>>? allRefs = null)
     {
         var docs = ImmutableDictionary<string, DocumentIndex>.Empty;
         if (doc is not null)
@@ -55,20 +54,19 @@ public sealed class XmlCodeLensHandlerTest
         return new GameIndex(
             BaselineIndex.Empty,
             docs,
-            allDefs ?? ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             allRefs ?? ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
-    private static XmlCodeLensHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
-        IFileHelper? fileHelper = null)
-    {
-        var svc = new FakeIndexService { Current = index };
-        return new XmlCodeLensHandler(svc, NullLogger<XmlCodeLensHandler>.Instance,
-            ctx ?? new AllowAllEaWContext(),
-            fileHelper ?? new FileHelper(new MockFileSystem()));
-    }
+    // ── gating ────────────────────────────────────────────────────────────────
 
-    // ── null / miss cases ─────────────────────────────────────────────────────
+    [Fact]
+    public async Task Handle_NonLuaFile_ReturnsNull()
+    {
+        var handler = BuildHandler(GameIndex.Empty);
+        var result = await handler.Handle(ForDoc("file:///test.xml"), CancellationToken.None);
+        Assert.Null(result);
+    }
 
     [Fact]
     public async Task Handle_NoDocumentInIndex_ReturnsEmptyContainer()
@@ -79,21 +77,13 @@ public sealed class XmlCodeLensHandlerTest
         Assert.Empty(result!);
     }
 
-    [Fact]
-    public async Task Handle_NonEaWFile_ReturnsNull()
-    {
-        var handler = BuildHandler(GameIndex.Empty, new DenyAllEaWContext());
-        var result = await handler.Handle(ForDoc(), CancellationToken.None);
-        Assert.Null(result);
-    }
-
     // ── symbol iteration ──────────────────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_DocumentWithSymbolAndZeroRefs_ReturnsLensWithZeroCount()
+    public async Task Handle_GlobalWithZeroReferences_ReturnsLensWithZeroCount()
     {
-        var sym = SymbolAt("UNIT_A", TestUri, 3);
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = GlobalAt("MyFunc", LuaUri, 3);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var handler = BuildHandler(BuildIndex(doc));
 
@@ -105,32 +95,31 @@ public sealed class XmlCodeLensHandlerTest
     }
 
     [Fact]
-    public async Task Handle_DocumentWithSymbolAndThreeRefs_ReturnsLensWithCountThree()
+    public async Task Handle_GlobalWithReferences_ReturnsLensWithCount()
     {
-        var sym = SymbolAt("UNIT_A", TestUri, 1);
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = GlobalAt("MyFunc", LuaUri, 1);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
-            "UNIT_A", ImmutableArray.Create(
-                MakeRef("UNIT_A", OtherUri, 0, 4, 6),
-                MakeRef("UNIT_A", OtherUri, 2, 4, 6),
-                MakeRef("UNIT_A", OtherUri, 4, 4, 6)));
+            "MyFunc", ImmutableArray.Create(
+                MakeRef("MyFunc", OtherUri, 0),
+                MakeRef("MyFunc", OtherUri, 2)));
         var handler = BuildHandler(BuildIndex(doc, refs));
 
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
 
         var lens = Assert.Single(result!);
-        Assert.Contains("3", lens.Command!.Title);
+        Assert.Contains("2", lens.Command!.Title);
     }
 
     [Fact]
-    public async Task Handle_MultipleSymbols_ReturnsOneLensPerSymbol()
+    public async Task Handle_MultipleGlobals_ReturnsOneLensPerGlobal()
     {
-        var doc = new DocumentIndex(TestUri, 1,
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(
-                SymbolAt("UNIT_A", TestUri, 1),
-                SymbolAt("UNIT_B", TestUri, 5),
-                SymbolAt("UNIT_C", TestUri, 9)),
+                GlobalAt("FuncA", LuaUri, 1),
+                GlobalAt("FuncB", LuaUri, 5),
+                GlobalAt("FuncC", LuaUri, 9)),
             ImmutableArray<GameReference>.Empty);
         var handler = BuildHandler(BuildIndex(doc));
 
@@ -142,8 +131,8 @@ public sealed class XmlCodeLensHandlerTest
     [Fact]
     public async Task Handle_LensRange_PlacedAtDefinitionLine()
     {
-        var sym = SymbolAt("UNIT_A", TestUri, 7);
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = GlobalAt("MyFunc", LuaUri, 7);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var handler = BuildHandler(BuildIndex(doc));
 
@@ -155,13 +144,28 @@ public sealed class XmlCodeLensHandlerTest
         Assert.Equal(7, lens.Range.End.Line);
     }
 
-    // ── FileOrigin guard ──────────────────────────────────────────────────────
+    // ── non-FileOrigin symbols skipped ────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_MegArchiveOriginSymbol_NoLensEmitted()
+    public async Task Handle_SymbolWithNonFileOrigin_NoLensEmitted()
     {
-        var sym = BaselineSymbol("UNIT_BASE");
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = new GameSymbol("MyFunc", GameSymbolKind.LuaGlobal, null, new UnknownOrigin("test"), null);
+        var doc = new DocumentIndex(LuaUri, 1,
+            ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
+        var handler = BuildHandler(BuildIndex(doc));
+
+        var result = await handler.Handle(ForDoc(), CancellationToken.None);
+
+        Assert.Empty(result!);
+    }
+
+    [Fact]
+    public async Task Handle_XmlObjectSymbolInLuaDoc_NoLensEmitted()
+    {
+        // XmlObject symbols must not produce Lua code lenses
+        var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
+            new FileOrigin(LuaUri, 2, 0), null);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var handler = BuildHandler(BuildIndex(doc));
 
@@ -175,11 +179,11 @@ public sealed class XmlCodeLensHandlerTest
     [Fact]
     public async Task Handle_SingularCount_TitleContainsSingularWord()
     {
-        var sym = SymbolAt("UNIT_A", TestUri, 0);
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = GlobalAt("MyFunc", LuaUri, 0);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
-            "UNIT_A", ImmutableArray.Create(MakeRef("UNIT_A", OtherUri, 0, 0, 6)));
+            "MyFunc", ImmutableArray.Create(MakeRef("MyFunc", OtherUri, 0)));
         var handler = BuildHandler(BuildIndex(doc, refs));
 
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
@@ -191,13 +195,13 @@ public sealed class XmlCodeLensHandlerTest
     [Fact]
     public async Task Handle_PluralCount_TitleContainsPluralWord()
     {
-        var sym = SymbolAt("UNIT_A", TestUri, 0);
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = GlobalAt("MyFunc", LuaUri, 0);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
-            "UNIT_A", ImmutableArray.Create(
-                MakeRef("UNIT_A", OtherUri, 0, 0, 6),
-                MakeRef("UNIT_A", OtherUri, 1, 0, 6)));
+            "MyFunc", ImmutableArray.Create(
+                MakeRef("MyFunc", OtherUri, 0),
+                MakeRef("MyFunc", OtherUri, 1)));
         var handler = BuildHandler(BuildIndex(doc, refs));
 
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
@@ -211,11 +215,11 @@ public sealed class XmlCodeLensHandlerTest
     [Fact]
     public async Task Handle_NonZeroCount_CommandIsAttached()
     {
-        var sym = SymbolAt("UNIT_A", TestUri, 0);
-        var doc = new DocumentIndex(TestUri, 1,
+        var sym = GlobalAt("MyFunc", LuaUri, 0);
+        var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
         var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
-            "UNIT_A", ImmutableArray.Create(MakeRef("UNIT_A", OtherUri, 0, 0, 6)));
+            "MyFunc", ImmutableArray.Create(MakeRef("MyFunc", OtherUri, 0)));
         var handler = BuildHandler(BuildIndex(doc, refs));
 
         var result = await handler.Handle(ForDoc(), CancellationToken.None);
@@ -226,32 +230,17 @@ public sealed class XmlCodeLensHandlerTest
         Assert.NotNull(lens.Command.Arguments);
     }
 
-    // ── URI normalization ─────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task Handle_MixedCaseUri_NormalizesBeforeIndexLookup()
-    {
-        const string lowercaseUri = "file:///d:/units.xml";
-        const string mixedCaseUri = "file:///D:/units.xml";
-
-        var sym = SymbolAt("UNIT_A", lowercaseUri, 0);
-        var doc = new DocumentIndex(lowercaseUri, 1,
-            ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
-        var handler = BuildHandler(BuildIndex(doc));
-
-        var result = await handler.Handle(ForDoc(mixedCaseUri), CancellationToken.None);
-
-        Assert.NotNull(result);
-        Assert.Single(result!);
-    }
-
     // ── resolve passthrough ───────────────────────────────────────────────────
 
     [Fact]
     public async Task Resolve_ReturnsLensUnchanged()
     {
         var handler = BuildHandler(GameIndex.Empty);
-        var lens = new CodeLens { Range = new LspRange(new Position(0, 0), new Position(0, 0)) };
+        var lens = new CodeLens
+        {
+            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                new Position(0, 0), new Position(0, 0))
+        };
 
         var result = await handler.Handle(lens, CancellationToken.None);
 
@@ -265,31 +254,18 @@ public sealed class XmlCodeLensHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
+            Task.CompletedTask;
 
-        public void RemoveDocument(string uri)
-        {
-        }
+        public void RemoveDocument(string uri) { }
+        public void ApplyBaseline(BaselineIndex baseline) { }
 
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return NullDisposable.Instance;
-        }
+        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
+            public void Dispose() { }
         }
     }
 }

@@ -372,6 +372,73 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("UNIT_B", reference.TargetId);
     }
 
+    // ── EaW real XML format ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_EaW_XmlDeclaration_And_Tab_IndentedElement_CorrectIdAndColumn()
+    {
+        // Mirrors the actual EaW XML format: <?xml?> header, tab-indented elements.
+        // Verifies that HAP attribute parsing and column computation are both correct.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("spaceunits.xml", ["SpaceUnit"]);
+
+        const string xml = "<?xml version=\"1.0\"?>\n<GameObjectFiles>\n\t<SpaceUnit Name=\"Broadside_Class_Cruiser\">\n\t\t<Text_ID>TEST</Text_ID>\n\t</SpaceUnit>\n</GameObjectFiles>";
+
+        var result = await Build(schema, registry).ParseAsync(
+            "file:///spaceunits.xml", xml, 1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Broadside_Class_Cruiser", sym.Id);          // ID must not include ">
+        var origin = Assert.IsType<FileOrigin>(sym.Origin);
+        // Line 2 (0-based): "\t<SpaceUnit Name=\"Broadside_Class_Cruiser\">"
+        // \t(1) + <(1) + SpaceUnit(9) + space(1) + Name(4) + =(1) + "(1) = 18 → value at col 18
+        Assert.Equal(2, origin.Line);
+        Assert.Equal(18, origin.Column);
+    }
+
+    // ── symbol column in FileOrigin ──────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_Symbol_FileOrigin_Column_IsNameAttributeValueStart()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("ships.xml", ["SpaceUnit"]);
+
+        // Line 1 (0-based): "<SpaceUnit Name="SHIP_A">..." — value "SHIP_A" starts at col 17
+        // "<SpaceUnit Name=\"" = 17 chars (0-16), so value starts at col 17
+        var result = await Build(schema, registry).ParseAsync(
+            "file:///ships.xml",
+            "<GameObjectFiles>\n<SpaceUnit Name=\"SHIP_A\"><Hp>100</Hp></SpaceUnit>\n</GameObjectFiles>",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        var origin = Assert.IsType<FileOrigin>(sym.Origin);
+        Assert.Equal(17, origin.Column);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Symbol_FileOrigin_Column_WithLeadingWhitespace()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("ships.xml", ["SpaceUnit"]);
+
+        // Line 1 (0-based): "    <SpaceUnit Name="SHIP_B">..." — 4-space indent → value at col 21
+        var result = await Build(schema, registry).ParseAsync(
+            "file:///ships.xml",
+            "<GameObjectFiles>\n    <SpaceUnit Name=\"SHIP_B\"><Hp>50</Hp></SpaceUnit>\n</GameObjectFiles>",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        var origin = Assert.IsType<FileOrigin>(sym.Origin);
+        Assert.Equal(21, origin.Column);
+    }
+
     // ── no-registry-no-symbols ──────────────────────────────────────────────
 
     [Fact]

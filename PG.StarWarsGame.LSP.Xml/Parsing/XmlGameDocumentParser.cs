@@ -40,7 +40,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         doc.LoadHtml(text);
 
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
-        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, registeredTypes, ct);
+        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, text, registeredTypes, ct);
 
         var references = CollectReferences(doc, canonicalUri, text, ct);
 
@@ -51,7 +51,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,
-        ImmutableArray<string> registeredTypes, CancellationToken ct)
+        string text, ImmutableArray<string> registeredTypes, CancellationToken ct)
     {
         var typeDef = registeredTypes
             .Select(t => _schema.GetObjectType(t))
@@ -59,6 +59,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
         if (typeDef?.NameTag is null) return [];
 
+        var lines = text.Split('\n');
         var symbols = new List<GameSymbol>();
         var rootContainer = doc.DocumentNode.ChildNodes
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
@@ -72,11 +73,28 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
                     typeDef.TypeName, node.Line);
             else
+            {
+                var col = FindNameAttributeValueColumn(lines, node.Line - 1, typeDef.NameTag, id);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
-                    new FileOrigin(documentUri, node.Line - 1, null), null));
+                    new FileOrigin(documentUri, node.Line - 1, col), null));
+            }
         }
 
         return symbols;
+    }
+
+    private static int? FindNameAttributeValueColumn(string[] lines, int lineIndex, string nameTag, string value)
+    {
+        if (lineIndex < 0 || lineIndex >= lines.Length) return null;
+        var lineText = lines[lineIndex].TrimEnd('\r');
+        foreach (var quote in new[] { '"', '\'' })
+        {
+            var pattern = $"{nameTag}={quote}{value}{quote}";
+            var idx = lineText.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0)
+                return idx + nameTag.Length + 2; // skip nameTag + '=' + opening quote
+        }
+        return null;
     }
 
     private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, string text,

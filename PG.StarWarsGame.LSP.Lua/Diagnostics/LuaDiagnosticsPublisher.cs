@@ -40,7 +40,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger)
         : this(p => server.TextDocument.PublishDiagnostics(p),
-            indexService, workspaceHost, fileHelper, schemaProvider, logger)
+            indexService, workspaceHost, fileHelper, schemaProvider, logger, debounceMs: 100)
     {
     }
 
@@ -50,8 +50,9 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
-        ILogger<LuaDiagnosticsPublisher> logger)
-        : base(publish, indexService, workspaceHost)
+        ILogger<LuaDiagnosticsPublisher> logger,
+        int debounceMs = 0)
+        : base(publish, indexService, workspaceHost, debounceMs)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;

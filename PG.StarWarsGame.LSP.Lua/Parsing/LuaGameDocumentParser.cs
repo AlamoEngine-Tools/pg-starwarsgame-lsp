@@ -8,6 +8,7 @@ using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Parsing;
@@ -44,11 +45,13 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
 
         var symbols = CollectSymbols(root, canonicalUri);
         var references = CollectReferences(root, canonicalUri, tree);
+        var requireArgs = CollectRequireArgs(root);
 
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,
             symbols.ToImmutableArray(),
-            references.ToImmutableArray()));
+            references.ToImmutableArray(),
+            requireArgs));
     }
 
     private List<GameSymbol> CollectSymbols(SyntaxNode root, string documentUri)
@@ -69,7 +72,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             if (string.IsNullOrEmpty(id))
                 continue;
 
-            var position = funcDecl.GetLocation().GetLineSpan().StartLinePosition;
+            var position = simpleName.Name.GetLocation().GetLineSpan().StartLinePosition;
             symbols.Add(new GameSymbol(
                 id,
                 GameSymbolKind.LuaGlobal,
@@ -96,26 +99,46 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
                 continue;
 
             var functionName = callee.Name;
-            var entries = _schemaProvider.GetXmlRefs(functionName);
-            if (entries.Count == 0)
+
+            // require() is tracked separately in CollectRequireArgs.
+            if (string.Equals(functionName, "require", StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            foreach (var entry in entries)
+            var entries = _schemaProvider.GetXmlRefs(functionName);
+            if (entries.Count > 0)
             {
-                if (TryExtractStringArgument(call, entry.ParamIndex) is not { } value)
-                    continue;
+                // Known EaW API function — emit XML object refs for the relevant arguments.
+                foreach (var entry in entries)
+                {
+                    if (TryExtractStringArgument(call, entry.ParamIndex) is not { } value)
+                        continue;
 
-                if (TryGetArgumentLocation(call, entry.ParamIndex, tree) is not { } loc)
-                    continue;
+                    if (TryGetArgumentLocation(call, entry.ParamIndex, tree) is not { } loc)
+                        continue;
 
+                    references.Add(new GameReference(
+                        value,
+                        GameSymbolKind.XmlObject,
+                        entry.ExpectedTypeName,
+                        documentUri,
+                        loc.Line,
+                        loc.Column,
+                        value.Length));
+                }
+            }
+            else
+            {
+                // User-defined or unknown function — track the call site as a LuaGlobal
+                // reference so rename can locate all callers via the index (O(1) lookup).
+                var calleeSpan = callee.GetLocation().GetLineSpan().StartLinePosition;
                 references.Add(new GameReference(
-                    value,
-                    GameSymbolKind.XmlObject,
-                    entry.ExpectedTypeName,
+                    functionName,
+                    GameSymbolKind.LuaGlobal,
+                    null,
                     documentUri,
-                    loc.Line,
-                    loc.Column,
-                    value.Length));
+                    calleeSpan.Line,
+                    calleeSpan.Character,
+                    functionName.Length));
             }
         }
 
@@ -175,5 +198,30 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         return (
             lineSpan.StartLinePosition.Line,
             lineSpan.StartLinePosition.Character + 1); // +1 to skip opening quote
+    }
+
+    private static ImmutableArray<string> CollectRequireArgs(SyntaxNode root)
+    {
+        var builder = ImmutableArray.CreateBuilder<string>();
+        foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
+        {
+            if (call.Expression is not IdentifierNameSyntax { Name: "require" }) continue;
+            var arg = ExtractRequireStringArg(call);
+            if (arg is null || LuaRequireResolver.IsRelative(arg)) continue;
+            builder.Add(arg);
+        }
+        return builder.ToImmutable();
+    }
+
+    private static string? ExtractRequireStringArg(FunctionCallExpressionSyntax call)
+    {
+        if (call.Argument is StringFunctionArgumentSyntax strArg)
+            return strArg.Expression.Token.ValueText;
+
+        if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
+            exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
+            return lit.Token.ValueText;
+
+        return null;
     }
 }

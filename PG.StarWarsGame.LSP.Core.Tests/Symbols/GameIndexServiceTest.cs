@@ -398,6 +398,68 @@ public sealed class GameIndexServiceTest
             svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, cts.Token));
     }
 
+    [Fact]
+    public async Task UpdateDocumentAsync_SecondEditForSameUri_CancelsInflightFirstParse()
+    {
+        using var firstParseStarted = new SemaphoreSlim(0, 1);
+        var firstParseCancelled = false;
+
+        var svc = Build(new DelegateParser(async (uri, _, version, ct) =>
+        {
+            if (version == 1)
+            {
+                firstParseStarted.Release();
+                try { await Task.Delay(Timeout.Infinite, ct); }
+                catch (OperationCanceledException) { firstParseCancelled = true; throw; }
+            }
+            return Doc(uri, version);
+        }));
+
+        var firstTask = svc.UpdateDocumentAsync("file:///f.xml", "v1", 1, default);
+
+        // Wait for the first parse to actually be in-flight
+        Assert.True(await firstParseStarted.WaitAsync(TimeSpan.FromSeconds(2)));
+
+        // A newer edit for the same URI — should cancel the first parse
+        await svc.UpdateDocumentAsync("file:///f.xml", "v2", 2, default);
+
+        // The first UpdateDocumentAsync must complete without throwing
+        await firstTask;
+
+        Assert.True(firstParseCancelled);
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_NewEditForDifferentUri_DoesNotCancelInflightParse()
+    {
+        using var aStarted = new SemaphoreSlim(0, 1);
+        using var aRelease = new SemaphoreSlim(0, 1);
+        var aCancelled = false;
+
+        var svc = Build(new DelegateParser(async (uri, _, version, ct) =>
+        {
+            if (uri.Contains("a.xml"))
+            {
+                aStarted.Release();
+                try { await aRelease.WaitAsync(ct); }
+                catch (OperationCanceledException) { aCancelled = true; throw; }
+            }
+            return Doc(uri, version);
+        }));
+
+        var aTask = svc.UpdateDocumentAsync("file:///a.xml", "v1", 1, default);
+        Assert.True(await aStarted.WaitAsync(TimeSpan.FromSeconds(2)));
+
+        // Edit a different URI — must not cancel a.xml's in-flight parse
+        await svc.UpdateDocumentAsync("file:///b.xml", "v1", 1, default);
+
+        aRelease.Release();
+        await aTask;
+
+        Assert.False(aCancelled);
+    }
+
     private sealed class FakeParser : IGameDocumentParser
     {
         private readonly DocumentIndex _result;
@@ -431,6 +493,24 @@ public sealed class GameIndexServiceTest
         {
             ct.ThrowIfCancellationRequested();
             return ValueTask.FromResult(Doc(uri, version));
+        }
+    }
+
+    private sealed class DelegateParser : IGameDocumentParser
+    {
+        private readonly Func<string, string, int, CancellationToken, ValueTask<DocumentIndex>> _fn;
+
+        public DelegateParser(Func<string, string, int, CancellationToken, ValueTask<DocumentIndex>> fn)
+        {
+            _fn = fn;
+        }
+
+        public bool CanParse(string ext) => true;
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
+            CancellationToken ct)
+        {
+            return _fn(uri, text, version, ct);
         }
     }
 }
