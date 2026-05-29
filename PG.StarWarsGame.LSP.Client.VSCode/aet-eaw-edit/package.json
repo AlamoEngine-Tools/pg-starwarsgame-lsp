@@ -1,0 +1,243 @@
+{
+  "name": "aet-eaw-edit",
+  "displayName": "Alamo Engine Tools - Empire at War Edit",
+  "description": "",
+  "author": {
+    "name": "Lukas Grünwald"
+  },
+  "publisher": "Alamo Engine Tools",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onLanguage:xml",
+    "onLanguage:lua"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aet-eaw-edit.lsp.debug.forceStartup",
+        "title": "EaWEdit: Forces LSP Startup.",
+        "when": "inDebugMode"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.restartServer",
+        "title": "EaWEdit: Restart LSP Server"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.revalidateWorkspace",
+        "title": "EaWEdit: Re-validate Workspace"
+      }
+    ],
+    "configuration": {
+      "title": "Alamo Engine Tools - Empire at War Edit",
+      "type": "object",
+      "properties": {
+        "aet-eaw-edit.lsp.enabled": {
+          "order": 100,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Enables the Empire at War specific LSP server."
+        },
+        "aet-eaw-edit.lsp.executable": {
+          "order": 200,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "The path to the [Alamo Engine Tools LSP executable](https://github.com/gruenwaldlk/PG.StarWarsGame.LSP/releases).\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode#` is `false`.",
+          "scope": "machine-overridable"
+        },
+        "aet-eaw-edit.lsp.xmlDirectories": {
+          "order": 300,
+          "type": "array",
+          "items": { 
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "default": [],
+          "markdownDescription": "Directories assumed to contain EaW XML game data files. The LSP server auto-detects EaW XML directories via metafiles; add paths here only when auto-detection cannot find them.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+        },
+        "aet-eaw-edit.lsp.locale": {
+          "order": 400,
+          "type": "string",
+          "default": "en",
+          "markdownDescription": "Language locale used for hover text and diagnostics.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+          "enum": ["en", "de", "fr", "es", "it", "pl", "ru"],
+          "enumItemLabels": ["English", "German", "French", "Spanish", "Italian", "Polish", "Russian"]
+        },
+        "aet-eaw-edit.lsp.modPaths": {
+          "order": 500,
+          "type": "array",
+          "items": { 
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "default": [],
+          "markdownDescription": "Additional directories containing mod files to index alongside the workspace.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+        },
+        "aet-eaw-edit.lsp.source.baseline.type": {
+          "order": 600,
+          "type": "string",
+          "default": "http",
+          "markdownDescription": "Where to load the EaW baseline index from. Use `http` to download automatically; `local` to point at a file; `none` to disable baseline loading.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+          "enum": ["http", "local", "none"],
+          "enumItemLabels": ["Download automatically (recommended)", "Local file", "Disabled"]
+        },
+        "aet-eaw-edit.lsp.source.baseline.localPath": {
+          "order": 700,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "Path to a local baseline `.msgpack` file.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
+          "scope": "machine-overridable"
+        },
+        "aet-eaw-edit.lsp.schema.source": {
+          "order": 800,
+          "type": "string",
+          "default": "http",
+          "markdownDescription": "Where to load the EaW XML schema from. Use `http` to fetch from GitHub (default); use `local` to point at a local copy.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+          "enum": ["http", "local"],
+          "enumItemLabels": ["GitHub (recommended)", "Local directory"]
+        },
+        "aet-eaw-edit.lsp.schema.url": {
+          "order": 900,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the default GitHub source.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
+        },
+        "aet-eaw-edit.lsp.schema.localPath": {
+          "order": 1000,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "Path to the local EaW XML schema directory (`schema/eaw/`).\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
+          "scope": "machine-overridable"
+        },
+        "aet-eaw-edit.localisation.editorEnabled": {
+          "order": 1100,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Enables the built-in localisation editor."
+        },
+        "aet-eaw-edit.localisation.format": {
+          "order": 1200,
+          "type": "string",
+          "default": "format-dat",
+          "markdownDescription": "Only applies when `#aet-eaw-edit.localisation.editorEnabled#` is set to `true`.",
+          "enum": [
+            "format-dat",
+            "format-csv",
+            "format-xml"
+          ],
+          "enumItemLabels": [
+            "DAT",
+            "CSV",
+            "XML"
+          ],
+          "markdownEnumDescriptions": [
+            "The game's proprietary *.DAT format.\n\n*Not recommended if the project is being worked on by multiple people.*",
+            "A comma-separated file per language. Recommended.",
+            "An XML file used by the [Empire at War Text Editor](https://www.nexusmods.com/starwarsempireatwar/mods/1859)"
+          ]
+        },
+        "aet-eaw-edit.modVerify.enabled": {
+          "order": 1300,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Enables the ModVerify integration."
+        },
+        "aet-eaw-edit.modVerify.executable": {
+          "order": 1400,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "The path to the [ModVerify](https://github.com/AlamoEngine-Tools/ModVerify/releases) executable.\n\nOnly applies when `#aet-eaw-edit.modVerify.enabled#` is set to `true`.",
+          "scope": "machine-overridable",
+          "when": "aet-eaw-edit.modVerify.enabled"
+        },
+        "aet-eaw-edit.modVerify.baseGameDirectory": {
+          "order": 1500,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "The path to the base game **Star Wars: Empire at War**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
+          "scope": "machine-overridable",
+          "when": "aet-eaw-edit.modVerify.enabled"
+        },
+        "aet-eaw-edit.modVerify.expansionDirectory": {
+          "order": 1600,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "The path to the expansion pack **Star Wars: Empire at War: Forces of Corruption**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
+          "scope": "machine-overridable",
+          "when": "aet-eaw-edit.modVerify.enabled"
+        },
+        "aet-eaw-edit.lsp.devMode.enabled": {
+          "order": 1700,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Start the LSP server from source using `dotnet run --project` instead of a pre-built executable. Requires `#aet-eaw-edit.lsp.devMode.projectPath#` to be set.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+        },
+        "aet-eaw-edit.lsp.devMode.projectPath": {
+          "order": 1800,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "Path to the `PG.StarWarsGame.LSP.Server.csproj` file used when `#aet-eaw-edit.lsp.devMode#` is enabled.",
+          "scope": "machine-overridable"
+        },
+        "aet-eaw-edit.lsp.debug.traceServer": {
+          "order": 1900,
+          "type": "string",
+          "default": "off",
+          "markdownDescription": "LSP wire-protocol trace level. Set to `messages` or `verbose` to log traffic in the output panel for debugging.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+          "enum": ["off", "messages", "verbose"],
+          "enumItemLabels": ["Off", "Messages", "Verbose"]
+        },
+        "aet-eaw-edit.lsp.debug.waitForDebugger": {
+          "order": 2000,
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Pass `--wait-for-debugger` to the LSP server process on startup, causing it to pause until a .NET debugger attaches.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.107.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "25.9.1",
+    "@typescript-eslint/eslint-plugin": "^8.50.0",
+    "@typescript-eslint/parser": "^8.50.0",
+    "eslint": "^10.4.0",
+    "typescript": "^6.0.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  },
+  "dependencies": {
+		"vscode-languageclient": "^9.0.1"
+  },
+  "bugs": {
+    "url": "https://github.com/gruenwaldlk/PG.StarWarsGame.LSP/issues",
+    "email": "gruenwald.lk@outlook.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/gruenwaldlk/PG.StarWarsGame.LSP.git"
+  }
+}
