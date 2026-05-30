@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as path from 'path';
 import * as vscode from 'vscode';
 import {
 	ExecuteCommandRequest,
@@ -36,15 +37,7 @@ function validateConfiguration(): boolean {
 	let valid = true;
 	const devMode = cfg('lsp.devMode').get<boolean>('enabled', false);
 
-	if (devMode) {
-		if (!cfg('lsp.devMode').get<string>('projectPath')) {
-			vscode.window.showErrorMessage(
-				'AET EaW Edit: Dev mode is enabled but no project path is configured. ' +
-				'Set "aet-eaw-edit.lsp.devMode.projectPath" to the path of the server .csproj file.'
-			);
-			valid = false;
-		}
-	} else {
+	if (!devMode) {
 		if (!cfg('lsp').get<string>('executable')) {
 			vscode.window.showErrorMessage(
 				'AET EaW Edit: LSP is enabled but no server executable is configured. ' +
@@ -82,7 +75,8 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
 	let serverArgs: string[];
 	if (devMode) {
-		const projectPath = cfg('lsp.devMode').get<string>('projectPath')!;
+		const projectPath = cfg('lsp.devMode').get<string>('projectPath') ||
+			path.join(context.extensionPath, '..', '..', 'PG.StarWarsGame.LSP.Server', 'PG.StarWarsGame.LSP.Server.csproj');
 		serverArgs = waitForDebugger
 			? ['run', '--project', projectPath, '--', '--wait-for-debugger']
 			: ['run', '--project', projectPath];
@@ -122,17 +116,31 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
 	lspClient = new LanguageClient(CLIENT_ID, CLIENT_NAME, serverOptions, clientOptions);
 
-	const traceLevel = cfg('lsp.debug').get<string>('traceServer', 'off');
-	const traceMap: Record<string, Trace> = { off: Trace.Off, messages: Trace.Messages, verbose: Trace.Verbose };
-	lspClient.setTrace(traceMap[traceLevel] ?? Trace.Off);
-
 	if (statusItem) {
 		statusItem.text = '$(loading~spin) AET EaW LSP: starting…';
 		statusItem.show();
 	}
 
-	lspClient.start().then(() => {
+	const traceLevel = cfg('lsp.debug').get<string>('traceServer', 'off');
+	const traceMap: Record<string, Trace> = { off: Trace.Off, messages: Trace.Messages, verbose: Trace.Verbose };
+	const resolvedTrace = traceMap[traceLevel] ?? Trace.Off;
+
+	lspClient.start().then(async () => {
+		// setTrace must be called after start() resolves: before that, activeConnection()
+		// returns undefined and the trace level is stored but never applied to the transport.
+		await lspClient?.setTrace(resolvedTrace);
 		logLine('LSP server started and initialized.');
+
+		// vscode-languageclient's hookConfigurationChanged reads aet.pg.swg.lsp.trace.server
+		// (the CLIENT_ID namespace), which is not in settings, so it resets trace to Off on
+		// every VS Code config change. Register our own listener — after hookConfigurationChanged's
+		// listener, so it fires last and wins — to re-apply the user's actual setting.
+		context.subscriptions.push(
+			vscode.workspace.onDidChangeConfiguration(() => {
+				const level = cfg('lsp.debug').get<string>('traceServer', 'off');
+				void lspClient?.setTrace(traceMap[level] ?? Trace.Off);
+			})
+		);
 	}).catch((e: unknown) => {
 		logLine(`LSP server failed to start: ${e}`);
 		lspClient = undefined;
@@ -206,7 +214,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.debug.forceStartup', async () => {
 			await stopLspClient();
-			if (cfg('lsp').get<string>('executable')) {
+			const devMode = cfg('lsp.devMode').get<boolean>('enabled', false);
+			if (devMode || cfg('lsp').get<string>('executable')) {
 				await startLspClient(context);
 			} else {
 				vscode.window.showErrorMessage(
