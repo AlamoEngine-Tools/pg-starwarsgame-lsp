@@ -179,4 +179,5 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 count++;
         return count;
     }
+
 }

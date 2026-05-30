@@ -73,6 +73,25 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
     }
 
     [Fact]
+    public void ParseTagFile_NameReference_WithoutReferenceKind_HasNoneReferenceKind()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Overlap_Test
+                                type: NameReference
+                            """;
+
+        using var provider = CreateAndLoad(yaml);
+
+        var tag = provider.GetTag("Overlap_Test");
+
+        Assert.NotNull(tag);
+        Assert.Equal(XmlValueType.NameReference, tag.ValueType);
+        Assert.Equal(ReferenceKind.None, tag.ReferenceKind);
+        Assert.Null(tag.ObjectType);
+    }
+
+    [Fact]
     public void ParseTagFile_NameReferenceWithReferenceType_Resolved()
     {
         const string tagsYaml = """

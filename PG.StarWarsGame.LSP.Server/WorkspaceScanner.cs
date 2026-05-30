@@ -140,6 +140,11 @@ public sealed class WorkspaceScanner
                         var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                         var uri = _fileHelper.PathToFileUri(file);
                         await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                        // [lgr] Seeding removed again, that triggers a fuill workspace scan. We don't want that.
+                        // Seed the workspace host so hover/completion work without a prior didOpen.
+                        // Skip if the client already sent didOpen (higher-version editor content wins).
+                        // if (!_workspaceHost.TryGet(uri, out _))
+                        //     _workspaceHost.AddOrUpdate(uri, text, 0);
                         var done = Interlocked.Increment(ref indexed);
                         _logger.LogDebug("Scanned {File} ({Done}/{Total})", file, done, files.Count);
                         progress?.OnNext(null, files.Count > 0 ? (int?)((decimal)done / files.Count * 100) : null,

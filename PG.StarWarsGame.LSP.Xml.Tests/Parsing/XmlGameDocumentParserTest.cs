@@ -570,6 +570,26 @@ public sealed class XmlGameDocumentParserTest
         Assert.Contains(result.References, r => r.TargetId == "Y_Wing");
     }
 
+    [Fact]
+    public async Task ParseAsync_TypeReferenceList_With_HardcodedSet_ReferenceKind_Does_Not_Emit_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        var tag = new XmlTagDefinition
+        {
+            Tag = "Behavior",
+            ValueType = XmlValueType.TypeReferenceList,
+            ReferenceKind = ReferenceKind.HardcodedSet
+        };
+        schema.AddTag(tag);
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<Unit Name="INFANTRY"><Behavior>BehaviorModule_AAGUN_Fire</Behavior></Unit>""",
+            1, default);
+
+        Assert.Empty(result.References);
+    }
+
     // ── FakeSchemaProvider ───────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider : ISchemaProvider

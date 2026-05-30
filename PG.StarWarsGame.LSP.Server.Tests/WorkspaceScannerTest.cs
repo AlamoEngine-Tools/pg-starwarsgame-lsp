@@ -591,6 +591,53 @@ public sealed class WorkspaceScannerTest
         Assert.Equal("<AlreadyOpen/>", doc.Text);
     }
 
+    [Fact]
+    public async Task ScanAsync_ParseableFiles_AreAddedToWorkspaceHost()
+    {
+        // Files that were bulk-scanned must land in the workspace host so that hover,
+        // completion, and other handlers that call _workspaceHost.TryGet can serve
+        // requests without requiring a prior textDocument/didOpen from the client.
+        var root = Root("ws");
+        var content = "<Root><Unit Name=\"X-Wing\"/></Root>";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "units.xml")] = new(content)
+        });
+        var host = new GameWorkspaceHost();
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, host, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        var uri = new FileHelper(fs).PathToFileUri(Path.Combine(root, "units.xml"));
+        Assert.True(host.TryGet(uri, out var doc));
+        Assert.Equal(content, doc.Text);
+        Assert.Equal(0, doc.Version);
+    }
+
+    [Fact]
+    public async Task ScanAsync_ParseableFiles_DoNotOverwriteAlreadyOpenDocument()
+    {
+        // If the client already sent textDocument/didOpen before the scan runs
+        // (workspace host has version > 0), the scan must not overwrite editor content
+        // with the on-disk version (which may lag behind unsaved edits).
+        var root = Root("ws");
+        var diskContent = "<Root/>";
+        var editorContent = "<Root><Unit Name=\"Edited\"/></Root>";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "units.xml")] = new(diskContent)
+        });
+        var host = new GameWorkspaceHost();
+        var uri = new FileHelper(fs).PathToFileUri(Path.Combine(root, "units.xml"));
+        host.AddOrUpdate(uri, editorContent, 1);
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, host, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        Assert.True(host.TryGet(uri, out var doc));
+        Assert.Equal(editorContent, doc.Text);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakePreOpenBuffer : IPreOpenBuffer

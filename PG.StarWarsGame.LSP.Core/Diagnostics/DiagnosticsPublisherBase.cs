@@ -44,6 +44,13 @@ public abstract class DiagnosticsPublisherBase
         _publish(p);
     }
 
+    protected void ClearAllPublished()
+    {
+        foreach (var uri in _lastPublishedUris)
+            _publish(EmptyParams(uri));
+        _lastPublishedUris = [];
+    }
+
     protected static PublishDiagnosticsParams EmptyParams(string uri)
     {
         return new PublishDiagnosticsParams

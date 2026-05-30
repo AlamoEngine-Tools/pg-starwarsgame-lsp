@@ -694,6 +694,31 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Contains(published, p => p.Uri.ToString() == uri2);
     }
 
+    [Fact]
+    public async Task RevalidateWorkspace_Clears_Diagnostics_For_Previously_Published_Uris_Not_In_Index()
+    {
+        const string uri = "file:///stale.xml";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/stale.xml"] = new("<Root/>")
+        });
+        var (publisher, published, indexService, workspaceHost) = BuildSubscribedWithFs(fs);
+
+        // First: simulate that this URI got diagnostics via index change
+        workspaceHost.Set(uri, "<Root/>");
+        indexService.Fire(IndexWithDoc(uri));  // records uri in _lastPublishedUris
+        published.Clear();
+
+        // Now remove it from the index — uri no longer indexed
+        indexService.Current = GameIndex.Empty;
+
+        // Revalidate: should clear the stale uri
+        await publisher.RevalidateWorkspaceAsync(CancellationToken.None);
+
+        var clear = Assert.Single(published, p => p.Uri.ToString() == uri);
+        Assert.Empty(clear.Diagnostics);
+    }
+
     private sealed class SuggestedFixStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
     {
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)

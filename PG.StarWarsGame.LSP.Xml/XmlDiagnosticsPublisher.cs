@@ -85,6 +85,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
+        ClearAllPublished();
         var index = _indexService.Current;
         foreach (var uri in index.Documents.Keys)
             await RevalidateDocumentAsync(uri, ct);
