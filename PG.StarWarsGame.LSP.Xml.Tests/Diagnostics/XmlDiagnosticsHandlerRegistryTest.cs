@@ -139,13 +139,15 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
     private static XmlTagDefinition TagWithOverride(
         string validationId,
         ValidationOverrideMode mode = ValidationOverrideMode.Additive,
-        ValidationOverrideOrder order = ValidationOverrideOrder.Append) =>
-        new()
+        ValidationOverrideOrder order = ValidationOverrideOrder.Append)
+    {
+        return new XmlTagDefinition
         {
             Tag = "Damage",
             ValueType = XmlValueType.Float,
             ValidationOverride = new TagValidationOverride { ValidationId = validationId, Mode = mode, Order = order }
         };
+    }
 
     [Fact]
     public void NoOverride_AllDefaultHandlersRun()
@@ -170,7 +172,8 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         var tag = TagWithOverride("custom-id", ValidationOverrideMode.Replace);
         var registry = new XmlDiagnosticsHandlerRegistry(
         [
-            new LambdaHandler<XmlTagValueFact>((_, _) => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "default")]),
+            new LambdaHandler<XmlTagValueFact>((_, _) =>
+                [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "default")]),
             new NamedLambdaHandler<XmlTagValueFact>("custom-id", (_, _) =>
                 [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "named")])
         ]);
@@ -189,8 +192,16 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         var invocationOrder = new List<string>();
         var registry = new XmlDiagnosticsHandlerRegistry(
         [
-            new LambdaHandler<XmlTagValueFact>((_, _) => { invocationOrder.Add("default"); return []; }),
-            new NamedLambdaHandler<XmlTagValueFact>("custom-id", (_, _) => { invocationOrder.Add("named"); return []; })
+            new LambdaHandler<XmlTagValueFact>((_, _) =>
+            {
+                invocationOrder.Add("default");
+                return [];
+            }),
+            new NamedLambdaHandler<XmlTagValueFact>("custom-id", (_, _) =>
+            {
+                invocationOrder.Add("named");
+                return [];
+            })
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
@@ -202,12 +213,20 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
     [Fact]
     public void Additive_Append_DefaultRunsFirst()
     {
-        var tag = TagWithOverride("custom-id", ValidationOverrideMode.Additive, ValidationOverrideOrder.Append);
+        var tag = TagWithOverride("custom-id");
         var invocationOrder = new List<string>();
         var registry = new XmlDiagnosticsHandlerRegistry(
         [
-            new LambdaHandler<XmlTagValueFact>((_, _) => { invocationOrder.Add("default"); return []; }),
-            new NamedLambdaHandler<XmlTagValueFact>("custom-id", (_, _) => { invocationOrder.Add("named"); return []; })
+            new LambdaHandler<XmlTagValueFact>((_, _) =>
+            {
+                invocationOrder.Add("default");
+                return [];
+            }),
+            new NamedLambdaHandler<XmlTagValueFact>("custom-id", (_, _) =>
+            {
+                invocationOrder.Add("named");
+                return [];
+            })
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
@@ -222,7 +241,8 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         var tag = TagWithOverride("missing-id", ValidationOverrideMode.Replace);
         var registry = new XmlDiagnosticsHandlerRegistry(
         [
-            new LambdaHandler<XmlTagValueFact>((_, _) => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "default")])
+            new LambdaHandler<XmlTagValueFact>((_, _) =>
+                [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "default")])
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
@@ -232,10 +252,11 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
     [Fact]
     public void UnknownValidationId_Additive_OnlyDefaultRuns()
     {
-        var tag = TagWithOverride("missing-id", ValidationOverrideMode.Additive, ValidationOverrideOrder.Append);
+        var tag = TagWithOverride("missing-id");
         var registry = new XmlDiagnosticsHandlerRegistry(
         [
-            new LambdaHandler<XmlTagValueFact>((_, _) => [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "default")])
+            new LambdaHandler<XmlTagValueFact>((_, _) =>
+                [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, "default")])
         ]);
         var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, tag, "0");
 
@@ -278,7 +299,10 @@ file sealed class NamedLambdaHandler<TFact> : XmlDiagnosticsHandler<TFact>, IXml
 
     public string ValidationId { get; }
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(TFact fact, DiagnosticsContext ctx) => _fn(fact, ctx);
+    protected override IEnumerable<XmlDiagnosticResult> Handle(TFact fact, DiagnosticsContext ctx)
+    {
+        return _fn(fact, ctx);
+    }
 }
 
 file sealed class StubSchemaProvider : ISchemaProvider

@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
@@ -20,18 +19,22 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private static DidChangeWatchedFilesParams Changed(params string[] uris)
-        => new()
+    {
+        return new DidChangeWatchedFilesParams
         {
             Changes = new Container<FileEvent>(uris.Select(u =>
                 new FileEvent { Uri = DocumentUri.From(u), Type = FileChangeType.Changed }))
         };
+    }
 
     private static DidChangeWatchedFilesParams Deleted(params string[] uris)
-        => new()
+    {
+        return new DidChangeWatchedFilesParams
         {
             Changes = new Container<FileEvent>(uris.Select(u =>
                 new FileEvent { Uri = DocumentUri.From(u), Type = FileChangeType.Deleted }))
         };
+    }
 
     private static GameDidChangeWatchedFilesHandler BuildHandler(
         SpyIndexService? index = null,
@@ -55,7 +58,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         const string freshContent = "<GameObjectFiles><Unit Name=\"NEW_UNIT\"/></GameObjectFiles>";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [path] = new MockFileData(freshContent)
+            [path] = new(freshContent)
         });
         var spy = new SpyIndexService();
 
@@ -71,7 +74,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         const string path = @"c:\scripts\mission.lua";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [path] = new MockFileData("-- stale disk content")
+            [path] = new("-- stale disk content")
         });
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(LuaUri, "-- live editor content", 5);
@@ -120,8 +123,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         const string luaPath = @"c:\scripts\mission.lua";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [xmlPath] = new MockFileData("<root/>"),
-            [luaPath] = new MockFileData("-- script")
+            [xmlPath] = new("<root/>"),
+            [luaPath] = new("-- script")
         });
         var spy = new SpyIndexService();
 
@@ -141,11 +144,11 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
 
     private sealed class SpyIndexService : IGameIndexService
     {
-        public GameIndex Current => GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
+        public readonly List<string> Removals = [];
 
         public readonly List<(string Uri, string Text)> Updates = [];
-        public readonly List<string> Removals = [];
+        public GameIndex Current => GameIndex.Empty;
+        public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -153,14 +156,27 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             return Task.CompletedTask;
         }
 
-        public void RemoveDocument(string uri) => Removals.Add(uri);
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void RemoveDocument(string uri)
+        {
+            Removals.Add(uri);
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -169,12 +185,19 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }

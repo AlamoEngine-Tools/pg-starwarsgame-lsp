@@ -51,12 +51,12 @@ public sealed class StoryParamReferenceHandlerTest
     }
 
     [Fact]
-    public void Unresolved_single_ref_emits_warning()
+    public void Unresolved_single_ref_emits_error()
     {
         var fact = MakeFact(XmlValueType.NameReference, "NotAPlanet");
         var results = Sut.Handle(fact, CtxWith(GameIndex.Empty)).ToList();
         var d = Assert.Single(results);
-        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
         Assert.Contains("NotAPlanet", d.Message);
     }
 
@@ -69,12 +69,13 @@ public sealed class StoryParamReferenceHandlerTest
     }
 
     [Fact]
-    public void Unresolved_token_in_ref_list_emits_warning()
+    public void Unresolved_token_in_ref_list_emits_error()
     {
         var fact = MakeFact(XmlValueType.NameReferenceList, "X_Wing Missing_Unit", "GameObjectType");
         var results = Sut.Handle(fact, CtxWith(IndexWith("X_Wing", "GameObjectType"))).ToList();
-        Assert.Single(results);
-        Assert.Contains("Missing_Unit", results[0].Message);
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+        Assert.Contains("Missing_Unit", d.Message);
     }
 
     [Fact]

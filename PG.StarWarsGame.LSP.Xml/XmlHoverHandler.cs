@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -77,10 +78,22 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
 
         // Cursor is not on a tag name — check if it is on a reference value.
         if (!XmlUtility.IsOnTagName(node!, lineIndex, charPos))
-            return Task.FromResult<Hover?>(TryBuildReferenceHover(uri, lineIndex, charPos, locale));
+            return Task.FromResult(TryBuildReferenceHover(uri, lineIndex, charPos, locale));
 
         // Cursor is on a tag name — show tag or type hover.
         var typeDef = _schema.GetObjectType(node!.Name);
+
+        // PascalCase lookup: ability class elements are snake_case in XML (e.g., lucky_shot_attack_ability)
+        // but registered as PascalCase schema types (LuckyShotAttackAbility).
+        typeDef ??= _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name));
+
+        // Ability sub-object field: walk parent chain to find the containing ability type.
+        if (typeDef is null)
+        {
+            var abilityTypeName = TryResolveContainingAbilityType(node);
+            if (abilityTypeName is not null)
+                typeDef = _schema.GetObjectType(abilityTypeName);
+        }
 
         // Registry-based fallback: for files with arbitrary element names, look up the type
         // via the registry and confirm the cursor is on a depth-1 type-container element.
@@ -127,6 +140,22 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
             "Hover request at {Line}:{Character} produced no result, because the tag could not be found.",
             request.Position.Line, charPos);
         return Task.FromResult<Hover?>(null);
+    }
+
+    private string? TryResolveContainingAbilityType(HtmlNode node)
+    {
+        for (var n = node.ParentNode; n?.ParentNode != null; n = n.ParentNode)
+        {
+            var parentTag = _schema.GetTag(n.ParentNode.Name);
+            // AbilityDefinitionSubObjectList: child tag name IS the ability class → PascalCase is the schema type name
+            if (parentTag?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
+                return XmlUtility.ToPascalCase(n.Name);
+            // GuiActivatedAbilityDefinitionSubObjectList: all children are Unit_Ability → fixed schema type UnitAbility
+            if (parentTag?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
+                return "UnitAbility";
+        }
+
+        return null;
     }
 
     private Hover? TryBuildReferenceHover(string uri, int line, int character, string locale)

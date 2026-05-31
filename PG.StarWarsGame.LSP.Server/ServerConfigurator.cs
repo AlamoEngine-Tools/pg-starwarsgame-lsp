@@ -58,6 +58,7 @@ public static class ServerConfigurator
             .WithHandler<GameDidChangeWatchedFilesHandler>()
             .WithHandler<XmlCodeActionHandler>()
             .WithHandler<XmlCodeLensHandler>()
+            .WithHandler<XmlLinkedEditingRangeHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithServices(services =>

@@ -210,6 +210,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             if (arg is null || LuaRequireResolver.IsRelative(arg)) continue;
             builder.Add(arg);
         }
+
         return builder.ToImmutable();
     }
 

@@ -225,6 +225,79 @@ public sealed class XmlReferencesHandlerTest
         Assert.Single(locations);
     }
 
+    // ── Group membership (ReferenceGroup) ────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CursorOnGroupKey_ReturnsBothGroupMemberOrigins()
+    {
+        // Two SFXEvents share the same Overlap_Test group key "Unit_AT_AT".
+        // Cursor is on the Overlap_Test tag value in the first SFXEvent's document.
+        var memberA = new GroupMembership("Unit_AT_AT", "SFXEvent",
+            new FileOrigin(TestUri, 5, 10));
+        var memberB = new GroupMembership("Unit_AT_AT", "SFXEvent",
+            new FileOrigin(OtherUri, 3, 8));
+
+        var callerDoc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(
+                new DocumentGroupMembership(memberA, 6, 20, 10)));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(TestUri, callerDoc),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
+        {
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(memberA, memberB))
+        };
+
+        var handler = BuildHandler(index);
+        // Cursor is on the tag-value span (TagLine=6, TagColumn=20..30)
+        var result = await handler.Handle(At(6, 25), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var locations = result!.ToList();
+        Assert.Equal(2, locations.Count);
+        Assert.Contains(locations, l => l.Range.Start.Line == 5 && l.Range.Start.Character == 10);
+        Assert.Contains(locations, l => l.Range.Start.Line == 3 && l.Range.Start.Character == 8);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnGroupKey_NormalReferencePathNotTaken()
+    {
+        // The group key happens to match a real symbol id — but since cursor resolves
+        // to a group membership, only group members should be returned (not workspace refs).
+        var member = new GroupMembership("UNIT_A", "SFXEvent", new FileOrigin(TestUri, 2, 4));
+        var callerDoc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(
+                new DocumentGroupMembership(member, 1, 5, 6)));
+
+        var regularRef = MakeRef("UNIT_A", OtherUri, 9, 0, 6);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(TestUri, callerDoc),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("UNIT_A", ImmutableArray.Create(regularRef)))
+        {
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("UNIT_A", ImmutableArray.Create(member))
+        };
+
+        var handler = BuildHandler(index);
+        var result = await handler.Handle(At(1, 7), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var locations = result!.ToList();
+        // Should return only the group member (line 2), NOT the regular ref (line 9)
+        Assert.Single(locations);
+        Assert.Equal(2, locations[0].Range.Start.Line);
+    }
+
     // ── EaW directory gating ─────────────────────────────────────────────────
 
     [Fact]

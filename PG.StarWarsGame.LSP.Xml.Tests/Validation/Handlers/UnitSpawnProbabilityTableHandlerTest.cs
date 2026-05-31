@@ -43,7 +43,8 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
     public void Wrong_type_returns_no_diagnostics()
     {
         var floatTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 }

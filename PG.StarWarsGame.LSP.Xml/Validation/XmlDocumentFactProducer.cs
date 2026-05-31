@@ -56,7 +56,8 @@ public sealed class XmlDocumentFactProducer(
     }
 
     private void WalkNodes(
-        HtmlNode node, List<XmlFact> facts, string text, string[] lines, bool isTypeContainerLevel, string documentUri)
+        HtmlNode node, List<XmlFact> facts, string text, string[] lines, bool isTypeContainerLevel, string documentUri,
+        string? abilityTypeName = null)
     {
         if (isTypeContainerLevel)
         {
@@ -80,7 +81,7 @@ public sealed class XmlDocumentFactProducer(
         foreach (var (name, nodes) in childGroups)
         {
             if (nodes.Count <= 1) continue;
-            var tagDef = schema.GetTag(name);
+            var tagDef = ResolveTag(name, abilityTypeName);
             if (tagDef is not null && !tagDef.MultipleAllowed)
                 duplicatedSingletons.Add(name);
         }
@@ -90,7 +91,26 @@ public sealed class XmlDocumentFactProducer(
         {
             if (child.NodeType != HtmlNodeType.Element) continue;
             var name = child.Name;
-            var tagDef = schema.GetTag(name);
+            var tagDef = ResolveTag(name, abilityTypeName);
+
+            // Type56: ability class elements have variable names → PascalCase → schema type
+            if (tagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
+            {
+                foreach (var abilityNode in child.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+                {
+                    var childAbilityType = XmlUtility.ToPascalCase(abilityNode.Name);
+                    WalkNodes(abilityNode, facts, text, lines, false, documentUri, childAbilityType);
+                }
+                continue;
+            }
+
+            // Type57: Unit_Ability elements are homogeneous — all use the UnitAbility schema type
+            if (tagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
+            {
+                foreach (var abilityNode in child.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+                    WalkNodes(abilityNode, facts, text, lines, false, documentUri, "UnitAbility");
+                continue;
+            }
 
             if (tagDef is null)
             {
@@ -123,6 +143,18 @@ public sealed class XmlDocumentFactProducer(
 
             WalkNodes(child, facts, text, lines, false, documentUri);
         }
+    }
+
+    private XmlTagDefinition? ResolveTag(string name, string? abilityTypeName)
+    {
+        if (abilityTypeName is not null)
+        {
+            var typeSpecific = schema.GetTagsForType(abilityTypeName)
+                .FirstOrDefault(t => t.Tag.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (typeSpecific is not null) return typeSpecific;
+        }
+
+        return schema.GetTag(name);
     }
 
     private static (int line0, int col0) ComputePosition(HtmlNode node, string[] lines)

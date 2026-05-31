@@ -33,19 +33,30 @@ public sealed class GameRenameHandlerTest
     }
 
     private static GameSymbol XmlSymbolAt(string id, string uri, int line, string typeName = "Unit")
-        => new(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(uri, line, null), null);
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(uri, line, null), null);
+    }
 
     private static GameSymbol XmlSymbolInArchive(string id)
-        => new(id, GameSymbolKind.XmlObject, "Unit", new MegArchiveOrigin("data.meg", "units.xml", 0, 0), null);
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new MegArchiveOrigin("data.meg", "units.xml", 0, 0),
+            null);
+    }
 
     private static GameSymbol LuaGlobal(string name, string uri)
-        => new(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, 0, null), null);
+    {
+        return new GameSymbol(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, 0, null), null);
+    }
 
     private static GameReference XmlRef(string id, string uri, int line, int col, int len)
-        => new(id, GameSymbolKind.XmlObject, "Unit", uri, line, col, len);
+    {
+        return new GameReference(id, GameSymbolKind.XmlObject, "Unit", uri, line, col, len);
+    }
 
     private static GameReference LuaRef(string id, string uri, int line, int col, int len)
-        => new(id, GameSymbolKind.XmlObject, null, uri, line, col, len);
+    {
+        return new GameReference(id, GameSymbolKind.XmlObject, null, uri, line, col, len);
+    }
 
     private static GameIndex BuildIndex(
         ImmutableDictionary<string, DocumentIndex>? docs = null,
@@ -67,7 +78,9 @@ public sealed class GameRenameHandlerTest
     }
 
     private static DocumentIndex LuaDoc(string uri)
-        => new(uri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
+    {
+        return new DocumentIndex(uri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
+    }
 
     private static GameRenameHandler BuildHandler(
         GameIndex index,
@@ -124,7 +137,7 @@ public sealed class GameRenameHandlerTest
             .Add("UNIT_VANILLA", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            defs: defs);
+            defs);
         var handler = BuildHandler(index);
         var result = await handler.Handle(RenameAt(0, 5, "UNIT_NEW"), CancellationToken.None);
         Assert.Null(result);
@@ -147,9 +160,9 @@ public sealed class GameRenameHandlerTest
 
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(r)));
 
         var handler = BuildHandler(index, host, schema);
@@ -177,9 +190,9 @@ public sealed class GameRenameHandlerTest
 
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray<GameReference>.Empty));
 
         var handler = BuildHandler(index, host, schema);
@@ -214,12 +227,12 @@ public sealed class GameRenameHandlerTest
         schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(XmlUri, xmlDoc)
                 .Add(LuaUri, luaDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(xmlRef, luaRef)));
 
         var handler = BuildHandler(index, host, schema);
@@ -252,12 +265,12 @@ public sealed class GameRenameHandlerTest
         schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(XmlUri, xmlDoc)
                 .Add(LuaUri, luaDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(xmlRef, luaRef)));
 
         var handler = BuildHandler(index, host, schema);
@@ -289,11 +302,11 @@ public sealed class GameRenameHandlerTest
         schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(XmlUri, testDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(refInTest, refInOther)));
 
         var handler = BuildHandler(index, host, schema);
@@ -322,12 +335,12 @@ public sealed class GameRenameHandlerTest
         schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(XmlUri, xmlDoc)
                 .Add(LuaUri, luaDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(luaRef)));
 
         var handler = BuildHandler(index, host, schema);
@@ -358,12 +371,12 @@ public sealed class GameRenameHandlerTest
         schema.RegisterType(new GameObjectTypeDefinition { TypeName = "Unit", NameTag = "Name" });
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(XmlUri, xmlDoc)
                 .Add(LuaUri, luaDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("UNIT_A", ImmutableArray.Create(luaRef)));
 
         var handler = BuildHandler(index, host, schema);
@@ -373,8 +386,8 @@ public sealed class GameRenameHandlerTest
         var luaEdits = result!.Changes![DocumentUri.From(LuaUri)].ToList();
         var edit = Assert.Single(luaEdits);
         Assert.Equal(0, edit.Range.Start.Line);
-        Assert.Equal(7, edit.Range.Start.Character);   // after opening quote
-        Assert.Equal(13, edit.Range.End.Character);    // before closing quote
+        Assert.Equal(7, edit.Range.Start.Character); // after opening quote
+        Assert.Equal(13, edit.Range.End.Character); // before closing quote
         Assert.Equal("UNIT_B", edit.NewText);
     }
 
@@ -386,7 +399,7 @@ public sealed class GameRenameHandlerTest
 
         var luaDoc = LuaDoc(LuaUri);
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc));
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc));
 
         var handler = BuildHandler(index, host);
         // cursor inside the string
@@ -405,8 +418,8 @@ public sealed class GameRenameHandlerTest
         host.AddOrUpdate(LuaUri, "Spawn(\"VANILLA_UNIT\")", 1);
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("VANILLA_UNIT", ImmutableArray.Create(sym)));
 
         var handler = BuildHandler(index, host);
@@ -423,7 +436,8 @@ public sealed class GameRenameHandlerTest
         // the "RunMission()" call site — rename must use the index, not re-parse host text.
         var callerRef = new GameReference("RunMission", GameSymbolKind.LuaGlobal, null, LuaUri, 0, 0, 10);
         var sym = LuaGlobal("RunMission", OtherLuaUri);
-        var callerDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(callerRef));
+        var callerDoc =
+            new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(callerRef));
         var defDoc = new DocumentIndex(OtherLuaUri, 1, ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
 
         var host = new FakeWorkspaceHost();
@@ -431,12 +445,12 @@ public sealed class GameRenameHandlerTest
         host.AddOrUpdate(LuaUri, "RunMission()", 1);
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(OtherLuaUri, defDoc)
                 .Add(LuaUri, callerDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("RunMission", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("RunMission", ImmutableArray.Create(callerRef)));
 
         var handler = BuildHandler(index, host);
@@ -461,19 +475,20 @@ public sealed class GameRenameHandlerTest
         var callerRef = new GameReference("RunMission", GameSymbolKind.LuaGlobal, null, LuaUri, 0, 0, 10);
         var sym = LuaGlobal("RunMission", OtherLuaUri);
         var defDoc = new DocumentIndex(OtherLuaUri, 1, ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
-        var callerDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(callerRef));
+        var callerDoc =
+            new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(callerRef));
 
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(OtherLuaUri, "function RunMission() end", 1);
         // LuaUri deliberately NOT added to host
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty
                 .Add(OtherLuaUri, defDoc)
                 .Add(LuaUri, callerDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("RunMission", ImmutableArray.Create(sym)),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
                 .Add("RunMission", ImmutableArray.Create(callerRef)));
 
         var handler = BuildHandler(index, host);
@@ -499,8 +514,8 @@ public sealed class GameRenameHandlerTest
         host.AddOrUpdate(LuaUri, "function Foo() end", 1);
 
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, defDoc),
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, defDoc),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
                 .Add("Foo", ImmutableArray.Create(sym)));
 
         var handler = BuildHandler(index, host);
@@ -524,7 +539,7 @@ public sealed class GameRenameHandlerTest
 
         var luaDoc = LuaDoc(LuaUri);
         var index = BuildIndex(
-            docs: ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc));
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc));
 
         var handler = BuildHandler(index, host);
         var result = await handler.Handle(RenameAt(0, 6, "y", LuaUri), CancellationToken.None);
@@ -547,16 +562,31 @@ public sealed class GameRenameHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -565,12 +595,19 @@ public sealed class GameRenameHandlerTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
@@ -580,28 +617,64 @@ public sealed class GameRenameHandlerTest
         private readonly Dictionary<string, GameObjectTypeDefinition> _types =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void RegisterType(GameObjectTypeDefinition def) => _types[def.TypeName] = def;
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
 
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void RegisterType(GameObjectTypeDefinition def)
+        {
+            _types[def.TypeName] = def;
+        }
     }
 
     private sealed class AllowAllEaWContext : IEaWXmlContext
     {
-        public bool IsEaWXmlFile(string fileUri) => true;
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return true;
+        }
     }
 
     private sealed class DenyAllEaWContext : IEaWXmlContext
     {
-        public bool IsEaWXmlFile(string fileUri) => false;
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return false;
+        }
     }
 }

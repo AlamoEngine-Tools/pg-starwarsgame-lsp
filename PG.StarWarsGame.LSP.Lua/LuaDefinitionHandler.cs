@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
@@ -12,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Util;
+using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -91,7 +93,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     }
 
     private static string? TryResolveRequireAtPosition(
-        Loretta.CodeAnalysis.SyntaxNode root, int line, int character, GameIndex index, IFileHelper fileHelper)
+        SyntaxNode root, int line, int character, GameIndex index, IFileHelper fileHelper)
     {
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
         {

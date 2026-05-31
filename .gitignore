@@ -502,7 +502,8 @@ fabric.properties
 /foc
 # Local secrets — copy .env.sentry.example and fill in your DSN
 .env.sentry
-/docs
+docs/
 *.py
 *.ps1
 *.md
+*.MD

@@ -23,7 +23,7 @@ public sealed class XmlDiagnosticsHandlerRegistry : IXmlDiagnosticsHandlerRegist
         {
             if (!_byValidationId.TryGetValue(named.ValidationId, out var list))
                 _byValidationId[named.ValidationId] = list = [];
-            list.Add((IXmlDiagnosticsHandler)named);
+            list.Add(named);
         }
     }
 
@@ -36,7 +36,7 @@ public sealed class XmlDiagnosticsHandlerRegistry : IXmlDiagnosticsHandlerRegist
             var customHandlers = (namedList ?? [])
                 .Where(h => h.FactType == fact.GetType());
 
-            IEnumerable<IXmlDiagnosticsHandler> sequence = ov.Mode switch
+            var sequence = ov.Mode switch
             {
                 ValidationOverrideMode.Replace => customHandlers,
                 ValidationOverrideMode.Additive when ov.Order == ValidationOverrideOrder.Prepend =>

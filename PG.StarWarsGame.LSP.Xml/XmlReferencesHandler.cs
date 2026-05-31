@@ -45,6 +45,23 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
         var id = hit.Value.Id;
         var locations = new List<Location>();
 
+        if (index.WorkspaceGroupMemberships.TryGetValue(id, out var members) && members.Length > 0)
+        {
+            foreach (var m in members)
+            {
+                if (m.MemberOrigin is not FileOrigin fo) continue;
+                var col = fo.Column ?? 0;
+                locations.Add(new Location
+                {
+                    Uri = fo.Uri,
+                    Range = new LspRange(new Position(fo.Line, col), new Position(fo.Line, col))
+                });
+            }
+
+            _logger.LogDebug("Find-refs (group): {Id} → {Count} member(s)", id, locations.Count);
+            return Task.FromResult<LocationContainer?>(new LocationContainer(locations));
+        }
+
         if (index.WorkspaceReferences.TryGetValue(id, out var refs))
             foreach (var r in refs)
                 locations.Add(new Location

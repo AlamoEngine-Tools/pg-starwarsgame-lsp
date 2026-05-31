@@ -123,6 +123,7 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
             if (idx < 0) continue;
             return (i, idx + funcName.Length + 2);
         }
+
         return (-1, -1);
     }
 

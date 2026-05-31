@@ -150,7 +150,7 @@ public sealed class ReferenceValidationPipelineTest
         var diagnostics = TypeMismatchDiagnostics(facts);
 
         var d = Assert.Single(diagnostics);
-        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
         Assert.Contains("REBEL_FIGHTER_01", d.Message);
     }
 

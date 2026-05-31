@@ -40,7 +40,8 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         string? tagsYaml = null, string? tagsFileName = "tags.yaml",
         string? tagsYaml2 = null, string? tagsFileName2 = null,
         string? typesYaml = null,
-        string? enumsYaml = null, string? enumsFileName = "enum.yaml")
+        string? enumsYaml = null, string? enumsFileName = "enum.yaml",
+        string? hardcodedYaml = null, string? hardcodedFileName = "set.yaml")
     {
         var tagsDir = Path.Combine(_tempDir, "tags");
         if (tagsYaml is not null)
@@ -65,11 +66,46 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
             File.WriteAllText(Path.Combine(enumsDir, enumsFileName!), enumsYaml);
         }
 
+        if (hardcodedYaml is not null)
+        {
+            var hardcodedDir = Path.Combine(_tempDir, "hardcoded");
+            Directory.CreateDirectory(hardcodedDir);
+            File.WriteAllText(Path.Combine(hardcodedDir, hardcodedFileName!), hardcodedYaml);
+        }
+
         // Constructor calls Load(); explicit call here ensures we re-read after all files are written
         var provider = new LocalFileSchemaProvider(_tempDir, new FileSystem(),
             NullLogger<LocalFileSchemaProvider>.Instance);
         provider.Load();
         return provider;
+    }
+
+    [Fact]
+    public void ParseTagFile_ReferenceGroup_SemanticType_Parsed()
+    {
+        const string tagsYaml = """
+                                tags:
+                                  - tag: Overlap_Test
+                                    type: NameReference
+                                    referenceKind: xmlObject
+                                    referenceType: SFXEvent
+                                    semanticType: referenceGroup
+                                """;
+        const string typesYaml = """
+                                 types:
+                                   - typeName: SFXEvent
+                                     nameTag: Name
+                                 """;
+
+        using var provider = CreateAndLoad(tagsYaml, typesYaml: typesYaml);
+
+        var tag = provider.GetTag("Overlap_Test");
+
+        Assert.NotNull(tag);
+        Assert.Equal(XmlValueType.NameReference, tag.ValueType);
+        Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
+        Assert.Equal(TagSemanticType.ReferenceGroup, tag.SemanticType);
+        Assert.Equal("SFXEvent", tag.ObjectType?.TypeName);
     }
 
     [Fact]
@@ -452,6 +488,144 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
 
         Assert.NotNull(tag);
         Assert.Null(tag.ValidationOverride);
+    }
+
+    // ── Hardcoded reference set loading ─────────────────────────────────────
+
+    [Fact]
+    public void ParseHardcodedSetFile_LoadedFromHardcodedDirectory()
+    {
+        const string hardcodedYaml = """
+                                     name: AbilityClass
+                                     values:
+                                       - name: Combat_Bonus_Ability
+                                       - name: Lucky_Shot_Attack_Ability
+                                     """;
+
+        using var provider = CreateAndLoad(hardcodedYaml: hardcodedYaml);
+
+        var set = provider.AllHardcodedSets.FirstOrDefault(s => s.Name == "AbilityClass");
+        Assert.NotNull(set);
+        Assert.Contains(set.Values, v => v.Name == "Combat_Bonus_Ability");
+        Assert.Contains(set.Values, v => v.Name == "Lucky_Shot_Attack_Ability");
+    }
+
+    [Fact]
+    public void ParseTagFile_HardcodedSetReference_ResolvedToSet()
+    {
+        const string tagsYaml = """
+                                tags:
+                                  - tag: Type
+                                    type: NameReference
+                                    referenceKind: hardcodedSet
+                                    referenceType: AbilityType
+                                """;
+        const string hardcodedYaml = """
+                                     name: AbilityType
+                                     values:
+                                       - name: HUNT
+                                       - name: FORCE_CLOAK
+                                     """;
+
+        using var provider = CreateAndLoad(tagsYaml, hardcodedYaml: hardcodedYaml);
+
+        var tag = provider.GetTag("Type");
+        Assert.NotNull(tag);
+        Assert.Equal(ReferenceKind.HardcodedSet, tag.ReferenceKind);
+        Assert.NotNull(tag.HardcodedSet);
+        Assert.Equal("AbilityType", tag.HardcodedSet.Name);
+        Assert.Contains(tag.HardcodedSet.Values, v => v.Name == "HUNT");
+        Assert.Contains(tag.HardcodedSet.Values, v => v.Name == "FORCE_CLOAK");
+    }
+
+    [Fact]
+    public void ParseTagFile_DynamicEnumValue_SchemaFixed_EnumResolved()
+    {
+        const string tagsYaml = """
+                                tags:
+                                  - tag: Activation_Style
+                                    type: DynamicEnumValue
+                                    referenceKind: enum
+                                    enumName: SpecialAbilityActivationStyle
+                                """;
+        const string enumsYaml = """
+                                 name: SpecialAbilityActivationStyle
+                                 values:
+                                   - name: User_Input
+                                   - name: Ground_Automatic
+                                   - name: Space_Automatic
+                                 """;
+
+        using var provider = CreateAndLoad(tagsYaml, enumsYaml: enumsYaml);
+
+        var tag = provider.GetTag("Activation_Style");
+        Assert.NotNull(tag);
+        Assert.Equal(XmlValueType.DynamicEnumValue, tag.ValueType);
+        Assert.Equal(ReferenceKind.Enum, tag.ReferenceKind);
+        Assert.NotNull(tag.Enum);
+        Assert.Equal("SpecialAbilityActivationStyle", tag.Enum.Name);
+        Assert.Contains(tag.Enum.Values, v => v.Name == "User_Input");
+        Assert.Contains(tag.Enum.Values, v => v.Name == "Ground_Automatic");
+    }
+
+    // ── Real schema integration ───────────────────────────────────────────────
+
+    private static string? FindRealSchemaRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null)
+        {
+            var candidate = System.IO.Path.Combine(dir.FullName, "schema", "eaw");
+            if (Directory.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+
+        return null;
+    }
+
+    [Fact]
+    public void RealSchema_AbilitiesTag_HasAbilityDefinitionSubObjectListType()
+    {
+        var root = FindRealSchemaRoot();
+        if (root is null) return; // schema not available in this test environment
+
+        using var provider = new LocalFileSchemaProvider(root, new FileSystem(),
+            NullLogger<LocalFileSchemaProvider>.Instance);
+        provider.Load();
+
+        var tag = provider.GetTag("Abilities");
+        Assert.NotNull(tag);
+        Assert.Equal(XmlValueType.AbilityDefinitionSubObjectList, tag.ValueType);
+    }
+
+    [Fact]
+    public void RealSchema_LuckyShotAttackAbility_ReturnsObjectType()
+    {
+        var root = FindRealSchemaRoot();
+        if (root is null) return;
+
+        using var provider = new LocalFileSchemaProvider(root, new FileSystem(),
+            NullLogger<LocalFileSchemaProvider>.Instance);
+        provider.Load();
+
+        var type = provider.GetObjectType("LuckyShotAttackAbility");
+        Assert.NotNull(type);
+        Assert.Equal("LuckyShotAttackAbility", type.TypeName);
+        Assert.Equal("Name", type.NameTag);
+    }
+
+    [Fact]
+    public void RealSchema_LuckyShotAttackAbility_HasTags()
+    {
+        var root = FindRealSchemaRoot();
+        if (root is null) return;
+
+        using var provider = new LocalFileSchemaProvider(root, new FileSystem(),
+            NullLogger<LocalFileSchemaProvider>.Instance);
+        provider.Load();
+
+        var tags = provider.GetTagsForType("LuckyShotAttackAbility");
+        Assert.NotEmpty(tags);
     }
 
     private static WatchlessMockFileSystem MakeMockFs(Dictionary<string, MockFileData>? files = null)

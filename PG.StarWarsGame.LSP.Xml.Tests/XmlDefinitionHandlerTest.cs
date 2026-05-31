@@ -187,6 +187,45 @@ public sealed class XmlDefinitionHandlerTest
         Assert.Equal(lowercaseUri, link.Location!.Uri.ToString());
     }
 
+    // ── group key — no canonical definition ──────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CursorOnGroupKey_ReturnsNull_EvenWhenSymbolWithSameIdExists()
+    {
+        // A symbol "Unit_AT_AT" exists in the workspace, but the cursor is on a
+        // group-membership tag value (not on a reference to that symbol). The definition
+        // handler must return null — group keys have no canonical single definition.
+        var groupMembership = new DocumentGroupMembership(
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin(TestUri, 2, 4)),
+            1, 5, 10);
+
+        var callerDoc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(groupMembership));
+
+        // Also put a real symbol with the same id in the index — collision scenario.
+        var collidingSymbol = SymbolAt("Unit_AT_AT", TargetUri, 10);
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("Unit_AT_AT", ImmutableArray.Create(collidingSymbol));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(TestUri, callerDoc),
+            defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
+        {
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(groupMembership.Membership))
+        };
+
+        var handler = BuildHandler(index);
+        // Cursor lands on the tag value span (line 1, col 7 — within [5..15))
+        var result = await handler.Handle(At(1, 7), CancellationToken.None);
+
+        Assert.Null(result);
+    }
+
     // ── EaW directory gating ─────────────────────────────────────────────────
 
     [Fact]

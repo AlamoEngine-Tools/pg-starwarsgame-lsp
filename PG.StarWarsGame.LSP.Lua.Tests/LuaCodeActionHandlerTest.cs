@@ -4,14 +4,16 @@
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core;
-using PG.StarWarsGame.LSP.Lua;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
 public sealed class LuaCodeActionHandlerTest
 {
-    private static LuaCodeActionHandler MakeSut() => new();
+    private static LuaCodeActionHandler MakeSut()
+    {
+        return new LuaCodeActionHandler();
+    }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)
     {
@@ -30,7 +32,7 @@ public sealed class LuaCodeActionHandlerTest
             Code = new DiagnosticCode(LuaDiagnosticCodes.DuplicateRequire),
             Range = new LspRange(new Position(line, startChar), new Position(line, endChar)),
             Severity = DiagnosticSeverity.Warning,
-            Message = $"require(\"x\") is a duplicate.",
+            Message = "require(\"x\") is a duplicate.",
             Source = AppProperties.LspServerId
         };
     }
@@ -42,7 +44,7 @@ public sealed class LuaCodeActionHandlerTest
             Code = new DiagnosticCode(LuaDiagnosticCodes.RedundantRequire),
             Range = new LspRange(new Position(line, startChar), new Position(line, endChar)),
             Severity = DiagnosticSeverity.Warning,
-            Message = $"require(\"x\") is redundant.",
+            Message = "require(\"x\") is redundant.",
             Source = AppProperties.LspServerId
         };
     }
@@ -52,7 +54,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_RedundantRequireDiagnostic_ReturnsOneQuickFix()
     {
-        var diag = RedundantRequireDiag(line: 3, startChar: 0, endChar: 12);
+        var diag = RedundantRequireDiag(3, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -94,7 +96,7 @@ public sealed class LuaCodeActionHandlerTest
     public async Task Handle_RedundantDiagnostic_EditDeletesEntireLine()
     {
         // Diagnostic is on line 5 — edit must cover (5,0)..(6,0) to delete the full line.
-        var diag = RedundantRequireDiag(line: 5, startChar: 0, endChar: 14);
+        var diag = RedundantRequireDiag(5, 0, 14);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -112,7 +114,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_RedundantDiagnostic_TitleIsRemoveRedundantRequire()
     {
-        var diag = RedundantRequireDiag(line: 0, startChar: 0, endChar: 12);
+        var diag = RedundantRequireDiag(0, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -123,7 +125,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_RedundantDiagnostic_IsPreferred()
     {
-        var diag = RedundantRequireDiag(line: 0, startChar: 0, endChar: 12);
+        var diag = RedundantRequireDiag(0, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -134,7 +136,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_MixedDiagnostics_OnlyRedundantGetsAction()
     {
-        var redundant = RedundantRequireDiag(line: 2, startChar: 0, endChar: 12);
+        var redundant = RedundantRequireDiag(2, 0, 12);
         var other = new Diagnostic
         {
             Code = new DiagnosticCode("something-else"),
@@ -153,7 +155,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_DuplicateRequireDiagnostic_ReturnsOneQuickFix()
     {
-        var diag = DuplicateRequireDiag(line: 2, startChar: 0, endChar: 12);
+        var diag = DuplicateRequireDiag(2, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -166,7 +168,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_DuplicateRequireDiagnostic_EditDeletesEntireLine()
     {
-        var diag = DuplicateRequireDiag(line: 3, startChar: 0, endChar: 12);
+        var diag = DuplicateRequireDiag(3, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -184,7 +186,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_DuplicateRequireDiagnostic_TitleIsRemoveDuplicateRequire()
     {
-        var diag = DuplicateRequireDiag(line: 0, startChar: 0, endChar: 12);
+        var diag = DuplicateRequireDiag(0, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -195,7 +197,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_DuplicateRequireDiagnostic_IsPreferred()
     {
-        var diag = DuplicateRequireDiag(line: 0, startChar: 0, endChar: 12);
+        var diag = DuplicateRequireDiag(0, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);

@@ -271,8 +271,14 @@ public sealed class GameRenameHandler : RenameHandlerBase
         {
             var path = _fileHelper.FileUriToPath(uri);
             if (path is null) return null;
-            try { text = _fileHelper.FileSystem.File.ReadAllText(path); }
-            catch { return null; }
+            try
+            {
+                text = _fileHelper.FileSystem.File.ReadAllText(path);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         var lines = text.Split('\n');
@@ -321,8 +327,14 @@ public sealed class GameRenameHandler : RenameHandlerBase
             return doc.Text;
         var path = _fileHelper.FileUriToPath(uri);
         if (path is null) return null;
-        try { return _fileHelper.FileSystem.File.ReadAllText(path); }
-        catch { return null; }
+        try
+        {
+            return _fileHelper.FileSystem.File.ReadAllText(path);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static void AddEdit(

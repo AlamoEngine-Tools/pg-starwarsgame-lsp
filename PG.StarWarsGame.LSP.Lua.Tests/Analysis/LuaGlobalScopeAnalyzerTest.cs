@@ -6,7 +6,6 @@ using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -344,7 +343,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
         Assert.Single(result);
-        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Warning,
+        Assert.Equal(DiagnosticSeverity.Warning,
             result[0].Severity);
     }
 
@@ -359,7 +358,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var symFoo = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
             new FileOrigin(uriB, 0, null), null);
         var docB = new DocumentIndex(uriB, 1, [symFoo], [],
-            ImmutableArray.Create("c"));           // B exports Foo, requires C
+            ImmutableArray.Create("c")); // B exports Foo, requires C
         var docC = new DocumentIndex(OtherUri, 1, [], []);
         var index = GameIndex.Empty with
         {
@@ -373,7 +372,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
         // Unused-require hint for require("b") since Foo is not called
         var diag = Assert.Single(result);
-        Assert.Equal(OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Hint,
+        Assert.Equal(DiagnosticSeverity.Hint,
             diag.Severity);
     }
 
@@ -387,18 +386,18 @@ public sealed class LuaGlobalScopeAnalyzerTest
         const string uriB = "file:///scripts/b.lua";
         const string text = """require("b")""";
         var docB = new DocumentIndex(uriB, 1, [], [],
-            ImmutableArray.Create("a"));   // B requires "a" → resolves back to uriA
+            ImmutableArray.Create("a")); // B requires "a" → resolves back to uriA
         var index = GameIndex.Empty with
         {
             Documents = GameIndex.Empty.Documents
                 .Add(uriA, new DocumentIndex(uriA, 1, [], []))
-                .Add(uriB, docB),
+                .Add(uriB, docB)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper);
 
         var errors = result.Where(d =>
-            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error).ToList();
+            d.Severity == DiagnosticSeverity.Error).ToList();
         Assert.Single(errors);
         Assert.Contains("cyclic", errors[0].Message, StringComparison.OrdinalIgnoreCase);
     }
@@ -418,13 +417,13 @@ public sealed class LuaGlobalScopeAnalyzerTest
             Documents = GameIndex.Empty.Documents
                 .Add(uriA, new DocumentIndex(uriA, 1, [], []))
                 .Add(uriB, docB)
-                .Add(uriC, docC),
+                .Add(uriC, docC)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(uriA, text, index, EmptySchema, s_fileHelper);
 
         var errors = result.Where(d =>
-            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error).ToList();
+            d.Severity == DiagnosticSeverity.Error).ToList();
         Assert.Single(errors);
     }
 
@@ -439,12 +438,12 @@ public sealed class LuaGlobalScopeAnalyzerTest
             Documents = GameIndex.Empty.Documents
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
                 .Add(LibUri, docB)
-                .Add(OtherUri, docC),
+                .Add(OtherUri, docC)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
         Assert.DoesNotContain(result, d =>
-            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error);
+            d.Severity == DiagnosticSeverity.Error);
     }
 
     [Fact]
@@ -455,12 +454,12 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var index = GameIndex.Empty with
         {
             Documents = GameIndex.Empty.Documents
-                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], [])),
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
         Assert.DoesNotContain(result, d =>
-            d.Severity == OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity.Error);
+            d.Severity == DiagnosticSeverity.Error);
     }
 
     // ── own-file / local-scope false positives (Bug B) ───────────────────────
@@ -741,7 +740,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             Documents = GameIndex.Empty.Documents
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
                 .Add(uriB, docB)
-                .Add(uriC, docC),
+                .Add(uriC, docC)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
@@ -770,7 +769,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             Documents = GameIndex.Empty.Documents
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
                 .Add(uriB, docB)
-                .Add(uriC, docC),
+                .Add(uriC, docC)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
@@ -788,7 +787,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
         {
             Documents = GameIndex.Empty.Documents
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
-                .Add(uriB, new DocumentIndex(uriB, 1, [], [])),
+                .Add(uriB, new DocumentIndex(uriB, 1, [], []))
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
@@ -814,7 +813,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
             Documents = GameIndex.Empty.Documents
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
                 .Add(uriSm, docSm)
-                .Add(uriBase, docBase),
+                .Add(uriBase, docBase)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
@@ -845,7 +844,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
                 .Add(uriB, docB)
                 .Add(uriC, docC)
-                .Add(uriD, docD),
+                .Add(uriD, docD)
         };
 
         var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);

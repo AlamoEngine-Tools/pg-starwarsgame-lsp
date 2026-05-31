@@ -15,4 +15,5 @@ public sealed class SerializedBaseline
     [Key(3)] public SerializedEnumValues[] DynamicEnumValues { get; set; } = [];
     [Key(4)] public SerializedEnumValues[] HardcodedEnumValues { get; set; } = [];
     [Key(5)] public SerializedEnumValues[] FileTypeMap { get; set; } = [];
+    [Key(6)] public SerializedGroupMemberships[] GroupMemberships { get; set; } = [];
 }

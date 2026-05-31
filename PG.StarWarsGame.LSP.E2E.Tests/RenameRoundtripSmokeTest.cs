@@ -38,7 +38,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         "Data/Scripts/Library/Pgevents.lua",
         "Data/Scripts/Ai/Spacemode/Tacticalmultiplayerbuildspaceunitsgeneric.lua",
         "Data/Scripts/Ai/Spacemode/Spaceartillery.lua",
-        "Data/Scripts/Ai/Spacemode/Hidesurpriseunits.lua",
+        "Data/Scripts/Ai/Spacemode/Hidesurpriseunits.lua"
     ];
 
     private readonly EawLspServerFixture _fixture;
@@ -56,7 +56,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         RequireEawWorkspace();
         await WaitForFullScanAsync();
         // Only Interdictor.lua open — all other affected files remain closed (on disk).
-        await RunRenameRoundtripAsync(InterdictorRel, isLuaEntry: true, []);
+        await RunRenameRoundtripAsync(InterdictorRel, true, []);
     }
 
     [Fact]
@@ -65,7 +65,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         RequireEawWorkspace();
         await WaitForFullScanAsync();
         // Simulate a user whose editor already has all relevant files open as cached tabs.
-        await RunRenameRoundtripAsync(InterdictorRel, isLuaEntry: true,
+        await RunRenameRoundtripAsync(InterdictorRel, true,
             [.. KnownLuaFiles, CorvettesXmlRel]);
     }
 
@@ -75,7 +75,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         RequireEawWorkspace();
         await WaitForFullScanAsync();
         // Only Spaceunitscorvettes.xml open — all Lua files remain closed.
-        await RunRenameRoundtripAsync(CorvettesXmlRel, isLuaEntry: false, []);
+        await RunRenameRoundtripAsync(CorvettesXmlRel, false, []);
     }
 
     [Fact]
@@ -84,7 +84,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         RequireEawWorkspace();
         await WaitForFullScanAsync();
         // Simulate a user with all relevant files already open.
-        await RunRenameRoundtripAsync(CorvettesXmlRel, isLuaEntry: false,
+        await RunRenameRoundtripAsync(CorvettesXmlRel, false,
             [.. KnownLuaFiles, CorvettesXmlRel]);
     }
 
@@ -295,12 +295,10 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
 
             // Always close every file the test opened.
             foreach (var uriStr in inMemory.Keys)
-            {
                 _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
                 {
                     TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uriStr) }
                 });
-            }
         }
     }
 
@@ -366,8 +364,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
     private static string ApplyTextEdits(string text, IEnumerable<TextEdit> edits)
     {
         var lines = text.Split('\n').ToList();
-        foreach (var edit in edits.OrderByDescending(
-                     e => (e.Range.Start.Line, e.Range.Start.Character)))
+        foreach (var edit in edits.OrderByDescending(e => (e.Range.Start.Line, e.Range.Start.Character)))
         {
             var line = lines[edit.Range.Start.Line];
             lines[edit.Range.Start.Line] =
@@ -375,6 +372,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 + edit.NewText
                 + line[edit.Range.End.Character..];
         }
+
         return string.Join('\n', lines);
     }
 
@@ -392,6 +390,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             if (idx < 0) continue;
             return (i, idx + funcName.Length + 2); // +2 for '(' and '"'
         }
+
         return (-1, -1);
     }
 
@@ -411,6 +410,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             if (attrIdx < 0) continue;
             return (i, attrIdx + attrName.Length + 2); // +2 for '=' and '"'
         }
+
         return (-1, -1);
     }
 

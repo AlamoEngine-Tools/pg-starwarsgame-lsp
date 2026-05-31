@@ -19,5 +19,14 @@ public enum TagSemanticType
     ///     Applies to GameObjectTypeReferenceList tags that support AND/OR/NOT operators.
     ///     Validator implementation deferred until expression syntax is confirmed.
     /// </summary>
-    PrerequisiteExpression
+    PrerequisiteExpression,
+
+    /// <summary>
+    ///     Groups the parent XML objects that share this tag's value under a common key.
+    ///     <c>referenceKind</c> and <c>referenceType</c> in YAML identify the type of objects being grouped.
+    ///     No unresolved-reference diagnostic is emitted; instead a
+    ///     <see cref="PG.StarWarsGame.LSP.Core.Symbols.GroupMembership" />
+    ///     entry is produced linking the group key to the parent object's definition position.
+    /// </summary>
+    ReferenceGroup
 }

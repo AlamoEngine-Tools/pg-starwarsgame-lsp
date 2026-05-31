@@ -209,6 +209,7 @@ public sealed class HttpSchemaProviderTest
         Assert.DoesNotContain("//", indexRequest.RequestUri!.AbsolutePath.TrimStart('/'));
         Assert.EndsWith("_index.json", indexRequest.RequestUri.ToString());
     }
+
     [Fact]
     public async Task LoadAsync_WhenFetchFails_ReadyAsyncCompletes()
     {
@@ -233,7 +234,9 @@ public sealed class HttpSchemaProviderTest
         }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
-            => Task.FromException<HttpResponseMessage>(_exception);
+        {
+            return Task.FromException<HttpResponseMessage>(_exception);
+        }
     }
 
     private sealed class FakeHttpMessageHandler : HttpMessageHandler

@@ -22,6 +22,14 @@ public sealed record GameIndex(
         ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
         ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
 
+    /// <summary>
+    ///     Group memberships aggregated across all workspace documents. Keyed case-insensitively by
+    ///     <see cref="GroupMembership.GroupKey" />. Multiple <see cref="GroupMembership" /> entries under
+    ///     the same key represent all objects that belong to that reference group.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<GroupMembership>> WorkspaceGroupMemberships { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase);
+
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)

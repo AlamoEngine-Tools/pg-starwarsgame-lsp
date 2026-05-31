@@ -11,5 +11,7 @@ public sealed class Type35Handler : XmlDiagnosticsHandler<XmlTagValueFact>
     public override XmlValueType? HandledValueType => XmlValueType.Type35;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
-        => [];
+    {
+        return [];
+    }
 }

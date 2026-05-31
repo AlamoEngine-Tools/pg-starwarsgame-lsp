@@ -17,13 +17,13 @@ public sealed class TypeMismatchHandlerTest
     }
 
     [Fact]
-    public void Wrong_type_emits_warning_with_id_and_types()
+    public void Wrong_type_emits_error_with_id_and_types()
     {
         var sym = MakeSymbol("X1", "GroundUnit");
         var fact = new XmlReferenceFact("file:///test.xml", 1, 0, 2, "X1", sym, "SpaceUnit");
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
-        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
         Assert.Contains("X1", d.Message);
         Assert.Contains("SpaceUnit", d.Message);
         Assert.Contains("GroundUnit", d.Message);

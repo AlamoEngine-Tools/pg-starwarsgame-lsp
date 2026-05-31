@@ -32,7 +32,9 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
     }
 
     public override Task<CodeAction> Handle(CodeAction request, CancellationToken ct)
-        => Task.FromResult(request);
+    {
+        return Task.FromResult(request);
+    }
 
     protected override CodeActionRegistrationOptions CreateRegistrationOptions(
         CodeActionCapability capability, ClientCapabilities clientCapabilities)

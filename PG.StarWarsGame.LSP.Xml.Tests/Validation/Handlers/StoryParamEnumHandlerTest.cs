@@ -36,12 +36,12 @@ public sealed class StoryParamEnumHandlerTest
     }
 
     [Fact]
-    public void Invalid_enum_value_emits_warning()
+    public void Invalid_enum_value_emits_error()
     {
         var fact = MakeFact(MakeEnum("RED", "GREEN"), "YELLOW");
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
-        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
         Assert.Contains("YELLOW", d.Message);
     }
 
@@ -53,12 +53,13 @@ public sealed class StoryParamEnumHandlerTest
     }
 
     [Fact]
-    public void Invalid_token_in_enum_list_emits_warning()
+    public void Invalid_token_in_enum_list_emits_error()
     {
         var fact = MakeFact(MakeEnum("A", "B"), "A INVALID");
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
-        Assert.Single(results);
-        Assert.Contains("INVALID", results[0].Message);
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+        Assert.Contains("INVALID", d.Message);
     }
 
     [Fact]

@@ -19,7 +19,8 @@ public static class BaselineSerializer
             SourceManifestHash = baseline.SourceManifestHash,
             DynamicEnumValues = ToSerializedArray(baseline.DynamicEnumValues),
             HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues),
-            FileTypeMap = ToSerializedArray(baseline.FileTypeMap)
+            FileTypeMap = ToSerializedArray(baseline.FileTypeMap),
+            GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships)
         };
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
@@ -43,7 +44,11 @@ public static class BaselineSerializer
         var enums = FromSerializedArray(dto.DynamicEnumValues);
         var hardcoded = FromSerializedArray(dto.HardcodedEnumValues);
         var fileTypeMap = FromSerializedArray(dto.FileTypeMap);
-        return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap);
+        var groupMemberships = FromSerializedGroupMemberships(dto.GroupMemberships);
+        return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap)
+        {
+            GroupMemberships = groupMemberships
+        };
     }
 
     private static SerializedEnumValues[] ToSerializedArray(
@@ -57,5 +62,22 @@ public static class BaselineSerializer
         SerializedEnumValues[] arr)
     {
         return arr.ToImmutableDictionary(e => e.Name, e => e.Values.ToImmutableArray());
+    }
+
+    private static SerializedGroupMemberships[] ToSerializedGroupMemberships(
+        ImmutableDictionary<string, ImmutableArray<GroupMembership>> dict)
+    {
+        return dict.Select(kv => new SerializedGroupMemberships
+                { GroupKey = kv.Key, Members = kv.Value.ToArray() })
+            .ToArray();
+    }
+
+    private static ImmutableDictionary<string, ImmutableArray<GroupMembership>> FromSerializedGroupMemberships(
+        SerializedGroupMemberships[] arr)
+    {
+        return arr.ToImmutableDictionary(
+            e => e.GroupKey,
+            e => e.Members.ToImmutableArray(),
+            StringComparer.OrdinalIgnoreCase);
     }
 }

@@ -8,10 +8,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class BooleanValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
-    public override XmlValueType? HandledValueType => XmlValueType.Boolean;
-
     private static readonly HashSet<string> ValidValues =
         new(StringComparer.OrdinalIgnoreCase) { "true", "false", "yes", "no", "1", "0" };
+
+    public override XmlValueType? HandledValueType => XmlValueType.Boolean;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {

@@ -25,8 +25,14 @@ public sealed class XmlValidatorCompletenessTest
             .Where(t => !t.IsAbstract && !t.IsInterface && typeof(IXmlDiagnosticsHandler).IsAssignableFrom(t))
             .Select(t =>
             {
-                try { return Activator.CreateInstance(t); }
-                catch { return null; }
+                try
+                {
+                    return Activator.CreateInstance(t);
+                }
+                catch
+                {
+                    return null;
+                }
             })
             .OfType<IXmlDiagnosticsHandler>()
             .Select(h => h.HandledValueType)

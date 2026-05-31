@@ -20,7 +20,7 @@ public sealed class TypeMismatchHandler : XmlDiagnosticsHandler<XmlReferenceFact
 
         return
         [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                 $"Type mismatch for '{fact.TargetId}': expected '{fact.ExpectedTypeName}' but found '{fact.Resolved.TypeName}'.")
         ];
     }

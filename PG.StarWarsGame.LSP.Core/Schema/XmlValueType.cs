@@ -143,14 +143,19 @@ public enum XmlValueType
     /// <summary>Campaign force deployment tuple (faction name, planet name, unit type name).</summary>
     ForceDeploymentList = 55,
 
-    /// <summary>Ability sub-object list (engine internal: AbilitySubObjectList). Semantics not fully characterized.</summary>
-    Type56 = 56,
+    /// <summary>
+    ///     Ability sub-object list (engine internal: AbilitySubObjectList). Contains heterogeneous named child elements
+    ///     whose tag name is the ability class (snake_case → PascalCase schema type, e.g. Lucky_Shot_Attack_Ability →
+    ///     LuckyShotAttackAbility). Each child's Name attribute is indexed as a GameSymbol.
+    /// </summary>
+    AbilityDefinitionSubObjectList = 56,
 
     /// <summary>
-    ///     Unit abilities data sub-object list (engine internal: UnitAbilitiesDataSubObjectList). Semantics not fully
-    ///     characterized.
+    ///     Unit abilities data sub-object list (engine internal: UnitAbilitiesDataSubObjectList). Contains anonymous
+    ///     Unit_Ability elements that activate named abilities at runtime. GUI_Activated_Ability_Name cross-references
+    ///     a named ability from the AbilityDefinitionSubObjectList Abilities list.
     /// </summary>
-    Type57 = 57,
+    GuiActivatedAbilityDefinitionSubObjectList = 57,
 
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     Type58 = 58,
@@ -200,8 +205,12 @@ public enum XmlValueType
     [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
     CategoryToIntegerMap = 72,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
-    Type73 = 73,
+    /// <summary>
+    ///     Ability behaviour type identifier (engine internal: AbilityType C++ enum). Names the engine behaviour
+    ///     associated with a SpecialAbilityData entry (e.g. HUNT, FORCE_CLOAK, DEFEND).
+    ///     Values overlap with BehaviorModule names but are a separate enum — do not conflate them.
+    /// </summary>
+    AbilityType = 73,
 
     /// <summary>Projectile category enum name (e.g. a named combat category used for targeting logic).</summary>
     ProjectileCategory = 74,

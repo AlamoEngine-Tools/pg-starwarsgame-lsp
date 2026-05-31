@@ -6,10 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class Type56Handler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class AbilityDefinitionSubObjectListHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
-    public override XmlValueType? HandledValueType => XmlValueType.Type56;
+    public override XmlValueType? HandledValueType => XmlValueType.AbilityDefinitionSubObjectList;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
-        => [];
+    {
+        return [];
+    }
 }

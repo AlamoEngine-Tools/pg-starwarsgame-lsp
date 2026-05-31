@@ -17,6 +17,13 @@ public static class XmlPositionResolver
                     new Position(line, r.Column),
                     new Position(line, r.Column + r.Length)));
 
+        if (!docIndex.GroupMemberships.IsDefault)
+            foreach (var gm in docIndex.GroupMemberships)
+                if (gm.TagLine == line && character >= gm.TagColumn && character < gm.TagColumn + gm.TagLength)
+                    return (gm.Membership.GroupKey, new LspRange(
+                        new Position(line, gm.TagColumn),
+                        new Position(line, gm.TagColumn + gm.TagLength)));
+
         foreach (var s in docIndex.Symbols)
             if (s.Origin is FileOrigin fo && fo.Line == line)
             {

@@ -5,6 +5,8 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 public sealed class EawLspServerFixture : LspServerFixture
 {
-    protected override string ResolveWorkspacePath() =>
-        LspTestEnvironment.EawWorkspacePath ?? TestDataDirectory;
+    protected override string ResolveWorkspacePath()
+    {
+        return LspTestEnvironment.EawWorkspacePath ?? TestDataDirectory;
+    }
 }

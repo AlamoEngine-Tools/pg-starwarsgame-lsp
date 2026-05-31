@@ -71,8 +71,7 @@ public sealed class LuaDefinitionHandlerTest
         var libDocIndex = new DocumentIndex(LibUri, 1, [symbol], []);
 
         var index = MakeIndex(
-            definitions: [("Foo", ImmutableArray.Create(symbol))],
-            documents: [(LuaUri, docIndex), (LibUri, libDocIndex)]);
+            [("Foo", ImmutableArray.Create(symbol))], (LuaUri, docIndex), (LibUri, libDocIndex));
 
         var result = await BuildHandler(index).Handle(RequestAt(0, 1), CancellationToken.None);
 
@@ -89,8 +88,8 @@ public sealed class LuaDefinitionHandlerTest
         var symbol = new GameSymbol("Bar", GameSymbolKind.LuaGlobal, null, new FileOrigin(LibUri, 2, 9), null);
         var docIndex = new DocumentIndex(LibUri, 1, [symbol], []);
         var index = MakeIndex(
-            definitions: [("Bar", ImmutableArray.Create(symbol))],
-            documents: (LibUri, docIndex));
+            [("Bar", ImmutableArray.Create(symbol))],
+            (LibUri, docIndex));
 
         var result = await BuildHandler(index).Handle(RequestAt(2, 9, LibUri), CancellationToken.None);
 
@@ -109,8 +108,8 @@ public sealed class LuaDefinitionHandlerTest
         // Symbol has UnknownOrigin — not navigable
         var symbol = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null, new UnknownOrigin("test"), null);
         var index = MakeIndex(
-            definitions: [("Foo", ImmutableArray.Create(symbol))],
-            documents: (LuaUri, docIndex));
+            [("Foo", ImmutableArray.Create(symbol))],
+            (LuaUri, docIndex));
 
         var result = await BuildHandler(index).Handle(RequestAt(0, 1), CancellationToken.None);
         Assert.Null(result);
@@ -129,8 +128,8 @@ public sealed class LuaDefinitionHandlerTest
         // The XML symbol is at line 5, col 0 in units.xml.
         var xmlSymbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit", new FileOrigin(xmlUri, 5, 0), null);
         var index = MakeIndex(
-            definitions: [("UNIT_A", ImmutableArray.Create(xmlSymbol))],
-            documents: (LuaUri, docIndex));
+            [("UNIT_A", ImmutableArray.Create(xmlSymbol))],
+            (LuaUri, docIndex));
 
         var result = await BuildHandler(index).Handle(RequestAt(0, 12), CancellationToken.None);
 
@@ -151,8 +150,8 @@ public sealed class LuaDefinitionHandlerTest
         var archiveSymbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new MegArchiveOrigin("data.meg", "units.xml", 5, 0), null);
         var index = MakeIndex(
-            definitions: [("UNIT_A", ImmutableArray.Create(archiveSymbol))],
-            documents: (LuaUri, docIndex));
+            [("UNIT_A", ImmutableArray.Create(archiveSymbol))],
+            (LuaUri, docIndex));
 
         var result = await BuildHandler(index).Handle(RequestAt(0, 12), CancellationToken.None);
         Assert.Null(result);
@@ -241,18 +240,31 @@ public sealed class LuaDefinitionHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public void RemoveDocument(string uri)
+        {
+        }
 
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -260,13 +272,20 @@ public sealed class LuaDefinitionHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
-        public bool TryGet(string uri, out TrackedDocument doc) =>
-            _docs.TryGetValue(uri, out doc!);
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }

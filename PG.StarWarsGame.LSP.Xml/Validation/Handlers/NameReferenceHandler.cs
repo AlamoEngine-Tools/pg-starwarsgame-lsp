@@ -15,12 +15,24 @@ public sealed class NameReferenceHandler : XmlDiagnosticsHandler<XmlTagValueFact
         if (fact.Tag.ValueType != XmlValueType.NameReference)
             return [];
 
-        if (fact.RawValue.Trim().Length == 0)
+        var trimmed = fact.RawValue.Trim();
+        if (trimmed.Length == 0)
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'' is not a valid name reference for <{fact.Tag.Tag}>.")
             ];
+
+        if (fact.Tag.ReferenceKind == ReferenceKind.HardcodedSet && fact.Tag.HardcodedSet is { } set)
+        {
+            var known = set.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (!known.Contains(trimmed))
+                return
+                [
+                    new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+                        $"'{trimmed}' is not a known value for '{set.Name}' on <{fact.Tag.Tag}>.")
+                ];
+        }
 
         return [];
     }

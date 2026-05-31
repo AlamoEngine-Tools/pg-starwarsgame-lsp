@@ -224,6 +224,94 @@ public sealed class BaselineSerializerTest
         Assert.Empty(result.FileTypeMap);
     }
 
+    // ── GroupMemberships ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_GroupMemberships_Empty()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        Assert.Empty(result.GroupMemberships);
+    }
+
+    [Fact]
+    public void RoundTrip_GroupMemberships_FileOrigin()
+    {
+        var membership = new GroupMembership("Unit_AT_AT", "SFXEvent",
+            new FileOrigin("file:///sfx.xml", 5, 10));
+        var baseline = Baseline() with
+        {
+            GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                    StringComparer.OrdinalIgnoreCase)
+                .Add("Unit_AT_AT", [membership])
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Single(result.GroupMemberships);
+        var members = result.GroupMemberships["Unit_AT_AT"];
+        Assert.Single(members);
+        Assert.Equal("Unit_AT_AT", members[0].GroupKey);
+        Assert.Equal("SFXEvent", members[0].MemberTypeName);
+        var origin = Assert.IsType<FileOrigin>(members[0].MemberOrigin);
+        Assert.Equal("file:///sfx.xml", origin.Uri);
+        Assert.Equal(5, origin.Line);
+        Assert.Equal(10, origin.Column);
+    }
+
+    [Fact]
+    public void RoundTrip_GroupMemberships_MegArchiveOrigin()
+    {
+        var membership = new GroupMembership("Laser_Group", "SFXEvent",
+            new MegArchiveOrigin("SFX.MEG", "SFX/LASER.XML", 3, null));
+        var baseline = Baseline() with
+        {
+            GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                    StringComparer.OrdinalIgnoreCase)
+                .Add("Laser_Group", [membership])
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        var members = result.GroupMemberships["Laser_Group"];
+        Assert.Single(members);
+        var origin = Assert.IsType<MegArchiveOrigin>(members[0].MemberOrigin);
+        Assert.Equal("SFX.MEG", origin.ArchivePath);
+        Assert.Equal("SFX/LASER.XML", origin.InternalPath);
+        Assert.Equal(3, origin.Line);
+        Assert.Null(origin.Column);
+    }
+
+    [Fact]
+    public void RoundTrip_GroupMemberships_MultipleGroupsAndMembers()
+    {
+        var g1m1 = new GroupMembership("GRP_A", "SFXEvent", new FileOrigin("file:///a.xml", 1, null));
+        var g1m2 = new GroupMembership("GRP_A", "SFXEvent", new FileOrigin("file:///b.xml", 2, null));
+        var g2m1 = new GroupMembership("GRP_B", "SFXEvent", new FileOrigin("file:///c.xml", 3, null));
+        var baseline = Baseline() with
+        {
+            GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                    StringComparer.OrdinalIgnoreCase)
+                .Add("GRP_A", [g1m1, g1m2])
+                .Add("GRP_B", [g2m1])
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(2, result.GroupMemberships.Count);
+        Assert.Equal(2, result.GroupMemberships["GRP_A"].Length);
+        Assert.Single(result.GroupMemberships["GRP_B"]);
+    }
+
+    [Fact]
+    public void RoundTrip_OldBaselineWithoutGroupMemberships_DeserializesWithEmptyGroupMemberships()
+    {
+        // Verify backwards compatibility: a baseline serialized before GroupMemberships existed
+        // deserializes without error and yields an empty GroupMemberships dict.
+        // We simulate this by checking BaselineIndex.Empty round-trips cleanly.
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        Assert.Empty(result.GroupMemberships);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols)

@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Completion;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -89,7 +90,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         // is technically inside a bracket (the opening '<' has no paired '>').
         if (IsTagNameContext(line, character))
         {
-            var (enclosingType, enclosingTagDepth) = FindEnclosingTagName(lines, lineIndex, character);
+            var (enclosingType, enclosingTagDepth, _) = FindEnclosingTagName(lines, lineIndex, character);
             if (enclosingType is null)
                 return Task.FromResult(new CompletionList());
 
@@ -112,7 +113,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             return Task.FromResult(new CompletionList());
 
         // Value completion: cursor is inside an element body
-        var (enclosingTag, enclosingDepth) = FindEnclosingTagName(lines, lineIndex, character);
+        var (enclosingTag, enclosingDepth, tagStack) = FindEnclosingTagName(lines, lineIndex, character);
         if (enclosingTag is null)
             return Task.FromResult(new CompletionList());
 
@@ -136,8 +137,40 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             return Task.FromResult(new CompletionList(storyValueItems));
         }
 
-        var tagDef = _schema.GetTag(enclosingTag);
-        if (tagDef is null)
+        // Three-tier type-aware tag lookup (mirrors XmlDocumentFactProducer.ResolveTag):
+        //   Tier 1 — ability sub-object context (Type56/57): use the ability schema type
+        //   Tier 2 — registered file types: use GetTagsForType for each registered type
+        //   Tier 3 — flat fallback
+        var containingAbilityType = TryResolveContainingAbilityType(tagStack);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
+        XmlTagDefinition? tagDef;
+        if (containingAbilityType is not null)
+        {
+            tagDef = _schema.GetTagsForType(containingAbilityType)
+                         .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase))
+                     ?? _schema.GetTag(enclosingTag);
+        }
+        else if (!fileTypes.IsEmpty)
+        {
+            XmlTagDefinition? typeSpecificDef = null;
+            foreach (var typeName in fileTypes)
+            {
+                typeSpecificDef = _schema.GetTagsForType(typeName)
+                                      .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase));
+                if (typeSpecificDef is not null) break;
+            }
+            // Prefer the registered-type def when it has completions; otherwise fall back to the
+            // flat def which may carry reference info from a different type's YAML.
+            tagDef = typeSpecificDef is not null && HasCompletions(typeSpecificDef)
+                ? typeSpecificDef
+                : _schema.GetTag(enclosingTag);
+        }
+        else
+        {
+            tagDef = _schema.GetTag(enclosingTag);
+        }
+
+        if (tagDef is null || !HasCompletions(tagDef))
             return Task.FromResult(new CompletionList());
 
         var partialValue = ExtractPartialValue(line, character);
@@ -215,7 +248,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             {
                 Label = t,
                 Kind = CompletionItemKind.Property,
-                InsertText = $"{t}></{t}>"
+                InsertText = $"{t}>$0</{t}>",
+                InsertTextFormat = InsertTextFormat.Snippet
             });
     }
 
@@ -296,20 +330,38 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             var isMultiInstance = fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
             var expectedDepth = isMultiInstance ? 2 : 1;
             if (depth != expectedDepth)
-                return [];
+            {
+                var subItems = TryBuildSubObjectListCompletions(parentName, prefix);
+                if (subItems is not null)
+                    return subItems;
 
-            var tagsList = new List<XmlTagDefinition>();
-            foreach (var typeName in fileTypes)
-                tagsList.AddRange(_schema.GetTagsForType(typeName));
-            candidates = tagsList;
+                // Allow completions at deeper levels when parent is an ability sub-object type.
+                var abilityType = _schema.GetObjectType(XmlUtility.ToPascalCase(parentName));
+                if (abilityType is null)
+                    return [];
+                candidates = _schema.GetTagsForType(abilityType.TypeName);
+            }
+            else
+            {
+                var tagsList = new List<XmlTagDefinition>();
+                foreach (var typeName in fileTypes)
+                    tagsList.AddRange(_schema.GetTagsForType(typeName));
+                candidates = tagsList;
+            }
         }
         else
         {
-            // Fallback for unregistered files: use element name as type name.
-            var typeDef = _schema.GetObjectType(parentName);
+            var subItems = TryBuildSubObjectListCompletions(parentName, prefix);
+            if (subItems is not null)
+                return subItems;
+
+            // Fallback for unregistered files: use element name as type name, with PascalCase conversion
+            // for ability class elements (e.g., Lucky_Shot_Attack_Ability → LuckyShotAttackAbility).
+            var typeDef = _schema.GetObjectType(parentName)
+                       ?? _schema.GetObjectType(XmlUtility.ToPascalCase(parentName));
             if (typeDef is null)
                 return [];
-            candidates = _schema.GetTagsForType(parentName);
+            candidates = _schema.GetTagsForType(typeDef.TypeName);
         }
 
         // Find already-present direct children of the parent element in the current document
@@ -322,8 +374,48 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             {
                 Label = t.Tag,
                 Kind = CompletionItemKind.Property,
-                InsertText = $"{t.Tag}></{t.Tag}>"
+                InsertText = $"{t.Tag}>$0</{t.Tag}>",
+                InsertTextFormat = InsertTextFormat.Snippet
             });
+    }
+
+    private IEnumerable<CompletionItem>? TryBuildSubObjectListCompletions(string parentName, string prefix)
+    {
+        var parentTagDef = _schema.GetTag(parentName);
+
+        if (parentTagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
+        {
+            const string label = "Unit_Ability";
+            if (prefix.Length > 0 && !label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return [];
+            return
+            [
+                new CompletionItem
+                {
+                    Label = label,
+                    Kind = CompletionItemKind.Property,
+                    InsertText = "Unit_Ability>\n    <Type>$0</Type>\n</Unit_Ability>",
+                    InsertTextFormat = InsertTextFormat.Snippet
+                }
+            ];
+        }
+
+        if (parentTagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
+        {
+            return _schema.AllObjectTypes
+                .Where(t => t.TypeName.EndsWith("Ability", StringComparison.OrdinalIgnoreCase))
+                .Select(t => XmlUtility.ToSnakeCase(t.TypeName))
+                .Where(name => prefix.Length == 0 || name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                .Select(name => new CompletionItem
+                {
+                    Label = name,
+                    Kind = CompletionItemKind.Property,
+                    InsertText = $"{name} Name=\"$1\">\n    $0\n</{name}>",
+                    InsertTextFormat = InsertTextFormat.Snippet
+                });
+        }
+
+        return null;
     }
 
     private static HashSet<string> CollectExistingChildTagNames(string text, string parentName)
@@ -377,11 +469,13 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     }
 
     /// <summary>
-    ///     Scans backwards from the cursor to find the innermost open element name and its stack depth.
+    ///     Scans backwards from the cursor to find the innermost open element name, its stack depth,
+    ///     and the full ancestor stack (innermost first).
     ///     Opening tags push, closing tags pop, self-closing tags do not push.
-    ///     Returns (name, depth) where depth = 1 means cursor is directly inside the document root element.
+    ///     Returns (name, depth, stack) where depth = 1 means cursor is directly inside the document root element.
     /// </summary>
-    private static (string? name, int depth) FindEnclosingTagName(string[] lines, int lineIndex, int character)
+    private static (string? name, int depth, List<string> stack) FindEnclosingTagName(
+        string[] lines, int lineIndex, int character)
     {
         // Collect all text up to the cursor
         var sb = new StringBuilder();
@@ -426,8 +520,29 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             pos = closeBracket + 1;
         }
 
-        return (stack.Count > 0 ? stack.Peek() : null, stack.Count);
+        // Stack enumerates top-first, so ToList() gives [innermost, ..., outermost]
+        var stackList = stack.ToList();
+        return (stackList.Count > 0 ? stackList[0] : null, stackList.Count, stackList);
     }
+
+    private string? TryResolveContainingAbilityType(List<string> stack)
+    {
+        // stack[0] = field being completed; stack[1..] = ancestors innermost-first
+        for (var i = 1; i < stack.Count; i++)
+        {
+            var parentTagDef = _schema.GetTag(stack[i]);
+            if (parentTagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
+                return "UnitAbility";
+            if (parentTagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
+                return XmlUtility.ToPascalCase(stack[i - 1]);
+        }
+
+        return null;
+    }
+
+    private static bool HasCompletions(XmlTagDefinition tagDef) =>
+        tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet ||
+        tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
 
     private static string ExtractFirstWord(string s)
     {

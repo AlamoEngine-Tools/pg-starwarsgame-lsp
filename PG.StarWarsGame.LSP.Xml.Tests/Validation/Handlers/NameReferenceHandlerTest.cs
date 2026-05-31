@@ -37,7 +37,58 @@ public sealed class NameReferenceHandlerTest
     public void Wrong_type_returns_no_diagnostics()
     {
         var floatTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
+        Assert.Empty(results);
+    }
+
+    // ── HardcodedSet validation ──────────────────────────────────────────────
+
+    private static XmlTagDefinition HardcodedTag(HardcodedReferenceSet set) => new()
+    {
+        Tag = "Type",
+        ValueType = XmlValueType.NameReference,
+        ReferenceKind = ReferenceKind.HardcodedSet,
+        HardcodedSet = set
+    };
+
+    private static HardcodedReferenceSet AbilityTypeSet(params string[] names) => new()
+    {
+        Name = "AbilityType",
+        Values = names.Select(n => new HardcodedReferenceSetValue { Name = n }).ToList()
+    };
+
+    [Theory]
+    [InlineData("HUNT")]
+    [InlineData("hunt")]
+    [InlineData("Force_Cloak")]
+    public void HardcodedSet_KnownValue_ReturnsNoDiagnostics(string value)
+    {
+        var tag = HardcodedTag(AbilityTypeSet("HUNT", "Force_Cloak", "DEFEND"));
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void HardcodedSet_UnknownValue_ReturnsError()
+    {
+        var tag = HardcodedTag(AbilityTypeSet("HUNT", "DEFEND"));
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "UNKNOWN_ABILITY"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Fact]
+    public void HardcodedSet_NoSet_ReturnsNoDiagnostics()
+    {
+        var tag = new XmlTagDefinition
+        {
+            Tag = "Type",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.HardcodedSet,
+            HardcodedSet = null
+        };
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "ANYTHING"), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 }

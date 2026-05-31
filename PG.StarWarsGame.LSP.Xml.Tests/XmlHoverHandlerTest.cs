@@ -500,6 +500,82 @@ public sealed class XmlHoverHandlerTest
         Assert.Null(result);
     }
 
+    // ── Ability sub-object hover ─────────────────────────────────────────────
+
+    private const string AbilityXml =
+        "<Root>\n" +
+        "<Abilities SubObjectList=\"Yes\">\n" +
+        "<Lucky_Shot_Attack_Ability Name=\"Luke_Shot\">\n" +
+        "<Applicable_Unit_Categories>INFANTRY</Applicable_Unit_Categories>\n" +
+        "</Lucky_Shot_Attack_Ability>\n" +
+        "</Abilities>\n" +
+        "</Root>";
+
+    private static GameObjectTypeDefinition AbilityTypeDef(string name) =>
+        new() { TypeName = name, NameTag = "Name" };
+
+    private static XmlTagDefinition AbilitiesContainerTag() => new()
+    {
+        Tag = "Abilities",
+        ValueType = XmlValueType.AbilityDefinitionSubObjectList
+    };
+
+    [Fact]
+    public async Task Handle_CursorOnAbilityClassElement_ShowsAbilityTypeHover()
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), AbilityXml, 1);
+        // Abilities tag must resolve to AbilityDefinitionSubObjectList so parent chain walk works
+        schema.AddTagByName(AbilitiesContainerTag());
+        schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
+
+        // Line 2: "<Lucky_Shot_Attack_Ability Name="Luke_Shot">" — cursor on 'L'
+        var result = await handler.Handle(At(2, 1), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains("LuckyShotAttackAbility", result.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnFieldInsideAbilityElement_ShowsAbilityTypeTagHover()
+    {
+        var (handler, host, schema, _) = Build();
+        host.AddOrUpdate(TestUri.ToString(), AbilityXml, 1);
+        schema.AddTagByName(AbilitiesContainerTag());
+        schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
+        schema.AddTagForType("LuckyShotAttackAbility",
+            new XmlTagDefinition { Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference,
+                Description = new Dictionary<string, string> { ["en"] = "Unit category filter" } });
+
+        // Line 3: "<Applicable_Unit_Categories>..." — cursor on 'A'
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains("Applicable_Unit_Categories", result.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnFieldInsideAbilityElement_DoesNotUseRegisteredGameObjectTypeSchema()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("GameObjectType"));
+        var (handler, host, schema, _) = Build(registry: registry);
+        host.AddOrUpdate(TestUri.ToString(), AbilityXml, 1);
+        schema.AddTagByName(AbilitiesContainerTag());
+        // GameObjectType has NO Applicable_Unit_Categories tag; ability type does
+        schema.AddType(AbilityTypeDef("GameObjectType"));
+        schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
+        schema.AddTagForType("LuckyShotAttackAbility",
+            new XmlTagDefinition { Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.Float,
+                Description = new Dictionary<string, string> { ["en"] = "From ability schema" } });
+
+        var result = await handler.Handle(At(3, 1), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains("Applicable_Unit_Categories", result.Contents.MarkupContent!.Value);
+        Assert.Contains("From ability schema", result.Contents.MarkupContent!.Value);
+    }
+
     // ── EaW directory gating ─────────────────────────────────────────────────
 
     [Fact]
@@ -541,13 +617,17 @@ public sealed class XmlHoverHandlerTest
     {
         private readonly Dictionary<string, GameObjectTypeDefinition> _typesByName =
             new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, XmlTagDefinition> _tagsByName =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByTypeName =
+            new(StringComparer.OrdinalIgnoreCase);
 
         public XmlTagDefinition? TagToReturn { get; set; }
         public GameObjectTypeDefinition? TypeToReturn { get; set; }
 
-        public XmlTagDefinition? GetTag(string _)
+        public XmlTagDefinition? GetTag(string name)
         {
-            return TagToReturn;
+            return _tagsByName.TryGetValue(name, out var def) ? def : TagToReturn;
         }
 
         public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
@@ -566,9 +646,19 @@ public sealed class XmlHoverHandlerTest
 
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
 
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string type)
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
         {
-            return GetObjectType(type) is null ? [] : GetAllTagDefinitions(type);
+            if (_tagsByTypeName.TryGetValue(typeName, out var list)) return list;
+            return GetObjectType(typeName) is null ? [] : GetAllTagDefinitions(typeName);
+        }
+
+        public void AddTagByName(XmlTagDefinition tag) => _tagsByName[tag.Tag] = tag;
+
+        public void AddTagForType(string typeName, XmlTagDefinition tag)
+        {
+            if (!_tagsByTypeName.TryGetValue(typeName, out var list))
+                _tagsByTypeName[typeName] = list = [];
+            list.Add(tag);
         }
 
         public EnumDefinition? GetEnum(string _)

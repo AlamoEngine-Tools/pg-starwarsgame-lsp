@@ -706,7 +706,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
         // First: simulate that this URI got diagnostics via index change
         workspaceHost.Set(uri, "<Root/>");
-        indexService.Fire(IndexWithDoc(uri));  // records uri in _lastPublishedUris
+        indexService.Fire(IndexWithDoc(uri)); // records uri in _lastPublishedUris
         published.Clear();
 
         // Now remove it from the index — uri no longer indexed

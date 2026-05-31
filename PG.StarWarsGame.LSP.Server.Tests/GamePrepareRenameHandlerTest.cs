@@ -6,7 +6,6 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -22,36 +21,51 @@ public sealed class GamePrepareRenameHandlerTest
     // ── helpers ────────────────────────────────────────────────────────────────
 
     private static PrepareRenameParams PrepareAt(int line, int character, string uri = XmlUri)
-        => new()
+    {
+        return new PrepareRenameParams
         {
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },
             Position = new Position(line, character)
         };
+    }
 
     private static GameSymbol XmlSymbolAt(string id, string uri, int line, string typeName = "Unit")
-        => new(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(uri, line, null), null);
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(uri, line, null), null);
+    }
 
     private static GameSymbol XmlSymbolInArchive(string id)
-        => new(id, GameSymbolKind.XmlObject, "Unit", new MegArchiveOrigin("data.meg", "units.xml", 0, 0), null);
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new MegArchiveOrigin("data.meg", "units.xml", 0, 0),
+            null);
+    }
 
     private static GameSymbol LuaGlobal(string name, string uri, int line = 0, int? col = null)
-        => new(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, line, col), null);
+    {
+        return new GameSymbol(name, GameSymbolKind.LuaGlobal, null, new FileOrigin(uri, line, col), null);
+    }
 
     private static GameReference XmlRef(string id, string uri, int line, int col, int len)
-        => new(id, GameSymbolKind.XmlObject, "Unit", uri, line, col, len);
+    {
+        return new GameReference(id, GameSymbolKind.XmlObject, "Unit", uri, line, col, len);
+    }
 
     private static GameReference LuaGlobalRef(string id, string uri, int line, int col, int len)
-        => new(id, GameSymbolKind.LuaGlobal, null, uri, line, col, len);
+    {
+        return new GameReference(id, GameSymbolKind.LuaGlobal, null, uri, line, col, len);
+    }
 
     private static GameIndex BuildIndex(
         ImmutableDictionary<string, DocumentIndex>? docs = null,
         ImmutableDictionary<string, ImmutableArray<GameSymbol>>? defs = null,
         ImmutableDictionary<string, ImmutableArray<GameReference>>? refs = null)
-        => new(
+    {
+        return new GameIndex(
             BaselineIndex.Empty,
             docs ?? ImmutableDictionary<string, DocumentIndex>.Empty,
             defs ?? ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
             refs ?? ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+    }
 
     private static DocumentIndex XmlDoc(string uri, GameSymbol? sym = null, GameReference? r = null)
     {
@@ -72,12 +86,14 @@ public sealed class GamePrepareRenameHandlerTest
         FakeWorkspaceHost? host = null,
         IEaWXmlContext? ctx = null,
         IFileHelper? fileHelper = null)
-        => new(
+    {
+        return new GamePrepareRenameHandler(
             new FakeIndexService { Current = index },
             host ?? new FakeWorkspaceHost(),
             ctx ?? new AllowAllEaWContext(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
             NullLogger<GamePrepareRenameHandler>.Instance);
+    }
 
     // ── file-type gating ──────────────────────────────────────────────────────
 
@@ -95,7 +111,7 @@ public sealed class GamePrepareRenameHandlerTest
     public async Task Handle_XmlFile_NotEaWXmlFile_ReturnsNull()
     {
         var handler = BuildHandler(GameIndex.Empty, ctx: new DenyAllEaWContext());
-        var result = await handler.Handle(PrepareAt(0, 0, XmlUri), CancellationToken.None);
+        var result = await handler.Handle(PrepareAt(0, 0), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -105,7 +121,7 @@ public sealed class GamePrepareRenameHandlerTest
         var doc = XmlDoc(XmlUri);
         var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc));
         var handler = BuildHandler(index);
-        var result = await handler.Handle(PrepareAt(0, 0, XmlUri), CancellationToken.None);
+        var result = await handler.Handle(PrepareAt(0, 0), CancellationToken.None);
         Assert.Null(result);
     }
 
@@ -120,10 +136,10 @@ public sealed class GamePrepareRenameHandlerTest
             .Add("UNIT_A", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index);
-        var result = await handler.Handle(PrepareAt(0, 12, XmlUri), CancellationToken.None);
+        var result = await handler.Handle(PrepareAt(0, 12), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.NotNull(result!.Range);
@@ -137,15 +153,15 @@ public sealed class GamePrepareRenameHandlerTest
     {
         // Symbol "UNIT_A" at line 1, no column → defaults to 0, range [1:0, 1:6]
         var sym = XmlSymbolAt("UNIT_A", XmlUri, 1);
-        var doc = XmlDoc(XmlUri, sym: sym);
+        var doc = XmlDoc(XmlUri, sym);
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             .Add("UNIT_A", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index);
-        var result = await handler.Handle(PrepareAt(1, 3, XmlUri), CancellationToken.None);
+        var result = await handler.Handle(PrepareAt(1, 3), CancellationToken.None);
 
         Assert.NotNull(result);
         Assert.NotNull(result!.Range);
@@ -164,10 +180,10 @@ public sealed class GamePrepareRenameHandlerTest
             .Add("UNIT_VANILLA", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index);
-        var result = await handler.Handle(PrepareAt(0, 5, XmlUri), CancellationToken.None);
+        var result = await handler.Handle(PrepareAt(0, 5), CancellationToken.None);
 
         Assert.Null(result);
     }
@@ -185,7 +201,7 @@ public sealed class GamePrepareRenameHandlerTest
             .Add("RunMission", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, callerDoc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index);
         var result = await handler.Handle(PrepareAt(0, 5, LuaUri), CancellationToken.None);
@@ -202,12 +218,12 @@ public sealed class GamePrepareRenameHandlerTest
     {
         // Declaration "Foo" at line 0, col 9 (function Foo)
         var sym = LuaGlobal("Foo", LuaUri, 0, 9);
-        var defDoc = LuaDocWith(LuaUri, sym: sym);
+        var defDoc = LuaDocWith(LuaUri, sym);
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             .Add("Foo", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, defDoc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index);
         var result = await handler.Handle(PrepareAt(0, 9, LuaUri), CancellationToken.None);
@@ -248,7 +264,7 @@ public sealed class GamePrepareRenameHandlerTest
             .Add("UNIT_A", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index, host);
         var result = await handler.Handle(PrepareAt(0, 8, LuaUri), CancellationToken.None);
@@ -256,8 +272,8 @@ public sealed class GamePrepareRenameHandlerTest
         Assert.NotNull(result);
         Assert.NotNull(result!.Range);
         Assert.Equal(0, result.Range!.Start.Line);
-        Assert.Equal(7, result.Range.Start.Character);  // after opening quote
-        Assert.Equal(13, result.Range.End.Character);   // before closing quote
+        Assert.Equal(7, result.Range.Start.Character); // after opening quote
+        Assert.Equal(13, result.Range.End.Character); // before closing quote
     }
 
     [Fact]
@@ -272,7 +288,7 @@ public sealed class GamePrepareRenameHandlerTest
             .Add("VANILLA_UNIT", ImmutableArray.Create(sym));
         var index = BuildIndex(
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, luaDoc),
-            defs: defs);
+            defs);
 
         var handler = BuildHandler(index, host);
         var result = await handler.Handle(PrepareAt(0, 8, LuaUri), CancellationToken.None);
@@ -312,15 +328,31 @@ public sealed class GamePrepareRenameHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -329,23 +361,36 @@ public sealed class GamePrepareRenameHandlerTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 
     private sealed class AllowAllEaWContext : IEaWXmlContext
     {
-        public bool IsEaWXmlFile(string fileUri) => true;
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return true;
+        }
     }
 
     private sealed class DenyAllEaWContext : IEaWXmlContext
     {
-        public bool IsEaWXmlFile(string fileUri) => false;
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return false;
+        }
     }
 }

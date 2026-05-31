@@ -21,4 +21,12 @@ public sealed record BaselineIndex(
         ImmutableDictionary<string, ImmutableArray<string>>.Empty,
         ImmutableDictionary<string, ImmutableArray<string>>.Empty,
         ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+
+    /// <summary>
+    ///     Group memberships extracted from shipped-game data. Keyed case-insensitively by
+    ///     <see cref="GroupMembership.GroupKey" />. Initially empty; populated by the BaselineBuilder
+    ///     in a future chunk.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<GroupMembership>> GroupMemberships { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase);
 }

@@ -150,6 +150,27 @@ public static class XmlUtility
         return false;
     }
 
+    /// <summary>
+    ///     Converts a snake_case or Snake_Case element name (as the game or HtmlAgilityPack produces it)
+    ///     to the PascalCase schema type name used in the YAML tag files.
+    ///     Example: "lucky_shot_attack_ability" → "LuckyShotAttackAbility"
+    /// </summary>
+    public static string ToPascalCase(string snakeName)
+    {
+        return string.Concat(snakeName.Split('_')
+            .Select(w => w.Length == 0 ? "" : char.ToUpperInvariant(w[0]) + w[1..]));
+    }
+
+    /// <summary>
+    ///     Converts a PascalCase schema type name to the Snake_Case element name used in game XML.
+    ///     Example: "LuckyShotAttackAbility" → "Lucky_Shot_Attack_Ability"
+    /// </summary>
+    public static string ToSnakeCase(string pascalName)
+    {
+        if (pascalName.Length == 0) return pascalName;
+        return string.Join("_", Regex.Split(pascalName, @"(?<=[a-z])(?=[A-Z])"));
+    }
+
     public static bool TryFindNodeByClosingLine(HtmlDocument doc, int line, out HtmlNode? node)
     {
         node = doc.DocumentNode

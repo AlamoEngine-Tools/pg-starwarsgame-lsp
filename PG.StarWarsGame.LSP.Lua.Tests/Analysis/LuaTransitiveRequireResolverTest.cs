@@ -11,16 +11,17 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
 
 public sealed class LuaTransitiveRequireResolverTest
 {
-    private static readonly IFileHelper s_fileHelper = new FileHelper(new MockFileSystem());
-
     private const string UriA = "file:///scripts/a.lua";
     private const string UriB = "file:///scripts/b.lua";
     private const string UriC = "file:///scripts/c.lua";
     private const string UriD = "file:///scripts/d.lua";
+    private static readonly IFileHelper s_fileHelper = new FileHelper(new MockFileSystem());
 
     // Build a DocumentIndex whose RequireArgs are set to the provided raw args.
-    private static DocumentIndex MakeDoc(string uri, params string[] requireArgs) =>
-        new(uri, 1, [], [], ImmutableArray.Create(requireArgs));
+    private static DocumentIndex MakeDoc(string uri, params string[] requireArgs)
+    {
+        return new DocumentIndex(uri, 1, [], [], ImmutableArray.Create(requireArgs));
+    }
 
     // Build the allDocuments dict from the supplied pairs.
     private static Dictionary<string, DocumentIndex> MakeDocs(
@@ -34,11 +35,15 @@ public sealed class LuaTransitiveRequireResolverTest
 
     private static IReadOnlySet<string> Resolve(
         IReadOnlySet<string> seeds,
-        IReadOnlyDictionary<string, DocumentIndex> docs) =>
-        LuaTransitiveRequireResolver.GetTransitiveDependencies(seeds, docs, s_fileHelper);
+        IReadOnlyDictionary<string, DocumentIndex> docs)
+    {
+        return LuaTransitiveRequireResolver.GetTransitiveDependencies(seeds, docs, s_fileHelper);
+    }
 
-    private static HashSet<string> Seeds(params string[] uris) =>
-        new(uris, StringComparer.OrdinalIgnoreCase);
+    private static HashSet<string> Seeds(params string[] uris)
+    {
+        return new HashSet<string>(uris, StringComparer.OrdinalIgnoreCase);
+    }
 
     // ── 1. empty seeds ────────────────────────────────────────────────────────
 

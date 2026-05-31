@@ -40,7 +40,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger)
         : this(p => server.TextDocument.PublishDiagnostics(p),
-            indexService, workspaceHost, fileHelper, schemaProvider, logger, debounceMs: 100)
+            indexService, workspaceHost, fileHelper, schemaProvider, logger, 100)
     {
     }
 

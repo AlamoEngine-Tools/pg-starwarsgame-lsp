@@ -15,7 +15,8 @@ public sealed class PassThroughHandlerTest
     public void Type35_always_returns_no_diagnostics(string value)
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.Type35);
-        var results = new Type35Handler().Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = new Type35Handler()
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
@@ -25,7 +26,8 @@ public sealed class PassThroughHandlerTest
     public void Type36_always_returns_no_diagnostics(string value)
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.Type36);
-        var results = new Type36Handler().Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = new Type36Handler()
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
@@ -35,7 +37,8 @@ public sealed class PassThroughHandlerTest
     public void Type37_always_returns_no_diagnostics(string value)
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.Type37);
-        var results = new Type37Handler().Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = new Type37Handler()
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
@@ -45,27 +48,30 @@ public sealed class PassThroughHandlerTest
     public void Type38_always_returns_no_diagnostics(string value)
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.Type38);
-        var results = new Type38Handler().Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = new Type38Handler()
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("some value")]
-    public void Type56_always_returns_no_diagnostics(string value)
+    public void AbilityDefinitionSubObjectList_always_returns_no_diagnostics(string value)
     {
-        var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.Type56);
-        var results = new Type56Handler().Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.AbilityDefinitionSubObjectList);
+        var results = new AbilityDefinitionSubObjectListHandler()
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("some value")]
-    public void Type57_always_returns_no_diagnostics(string value)
+    public void GuiActivatedAbilityDefinitionSubObjectList_always_returns_no_diagnostics(string value)
     {
-        var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.Type57);
-        var results = new Type57Handler().Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.GuiActivatedAbilityDefinitionSubObjectList);
+        var results = new GuiActivatedAbilityDefinitionSubObjectListHandler()
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 }

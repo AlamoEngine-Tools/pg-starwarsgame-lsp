@@ -25,17 +25,17 @@ public sealed partial class IntFloatTupleListHandler : XmlDiagnosticsHandler<Xml
             return [Error(fact, trimmed)];
 
         for (var i = 0; i < parts.Length; i += 2)
-        {
             if (!int.TryParse(parts[i], out _) || !LenientFloatParser.TryParse(parts[i + 1], out _))
                 return [Error(fact, trimmed)];
-        }
 
         return [];
     }
 
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed) =>
-        new(XmlDiagnosticSeverity.Error,
+    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed)
+    {
+        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"'{trimmed}' is not a valid int-float tuple list for <{fact.Tag.Tag}>. Expected alternating integer and float pairs.");
+    }
 
     [GeneratedRegex(@"[\s,]+")]
     private static partial Regex Separator();

@@ -65,6 +65,43 @@ public sealed class XmlUtilityTest
         Assert.Equal(("C", 4), result[2]);
     }
 
+    // ── ToPascalCase ─────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("lucky_shot_attack_ability", "LuckyShotAttackAbility")]
+    [InlineData("combat_bonus_ability", "CombatBonusAbility")]
+    [InlineData("force_cloak_ability", "ForceCloakAbility")]
+    [InlineData("Lucky_Shot_Attack_Ability", "LuckyShotAttackAbility")]
+    [InlineData("single", "Single")]
+    [InlineData("", "")]
+    public void ToPascalCase_Conversions(string input, string expected)
+    {
+        Assert.Equal(expected, XmlUtility.ToPascalCase(input));
+    }
+
+    // ── ToSnakeCase ──────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("LuckyShotAttackAbility", "Lucky_Shot_Attack_Ability")]
+    [InlineData("ForceCloakAbility", "Force_Cloak_Ability")]
+    [InlineData("UnitAbility", "Unit_Ability")]
+    [InlineData("SpaceUnit", "Space_Unit")]
+    [InlineData("Single", "Single")]
+    [InlineData("", "")]
+    public void ToSnakeCase_Conversions(string input, string expected)
+    {
+        Assert.Equal(expected, XmlUtility.ToSnakeCase(input));
+    }
+
+    [Theory]
+    [InlineData("LuckyShotAttackAbility")]
+    [InlineData("ForceCloakAbility")]
+    [InlineData("UnitAbility")]
+    public void ToSnakeCase_RoundTrip_WithToPascalCase(string pascalInput)
+    {
+        Assert.Equal(pascalInput, XmlUtility.ToPascalCase(XmlUtility.ToSnakeCase(pascalInput)));
+    }
+
     // ── IsOnTagName ───────────────────────────────────────────────────────────
 
     [Fact]

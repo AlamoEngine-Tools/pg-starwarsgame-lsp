@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -91,7 +90,8 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
                 var range = hit.Value.Range;
                 // Zero-length means cursor is on a declaration; extend by the symbol name length.
                 if (range.Start == range.End)
-                    range = new LspRange(range.Start, new Position(range.Start.Line, range.Start.Character + hit.Value.Id.Length));
+                    range = new LspRange(range.Start,
+                        new Position(range.Start.Line, range.Start.Character + hit.Value.Id.Length));
 
                 return new RangeOrPlaceholderRange(range);
             }
@@ -160,8 +160,14 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
             return doc.Text;
         var path = _fileHelper.FileUriToPath(uri);
         if (path is null) return null;
-        try { return _fileHelper.FileSystem.File.ReadAllText(path); }
-        catch { return null; }
+        try
+        {
+            return _fileHelper.FileSystem.File.ReadAllText(path);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     protected override RenameRegistrationOptions CreateRegistrationOptions(

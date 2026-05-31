@@ -26,6 +26,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandlerRegistry, XmlDiagnosticsHandlerRegistry>();
 
         // XmlTagValueFact handlers (format validators)
+        services.AddSingleton<IXmlDiagnosticsHandler, DeprecatedTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
@@ -58,8 +59,8 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, Type36Handler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Type37Handler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Type38Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, Type56Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, Type57Handler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AbilityDefinitionSubObjectListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, GuiActivatedAbilityDefinitionSubObjectListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ConditionalSfxEventHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DeathCloneSpecHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardPointTypeToTextureMapHandler>();

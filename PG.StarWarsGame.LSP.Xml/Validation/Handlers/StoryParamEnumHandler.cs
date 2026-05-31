@@ -21,7 +21,7 @@ public sealed class StoryParamEnumHandler : XmlDiagnosticsHandler<StoryParamFact
             if (!enumDef.Values.Any(v => string.Equals(v.Name, token, StringComparison.OrdinalIgnoreCase)))
                 return
                 [
-                    new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                    new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                         $"'{token}' is not a valid {enumDef.Name} value.")
                 ];
 

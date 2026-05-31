@@ -23,12 +23,21 @@ public sealed class GameIndexServiceTest
         return new GameReference(targetId, null, null, docUri, 1, 0, 4);
     }
 
+    private static DocumentGroupMembership GroupMembership(string groupKey, string memberUri = "file:///f.xml")
+    {
+        return new DocumentGroupMembership(
+            new GroupMembership(groupKey, "SFXEvent", new FileOrigin(memberUri, 1, null)),
+            2, 4, groupKey.Length);
+    }
+
     private static DocumentIndex Doc(string uri, int version,
-        GameSymbol[]? symbols = null, GameReference[]? refs = null)
+        GameSymbol[]? symbols = null, GameReference[]? refs = null,
+        DocumentGroupMembership[]? groupMemberships = null)
     {
         return new DocumentIndex(uri, version,
             (symbols ?? []).ToImmutableArray(),
-            (refs ?? []).ToImmutableArray());
+            (refs ?? []).ToImmutableArray(),
+            GroupMemberships: (groupMemberships ?? []).ToImmutableArray());
     }
 
     private static IGameIndexService Build(params IGameDocumentParser[] parsers)
@@ -143,6 +152,46 @@ public sealed class GameIndexServiceTest
         await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
 
         Assert.True(svc.Current.WorkspaceReferences.ContainsKey("TARGET"));
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_Populates_WorkspaceGroupMemberships()
+    {
+        var gm = GroupMembership("MY_GROUP");
+        var svc = Build(new FakeParser(Doc("", 0, groupMemberships: [gm])));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.True(svc.Current.WorkspaceGroupMemberships.ContainsKey("MY_GROUP"));
+        Assert.Single(svc.Current.WorkspaceGroupMemberships["MY_GROUP"]);
+        Assert.Equal("MY_GROUP", svc.Current.WorkspaceGroupMemberships["MY_GROUP"][0].GroupKey);
+    }
+
+    [Fact]
+    public async Task RemoveDocument_Strips_WorkspaceGroupMemberships()
+    {
+        var gm = GroupMembership("MY_GROUP");
+        var svc = Build(new FakeParser(Doc("", 0, groupMemberships: [gm])));
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        svc.RemoveDocument("file:///f.xml");
+
+        Assert.Empty(svc.Current.WorkspaceGroupMemberships);
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_TwoDocsSameGroupKey_MembersAreAggregated()
+    {
+        var gm1 = GroupMembership("SHARED_GROUP", "file:///a.xml");
+        var gm2 = GroupMembership("SHARED_GROUP", "file:///b.xml");
+        var parserA = new FakeParser(Doc("", 0, groupMemberships: [gm1]));
+        var parserB = new FakeParser(Doc("", 0, groupMemberships: [gm2]));
+        var svc = Build(new MultiParser(parserA, parserB));
+
+        await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///b.xml", "<X/>", 1, default);
+
+        Assert.Equal(2, svc.Current.WorkspaceGroupMemberships["SHARED_GROUP"].Length);
     }
 
     [Fact]
@@ -409,9 +458,17 @@ public sealed class GameIndexServiceTest
             if (version == 1)
             {
                 firstParseStarted.Release();
-                try { await Task.Delay(Timeout.Infinite, ct); }
-                catch (OperationCanceledException) { firstParseCancelled = true; throw; }
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    firstParseCancelled = true;
+                    throw;
+                }
             }
+
             return Doc(uri, version);
         }));
 
@@ -442,9 +499,17 @@ public sealed class GameIndexServiceTest
             if (uri.Contains("a.xml"))
             {
                 aStarted.Release();
-                try { await aRelease.WaitAsync(ct); }
-                catch (OperationCanceledException) { aCancelled = true; throw; }
+                try
+                {
+                    await aRelease.WaitAsync(ct);
+                }
+                catch (OperationCanceledException)
+                {
+                    aCancelled = true;
+                    throw;
+                }
             }
+
             return Doc(uri, version);
         }));
 
@@ -481,6 +546,30 @@ public sealed class GameIndexServiceTest
         }
     }
 
+    private sealed class MultiParser : IGameDocumentParser
+    {
+        private readonly FakeParser _a;
+        private readonly FakeParser _b;
+
+        public MultiParser(FakeParser a, FakeParser b)
+        {
+            _a = a;
+            _b = b;
+        }
+
+        public bool CanParse(string ext)
+        {
+            return true;
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return uri.Contains("/a.")
+                ? _a.ParseAsync(uri, text, version, ct)
+                : _b.ParseAsync(uri, text, version, ct);
+        }
+    }
+
     private sealed class CancellingParser : IGameDocumentParser
     {
         public bool CanParse(string ext)
@@ -505,7 +594,10 @@ public sealed class GameIndexServiceTest
             _fn = fn;
         }
 
-        public bool CanParse(string ext) => true;
+        public bool CanParse(string ext)
+        {
+            return true;
+        }
 
         public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
             CancellationToken ct)

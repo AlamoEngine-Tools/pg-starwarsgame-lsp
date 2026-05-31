@@ -8,7 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
@@ -238,7 +238,7 @@ public sealed class LuaCodeLensHandlerTest
         var handler = BuildHandler(GameIndex.Empty);
         var lens = new CodeLens
         {
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+            Range = new Range(
                 new Position(0, 0), new Position(0, 0))
         };
 
@@ -254,18 +254,31 @@ public sealed class LuaCodeLensHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
+        public void RemoveDocument(string uri)
+        {
+        }
 
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

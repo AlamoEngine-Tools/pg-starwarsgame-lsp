@@ -60,6 +60,18 @@ public sealed class XmlGameDocumentParserTest
         return new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.Float };
     }
 
+    private static XmlTagDefinition GroupRefTag(string tag, string referenceType)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = tag,
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            SemanticType = TagSemanticType.ReferenceGroup,
+            ObjectType = new GameObjectTypeDefinition { TypeName = referenceType }
+        };
+    }
+
     // ── CanParse ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -384,13 +396,14 @@ public sealed class XmlGameDocumentParserTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("spaceunits.xml", ["SpaceUnit"]);
 
-        const string xml = "<?xml version=\"1.0\"?>\n<GameObjectFiles>\n\t<SpaceUnit Name=\"Broadside_Class_Cruiser\">\n\t\t<Text_ID>TEST</Text_ID>\n\t</SpaceUnit>\n</GameObjectFiles>";
+        const string xml =
+            "<?xml version=\"1.0\"?>\n<GameObjectFiles>\n\t<SpaceUnit Name=\"Broadside_Class_Cruiser\">\n\t\t<Text_ID>TEST</Text_ID>\n\t</SpaceUnit>\n</GameObjectFiles>";
 
         var result = await Build(schema, registry).ParseAsync(
             "file:///spaceunits.xml", xml, 1, default);
 
         var sym = Assert.Single(result.Symbols);
-        Assert.Equal("Broadside_Class_Cruiser", sym.Id);          // ID must not include ">
+        Assert.Equal("Broadside_Class_Cruiser", sym.Id); // ID must not include ">
         var origin = Assert.IsType<FileOrigin>(sym.Origin);
         // Line 2 (0-based): "\t<SpaceUnit Name=\"Broadside_Class_Cruiser\">"
         // \t(1) + <(1) + SpaceUnit(9) + space(1) + Name(4) + =(1) + "(1) = 18 → value at col 18
@@ -588,6 +601,235 @@ public sealed class XmlGameDocumentParserTest
             1, default);
 
         Assert.Empty(result.References);
+    }
+
+    // ── ReferenceGroup — group membership emission ───────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_ReferenceGroup_Tag_Does_Not_Emit_GameReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SFXEvent"));
+        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///sfx.xml",
+            """<SFXEvents><SFXEvent Name="SFX_LASER"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent></SFXEvents>""",
+            1, default);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ReferenceGroup_Tag_Emits_GroupMembership_WithGroupKey()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SFXEvent"));
+        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///sfx.xml",
+            """<SFXEvents><SFXEvent Name="SFX_LASER"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent></SFXEvents>""",
+            1, default);
+
+        var gm = Assert.Single(result.GroupMemberships);
+        Assert.Equal("Unit_AT_AT", gm.Membership.GroupKey);
+        Assert.Equal("SFXEvent", gm.Membership.MemberTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ReferenceGroup_MemberOrigin_PointsToParentNameAttribute()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SFXEvent"));
+        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+
+        // Multi-line: SFXEvent is on line 1 (0-indexed)
+        var result = await Build(schema).ParseAsync(
+            "file:///sfx.xml",
+            "<SFXEvents>\n<SFXEvent Name=\"SFX_LASER\"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>\n</SFXEvents>",
+            1, default);
+
+        var gm = Assert.Single(result.GroupMemberships);
+        var origin = Assert.IsType<FileOrigin>(gm.Membership.MemberOrigin);
+        Assert.Equal("file:///sfx.xml", origin.Uri);
+        Assert.Equal(1, origin.Line); // line 1 (0-indexed)
+        // Column points into the Name attribute value "SFX_LASER":
+        // "<SFXEvent Name=\"SFX_LASER\">" — 'N' of "Name" is at col 10; col = 10 + len("Name") + 2 = 16
+        Assert.Equal(16, origin.Column);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ReferenceGroup_TagPosition_IsValueSpan()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SFXEvent"));
+        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///sfx.xml",
+            "<SFXEvents>\n<SFXEvent Name=\"SFX_LASER\"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>\n</SFXEvents>",
+            1, default);
+
+        var gm = Assert.Single(result.GroupMemberships);
+        Assert.Equal("Unit_AT_AT".Length, gm.TagLength);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ReferenceGroup_EmptyValue_EmitsNoMembership()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SFXEvent"));
+        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///sfx.xml",
+            """<SFXEvents><SFXEvent Name="SFX_LASER"><Overlap_Test></Overlap_Test></SFXEvent></SFXEvents>""",
+            1, default);
+
+        Assert.Empty(result.GroupMemberships);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ReferenceGroup_TwoElements_EmitsTwoMemberships()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SFXEvent"));
+        schema.AddTag(GroupRefTag("Overlap_Test", "SFXEvent"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///sfx.xml",
+            """
+            <SFXEvents>
+              <SFXEvent Name="SFX_A"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>
+              <SFXEvent Name="SFX_B"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>
+            </SFXEvents>
+            """,
+            1, default);
+
+        Assert.Equal(2, result.GroupMemberships.Length);
+        Assert.All(result.GroupMemberships, gm => Assert.Equal("Unit_AT_AT", gm.Membership.GroupKey));
+    }
+
+    // ── AbilityDefinitionSubObjectList sub-object list symbol indexing ───────────────────────────────
+
+    private static XmlTagDefinition SubObjectListTag(string tag)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = tag,
+            ValueType = XmlValueType.AbilityDefinitionSubObjectList
+        };
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_NameAttribute_Is_Indexed_As_Symbol()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></U>""",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("My_Ability", sym.Id);
+        Assert.Equal("LuckyShotAttackAbility", sym.TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, sym.Kind);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_Multiple_Children_Index_All_As_Symbols()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+        schema.AddType(Type("ForceCloakAbility"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="Ability_A"/><Force_Cloak_Ability Name="Ability_B"/></Abilities></U>""",
+            1, default);
+
+        Assert.Equal(2, result.Symbols.Length);
+        Assert.Contains(result.Symbols, s => s.Id == "Ability_A" && s.TypeName == "LuckyShotAttackAbility");
+        Assert.Contains(result.Symbols, s => s.Id == "Ability_B" && s.TypeName == "ForceCloakAbility");
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_Unknown_Type_Is_Silently_Skipped()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        // No type registered for BasePowerAbility
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Base_Power_Ability Name="My_Ability"/></Abilities></U>""",
+            1, default);
+
+        Assert.Empty(result.Symbols);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_Child_With_No_Name_Attribute_Is_Skipped()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability/></Abilities></U>""",
+            1, default);
+
+        Assert.Empty(result.Symbols);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_Symbol_FileOrigin_Column_IsNameAttributeValueStart()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("CombatBonusAbility"));
+
+        // Line 2 (0-based): "<Combat_Bonus_Ability Name="MY_BONUS"/>"
+        // "<Combat_Bonus_Ability Name=\"" = 28 chars (0-27) → value at col 28
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            "<U>\n<Abilities SubObjectList=\"Yes\">\n<Combat_Bonus_Ability Name=\"MY_BONUS\"/>\n</Abilities>\n</U>",
+            1, default);
+
+        var sym = Assert.Single(result.Symbols);
+        var origin = Assert.IsType<FileOrigin>(sym.Origin);
+        Assert.Equal(2, origin.Line);
+        Assert.Equal(28, origin.Column);
+    }
+
+    // ── GUI_Activated_Ability_Name reference (GuiActivatedAbilityDefinitionSubObjectList cross-link) ─────────────
+
+    [Fact]
+    public async Task ParseAsync_GUI_Activated_Ability_Name_Emits_XmlObject_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "GUI_Activated_Ability_Name",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject
+        });
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Unit_Abilities_Data SubObjectList="Yes"><Unit_Ability><GUI_Activated_Ability_Name>My_Special_Ability</GUI_Activated_Ability_Name></Unit_Ability></Unit_Abilities_Data></U>""",
+            1, default);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("My_Special_Ability", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Null(reference.ExpectedTypeName);
     }
 
     // ── FakeSchemaProvider ───────────────────────────────────────────────────

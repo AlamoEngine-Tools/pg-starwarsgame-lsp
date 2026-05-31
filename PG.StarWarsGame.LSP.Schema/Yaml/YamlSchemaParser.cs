@@ -44,7 +44,8 @@ internal static class YamlSchemaParser
                 var mode = ValidationOverrideMode.Additive;
                 if (vo.Mode is not null && !Enum.TryParse(vo.Mode, true, out mode))
                 {
-                    logger?.LogWarning("Unknown validationOverride mode '{Mode}' for tag '{Tag}' — defaulting to Additive",
+                    logger?.LogWarning(
+                        "Unknown validationOverride mode '{Mode}' for tag '{Tag}' — defaulting to Additive",
                         vo.Mode, entry.Tag);
                     mode = ValidationOverrideMode.Additive;
                 }
@@ -52,7 +53,8 @@ internal static class YamlSchemaParser
                 var order = ValidationOverrideOrder.Append;
                 if (vo.Order is not null && !Enum.TryParse(vo.Order, true, out order))
                 {
-                    logger?.LogWarning("Unknown validationOverride order '{Order}' for tag '{Tag}' — defaulting to Append",
+                    logger?.LogWarning(
+                        "Unknown validationOverride order '{Order}' for tag '{Tag}' — defaulting to Append",
                         vo.Order, entry.Tag);
                     order = ValidationOverrideOrder.Append;
                 }

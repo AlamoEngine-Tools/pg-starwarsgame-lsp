@@ -50,7 +50,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileHelper fileHelper)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
-            fileTypeRegistry, fileHelper, debounceMs: 100)
+            fileTypeRegistry, fileHelper, 100)
     {
     }
 

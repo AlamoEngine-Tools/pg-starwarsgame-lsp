@@ -15,10 +15,10 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 public class LspServerFixture : IAsyncLifetime
 {
-    private readonly TaskCompletionSource _scanStartedTcs =
+    private readonly TaskCompletionSource _scanCompleteTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private readonly TaskCompletionSource _scanCompleteTcs =
+    private readonly TaskCompletionSource _scanStartedTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
     private LanguageClient? _client;
@@ -56,9 +56,6 @@ public class LspServerFixture : IAsyncLifetime
             await InitializeSpawnedAsync(workspacePath);
     }
 
-    protected virtual string ResolveWorkspacePath() =>
-        LspTestEnvironment.WorkspacePath ?? TestDataDirectory;
-
     public async Task DisposeAsync()
     {
         if (_client is IAsyncDisposable asyncClient)
@@ -82,6 +79,11 @@ public class LspServerFixture : IAsyncLifetime
             {
                 _process.Dispose();
             }
+    }
+
+    protected virtual string ResolveWorkspacePath()
+    {
+        return LspTestEnvironment.WorkspacePath ?? TestDataDirectory;
     }
 
     /// <summary>

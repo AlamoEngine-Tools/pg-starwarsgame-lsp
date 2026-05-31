@@ -47,8 +47,12 @@ public sealed class GameIndexService : IGameIndexService
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         _inflightCts.AddOrUpdate(
             uri,
-            addValueFactory: _ => cts,
-            updateValueFactory: (_, prior) => { prior.Cancel(); return cts; });
+            _ => cts,
+            (_, prior) =>
+            {
+                prior.Cancel();
+                return cts;
+            });
 
         // Parse outside the CAS loop — potentially slow, must not hold a lock.
         DocumentIndex newDoc;
@@ -160,11 +164,22 @@ public sealed class GameIndexService : IGameIndexService
                 ? refs.SetItem(reference.TargetId, arr.Add(reference))
                 : refs.Add(reference.TargetId, ImmutableArray.Create(reference));
 
+        var groups = base_.WorkspaceGroupMemberships;
+        if (!doc.GroupMemberships.IsDefault)
+            foreach (var dgm in doc.GroupMemberships)
+            {
+                var key = dgm.Membership.GroupKey;
+                groups = groups.TryGetValue(key, out var arr)
+                    ? groups.SetItem(key, arr.Add(dgm.Membership))
+                    : groups.Add(key, ImmutableArray.Create(dgm.Membership));
+            }
+
         return base_ with
         {
             Documents = base_.Documents.SetItem(doc.DocumentUri, doc),
             WorkspaceDefinitions = defs,
-            WorkspaceReferences = refs
+            WorkspaceReferences = refs,
+            WorkspaceGroupMemberships = groups
         };
     }
 
@@ -189,11 +204,22 @@ public sealed class GameIndexService : IGameIndexService
             refs = trimmed.IsEmpty ? refs.Remove(reference.TargetId) : refs.SetItem(reference.TargetId, trimmed);
         }
 
+        var groups = index.WorkspaceGroupMemberships;
+        if (!existing.GroupMemberships.IsDefault)
+            foreach (var dgm in existing.GroupMemberships)
+            {
+                var key = dgm.Membership.GroupKey;
+                if (!groups.TryGetValue(key, out var arr)) continue;
+                var trimmed = arr.Remove(dgm.Membership);
+                groups = trimmed.IsEmpty ? groups.Remove(key) : groups.SetItem(key, trimmed);
+            }
+
         return index with
         {
             Documents = index.Documents.Remove(uri),
             WorkspaceDefinitions = defs,
-            WorkspaceReferences = refs
+            WorkspaceReferences = refs,
+            WorkspaceGroupMemberships = groups
         };
     }
 

@@ -165,6 +165,46 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Equal(4, tvf.Length);
     }
 
+    // ── ability sub-object fact production ───────────────────────────────────
+
+    [Fact]
+    public void AbilityField_EmitsFactWithAbilityTypeTagDefinition()
+    {
+        // <Root><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="...">
+        //   <Applicable_Unit_Categories>INFANTRY</Applicable_Unit_Categories>
+        // </Lucky_Shot_Attack_Ability></Abilities></Root>
+        const string xml =
+            "<Root><Abilities SubObjectList=\"Yes\">" +
+            "<Lucky_Shot_Attack_Ability Name=\"Luke_Shot\">" +
+            "<Applicable_Unit_Categories>INFANTRY</Applicable_Unit_Categories>" +
+            "</Lucky_Shot_Attack_Ability></Abilities></Root>";
+
+        var facts = Build(new AbilitySubObjectSchemaProvider()).Produce(xml, Uri);
+
+        var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal("Applicable_Unit_Categories", tvf.Tag.Tag, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal("INFANTRY", tvf.RawValue);
+        // Fact must carry the ability type's tag definition (NameReference), not a global Float
+        Assert.Equal(XmlValueType.NameReference, tvf.Tag.ValueType);
+    }
+
+    [Fact]
+    public void AbilityField_UnknownInAbilityType_FallsBackToGlobalTagGracefully()
+    {
+        const string xml =
+            "<Root><Abilities SubObjectList=\"Yes\">" +
+            "<Lucky_Shot_Attack_Ability Name=\"Luke_Shot\">" +
+            "<Max_Speed>5.0</Max_Speed>" +
+            "</Lucky_Shot_Attack_Ability></Abilities></Root>";
+
+        // Max_Speed is not in LuckyShotAttackAbility schema, but IS a global tag (Float)
+        var facts = Build(new AbilitySubObjectSchemaProvider()).Produce(xml, Uri);
+
+        var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal("Max_Speed", tvf.Tag.Tag, StringComparer.OrdinalIgnoreCase);
+        Assert.Equal(XmlValueType.Float, tvf.Tag.ValueType);
+    }
+
     // ── structural validation ─────────────────────────────────────────────────
 
     [Fact]
@@ -374,6 +414,49 @@ file sealed class EmptySchemaProvider : ISchemaProvider
     }
 
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+    public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
+}
+
+file sealed class AbilitySubObjectSchemaProvider : ISchemaProvider
+{
+    private static readonly XmlTagDefinition AbilitiesTag = new()
+        { Tag = "Abilities", ValueType = XmlValueType.AbilityDefinitionSubObjectList };
+
+    private static readonly XmlTagDefinition ApplicableUnitCategoriesTag = new()
+        { Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference };
+
+    private static readonly XmlTagDefinition MaxSpeedTag = new()
+        { Tag = "Max_Speed", ValueType = XmlValueType.Float };
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        if (tagName.Equals("Abilities", StringComparison.OrdinalIgnoreCase)) return AbilitiesTag;
+        if (tagName.Equals("Max_Speed", StringComparison.OrdinalIgnoreCase)) return MaxSpeedTag;
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+
+    public GameObjectTypeDefinition? GetObjectType(string _) => null;
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        if (typeName.Equals("LuckyShotAttackAbility", StringComparison.OrdinalIgnoreCase))
+            return [ApplicableUnitCategoriesTag];
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string _) => null;
+    public IReadOnlyList<XmlTagDefinition> AllTags => [AbilitiesTag, ApplicableUnitCategoriesTag, MaxSpeedTag];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];

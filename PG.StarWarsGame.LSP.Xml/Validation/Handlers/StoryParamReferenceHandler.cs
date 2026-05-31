@@ -22,7 +22,7 @@ public sealed class StoryParamReferenceHandler : XmlDiagnosticsHandler<StoryPara
             if (ctx.Index.Resolve(fact.RawValue) is null)
                 return
                 [
-                    new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                    new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                         $"'{fact.RawValue}' is not a recognized {refType}.")
                 ];
             return [];
@@ -34,7 +34,7 @@ public sealed class StoryParamReferenceHandler : XmlDiagnosticsHandler<StoryPara
                 if (ctx.Index.Resolve(token) is null)
                     return
                     [
-                        new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                        new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                             $"'{token}' is not a recognized {refType}.")
                     ];
             return [];
