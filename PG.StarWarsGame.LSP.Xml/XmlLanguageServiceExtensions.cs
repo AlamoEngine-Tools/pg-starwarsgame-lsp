@@ -30,7 +30,11 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AudioFileFormatHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BooleanValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, MapFileFormatHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ModelFileFormatHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, TextureFileFormatHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CableRenderModeHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DynamicEnumValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FloatListHandler>();

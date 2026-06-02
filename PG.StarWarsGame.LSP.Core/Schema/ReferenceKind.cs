@@ -23,6 +23,9 @@ public enum ReferenceKind
     /// <summary>Audio sample filename resolved by the engine SFX system.</summary>
     AudioFile,
 
+    /// <summary>Alamo Engine tactical map file (.ted).</summary>
+    MapFile,
+
     /// <summary>Animation bone name embedded in a 3D model.</summary>
     BoneName,
 

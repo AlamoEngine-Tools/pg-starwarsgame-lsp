@@ -1,0 +1,27 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
+
+namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
+
+public sealed class AudioFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+{
+    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    {
+        if (fact.Tag.ReferenceKind != ReferenceKind.AudioFile)
+            return [];
+
+        var results = new List<XmlDiagnosticResult>();
+        foreach (var token in fact.RawValue.Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (!token.EndsWith(".wav", StringComparison.OrdinalIgnoreCase) &&
+                !token.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
+                results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+                    $"'{token}' is not a valid audio filename for <{fact.Tag.Tag}>. Expected a .wav or .mp3 file."));
+        }
+
+        return results;
+    }
+}
