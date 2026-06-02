@@ -8,6 +8,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -43,43 +45,12 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         if (!_workspaceHost.TryGet(uri, out var doc))
             return Task.FromResult(new CompletionList());
 
-        var lines = doc.Text.Split('\n');
-        var lineIndex = request.Position.Line;
-        if (lineIndex >= lines.Length)
-            return Task.FromResult(new CompletionList());
-
-        var line = lines[lineIndex].TrimEnd('\r');
+        var line = request.Position.Line;
         var character = request.Position.Character;
-
-        var context = FindStringArgContext(line, character);
-        if (context is null)
-            return Task.FromResult(new CompletionList());
-
-        var (functionName, paramIndex) = context.Value;
         var index = _indexService.Current;
 
-        if (string.Equals(functionName, "require", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(new CompletionList(BuildRequireCompletions(index)));
-
-        var xmlRefs = _schemaProvider.GetXmlRefs(functionName);
-        if (xmlRefs.Count == 0)
-            return Task.FromResult(new CompletionList());
-
-        XmlRefEntry? refEntry = null;
-        foreach (var r in xmlRefs)
-            if (r.ParamIndex == paramIndex)
-            {
-                refEntry = r;
-                break;
-            }
-
-        if (refEntry is null)
-            return Task.FromResult(new CompletionList());
-
-        _logger.LogDebug("Lua completion: {Function} param {Index} → type {Type}",
-            functionName, paramIndex, refEntry.Value.ExpectedTypeName ?? "*");
-
-        return Task.FromResult(new CompletionList(BuildXmlRefCompletions(index, refEntry.Value.ExpectedTypeName)));
+        var ctx = LuaCompletionContextClassifier.Classify(doc.Text, line, character);
+        return Task.FromResult(BuildCompletions(ctx, uri, doc.Text, line, character, index));
     }
 
     public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
@@ -93,99 +64,102 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         return new CompletionRegistrationOptions
         {
             DocumentSelector = TextDocumentSelector.ForLanguage("lua"),
-            TriggerCharacters = new Container<string>("\"", "'"),
+            TriggerCharacters = new Container<string>("\"", "'", ".", ":"),
             ResolveProvider = false
         };
     }
 
-    // Scans the line text backward from `character` to detect if the cursor is inside
-    // a string literal that is an argument to a function call.
-    // Returns (FunctionName, ParamIndex) if found, null otherwise.
-    private static (string FunctionName, int ParamIndex)? FindStringArgContext(string line, int character)
+    private CompletionList BuildCompletions(
+        LuaCompletionContext? ctx,
+        string uri, string text, int line, int character,
+        GameIndex index)
     {
-        var bound = Math.Min(character, line.Length);
-
-        // Walk backward to find the opening quote of the string we're inside.
-        var i = bound - 1;
-        while (i >= 0)
+        switch (ctx)
         {
-            var ch = line[i];
-            if (ch == '"' || ch == '\'') break;
-            if (ch == ')' || ch == ';') return null; // not inside a string in a call
-            i--;
-        }
+            case StringArgContext { FunctionName: var fn, ParamIndex: var param }
+                when string.Equals(fn, "require", StringComparison.OrdinalIgnoreCase):
+                return new CompletionList(BuildRequireCompletions(uri, index));
 
-        if (i < 0) return null;
-        var quotePos = i;
-
-        // Walk backward from the opening quote, counting commas (for param index)
-        // and tracking bracket depth to find the enclosing '('.
-        i = quotePos - 1;
-        var paramIndex = 0;
-        var depth = 0;
-
-        while (i >= 0)
-        {
-            var ch = line[i];
-            if (ch == ')' || ch == ']' || ch == '}')
+            case StringArgContext { FunctionName: var fn, ParamIndex: var param }:
             {
-                depth++;
-                i--;
-                continue;
+                var xmlRefs = _schemaProvider.GetXmlRefs(fn);
+                if (xmlRefs.Count == 0) return new CompletionList();
+
+                XmlRefEntry? refEntry = null;
+                foreach (var r in xmlRefs)
+                    if (r.ParamIndex == param) { refEntry = r; break; }
+
+                if (refEntry is null) return new CompletionList();
+
+                _logger.LogDebug("Lua completion: {Function} param {Index} → type {Type}",
+                    fn, param, refEntry.Value.ExpectedTypeName ?? "*");
+
+                return new CompletionList(BuildXmlRefCompletions(index, refEntry.Value.ExpectedTypeName));
             }
 
-            if (ch == '(' || ch == '[' || ch == '{')
+            case IdentifierContext { AtStatementStart: var atStart }:
             {
-                if (depth > 0)
-                {
-                    depth--;
-                    i--;
-                    continue;
-                }
-
-                break; // found the enclosing opening paren
+                var scope = LuaLocalScopeCollector.CollectAt(
+                    text, line, character, uri, index, _schemaProvider, _fileHelper);
+                var items = LuaIdentifierCompletionProvider.Provide(scope).ToList();
+                if (atStart)
+                    items.AddRange(LuaSnippetCompletionProvider.Snippets);
+                return new CompletionList(items);
             }
 
-            if (ch == ',' && depth == 0) paramIndex++;
-            if (ch == ';' || ch == '\n') return null;
-            i--;
+            case MemberAccessContext memberCtx:
+            {
+                var scope = LuaLocalScopeCollector.CollectAt(
+                    text, line, character, uri, index, _schemaProvider, _fileHelper);
+                return new CompletionList(LuaMemberCompletionProvider.Provide(memberCtx, scope, _schemaProvider));
+            }
+
+            default:
+                return new CompletionList();
         }
-
-        if (i < 0) return null;
-        var parenPos = i;
-
-        // Extract function name immediately before the paren.
-        i = parenPos - 1;
-        while (i >= 0 && char.IsWhiteSpace(line[i])) i--;
-
-        var nameEnd = i;
-        if (nameEnd < 0) return null;
-
-        while (i >= 0 && (char.IsLetterOrDigit(line[i]) || line[i] == '_')) i--;
-        var nameStart = i + 1;
-
-        if (nameStart > nameEnd) return null;
-
-        return (line[nameStart..(nameEnd + 1)], paramIndex);
     }
 
-    private static IEnumerable<CompletionItem> BuildRequireCompletions(GameIndex index)
+    private IEnumerable<CompletionItem> BuildRequireCompletions(string currentUri, GameIndex index)
     {
+        var fileHelper = _fileHelper;
+        var sharedUris = LuaFileClassifier.GetSharedUris(index.Documents, fileHelper);
+
         foreach (var uri in index.Documents.Keys)
         {
             if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
+            if (string.Equals(uri, currentUri, StringComparison.OrdinalIgnoreCase)) continue;
 
             var normalized = uri.Replace('\\', '/');
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
-
             if (!filename.EndsWith(".lua", StringComparison.OrdinalIgnoreCase)) continue;
-            var moduleName = filename[..^4]; // strip ".lua"
+            var moduleName = filename[..^4];
+
+            // Determine tier and sort order
+            string sortText;
+            string? detail;
+            if (LuaFileClassifier.IsLibraryUri(uri))
+            {
+                sortText = "0_" + moduleName;
+                detail = "library";
+            }
+            else if (sharedUris.Contains(uri))
+            {
+                sortText = "1_" + moduleName;
+                detail = "dependency";
+            }
+            else
+            {
+                // Standalone — omit from require completions
+                continue;
+            }
 
             yield return new CompletionItem
             {
                 Label = moduleName,
-                Kind = CompletionItemKind.Module
+                Kind = CompletionItemKind.Module,
+                SortText = sortText,
+                Detail = detail
             };
         }
     }

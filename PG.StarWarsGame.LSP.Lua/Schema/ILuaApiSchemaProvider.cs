@@ -25,9 +25,26 @@ public interface ILuaApiSchemaProvider
     ///     Lookup is case-insensitive.
     /// </summary>
     string? GetFunctionDescription(string functionName);
+
+    /// <summary>
+    ///     Returns the engine return type name for a function (from <c>---@return</c> annotation),
+    ///     or <c>null</c> if unknown. Lookup is case-insensitive.
+    /// </summary>
+    string? GetReturnTypeName(string functionName);
+
+    /// <summary>
+    ///     Returns all documented members of the given engine type (from <c>function TypeName.X</c>
+    ///     / <c>function TypeName:X</c> declarations). Empty when the type is unknown.
+    /// </summary>
+    IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName);
 }
 
-/// <summary>
-///     Describes one XML object reference parameter in a C++ API function.
-/// </summary>
+/// <summary>Describes one XML object reference parameter in a C++ API function.</summary>
 public readonly record struct XmlRefEntry(int ParamIndex, string? ExpectedTypeName);
+
+/// <summary>Describes one member of an engine-exposed Lua type.</summary>
+public readonly record struct LuaTypeMember(
+    string Name,
+    bool IsMethod,
+    string? Description,
+    string? ReturnTypeName);

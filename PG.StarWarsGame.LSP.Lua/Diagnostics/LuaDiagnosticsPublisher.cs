@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
+using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
 using LspDiagnosticContainer = OmniSharp.Extensions.LanguageServer.Protocol.Models.Container<
     OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic>;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
@@ -69,6 +70,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         CollectReferenceErrors(uri, index, diagnostics);
         diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, text, index.Documents.Keys, _fileHelper));
         diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, text, index, _schemaProvider, _fileHelper));
+        diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(text, uri));
 
         Publish(new LspPublishParams
         {
@@ -82,13 +84,20 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         foreach (var diag in tree.GetDiagnostics())
         {
-            if (diag.Severity != DiagnosticSeverity.Error) continue;
+            if (diag.Severity == DiagnosticSeverity.Hidden) continue;
+            var lspSeverity = diag.Severity switch
+            {
+                DiagnosticSeverity.Error => LspDiagnosticSeverity.Error,
+                DiagnosticSeverity.Warning => LspDiagnosticSeverity.Warning,
+                _ => LspDiagnosticSeverity.Information
+            };
             var span = diag.Location.GetLineSpan();
             var start = span.StartLinePosition;
             var end = span.EndLinePosition;
             diagnostics.Add(new LspDiagnostic
             {
-                Severity = LspDiagnosticSeverity.Error,
+                Code = new LspDiagnosticCode(diag.Id),
+                Severity = lspSeverity,
                 Message = diag.GetMessage(),
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),

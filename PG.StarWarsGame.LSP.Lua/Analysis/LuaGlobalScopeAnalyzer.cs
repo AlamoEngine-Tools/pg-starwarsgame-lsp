@@ -52,13 +52,17 @@ internal static class LuaGlobalScopeAnalyzer
         var transitiveRequiredUris = LuaTransitiveRequireResolver.GetTransitiveDependencies(
             requiredUris, index.Documents, fileHelper);
 
+        // Compute the shared URIs (Tier 1 library + Tier 2 dependency files) once for
+        // sandbox isolation — standalone files' globals must not bleed into other files.
+        var sharedUris = LuaFileClassifier.GetSharedUris(index.Documents, fileHelper);
+
         // Phase 2: collect all identifier names used in this file.
         var usedIdentifiers = CollectUsedIdentifiers(root);
 
         // Phase 3: missing-require diagnostics (uses transitive set + locallyBound skip).
         EmitMissingRequireDiagnostics(
             root, documentUri, index, schemaProvider,
-            locallyBound, transitiveRequiredUris, diagnostics);
+            locallyBound, transitiveRequiredUris, sharedUris, diagnostics);
 
         // Phase 4: unused-require diagnostics (transitive scope per required file).
         EmitUnusedRequireDiagnostics(
@@ -68,7 +72,7 @@ internal static class LuaGlobalScopeAnalyzer
         EmitCyclicRequireDiagnostics(documentUri, requireCalls, index, fileHelper, diagnostics);
 
         // Phase 6: global override diagnostics.
-        EmitGlobalOverrideDiagnostics(root, index, transitiveRequiredUris, diagnostics);
+        EmitGlobalOverrideDiagnostics(root, index, transitiveRequiredUris, sharedUris, diagnostics);
 
         // Phase 7: redundant require diagnostics.
         EmitRedundantRequireDiagnostics(requireCalls, index, fileHelper, diagnostics);
@@ -120,10 +124,11 @@ internal static class LuaGlobalScopeAnalyzer
         ILuaApiSchemaProvider schemaProvider,
         HashSet<string> locallyBound,
         IReadOnlySet<string> requiredUris,
+        IReadOnlySet<string> sharedUris,
         List<LspDiagnostic> diagnostics)
     {
-        // Build a map from LuaGlobal name → defining URI (for globals in other files).
-        var luaGlobalsByName = BuildLuaGlobalsMap(index, documentUri);
+        // Build a map from LuaGlobal name → defining URIs (library/dependency files only).
+        var luaGlobalsByName = BuildLuaGlobalsMap(index, documentUri, sharedUris);
 
         // Track names already warned about to deduplicate across occurrences.
         var warned = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -135,15 +140,16 @@ internal static class LuaGlobalScopeAnalyzer
             if (s_lua51Globals.Contains(name)) continue;
             if (schemaProvider.AllFunctionNames.Contains(name)) continue;
             if (locallyBound.Contains(name)) continue;
-            if (!luaGlobalsByName.TryGetValue(name, out var defUri)) continue;
-            if (requiredUris.Contains(defUri)) continue;
+            if (!luaGlobalsByName.TryGetValue(name, out var defUris)) continue;
+            // No warning if at least one defining file is in the transitive require closure.
+            if (defUris.Any(uri => requiredUris.Contains(uri))) continue;
 
             if (!warned.Add(name)) continue;
 
             var span = id.GetLocation().GetLineSpan();
             var start = span.StartLinePosition;
             var end = span.EndLinePosition;
-            var filename = Path.GetFileNameWithoutExtension(defUri);
+            var filename = Path.GetFileNameWithoutExtension(defUris[0]);
 
             diagnostics.Add(new LspDiagnostic
             {
@@ -157,21 +163,25 @@ internal static class LuaGlobalScopeAnalyzer
         }
     }
 
-    // Returns a map: LuaGlobal name → defining file URI (only globals NOT defined in documentUri).
-    private static Dictionary<string, string> BuildLuaGlobalsMap(GameIndex index, string documentUri)
+    // Returns a map: LuaGlobal name → list of defining file URIs.
+    // Only includes globals from shared files (Tier 1 libraries and Tier 2 dependencies).
+    // Standalone files' globals are excluded to prevent cross-sandbox bleed.
+    private static Dictionary<string, List<string>> BuildLuaGlobalsMap(
+        GameIndex index, string documentUri, IReadOnlySet<string> sharedUris)
     {
-        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var (id, symbols) in index.WorkspaceDefinitions)
         foreach (var sym in symbols)
         {
             if (sym.Kind != GameSymbolKind.LuaGlobal) continue;
             if (sym.Origin is not FileOrigin fo) continue;
             if (string.Equals(fo.Uri, documentUri, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!sharedUris.Contains(fo.Uri)) continue;
 
-            // Last writer wins if the same name is defined in multiple files;
-            // the caller checks if ANY defining URI is required, so this is fine.
-            if (!map.ContainsKey(id))
-                map[id] = fo.Uri;
+            if (!map.TryGetValue(id, out var uris))
+                map[id] = uris = new List<string>(1);
+            if (!uris.Contains(fo.Uri, StringComparer.OrdinalIgnoreCase))
+                uris.Add(fo.Uri);
         }
 
         return map;
@@ -261,14 +271,18 @@ internal static class LuaGlobalScopeAnalyzer
         SyntaxNode root,
         GameIndex index,
         IReadOnlySet<string> transitiveRequiredUris,
+        IReadOnlySet<string> sharedUris,
         List<LspDiagnostic> diagnostics)
     {
         var requiredGlobalNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var uri in transitiveRequiredUris)
+        {
+            if (!sharedUris.Contains(uri)) continue;
             if (index.Documents.TryGetValue(uri, out var doc))
                 foreach (var sym in doc.Symbols)
                     if (sym.Kind == GameSymbolKind.LuaGlobal)
                         requiredGlobalNames.Add(sym.Id);
+        }
 
         foreach (var funcDecl in root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())
         {

@@ -15,15 +15,17 @@ public sealed class LuaApiSchemaProxy : ILuaApiSchemaProvider
 
     public IReadOnlySet<string> AllFunctionNames => _inner.AllFunctionNames;
 
-    public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
-    {
-        return _inner.GetXmlRefs(functionName);
-    }
+    public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName) =>
+        _inner.GetXmlRefs(functionName);
 
-    public string? GetFunctionDescription(string functionName)
-    {
-        return _inner.GetFunctionDescription(functionName);
-    }
+    public string? GetFunctionDescription(string functionName) =>
+        _inner.GetFunctionDescription(functionName);
+
+    public string? GetReturnTypeName(string functionName) =>
+        _inner.GetReturnTypeName(functionName);
+
+    public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) =>
+        _inner.GetMembersOf(typeName);
 
     public void Configure(ILuaApiSchemaProvider provider)
     {
@@ -33,15 +35,9 @@ public sealed class LuaApiSchemaProxy : ILuaApiSchemaProvider
     private sealed class EmptyProvider : ILuaApiSchemaProvider
     {
         public IReadOnlySet<string> AllFunctionNames => new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
-        {
-            return [];
-        }
-
-        public string? GetFunctionDescription(string functionName)
-        {
-            return null;
-        }
+        public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName) => [];
+        public string? GetFunctionDescription(string functionName) => null;
+        public string? GetReturnTypeName(string functionName) => null;
+        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) => [];
     }
 }

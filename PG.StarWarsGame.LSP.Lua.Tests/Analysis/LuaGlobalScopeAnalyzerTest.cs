@@ -167,8 +167,11 @@ public sealed class LuaGlobalScopeAnalyzerTest
     }
 
     [Fact]
-    public void Analyze_TwoMissingGlobalsFromDifferentFiles_TwoWarnings()
+    public void Analyze_TwoMissingGlobalsFromDifferentSharedFiles_TwoWarnings()
     {
+        // Both LibUri (library by path) and OtherUri (dependency — required by a third file)
+        // are shared files. Globals from both should trigger missing-require warnings.
+        const string requirer = "file:///scripts/ai/plan_x.lua";
         const string text = """
                             HelperA()
                             HelperB()
@@ -179,12 +182,15 @@ public sealed class LuaGlobalScopeAnalyzerTest
             new FileOrigin(OtherUri, 0, null), null);
         var libDoc = new DocumentIndex(LibUri, 1, [symA], []);
         var otherDoc = new DocumentIndex(OtherUri, 1, [symB], []);
+        // plan_x.lua requires "other" → makes OtherUri a Dependency (Tier 2)
+        var requirerDoc = new DocumentIndex(requirer, 1, [], [], ImmutableArray.Create("other"));
         var index = GameIndex.Empty with
         {
             Documents = GameIndex.Empty.Documents
                 .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
                 .Add(LibUri, libDoc)
-                .Add(OtherUri, otherDoc),
+                .Add(OtherUri, otherDoc)
+                .Add(requirer, requirerDoc),
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
                 .Add("HelperA", [symA])
                 .Add("HelperB", [symB])
@@ -322,15 +328,15 @@ public sealed class LuaGlobalScopeAnalyzerTest
     }
 
     [Fact]
-    public void Analyze_TransitiveRequire_GlobalFromUnreachableFile_EmitsWarning()
+    public void Analyze_TransitiveRequire_GlobalFromUnreachableSharedFile_EmitsWarning()
     {
-        // A does NOT require B, but B requires C which defines Foo.
-        // A calls Foo() → still a warning (B not in A's require chain at all).
+        // A does NOT require anything; OtherUri is a Dependency (required by LibUri via "other").
+        // A calls Foo() which is defined in OtherUri → warning because OtherUri is shared but not required by A.
         const string text = "Foo()";
         var symFoo = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null,
             new FileOrigin(OtherUri, 0, null), null);
         var docB = new DocumentIndex(LibUri, 1, [], [],
-            ImmutableArray.Create("c"));
+            ImmutableArray.Create("other")); // LibUri requires "other" → OtherUri becomes Dependency
         var docC = new DocumentIndex(OtherUri, 1, [symFoo], []);
         var index = GameIndex.Empty with
         {
@@ -984,5 +990,130 @@ public sealed class LuaGlobalScopeAnalyzerTest
         var dup = result.Single(d => d.Message.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
         // Original is on line 0 (0-indexed) = line 1 for human display.
         Assert.Contains("line 1", dup.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // ── sandbox isolation (Tier 3 standalones invisible to other files) ───────
+
+    [Fact]
+    public void Analyze_GlobalInStandaloneFile_NotRequiredAnywhere_NoDiagnostic()
+    {
+        // PlanB is standalone (nobody requires it). CurrentUri uses "Definitions" which happens
+        // to be defined in PlanB, but CurrentUri also defines its own Definitions.
+        // After sandbox isolation: PlanB's global is invisible → no missing-require warning.
+        const string planB = "file:///scripts/ai/plan_b.lua";
+        const string text = """
+                            function Definitions() end
+                            Definitions()
+                            """;
+        var symCurrent = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(CurrentUri, 0, null), null);
+        var symOther = new GameSymbol("Definitions", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(planB, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [symCurrent], []))
+                .Add(planB, new DocumentIndex(planB, 1, [symOther], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("Definitions", [symCurrent, symOther])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_StandaloneGlobalUsedByAnotherStandalone_NoDiagnostic()
+    {
+        // PlanB defines UniqueHelper(). CurrentUri calls UniqueHelper() but doesn't define it.
+        // PlanB is standalone (nobody requires it) → UniqueHelper is invisible → no warning.
+        const string planB = "file:///scripts/ai/plan_b.lua";
+        const string text = "UniqueHelper()";
+        var sym = new GameSymbol("UniqueHelper", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(planB, 0, null), null);
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(planB, new DocumentIndex(planB, 1, [sym], [])),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("UniqueHelper", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Analyze_LibraryGlobalUsedByStandalone_NotRequired_EmitsWarning()
+    {
+        // Library files (Tier 1) are always shared — their globals ARE visible and trigger warnings.
+        const string text = "LibHelper()";
+        var index = AddCurrentDoc(IndexWithLibGlobal("LibHelper"));
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var diag = Assert.Single(result);
+        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
+        Assert.Contains("LibHelper", diag.Message);
+    }
+
+    [Fact]
+    public void Analyze_DependencyGlobalUsedByStandalone_NotRequired_EmitsWarning()
+    {
+        // Dependency files (Tier 2: required by some other file) are shared — their globals trigger warnings.
+        const string depUri = "file:///scripts/pgstatemachine.lua";
+        const string requirer = "file:///scripts/ai/plan_x.lua";
+        const string text = "StateMachineInit()";
+        var sym = new GameSymbol("StateMachineInit", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(depUri, 0, null), null);
+        // plan_x requires pgstatemachine → depUri becomes Dependency (Tier 2)
+        var requirerDoc = new DocumentIndex(requirer, 1, [], [], ImmutableArray.Create("pgstatemachine"));
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(depUri, new DocumentIndex(depUri, 1, [sym], []))
+                .Add(requirer, requirerDoc),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("StateMachineInit", [sym])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+
+        var diag = Assert.Single(result);
+        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
+        Assert.Contains("StateMachineInit", diag.Message);
+    }
+
+    [Fact]
+    public void Analyze_MultipleFilesDefineGlobal_AtLeastOneRequired_NoDiagnostic()
+    {
+        // HelperA is defined in both LibUri AND OtherUri; current file requires "mylib" (LibUri).
+        // Since at least one defining URI is in the require closure, no warning.
+        const string text = """
+                            require("mylib")
+                            HelperA()
+                            """;
+        var symA = new GameSymbol("HelperA", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var symB = new GameSymbol("HelperA", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(OtherUri, 0, null), null);
+        var libDoc = new DocumentIndex(LibUri, 1, [symA], []);
+        // Make OtherUri a dependency so it's in the shared set
+        const string requirer = "file:///scripts/ai/plan_x.lua";
+        var otherDoc = new DocumentIndex(OtherUri, 1, [symB], []);
+        var requirerDoc = new DocumentIndex(requirer, 1, [], [], ImmutableArray.Create("other"));
+        var index = GameIndex.Empty with
+        {
+            Documents = GameIndex.Empty.Documents
+                .Add(CurrentUri, new DocumentIndex(CurrentUri, 1, [], []))
+                .Add(LibUri, libDoc)
+                .Add(OtherUri, otherDoc)
+                .Add(requirer, requirerDoc),
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("HelperA", [symA, symB])
+        };
+
+        var result = LuaGlobalScopeAnalyzer.Analyze(CurrentUri, text, index, EmptySchema, s_fileHelper);
+        Assert.Empty(result);
     }
 }

@@ -183,19 +183,147 @@ public sealed class LuaCompletionHandlerTest
             string.Equals(i.Label, "pgstatemachine", StringComparison.OrdinalIgnoreCase));
     }
 
-    // ── outside string ────────────────────────────────────────────────────────
+    // ── identifier completions ────────────────────────────────────────────────
 
     [Fact]
-    public async Task Handle_OutsideAnyString_ReturnsEmpty()
+    public async Task Handle_IdentifierContext_ReturnsLua51Builtins()
     {
         var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(LuaUri, "RunMission()", 1);
+        host.AddOrUpdate(LuaUri, "pai", 1); // partial "pairs" at start of line
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var handler = BuildHandler(GameIndex.Empty, new LuaApiSchemaProvider([]), host);
-        // cursor on function name at col 5 — not inside any string
-        var result = await handler.Handle(CompletionAt(0, 5), CancellationToken.None);
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(CompletionAt(0, 3), CancellationToken.None);
 
-        Assert.Empty(result.Items);
+        Assert.Contains(result.Items, i => i.Label == "pairs" && i.Kind == CompletionItemKind.Keyword);
+    }
+
+    [Fact]
+    public async Task Handle_IdentifierContext_ReturnsEngineApiFunctions()
+    {
+        var schema = new LuaApiSchemaProvider([
+            "function Find_Player(playerIndex) end"
+        ]);
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Find", 1);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var handler = BuildHandler(index, schema, host);
+        var result = await handler.Handle(CompletionAt(0, 4), CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "Find_Player" && i.Kind == CompletionItemKind.Function);
+    }
+
+    [Fact]
+    public async Task Handle_IdentifierContext_OwnGlobal_IsIncluded()
+    {
+        var sym = new GameSymbol("MyGlobal", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LuaUri, 0, null), null);
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "My", 1);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [sym], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("MyGlobal", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(CompletionAt(0, 2), CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "MyGlobal");
+    }
+
+    // ── snippet completions ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_AtStatementStart_SnippetsIncluded()
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "if", 1); // "if" typed at start of line
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(CompletionAt(0, 2), CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "if" && i.Kind == CompletionItemKind.Snippet);
+    }
+
+    [Fact]
+    public async Task Handle_NotAtStatementStart_NoSnippets()
+    {
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "local x = if", 1); // "if" after assignment
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(CompletionAt(0, 12), CancellationToken.None);
+
+        Assert.DoesNotContain(result.Items, i => i.Kind == CompletionItemKind.Snippet);
+    }
+
+    // ── require ordering ─────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_RequireCompletion_LibraryFilesHaveLowerSortText()
+    {
+        const string libUri = "file:///scripts/library/statemachine.lua";
+        const string depUri = "file:///scripts/pgplayer.lua";
+        // mainUri requires depUri (making it a Dependency), libUri is library (path based)
+        var mainDoc = new DocumentIndex(LuaUri, 1, [], [], ImmutableArray.Create("pgplayer"));
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, mainDoc)
+                .Add(libUri, new DocumentIndex(libUri, 1, [], []))
+                .Add(depUri, new DocumentIndex(depUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "require(\"\")", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(CompletionAt(0, 9), CancellationToken.None);
+
+        var libItem = result.Items.FirstOrDefault(i => i.Label == "statemachine");
+        var depItem = result.Items.FirstOrDefault(i => i.Label == "pgplayer");
+
+        Assert.NotNull(libItem);
+        Assert.NotNull(depItem);
+        // Library sort text starts with "0_", dependency with "1_" → library sorts before dependency
+        Assert.True(string.Compare(libItem!.SortText, depItem!.SortText, StringComparison.Ordinal) < 0,
+            $"Library '{libItem.SortText}' should sort before Dependency '{depItem.SortText}'");
+    }
+
+    [Fact]
+    public async Task Handle_RequireCompletion_StandaloneFileOmitted()
+    {
+        const string standaloneUri = "file:///scripts/somescript.lua";
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], []))
+                .Add(standaloneUri, new DocumentIndex(standaloneUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "require(\"\")", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(CompletionAt(0, 9), CancellationToken.None);
+
+        // "somescript" is standalone (no one requires it, not in library/) → must be omitted
+        Assert.DoesNotContain(result.Items, i => i.Label == "somescript");
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────

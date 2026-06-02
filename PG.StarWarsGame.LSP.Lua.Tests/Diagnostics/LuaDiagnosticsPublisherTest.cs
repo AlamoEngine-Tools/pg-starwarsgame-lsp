@@ -197,6 +197,30 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Empty(Assert.Single(published).Diagnostics!);
     }
 
+    [Fact]
+    public void OnIndexChanged_LuaSyntaxError_DiagnosticCodeIsLorrettaId()
+    {
+        // Loretta diagnostic IDs (e.g. "LUA1003") should be surfaced as the LSP Code field
+        // so users and editors can identify and look up the exact Loretta diagnostic.
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, "function Foo(");
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        indexService.Fire(index);
+
+        var pub = Assert.Single(published);
+        var errorDiags = pub.Diagnostics!.Where(d => d.Severity == DiagnosticSeverity.Error).ToList();
+        Assert.NotEmpty(errorDiags);
+        Assert.All(errorDiags, d =>
+        {
+            Assert.True(d.Code?.IsString == true, $"Code should be a string Loretta ID, was: {d.Code}");
+            Assert.StartsWith("LUA", d.Code?.String);
+        });
+    }
+
     // ── import (require) errors ───────────────────────────────────────────────
 
     [Fact]
