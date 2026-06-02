@@ -59,7 +59,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
     {
         // Authoritative count of concrete IXmlDiagnosticsHandler registrations. Update this
         // deliberately whenever a handler is added or removed so the change is reviewed.
-        const int expectedHandlerCount = 84;
+        const int expectedHandlerCount = 78;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

@@ -59,12 +59,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, SfxEventHudReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NameReferenceListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeReferenceListHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, Type35Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, Type36Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, Type37Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, Type38Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, AbilityDefinitionSubObjectListHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, GuiActivatedAbilityDefinitionSubObjectListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ConditionalSfxEventHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DeathCloneSpecHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardPointTypeToTextureMapHandler>();

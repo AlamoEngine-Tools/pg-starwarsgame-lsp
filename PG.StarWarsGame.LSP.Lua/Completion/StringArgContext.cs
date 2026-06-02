@@ -3,4 +3,5 @@
 
 namespace PG.StarWarsGame.LSP.Lua.Completion;
 
-internal abstract record LuaCompletionContext;
+/// <summary>Cursor is inside a string literal that is an argument to a function call.</summary>
+internal sealed record StringArgContext(string FunctionName, int ParamIndex) : LuaCompletionContext;

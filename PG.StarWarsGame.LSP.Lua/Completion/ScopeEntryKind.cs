@@ -3,4 +3,12 @@
 
 namespace PG.StarWarsGame.LSP.Lua.Completion;
 
-internal abstract record LuaCompletionContext;
+internal enum ScopeEntryKind
+{
+    LocalVariable,
+    Parameter,
+    OwnGlobal,
+    RequiredGlobal,
+    EngineApi,
+    Lua51Builtin,
+}

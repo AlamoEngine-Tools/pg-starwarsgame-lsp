@@ -3,4 +3,5 @@
 
 namespace PG.StarWarsGame.LSP.Lua.Completion;
 
-internal abstract record LuaCompletionContext;
+/// <summary>Cursor is on a bare identifier (not inside a string, not after a member access dot).</summary>
+internal sealed record IdentifierContext(bool AtStatementStart) : LuaCompletionContext;

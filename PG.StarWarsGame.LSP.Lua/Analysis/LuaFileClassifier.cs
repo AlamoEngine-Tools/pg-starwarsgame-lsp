@@ -6,13 +6,6 @@ using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis;
 
-internal enum LuaFileTier
-{
-    Library,
-    Dependency,
-    Standalone
-}
-
 internal static class LuaFileClassifier
 {
     private const string LibrarySegment = "/library/";
