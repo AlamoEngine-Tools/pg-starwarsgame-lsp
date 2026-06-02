@@ -90,21 +90,26 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         // is technically inside a bracket (the opening '<' has no paired '>').
         if (IsTagNameContext(line, character))
         {
-            var (enclosingType, enclosingTagDepth, _) = FindEnclosingTagName(lines, lineIndex, character);
-            if (enclosingType is null)
+            var prefix = ExtractPartialTagName(line, character);
+            // Truncate text just before the partial '<' so HAP sees a well-formed document.
+            var anglePos = character - prefix.Length - 1;
+            var truncatedDoc = XmlUtility.CreateHtmlDocument(BuildTruncatedText(lines, lineIndex, anglePos));
+            var enclosingNode = XmlUtility.FindEnclosingElement(truncatedDoc, lineIndex);
+            if (enclosingNode is null)
                 return Task.FromResult(new CompletionList());
+
+            var enclosingType = enclosingNode.Name;
+            var enclosingTagDepth = XmlUtility.GetDepth(enclosingNode);
 
             // StoryParser context: cursor inside <Event> — use context-aware tag list
             if (string.Equals(enclosingType, "Event", StringComparison.OrdinalIgnoreCase) &&
                 IsStoryParserDocument(uri))
             {
-                var prefix = ExtractPartialTagName(line, character);
                 var storyItems = BuildStoryEventTagCompletions(text, lineIndex, character, prefix);
                 return Task.FromResult(new CompletionList(storyItems));
             }
 
-            var tagItems = BuildTagNameCompletions(uri, text, enclosingType, enclosingTagDepth,
-                ExtractPartialTagName(line, character));
+            var tagItems = BuildTagNameCompletions(uri, text, enclosingType, enclosingTagDepth, prefix);
             return Task.FromResult(new CompletionList(tagItems));
         }
 
@@ -113,7 +118,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             return Task.FromResult(new CompletionList());
 
         // Value completion: cursor is inside an element body
-        var (enclosingTag, enclosingDepth, tagStack) = FindEnclosingTagName(lines, lineIndex, character);
+        var valueDoc = XmlUtility.CreateHtmlDocument(text);
+        var enclosingValueNode = XmlUtility.FindEnclosingElement(valueDoc, lineIndex);
+        var enclosingTag = enclosingValueNode?.Name;
+        var enclosingDepth = enclosingValueNode is null ? 0 : XmlUtility.GetDepth(enclosingValueNode);
         if (enclosingTag is null)
             return Task.FromResult(new CompletionList());
 
@@ -141,7 +149,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         //   Tier 1 — ability sub-object context (Type56/57): use the ability schema type
         //   Tier 2 — registered file types: use GetTagsForType for each registered type
         //   Tier 3 — flat fallback
-        var containingAbilityType = TryResolveContainingAbilityType(tagStack);
+        var containingAbilityType = TryResolveContainingAbilityType(enclosingValueNode!);
         var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
         XmlTagDefinition? tagDef;
         if (containingAbilityType is not null)
@@ -468,73 +476,19 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return false;
     }
 
-    /// <summary>
-    ///     Scans backwards from the cursor to find the innermost open element name, its stack depth,
-    ///     and the full ancestor stack (innermost first).
-    ///     Opening tags push, closing tags pop, self-closing tags do not push.
-    ///     Returns (name, depth, stack) where depth = 1 means cursor is directly inside the document root element.
-    /// </summary>
-    private static (string? name, int depth, List<string> stack) FindEnclosingTagName(
-        string[] lines, int lineIndex, int character)
+    private string? TryResolveContainingAbilityType(HtmlNode node)
     {
-        // Collect all text up to the cursor
-        var sb = new StringBuilder();
-        for (var i = 0; i < lineIndex; i++)
-            sb.Append(lines[i]).Append('\n');
-        var currentLine = lines[lineIndex].TrimEnd('\r');
-        sb.Append(currentLine[..Math.Min(character, currentLine.Length)]);
-
-        var text = sb.ToString();
-
-        // Walk forward through all tags; maintain a stack
-        var stack = new Stack<string>();
-        var pos = 0;
-        while (pos < text.Length)
+        var child = node;
+        var parent = child.ParentNode;
+        while (parent is { NodeType: HtmlNodeType.Element })
         {
-            var openBracket = text.IndexOf('<', pos);
-            if (openBracket < 0) break;
-
-            var closeBracket = text.IndexOf('>', openBracket);
-            if (closeBracket < 0) break;
-
-            var inner = text[(openBracket + 1)..closeBracket].Trim();
-            var selfClose = inner.EndsWith('/');
-            if (selfClose)
-                inner = inner[..^1].Trim();
-
-            if (inner.StartsWith('/'))
-            {
-                // Closing tag
-                var name = ExtractFirstWord(inner[1..]);
-                if (stack.Count > 0 && string.Equals(stack.Peek(), name, StringComparison.OrdinalIgnoreCase))
-                    stack.Pop();
-            }
-            else if (!inner.StartsWith('!') && !inner.StartsWith('?') && !selfClose)
-            {
-                // Opening tag (not comment, not PI, not self-closing)
-                var name = ExtractFirstWord(inner);
-                if (!string.IsNullOrEmpty(name))
-                    stack.Push(name);
-            }
-
-            pos = closeBracket + 1;
-        }
-
-        // Stack enumerates top-first, so ToList() gives [innermost, ..., outermost]
-        var stackList = stack.ToList();
-        return (stackList.Count > 0 ? stackList[0] : null, stackList.Count, stackList);
-    }
-
-    private string? TryResolveContainingAbilityType(List<string> stack)
-    {
-        // stack[0] = field being completed; stack[1..] = ancestors innermost-first
-        for (var i = 1; i < stack.Count; i++)
-        {
-            var parentTagDef = _schema.GetTag(stack[i]);
-            if (parentTagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
+            var tagDef = _schema.GetTag(parent.Name);
+            if (tagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
                 return "UnitAbility";
-            if (parentTagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
-                return XmlUtility.ToPascalCase(stack[i - 1]);
+            if (tagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
+                return XmlUtility.ToPascalCase(child.Name);
+            child = parent;
+            parent = parent.ParentNode;
         }
 
         return null;
@@ -543,14 +497,6 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static bool HasCompletions(XmlTagDefinition tagDef) =>
         tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet ||
         tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
-
-    private static string ExtractFirstWord(string s)
-    {
-        var i = 0;
-        while (i < s.Length && (char.IsLetterOrDigit(s[i]) || s[i] == '_' || s[i] == '-'))
-            i++;
-        return s[..i];
-    }
 
     /// <summary>Extracts the token being typed at the cursor (for prefix filtering).</summary>
     private static string ExtractPartialValue(string line, int character)
@@ -586,5 +532,24 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             i--;
         // i now points at '<' or whitespace; partial starts at i+1
         return line[(i + 1)..bound];
+    }
+
+    /// <summary>
+    ///     Builds the document text truncated at <paramref name="anglePos" /> on the current line,
+    ///     so HAP sees only the XML that came BEFORE the partial &lt; the user is typing.
+    /// </summary>
+    private static string BuildTruncatedText(string[] lines, int lineIndex, int anglePos)
+    {
+        var sb = new StringBuilder();
+        for (var i = 0; i < lineIndex; i++)
+            sb.Append(lines[i]).Append('\n');
+        if (lineIndex < lines.Length)
+        {
+            var currentLine = lines[lineIndex].TrimEnd('\r');
+            var truncateAt = Math.Max(0, Math.Min(anglePos, currentLine.Length));
+            sb.Append(currentLine[..truncateAt]);
+        }
+
+        return sb.ToString();
     }
 }

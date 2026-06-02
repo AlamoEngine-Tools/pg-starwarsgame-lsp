@@ -25,15 +25,13 @@ public sealed class XmlDocumentFactProducer(
             facts.Add(new XmlStructureFact(documentUri, error.Line, error.Column, 1, error.Reason));
 
         var doc = XmlUtility.CreateHtmlDocument(xmlText);
-        var lineNum = doc.DocumentNode.EndNode.Line;
-        var lines = xmlText.Split('\n');
 
         var isTypeContainerLevel = IsTypeContainerDocument(documentUri);
 
         foreach (var root in doc.DocumentNode.ChildNodes)
         {
             if (root.NodeType != HtmlNodeType.Element) continue;
-            WalkNodes(root, facts, xmlText, lines, isTypeContainerLevel, documentUri);
+            WalkNodes(root, facts, xmlText, isTypeContainerLevel, documentUri);
         }
 
         // Collect notes hints for every element in the document
@@ -42,8 +40,7 @@ public sealed class XmlDocumentFactProducer(
         {
             var tag = schema.GetTag(node.Name);
             if (tag is null || tag.Notes.Count == 0) continue;
-            var line0 = Math.Max(0, node.Line - 1);
-            facts.Add(new XmlNotesFact(documentUri, line0, 0, 0, tag));
+            facts.Add(new XmlNotesFact(documentUri, XmlUtility.GetLine(node), 0, 0, tag));
         }
 
         return facts;
@@ -56,14 +53,14 @@ public sealed class XmlDocumentFactProducer(
     }
 
     private void WalkNodes(
-        HtmlNode node, List<XmlFact> facts, string text, string[] lines, bool isTypeContainerLevel, string documentUri,
+        HtmlNode node, List<XmlFact> facts, string text, bool isTypeContainerLevel, string documentUri,
         string? abilityTypeName = null)
     {
         if (isTypeContainerLevel)
         {
             foreach (var child in node.ChildNodes)
                 if (child.NodeType == HtmlNodeType.Element)
-                    WalkNodes(child, facts, text, lines, false, documentUri);
+                    WalkNodes(child, facts, text, false, documentUri);
             return;
         }
 
@@ -99,7 +96,7 @@ public sealed class XmlDocumentFactProducer(
                 foreach (var abilityNode in child.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
                 {
                     var childAbilityType = XmlUtility.ToPascalCase(abilityNode.Name);
-                    WalkNodes(abilityNode, facts, text, lines, false, documentUri, childAbilityType);
+                    WalkNodes(abilityNode, facts, text, false, documentUri, childAbilityType);
                 }
                 continue;
             }
@@ -108,17 +105,18 @@ public sealed class XmlDocumentFactProducer(
             if (tagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
             {
                 foreach (var abilityNode in child.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
-                    WalkNodes(abilityNode, facts, text, lines, false, documentUri, "UnitAbility");
+                    WalkNodes(abilityNode, facts, text, false, documentUri, "UnitAbility");
                 continue;
             }
 
             if (tagDef is null)
             {
-                WalkNodes(child, facts, text, lines, false, documentUri);
+                WalkNodes(child, facts, text, false, documentUri);
                 continue;
             }
 
-            var (line0, col0) = ComputePosition(child, lines);
+            var line0 = XmlUtility.GetLine(child);
+            var col0 = XmlUtility.GetTagBracketColumn(child);
 
             if (duplicatedSingletons.Contains(name))
             {
@@ -126,9 +124,9 @@ public sealed class XmlDocumentFactProducer(
                     .Where(n => !ReferenceEquals(n, child))
                     .Select(n => n.Line)
                     .ToList();
-                var openLen = ComputeOpeningTagLength(child, col0, line0 < lines.Length ? lines[line0] : string.Empty);
+                var openLen = XmlUtility.GetOpeningTagLength(child);
                 facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines));
-                WalkNodes(child, facts, text, lines, false, documentUri);
+                WalkNodes(child, facts, text, false, documentUri);
                 continue;
             }
 
@@ -137,11 +135,11 @@ public sealed class XmlDocumentFactProducer(
             {
                 var innerHtml = child.InnerHtml;
                 var leadingWs = innerHtml.Length - innerHtml.TrimStart().Length;
-                var (valLine, valCol) = ComputeOffsetToLineCol(text, child.InnerStartIndex + leadingWs);
+                var (valLine, valCol) = XmlUtility.OffsetToPosition(text, child.InnerStartIndex + leadingWs);
                 facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, rawValue.Length, tagDef, rawValue));
             }
 
-            WalkNodes(child, facts, text, lines, false, documentUri);
+            WalkNodes(child, facts, text, false, documentUri);
         }
     }
 
@@ -157,32 +155,4 @@ public sealed class XmlDocumentFactProducer(
         return schema.GetTag(name);
     }
 
-    private static (int line0, int col0) ComputePosition(HtmlNode node, string[] lines)
-    {
-        var line0 = Math.Max(0, node.Line - 1);
-        var sourceLine = line0 < lines.Length ? lines[line0].TrimEnd('\r') : string.Empty;
-        var col0 = sourceLine.IndexOf('<');
-        if (col0 < 0) col0 = 0;
-        return (line0, col0);
-    }
-
-    private static (int line, int col) ComputeOffsetToLineCol(string text, int offset)
-    {
-        var line = 0;
-        var lineStart = 0;
-        for (var i = 0; i < offset && i < text.Length; i++)
-            if (text[i] == '\n')
-            {
-                line++;
-                lineStart = i + 1;
-            }
-
-        return (line, offset - lineStart);
-    }
-
-    private static int ComputeOpeningTagLength(HtmlNode node, int col0, string sourceLine)
-    {
-        var closeAngle = sourceLine.IndexOf('>', col0);
-        return closeAngle >= 0 ? closeAngle + 1 - col0 : node.Name.Length + 2;
-    }
 }

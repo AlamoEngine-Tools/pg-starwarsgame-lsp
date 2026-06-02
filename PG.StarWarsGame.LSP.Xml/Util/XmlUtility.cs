@@ -182,4 +182,70 @@ public static class XmlUtility
                 GetLine(n.EndNode) == line);
         return node is not null;
     }
+
+    /// <summary>
+    ///     Returns the deepest element that structurally contains <paramref name="cursorLine" /> (0-based).
+    ///     Elements with no explicit closing tag (auto-closed by HAP) are treated as extending to
+    ///     end-of-document — correct for truncated text where the closing tag was cut off.
+    /// </summary>
+    public static HtmlNode? FindEnclosingElement(HtmlDocument doc, int cursorLine)
+    {
+        HtmlNode? best = null;
+        var bestDepth = -1;
+        foreach (var node in doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            var startLine = GetLine(node);
+            if (startLine > cursorLine) continue;
+
+            // Treat as open-to-end when EndNode is absent, self-referencing, or has an invalid
+        // position (HAP sets EndNode.Line = 0 for auto-closed elements in some cases).
+        var endLine = node.EndNode is not null && !ReferenceEquals(node.EndNode, node)
+                      && node.EndNode.Line >= node.Line
+                ? GetLine(node.EndNode)
+                : int.MaxValue;
+            if (cursorLine > endLine) continue;
+
+            var depth = GetDepth(node);
+            if (depth > bestDepth)
+            {
+                bestDepth = depth;
+                best = node;
+            }
+        }
+
+        return best;
+    }
+
+    /// <summary>
+    ///     Returns the LSP 0-based column of the opening <c>&lt;</c> bracket of <paramref name="node" />.
+    ///     Use <see cref="GetOpeningTagStartColumn" /> for the column of the tag name (one past the bracket).
+    /// </summary>
+    public static int GetTagBracketColumn(HtmlNode? node) =>
+        node is null ? InvalidLineMarker : node.LinePosition;
+
+    /// <summary>
+    ///     Returns the byte length of the opening tag including <c>&lt;</c>, name, attributes, and <c>&gt;</c>.
+    ///     Uses <c>InnerStartIndex - StreamPosition</c> which HAP computes natively.
+    /// </summary>
+    public static int GetOpeningTagLength(HtmlNode? node) =>
+        node is null ? 0 : node.InnerStartIndex - node.StreamPosition;
+
+    /// <summary>
+    ///     Converts an absolute byte <paramref name="offset" /> in <paramref name="text" /> to a
+    ///     0-based LSP <c>(Line, Col)</c> position by counting newlines.
+    /// </summary>
+    public static (int Line, int Col) OffsetToPosition(string text, int offset)
+    {
+        var line = 0;
+        var lineStart = 0;
+        for (var i = 0; i < offset && i < text.Length; i++)
+            if (text[i] == '\n')
+            {
+                line++;
+                lineStart = i + 1;
+            }
+
+        return (line, offset - lineStart);
+    }
 }

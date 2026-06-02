@@ -17,6 +17,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Util;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -302,13 +303,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             if (token.Length == 0 || validNames.Contains(token)) continue;
 
             var absPos = child.InnerStartIndex + tokenStart;
-            var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
-            var newlineCount = 0;
-            for (var j = 0; j < tokenStart && j < innerText.Length; j++)
-                if (innerText[j] == '\n')
-                    newlineCount++;
-            var line0 = child.Line - 1 + newlineCount;
-            var col0 = absPos - lineStart;
+            var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
 
             diagnostics.Add(new Diagnostic
             {

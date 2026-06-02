@@ -62,7 +62,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
         if (typeDef?.NameTag is null) return [];
 
-        var lines = text.Split('\n');
         var symbols = new List<GameSymbol>();
         var rootContainer = doc.DocumentNode.ChildNodes
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
@@ -79,7 +78,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             }
             else
             {
-                var col = FindNameAttributeValueColumn(lines, node.Line - 1, typeDef.NameTag, id);
+                var col = FindNameAttributeValueColumn(node, typeDef.NameTag, text);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
                     new FileOrigin(documentUri, node.Line - 1, col), null));
             }
@@ -88,19 +87,12 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return symbols;
     }
 
-    private static int? FindNameAttributeValueColumn(string[] lines, int lineIndex, string nameTag, string value)
+    private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, string text)
     {
-        if (lineIndex < 0 || lineIndex >= lines.Length) return null;
-        var lineText = lines[lineIndex].TrimEnd('\r');
-        foreach (var quote in new[] { '"', '\'' })
-        {
-            var pattern = $"{nameTag}={quote}{value}{quote}";
-            var idx = lineText.IndexOf(pattern, StringComparison.OrdinalIgnoreCase);
-            if (idx >= 0)
-                return idx + nameTag.Length + 2; // skip nameTag + '=' + opening quote
-        }
-
-        return null;
+        var attr = node.Attributes.FirstOrDefault(a =>
+            a.Name.Equals(nameTag, StringComparison.OrdinalIgnoreCase));
+        if (attr is null) return null;
+        return XmlUtility.OffsetToPosition(text, attr.ValueStartIndex).Col;
     }
 
     private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, string text,
@@ -121,9 +113,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
                     var absPos = child.InnerStartIndex + tokenOffset;
-                    var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
-                    var line = child.Line - 1 + CountNewlines(innerText, tokenOffset);
-                    var column = absPos - lineStart;
+                    var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
 
                     references.Add(new GameReference(
                         name,
@@ -144,7 +134,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         string text, CancellationToken ct)
     {
         var memberships = new List<DocumentGroupMembership>();
-        var lines = text.Split('\n');
 
         foreach (var node in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
@@ -163,9 +152,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 // Tag-value cursor position
                 var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
                 var absPos = child.InnerStartIndex + tokenOffset;
-                var lineStart = text.LastIndexOf('\n', Math.Max(0, absPos - 1)) + 1;
-                var tagLine = child.Line - 1 + CountNewlines(innerText, tokenOffset);
-                var tagColumn = absPos - lineStart;
+                var (tagLine, tagColumn) = XmlUtility.OffsetToPosition(text, absPos);
 
                 // Parent-name navigation target
                 var memberTypeName = tagDef.ObjectType?.TypeName;
@@ -179,7 +166,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     var parentId = GetNameAttribute(node, nameTag);
                     if (parentId.Length > 0)
-                        memberColumn = FindNameAttributeValueColumn(lines, memberLine, nameTag, parentId);
+                        memberColumn = FindNameAttributeValueColumn(node, nameTag, text);
                 }
 
                 memberships.Add(new DocumentGroupMembership(
@@ -234,7 +221,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         HtmlDocument doc, string documentUri, string text, CancellationToken ct)
     {
         var symbols = new List<GameSymbol>();
-        var lines = text.Split('\n');
 
         foreach (var node in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
@@ -255,7 +241,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     var id = GetNameAttribute(abilityNode, objectType.NameTag);
                     if (string.IsNullOrEmpty(id)) continue;
 
-                    var col = FindNameAttributeValueColumn(lines, abilityNode.Line - 1, objectType.NameTag, id);
+                    var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, text);
                     symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
                         new FileOrigin(documentUri, abilityNode.Line - 1, col), null));
                 }
@@ -267,12 +253,4 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
 
 
-    private static int CountNewlines(string text, int upToOffset)
-    {
-        var count = 0;
-        for (var i = 0; i < upToOffset && i < text.Length; i++)
-            if (text[i] == '\n')
-                count++;
-        return count;
-    }
 }

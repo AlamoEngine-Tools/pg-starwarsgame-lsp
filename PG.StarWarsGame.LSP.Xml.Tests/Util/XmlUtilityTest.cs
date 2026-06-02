@@ -204,4 +204,159 @@ public sealed class XmlUtilityTest
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Foo/>\n</Root>");
         Assert.False(XmlUtility.TryFindNodeByClosingLine(doc, 1, out _));
     }
+
+    // ── FindEnclosingElement ──────────────────────────────────────────────────
+
+    [Fact]
+    public void FindEnclosingElement_CursorInsideLeafElement_ReturnsLeaf()
+    {
+        // line 0: <Root>
+        // line 1: <Child>hello</Child>   ← cursor line
+        // line 2: </Root>
+        var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Child>hello</Child>\n</Root>");
+        var node = XmlUtility.FindEnclosingElement(doc, 1);
+        Assert.NotNull(node);
+        Assert.Equal("child", node!.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FindEnclosingElement_CursorBetweenSiblings_ReturnsParent()
+    {
+        // line 0: <Root>
+        // line 1:   <A>1</A>
+        // line 2:   ← cursor (between siblings, inside Root)
+        // line 3:   <B>2</B>
+        // line 4: </Root>
+        var doc = XmlUtility.CreateHtmlDocument("<Root>\n  <A>1</A>\n  \n  <B>2</B>\n</Root>");
+        var node = XmlUtility.FindEnclosingElement(doc, 2);
+        Assert.NotNull(node);
+        Assert.Equal("root", node!.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FindEnclosingElement_CursorInsideNestedElement_ReturnsDeepest()
+    {
+        // line 0: <Outer>
+        // line 1:   <Inner>
+        // line 2:     ← cursor
+        // line 3:   </Inner>
+        // line 4: </Outer>
+        var doc = XmlUtility.CreateHtmlDocument("<Outer>\n  <Inner>\n    \n  </Inner>\n</Outer>");
+        var node = XmlUtility.FindEnclosingElement(doc, 2);
+        Assert.NotNull(node);
+        Assert.Equal("inner", node!.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void FindEnclosingElement_TruncatedDocument_ReturnsUnclosedParent()
+    {
+        // Simulates text truncated at cursor before a '<' typed inside GameObjectType.
+        // The truncated text has no </GameObjectType> — HAP auto-closes it.
+        const string truncated = "<GameObjectFiles>\n  <GameObjectType Name=\"Foo\">\n    <Max_Speed>500</Max_Speed>\n    ";
+        var doc = XmlUtility.CreateHtmlDocument(truncated);
+        // cursor line = 3 (the line with just spaces, inside GameObjectType)
+        var node = XmlUtility.FindEnclosingElement(doc, 3);
+        Assert.NotNull(node);
+        Assert.Equal("gameobjecttype", node!.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+
+    [Fact]
+    public void FindEnclosingElement_CursorAfterAllElements_ReturnsNull()
+    {
+        var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Child>x</Child>\n</Root>");
+        // Line 5 is beyond the document — nothing contains it
+        var node = XmlUtility.FindEnclosingElement(doc, 5);
+        Assert.Null(node);
+    }
+
+    // ── GetTagBracketColumn ───────────────────────────────────────────────────
+
+    [Fact]
+    public void GetTagBracketColumn_TagAtStartOfLine_ReturnsZero()
+    {
+        // "<Foo>bar</Foo>" — '<' is at column 0
+        var doc = XmlUtility.CreateHtmlDocument("<Foo>bar</Foo>");
+        XmlUtility.TryFindNode(doc, 0, out var node);
+        Assert.Equal(0, XmlUtility.GetTagBracketColumn(node));
+    }
+
+    [Fact]
+    public void GetTagBracketColumn_IndentedTag_ReturnsIndentColumn()
+    {
+        // line 1: "  <Bar>x</Bar>" — '<' is at column 2
+        var doc = XmlUtility.CreateHtmlDocument("<Root>\n  <Bar>x</Bar>\n</Root>");
+        XmlUtility.TryFindNode(doc, 1, out var node);
+        Assert.Equal(2, XmlUtility.GetTagBracketColumn(node));
+    }
+
+    [Fact]
+    public void GetTagBracketColumn_NullNode_ReturnsInvalidMarker()
+    {
+        Assert.Equal(XmlUtility.InvalidLineMarker, XmlUtility.GetTagBracketColumn(null));
+    }
+
+    // ── GetOpeningTagLength ───────────────────────────────────────────────────
+
+    [Fact]
+    public void GetOpeningTagLength_SimpleTag_ReturnsCorrectLength()
+    {
+        // "<Foo>bar</Foo>" — opening tag "<Foo>" has length 5
+        var doc = XmlUtility.CreateHtmlDocument("<Foo>bar</Foo>");
+        XmlUtility.TryFindNode(doc, 0, out var node);
+        Assert.Equal(5, XmlUtility.GetOpeningTagLength(node));
+    }
+
+    [Fact]
+    public void GetOpeningTagLength_TagWithAttribute_IncludesAttribute()
+    {
+        // "<Unit Name=\"Foo\">x</Unit>" — opening tag has length 17
+        var doc = XmlUtility.CreateHtmlDocument("<Unit Name=\"Foo\">x</Unit>");
+        XmlUtility.TryFindNode(doc, 0, out var node);
+        Assert.Equal(17, XmlUtility.GetOpeningTagLength(node));
+    }
+
+    [Fact]
+    public void GetOpeningTagLength_NullNode_ReturnsZero()
+    {
+        Assert.Equal(0, XmlUtility.GetOpeningTagLength(null));
+    }
+
+    // ── OffsetToPosition ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void OffsetToPosition_OffsetOnFirstLine_ReturnsLineZero()
+    {
+        var (line, col) = XmlUtility.OffsetToPosition("hello world", 6);
+        Assert.Equal(0, line);
+        Assert.Equal(6, col);
+    }
+
+    [Fact]
+    public void OffsetToPosition_OffsetAfterNewline_ReturnsLine1()
+    {
+        // "ab\ncd" — offset 3 = 'c', line 1 col 0
+        var (line, col) = XmlUtility.OffsetToPosition("ab\ncd", 3);
+        Assert.Equal(1, line);
+        Assert.Equal(0, col);
+    }
+
+    [Fact]
+    public void OffsetToPosition_OffsetMidSecondLine_ReturnsCorrectPosition()
+    {
+        // "ab\ncd\nef" — offset 7 = 'e' on line 2 at col 0... wait let's count:
+        // 0:'a' 1:'b' 2:'\n' 3:'c' 4:'d' 5:'\n' 6:'e' 7:'f'
+        // offset 6 = 'e' → line 2, col 0
+        var (line, col) = XmlUtility.OffsetToPosition("ab\ncd\nef", 6);
+        Assert.Equal(2, line);
+        Assert.Equal(0, col);
+    }
+
+    [Fact]
+    public void OffsetToPosition_ZeroOffset_ReturnsOrigin()
+    {
+        var (line, col) = XmlUtility.OffsetToPosition("anything", 0);
+        Assert.Equal(0, line);
+        Assert.Equal(0, col);
+    }
 }
