@@ -8,13 +8,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class UnitSpawnTableHandler : CommaSeparatedPairHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.UnitSpawnTable;
+    protected override XmlValueType TargetType => XmlValueType.UnitSpawnTable;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.UnitSpawnTable)
-            return [];
-
         var parts = SplitOnFirstComma(fact.RawValue.Trim());
         if (parts.Length != 2 || parts[0].Trim().Length == 0 ||
             !int.TryParse(parts[1].Trim(), out var count) || count < -1)

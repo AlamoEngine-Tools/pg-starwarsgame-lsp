@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class UvSlotIndexHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class UvSlotIndexHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.UvSlotIndex;
+    protected override XmlValueType TargetType => XmlValueType.UvSlotIndex;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.UvSlotIndex)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         if (!int.TryParse(trimmed, out var value) || value < 0 || value > 3)
             return

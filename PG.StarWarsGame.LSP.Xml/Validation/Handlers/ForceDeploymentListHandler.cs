@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class ForceDeploymentListHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class ForceDeploymentListHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.ForceDeploymentList;
+    protected override XmlValueType TargetType => XmlValueType.ForceDeploymentList;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.ForceDeploymentList)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         var parts = trimmed.Split(',');
         if (parts.Length < 3 || parts.Any(p => p.Trim().Length == 0))

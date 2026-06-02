@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class TypeReferenceHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class TypeReferenceHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.TypeReference;
+    protected override XmlValueType TargetType => XmlValueType.TypeReference;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.TypeReference)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [

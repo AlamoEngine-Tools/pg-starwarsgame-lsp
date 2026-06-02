@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class FloatValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class FloatValueHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.Float;
+    protected override XmlValueType TargetType => XmlValueType.Float;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.Float)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         if (!LenientFloatParser.TryParse(trimmed, out _))
             return

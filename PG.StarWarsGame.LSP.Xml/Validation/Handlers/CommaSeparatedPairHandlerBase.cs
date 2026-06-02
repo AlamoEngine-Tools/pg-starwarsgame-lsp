@@ -6,7 +6,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public abstract class CommaSeparatedPairHandlerBase : XmlDiagnosticsHandler<XmlTagValueFact>
+public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
 {
     protected static string[] SplitOnFirstComma(string raw)
     {

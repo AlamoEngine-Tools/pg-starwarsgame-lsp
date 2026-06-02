@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class ProjectileCategoryHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class ProjectileCategoryHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.ProjectileCategory;
+    protected override XmlValueType TargetType => XmlValueType.ProjectileCategory;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.ProjectileCategory)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [

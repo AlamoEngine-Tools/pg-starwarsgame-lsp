@@ -11,13 +11,10 @@ public sealed class AbilityModFlagHandler : CommaSeparatedPairHandlerBase
     private static readonly HashSet<string> ValidBoolValues =
         new(StringComparer.OrdinalIgnoreCase) { "true", "false", "yes", "no", "1", "0" };
 
-    public override XmlValueType? HandledValueType => XmlValueType.AbilityModFlag;
+    protected override XmlValueType TargetType => XmlValueType.AbilityModFlag;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.AbilityModFlag)
-            return [];
-
         var parts = SplitOnFirstComma(fact.RawValue.Trim());
         if (parts.Length != 2 || parts[0].Trim().Length == 0 ||
             !ValidBoolValues.Contains(parts[1].Trim()))

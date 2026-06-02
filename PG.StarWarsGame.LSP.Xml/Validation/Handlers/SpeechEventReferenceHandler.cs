@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class SpeechEventReferenceHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class SpeechEventReferenceHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.SpeechEventReference;
+    protected override XmlValueType TargetType => XmlValueType.SpeechEventReference;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.SpeechEventReference)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [

@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class MusicEventReferenceHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class MusicEventReferenceHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.MusicEventReference;
+    protected override XmlValueType TargetType => XmlValueType.MusicEventReference;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.MusicEventReference)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [

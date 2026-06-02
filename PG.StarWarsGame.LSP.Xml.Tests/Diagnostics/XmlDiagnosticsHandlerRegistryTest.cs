@@ -113,6 +113,39 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
         Assert.Contains(results, r => r.Message == "warn:y");
     }
 
+    // ── dispatch ignores HandledValueType ─────────────────────────────────────
+
+    [Fact]
+    public void Dispatch_KeysOnFactTypeOnly_IgnoresHandledValueType()
+    {
+        // Two handlers for the same fact type but with different HandledValueType overrides.
+        // Dispatch must invoke BOTH — it keys on FactType, never on HandledValueType.
+        var calledBoolean = false;
+        var calledFloat = false;
+        var registry = new XmlDiagnosticsHandlerRegistry(
+        [
+            new TypedLambdaHandler(XmlValueType.Boolean, (_, _) =>
+            {
+                calledBoolean = true;
+                return [];
+            }),
+            new TypedLambdaHandler(XmlValueType.Float, (_, _) =>
+            {
+                calledFloat = true;
+                return [];
+            })
+        ]);
+
+        // Fact value type matches neither handler's HandledValueType.
+        var rgbaTag = new XmlTagDefinition { Tag = "Color", ValueType = XmlValueType.RGBA };
+        var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 3, rgbaTag, "x");
+
+        registry.Dispatch(fact, EmptyCtx).ToList();
+
+        Assert.True(calledBoolean, "Boolean-typed handler should still be dispatched.");
+        Assert.True(calledFloat, "Float-typed handler should still be dispatched.");
+    }
+
     // ── context forwarded ────────────────────────────────────────────────────
 
     [Fact]
@@ -280,6 +313,25 @@ file sealed class LambdaHandler<TFact> : XmlDiagnosticsHandler<TFact>
     }
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(TFact fact, DiagnosticsContext ctx)
+    {
+        return _fn(fact, ctx);
+    }
+}
+
+file sealed class TypedLambdaHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+{
+    private readonly Func<XmlTagValueFact, DiagnosticsContext, IEnumerable<XmlDiagnosticResult>> _fn;
+
+    public TypedLambdaHandler(XmlValueType handledValueType,
+        Func<XmlTagValueFact, DiagnosticsContext, IEnumerable<XmlDiagnosticResult>> fn)
+    {
+        HandledValueType = handledValueType;
+        _fn = fn;
+    }
+
+    public override XmlValueType? HandledValueType { get; }
+
+    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         return _fn(fact, ctx);
     }

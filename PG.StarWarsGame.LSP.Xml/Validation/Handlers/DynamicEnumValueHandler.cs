@@ -7,16 +7,13 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed partial class DynamicEnumValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed partial class DynamicEnumValueHandler : SingleValueTypeHandlerBase
 {
     private static readonly char[] ValueSeparators = ['|', ','];
-    public override XmlValueType? HandledValueType => XmlValueType.DynamicEnumValue;
+    protected override XmlValueType TargetType => XmlValueType.DynamicEnumValue;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.DynamicEnumValue)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         if (string.IsNullOrEmpty(trimmed))
             return

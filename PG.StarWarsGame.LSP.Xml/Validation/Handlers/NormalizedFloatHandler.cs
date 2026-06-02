@@ -7,15 +7,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class NormalizedFloatHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class NormalizedFloatHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.NormalizedFloat;
+    protected override XmlValueType TargetType => XmlValueType.NormalizedFloat;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.NormalizedFloat)
-            return [];
-
         var trimmed = fact.RawValue.Trim().TrimEnd('f', 'F');
         if (!double.TryParse(trimmed, NumberStyles.Float, CultureInfo.InvariantCulture, out var d))
             return

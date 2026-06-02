@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class ConditionalSpeechEventHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class ConditionalSpeechEventHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.ConditionalSpeechEvent;
+    protected override XmlValueType TargetType => XmlValueType.ConditionalSpeechEvent;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.ConditionalSpeechEvent)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         var parts = trimmed.Split(',');
         // Needs at least condition + event name; all parts non-empty

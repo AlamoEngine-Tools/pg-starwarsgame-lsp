@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class ShipClassTypeHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class ShipClassTypeHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.ShipClassType;
+    protected override XmlValueType TargetType => XmlValueType.ShipClassType;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.ShipClassType)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [

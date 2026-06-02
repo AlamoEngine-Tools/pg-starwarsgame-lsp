@@ -7,15 +7,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed partial class FloatListHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed partial class FloatListHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.FloatList;
+    protected override XmlValueType TargetType => XmlValueType.FloatList;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.FloatList)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         if (trimmed.Length == 0)
             return

@@ -8,13 +8,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class AbilityModMultiplierHandler : CommaSeparatedPairHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.AbilityModMultiplier;
+    protected override XmlValueType TargetType => XmlValueType.AbilityModMultiplier;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.AbilityModMultiplier)
-            return [];
-
         var parts = SplitOnFirstComma(fact.RawValue.Trim());
         if (parts.Length != 2 || parts[0].Trim().Length == 0 ||
             !LenientFloatParser.TryParse(parts[1].Trim(), out _))

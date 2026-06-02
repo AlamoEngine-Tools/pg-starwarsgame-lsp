@@ -8,13 +8,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class ConditionalSfxEventHandler : CommaSeparatedPairHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.ConditionalSfxEvent;
+    protected override XmlValueType TargetType => XmlValueType.ConditionalSfxEvent;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.ConditionalSfxEvent)
-            return [];
-
         var parts = SplitOnFirstComma(fact.RawValue.Trim());
         if (parts.Length != 2 || parts[0].Trim().Length == 0 || parts[1].Trim().Length == 0)
             return

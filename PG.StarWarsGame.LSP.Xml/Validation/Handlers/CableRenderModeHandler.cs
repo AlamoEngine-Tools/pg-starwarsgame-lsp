@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class CableRenderModeHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class CableRenderModeHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.CableRenderMode;
+    protected override XmlValueType TargetType => XmlValueType.CableRenderMode;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.CableRenderMode)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [

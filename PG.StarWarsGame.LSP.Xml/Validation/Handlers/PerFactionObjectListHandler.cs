@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class PerFactionObjectListHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.PerFactionObjectList;
+    protected override XmlValueType TargetType => XmlValueType.PerFactionObjectList;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.PerFactionObjectList)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         var parts = trimmed.Split(',');
         // Need at least FactionName + one ObjectName; all elements must be non-empty

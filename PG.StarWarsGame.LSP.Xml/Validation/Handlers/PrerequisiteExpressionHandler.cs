@@ -11,14 +11,13 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     Validates the boolean prerequisite expression format used by Required_Special_Structures.
 ///     Only handles tags with ValueType = GameObjectTypeReferenceList AND SemanticType = PrerequisiteExpression.
 /// </summary>
-public sealed partial class PrerequisiteExpressionHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed partial class PrerequisiteExpressionHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.GameObjectTypeReferenceList;
+    protected override XmlValueType TargetType => XmlValueType.GameObjectTypeReferenceList;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.GameObjectTypeReferenceList ||
-            fact.Tag.SemanticType != TagSemanticType.PrerequisiteExpression)
+        if (fact.Tag.SemanticType != TagSemanticType.PrerequisiteExpression)
             return [];
 
         var trimmed = fact.RawValue.Trim();

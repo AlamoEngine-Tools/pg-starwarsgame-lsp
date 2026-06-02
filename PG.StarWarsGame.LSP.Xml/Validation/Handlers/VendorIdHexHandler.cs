@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class VendorIdHexHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class VendorIdHexHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.VendorIdHex;
+    protected override XmlValueType TargetType => XmlValueType.VendorIdHex;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.VendorIdHex)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         if (!ShaderVersionHexHandler.IsHexLiteral(trimmed))
             return

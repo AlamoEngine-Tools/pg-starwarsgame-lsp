@@ -7,15 +7,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed partial class RgbaValueHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed partial class RgbaValueHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.RGBA;
+    protected override XmlValueType TargetType => XmlValueType.RGBA;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.RGBA)
-            return [];
-
         var trimmed = fact.RawValue.Trim();
         var parts = Separator().Split(trimmed);
         if (parts.Length is not 3 and not 4 || parts.Any(p => !IsByteComponent(p)))

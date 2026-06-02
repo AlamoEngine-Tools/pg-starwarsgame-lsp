@@ -6,15 +6,12 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class CommandBarPropertyHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+public sealed class CommandBarPropertyHandler : SingleValueTypeHandlerBase
 {
-    public override XmlValueType? HandledValueType => XmlValueType.CommandBarProperty;
+    protected override XmlValueType TargetType => XmlValueType.CommandBarProperty;
 
-    protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (fact.Tag.ValueType != XmlValueType.CommandBarProperty)
-            return [];
-
         if (fact.RawValue.Trim().Length == 0)
             return
             [
