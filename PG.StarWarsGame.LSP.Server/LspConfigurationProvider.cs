@@ -101,6 +101,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             }
         }
 
+        var workspaceRoot = TryGetString(elem, "workspaceRoot");
         var baseGamePath = TryGetString(elem, "baseGamePath");
         var expansionGamePath = TryGetString(elem, "expansionGamePath");
         var locale = TryGetString(elem, "locale");
@@ -129,6 +130,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 
         return new LspConfiguration
         {
+            WorkspaceRoot = workspaceRoot,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
             ModPaths = modPaths,
@@ -151,6 +153,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     {
         return new LspConfiguration
         {
+            WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             ModPaths = overlay.ModPaths.Count > 0 ? overlay.ModPaths : file.ModPaths,

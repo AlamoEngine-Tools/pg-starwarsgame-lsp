@@ -4,7 +4,6 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
-using Xunit;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
@@ -22,7 +21,8 @@ public sealed class MapFileFormatHandlerTest
     [InlineData("battle.ted")]
     public void Valid_map_extension_returns_no_diagnostics(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(MapTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(MapTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 
@@ -33,7 +33,8 @@ public sealed class MapFileFormatHandlerTest
     [InlineData("no_extension")]
     public void Invalid_map_extension_returns_error(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(MapTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(MapTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
@@ -42,7 +43,8 @@ public sealed class MapFileFormatHandlerTest
     public void Non_map_tag_returns_no_diagnostics()
     {
         var otherTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "battle.xml"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut
+            .Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "battle.xml"), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 }

@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Localisation;
+
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public interface IGameIndexService
@@ -10,6 +12,7 @@ public interface IGameIndexService
     Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct);
     void RemoveDocument(string uri);
     void ApplyBaseline(BaselineIndex baseline);
+    void ApplyLocalisation(ILocalisationIndex index);
 
     /// <summary>
     ///     Suppresses <see cref="IndexChanged" /> while the returned scope is alive.

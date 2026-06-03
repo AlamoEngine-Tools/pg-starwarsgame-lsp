@@ -22,7 +22,10 @@ internal static class XmlHandlerTestFixtures
         EnumDefinition? enumDef = null,
         ReferenceKind referenceKind = ReferenceKind.None)
     {
-        return new XmlTagDefinition { Tag = name, ValueType = type, SemanticType = semanticType, Enum = enumDef, ReferenceKind = referenceKind };
+        return new XmlTagDefinition
+        {
+            Tag = name, ValueType = type, SemanticType = semanticType, Enum = enumDef, ReferenceKind = referenceKind
+        };
     }
 
     public static XmlTagValueFact MakeFact(XmlTagDefinition tag, string rawValue)

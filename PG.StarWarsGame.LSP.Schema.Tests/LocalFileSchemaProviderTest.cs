@@ -575,7 +575,7 @@ public sealed class LocalFileSchemaProviderTest : IDisposable
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
         while (dir != null)
         {
-            var candidate = System.IO.Path.Combine(dir.FullName, "schema", "eaw");
+            var candidate = Path.Combine(dir.FullName, "schema", "eaw");
             if (Directory.Exists(candidate)) return candidate;
             dir = dir.Parent;
         }

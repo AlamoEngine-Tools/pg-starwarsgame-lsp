@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -17,15 +18,25 @@ namespace PG.StarWarsGame.LSP.Xml.Tests;
 
 public sealed class XmlCompletionHandlerTest
 {
+    // ── ability sub-object tag-name completions ───────────────────────────────
+
+    private const string AbilityXmlForCompletion =
+        "<Root>\n" +
+        "<Abilities SubObjectList=\"Yes\">\n" +
+        "<Lucky_Shot_Attack_Ability Name=\"Luke_Shot\">\n" +
+        "  <\n" +
+        "</Lucky_Shot_Attack_Ability>\n" +
+        "</Abilities>\n" +
+        "</Root>";
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static DocumentUri TestUri => DocumentUri.From("file:///test.xml");
 
     private static (XmlCompletionHandler handler, FakeGameWorkspaceHost host, FakeSchemaProvider schema,
         FakeProposalRegistry proposals) Build(
-        FakeFileTypeRegistry? registry = null,
-        IEaWXmlContext? ctx = null,
-        IXmlCompletionRegistry? completionReg = null)
+            FakeFileTypeRegistry? registry = null,
+            IEaWXmlContext? ctx = null,
+            IXmlCompletionRegistry? completionReg = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
@@ -214,17 +225,6 @@ public sealed class XmlCompletionHandlerTest
         Assert.Equal(CompletionItemKind.Property, item.Kind);
     }
 
-    // ── ability sub-object tag-name completions ───────────────────────────────
-
-    private const string AbilityXmlForCompletion =
-        "<Root>\n" +
-        "<Abilities SubObjectList=\"Yes\">\n" +
-        "<Lucky_Shot_Attack_Ability Name=\"Luke_Shot\">\n" +
-        "  <\n" +
-        "</Lucky_Shot_Attack_Ability>\n" +
-        "</Abilities>\n" +
-        "</Root>";
-
     [Fact]
     public async Task Handle_TagNameContext_InsideAbilityElement_UnregisteredFile_ReturnsAbilityTags()
     {
@@ -248,7 +248,7 @@ public sealed class XmlCompletionHandlerTest
     {
         var registry = new FakeFileTypeRegistry();
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
-        var (handler, host, schema, _) = Build(registry: registry);
+        var (handler, host, schema, _) = Build(registry);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
         schema.AddType(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
@@ -269,7 +269,7 @@ public sealed class XmlCompletionHandlerTest
     {
         var registry = new FakeFileTypeRegistry();
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
-        var (handler, host, schema, _) = Build(registry: registry);
+        var (handler, host, schema, _) = Build(registry);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
         schema.AddTagForType("GameObjectType", new XmlTagDefinition
@@ -302,7 +302,7 @@ public sealed class XmlCompletionHandlerTest
     {
         var registry = new FakeFileTypeRegistry();
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
-        var (handler, host, schema, _) = Build(registry: registry);
+        var (handler, host, schema, _) = Build(registry);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
         schema.AddTagForType("GameObjectType", new XmlTagDefinition
@@ -331,7 +331,7 @@ public sealed class XmlCompletionHandlerTest
     {
         var registry = new FakeFileTypeRegistry();
         registry.RegisterFile("file:///test.xml", ImmutableArray.Create("GameObjectType"));
-        var (handler, host, schema, _) = Build(registry: registry);
+        var (handler, host, schema, _) = Build(registry);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
         schema.AddTagForType("GameObjectType", new XmlTagDefinition
@@ -515,6 +515,34 @@ public sealed class XmlCompletionHandlerTest
         var labels = result.Items.Select(i => i.Label).ToList();
         Assert.Contains("Reward_Param1", labels);
         Assert.DoesNotContain("Reward_Param2", labels);
+    }
+
+    [Fact]
+    public async Task Handle_ValueCompletion_CursorDirectlyAfterSeparator_PartialValueIsEmpty()
+    {
+        // "SHIELDED,|" — cursor right after comma with no space.
+        // ExtractPartialValue must treat comma as a word boundary and return "",
+        // not walk back through "SHIELDED," producing a prefix nothing matches.
+        var capturing = new CapturingCompletionRegistry();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Behavior", ValueType = XmlValueType.TypeReferenceList,
+            ReferenceKind = ReferenceKind.HardcodedSet
+        });
+
+        // line 2: <Behavior>SHIELDED,</Behavior>
+        // col 10 = 'S', col 17 = 'D', col 18 = ',', col 19 = cursor
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<Behavior>SHIELDED,</Behavior>\n</SpaceUnit>\n</Root>", 1);
+
+        await handler.Handle(At(2, 19), CancellationToken.None);
+
+        Assert.Equal("", capturing.LastPartialValue);
     }
 
     // ── StoryParser value completions ─────────────────────────────────────────
@@ -744,7 +772,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
@@ -770,7 +798,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
@@ -794,7 +822,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
@@ -812,12 +840,35 @@ public sealed class XmlCompletionHandlerTest
     }
 
     [Fact]
+    public async Task Handle_ValueCompletion_LocalisationKeyTag_ProvidersAreCalled()
+    {
+        var capturing = new CapturingCompletionRegistry();
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Text_ID", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.LocalisationKey
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<Text_ID>TEXT_</Text_ID>\n</SpaceUnit>\n</Root>", 1);
+
+        // "<Text_ID>" is 9 chars; col 9 = first char of value body
+        await handler.Handle(At(2, 9), CancellationToken.None);
+
+        Assert.NotNull(capturing.LastTagDef);
+    }
+
+    [Fact]
     public async Task Handle_ValueCompletion_BooleanTag_ProvidersAreCalled()
     {
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
@@ -839,7 +890,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
@@ -865,7 +916,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         schema.AddType(new GameObjectTypeDefinition { TypeName = "UnitAbility" });
@@ -900,7 +951,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("GameObjectType"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
         schema.AddType(new GameObjectTypeDefinition { TypeName = "LuckyShotAttackAbility", NameTag = "Name" });
@@ -911,12 +962,14 @@ public sealed class XmlCompletionHandlerTest
         // LuckyShotAttackAbility.Applicable_Unit_Categories = Enum (the correct def) — added first
         schema.AddTagForType("LuckyShotAttackAbility", new XmlTagDefinition
         {
-            Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.DynamicEnumValue, ReferenceKind = ReferenceKind.Enum
+            Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.DynamicEnumValue,
+            ReferenceKind = ReferenceKind.Enum
         });
         // GameObjectType.Applicable_Unit_Categories = XmlObject (wrong def) — added last so flat lookup returns it
         schema.AddTagForType("GameObjectType", new XmlTagDefinition
         {
-            Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject
+            Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject
         });
 
         host.AddOrUpdate(TestUri.ToString(),
@@ -938,7 +991,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         // SpaceUnit defines "Alliance" with no reference info (complex/tuple format)
@@ -970,13 +1023,14 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
         // SpaceUnit.SFXEvent_Attack = XmlObject → SFXEvent (the correct def) — added first
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
         {
-            Tag = "SFXEvent_Attack", ValueType = XmlValueType.SFXEventReference, ReferenceKind = ReferenceKind.XmlObject,
+            Tag = "SFXEvent_Attack", ValueType = XmlValueType.SFXEventReference,
+            ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "SFXEvent" }
         });
         // OtherType.SFXEvent_Attack = XmlObject → GameObjectType (wrong def) — added last so flat lookup returns it
@@ -1002,7 +1056,7 @@ public sealed class XmlCompletionHandlerTest
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("Faction"));
-        var (handler, host, schema, _) = Build(registry: registry, completionReg: capturing);
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
         schema.AddTagForType("Faction", new XmlTagDefinition
@@ -1145,10 +1199,12 @@ public sealed class XmlCompletionHandlerTest
     private sealed class CapturingCompletionRegistry : IXmlCompletionRegistry
     {
         public XmlTagDefinition? LastTagDef { get; private set; }
+        public string? LastPartialValue { get; private set; }
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)
         {
             LastTagDef = tag;
+            LastPartialValue = partialValue;
             return [];
         }
     }
@@ -1168,6 +1224,10 @@ public sealed class XmlCompletionHandlerTest
         }
 
         public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
         {
         }
 

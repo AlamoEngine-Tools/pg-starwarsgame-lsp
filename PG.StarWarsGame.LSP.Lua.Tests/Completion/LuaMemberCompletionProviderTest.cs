@@ -62,7 +62,7 @@ public sealed class LuaMemberCompletionProviderTest
     public void Provide_ColonAccess_OnlyMethodMembers()
     {
         var scope = new List<ScopeEntry> { new("Find_Player", ScopeEntryKind.EngineApi, null) };
-        var items = Provide("Find_Player", isMethod: true, scope).ToList();
+        var items = Provide("Find_Player", true, scope).ToList();
         // GetName is a method (:), Faction is a field (.) → only GetName
         Assert.Contains(items, i => i.Label == "GetName");
         Assert.DoesNotContain(items, i => i.Label == "Faction");
@@ -72,7 +72,7 @@ public sealed class LuaMemberCompletionProviderTest
     public void Provide_DotAccess_OnlyFieldMembers()
     {
         var scope = new List<ScopeEntry> { new("Find_Player", ScopeEntryKind.EngineApi, null) };
-        var items = Provide("Find_Player", isMethod: false, scope).ToList();
+        var items = Provide("Find_Player", false, scope).ToList();
         // Faction is a field (.), GetName is a method (:) → only Faction
         Assert.Contains(items, i => i.Label == "Faction");
         Assert.DoesNotContain(items, i => i.Label == "GetName");
@@ -84,7 +84,7 @@ public sealed class LuaMemberCompletionProviderTest
     public void Provide_MethodCompletion_KindIsMethod()
     {
         var scope = new List<ScopeEntry> { new("Find_Player", ScopeEntryKind.EngineApi, null) };
-        var items = Provide("Find_Player", isMethod: true, scope).ToList();
+        var items = Provide("Find_Player", true, scope).ToList();
         var getNameItem = items.SingleOrDefault(i => i.Label == "GetName");
         Assert.NotNull(getNameItem);
         Assert.Equal(CompletionItemKind.Method, getNameItem!.Kind);
@@ -94,7 +94,7 @@ public sealed class LuaMemberCompletionProviderTest
     public void Provide_FieldCompletion_KindIsField()
     {
         var scope = new List<ScopeEntry> { new("Find_Player", ScopeEntryKind.EngineApi, null) };
-        var items = Provide("Find_Player", isMethod: false, scope).ToList();
+        var items = Provide("Find_Player", false, scope).ToList();
         var factionItem = items.SingleOrDefault(i => i.Label == "Faction");
         Assert.NotNull(factionItem);
         Assert.Equal(CompletionItemKind.Field, factionItem!.Kind);

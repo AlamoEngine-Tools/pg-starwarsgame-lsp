@@ -53,6 +53,14 @@ public sealed class LspConfigurationProviderTest : IDisposable
     // ── init options extraction ──────────────────────────────────────────────
 
     [Fact]
+    public void LoadFrom_WithWorkspaceRoot_PopulatesWorkspaceRoot()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = "/mod/eaw" }));
+        Assert.Equal("/mod/eaw", provider.Current.WorkspaceRoot);
+    }
+
+    [Fact]
     public void LoadFrom_WithGamePath_Extracted()
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);

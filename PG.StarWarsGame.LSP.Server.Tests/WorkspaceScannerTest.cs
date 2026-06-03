@@ -4,10 +4,12 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -24,7 +26,7 @@ public sealed class WorkspaceScannerTest
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IEnumerable<string> eawRoots, params IGameDocumentParser[] parsers)
     {
-        return Build(fs, svc, new GameWorkspaceHost(), eawRoots, parsers);
+        return Build(fs, svc, new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance), eawRoots, parsers);
     }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
@@ -36,7 +38,8 @@ public sealed class WorkspaceScannerTest
             ctx.AddDirectory(r);
         return new WorkspaceScanner(fh, parsers, svc, host,
             NullLogger<WorkspaceScanner>.Instance, null,
-            new FileTypeRegistry(), new FakeSchemaProvider(), ctx, new PreOpenBuffer());
+            new FileTypeRegistry(), new FakeSchemaProvider(), ctx, new PreOpenBuffer(),
+            new NullLocalisationLoader());
     }
 
     private static WorkspaceScanner BuildWithBuffer(MockFileSystem fs, FakeIndexService svc,
@@ -49,14 +52,15 @@ public sealed class WorkspaceScannerTest
             ctx.AddDirectory(r);
         return new WorkspaceScanner(fh, parsers, svc, host,
             NullLogger<WorkspaceScanner>.Instance, null,
-            new FileTypeRegistry(), new FakeSchemaProvider(), ctx, buffer);
+            new FileTypeRegistry(), new FakeSchemaProvider(), ctx, buffer,
+            new NullLocalisationLoader());
     }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
         IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return Build(fs, svc, new GameWorkspaceHost(), registry, schema, parsers);
+        return Build(fs, svc, new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance), registry, schema, parsers);
     }
 
     private static WorkspaceScanner Build(MockFileSystem fs, FakeIndexService svc,
@@ -66,7 +70,8 @@ public sealed class WorkspaceScannerTest
         var fh = new FileHelper(fs);
         return new WorkspaceScanner(fh, parsers, svc, host,
             NullLogger<WorkspaceScanner>.Instance, null,
-            registry, schema, new EaWXmlContext(fh), new PreOpenBuffer());
+            registry, schema, new EaWXmlContext(fh), new PreOpenBuffer(),
+            new NullLocalisationLoader());
     }
 
     private static (WorkspaceScanner Scanner, EaWXmlContext Context) BuildWithContext(
@@ -75,9 +80,11 @@ public sealed class WorkspaceScannerTest
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
-        var scanner = new WorkspaceScanner(fh, parsers, svc, new GameWorkspaceHost(),
+        var scanner = new WorkspaceScanner(fh, parsers, svc,
+            new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance),
             NullLogger<WorkspaceScanner>.Instance, null,
-            registry, schema, ctx, new PreOpenBuffer());
+            registry, schema, ctx, new PreOpenBuffer(),
+            new NullLocalisationLoader());
         return (scanner, ctx);
     }
 
@@ -542,7 +549,7 @@ public sealed class WorkspaceScannerTest
         var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(root, "units.xml"));
         var fs = new MockFileSystem();
         fs.AddDirectory(root);
-        var host = new GameWorkspaceHost();
+        var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var buffer = new FakePreOpenBuffer((uri, "<EditorText/>", 1));
         var svc = new FakeIndexService();
 
@@ -562,7 +569,7 @@ public sealed class WorkspaceScannerTest
             .PathToFileUri(Path.Combine(Root("other"), "script.lua"));
         var fs = new MockFileSystem();
         fs.AddDirectory(root);
-        var host = new GameWorkspaceHost();
+        var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var buffer = new FakePreOpenBuffer((nonEaWUri, "-- lua", 1));
         var svc = new FakeIndexService();
 
@@ -580,7 +587,7 @@ public sealed class WorkspaceScannerTest
         var uri = new FileHelper(new MockFileSystem()).PathToFileUri(Path.Combine(root, "units.xml"));
         var fs = new MockFileSystem();
         fs.AddDirectory(root);
-        var host = new GameWorkspaceHost();
+        var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         host.AddOrUpdate(uri, "<AlreadyOpen/>", 1);
         var buffer = new FakePreOpenBuffer((uri, "<BufferVersion/>", 0));
         var svc = new FakeIndexService();
@@ -603,7 +610,7 @@ public sealed class WorkspaceScannerTest
         {
             [Path.Combine(root, "units.xml")] = new(content)
         });
-        var host = new GameWorkspaceHost();
+        var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var svc = new FakeIndexService();
 
         await Build(fs, svc, host, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
@@ -627,7 +634,7 @@ public sealed class WorkspaceScannerTest
         {
             [Path.Combine(root, "units.xml")] = new(diskContent)
         });
-        var host = new GameWorkspaceHost();
+        var host = new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance);
         var uri = new FileHelper(fs).PathToFileUri(Path.Combine(root, "units.xml"));
         host.AddOrUpdate(uri, editorContent, 1);
         var svc = new FakeIndexService();
@@ -867,6 +874,10 @@ public sealed class WorkspaceScannerTest
         {
         }
 
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             Interlocked.Increment(ref BeginBulkUpdateCallCount);
@@ -892,5 +903,13 @@ public sealed class WorkspaceScannerTest
             {
             }
         }
+    }
+}
+
+file sealed class NullLocalisationLoader : ILocalisationLoader
+{
+    public Task LoadAsync(CancellationToken ct)
+    {
+        return Task.CompletedTask;
     }
 }

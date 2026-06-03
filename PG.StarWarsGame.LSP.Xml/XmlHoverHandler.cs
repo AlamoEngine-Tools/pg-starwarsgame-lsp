@@ -112,8 +112,9 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
 
         if (typeDef is not null)
         {
-            var typedTagDef = _schema.GetTagsForType(typeDef.TypeName).FirstOrDefault(t =>
-                string.Equals(t.Tag, node.Name, StringComparison.OrdinalIgnoreCase));
+            // single-node context; full ancestor walk lives in XmlDocumentFactProducer
+            var hoverContext = new TagResolutionContext(typeDef.TypeName, XmlUtility.GetDepth(node), node);
+            var typedTagDef = XmlTagResolver.Resolve(_schema, node.Name, hoverContext);
 
             if (typedTagDef is not null)
             {

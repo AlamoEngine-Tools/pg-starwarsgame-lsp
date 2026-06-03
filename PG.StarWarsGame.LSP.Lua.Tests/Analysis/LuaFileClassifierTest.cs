@@ -11,16 +11,17 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
 
 public sealed class LuaFileClassifierTest
 {
-    private static readonly IFileHelper s_fileHelper = new FileHelper(new MockFileSystem());
-
     private const string LibraryUri = "file:///scripts/library/pgstatemachine.lua";
     private const string LibraryUri2 = "file:///scripts/library/pgevents.lua";
     private const string DependencyUri = "file:///scripts/heroplansonly.lua";
     private const string StandaloneA = "file:///scripts/ai/plan_a.lua";
     private const string StandaloneB = "file:///scripts/ai/plan_b.lua";
+    private static readonly IFileHelper s_fileHelper = new FileHelper(new MockFileSystem());
 
-    private static DocumentIndex MakeDoc(string uri, params string[] requireArgs) =>
-        new(uri, 1, [], [], ImmutableArray.Create(requireArgs));
+    private static DocumentIndex MakeDoc(string uri, params string[] requireArgs)
+    {
+        return new DocumentIndex(uri, 1, [], [], ImmutableArray.Create(requireArgs));
+    }
 
     private static Dictionary<string, DocumentIndex> MakeDocs(
         params (string uri, DocumentIndex doc)[] entries)

@@ -1,11 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core;
+using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
@@ -41,7 +43,7 @@ internal static class LuaUpvalueAnalyzer
         return diagnostics;
     }
 
-    private static Dictionary<string, LocalInfo> CollectFileLevelLocals(Loretta.CodeAnalysis.SyntaxNode root)
+    private static Dictionary<string, LocalInfo> CollectFileLevelLocals(SyntaxNode root)
     {
         var locals = new Dictionary<string, LocalInfo>(StringComparer.OrdinalIgnoreCase);
 
@@ -59,9 +61,7 @@ internal static class LuaUpvalueAnalyzer
         return locals;
     }
 
-    private readonly record struct LocalInfo(bool Suppressed, int Line);
-
-    private static bool IsInsideFunction(Loretta.CodeAnalysis.SyntaxNode node)
+    private static bool IsInsideFunction(SyntaxNode node)
     {
         var parent = node.Parent;
         while (parent is not null)
@@ -72,10 +72,11 @@ internal static class LuaUpvalueAnalyzer
                 return true;
             parent = parent.Parent;
         }
+
         return false;
     }
 
-    private static bool HasUpvalueOkAnnotation(Loretta.CodeAnalysis.SyntaxNode node)
+    private static bool HasUpvalueOkAnnotation(SyntaxNode node)
     {
         var leadingTrivia = node.GetFirstToken().LeadingTrivia;
         foreach (var trivia in leadingTrivia)
@@ -84,6 +85,7 @@ internal static class LuaUpvalueAnalyzer
             if (text.StartsWith("---@upvalue-ok", StringComparison.OrdinalIgnoreCase))
                 return true;
         }
+
         return false;
     }
 
@@ -98,8 +100,8 @@ internal static class LuaUpvalueAnalyzer
 
         // All local declarations inside the function body (any nesting depth)
         foreach (var local in funcDecl.DescendantNodes().OfType<LocalVariableDeclarationStatementSyntax>())
-            foreach (var nameDecl in local.Names)
-                names.Add(nameDecl.Name);
+        foreach (var nameDecl in local.Names)
+            names.Add(nameDecl.Name);
 
         foreach (var localFunc in funcDecl.DescendantNodes().OfType<LocalFunctionDeclarationStatementSyntax>())
             names.Add(localFunc.Name.Name);
@@ -185,4 +187,6 @@ internal static class LuaUpvalueAnalyzer
             });
         }
     }
+
+    private readonly record struct LocalInfo(bool Suppressed, int Line);
 }

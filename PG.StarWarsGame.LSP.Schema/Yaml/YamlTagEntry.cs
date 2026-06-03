@@ -12,7 +12,7 @@ internal sealed class YamlTagEntry
     public string? ReferenceType { get; set; }
     public string? EnumName { get; set; }
     public string? SemanticType { get; set; }
-    public string? ValueGroup { get; set; }
+    public object? ValueGroup { get; set; } // scalar string or YAML sequence — coerced in parser
     public bool Deprecated { get; set; }
     public string? AvailableSince { get; set; }
     public Dictionary<string, string> Description { get; set; } = [];

@@ -20,6 +20,7 @@
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj"/>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj"/>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Xml\PG.StarWarsGame.LSP.Xml.csproj"/>
+        <ProjectReference Include="..\..\PetroglyphTools\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline.csproj"/>
     </ItemGroup>
 
     <PropertyGroup>

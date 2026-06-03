@@ -14,7 +14,7 @@ internal sealed record RawTagDefinition
     public string? ReferenceType { get; init; }
     public string? EnumName { get; init; }
     public TagSemanticType SemanticType { get; init; }
-    public string? ValueGroup { get; init; }
+    public IReadOnlyList<string> ValueGroups { get; init; } = [];
     public bool Deprecated { get; init; }
     public string? AvailableSince { get; init; }
     public IReadOnlyDictionary<string, string> Description { get; init; } = new Dictionary<string, string>();

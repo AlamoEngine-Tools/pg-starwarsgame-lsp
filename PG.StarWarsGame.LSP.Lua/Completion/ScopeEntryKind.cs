@@ -10,5 +10,5 @@ internal enum ScopeEntryKind
     OwnGlobal,
     RequiredGlobal,
     EngineApi,
-    Lua51Builtin,
+    Lua51Builtin
 }

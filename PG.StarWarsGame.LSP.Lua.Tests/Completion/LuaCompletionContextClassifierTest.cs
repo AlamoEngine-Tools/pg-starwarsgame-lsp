@@ -10,7 +10,7 @@ public sealed class LuaCompletionContextClassifierTest
     private static LuaCompletionContext? Classify(string text, int line = 0, int character = -1)
     {
         var lines = text.Split('\n');
-        var col = character < 0 ? (line < lines.Length ? lines[line].TrimEnd('\r').Length : 0) : character;
+        var col = character < 0 ? line < lines.Length ? lines[line].TrimEnd('\r').Length : 0 : character;
         return LuaCompletionContextClassifier.Classify(text, line, col);
     }
 
@@ -119,7 +119,7 @@ public sealed class LuaCompletionContextClassifierTest
     {
         // line 1 starts with only whitespace before the cursor → statement start
         const string text = "function Foo()\n    ";
-        var ctx = Classify(text, line: 1, character: 4);
+        var ctx = Classify(text, 1, 4);
         var id = Assert.IsType<IdentifierContext>(ctx);
         Assert.True(id.AtStatementStart);
     }

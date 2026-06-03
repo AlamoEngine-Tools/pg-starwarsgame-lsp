@@ -5,7 +5,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
@@ -13,11 +12,14 @@ public sealed class XmlLinkedEditingRangeHandlerTest
 {
     private const string TestUri = "file:///test.xml";
 
-    private static LinkedEditingRangeParams At(int line, int character) => new()
+    private static LinkedEditingRangeParams At(int line, int character)
     {
-        TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(TestUri) },
-        Position = new Position(line, character)
-    };
+        return new LinkedEditingRangeParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(TestUri) },
+            Position = new Position(line, character)
+        };
+    }
 
     private static XmlLinkedEditingRangeHandler Build(string text)
     {
@@ -136,10 +138,15 @@ public sealed class XmlLinkedEditingRangeHandlerTest
 
     private sealed class FakeHost(string uri, string text) : IGameWorkspaceHost
     {
-        public IEnumerable<TrackedDocument> All => [new TrackedDocument(uri, text, 1)];
+        public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
 
-        public void AddOrUpdate(string u, string t, int v) { }
-        public void Remove(string u) { }
+        public void AddOrUpdate(string u, string t, int v)
+        {
+        }
+
+        public void Remove(string u)
+        {
+        }
 
         public bool TryGet(string u, out TrackedDocument doc)
         {

@@ -4,7 +4,6 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
-using Xunit;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
@@ -25,7 +24,8 @@ public sealed class TextureFileFormatHandlerTest
     [InlineData("icon.dds")]
     public void Valid_texture_extensions_return_no_diagnostics(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(TextureTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(TextureTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 
@@ -38,7 +38,8 @@ public sealed class TextureFileFormatHandlerTest
     [InlineData("no_extension")]
     public void Invalid_texture_extensions_return_error(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(TextureTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(TextureTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
@@ -47,7 +48,8 @@ public sealed class TextureFileFormatHandlerTest
     public void Non_texture_tag_returns_no_diagnostics()
     {
         var otherTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "icon.png"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "icon.png"), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 }

@@ -103,6 +103,10 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeMismatchHandler>();
 
+        // Localisation handlers
+        services.AddSingleton<IXmlDiagnosticsHandler, LocalisationKeyExistenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, LocalisationKeyListExistenceHandler>();
+
         // Story handlers
         services.AddSingleton<IXmlDiagnosticsHandler, DeprecatedEventTypeHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, EventTypeNotesHandler>();
@@ -130,6 +134,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCompletionRegistry, XmlCompletionRegistry>();
         services.AddSingleton<IXmlCompletionProvider, GameObjectReferenceCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, HardcodedSetCompletionProvider>();
+        services.AddSingleton<IXmlCompletionProvider, LocalisationKeyCompletionProvider>();
 
         return services;
     }

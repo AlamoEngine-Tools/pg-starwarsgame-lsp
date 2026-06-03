@@ -250,7 +250,4 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
         return symbols;
     }
-
-
-
 }

@@ -1,9 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 
@@ -59,7 +56,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
     {
         // Authoritative count of concrete IXmlDiagnosticsHandler registrations. Update this
         // deliberately whenever a handler is added or removed so the change is reviewed.
-        const int expectedHandlerCount = 78;
+        const int expectedHandlerCount = 80;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

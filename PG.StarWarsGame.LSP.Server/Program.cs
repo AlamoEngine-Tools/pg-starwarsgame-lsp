@@ -8,6 +8,9 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.LSP.Server;
 using Serilog;
 
+Console.Error.WriteLine(
+    $"[LSP] PID {Environment.ProcessId} args=[{(args.Length == 0 ? "<none>" : string.Join(", ", args))}]");
+
 if (args.Contains("--wait-for-debugger") || Environment.GetEnvironmentVariable("LSP_WAIT_DEBUGGER") == "1")
 {
     Console.Error.WriteLine($"[LSP] Waiting for debugger — PID {Environment.ProcessId}");

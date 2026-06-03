@@ -205,6 +205,21 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Equal(XmlValueType.Float, tvf.Tag.ValueType);
     }
 
+    // ── type-container context resolution ────────────────────────────────────
+
+    [Fact]
+    public void TypeContainer_SFXEvent_TextId_EmitsNameReferenceListFact()
+    {
+        // SFXEvent.Text_ID is NameReferenceList; global GetTag("Text_ID") returns NameReference.
+        // Without object-type context the wrong ValueType reaches the handler.
+        const string uri = "file:///sfx/SFXEvents.xml";
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"foo\"><Text_ID>K1 K2</Text_ID></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, uri);
+        var tvf = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal(XmlValueType.NameReferenceList, tvf.Tag.ValueType);
+    }
+
     // ── structural validation ─────────────────────────────────────────────────
 
     [Fact]
@@ -444,9 +459,15 @@ file sealed class AbilitySubObjectSchemaProvider : ISchemaProvider
         return null;
     }
 
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
 
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
 
     public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
     {
@@ -455,7 +476,11 @@ file sealed class AbilitySubObjectSchemaProvider : ISchemaProvider
         return [];
     }
 
-    public EnumDefinition? GetEnum(string _) => null;
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
     public IReadOnlyList<XmlTagDefinition> AllTags => [AbilitiesTag, ApplicableUnitCategoriesTag, MaxSpeedTag];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
@@ -467,6 +492,56 @@ file sealed class AbilitySubObjectSchemaProvider : ISchemaProvider
         add { }
         remove { }
     }
+}
+
+file sealed class SfxEventSchemaProvider : ISchemaProvider
+{
+    private static readonly XmlTagDefinition GlobalTextId = new()
+        { Tag = "Text_ID", ValueType = XmlValueType.NameReference };
+
+    private static readonly XmlTagDefinition SfxTextId = new()
+        { Tag = "Text_ID", ValueType = XmlValueType.NameReferenceList };
+
+    private static readonly GameObjectTypeDefinition SfxEventTypeDef = new()
+        { TypeName = "SFXEvent", NameTag = "Name" };
+
+    public XmlTagDefinition? GetTag(string tagName)
+        => tagName.Equals("Text_ID", StringComparison.OrdinalIgnoreCase) ? GlobalTextId : null;
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+        => typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? SfxEventTypeDef : null;
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        => typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? [SfxTextId] : [];
+
+    public EnumDefinition? GetEnum(string _) => null;
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => [GlobalTextId, SfxTextId];
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [SfxEventTypeDef];
+    public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
+}
+
+file sealed class SfxEventFileTypeRegistry : IFileTypeRegistry
+{
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
+        new Dictionary<string, ImmutableArray<string>>();
+
+    public ImmutableArray<string> GetTypesForFile(string _)
+        => ImmutableArray.Create("SFXEvent");
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) { }
+
+    public void UnregisterFile(string normalizedPath) { }
 }
 
 file sealed class EmptyFileTypeRegistry : IFileTypeRegistry

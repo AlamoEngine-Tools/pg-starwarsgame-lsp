@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
+using Loretta.CodeAnalysis.Text;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -48,11 +50,9 @@ internal static class LuaLocalScopeCollector
         index.Documents.TryGetValue(normalizedUri, out var docIndex);
 
         if (docIndex is not null)
-        {
             foreach (var sym in docIndex.Symbols)
                 if (sym.Kind == GameSymbolKind.LuaGlobal)
                     entries.Add(new ScopeEntry(sym.Id, ScopeEntryKind.OwnGlobal, null));
-        }
 
         // 3. Required file globals (transitive closure)
         CollectRequiredGlobals(normalizedUri, docIndex, index, fileHelper, entries);
@@ -80,7 +80,7 @@ internal static class LuaLocalScopeCollector
     }
 
     private static void CollectLocals(
-        Loretta.CodeAnalysis.SyntaxNode root,
+        SyntaxNode root,
         int cursorOffset,
         List<ScopeEntry> entries)
     {
@@ -99,7 +99,7 @@ internal static class LuaLocalScopeCollector
     }
 
     private static void CollectParameters(
-        Loretta.CodeAnalysis.SyntaxNode root,
+        SyntaxNode root,
         int cursorOffset,
         List<ScopeEntry> entries)
     {
@@ -117,8 +117,8 @@ internal static class LuaLocalScopeCollector
                 AddParameters(anonFunc.Parameters, entries);
     }
 
-    private static Loretta.CodeAnalysis.Text.TextSpan? GetEnclosingFunctionFullSpan(
-        Loretta.CodeAnalysis.SyntaxNode node)
+    private static TextSpan? GetEnclosingFunctionFullSpan(
+        SyntaxNode node)
     {
         var parent = node.Parent;
         while (parent is not null)
@@ -129,6 +129,7 @@ internal static class LuaLocalScopeCollector
                 return parent.FullSpan;
             parent = parent.Parent;
         }
+
         return null;
     }
 
@@ -174,5 +175,4 @@ internal static class LuaLocalScopeCollector
             entries.Add(new ScopeEntry(id, ScopeEntryKind.RequiredGlobal, null));
         }
     }
-
 }

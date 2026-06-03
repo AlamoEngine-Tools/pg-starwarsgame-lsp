@@ -82,7 +82,8 @@ public sealed class AbilitySfxMapHandlerTest
     public void AbilityCode_UnknownValue_WithoutAbilityTypeSet_ReturnsNoDiagnostics()
     {
         // Graceful degradation: no extra error when AbilityType set is absent
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "UNKNOWN_CODE, SFX_Event"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "UNKNOWN_CODE, SFX_Event"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
@@ -102,7 +103,8 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_ResolvedSymbol_ReturnsNoDiagnostics()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("SFX_Hunt"), "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("SFX_Hunt"), "file:///test.xml",
+            "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, SFX_Hunt"), ctx).ToList();
         Assert.Empty(results);
     }
@@ -110,7 +112,8 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_WithLoadedIndex_ReturnsError()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"), "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"), "file:///test.xml",
+            "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), ctx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
@@ -120,30 +123,57 @@ public sealed class AbilitySfxMapHandlerTest
     [Fact]
     public void SfxEvent_UnresolvedSymbol_WithEmptyIndex_ReturnsNoDiagnostics()
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 
     [Fact]
     public void SfxEvent_EmptyName_IsAllowed()
     {
-        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Some_SFX"), "file:///test.xml", "en");
+        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Some_SFX"), "file:///test.xml",
+            "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT,"), ctx).ToList();
         Assert.Empty(results);
     }
 
     private sealed class StubSchemaProvider(IReadOnlyList<HardcodedReferenceSet> sets) : ISchemaProvider
     {
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public GameObjectTypeDefinition? GetObjectType(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-        public EnumDefinition? GetEnum(string _) => null;
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => sets;
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
     }
 }

@@ -11,15 +11,21 @@ public sealed class DeprecatedTagHandlerTest
 {
     private static readonly DeprecatedTagHandler Sut = new();
 
-    private static XmlTagDefinition DeprecatedTag(string name) => new()
+    private static XmlTagDefinition DeprecatedTag(string name)
     {
-        Tag = name, ValueType = XmlValueType.Float, Deprecated = true
-    };
+        return new XmlTagDefinition
+        {
+            Tag = name, ValueType = XmlValueType.Float, Deprecated = true
+        };
+    }
 
-    private static XmlTagDefinition ActiveTag(string name) => new()
+    private static XmlTagDefinition ActiveTag(string name)
     {
-        Tag = name, ValueType = XmlValueType.Float, Deprecated = false
-    };
+        return new XmlTagDefinition
+        {
+            Tag = name, ValueType = XmlValueType.Float, Deprecated = false
+        };
+    }
 
     [Fact]
     public void Deprecated_tag_emits_warning()

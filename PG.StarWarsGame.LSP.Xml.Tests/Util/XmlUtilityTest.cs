@@ -252,7 +252,8 @@ public sealed class XmlUtilityTest
     {
         // Simulates text truncated at cursor before a '<' typed inside GameObjectType.
         // The truncated text has no </GameObjectType> — HAP auto-closes it.
-        const string truncated = "<GameObjectFiles>\n  <GameObjectType Name=\"Foo\">\n    <Max_Speed>500</Max_Speed>\n    ";
+        const string truncated =
+            "<GameObjectFiles>\n  <GameObjectType Name=\"Foo\">\n    <Max_Speed>500</Max_Speed>\n    ";
         var doc = XmlUtility.CreateHtmlDocument(truncated);
         // cursor line = 3 (the line with just spaces, inside GameObjectType)
         var node = XmlUtility.FindEnclosingElement(doc, 3);
@@ -260,6 +261,43 @@ public sealed class XmlUtilityTest
         Assert.Equal("gameobjecttype", node!.Name, StringComparer.OrdinalIgnoreCase);
     }
 
+
+    [Fact]
+    public void FindEnclosingElement_SelfClosingLeafAboveCursor_DoesNotStealEnclosing()
+    {
+        // Reproduces a real-file bug: self-closing elements (<Tag />) get EndNode = self (HAP
+        // treats them as self-closing), which previously caused endLine = int.MaxValue. Because
+        // such elements are deeper than real container ancestors, they wrongly win the depth
+        // comparison for any cursor below them.
+        //
+        // line 0: <GameObjectFiles>
+        // line 1:   <SpaceUnit Name="Unit1">
+        // line 2:     <Tactical_Build_Prerequisites />     ← self-closing; used to steal result
+        // line 3:     <Tactical_Production_Queue>X</...>
+        // line 4:   </SpaceUnit>
+        // line 5:   <SpaceUnit Name="Unit2">
+        // line 6:     ← cursor (inside Unit2 but before any child starts)
+        // line 7:     <Max_Speed>100.0</Max_Speed>
+        // line 8:   </SpaceUnit>
+        // line 9: </GameObjectFiles>
+        const string xml =
+            "<GameObjectFiles>\n" +
+            "  <SpaceUnit Name=\"Unit1\">\n" +
+            "    <Tactical_Build_Prerequisites />\n" +
+            "    <Tactical_Production_Queue>X</Tactical_Production_Queue>\n" +
+            "  </SpaceUnit>\n" +
+            "  <SpaceUnit Name=\"Unit2\">\n" +
+            "    \n" +
+            "    <Max_Speed>100.0</Max_Speed>\n" +
+            "  </SpaceUnit>\n" +
+            "</GameObjectFiles>";
+
+        var doc = XmlUtility.CreateHtmlDocument(xml);
+        var node = XmlUtility.FindEnclosingElement(doc, 6); // cursor inside Unit2
+
+        Assert.NotNull(node);
+        Assert.Equal("spaceunit", node!.Name, StringComparer.OrdinalIgnoreCase);
+    }
 
     [Fact]
     public void FindEnclosingElement_CursorAfterAllElements_ReturnsNull()

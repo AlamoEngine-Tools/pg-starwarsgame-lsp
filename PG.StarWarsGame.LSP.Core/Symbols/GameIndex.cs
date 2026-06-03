@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Localisation;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -29,6 +30,12 @@ public sealed record GameIndex(
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<GroupMembership>> WorkspaceGroupMemberships { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) localisation key set. Used by
+    ///     <c>LocalisationKeyExistenceHandler</c> and <c>LocalisationKeyCompletionProvider</c>.
+    /// </summary>
+    public ILocalisationIndex Localisation { get; init; } = EmptyLocalisationIndex.Instance;
 
     public GameSymbol? Resolve(string id)
     {

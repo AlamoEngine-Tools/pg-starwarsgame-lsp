@@ -5,7 +5,11 @@ using System.IO.Abstractions;
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Server;
+using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.Localisation.Data.Config.v2;
+using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -16,6 +20,7 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
@@ -59,6 +64,7 @@ public static class ServerConfigurator
             .WithHandler<XmlCodeActionHandler>()
             .WithHandler<XmlCodeLensHandler>()
             .WithHandler<XmlLinkedEditingRangeHandler>()
+            .WithHandler<XmlInlayHintHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithServices(services =>
@@ -96,6 +102,8 @@ public static class ServerConfigurator
 
                 services.AddLuaLanguageServices();
                 services.AddXmlLanguageServices();
+                services.SupportLocalisationBaseline();
+                services.AddSingleton<ILocalisationLoader, LocalisationLoader>();
 
                 // GameHoverHandler routes by extension to one of these providers.
                 // Registered as interfaces only so DryIoc does not see them as competing IHoverHandler registrations.
@@ -108,6 +116,17 @@ public static class ServerConfigurator
                 try
                 {
                     var logger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
+
+                    logger.LogInformation("[initialize] RootUri={RootUri} RootPath={RootPath}",
+                        request.RootUri, request.RootPath);
+                    logger.LogInformation("[initialize] WorkspaceFolders={Folders}",
+                        request.WorkspaceFolders is null
+                            ? "<null>"
+                            : string.Join(", ", request.WorkspaceFolders.Select(f => f.Uri.ToString())));
+                    logger.LogInformation("[initialize] InitializationOptions={Options}",
+                        JsonConvert.SerializeObject(request.InitializationOptions,
+                            Formatting.None));
+
                     var configProvider = server.Services.GetRequiredService<ILspConfigurationProvider>();
 
                     var configSpan = tx.StartChild("config.load", "Load initialization options");
@@ -225,15 +244,54 @@ public static class ServerConfigurator
 
                     indexService.ApplyBaseline(baseline);
 
+                    var locSpan = tx.StartChild("localisation.baseline", "Load baseline localisation keys");
+                    try
+                    {
+                        var locProvider = server.Services.GetRequiredService<IBaselineTranslationProvider>();
+                        var langService = server.Services.GetRequiredService<ILanguageService>();
+                        if (!langService.TryGetByIdentifier(config.Current.Locale, out var language))
+                            language = langService.Default;
+                        var eawDb = locProvider.GetMasterText(GameType.EaW, language!);
+                        var focDb = locProvider.GetMasterText(GameType.FoC, language!);
+                        indexService.ApplyLocalisation(
+                            new TranslationDatabaseLocalisationIndex([eawDb, focDb], language!));
+                        locSpan.Finish(SpanStatus.Ok);
+                    }
+                    catch (Exception ex)
+                    {
+                        initLogger.LogError(ex, "Baseline localisation load failed; localisation keys unavailable");
+                        locSpan.Finish(SpanStatus.InternalError);
+                    }
+
                     var workspaceFolderPaths = request.WorkspaceFolders
                         ?.Select(f => f.Uri.GetFileSystemPath())
                         .Where(p => !string.IsNullOrEmpty(p))
                         .ToList();
-                    var folders = workspaceFolderPaths is { Count: > 0 }
-                        ? workspaceFolderPaths
-                        : request.RootUri is not null
-                            ? [request.RootUri.GetFileSystemPath()]
-                            : [];
+                    var configWorkspaceRoot = config.Current.WorkspaceRoot;
+
+                    // Build scan roots: start from protocol-level folders or RootUri, then always
+                    // add configWorkspaceRoot if it isn't already covered. The extension sends
+                    // workspaceRoot = the game data directory, which may be a subdirectory of the
+                    // VS Code workspace root — so it must always be included, not used as a fallback.
+                    var folders = new List<string>();
+                    if (workspaceFolderPaths is { Count: > 0 })
+                        folders.AddRange(workspaceFolderPaths);
+                    else if (request.RootUri is not null)
+                    {
+                        var rootPath = request.RootUri.GetFileSystemPath();
+                        if (!string.IsNullOrEmpty(rootPath))
+                            folders.Add(rootPath);
+                    }
+                    if (configWorkspaceRoot is not null &&
+                        !folders.Any(f => string.Equals(f, configWorkspaceRoot, StringComparison.OrdinalIgnoreCase)))
+                        folders.Add(configWorkspaceRoot);
+
+                    initLogger.LogInformation(
+                        "[initialized] Scan folders={Folders} (WorkspaceFolders={WF}, RootUri={RU}, ConfigRoot={CR})",
+                        string.Join(", ", folders),
+                        request.WorkspaceFolders?.Count() ?? 0,
+                        request.RootUri?.ToString() ?? "<null>",
+                        configWorkspaceRoot ?? "<null>");
                     if (folders.Count > 0)
                     {
                         var scanner = server.Services.GetRequiredService<WorkspaceScanner>();

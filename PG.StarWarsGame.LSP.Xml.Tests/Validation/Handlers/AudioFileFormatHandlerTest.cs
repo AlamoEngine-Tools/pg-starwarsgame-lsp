@@ -4,7 +4,6 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
-using Xunit;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
@@ -23,7 +22,8 @@ public sealed class AudioFileFormatHandlerTest
     [InlineData("Audio/hit.MP3")]
     public void Single_valid_audio_extension_returns_no_diagnostics(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(AudioTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(AudioTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 
@@ -43,7 +43,8 @@ public sealed class AudioFileFormatHandlerTest
     [InlineData("hit")]
     public void Single_invalid_token_returns_one_error(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(AudioTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(AudioTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
@@ -73,7 +74,8 @@ public sealed class AudioFileFormatHandlerTest
     public void Non_audio_tag_returns_no_diagnostics()
     {
         var otherTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "hit.ogg"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "hit.ogg"), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 }

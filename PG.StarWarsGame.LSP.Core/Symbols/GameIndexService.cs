@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
@@ -123,6 +124,18 @@ public sealed class GameIndexService : IGameIndexService
 
         _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count,
             baseline.BuiltAt);
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    public void ApplyLocalisation(ILocalisationIndex index)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { Localisation = index };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 

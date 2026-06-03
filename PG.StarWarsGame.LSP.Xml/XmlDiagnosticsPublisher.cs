@@ -275,13 +275,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         HtmlNode child, XmlTagDefinition tagDef, HardcodedReferenceSet set,
         string text, List<Diagnostic> diagnostics)
     {
+        var groups = tagDef.ValueGroups;
         var validNames = new HashSet<string>(
-            tagDef.ValueGroup is null
+            groups.Count == 0
                 ? set.Values.Select(v => v.Name)
                 : set.Values
                     .Where(v => v.Groups.Count == 0 ||
-                                v.Groups.Any(g => string.Equals(g, tagDef.ValueGroup,
-                                    StringComparison.OrdinalIgnoreCase)))
+                                v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)))
                     .Select(v => v.Name),
             StringComparer.OrdinalIgnoreCase);
 

@@ -114,6 +114,50 @@ public sealed class YamlSchemaParserTest
     }
 
     [Fact]
+    public void ParseTagFile_ValueGroup_Scalar_ParsedAsSingleElementList()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Primary_Locomotor_Name
+                                type: NameReference
+                                valueGroup: Locomotor
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(["Locomotor"], tag.ValueGroups);
+    }
+
+    [Fact]
+    public void ParseTagFile_ValueGroup_List_ParsedAsMultipleElements()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: LandBehavior
+                                type: TypeReferenceList
+                                valueGroup: [Land, Space]
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(["Land", "Space"], tag.ValueGroups);
+    }
+
+    [Fact]
+    public void ParseTagFile_NoValueGroup_DefaultsToEmptyList()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Speed
+                                type: Float
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Empty(tag.ValueGroups);
+    }
+
+    [Fact]
     public void ParseTagFile_MultipleLocales_AllPreserved()
     {
         const string yaml = """

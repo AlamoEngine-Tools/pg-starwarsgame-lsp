@@ -75,7 +75,7 @@ internal static class YamlSchemaParser
                 ReferenceType = entry.ReferenceType,
                 EnumName = entry.EnumName,
                 SemanticType = st,
-                ValueGroup = entry.ValueGroup,
+                ValueGroups = ParseValueGroups(entry.ValueGroup),
                 Deprecated = entry.Deprecated,
                 AvailableSince = entry.AvailableSince,
                 Description = entry.Description,
@@ -205,6 +205,16 @@ internal static class YamlSchemaParser
             Deprecated = file.Deprecated,
             AvailableSince = file.AvailableSince,
             Values = values
+        };
+    }
+
+    private static IReadOnlyList<string> ParseValueGroups(object? raw)
+    {
+        return raw switch
+        {
+            string s when s.Length > 0 => [s],
+            List<object> list => list.OfType<string>().ToList(),
+            _ => []
         };
     }
 

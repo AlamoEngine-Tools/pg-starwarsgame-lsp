@@ -10,8 +10,10 @@ internal static class LuaFileClassifier
 {
     private const string LibrarySegment = "/library/";
 
-    public static bool IsLibraryUri(string uri) =>
-        uri.Contains(LibrarySegment, StringComparison.OrdinalIgnoreCase);
+    public static bool IsLibraryUri(string uri)
+    {
+        return uri.Contains(LibrarySegment, StringComparison.OrdinalIgnoreCase);
+    }
 
     public static IReadOnlySet<string> GetSharedUris(
         IReadOnlyDictionary<string, DocumentIndex> documents,

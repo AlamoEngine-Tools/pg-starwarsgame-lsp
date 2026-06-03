@@ -17,14 +17,17 @@ internal static class LuaSnippetCompletionProvider
         Snippet("repeat", "repeat\n\t$0\nuntil $1"),
         Snippet("function", "function ${1:name}($2)\n\t$0\nend"),
         Snippet("local function", "local function ${1:name}($2)\n\t$0\nend"),
-        Snippet("local", "local ${1:name} = $0"),
+        Snippet("local", "local ${1:name} = $0")
     ];
 
-    private static CompletionItem Snippet(string label, string insertText) => new()
+    private static CompletionItem Snippet(string label, string insertText)
     {
-        Label = label,
-        Kind = CompletionItemKind.Snippet,
-        InsertText = insertText,
-        InsertTextFormat = InsertTextFormat.Snippet
-    };
+        return new CompletionItem
+        {
+            Label = label,
+            Kind = CompletionItemKind.Snippet,
+            InsertText = insertText,
+            InsertTextFormat = InsertTextFormat.Snippet
+        };
+    }
 }

@@ -87,7 +87,11 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
                 XmlRefEntry? refEntry = null;
                 foreach (var r in xmlRefs)
-                    if (r.ParamIndex == param) { refEntry = r; break; }
+                    if (r.ParamIndex == param)
+                    {
+                        refEntry = r;
+                        break;
+                    }
 
                 if (refEntry is null) return new CompletionList();
 

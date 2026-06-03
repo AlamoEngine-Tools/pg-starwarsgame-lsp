@@ -27,11 +27,12 @@ public record XmlTagDefinition
     public TagSemanticType SemanticType { get; init; }
 
     /// <summary>
-    ///     Optional free-form key identifying which semantic subset of valid values is appropriate for this tag.
-    ///     Used by completion providers to pre-filter suggestions.
-    ///     <c>null</c> means "no restriction beyond what the base <see cref="ValueType" /> implies."
+    ///     Ordered list of group keys restricting which hardcoded-set or enum values are valid for this tag.
+    ///     Empty means "no restriction." When non-empty, completion providers rank values by their position
+    ///     in this list (first group = highest priority) and diagnostics reject values that belong to none
+    ///     of the listed groups (values with empty <see cref="HardcodedReferenceSetValue.Groups" /> are always accepted).
     /// </summary>
-    public string? ValueGroup { get; init; }
+    public IReadOnlyList<string> ValueGroups { get; init; } = [];
 
     /// <summary>If true, this tag is deprecated and should not be used in new files.</summary>
     public bool Deprecated { get; init; }

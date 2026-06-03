@@ -5,6 +5,7 @@ namespace PG.StarWarsGame.LSP.Core.Configuration;
 
 public record LspConfiguration
 {
+    public string? WorkspaceRoot { get; init; }
     public string? GamePath { get; init; }
     public string? ExpansionPath { get; init; }
     public IReadOnlyList<string> ModPaths { get; init; } = [];
@@ -12,4 +13,5 @@ public record LspConfiguration
     public SchemaSourceConfig SchemaSource { get; init; } = new();
     public BaselineSourceConfig BaselineSource { get; init; } = new();
     public IReadOnlyList<string> XmlDirectories { get; init; } = [];
+    public LocalisationConfig Localisation { get; init; } = new();
 }

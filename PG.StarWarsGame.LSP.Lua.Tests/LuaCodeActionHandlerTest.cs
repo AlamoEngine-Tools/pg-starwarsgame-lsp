@@ -219,7 +219,7 @@ public sealed class LuaCodeActionHandlerTest
             Code = new DiagnosticCode(LuaDiagnosticCodes.EngineUpvalue),
             Range = new LspRange(new Position(useLine, useChar), new Position(useLine, useEnd)),
             Severity = DiagnosticSeverity.Warning,
-            Message = $"File-level local 'x' is captured as an upvalue by 'Foo'.",
+            Message = "File-level local 'x' is captured as an upvalue by 'Foo'.",
             Source = AppProperties.LspServerId,
             RelatedInformation = new Container<DiagnosticRelatedInformation>(
                 new DiagnosticRelatedInformation
@@ -246,7 +246,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_EngineUpvalueDiagnostic_ReturnsSuppressAnnotationAction()
     {
-        var diag = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -258,7 +258,7 @@ public sealed class LuaCodeActionHandlerTest
     public async Task Handle_EngineUpvalueDiagnostic_SuppressAction_InsertsAnnotationAboveDeclaration()
     {
         // local is on line 0 → annotation insert is (0,0)-(0,0) with "---@upvalue-ok\n"
-        var diag = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -278,7 +278,7 @@ public sealed class LuaCodeActionHandlerTest
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
         var host = new FakeWorkspaceHost();
         host.Set("file:///s.lua", docText);
-        var diag = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
@@ -292,8 +292,8 @@ public sealed class LuaCodeActionHandlerTest
     public async Task Handle_EngineUpvalueDiagnostic_TwoCapturingFunctions_NoMoveLocalAction()
     {
         // Two separate diagnostics reference the same local (declLine 0) → captured by 2 functions
-        var diag1 = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
-        var diag2 = EngineUpvalueDiag(useLine: 5, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 4);
+        var diag1 = EngineUpvalueDiag(2, 11, 12, 0, 1);
+        var diag2 = EngineUpvalueDiag(5, 11, 12, 0, 4);
         var request = ParamsWithDiagnostics("file:///s.lua", diag1, diag2);
 
         var result = await MakeSut().Handle(request, CancellationToken.None);
@@ -307,7 +307,7 @@ public sealed class LuaCodeActionHandlerTest
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
         var host = new FakeWorkspaceHost();
         host.Set("file:///s.lua", docText);
-        var diag = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
@@ -323,7 +323,7 @@ public sealed class LuaCodeActionHandlerTest
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
         var host = new FakeWorkspaceHost();
         host.Set("file:///s.lua", docText);
-        var diag = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
@@ -343,7 +343,7 @@ public sealed class LuaCodeActionHandlerTest
         const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
         var host = new FakeWorkspaceHost();
         host.Set("file:///s.lua", docText);
-        var diag = EngineUpvalueDiag(useLine: 2, useChar: 11, useEnd: 12, declLine: 0, funcDeclLine: 1);
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 
         var result = await MakeSut(host).Handle(request, CancellationToken.None);
@@ -362,17 +362,26 @@ public sealed class LuaCodeActionHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = new(StringComparer.OrdinalIgnoreCase);
 
-        public void Set(string uri, string text) =>
-            _docs[uri] = new TrackedDocument(uri, text, 1);
-
-        public void AddOrUpdate(string uri, string text, int version) =>
+        public void AddOrUpdate(string uri, string text, int version)
+        {
             _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public bool TryGet(string uri, out TrackedDocument doc) =>
-            _docs.TryGetValue(uri, out doc!);
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
+
+        public void Set(string uri, string text)
+        {
+            _docs[uri] = new TrackedDocument(uri, text, 1);
+        }
     }
 }

@@ -154,9 +154,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         XmlTagDefinition? tagDef;
         if (containingAbilityType is not null)
         {
-            tagDef = _schema.GetTagsForType(containingAbilityType)
-                         .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase))
-                     ?? _schema.GetTag(enclosingTag);
+            // single-node context; full ancestor walk lives in XmlDocumentFactProducer
+            var completionContext = new TagResolutionContext(
+                containingAbilityType, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
+            tagDef = XmlTagResolver.Resolve(_schema, enclosingTag, completionContext);
         }
         else if (!fileTypes.IsEmpty)
         {
@@ -164,9 +165,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             foreach (var typeName in fileTypes)
             {
                 typeSpecificDef = _schema.GetTagsForType(typeName)
-                                      .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase));
                 if (typeSpecificDef is not null) break;
             }
+
             // Prefer the registered-type def when it has completions; otherwise fall back to the
             // flat def which may carry reference info from a different type's YAML.
             tagDef = typeSpecificDef is not null && HasCompletions(typeSpecificDef)
@@ -366,7 +368,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             // Fallback for unregistered files: use element name as type name, with PascalCase conversion
             // for ability class elements (e.g., Lucky_Shot_Attack_Ability → LuckyShotAttackAbility).
             var typeDef = _schema.GetObjectType(parentName)
-                       ?? _schema.GetObjectType(XmlUtility.ToPascalCase(parentName));
+                          ?? _schema.GetObjectType(XmlUtility.ToPascalCase(parentName));
             if (typeDef is null)
                 return [];
             candidates = _schema.GetTagsForType(typeDef.TypeName);
@@ -409,7 +411,6 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         }
 
         if (parentTagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
-        {
             return _schema.AllObjectTypes
                 .Where(t => t.TypeName.EndsWith("Ability", StringComparison.OrdinalIgnoreCase))
                 .Select(t => XmlUtility.ToSnakeCase(t.TypeName))
@@ -421,7 +422,6 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
                     InsertText = $"{name} Name=\"$1\">\n    $0\n</{name}>",
                     InsertTextFormat = InsertTextFormat.Snippet
                 });
-        }
 
         return null;
     }
@@ -494,16 +494,20 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return null;
     }
 
-    private static bool HasCompletions(XmlTagDefinition tagDef) =>
-        tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet ||
-        tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
+    private static bool HasCompletions(XmlTagDefinition tagDef)
+    {
+        return tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet or ReferenceKind.LocalisationKey ||
+               tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
+    }
 
     /// <summary>Extracts the token being typed at the cursor (for prefix filtering).</summary>
     private static string ExtractPartialValue(string line, int character)
     {
         var bound = Math.Min(character, line.Length);
         var i = bound - 1;
-        while (i >= 0 && line[i] != '>' && !char.IsWhiteSpace(line[i]))
+        while (i >= 0 && line[i] != '>' && line[i] != ',' && line[i] != ';'
+               && line[i] != '|' && line[i] != '/' && line[i] != '\\'
+               && !char.IsWhiteSpace(line[i]))
             i--;
         return line[(i + 1)..bound];
     }

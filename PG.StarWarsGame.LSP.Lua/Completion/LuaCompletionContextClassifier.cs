@@ -64,12 +64,25 @@ internal static class LuaCompletionContextClassifier
         while (i >= 0)
         {
             var ch = line[i];
-            if (ch is ')' or ']' or '}') { depth++; i--; continue; }
+            if (ch is ')' or ']' or '}')
+            {
+                depth++;
+                i--;
+                continue;
+            }
+
             if (ch is '(' or '[' or '{')
             {
-                if (depth > 0) { depth--; i--; continue; }
+                if (depth > 0)
+                {
+                    depth--;
+                    i--;
+                    continue;
+                }
+
                 break;
             }
+
             if (ch == ',' && depth == 0) paramIndex++;
             if (ch is ';' or '\n') return null;
             i--;
@@ -103,8 +116,11 @@ internal static class LuaCompletionContextClassifier
                 if (c is '"' or '\'') openQuote = c;
             }
             else if (c == openQuote && (i == 0 || line[i - 1] != '\\'))
+            {
                 openQuote = null;
+            }
         }
+
         return openQuote is not null;
     }
 

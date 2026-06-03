@@ -49,7 +49,7 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         var diags = await received;
         Assert.Contains(diags.Diagnostics,
             d => d.Message.Contains("HARD_POINT_WEAPON_LASER_NO_COMMA", StringComparison.OrdinalIgnoreCase)
-              || d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase));
+                 || d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -77,12 +77,13 @@ public sealed class TupleReferenceValidationSmokeTest : IClassFixture<EawLspServ
         var diags = await received;
         Assert.DoesNotContain(diags.Diagnostics,
             d => d.Message.Contains("hard point", StringComparison.OrdinalIgnoreCase)
-              || d.Message.Contains("HardPoint", StringComparison.OrdinalIgnoreCase));
+                 || d.Message.Contains("HardPoint", StringComparison.OrdinalIgnoreCase));
     }
 
     private static void RequireEawWorkspace()
     {
         if (LspTestEnvironment.EawWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
-            throw new Exception("$XunitDynamicSkip$eaw/ workspace not found; cannot run tuple reference validation smoke tests.");
+            throw new Exception(
+                "$XunitDynamicSkip$eaw/ workspace not found; cannot run tuple reference validation smoke tests.");
     }
 }

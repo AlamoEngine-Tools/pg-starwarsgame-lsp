@@ -38,7 +38,7 @@ public sealed class LuaLocalScopeCollectorTest
         // line 0: local x = 1
         // line 1: cursor here (line 1, col 0)
         const string text = "local x = 1\n";
-        var entries = Collect(text, line: 1, character: 0);
+        var entries = Collect(text, 1);
         Assert.Contains(entries, e => e.Name == "x" && e.Kind == ScopeEntryKind.LocalVariable);
     }
 
@@ -47,7 +47,7 @@ public sealed class LuaLocalScopeCollectorTest
     {
         // cursor on line 0, local on line 1
         const string text = "\nlocal x = 1";
-        var entries = Collect(text, line: 0, character: 0);
+        var entries = Collect(text);
         Assert.DoesNotContain(entries, e => e.Name == "x");
     }
 
@@ -56,7 +56,7 @@ public sealed class LuaLocalScopeCollectorTest
     {
         // local a on line 0, local b on line 2 — cursor on line 1
         const string text = "local a = 1\n\nlocal b = 2";
-        var entries = Collect(text, line: 1, character: 0);
+        var entries = Collect(text, 1);
         Assert.Contains(entries, e => e.Name == "a");
         Assert.DoesNotContain(entries, e => e.Name == "b");
     }
@@ -66,7 +66,7 @@ public sealed class LuaLocalScopeCollectorTest
     {
         // local y declared inside Foo, cursor is at file scope after Foo
         const string text = "function Foo()\n    local y = 1\nend\n";
-        var entries = Collect(text, line: 3, character: 0);
+        var entries = Collect(text, 3);
         Assert.DoesNotContain(entries, e => e.Name == "y");
     }
 
@@ -77,7 +77,7 @@ public sealed class LuaLocalScopeCollectorTest
     {
         // function Foo(param) — cursor inside the function body
         const string text = "function Foo(param)\n    \nend";
-        var entries = Collect(text, line: 1, character: 4);
+        var entries = Collect(text, 1, 4);
         Assert.Contains(entries, e => e.Name == "param" && e.Kind == ScopeEntryKind.Parameter);
     }
 
@@ -86,7 +86,7 @@ public sealed class LuaLocalScopeCollectorTest
     {
         // cursor at line 3 (after end)
         const string text = "function Foo(param)\nend\n";
-        var entries = Collect(text, line: 2, character: 0);
+        var entries = Collect(text, 2);
         Assert.DoesNotContain(entries, e => e.Name == "param");
     }
 
@@ -94,7 +94,7 @@ public sealed class LuaLocalScopeCollectorTest
     public void MultipleParameters_AllInScope()
     {
         const string text = "function Foo(a, b, c)\n    \nend";
-        var entries = Collect(text, line: 1, character: 4);
+        var entries = Collect(text, 1, 4);
         Assert.Contains(entries, e => e.Name == "a");
         Assert.Contains(entries, e => e.Name == "b");
         Assert.Contains(entries, e => e.Name == "c");
@@ -114,7 +114,7 @@ public sealed class LuaLocalScopeCollectorTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("MyGlobal", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var entries = Collect("", line: 0, character: 0, index: index);
+        var entries = Collect("", 0, 0, index);
         Assert.Contains(entries, e => e.Name == "MyGlobal" && e.Kind == ScopeEntryKind.OwnGlobal);
     }
 
@@ -134,7 +134,7 @@ public sealed class LuaLocalScopeCollectorTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("OtherGlobal", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var entries = Collect("", line: 0, character: 0, index: index);
+        var entries = Collect("", 0, 0, index);
         Assert.DoesNotContain(entries, e => e.Name == "OtherGlobal");
     }
 
@@ -157,8 +157,8 @@ public sealed class LuaLocalScopeCollectorTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunStateMachine", [sym]),
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
-        var entries = Collect("require(\"PGStateMachine\")", line: 0, character: 0,
-            index: index, docUri: DocUri);
+        var entries = Collect("require(\"PGStateMachine\")", 0, 0,
+            index, DocUri);
         Assert.Contains(entries, e => e.Name == "RunStateMachine" && e.Kind == ScopeEntryKind.RequiredGlobal);
     }
 
@@ -178,7 +178,7 @@ public sealed class LuaLocalScopeCollectorTest
     [Fact]
     public void Lua51Builtins_AreInScope()
     {
-        var entries = Collect("", 0, 0);
+        var entries = Collect("");
         Assert.Contains(entries, e => e.Name == "pairs" && e.Kind == ScopeEntryKind.Lua51Builtin);
         Assert.Contains(entries, e => e.Name == "table" && e.Kind == ScopeEntryKind.Lua51Builtin);
     }
@@ -190,9 +190,24 @@ public sealed class LuaLocalScopeCollectorTest
         public IReadOnlySet<string> AllFunctionNames { get; } =
             new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
 
-        public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName) => [];
-        public string? GetFunctionDescription(string functionName) => null;
-        public string? GetReturnTypeName(string functionName) => null;
-        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) => [];
+        public IReadOnlyList<XmlRefEntry> GetXmlRefs(string functionName)
+        {
+            return [];
+        }
+
+        public string? GetFunctionDescription(string functionName)
+        {
+            return null;
+        }
+
+        public string? GetReturnTypeName(string functionName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName)
+        {
+            return [];
+        }
     }
 }

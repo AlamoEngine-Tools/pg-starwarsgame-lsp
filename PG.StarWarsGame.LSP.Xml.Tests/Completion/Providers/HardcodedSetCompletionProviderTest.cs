@@ -24,7 +24,7 @@ public sealed class HardcodedSetCompletionProviderTest
         };
     }
 
-    private static XmlTagDefinition HardcodedTag(HardcodedReferenceSet? set, string? valueGroup = null)
+    private static XmlTagDefinition HardcodedTag(HardcodedReferenceSet? set, params string[] valueGroups)
     {
         return new XmlTagDefinition
         {
@@ -32,7 +32,7 @@ public sealed class HardcodedSetCompletionProviderTest
             ValueType = XmlValueType.NameReference,
             ReferenceKind = ReferenceKind.HardcodedSet,
             HardcodedSet = set,
-            ValueGroup = valueGroup
+            ValueGroups = valueGroups
         };
     }
 
@@ -103,6 +103,51 @@ public sealed class HardcodedSetCompletionProviderTest
         var result = Provider.GetProposals(tag, "", GameIndex.Empty);
 
         Assert.Single(result);
+    }
+
+    // ── GetProposals — multiple ValueGroups ──────────────────────────────────
+
+    [Fact]
+    public void GetProposals_MultipleValueGroups_MatchesValuesInAnyGroup()
+    {
+        var tag = HardcodedTag(
+            Set(("LandUnit", ["land"]), ("SpaceUnit", ["space"]), ("AirUnit", ["air"])),
+            "land", "space");
+
+        var result = Provider.GetProposals(tag, "", GameIndex.Empty);
+
+        Assert.Equal(2, result.Count);
+        Assert.Contains(result, p => p.Label == "LandUnit");
+        Assert.Contains(result, p => p.Label == "SpaceUnit");
+    }
+
+    [Fact]
+    public void GetProposals_MultipleValueGroups_FirstGroupMatchesRankFirst()
+    {
+        var tag = HardcodedTag(
+            Set(("SpaceUnit", ["space"]), ("LandUnit", ["land"]), ("Universal", [])),
+            "land", "space");
+
+        var result = Provider.GetProposals(tag, "", GameIndex.Empty);
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("LandUnit", result[0].Label); // matches first group "land"
+        Assert.Equal("SpaceUnit", result[1].Label); // matches second group "space"
+        Assert.Equal("Universal", result[2].Label); // empty groups — always last
+    }
+
+    [Fact]
+    public void GetProposals_MultipleValueGroups_EmptyGroupsValueRanksAfterAllGroupMatches()
+    {
+        var tag = HardcodedTag(
+            Set(("Universal", []), ("Specific", ["land"])),
+            "land", "space");
+
+        var result = Provider.GetProposals(tag, "", GameIndex.Empty);
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("Specific", result[0].Label);
+        Assert.Equal("Universal", result[1].Label);
     }
 
     // ── GetProposals — partialValue filtering ─────────────────────────────────

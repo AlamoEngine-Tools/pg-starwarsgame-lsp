@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -46,14 +47,14 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         return new HardcodedReferenceSetValue { Name = name, Groups = groups };
     }
 
-    private static XmlTagDefinition BehaviorTag(string tagName, string? valueGroup = null)
+    private static XmlTagDefinition BehaviorTag(string tagName, params string[] valueGroups)
     {
         return new XmlTagDefinition
         {
             Tag = tagName,
             ValueType = XmlValueType.TypeReferenceList,
             ReferenceKind = ReferenceKind.HardcodedSet,
-            ValueGroup = valueGroup
+            ValueGroups = valueGroups
         };
     }
 
@@ -161,6 +162,41 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         Assert.Empty(diags);
     }
 
+    // ── multi-group filtering ────────────────────────────────────────────────
+
+    [Fact]
+    public void MultiValueGroup_token_matching_any_group_is_valid()
+    {
+        var schema = new StubHardcodedSchemaProvider(
+            BehaviorTag("Behavior", "land", "space"),
+            BehaviorModuleSet(Value("LandUnit", "land"), Value("SpaceUnit", "space")));
+        var publisher = BuildPublisher(schema);
+
+        const string xml =
+            "<GameObjectFiles><GameObject><Behavior>LandUnit SpaceUnit</Behavior></GameObject></GameObjectFiles>";
+
+        var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
+
+        Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void MultiValueGroup_token_matching_no_group_is_invalid()
+    {
+        var schema = new StubHardcodedSchemaProvider(
+            BehaviorTag("LandBehavior", "land", "space"),
+            BehaviorModuleSet(Value("AirUnit", "air"), Value("LandUnit", "land")));
+        var publisher = BuildPublisher(schema);
+
+        const string xml =
+            "<GameObjectFiles><GameObject><LandBehavior>AirUnit</LandBehavior></GameObject></GameObjectFiles>";
+
+        var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
+
+        var diag = Assert.Single(diags);
+        Assert.Contains("AirUnit", diag.Message);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 }
 
@@ -265,6 +301,10 @@ file sealed class StubIndexService : IGameIndexService
     }
 
     public void ApplyBaseline(BaselineIndex baseline)
+    {
+    }
+
+    public void ApplyLocalisation(ILocalisationIndex index)
     {
     }
 

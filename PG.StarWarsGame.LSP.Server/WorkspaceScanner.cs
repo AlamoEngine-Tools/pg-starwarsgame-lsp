@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -20,6 +21,7 @@ public sealed class WorkspaceScanner
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
+    private readonly ILocalisationLoader _localisationLoader;
     private readonly ILogger<WorkspaceScanner> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly IPreOpenBuffer _preOpenBuffer;
@@ -37,7 +39,8 @@ public sealed class WorkspaceScanner
         ILogger<WorkspaceScanner> logger,
         IServerWorkDoneManager? workDone,
         IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
-        EaWXmlContext eaWXmlContext, IPreOpenBuffer preOpenBuffer)
+        EaWXmlContext eaWXmlContext, IPreOpenBuffer preOpenBuffer,
+        ILocalisationLoader localisationLoader)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -49,6 +52,7 @@ public sealed class WorkspaceScanner
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
         _preOpenBuffer = preOpenBuffer;
+        _localisationLoader = localisationLoader;
         _schema.SchemaRefreshed += OnSchemaRefreshed;
     }
 
@@ -160,6 +164,18 @@ public sealed class WorkspaceScanner
             finally
             {
                 progress?.Dispose();
+            }
+
+            var locSpan = tx.StartChild("lsp.workspace.localisation", "Load workspace localisation keys");
+            try
+            {
+                await _localisationLoader.LoadAsync(ct);
+                locSpan.Finish(SpanStatus.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Workspace localisation load failed");
+                locSpan.Finish(SpanStatus.InternalError);
             }
 
             _lastRoots = roots;

@@ -44,19 +44,25 @@ public sealed class NameReferenceHandlerTest
 
     // ── HardcodedSet validation ──────────────────────────────────────────────
 
-    private static XmlTagDefinition HardcodedTag(HardcodedReferenceSet set) => new()
+    private static XmlTagDefinition HardcodedTag(HardcodedReferenceSet set)
     {
-        Tag = "Type",
-        ValueType = XmlValueType.NameReference,
-        ReferenceKind = ReferenceKind.HardcodedSet,
-        HardcodedSet = set
-    };
+        return new XmlTagDefinition
+        {
+            Tag = "Type",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.HardcodedSet,
+            HardcodedSet = set
+        };
+    }
 
-    private static HardcodedReferenceSet AbilityTypeSet(params string[] names) => new()
+    private static HardcodedReferenceSet AbilityTypeSet(params string[] names)
     {
-        Name = "AbilityType",
-        Values = names.Select(n => new HardcodedReferenceSetValue { Name = n }).ToList()
-    };
+        return new HardcodedReferenceSet
+        {
+            Name = "AbilityType",
+            Values = names.Select(n => new HardcodedReferenceSetValue { Name = n }).ToList()
+        };
+    }
 
     [Theory]
     [InlineData("HUNT")]
@@ -73,7 +79,8 @@ public sealed class NameReferenceHandlerTest
     public void HardcodedSet_UnknownValue_ReturnsError()
     {
         var tag = HardcodedTag(AbilityTypeSet("HUNT", "DEFEND"));
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "UNKNOWN_ABILITY"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut
+            .Handle(XmlHandlerTestFixtures.MakeFact(tag, "UNKNOWN_ABILITY"), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
@@ -88,7 +95,8 @@ public sealed class NameReferenceHandlerTest
             ReferenceKind = ReferenceKind.HardcodedSet,
             HardcodedSet = null
         };
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "ANYTHING"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "ANYTHING"), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 }

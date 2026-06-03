@@ -4,7 +4,6 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
-using Xunit;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
@@ -22,7 +21,8 @@ public sealed class ModelFileFormatHandlerTest
     [InlineData("unit.alo")]
     public void Valid_model_extension_returns_no_diagnostics(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(ModelTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(ModelTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 
@@ -34,7 +34,8 @@ public sealed class ModelFileFormatHandlerTest
     [InlineData("no_extension")]
     public void Invalid_model_extension_returns_error(string value)
     {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(ModelTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(ModelTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
@@ -43,7 +44,8 @@ public sealed class ModelFileFormatHandlerTest
     public void Non_model_tag_returns_no_diagnostics()
     {
         var otherTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "unit.obj"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(otherTag, "unit.obj"), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 }

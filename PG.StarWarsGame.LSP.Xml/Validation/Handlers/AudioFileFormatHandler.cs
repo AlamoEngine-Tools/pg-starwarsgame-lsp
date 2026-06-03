@@ -14,13 +14,11 @@ public sealed class AudioFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFa
             return [];
 
         var results = new List<XmlDiagnosticResult>();
-        foreach (var token in fact.RawValue.Split((char[]?) null, StringSplitOptions.RemoveEmptyEntries))
-        {
+        foreach (var token in fact.RawValue.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
             if (!token.EndsWith(".wav", StringComparison.OrdinalIgnoreCase) &&
                 !token.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'{token}' is not a valid audio filename for <{fact.Tag.Tag}>. Expected a .wav or .mp3 file."));
-        }
 
         return results;
     }

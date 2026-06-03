@@ -116,7 +116,7 @@ public sealed class SchemaIndex
                 ? _enums.GetValueOrDefault(raw.EnumName)
                 : null,
             SemanticType = raw.SemanticType,
-            ValueGroup = raw.ValueGroup,
+            ValueGroups = raw.ValueGroups,
             Deprecated = raw.Deprecated,
             AvailableSince = raw.AvailableSince,
             Description = raw.Description,

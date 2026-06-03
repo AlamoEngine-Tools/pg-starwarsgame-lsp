@@ -8,8 +8,10 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
 
 public sealed class LuaUpvalueAnalyzerTest
 {
-    private static IReadOnlyList<Diagnostic> Analyze(string text, string? uri = null) =>
-        LuaUpvalueAnalyzer.Analyze(text, uri);
+    private static IReadOnlyList<Diagnostic> Analyze(string text, string? uri = null)
+    {
+        return LuaUpvalueAnalyzer.Analyze(text, uri);
+    }
 
     // ── no-warning baseline ───────────────────────────────────────────────────
 
