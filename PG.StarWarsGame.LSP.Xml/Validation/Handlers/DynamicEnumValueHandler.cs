@@ -58,6 +58,21 @@ public sealed partial class DynamicEnumValueHandler : SingleValueTypeHandlerBase
                     ];
         }
 
+        if (fact.Tag.Enum is { Kind: EnumKind.DynamicXml } dynEnumDef
+            && ctx.Index.Baseline.DynamicEnumValues.TryGetValue(dynEnumDef.Name, out var knownValues)
+            && knownValues.Length > 0)
+        {
+            var knownSet = new HashSet<string>(knownValues, StringComparer.OrdinalIgnoreCase);
+            foreach (var seg in trimmed.Split(ValueSeparators,
+                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                if (!knownSet.Contains(seg))
+                    return
+                    [
+                        new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                            $"'{seg}' is not a known {dynEnumDef.Name} value.")
+                    ];
+        }
+
         return [];
     }
 

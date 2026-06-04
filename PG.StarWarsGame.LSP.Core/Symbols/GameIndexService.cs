@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Util;
 
@@ -134,6 +135,30 @@ public sealed class GameIndexService : IGameIndexService
         {
             snapshot = Volatile.Read(ref _current);
             updated = snapshot with { Localisation = index };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    public void ApplyAssetFiles(IAssetFileIndex index)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { AssetFiles = index };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { ModelBones = bones };
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         RaiseIndexChanged(Volatile.Read(ref _current));

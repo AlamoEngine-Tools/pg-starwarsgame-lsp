@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -94,7 +96,7 @@ public sealed class DynamicEnumValueHandlerTest
     }
 
     [Fact]
-    public void Dynamic_xml_enum_skips_value_check()
+    public void Dynamic_xml_enum_empty_baseline_skips_value_check()
     {
         var enumDef = new EnumDefinition { Name = "MyEnum", Kind = EnumKind.DynamicXml, Values = [] };
         var tag = XmlHandlerTestFixtures.MakeTag("Tag", XmlValueType.DynamicEnumValue, enumDef: enumDef);
@@ -110,6 +112,106 @@ public sealed class DynamicEnumValueHandlerTest
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, "abc"), XmlHandlerTestFixtures.EmptyCtx)
             .ToList();
         Assert.Empty(results);
+    }
+
+    // ── DynamicXml enum — baseline validation ─────────────────────────────────
+
+    [Fact]
+    public void DynamicXml_unknown_value_with_populated_baseline_emits_warning()
+    {
+        var enumDef = DynXml("DamageType");
+        var tag = XmlHandlerTestFixtures.MakeTag("Damage_Type", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+        var ctx = CtxWithEnumValues("DamageType", "EXPLOSIVE", "ENERGY");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "MADE_UP"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("MADE_UP", d.Message);
+    }
+
+    [Fact]
+    public void DynamicXml_known_value_with_populated_baseline_emits_no_diagnostic()
+    {
+        var enumDef = DynXml("DamageType");
+        var tag = XmlHandlerTestFixtures.MakeTag("Damage_Type", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+        var ctx = CtxWithEnumValues("DamageType", "EXPLOSIVE", "ENERGY");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "EXPLOSIVE"), ctx).ToList();
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void DynamicXml_value_lookup_is_case_insensitive()
+    {
+        var enumDef = DynXml("DamageType");
+        var tag = XmlHandlerTestFixtures.MakeTag("Damage_Type", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+        var ctx = CtxWithEnumValues("DamageType", "Damage_Default");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "DAMAGE_DEFAULT"), ctx).ToList();
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void DynamicXml_enum_not_in_baseline_dict_skips_validation()
+    {
+        var enumDef = DynXml("MovementClass");
+        var tag = XmlHandlerTestFixtures.MakeTag("Movement_Class", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+        // Baseline only has DamageType, not MovementClass
+        var ctx = CtxWithEnumValues("DamageType", "EXPLOSIVE");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "MADE_UP"), ctx).ToList();
+
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void DynamicXml_flag_list_with_one_unknown_segment_emits_warning()
+    {
+        var enumDef = DynXml("GameObjectCategoryType");
+        var tag = XmlHandlerTestFixtures.MakeTag("Category", XmlValueType.DynamicEnumValue,
+            TagSemanticType.FlagList, enumDef);
+        var ctx = CtxWithEnumValues("GameObjectCategoryType", "Fighter", "Bomber");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "Fighter | UNKNOWN_CAT"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("UNKNOWN_CAT", d.Message);
+    }
+
+    [Fact]
+    public void DynamicXml_flag_list_all_known_emits_no_diagnostic()
+    {
+        var enumDef = DynXml("GameObjectCategoryType");
+        var tag = XmlHandlerTestFixtures.MakeTag("Category", XmlValueType.DynamicEnumValue,
+            TagSemanticType.FlagList, enumDef);
+        var ctx = CtxWithEnumValues("GameObjectCategoryType", "Fighter", "Bomber");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "Fighter | Bomber"), ctx).ToList();
+
+        Assert.Empty(results);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static EnumDefinition DynXml(string name) =>
+        new() { Name = name, Kind = EnumKind.DynamicXml, Values = [] };
+
+    private static DiagnosticsContext CtxWithEnumValues(string enumName, params string[] values)
+    {
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                DynamicEnumValues = ImmutableDictionary.CreateRange(
+                    StringComparer.OrdinalIgnoreCase,
+                    [KeyValuePair.Create(enumName, ImmutableArray.Create(values))])
+            }
+        };
+        return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
     }
 
     private static EnumDefinition SchemaFixed(string name, bool isBitfield, params string[] values)

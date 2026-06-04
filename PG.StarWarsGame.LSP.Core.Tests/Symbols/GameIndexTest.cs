@@ -224,4 +224,101 @@ public sealed class GameIndexTest
         Assert.Equal(sym, result.Value.Winner);
         Assert.Null(result.Value.Shadowed);
     }
+
+    // ── AllGroupMemberships ──────────────────────────────────────────────────
+
+    [Fact]
+    public void AllGroupMemberships_EmptyBaselineAndWorkspace_ReturnsEmpty()
+    {
+        Assert.Empty(GameIndex.Empty.AllGroupMemberships);
+    }
+
+    [Fact]
+    public void AllGroupMemberships_BaselineOnlyGroups_ReturnsBaselineGroups()
+    {
+        var m = new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///sfx.xml", 0, null));
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                        StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(m))
+            }
+        };
+
+        var all = index.AllGroupMemberships;
+
+        Assert.True(all.ContainsKey("Unit_AT_AT"));
+        Assert.Single(all["Unit_AT_AT"]);
+    }
+
+    [Fact]
+    public void AllGroupMemberships_WorkspaceOnlyGroups_ReturnsWorkspaceGroups()
+    {
+        var m = new GroupMembership("Unit_TIE", "SFXEvent", new FileOrigin("file:///sfx.xml", 1, null));
+        var index = GameIndex.Empty with
+        {
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_TIE", ImmutableArray.Create(m))
+        };
+
+        var all = index.AllGroupMemberships;
+
+        Assert.True(all.ContainsKey("Unit_TIE"));
+        Assert.Single(all["Unit_TIE"]);
+    }
+
+    [Fact]
+    public void AllGroupMemberships_BothHaveSameKey_MergesMembers()
+    {
+        var baselineMember =
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///shipped.xml", 0, null));
+        var workspaceMember =
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///mod.xml", 1, null));
+
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                        StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(baselineMember))
+            },
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(workspaceMember))
+        };
+
+        var all = index.AllGroupMemberships;
+
+        Assert.Equal(2, all["Unit_AT_AT"].Length);
+    }
+
+    [Fact]
+    public void AllGroupMemberships_DisjointKeys_ReturnsBoth()
+    {
+        var bm = new GroupMembership("Baseline_Group", "SFXEvent", new FileOrigin("file:///s.xml", 0, null));
+        var wm = new GroupMembership("Workspace_Group", "SFXEvent", new FileOrigin("file:///m.xml", 0, null));
+
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                        StringComparer.OrdinalIgnoreCase)
+                    .Add("Baseline_Group", ImmutableArray.Create(bm))
+            },
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Workspace_Group", ImmutableArray.Create(wm))
+        };
+
+        var all = index.AllGroupMemberships;
+
+        Assert.Equal(2, all.Count);
+        Assert.True(all.ContainsKey("Baseline_Group"));
+        Assert.True(all.ContainsKey("Workspace_Group"));
+    }
 }

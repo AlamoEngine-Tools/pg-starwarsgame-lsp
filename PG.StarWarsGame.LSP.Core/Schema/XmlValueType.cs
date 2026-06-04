@@ -210,6 +210,8 @@ public enum XmlValueType
     ///     associated with a SpecialAbilityData entry (e.g. HUNT, FORCE_CLOAK, DEFEND).
     ///     Values overlap with BehaviorModule names but are a separate enum — do not conflate them.
     /// </summary>
+    /// <remarks>No YAML tag uses <c>type: AbilityType</c>; validation is handled via NameReference + hardcodedSet.</remarks>
+    [Obsolete("No YAML tag maps to this value type — validated via NameReference+hardcodedSet instead.")]
     AbilityType = 73,
 
     /// <summary>Projectile category enum name (e.g. a named combat category used for targeting logic).</summary>

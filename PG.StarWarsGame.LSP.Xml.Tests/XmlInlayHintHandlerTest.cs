@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using System.IO.Abstractions.TestingHelpers;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -195,6 +196,8 @@ public sealed class XmlInlayHintHandlerTest
         public void RemoveDocument(string uri) { }
         public void ApplyBaseline(BaselineIndex baseline) { }
         public void ApplyLocalisation(ILocalisationIndex index) { }
+        public void ApplyAssetFiles(IAssetFileIndex index) { }
+        public void ApplyModelBones(System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones) { }
         public IDisposable BeginBulkUpdate() => NullDisp.Instance;
 
         private sealed class NullDisp : IDisposable { public static readonly NullDisp Instance = new(); public void Dispose() { } }

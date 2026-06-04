@@ -45,7 +45,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
         var id = hit.Value.Id;
         var locations = new List<Location>();
 
-        if (index.WorkspaceGroupMemberships.TryGetValue(id, out var members) && members.Length > 0)
+        if (index.AllGroupMemberships.TryGetValue(id, out var members) && members.Length > 0)
         {
             foreach (var m in members)
             {

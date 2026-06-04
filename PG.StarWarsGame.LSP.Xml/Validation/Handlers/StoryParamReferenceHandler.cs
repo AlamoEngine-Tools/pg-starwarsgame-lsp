@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -30,7 +31,8 @@ public sealed class StoryParamReferenceHandler : XmlDiagnosticsHandler<StoryPara
 
         if (fact.Def.ValueType == XmlValueType.NameReferenceList)
         {
-            foreach (var token in fact.RawValue.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            foreach (var token in ListValueConstants.PrepareValueForSplit(fact.RawValue)
+                         .Split(ListValueConstants.GetListSeparators(), StringSplitOptions.RemoveEmptyEntries))
                 if (ctx.Index.Resolve(token) is null)
                     return
                     [

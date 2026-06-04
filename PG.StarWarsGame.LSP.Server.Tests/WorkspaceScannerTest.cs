@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -89,6 +90,70 @@ public sealed class WorkspaceScannerTest
     }
 
     // ── tests ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ScanAsync_GlobsAssetFiles_AppliesMergedCatalog()
+    {
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "a.xml")] = new("<Root/>"),
+            [Path.Combine(root, "Data", "Art", "Textures", "Foo.tga")] = new(""),
+            [Path.Combine(root, "Data", "Art", "Models", "Bar.alo")] = new(""),
+            [Path.Combine(root, "readme.txt")] = new("")
+        });
+        var svc = new FakeIndexService();
+
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/foo.tga"));
+        Assert.True(svc.AppliedAssetFiles.Contains("data/art/models/bar.alo"));
+        Assert.False(svc.AppliedAssetFiles.Contains("readme.txt"));
+    }
+
+    [Fact]
+    public async Task ScanAsync_AppliesModelBones_FromBaseline()
+    {
+        // No workspace .alo files; the scanner must still publish the baseline bones via ApplyModelBones.
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "a.xml")] = new("<Root/>")
+        });
+        var baseline = BaselineIndex.Empty with
+        {
+            ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("data/art/models/shipped.alo", ["root", "muzzle_bone"])
+        };
+        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        Assert.NotNull(svc.AppliedModelBones);
+        Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
+    }
+
+    [Fact]
+    public async Task ScanAsync_MergesBaselineAssetFiles()
+    {
+        var root = Root("ws");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "Data", "Art", "Textures", "Local.tga")] = new("")
+        });
+        var baseline = BaselineIndex.Empty with
+        {
+            AssetFiles = ImmutableHashSet.Create("data/art/textures/shipped.tga")
+        };
+        var svc = new FakeIndexService(GameIndex.Empty with { Baseline = baseline });
+
+        await Build(fs, svc, [root], new FakeParser()).ScanAsync([root], CancellationToken.None);
+
+        Assert.NotNull(svc.AppliedAssetFiles);
+        Assert.True(svc.AppliedAssetFiles!.Contains("data/art/textures/local.tga"));
+        Assert.True(svc.AppliedAssetFiles.Contains("data/art/textures/shipped.tga"));
+    }
 
     [Fact]
     public async Task ScanAsync_IndexedUri_HasFileScheme()
@@ -876,6 +941,20 @@ public sealed class WorkspaceScannerTest
 
         public void ApplyLocalisation(ILocalisationIndex index)
         {
+        }
+
+        public IAssetFileIndex? AppliedAssetFiles { get; private set; }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+            AppliedAssetFiles = index;
+        }
+
+        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelBones { get; private set; }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+            AppliedModelBones = bones;
         }
 
         public IDisposable BeginBulkUpdate()

@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Completion;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -36,16 +37,19 @@ public sealed class XmlCompletionHandlerTest
         FakeProposalRegistry proposals) Build(
             FakeFileTypeRegistry? registry = null,
             IEaWXmlContext? ctx = null,
-            IXmlCompletionRegistry? completionReg = null)
+            IXmlCompletionRegistry? completionReg = null,
+            GameIndex? index = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var proposals = new FakeProposalRegistry();
-        var indexService = new FakeIndexService();
+        var indexService = new FakeIndexService(index);
         var storyProposals = new StoryParamValueProposalProvider();
+        var boneHelper = new BoneNameCompletionHelper(schema);
         return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
             completionReg ?? new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry(),
-            new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext()), host, schema, proposals);
+            new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(), boneHelper), host, schema,
+            proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -1075,6 +1079,67 @@ public sealed class XmlCompletionHandlerTest
         Assert.Equal(ReferenceKind.Enum, capturing.LastTagDef?.ReferenceKind);
     }
 
+    // ── boneName completions ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_ValueCompletion_BoneNameTag_ReturnsBonesFromSiblingModel()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+
+        var bones = ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
+            .Add("unit.alo", ["root", "turret_bone"]);
+        var index = GameIndex.Empty with { ModelBones = bones };
+
+        var (handler, host, schema, _) = Build(registry, index: index);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Space_Model_Name", ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.ModelFile
+        });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Barrel_Bone_Name", ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.BoneName
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<Space_Model_Name>unit.alo</Space_Model_Name>\n<Barrel_Bone_Name></Barrel_Bone_Name>\n</SpaceUnit>\n</Root>",
+            1);
+
+        // line 3: "<Barrel_Bone_Name></Barrel_Bone_Name>"; col 18 = inside the body (after '>')
+        var result = await handler.Handle(At(3, 18), CancellationToken.None);
+
+        var labels = result.Items.Select(i => i.Label).ToList();
+        Assert.Contains("root", labels);
+        Assert.Contains("turret_bone", labels);
+    }
+
+    [Fact]
+    public async Task Handle_ValueCompletion_BoneNameTag_NoModelsIndexed_ReturnsEmpty()
+    {
+        // The BoneName gate must pass (HasCompletions), but with no bones indexed the result is empty.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, _) = Build(registry);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "Barrel_Bone_Name", ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.BoneName
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<Barrel_Bone_Name></Barrel_Bone_Name>\n</SpaceUnit>\n</Root>", 1);
+
+        var result = await handler.Handle(At(2, 18), CancellationToken.None);
+
+        Assert.Empty(result.Items);
+    }
+
     // ── EaW directory gating ─────────────────────────────────────────────────
 
     [Fact]
@@ -1211,7 +1276,12 @@ public sealed class XmlCompletionHandlerTest
 
     private sealed class FakeIndexService : IGameIndexService
     {
-        public GameIndex Current { get; } = GameIndex.Empty;
+        public FakeIndexService(GameIndex? current = null)
+        {
+            Current = current ?? GameIndex.Empty;
+        }
+
+        public GameIndex Current { get; }
         public event Action<GameIndex>? IndexChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
@@ -1228,6 +1298,15 @@ public sealed class XmlCompletionHandlerTest
         }
 
         public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(
+            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
         {
         }
 

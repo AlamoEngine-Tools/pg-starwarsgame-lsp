@@ -94,4 +94,28 @@ public sealed class StoryParamReferenceHandlerTest
             "anything");
         Assert.Empty(Sut.Handle(fact, CtxWith(GameIndex.Empty)));
     }
+
+    [Fact]
+    public void Tab_separated_tokens_in_ref_list_all_resolved_emits_no_diagnostics()
+    {
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                Symbols = ImmutableDictionary.CreateRange(
+                    StringComparer.OrdinalIgnoreCase,
+                    [
+                        KeyValuePair.Create("X_Wing",
+                            new GameSymbol("X_Wing", GameSymbolKind.XmlObject, "GameObjectType",
+                                new UnknownOrigin("test"), null)),
+                        KeyValuePair.Create("Y_Wing",
+                            new GameSymbol("Y_Wing", GameSymbolKind.XmlObject, "GameObjectType",
+                                new UnknownOrigin("test"), null))
+                    ])
+            }
+        };
+        var fact = MakeFact(XmlValueType.NameReferenceList, "X_Wing\tY_Wing", "GameObjectType");
+
+        Assert.Empty(Sut.Handle(fact, CtxWith(index)));
+    }
 }

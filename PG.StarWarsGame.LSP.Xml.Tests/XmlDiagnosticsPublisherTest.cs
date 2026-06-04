@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -819,6 +820,15 @@ public sealed class XmlDiagnosticsPublisherTest
         }
 
         public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(
+            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
         {
         }
 

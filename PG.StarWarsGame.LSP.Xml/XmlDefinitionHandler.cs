@@ -43,7 +43,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
         // Group keys have no canonical single definition — they link co-members, not a target symbol.
-        if (index.WorkspaceGroupMemberships.ContainsKey(hit.Value.Id))
+        if (index.AllGroupMemberships.ContainsKey(hit.Value.Id))
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
         var symbol = index.Resolve(hit.Value.Id);

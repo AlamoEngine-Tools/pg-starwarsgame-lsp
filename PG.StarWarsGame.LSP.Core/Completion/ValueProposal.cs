@@ -10,4 +10,11 @@ public record ValueProposal
 
     /// <summary>Text inserted on accept; falls back to <see cref="Label" /> when null.</summary>
     public string? InsertText { get; init; }
+
+    /// <summary>
+    ///     Right-aligned secondary label shown in the completion popup (maps to
+    ///     <c>CompletionItem.labelDetails.description</c> in LSP 3.17). Clients that do not support
+    ///     <c>labelDetails</c> ignore it; the <see cref="Detail" /> field remains the universal fallback.
+    /// </summary>
+    public string? Description { get; init; }
 }

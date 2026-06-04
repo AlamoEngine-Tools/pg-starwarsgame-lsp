@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
@@ -36,6 +37,42 @@ public sealed record GameIndex(
     ///     <c>LocalisationKeyExistenceHandler</c> and <c>LocalisationKeyCompletionProvider</c>.
     /// </summary>
     public ILocalisationIndex Localisation { get; init; } = EmptyLocalisationIndex.Instance;
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) asset-file catalog. Used by <c>AssetFileExistenceHandler</c>
+    ///     and <c>AssetFileCompletionProvider</c> to validate and complete <c>textureFile</c>,
+    ///     <c>modelFile</c>, <c>audioFile</c> and <c>mapFile</c> references.
+    /// </summary>
+    public IAssetFileIndex AssetFiles { get; init; } = EmptyAssetFileIndex.Instance;
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) bone-name catalog, keyed by normalised <c>.alo</c> model path
+    ///     (lowercase, forward-slash). Used by <c>BoneNameCompletionHelper</c> to complete
+    ///     <c>boneName</c> references against the model(s) referenced by sibling model tags.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<string>> ModelBones { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Merged (baseline ∪ workspace) group memberships. Prefer this over
+    ///     <see cref="WorkspaceGroupMemberships" /> in LSP handlers so shipped-game members are included
+    ///     alongside mod-workspace members when resolving group keys.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<GroupMembership>> AllGroupMemberships
+    {
+        get
+        {
+            if (Baseline.GroupMemberships.IsEmpty) return WorkspaceGroupMemberships;
+            if (WorkspaceGroupMemberships.IsEmpty) return Baseline.GroupMemberships;
+
+            var result = WorkspaceGroupMemberships;
+            foreach (var (key, baselineMembers) in Baseline.GroupMemberships)
+                result = result.TryGetValue(key, out var ws)
+                    ? result.SetItem(key, ws.AddRange(baselineMembers))
+                    : result.Add(key, baselineMembers);
+            return result;
+        }
+    }
 
     public GameSymbol? Resolve(string id)
     {

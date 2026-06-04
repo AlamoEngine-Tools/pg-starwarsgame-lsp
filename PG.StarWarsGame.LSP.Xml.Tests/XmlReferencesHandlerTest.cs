@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -299,6 +300,43 @@ public sealed class XmlReferencesHandlerTest
         Assert.Equal(2, locations[0].Range.Start.Line);
     }
 
+    // ── Baseline group visibility ────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CursorOnGroupKey_BaselineGroupMembersAreReturned()
+    {
+        var baselineMember =
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///shipped.xml", 5, 10));
+        var callerMember =
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin(TestUri, 3, 0));
+
+        var callerDoc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(
+                new DocumentGroupMembership(callerMember, 1, 5, 10)));
+
+        // Only baseline has the group — workspace has only the cursor doc (no WorkspaceGroupMemberships entry)
+        var index = new GameIndex(
+            BaselineIndex.Empty with
+            {
+                GroupMemberships = ImmutableDictionary
+                    .Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(baselineMember))
+            },
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(TestUri, callerDoc),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var handler = BuildHandler(index);
+        var result = await handler.Handle(At(1, 7), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var locations = result!.ToList();
+        // Should include the baseline-shipped member (line 5 of shipped.xml)
+        Assert.Contains(locations, l => l.Uri.ToString().Contains("shipped.xml") && l.Range.Start.Line == 5);
+    }
+
     // ── EaW directory gating ─────────────────────────────────────────────────
 
     [Fact]
@@ -330,6 +368,15 @@ public sealed class XmlReferencesHandlerTest
         }
 
         public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(
+            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
         {
         }
 

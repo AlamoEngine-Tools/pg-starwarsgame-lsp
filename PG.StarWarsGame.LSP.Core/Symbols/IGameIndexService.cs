@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
@@ -13,6 +15,8 @@ public interface IGameIndexService
     void RemoveDocument(string uri);
     void ApplyBaseline(BaselineIndex baseline);
     void ApplyLocalisation(ILocalisationIndex index);
+    void ApplyAssetFiles(IAssetFileIndex index);
+    void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones);
 
     /// <summary>
     ///     Suppresses <see cref="IndexChanged" /> while the returned scope is alive.

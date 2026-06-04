@@ -16,4 +16,6 @@ public sealed class SerializedBaseline
     [Key(4)] public SerializedEnumValues[] HardcodedEnumValues { get; set; } = [];
     [Key(5)] public SerializedEnumValues[] FileTypeMap { get; set; } = [];
     [Key(6)] public SerializedGroupMemberships[] GroupMemberships { get; set; } = [];
+    [Key(7)] public string[] AssetFiles { get; set; } = [];
+    [Key(8)] public SerializedEnumValues[] ModelBones { get; set; } = [];
 }

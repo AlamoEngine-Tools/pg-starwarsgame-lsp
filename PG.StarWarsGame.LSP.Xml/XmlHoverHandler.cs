@@ -78,7 +78,13 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
 
         // Cursor is not on a tag name — check if it is on a reference value.
         if (!XmlUtility.IsOnTagName(node!, lineIndex, charPos))
-            return Task.FromResult(TryBuildReferenceHover(uri, lineIndex, charPos, locale));
+        {
+            if (TryBuildReferenceHover(uri, lineIndex, charPos, locale, out var refHover))
+                return Task.FromResult<Hover?>(refHover);
+            if (TryBuildAssetHover(node!, lineIndex, charPos, out var assetHover))
+                return Task.FromResult<Hover?>(assetHover);
+            return Task.FromResult<Hover?>(null);
+        }
 
         // Cursor is on a tag name — show tag or type hover.
         var typeDef = _schema.GetObjectType(node!.Name);
@@ -90,8 +96,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         // Ability sub-object field: walk parent chain to find the containing ability type.
         if (typeDef is null)
         {
-            var abilityTypeName = TryResolveContainingAbilityType(node);
-            if (abilityTypeName is not null)
+            if (TryResolveContainingAbilityType(node, out var abilityTypeName))
                 typeDef = _schema.GetObjectType(abilityTypeName);
         }
 
@@ -143,43 +148,86 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         return Task.FromResult<Hover?>(null);
     }
 
-    private string? TryResolveContainingAbilityType(HtmlNode node)
+    private bool TryResolveContainingAbilityType(HtmlNode node, out string? abilityTypeName)
     {
         for (var n = node.ParentNode; n?.ParentNode != null; n = n.ParentNode)
         {
             var parentTag = _schema.GetTag(n.ParentNode.Name);
             // AbilityDefinitionSubObjectList: child tag name IS the ability class → PascalCase is the schema type name
             if (parentTag?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
-                return XmlUtility.ToPascalCase(n.Name);
+            {
+                abilityTypeName = XmlUtility.ToPascalCase(n.Name);
+                return true;
+            }
             // GuiActivatedAbilityDefinitionSubObjectList: all children are Unit_Ability → fixed schema type UnitAbility
             if (parentTag?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
-                return "UnitAbility";
+            {
+                abilityTypeName = "UnitAbility";
+                return true;
+            }
         }
 
-        return null;
+        abilityTypeName = null;
+        return false;
     }
 
-    private Hover? TryBuildReferenceHover(string uri, int line, int character, string locale)
+    private bool TryBuildAssetHover(HtmlNode node, int line, int character, out Hover? hover)
+    {
+        var tagDef = _schema.GetTag(node.Name);
+        if (tagDef is null || tagDef.ReferenceKind is not (
+            ReferenceKind.TextureFile or ReferenceKind.ModelFile or
+            ReferenceKind.AudioFile or ReferenceKind.MapFile))
+        {
+            hover = null;
+            return false;
+        }
+
+        var value = node.InnerText.Trim();
+        if (string.IsNullOrEmpty(value))
+        {
+            hover = null;
+            return false;
+        }
+
+        hover = HoverUtility.BuildAssetReferenceHover(
+            tagDef, value, _indexService.Current.AssetFiles, line, character, value.Length);
+        return hover is not null;
+    }
+
+    private bool TryBuildReferenceHover(string uri, int line, int character, string locale, out Hover? hover)
     {
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var index = _indexService.Current;
         if (!index.Documents.TryGetValue(normalizedUri, out var docIndex))
-            return null;
+        {
+            hover = null;
+            return false;
+        }
 
         var reference = docIndex.References.FirstOrDefault(r =>
             r.Line == line && character >= r.Column && character < r.Column + r.Length);
         if (reference is null)
-            return null;
+        {
+            hover = null;
+            return false;
+        }
 
         var symbol = index.Resolve(reference.TargetId);
         if (symbol?.TypeName is null)
-            return null;
+        {
+            hover = null;
+            return false;
+        }
 
         var typeDef = _schema.GetObjectType(symbol.TypeName);
         if (typeDef is null)
-            return null;
+        {
+            hover = null;
+            return false;
+        }
 
         _logger.LogDebug("Hover resolved: reference {Id} → {Type}", reference.TargetId, typeDef.TypeName);
-        return HoverUtility.BuildReferenceHover(typeDef, symbol.Id, reference, locale);
+        hover = HoverUtility.BuildReferenceHover(typeDef, symbol.Id, reference, locale, symbol.Origin);
+        return true;
     }
 }

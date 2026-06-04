@@ -9,9 +9,9 @@ using PG.StarWarsGame.LSP.Xml.Validation;
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
 /// <summary>
-///     These value types have no validator: the engine treats them as opaque pass-through
-///     data. Dispatching such a fact through the full registered handler set must yield zero
-///     diagnostics. Guards that there is never a registered handler emitting noise for them.
+///     Structural container types whose handlers are intentional no-ops: they hold sub-object
+///     children rather than a scalar value, so dispatching any value through the full registered
+///     handler set must yield zero diagnostics.
 /// </summary>
 public sealed class PassThroughHandlerTest
 {
@@ -26,14 +26,11 @@ public sealed class PassThroughHandlerTest
     }
 
     [Theory]
-    [InlineData(XmlValueType.Type35, "")]
-    [InlineData(XmlValueType.Type35, "some value")]
-    [InlineData(XmlValueType.Type36, "some value")]
-    [InlineData(XmlValueType.Type37, "some value")]
-    [InlineData(XmlValueType.Type38, "some value")]
-    [InlineData(XmlValueType.AbilityDefinitionSubObjectList, "some value")]
-    [InlineData(XmlValueType.GuiActivatedAbilityDefinitionSubObjectList, "some value")]
-    public void Unvalidated_value_types_produce_no_diagnostics(XmlValueType valueType, string value)
+    [InlineData(XmlValueType.AbilityDefinitionSubObjectList, "some content")]
+    [InlineData(XmlValueType.AbilityDefinitionSubObjectList, "")]
+    [InlineData(XmlValueType.GuiActivatedAbilityDefinitionSubObjectList, "some content")]
+    [InlineData(XmlValueType.GuiActivatedAbilityDefinitionSubObjectList, "")]
+    public void StructuralContainerTypes_AlwaysProduceNoDiagnostics(XmlValueType valueType, string value)
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Tag", valueType);
         var fact = XmlHandlerTestFixtures.MakeFact(tag, value);

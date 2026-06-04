@@ -20,7 +20,9 @@ public static class BaselineSerializer
             DynamicEnumValues = ToSerializedArray(baseline.DynamicEnumValues),
             HardcodedEnumValues = ToSerializedArray(baseline.HardcodedEnumValues),
             FileTypeMap = ToSerializedArray(baseline.FileTypeMap),
-            GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships)
+            GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships),
+            AssetFiles = baseline.AssetFiles.ToArray(),
+            ModelBones = ToSerializedArray(baseline.ModelBones)
         };
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
@@ -45,9 +47,14 @@ public static class BaselineSerializer
         var hardcoded = FromSerializedArray(dto.HardcodedEnumValues);
         var fileTypeMap = FromSerializedArray(dto.FileTypeMap);
         var groupMemberships = FromSerializedGroupMemberships(dto.GroupMemberships);
+        var assetFiles = dto.AssetFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        var modelBones = (dto.ModelBones ?? []).ToImmutableDictionary(
+            e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
         return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap)
         {
-            GroupMemberships = groupMemberships
+            GroupMemberships = groupMemberships,
+            AssetFiles = assetFiles,
+            ModelBones = modelBones
         };
     }
 

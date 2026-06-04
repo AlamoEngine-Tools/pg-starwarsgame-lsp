@@ -57,6 +57,12 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, SpeechEventReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, MusicEventReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SfxEventHudReferenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, Type35Handler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, Type36Handler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, Type37Handler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, Type38Handler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AbilityDefinitionSubObjectListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, GuiActivatedAbilityDefinitionSubObjectListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NameReferenceListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeReferenceListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ConditionalSfxEventHandler>();
@@ -107,6 +113,12 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, LocalisationKeyExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, LocalisationKeyListExistenceHandler>();
 
+        // Asset-file existence handlers (shared asset-file catalog)
+        services.AddSingleton<IXmlDiagnosticsHandler, TextureFileExistenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ModelFileExistenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AudioFileExistenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, MapFileExistenceHandler>();
+
         // Story handlers
         services.AddSingleton<IXmlDiagnosticsHandler, DeprecatedEventTypeHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, EventTypeNotesHandler>();
@@ -135,6 +147,10 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCompletionProvider, GameObjectReferenceCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, HardcodedSetCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, LocalisationKeyCompletionProvider>();
+        services.AddSingleton<IXmlCompletionProvider, AssetFileCompletionProvider>();
+
+        // boneName completion helper (resolved into XmlCompletionHandler via DI)
+        services.AddSingleton<BoneNameCompletionHelper>();
 
         return services;
     }

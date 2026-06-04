@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -305,6 +306,15 @@ file sealed class StubIndexService : IGameIndexService
     }
 
     public void ApplyLocalisation(ILocalisationIndex index)
+    {
+    }
+
+    public void ApplyAssetFiles(IAssetFileIndex index)
+    {
+    }
+
+    public void ApplyModelBones(
+        System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
     {
     }
 

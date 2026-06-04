@@ -312,6 +312,60 @@ public sealed class BaselineSerializerTest
         Assert.Empty(result.GroupMemberships);
     }
 
+    // ── AssetFiles ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_AssetFiles_Empty()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        Assert.Empty(result.AssetFiles);
+    }
+
+    [Fact]
+    public void RoundTrip_AssetFiles()
+    {
+        var baseline = Baseline() with
+        {
+            AssetFiles = ImmutableHashSet.Create(
+                "data/art/textures/foo.tga",
+                "data/art/models/bar.alo",
+                "data/audio/baz.wav")
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Equal(3, result.AssetFiles.Count);
+        Assert.Contains("data/art/textures/foo.tga", result.AssetFiles);
+        Assert.Contains("data/art/models/bar.alo", result.AssetFiles);
+        Assert.Contains("data/audio/baz.wav", result.AssetFiles);
+    }
+
+    // ── ModelBones ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void RoundTrip_ModelBones_Empty()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        Assert.Empty(result.ModelBones);
+    }
+
+    [Fact]
+    public void RoundTrip_ModelBones()
+    {
+        var baseline = Baseline() with
+        {
+            ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("data/art/models/unit.alo", ["root", "turret_bone"])
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Single(result.ModelBones);
+        Assert.Collection(result.ModelBones["data/art/models/unit.alo"],
+            b => Assert.Equal("root", b),
+            b => Assert.Equal("turret_bone", b));
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols)

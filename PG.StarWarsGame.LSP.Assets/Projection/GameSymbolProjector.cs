@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using PG.StarWarsGame.Files.XML;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -21,7 +20,6 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
     public BaselineIndex Project(
         IEnumerable<ProjectableEntry> gameObjects,
         IEnumerable<ProjectableEntry> sfxEvents,
-        string? gameConstantsXml,
         string sourceManifestHash)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
@@ -41,10 +39,10 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             builder[sym.Id] = sym;
         }
 
-        var (dynamicEnums, hardcodedEnums) = ExtractDynamicEnums(gameConstantsXml);
-
         return new BaselineIndex(builder.ToImmutable(), DateTimeOffset.UtcNow,
-            sourceManifestHash, dynamicEnums, hardcodedEnums,
+            sourceManifestHash,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
     }
 
@@ -74,87 +72,5 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         if (string.IsNullOrEmpty(location.XmlFile))
             return new UnknownOrigin("no source location");
         return new FileOrigin(location.XmlFile, location.Line ?? 0, null);
-    }
-
-    private static (
-        ImmutableDictionary<string, ImmutableArray<string>> dynamic,
-        ImmutableDictionary<string, ImmutableArray<string>> hardcoded
-        ) ExtractDynamicEnums(string? gameConstantsXml)
-    {
-        var empty = ImmutableDictionary<string, ImmutableArray<string>>.Empty;
-        if (string.IsNullOrEmpty(gameConstantsXml))
-            return (empty, empty);
-
-        XDocument doc;
-        try
-        {
-            doc = XDocument.Parse(gameConstantsXml);
-        }
-        catch
-        {
-            return (empty, empty);
-        }
-
-        var dyn = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
-        var hard = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
-
-        var (dmgAll, dmgHard) = ParseNameListWithBoundary(doc, "Damage_Types");
-        if (dmgAll.Length > 0) dyn["DamageType"] = dmgAll;
-        if (dmgHard.Length > 0) hard["DamageType"] = dmgHard;
-
-        var (armorAll, armorHard) = ParseNameListWithBoundary(doc, "Armor_Types");
-        if (armorAll.Length > 0) dyn["ArmorType"] = armorAll;
-        if (armorHard.Length > 0) hard["ArmorType"] = armorHard;
-
-        return (dyn.ToImmutable(), hard.ToImmutable());
-    }
-
-    private static (ImmutableArray<string> all, ImmutableArray<string> hardcoded)
-        ParseNameListWithBoundary(XDocument doc, string tagName)
-    {
-        var el = doc.Descendants(tagName).FirstOrDefault();
-        if (el is null) return ([], []);
-
-        var all = new List<string>();
-        var hardcoded = new List<string>();
-        var pastBoundary = false;
-
-        foreach (var node in el.Nodes())
-        {
-            if (node is XComment comment && IsBoundaryComment(comment.Value))
-            {
-                pastBoundary = true;
-                continue;
-            }
-
-            IEnumerable<string> tokens;
-            if (node is XText text)
-            {
-                tokens = text.Value.Split((char[])[' ', '\t', '\r', '\n'],
-                    StringSplitOptions.RemoveEmptyEntries);
-            }
-            else if (node is XElement child)
-            {
-                var v = child.Value.Trim();
-                tokens = v.Length > 0 ? [v] : [];
-            }
-            else
-            {
-                continue;
-            }
-
-            foreach (var t in tokens)
-            {
-                all.Add(t);
-                if (pastBoundary) hardcoded.Add(t);
-            }
-        }
-
-        return ([..all], [..hardcoded]);
-    }
-
-    internal static bool IsBoundaryComment(string commentText)
-    {
-        return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
     }
 }

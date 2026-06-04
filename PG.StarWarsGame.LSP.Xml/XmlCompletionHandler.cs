@@ -41,6 +41,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
 
+    private readonly BoneNameCompletionHelper _boneHelper;
+
     private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
     private readonly StoryParamValueProposalProvider _storyProposals;
@@ -55,7 +57,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IXmlCompletionRegistry completionRegistry,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
-        IEaWXmlContext eaWXmlContext)
+        IEaWXmlContext eaWXmlContext,
+        BoneNameCompletionHelper boneHelper)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
@@ -66,6 +69,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
+        _boneHelper = boneHelper;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
@@ -149,10 +153,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         //   Tier 1 — ability sub-object context (Type56/57): use the ability schema type
         //   Tier 2 — registered file types: use GetTagsForType for each registered type
         //   Tier 3 — flat fallback
-        var containingAbilityType = TryResolveContainingAbilityType(enclosingValueNode!);
         var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
         XmlTagDefinition? tagDef;
-        if (containingAbilityType is not null)
+        if (TryResolveContainingAbilityType(enclosingValueNode!, out var containingAbilityType))
         {
             // single-node context; full ancestor walk lives in XmlDocumentFactProducer
             var completionContext = new TagResolutionContext(
@@ -183,6 +186,20 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         if (tagDef is null || !HasCompletions(tagDef))
             return Task.FromResult(new CompletionList());
 
+        // boneName references resolve against the .alo model(s) named by sibling model tags on the
+        // owning XML object — handled by a dedicated helper that walks the HAP ancestor chain.
+        if (tagDef.ReferenceKind == ReferenceKind.BoneName)
+        {
+            var partial = ExtractPartialValue(line, character);
+            var boneProposals = _boneHelper.GetProposals(enclosingValueNode!, partial, _indexService.Current);
+            return Task.FromResult(new CompletionList(boneProposals.Select(p => new CompletionItem
+            {
+                Label = p.Label,
+                InsertText = p.Label,
+                Kind = CompletionItemKind.Value
+            })));
+        }
+
         var partialValue = ExtractPartialValue(line, character);
         var valueProposals = _proposals.GetProposals(tagDef.ValueType, tagDef, partialValue)
             .Concat(_completionRegistry.GetProposals(tagDef, partialValue, _indexService.Current));
@@ -191,6 +208,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         {
             Label = p.Label,
             Detail = p.Detail,
+            LabelDetails = p.Description is not null
+                ? new CompletionItemLabelDetails { Description = p.Description }
+                : null,
             InsertText = p.InsertText ?? p.Label,
             Kind = CompletionItemKind.Value
         });
@@ -476,7 +496,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return false;
     }
 
-    private string? TryResolveContainingAbilityType(HtmlNode node)
+    private bool TryResolveContainingAbilityType(HtmlNode node, out string? abilityTypeName)
     {
         var child = node;
         var parent = child.ParentNode;
@@ -484,19 +504,28 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         {
             var tagDef = _schema.GetTag(parent.Name);
             if (tagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
-                return "UnitAbility";
+            {
+                abilityTypeName = "UnitAbility";
+                return true;
+            }
             if (tagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
-                return XmlUtility.ToPascalCase(child.Name);
+            {
+                abilityTypeName = XmlUtility.ToPascalCase(child.Name);
+                return true;
+            }
             child = parent;
             parent = parent.ParentNode;
         }
 
-        return null;
+        abilityTypeName = null;
+        return false;
     }
 
     private static bool HasCompletions(XmlTagDefinition tagDef)
     {
-        return tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet or ReferenceKind.LocalisationKey ||
+        return tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet
+                   or ReferenceKind.LocalisationKey or ReferenceKind.TextureFile or ReferenceKind.ModelFile
+                   or ReferenceKind.AudioFile or ReferenceKind.MapFile or ReferenceKind.BoneName ||
                tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
     }
 

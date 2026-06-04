@@ -76,6 +76,33 @@ public sealed class GameIndexServiceTest
         Assert.NotNull(fired);
     }
 
+    // ── ApplyModelBones ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void ApplyModelBones_Updates_Current_ModelBones()
+    {
+        var svc = Build();
+        var bones = ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
+            .Add("data/art/models/unit.alo", ["root", "turret_bone"]);
+
+        svc.ApplyModelBones(bones);
+
+        Assert.Equal(["root", "turret_bone"], svc.Current.ModelBones["data/art/models/unit.alo"].ToArray());
+    }
+
+    [Fact]
+    public void ApplyModelBones_Fires_IndexChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.IndexChanged += idx => fired = idx;
+
+        svc.ApplyModelBones(
+            ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.NotNull(fired);
+    }
+
     // ── URI normalization — canonical form at the index boundary ────────────
 
     [Fact]

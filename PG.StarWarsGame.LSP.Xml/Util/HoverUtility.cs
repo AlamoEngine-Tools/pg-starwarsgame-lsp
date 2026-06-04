@@ -1,9 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO;
 using System.Text;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -105,13 +107,16 @@ internal static class HoverUtility
     }
 
     public static Hover BuildReferenceHover(
-        GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale)
+        GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale,
+        SymbolOrigin? origin = null)
     {
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}`");
         sb.AppendLine($" *`\"{symbolId}\"`*");
         sb.Append(Resolve(type.Description, locale));
         AppendNotes(sb, type.Notes, locale);
+        if (origin is MegArchiveOrigin meg)
+            AppendPackedOrigin(sb, meg);
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -121,6 +126,72 @@ internal static class HoverUtility
             }),
             Range = MakeRange(reference.Line, reference.Column, reference.Length)
         };
+    }
+
+    public static Hover? BuildAssetReferenceHover(
+        XmlTagDefinition tag, string rawValue, IAssetFileIndex assetFiles, int line, int col, int length)
+    {
+        var value = rawValue.Replace('\\', '/').Trim();
+        if (string.IsNullOrEmpty(value)) return null;
+
+        var ext = Path.GetExtension(value);
+        if (string.IsNullOrEmpty(ext)) return null;
+
+        var matches = assetFiles.GetByExtension(ext)
+            .Where(p =>
+                p.Equals(value, StringComparison.OrdinalIgnoreCase) ||
+                p.EndsWith("/" + value, StringComparison.OrdinalIgnoreCase) ||
+                Path.GetFileName(p).Equals(value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (matches.Count == 0) return null;
+
+        var kindLabel = tag.ReferenceKind switch
+        {
+            ReferenceKind.TextureFile => "Texture",
+            ReferenceKind.ModelFile   => "Model",
+            ReferenceKind.AudioFile   => "Audio",
+            ReferenceKind.MapFile     => "Map",
+            _                         => "Asset"
+        };
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"### `{value}`");
+        sb.AppendLine($"*{kindLabel} file*");
+
+        if (matches.Count == 1)
+        {
+            var fullPath = matches[0];
+            sb.AppendLine();
+            sb.Append(assetFiles.IsPackedAsset(fullPath)
+                ? $"📦 `{fullPath}`"
+                : $"`{fullPath}`");
+        }
+        else
+        {
+            sb.AppendLine();
+            foreach (var path in matches)
+                sb.AppendLine(assetFiles.IsPackedAsset(path) ? $"- 📦 `{path}`" : $"- `{path}`");
+        }
+
+        return new Hover
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = sb.ToString()
+            }),
+            Range = MakeRange(line, col, length)
+        };
+    }
+
+    private static void AppendPackedOrigin(StringBuilder sb, MegArchiveOrigin meg)
+    {
+        var archiveName = Path.GetFileName(meg.ArchivePath);
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.Append($"📦 Packed in `{archiveName}` → `{meg.InternalPath}`");
     }
 
     private static void AppendNotes(StringBuilder sb, IReadOnlyDictionary<string, string> notes, string locale)

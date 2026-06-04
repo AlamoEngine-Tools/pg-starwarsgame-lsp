@@ -7,6 +7,8 @@ using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server.WorkDone;
+using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -17,6 +19,11 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class WorkspaceScanner
 {
+    // Asset extensions covered by the shared asset-file catalog (Workstream B). Mirrors the
+    // set enumerated by the BaselineBuilder's AssetFileEnumerator.
+    private static readonly HashSet<string> AssetExtensions =
+        new(StringComparer.OrdinalIgnoreCase) { ".tga", ".dds", ".alo", ".wav", ".mp3", ".ted" };
+
     private readonly EaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -166,6 +173,30 @@ public sealed class WorkspaceScanner
                 progress?.Dispose();
             }
 
+            var assetSpan = tx.StartChild("lsp.workspace.assets", "Glob workspace asset files");
+            try
+            {
+                ApplyAssetCatalog(roots);
+                assetSpan.Finish(SpanStatus.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Workspace asset glob failed");
+                assetSpan.Finish(SpanStatus.InternalError);
+            }
+
+            var boneSpan = tx.StartChild("lsp.workspace.bones", "Extract workspace ALO bone names");
+            try
+            {
+                ApplyModelBoneCatalog(roots);
+                boneSpan.Finish(SpanStatus.Ok);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Workspace ALO bone extraction failed");
+                boneSpan.Finish(SpanStatus.InternalError);
+            }
+
             var locSpan = tx.StartChild("lsp.workspace.localisation", "Load workspace localisation keys");
             try
             {
@@ -186,6 +217,64 @@ public sealed class WorkspaceScanner
             tx.Finish(SpanStatus.InternalError);
             throw;
         }
+    }
+
+    // Globs loose asset files (textures, models, audio, maps) under the workspace roots,
+    // normalises them relative to their root (lowercase, forward-slash), unions with the
+    // baseline catalog, and publishes the merged IAssetFileIndex on the GameIndex.
+    private void ApplyAssetCatalog(IList<string> roots)
+    {
+        var baseline = _indexService.Current.Baseline.AssetFiles;
+        var workspace = new List<string>();
+
+        foreach (var root in roots)
+        {
+            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
+            foreach (var file in _fileHelper.FileSystem.Directory
+                         .EnumerateFiles(root, "*", SearchOption.AllDirectories))
+            {
+                if (!AssetExtensions.Contains(_fileHelper.FileSystem.Path.GetExtension(file)))
+                    continue;
+                var relative = _fileHelper.FileSystem.Path.GetRelativePath(root, file);
+                workspace.Add(_fileHelper.NormalizeGamePath(relative));
+            }
+        }
+
+        _logger.LogInformation(
+            "Asset catalog: {Workspace} workspace asset(s) merged with {Baseline} baseline asset(s)",
+            workspace.Count, baseline.Count);
+
+        _indexService.ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
+    }
+
+    // Extracts bone names from loose workspace .alo models, unions them with the baseline bone
+    // catalog (workspace models override shipped ones at the same path), and publishes the merged
+    // map on the GameIndex for boneName completion.
+    private void ApplyModelBoneCatalog(IList<string> roots)
+    {
+        var baseline = _indexService.Current.Baseline.ModelBones;
+        var merged = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var (path, bones) in baseline)
+            merged[path] = bones;
+
+        var workspaceCount = 0;
+        foreach (var root in roots)
+        {
+            if (!_fileHelper.FileSystem.Directory.Exists(root)) continue;
+            var bonesByModel = BoneNameExtractor.Extract(_fileHelper.FileSystem, root);
+            foreach (var (path, bones) in bonesByModel)
+            {
+                merged[path] = bones.ToImmutableArray();
+                workspaceCount++;
+            }
+        }
+
+        _logger.LogInformation(
+            "Model bone catalog: {Workspace} workspace model(s) merged with {Baseline} baseline model(s)",
+            workspaceCount, baseline.Count);
+
+        _indexService.ApplyModelBones(merged.ToImmutable());
     }
 
     private void OnSchemaRefreshed(object? sender, EventArgs e)

@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -283,6 +284,15 @@ public sealed class LuaHoverHandlerTest
         }
 
         public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(
+            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
         {
         }
 
