@@ -240,6 +240,38 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	context.subscriptions.push(
+		vscode.commands.registerCommand('aet.newModProject', async () => {
+			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
+			const name = await vscode.window.showInputBox({
+				prompt: 'Mod name',
+				placeHolder: 'My Awesome Mod',
+				validateInput: v => v?.trim() ? null : 'Name is required',
+			});
+			if (!name) return;
+			const folders = await vscode.window.showOpenDialog({
+				canSelectFolders: true, canSelectFiles: false, canSelectMany: false,
+				openLabel: 'Select mod root folder',
+			});
+			if (!folders?.length) return;
+			await lspClient.sendRequest(ExecuteCommandRequest.type, {
+				command: 'aet.newModProject',
+				arguments: [{ name: name.trim(), path: folders[0].fsPath }],
+			});
+			vscode.window.showInformationMessage(`Mod project '${name.trim()}' created.`);
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet.reloadProject', async () => {
+			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
+			await lspClient.sendRequest(ExecuteCommandRequest.type, {
+				command: 'aet.reloadProject',
+				arguments: [],
+			});
+		}),
+	);
+
+	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.showReferences',
 			(uriStr: string,
 			 position: { line: number; character: number },

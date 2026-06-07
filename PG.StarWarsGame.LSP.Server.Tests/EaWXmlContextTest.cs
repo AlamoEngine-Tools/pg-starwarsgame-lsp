@@ -191,4 +191,32 @@ public sealed class EaWXmlContextTest
 
         Assert.True(ctx.IsEaWXmlFile(uri));
     }
+
+    // ── SetDirectories ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void SetDirectories_ReplacesExistingDirectories()
+    {
+        var dirA = Path.Combine(Root("game"), "data", "xml");
+        var dirB = Path.Combine(Root("mod"), "data", "xml");
+        var ctx = Build();
+        ctx.AddDirectory(dirA);
+
+        ctx.SetDirectories([dirB]);
+
+        Assert.False(ctx.IsEaWXmlFile(ToUri(Path.Combine(dirA, "foo.xml"))));
+        Assert.True(ctx.IsEaWXmlFile(ToUri(Path.Combine(dirB, "bar.xml"))));
+    }
+
+    [Fact]
+    public void SetDirectories_EmptyList_ClearsAllDirectories()
+    {
+        var dir = Path.Combine(Root("game"), "data", "xml");
+        var ctx = Build();
+        ctx.AddDirectory(dir);
+
+        ctx.SetDirectories([]);
+
+        Assert.False(ctx.IsEaWXmlFile(ToUri(Path.Combine(dir, "foo.xml"))));
+    }
 }

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PG StarWarsGame Mod Project",
+  "type": "object",
+  "required": ["modinfo"],
+  "additionalProperties": false,
+  "properties": {
+    "modinfo": {
+      "description": "Embedded mod metadata — source of truth for mod identity.",
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name":    { "type": "string", "minLength": 1 },
+        "version": { "type": "string" },
+        "summary": { "type": "string" },
+        "icon":    { "type": "string" },
+        "languages": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["code"], "additionalProperties": false,
+            "properties": {
+              "code":    { "type": "string", "minLength": 2, "maxLength": 5 },
+              "support": { "type": "integer", "minimum": 0 }
+            }
+          }
+        },
+        "custom": { "type": "object" }
+      }
+    },
+    "directories": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "xml":     { "type": "array", "items": { "type": "string" } },
+        "scripts": { "type": "array", "items": { "type": "string" } },
+        "art":     { "type": "array", "items": { "type": "string" } },
+        "audio":   { "type": "array", "items": { "type": "string" } },
+        "text":    { "type": "array", "items": { "type": "string" } },
+        "ai":      { "type": "array", "items": { "type": "string" },
+                    "description": "Reserved — currently excluded from XML parsing." }
+      }
+    },
+    "projectReferences": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["path"], "additionalProperties": false,
+        "properties": {
+          "path": { "type": "string" }
+        }
+      }
+    }
+  }
+}

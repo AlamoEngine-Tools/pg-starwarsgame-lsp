@@ -1,15 +1,19 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -41,13 +45,30 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     private static GameDidChangeWatchedFilesHandler BuildHandler(
         SpyIndexService? index = null,
         FakeWorkspaceHost? host = null,
-        MockFileSystem? fs = null)
+        MockFileSystem? fs = null,
+        FakeReloadService? reload = null)
     {
         var fileSystem = fs ?? new MockFileSystem();
+        var fileHelper = new FileHelper(fileSystem);
+        var idx = index ?? new SpyIndexService();
+        var scanner = new WorkspaceScanner(
+            fileHelper,
+            [],
+            idx,
+            new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance),
+            NullLogger<WorkspaceScanner>.Instance,
+            null,
+            new FileTypeRegistry(),
+            new FakeSchemaProvider(),
+            new EaWXmlContext(fileHelper),
+            new PreOpenBuffer(),
+            new NullLocalisationLoader());
         return new GameDidChangeWatchedFilesHandler(
-            index ?? new SpyIndexService(),
+            idx,
             host ?? new FakeWorkspaceHost(),
-            new FileHelper(fileSystem),
+            fileHelper,
+            scanner,
+            reload ?? new FakeReloadService(),
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
     }
 
@@ -142,7 +163,101 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Equal(2, spy.Updates.Count);
     }
 
+    // ── .pgproj changes ────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_PgprojChanged_TriggersReload_AndDoesNotReIndex()
+    {
+        const string pgprojUri = "file:///c:/mods/mymod/mymod.pgproj";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\mymod.pgproj"] = new("{}")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService();
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(pgprojUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.ReloadCount);
+        Assert.Empty(spy.Updates);
+    }
+
+    [Fact]
+    public async Task Handle_PgprojDeleted_TriggersReload()
+    {
+        const string pgprojUri = "file:///c:/mods/mymod/mymod.pgproj";
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService();
+
+        var handler = BuildHandler(spy, reload: reload);
+        await handler.Handle(Deleted(pgprojUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.ReloadCount);
+        Assert.Empty(spy.Removals);
+    }
+
+    // ── asset changes ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_AssetFileChanged_DoesNotReIndexAsDocument()
+    {
+        const string assetUri = "file:///c:/data/art/textures/foo.tga";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\data\art\textures\foo.tga"] = new("")
+        });
+        var spy = new SpyIndexService();
+
+        var handler = BuildHandler(spy, fs: fs);
+        await handler.Handle(Changed(assetUri), CancellationToken.None);
+
+        Assert.Empty(spy.Updates);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
+
+    private sealed class FakeReloadService : IModProjectReloadService
+    {
+        public int ReloadCount { get; private set; }
+
+        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ReloadAsync(CancellationToken ct)
+        {
+            ReloadCount++;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeSchemaProvider : ISchemaProvider
+    {
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { value?.Invoke(this, EventArgs.Empty); }
+            remove { }
+        }
+
+        public XmlTagDefinition? GetTag(string tagName) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
+        public EnumDefinition? GetEnum(string enumName) => null;
+    }
+
+    private sealed class NullLocalisationLoader : ILocalisationLoader
+    {
+        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct) => Task.CompletedTask;
+    }
 
     private sealed class SpyIndexService : IGameIndexService
     {

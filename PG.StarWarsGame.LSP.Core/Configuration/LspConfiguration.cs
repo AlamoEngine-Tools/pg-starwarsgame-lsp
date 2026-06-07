@@ -12,6 +12,5 @@ public record LspConfiguration
     public string Locale { get; init; } = "en";
     public SchemaSourceConfig SchemaSource { get; init; } = new();
     public BaselineSourceConfig BaselineSource { get; init; } = new();
-    public IReadOnlyList<string> XmlDirectories { get; init; } = [];
     public LocalisationConfig Localisation { get; init; } = new();
 }

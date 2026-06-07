@@ -14,6 +14,7 @@ using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -54,7 +55,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         _logger = logger;
     }
 
-    public async Task LoadAsync(CancellationToken ct)
+    public async Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct)
     {
         var config = _configProvider.Current;
         var locConfig = config.Localisation;
@@ -65,9 +66,23 @@ public sealed class LocalisationLoader : ILocalisationLoader
         var eawDb = _baselineProvider.GetMasterText(GameType.EaW, language!);
         var focDb = _baselineProvider.GetMasterText(GameType.FoC, language!);
 
-        var sourcePaths = locConfig.SourcePaths.Count > 0
-            ? locConfig.SourcePaths
-            : AutoDetectPaths(config.ModPaths, locConfig.ResourceType);
+        IReadOnlyList<string> sourcePaths;
+        string resourceType;
+
+        if (workspaceConfig.TextRoots.Count > 0)
+        {
+            // pgproj mode: TextRoots replace SourcePaths; TextResourceType replaces locConfig.ResourceType.
+            resourceType = workspaceConfig.TextResourceType ?? locConfig.ResourceType;
+            sourcePaths = EnumerateFromTextRoots(workspaceConfig.TextRoots, resourceType);
+        }
+        else
+        {
+            // Heuristic mode: user config unchanged.
+            resourceType = locConfig.ResourceType;
+            sourcePaths = locConfig.SourcePaths.Count > 0
+                ? locConfig.SourcePaths
+                : AutoDetectPaths(config.ModPaths, resourceType);
+        }
 
         if (sourcePaths.Count == 0)
         {
@@ -77,9 +92,23 @@ public sealed class LocalisationLoader : ILocalisationLoader
 
         var wsDb = _factory.CreateKeyed([language!]);
         foreach (var path in sourcePaths)
-            await TryImportFileAsync(path, locConfig.ResourceType, language!, wsDb, ct);
+            await TryImportFileAsync(path, resourceType, language!, wsDb, ct);
 
         _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex([eawDb, focDb, wsDb], language!));
+    }
+
+    private IReadOnlyList<string> EnumerateFromTextRoots(IReadOnlyList<string> textRoots, string resourceType)
+    {
+        var ext = ResourceTypeToExtension(resourceType);
+        var results = new List<string>();
+        foreach (var dir in textRoots)
+        {
+            if (!_fileHelper.FileSystem.Directory.Exists(dir)) continue;
+            results.AddRange(_fileHelper.FileSystem.Directory
+                .EnumerateFiles(dir, $"*{ext}", SearchOption.TopDirectoryOnly));
+        }
+
+        return results;
     }
 
     private IReadOnlyList<string> AutoDetectPaths(IReadOnlyList<string> modPaths, string resourceType)

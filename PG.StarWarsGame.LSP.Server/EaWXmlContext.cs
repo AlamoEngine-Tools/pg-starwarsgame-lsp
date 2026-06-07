@@ -17,6 +17,8 @@ public sealed class EaWXmlContext : IEaWXmlContext
         _fileHelper = fileHelper;
     }
 
+    public bool HasDirectories => !_directories.IsEmpty;
+
     public bool IsEaWXmlFile(string fileUri)
     {
         var normalized = _fileHelper.NormalizeUri(fileUri);
@@ -36,5 +38,19 @@ public sealed class EaWXmlContext : IEaWXmlContext
             : _fileHelper.PathToFileUri(absolutePath);
         var prefix = uri.TrimEnd('/') + '/';
         ImmutableInterlocked.Update(ref _directories, d => d.Add(prefix));
+    }
+
+    public void SetDirectories(IEnumerable<string> absolutePaths)
+    {
+        var next = ImmutableHashSet<string>.Empty;
+        foreach (var path in absolutePaths)
+        {
+            var uri = path.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                ? _fileHelper.NormalizeUri(path)
+                : _fileHelper.PathToFileUri(path);
+            next = next.Add(uri.TrimEnd('/') + '/');
+        }
+
+        Volatile.Write(ref _directories, next);
     }
 }

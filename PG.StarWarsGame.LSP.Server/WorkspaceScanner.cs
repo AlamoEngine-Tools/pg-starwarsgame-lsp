@@ -39,7 +39,16 @@ public sealed class WorkspaceScanner
     // Stored after a successful ScanAsync so OnSchemaRefreshed can trigger a re-scan.
     // Null until the first scan completes, which prevents re-scans during the initial
     // WaitForSchemaAsync phase (the initial scan handles schema readiness itself).
+    private volatile WorkspaceConfiguration? _lastConfig;
     private volatile List<string>? _lastRoots;
+
+    // Roots used for the most recent asset catalog glob; consumed by the watched-files
+    // handler to re-glob assets when a loose asset file changes on disk.
+    public IReadOnlyList<string>? LastAssetRoots { get; private set; }
+
+    // The configuration applied by the most recent successful scan. Exposed for diagnostics
+    // and for verifying which configuration the project reload service resolved.
+    public WorkspaceConfiguration? LastScannedConfig => _lastConfig;
 
     public WorkspaceScanner(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IGameWorkspaceHost workspaceHost,
@@ -63,16 +72,24 @@ public sealed class WorkspaceScanner
         _schema.SchemaRefreshed += OnSchemaRefreshed;
     }
 
-    public async Task ScanAsync(IEnumerable<string> workspaceFolders, CancellationToken ct)
+    public async Task ScanAsync(WorkspaceConfiguration config, IEnumerable<string> workspaceRoots,
+        CancellationToken ct)
     {
         var tx = SentrySdk.StartTransaction("lsp.workspace.scan", "workspace.index");
         try
         {
             var sw = Stopwatch.StartNew();
-            var roots = workspaceFolders.ToList();
+            var roots = workspaceRoots.ToList();
             _logger.LogInformation(
                 "Workspace scan starting. Roots: [{Roots}]. AllMetafiles={MetafileCount}, AllTags={TagCount}",
                 string.Join(", ", roots), _schema.AllMetafiles.Count, _schema.AllTags.Count);
+
+            // Seed EaWXmlContext from the project-declared XML directories BEFORE waiting for
+            // the schema, so IsEaWXmlFile is true for any didOpen events that arrive while
+            // schema is loading over HTTP. On the heuristic path (no pgproj), the context
+            // remains empty here and is populated by PreScanMetafiles or the fallback below.
+            if (config.XmlDirectories.Count > 0)
+                _eaWXmlContext.SetDirectories(config.XmlDirectories);
 
             var schemaWaitSpan = tx.StartChild("lsp.schema.wait", "Wait for schema to be ready");
             await WaitForSchemaAsync(ct);
@@ -80,9 +97,15 @@ public sealed class WorkspaceScanner
             _logger.LogInformation("WaitForSchemaAsync complete at {Elapsed} ms", sw.ElapsedMilliseconds);
 
             var preScanSpan = tx.StartChild("lsp.workspace.prescan", "Pre-scan metafiles and register file types");
-            PreScanMetafiles(roots);
+            IList<string>? pgprojXmlDirs = config.XmlDirectories.Count > 0 ? config.XmlDirectories.ToList() : null;
+            PreScanMetafiles(roots, pgprojXmlDirs);
             preScanSpan.Finish(SpanStatus.Ok);
             _logger.LogInformation("PreScanMetafiles complete at {Elapsed} ms", sw.ElapsedMilliseconds);
+
+            // Heuristic fallback: no pgproj and no metafiles found on disk → seed the
+            // context with workspace roots so any XML file under them is recognised.
+            if (!_eaWXmlContext.HasDirectories)
+                _eaWXmlContext.SetDirectories(roots);
 
             // Replay didOpen events that arrived before EaWXmlContext was configured.
             // Only add files that are now recognised as EaW XML and not already in the host.
@@ -97,20 +120,33 @@ public sealed class WorkspaceScanner
             _logger.LogInformation("PreOpenBuffer drained: {Count} file(s) seeded at {Elapsed} ms",
                 preOpened.Count, sw.ElapsedMilliseconds);
 
-            var files = roots
-                .SelectMany(folder =>
-                    _fileHelper.FileSystem.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories))
+            // XML is enumerated from the project's declared XML directories when present,
+            // otherwise from the workspace roots. The IsEaWXmlFile gate still filters the
+            // candidates so only recognised EaW data files are indexed. Lua is enumerated
+            // from the declared script roots when present, otherwise from the workspace roots.
+            var xmlRoots = config.XmlDirectories.Count > 0 ? config.XmlDirectories.ToList() : roots;
+            var scriptRoots = config.ScriptRoots.Count > 0 ? config.ScriptRoots.ToList() : roots;
+
+            var files = EnumerateFiles(xmlRoots)
                 .Where(f =>
                 {
                     var ext = _fileHelper.FileSystem.Path.GetExtension(f);
+                    if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
                     if (!_parsers.Any(p => p.CanParse(ext))) return false;
                     // XML files are gated to known EaW data directories to avoid indexing
-                    // unrelated XML files (e.g. project settings). Other file types (e.g. .lua)
-                    // have no such restriction — any parseable file in the workspace is a game file.
-                    if (ext.Equals(".xml", StringComparison.OrdinalIgnoreCase))
-                        return _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
-                    return true;
+                    // unrelated XML files (e.g. project settings).
+                    return _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
                 })
+                .Concat(EnumerateFiles(scriptRoots)
+                    .Where(f =>
+                    {
+                        var ext = _fileHelper.FileSystem.Path.GetExtension(f);
+                        if (ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
+                        // Non-XML parseable files (e.g. .lua) have no directory gate — any
+                        // parseable file under the script roots is a game file.
+                        return _parsers.Any(p => p.CanParse(ext));
+                    }))
+                .Distinct()
                 .ToList();
 
             _logger.LogInformation("Workspace scan: {Count} parseable file(s) found at {Elapsed} ms", files.Count,
@@ -173,10 +209,12 @@ public sealed class WorkspaceScanner
                 progress?.Dispose();
             }
 
+            var assetRoots = config.AssetRoots.Count > 0 ? config.AssetRoots.ToList() : roots;
+
             var assetSpan = tx.StartChild("lsp.workspace.assets", "Glob workspace asset files");
             try
             {
-                ApplyAssetCatalog(roots);
+                ApplyAssetCatalog(assetRoots);
                 assetSpan.Finish(SpanStatus.Ok);
             }
             catch (Exception ex)
@@ -188,7 +226,7 @@ public sealed class WorkspaceScanner
             var boneSpan = tx.StartChild("lsp.workspace.bones", "Extract workspace ALO bone names");
             try
             {
-                ApplyModelBoneCatalog(roots);
+                ApplyModelBoneCatalog(assetRoots);
                 boneSpan.Finish(SpanStatus.Ok);
             }
             catch (Exception ex)
@@ -200,7 +238,7 @@ public sealed class WorkspaceScanner
             var locSpan = tx.StartChild("lsp.workspace.localisation", "Load workspace localisation keys");
             try
             {
-                await _localisationLoader.LoadAsync(ct);
+                await _localisationLoader.LoadAsync(config, ct);
                 locSpan.Finish(SpanStatus.Ok);
             }
             catch (Exception ex)
@@ -209,7 +247,9 @@ public sealed class WorkspaceScanner
                 locSpan.Finish(SpanStatus.InternalError);
             }
 
+            _lastConfig = config;
             _lastRoots = roots;
+            LastAssetRoots = assetRoots;
             tx.Finish(SpanStatus.Ok);
         }
         catch (Exception)
@@ -219,10 +259,23 @@ public sealed class WorkspaceScanner
         }
     }
 
+    public static bool IsAssetFile(string path)
+    {
+        return AssetExtensions.Contains(Path.GetExtension(path));
+    }
+
+    private IEnumerable<string> EnumerateFiles(IEnumerable<string> roots)
+    {
+        return roots
+            .Where(_fileHelper.FileSystem.Directory.Exists)
+            .SelectMany(folder =>
+                _fileHelper.FileSystem.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories));
+    }
+
     // Globs loose asset files (textures, models, audio, maps) under the workspace roots,
     // normalises them relative to their root (lowercase, forward-slash), unions with the
     // baseline catalog, and publishes the merged IAssetFileIndex on the GameIndex.
-    private void ApplyAssetCatalog(IList<string> roots)
+    public void ApplyAssetCatalog(IEnumerable<string> roots)
     {
         var baseline = _indexService.Current.Baseline.AssetFiles;
         var workspace = new List<string>();
@@ -250,7 +303,7 @@ public sealed class WorkspaceScanner
     // Extracts bone names from loose workspace .alo models, unions them with the baseline bone
     // catalog (workspace models override shipped ones at the same path), and publishes the merged
     // map on the GameIndex for boneName completion.
-    private void ApplyModelBoneCatalog(IList<string> roots)
+    private void ApplyModelBoneCatalog(IEnumerable<string> roots)
     {
         var baseline = _indexService.Current.Baseline.ModelBones;
         var merged = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
@@ -280,17 +333,19 @@ public sealed class WorkspaceScanner
     private void OnSchemaRefreshed(object? sender, EventArgs e)
     {
         var roots = _lastRoots;
-        if (roots is null) return;
+        var config = _lastConfig;
+        if (roots is null || config is null) return;
 
         // Immediately update EaWXmlContext directories so IsEaWXmlFile is correct
         // for any document opens that arrive before the background re-scan completes.
-        PreScanMetafiles(roots);
+        IList<string>? pgprojXmlDirs = config.XmlDirectories.Count > 0 ? config.XmlDirectories.ToList() : null;
+        PreScanMetafiles(roots, pgprojXmlDirs);
 
         _ = Task.Run(async () =>
         {
             try
             {
-                await ScanAsync(roots, CancellationToken.None);
+                await ScanAsync(config, roots, CancellationToken.None);
             }
             catch (Exception ex)
             {
@@ -322,7 +377,7 @@ public sealed class WorkspaceScanner
         }
     }
 
-    private void PreScanMetafiles(IList<string> roots)
+    private void PreScanMetafiles(IList<string> roots, IList<string>? xmlRoots = null)
     {
         var baseline = _indexService.Current.Baseline;
 
@@ -341,7 +396,7 @@ public sealed class WorkspaceScanner
                 }
                 else
                 {
-                    FallbackFromBaseline(baseline, def, roots);
+                    FallbackFromBaseline(baseline, def, roots, xmlRoots);
                 }
             }
             else // DirectContent
@@ -356,7 +411,7 @@ public sealed class WorkspaceScanner
                 }
                 else
                 {
-                    FallbackFromBaseline(baseline, def, roots);
+                    FallbackFromBaseline(baseline, def, roots, xmlRoots);
                 }
             }
         }
@@ -405,15 +460,31 @@ public sealed class WorkspaceScanner
         }
     }
 
-    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def, IList<string> roots)
+    private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def,
+        IList<string> roots, IList<string>? xmlRoots = null)
     {
         foreach (var (relativePath, types) in baseline.FileTypeMap)
         {
             if (!types.Any(t => def.Types.Contains(t, StringComparer.OrdinalIgnoreCase))) continue;
-            var relSystemPath = relativePath.Replace('/', Path.DirectorySeparatorChar);
-            foreach (var root in roots)
-                _fileTypeRegistry.RegisterFile(
-                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(root, relSystemPath)), types);
+
+            if (xmlRoots is { Count: > 0 })
+            {
+                // pgproj mode: XML dirs point directly at the data folder, so only the
+                // filename portion of the baseline key is needed (mirrors RegisterFromMetafile).
+                var relSystemPath = relativePath.Replace('/', _fileHelper.FileSystem.Path.DirectorySeparatorChar);
+                var filename = _fileHelper.FileSystem.Path.GetFileName(relSystemPath);
+                foreach (var xmlRoot in xmlRoots)
+                    _fileTypeRegistry.RegisterFile(
+                        _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, filename)), types);
+            }
+            else
+            {
+                // Heuristic mode: workspace root + full game-root-relative path.
+                var relSystemPath = relativePath.Replace('/', Path.DirectorySeparatorChar);
+                foreach (var root in roots)
+                    _fileTypeRegistry.RegisterFile(
+                        _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(root, relSystemPath)), types);
+            }
         }
     }
 }

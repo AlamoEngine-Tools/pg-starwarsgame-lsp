@@ -6,4 +6,10 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 public interface IEaWXmlContext
 {
     bool IsEaWXmlFile(string fileUri);
+
+    bool HasDirectories { get; }
+
+    void AddDirectory(string absolutePath);
+
+    void SetDirectories(IEnumerable<string> absolutePaths);
 }

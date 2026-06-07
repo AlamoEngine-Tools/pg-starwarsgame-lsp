@@ -20,7 +20,9 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
@@ -67,6 +69,8 @@ public static class ServerConfigurator
             .WithHandler<XmlInlayHintHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()
             .WithHandler<RevalidateDocumentCommandHandler>()
+            .WithHandler<ReloadProjectCommandHandler>()
+            .WithHandler<NewModProjectCommandHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
@@ -89,6 +93,12 @@ public static class ServerConfigurator
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
                 services.AddSingleton<IPreOpenBuffer, PreOpenBuffer>();
                 services.AddSingleton<WorkspaceScanner>();
+
+                services.AddSingleton<ModProjectLoader>();
+                services.AddSingleton<ProjectDependencyGraph>();
+                services.AddSingleton<ModProjectResolver>();
+                services.AddSingleton<IModProjectDetector, ModProjectDetector>();
+                services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
 
                 services.AddSingleton<BaselineLoader>(sp =>
                     new BaselineLoader(
@@ -133,10 +143,6 @@ public static class ServerConfigurator
                     configProvider.LoadFrom(request.InitializationOptions);
                     logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
                     configSpan.Finish(SpanStatus.Ok);
-
-                    var eaWXmlContext = server.Services.GetRequiredService<EaWXmlContext>();
-                    foreach (var dir in configProvider.Current.XmlDirectories)
-                        eaWXmlContext.AddDirectory(dir);
 
                     var schemaSpan = tx.StartChild("schema.setup", "Configure schema provider");
                     var src = configProvider.Current.SchemaSource;
@@ -294,12 +300,12 @@ public static class ServerConfigurator
                         configWorkspaceRoot ?? "<null>");
                     if (folders.Count > 0)
                     {
-                        var scanner = server.Services.GetRequiredService<WorkspaceScanner>();
+                        var reloadService = server.Services.GetRequiredService<IModProjectReloadService>();
                         _ = Task.Run(async () =>
                         {
                             try
                             {
-                                await scanner.ScanAsync(folders, CancellationToken.None);
+                                await reloadService.LoadAsync(folders, CancellationToken.None);
                             }
                             catch (Exception ex)
                             {

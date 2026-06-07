@@ -10,6 +10,7 @@ using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
@@ -59,7 +60,7 @@ public sealed class LocalisationLoaderTest
         };
 
         var (loader, indexService) = BuildLoader(fs, config);
-        await loader.LoadAsync(CancellationToken.None);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_MY_UNIT_NAME"));
     }
@@ -82,7 +83,7 @@ public sealed class LocalisationLoaderTest
         };
 
         var (loader, indexService) = BuildLoader(fs, config);
-        await loader.LoadAsync(CancellationToken.None);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_AUTO_DETECT_KEY"));
     }
@@ -97,7 +98,7 @@ public sealed class LocalisationLoaderTest
         };
 
         var (loader, indexService) = BuildLoader(new MockFileSystem(), config);
-        await loader.LoadAsync(CancellationToken.None);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.NotNull(indexService.Current.Localisation);
     }
@@ -121,7 +122,8 @@ public sealed class LocalisationLoaderTest
         };
 
         var (loader, indexService) = BuildLoader(fs, config);
-        var ex = await Record.ExceptionAsync(() => loader.LoadAsync(CancellationToken.None));
+        var ex = await Record.ExceptionAsync(
+            () => loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None));
 
         Assert.Null(ex);
     }
@@ -145,10 +147,91 @@ public sealed class LocalisationLoaderTest
         };
 
         var (loader, indexService) = BuildLoader(fs, config);
-        await loader.LoadAsync(CancellationToken.None);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("KEY_A"));
         Assert.True(indexService.Current.Localisation.ContainsKey("KEY_B"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_TextRootsPopulated_UsesTextRootsAndResourceType()
+    {
+        // pgproj mode: TextRoots + TextResourceType replace SourcePaths / locConfig.ResourceType.
+        const string csvPath = "/mod/text/localisation.csv";
+        const string csvContent = "key,ENGLISH\nTEXT_PGPROJ_KEY,Hello";
+
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [csvPath] = new(csvContent)
+        });
+
+        var config = new LspConfiguration
+        {
+            // User config has no source paths and a different resource type — both must be ignored.
+            Localisation = new LocalisationConfig { ResourceType = "Dat", SourcePaths = [] }
+        };
+
+        var workspaceConfig = new WorkspaceConfiguration([], [], ["/mod/text"], [], "Csv");
+
+        var (loader, indexService) = BuildLoader(fs, config);
+        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_PGPROJ_KEY"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_TextRootsPopulated_NoTextResourceType_FallsBackToUserResourceType()
+    {
+        // TextRoots set but no TextResourceType → use locConfig.ResourceType for the extension filter.
+        const string csvPath = "/mod/text/localisation.csv";
+        const string csvContent = "key,ENGLISH\nTEXT_FALLBACK_TYPE,Hello";
+
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [csvPath] = new(csvContent)
+        });
+
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig { ResourceType = "Csv" }
+        };
+
+        var workspaceConfig = new WorkspaceConfiguration([], [], ["/mod/text"], [], null);
+
+        var (loader, indexService) = BuildLoader(fs, config);
+        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_FALLBACK_TYPE"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_TextRootsEmpty_IgnoresTextResourceType_UsesUserConfig()
+    {
+        // Heuristic mode: TextRoots empty → user's SourcePaths and ResourceType apply unchanged.
+        const string csvPath = "/mod/text/localisation.csv";
+        const string csvContent = "key,ENGLISH\nTEXT_HEURISTIC_KEY,Hello";
+
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [csvPath] = new(csvContent)
+        });
+
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig
+            {
+                ResourceType = "Csv",
+                SourcePaths = [csvPath]
+            }
+        };
+
+        // TextRoots empty — workspace TextResourceType should be ignored.
+        var workspaceConfig = new WorkspaceConfiguration([], [], [], [], "Dat");
+
+        var (loader, indexService) = BuildLoader(fs, config);
+        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_HEURISTIC_KEY"));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

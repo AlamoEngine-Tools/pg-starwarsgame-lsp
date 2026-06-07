@@ -11,6 +11,16 @@ internal sealed class AllowAllEaWContext : IEaWXmlContext
     {
         return true;
     }
+
+    public bool HasDirectories => true;
+
+    public void AddDirectory(string absolutePath)
+    {
+    }
+
+    public void SetDirectories(IEnumerable<string> absolutePaths)
+    {
+    }
 }
 
 internal sealed class DenyAllEaWContext : IEaWXmlContext
@@ -18,5 +28,15 @@ internal sealed class DenyAllEaWContext : IEaWXmlContext
     public bool IsEaWXmlFile(string fileUri)
     {
         return false;
+    }
+
+    public bool HasDirectories => false;
+
+    public void AddDirectory(string absolutePath)
+    {
+    }
+
+    public void SetDirectories(IEnumerable<string> absolutePaths)
+    {
     }
 }

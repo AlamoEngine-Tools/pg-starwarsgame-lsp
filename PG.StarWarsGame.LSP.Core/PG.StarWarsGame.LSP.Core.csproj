@@ -14,4 +14,17 @@
         <PackageReference Include="Testably.Abstractions.FileSystem.Interface" Version="10.1.0"/>
     </ItemGroup>
 
+    <ItemGroup>
+        <EmbeddedResource Include="Resources\pgproj.schema.json"/>
+    </ItemGroup>
+
+    <Target Name="CopyPgprojSchema" AfterTargets="Build">
+        <Copy SourceFiles="Resources\pgproj.schema.json"
+              DestinationFiles="..\vscode-client\resources\pgproj.schema.json"
+              SkipUnchangedFiles="true"/>
+        <Copy SourceFiles="Resources\pgproj.schema.json"
+              DestinationFiles="..\PG.StarWarsGame.LSP.Client.VSCode\aet-eaw-edit\resources\pgproj.schema.json"
+              SkipUnchangedFiles="true"/>
+    </Target>
+
 </Project>

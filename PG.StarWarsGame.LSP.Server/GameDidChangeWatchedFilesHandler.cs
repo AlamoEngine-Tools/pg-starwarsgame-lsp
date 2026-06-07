@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Project;
 using LspFileSystemWatcher = OmniSharp.Extensions.LanguageServer.Protocol.Models.FileSystemWatcher;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -18,17 +19,23 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
+    private readonly IModProjectReloadService _reloadService;
+    private readonly WorkspaceScanner _scanner;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public GameDidChangeWatchedFilesHandler(
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
+        WorkspaceScanner scanner,
+        IModProjectReloadService reloadService,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
+        _scanner = scanner;
+        _reloadService = reloadService;
         _logger = logger;
     }
 
@@ -39,17 +46,32 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         {
             var uri = _fileHelper.NormalizeUri(change.Uri.ToString());
 
+            // A changed/created/deleted .pgproj re-derives the whole workspace configuration.
+            if (uri.EndsWith(".pgproj", StringComparison.OrdinalIgnoreCase))
+            {
+                await _reloadService.ReloadAsync(ct);
+                continue;
+            }
+
             if (change.Type == FileChangeType.Deleted)
             {
                 _indexService.RemoveDocument(uri);
                 continue;
             }
 
+            var path = _fileHelper.FileUriToPath(uri);
+            if (path is null) continue;
+
+            // A changed loose asset file re-globs the asset catalog from the last-scanned roots.
+            if (WorkspaceScanner.IsAssetFile(path))
+            {
+                _scanner.ApplyAssetCatalog(_scanner.LastAssetRoots ?? []);
+                continue;
+            }
+
             // Opened documents are kept in sync by didOpen/didChange — skip them.
             if (_workspaceHost.TryGet(uri, out _)) continue;
 
-            var path = _fileHelper.FileUriToPath(uri);
-            if (path is null) continue;
             if (!_fileHelper.FileSystem.File.Exists(path)) continue;
 
             try
@@ -73,7 +95,8 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         {
             Watchers = new Container<LspFileSystemWatcher>(
                 new LspFileSystemWatcher { GlobPattern = "**/*.xml" },
-                new LspFileSystemWatcher { GlobPattern = "**/*.lua" })
+                new LspFileSystemWatcher { GlobPattern = "**/*.lua" },
+                new LspFileSystemWatcher { GlobPattern = "**/*.pgproj" })
         };
     }
 }

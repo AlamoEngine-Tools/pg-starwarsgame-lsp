@@ -32,6 +32,14 @@
       {
         "command": "aet-eaw-edit.lsp.revalidateWorkspace",
         "title": "EaWEdit: Re-validate Workspace"
+      },
+      {
+        "command": "aet.newModProject",
+        "title": "EaWEdit: New Mod Project"
+      },
+      {
+        "command": "aet.reloadProject",
+        "title": "EaWEdit: Reload Mod Project"
       }
     ],
     "configuration": {

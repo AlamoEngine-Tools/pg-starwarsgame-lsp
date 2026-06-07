@@ -395,17 +395,23 @@ public sealed class GamePrepareRenameHandlerTest
 
     private sealed class AllowAllEaWContext : IEaWXmlContext
     {
-        public bool IsEaWXmlFile(string fileUri)
-        {
-            return true;
-        }
+        public bool HasDirectories => true;
+
+        public bool IsEaWXmlFile(string fileUri) => true;
+
+        public void AddDirectory(string absolutePath) { }
+
+        public void SetDirectories(IEnumerable<string> absolutePaths) { }
     }
 
     private sealed class DenyAllEaWContext : IEaWXmlContext
     {
-        public bool IsEaWXmlFile(string fileUri)
-        {
-            return false;
-        }
+        public bool HasDirectories => false;
+
+        public bool IsEaWXmlFile(string fileUri) => false;
+
+        public void AddDirectory(string absolutePath) { }
+
+        public void SetDirectories(IEnumerable<string> absolutePaths) { }
     }
 }
