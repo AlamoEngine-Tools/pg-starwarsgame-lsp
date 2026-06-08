@@ -93,7 +93,15 @@ file sealed class StubLocalisationIndex : ILocalisationIndex
         _keys = new HashSet<string>(keys, StringComparer.OrdinalIgnoreCase);
     }
 
-    public bool ContainsKey(string key) => _keys.Contains(key);
+    public bool ContainsKey(string key)
+    {
+        return _keys.Contains(key);
+    }
+
     public IEnumerable<string> Keys => _keys;
-    public string? GetValue(string key) => null;
+
+    public string? GetValue(string key)
+    {
+        return null;
+    }
 }

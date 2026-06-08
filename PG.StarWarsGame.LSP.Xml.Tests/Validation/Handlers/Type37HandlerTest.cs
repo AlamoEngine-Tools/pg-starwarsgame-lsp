@@ -10,6 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 public sealed class Type37HandlerTest
 {
     private static readonly Type37Handler Sut = new();
+
     private static readonly XmlTagDefinition Tag =
         XmlHandlerTestFixtures.MakeTag("SFXEvent_Weather_Begin", XmlValueType.Type37);
 

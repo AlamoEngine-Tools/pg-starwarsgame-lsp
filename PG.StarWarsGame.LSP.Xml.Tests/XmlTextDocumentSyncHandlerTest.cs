@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -23,28 +24,23 @@ public sealed class XmlTextDocumentSyncHandlerTest
 
     private static (XmlTextDocumentSyncHandler handler,
         FakeGameWorkspaceHost host,
-        FakeGameIndexService index) Build(MockFileSystem? fs = null, IEaWXmlContext? ctx = null)
+        FakeGameIndexService index) Build(MockFileSystem? fs = null, IEaWXmlContext? ctx = null,
+            IStartupGate? gate = null)
     {
         var host = new FakeGameWorkspaceHost();
         var index = new FakeGameIndexService();
         var fileHelper = new FileHelper(fs ?? new MockFileSystem());
         return (new XmlTextDocumentSyncHandler(host, index, fileHelper,
-                ctx ?? new AllowAllEaWContext(), new PreOpenBuffer()),
+                ctx ?? new AllowAllEaWContext(), gate ?? OpenGate()),
             host, index);
     }
 
-    private static (XmlTextDocumentSyncHandler handler,
-        FakeGameWorkspaceHost host,
-        FakeGameIndexService index,
-        FakePreOpenBuffer buffer) BuildWithBuffer(IEaWXmlContext? ctx = null)
+    // A gate that runs handler actions immediately (normal post-startup operation).
+    private static StartupGate OpenGate()
     {
-        var host = new FakeGameWorkspaceHost();
-        var index = new FakeGameIndexService();
-        var buffer = new FakePreOpenBuffer();
-        var fileHelper = new FileHelper(new MockFileSystem());
-        return (new XmlTextDocumentSyncHandler(host, index, fileHelper,
-                ctx ?? new AllowAllEaWContext(), buffer),
-            host, index, buffer);
+        var gate = new StartupGate();
+        gate.OpenAsync().GetAwaiter().GetResult();
+        return gate;
     }
 
     // ── DidOpen ──────────────────────────────────────────────────────────────
@@ -84,9 +80,12 @@ public sealed class XmlTextDocumentSyncHandlerTest
     }
 
     [Fact]
-    public async Task DidOpen_WhenNotEaWFile_IsBuffered()
+    public async Task DidOpen_WhileGateClosed_IsBuffered_ThenAppliedOnOpen()
     {
-        var (handler, host, index, buffer) = BuildWithBuffer(new DenyAllEaWContext());
+        // While the startup pipeline runs the gate is closed: the open is buffered and applied
+        // only when the gate drains, by which point the index and EaW directories are ready.
+        var gate = new StartupGate(); // closed
+        var (handler, host, index) = Build(gate: gate);
 
         await handler.Handle(new DidOpenTextDocumentParams
         {
@@ -94,12 +93,14 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Single(buffer.RecordedOpens);
-        Assert.Equal(TestUri.ToString(), buffer.RecordedOpens[0].Uri);
-        Assert.Equal("<Foo/>", buffer.RecordedOpens[0].Text);
-        Assert.Equal(1, buffer.RecordedOpens[0].Version);
         Assert.Empty(host.AddOrUpdateCalls);
         Assert.Empty(index.UpdateCalls);
+
+        await gate.OpenAsync();
+
+        Assert.Single(host.AddOrUpdateCalls);
+        Assert.Single(index.UpdateCalls);
+        Assert.Equal("<Foo/>", index.UpdateCalls[0].Text);
     }
 
     // ── DidChange ────────────────────────────────────────────────────────────
@@ -284,21 +285,6 @@ public sealed class XmlTextDocumentSyncHandlerTest
 
     // ── Fakes ────────────────────────────────────────────────────────────────
 
-    internal sealed class FakePreOpenBuffer : IPreOpenBuffer
-    {
-        public List<(string Uri, string Text, int Version)> RecordedOpens { get; } = [];
-
-        public void RecordOpen(string uri, string text, int version)
-        {
-            RecordedOpens.Add((uri, text, version));
-        }
-
-        public IReadOnlyList<(string Uri, string Text, int Version)> DrainAndClose()
-        {
-            return [];
-        }
-    }
-
     internal sealed class FakeGameWorkspaceHost : IGameWorkspaceHost
     {
         public List<Call> AddOrUpdateCalls { get; } = [];
@@ -363,7 +349,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 

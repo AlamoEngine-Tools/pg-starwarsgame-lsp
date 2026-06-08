@@ -43,9 +43,9 @@ eawCommand.AddOption(schemaOption);
 eawCommand.SetHandler(async context =>
 {
     var eawPath = context.ParseResult.GetValueForOption(eawPathOption)!.FullName;
-    var output  = context.ParseResult.GetValueForOption(outputOption)!.FullName;
-    var schema  = context.ParseResult.GetValueForOption(schemaOption)?.FullName ?? FindSchemaPath();
-    context.ExitCode = await RunAsync(enginePath: eawPath, eawLayerPath: null, output, schema);
+    var output = context.ParseResult.GetValueForOption(outputOption)!.FullName;
+    var schema = context.ParseResult.GetValueForOption(schemaOption)?.FullName ?? FindSchemaPath();
+    context.ExitCode = await RunAsync(eawPath, null, output, schema);
 });
 
 // ── foc verb ──────────────────────────────────────────────────────────────────
@@ -65,9 +65,9 @@ focCommand.SetHandler(async context =>
 {
     var eawPath = context.ParseResult.GetValueForOption(focEawOption)!.FullName;
     var focPath = context.ParseResult.GetValueForOption(focFocOption)!.FullName;
-    var output  = context.ParseResult.GetValueForOption(outputOption)!.FullName;
-    var schema  = context.ParseResult.GetValueForOption(schemaOption)?.FullName ?? FindSchemaPath();
-    context.ExitCode = await RunAsync(enginePath: focPath, eawLayerPath: eawPath, output, schema);
+    var output = context.ParseResult.GetValueForOption(outputOption)!.FullName;
+    var schema = context.ParseResult.GetValueForOption(schemaOption)?.FullName ?? FindSchemaPath();
+    context.ExitCode = await RunAsync(focPath, eawPath, output, schema);
 });
 
 // ── Root command ──────────────────────────────────────────────────────────────
@@ -157,44 +157,49 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     // semantics: EaW entries are written first, engine (FoC) entries overwrite
     // them for the same normalised path.
 
-    var megFileService  = sp.GetRequiredService<IMegFileService>();
-    var megExtractor    = sp.GetRequiredService<IMegFileExtractor>();
-    var aloFileService  = sp.GetRequiredService<IAloFileService>();
-    var mtdFileService  = sp.GetRequiredService<IMtdFileService>();
-    var assetLogger     = sp.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(MegAssetCatalogBuilder));
+    var megFileService = sp.GetRequiredService<IMegFileService>();
+    var megExtractor = sp.GetRequiredService<IMegFileExtractor>();
+    var aloFileService = sp.GetRequiredService<IAloFileService>();
+    var mtdFileService = sp.GetRequiredService<IMtdFileService>();
+    var assetLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger(nameof(MegAssetCatalogBuilder));
 
     var entryLookup = new Dictionary<string, MegDataEntryLocationReference>(StringComparer.OrdinalIgnoreCase);
-    var megEntries  = new List<(string megName, IEnumerable<string> entryPaths)>();
+    var megEntries = new List<(string megName, IEnumerable<string> entryPaths)>();
 
     // Ordered list: EaW paths (if provided) followed by engine paths.
     var orderedMegPaths = BuildOrderedMegPaths(eawLayerPath, enginePath);
     Console.WriteLine($"MEG archives to scan: {orderedMegPaths.Count}");
 
     foreach (var megPath in orderedMegPaths)
-    {
         try
         {
-            var megFile     = megFileService.Load(megPath);
-            var entryPaths  = new List<string>(megFile.Archive.Count);
+            var megFile = megFileService.Load(megPath);
+            var entryPaths = new List<string>(megFile.Archive.Count);
             foreach (var entry in megFile.Archive)
             {
                 var normalized = MegAssetCatalogBuilder.NormalizeMegPath(entry.Path);
                 entryLookup[normalized] = new MegDataEntryLocationReference(megFile, entry);
                 entryPaths.Add(entry.Path);
             }
+
             megEntries.Add((Path.GetFileName(megPath), entryPaths));
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Warning: Could not load MEG '{megPath}': {ex.Message}");
         }
-    }
 
     Func<string, Stream?> openMegEntry = normalizedPath =>
     {
         if (!entryLookup.TryGetValue(normalizedPath, out var locationRef)) return null;
-        try { return megExtractor.GetData(locationRef); }
-        catch { return null; }
+        try
+        {
+            return megExtractor.GetData(locationRef);
+        }
+        catch
+        {
+            return null;
+        }
     };
 
     // ── Dynamic enum extraction ───────────────────────────────────────────────
@@ -289,8 +294,14 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     Func<Stream, IEnumerable<string>> getMtdIcons = stream =>
     {
-        try { return mtdFileService.Load(stream).Content.Select(e => e.FileName); }
-        catch { return []; }
+        try
+        {
+            return mtdFileService.Load(stream).Content.Select(e => e.FileName);
+        }
+        catch
+        {
+            return [];
+        }
     };
 
     var (assetFiles, modelBones) = MegAssetCatalogBuilder.Build(
@@ -386,9 +397,28 @@ file sealed class NullSchemaProvider : ISchemaProvider
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
-    public XmlTagDefinition? GetTag(string t) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t) => [];
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t) => [];
-    public EnumDefinition? GetEnum(string e) => null;
-    public GameObjectTypeDefinition? GetObjectType(string t) => null;
+    public XmlTagDefinition? GetTag(string t)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string t)
+    {
+        return [];
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string t)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string e)
+    {
+        return null;
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string t)
+    {
+        return null;
+    }
 }

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Lua;
@@ -15,7 +16,7 @@ public class GameHoverHandlerTest
     {
         var lua = new FakeLuaProvider(new Hover());
         var xml = new FakeXmlProvider(null);
-        var handler = new GameHoverHandler(xml, lua);
+        var handler = new GameHoverHandler(xml, lua, new NullLogger<GameHoverHandler>());
 
         await handler.Handle(RequestFor("file:///script.lua"), CancellationToken.None);
 
@@ -28,7 +29,7 @@ public class GameHoverHandlerTest
     {
         var lua = new FakeLuaProvider(null);
         var xml = new FakeXmlProvider(new Hover());
-        var handler = new GameHoverHandler(xml, lua);
+        var handler = new GameHoverHandler(xml, lua, new NullLogger<GameHoverHandler>());
 
         await handler.Handle(RequestFor("file:///data.xml"), CancellationToken.None);
 
@@ -40,7 +41,8 @@ public class GameHoverHandlerTest
     public async Task Handle_LuaUri_ReturnsLuaResult()
     {
         var expected = MakeHover("lua result");
-        var handler = new GameHoverHandler(new FakeXmlProvider(null), new FakeLuaProvider(expected));
+        var handler = new GameHoverHandler(new FakeXmlProvider(null), new FakeLuaProvider(expected),
+            new NullLogger<GameHoverHandler>());
 
         var result = await handler.Handle(RequestFor("file:///script.lua"), CancellationToken.None);
 
@@ -51,7 +53,8 @@ public class GameHoverHandlerTest
     public async Task Handle_XmlUri_ReturnsXmlResult()
     {
         var expected = MakeHover("xml result");
-        var handler = new GameHoverHandler(new FakeXmlProvider(expected), new FakeLuaProvider(null));
+        var handler = new GameHoverHandler(new FakeXmlProvider(expected), new FakeLuaProvider(null),
+            new NullLogger<GameHoverHandler>());
 
         var result = await handler.Handle(RequestFor("file:///data.xml"), CancellationToken.None);
 
@@ -63,11 +66,11 @@ public class GameHoverHandlerTest
     {
         var lua = new FakeLuaProvider(null);
         var xml = new FakeXmlProvider(null);
-        var handler = new GameHoverHandler(xml, lua);
+        var handler = new GameHoverHandler(xml, lua, new NullLogger<GameHoverHandler>());
 
         await handler.Handle(RequestFor("file:///notes.txt"), CancellationToken.None);
 
-        Assert.True(xml.WasCalled);
+        Assert.False(xml.WasCalled);
         Assert.False(lua.WasCalled);
     }
 

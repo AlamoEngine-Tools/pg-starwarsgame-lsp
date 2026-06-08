@@ -197,8 +197,10 @@ public sealed class DynamicEnumValueHandlerTest
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private static EnumDefinition DynXml(string name) =>
-        new() { Name = name, Kind = EnumKind.DynamicXml, Values = [] };
+    private static EnumDefinition DynXml(string name)
+    {
+        return new EnumDefinition { Name = name, Kind = EnumKind.DynamicXml, Values = [] };
+    }
 
     private static DiagnosticsContext CtxWithEnumValues(string enumName, params string[] values)
     {

@@ -70,11 +70,19 @@ file sealed class TwoTypeSchemaProvider : ISchemaProvider
         { Tag = "Text_ID", ValueType = XmlValueType.NameReferenceList };
 
     public XmlTagDefinition? GetTag(string tagName)
-        => tagName.Equals("Text_ID", StringComparison.OrdinalIgnoreCase) ? GlobalTextId : null;
+    {
+        return tagName.Equals("Text_ID", StringComparison.OrdinalIgnoreCase) ? GlobalTextId : null;
+    }
 
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
 
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
 
     public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
     {
@@ -84,7 +92,10 @@ file sealed class TwoTypeSchemaProvider : ISchemaProvider
         return [];
     }
 
-    public EnumDefinition? GetEnum(string _) => null;
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
 
     public IReadOnlyList<XmlTagDefinition> AllTags => [GlobalTextId];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];

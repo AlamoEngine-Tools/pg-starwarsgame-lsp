@@ -6,9 +6,9 @@ using PG.StarWarsGame.LSP.Core.Schema;
 namespace PG.StarWarsGame.LSP.Xml.Util;
 
 /// <summary>
-/// Dispatcher: selects the appropriate <see cref="ITagResolver"/> based on the file-level
-/// object type (the root of the context chain, determined from the file's metafile registration)
-/// and delegates resolution to it.
+///     Dispatcher: selects the appropriate <see cref="ITagResolver" /> based on the file-level
+///     object type (the root of the context chain, determined from the file's metafile registration)
+///     and delegates resolution to it.
 /// </summary>
 internal static class XmlTagResolver
 {
@@ -16,7 +16,9 @@ internal static class XmlTagResolver
 
     public static XmlTagDefinition? Resolve(
         ISchemaProvider schema, string tagName, TagResolutionContext? context)
-        => SelectResolver(context).Resolve(schema, tagName, context);
+    {
+        return SelectResolver(context).Resolve(schema, tagName, context);
+    }
 
     private static ITagResolver SelectResolver(TagResolutionContext? context)
     {

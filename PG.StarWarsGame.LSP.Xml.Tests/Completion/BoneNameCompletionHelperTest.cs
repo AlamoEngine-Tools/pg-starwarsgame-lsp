@@ -166,22 +166,35 @@ public sealed class BoneNameCompletionHelperTest
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
 
-        public void Add(string tag, ReferenceKind kind)
+        public XmlTagDefinition? GetTag(string tagName)
         {
-            _tags[tag] = new XmlTagDefinition
-            {
-                Tag = tag, ValueType = XmlValueType.NameReference, ReferenceKind = kind
-            };
+            return _tags.GetValueOrDefault(tagName);
         }
 
-        public XmlTagDefinition? GetTag(string tagName) => _tags.GetValueOrDefault(tagName);
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
 
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
         public IReadOnlyList<XmlTagDefinition> AllTags => [.. _tags.Values];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
@@ -190,6 +203,14 @@ public sealed class BoneNameCompletionHelperTest
         {
             add { }
             remove { }
+        }
+
+        public void Add(string tag, ReferenceKind kind)
+        {
+            _tags[tag] = new XmlTagDefinition
+            {
+                Tag = tag, ValueType = XmlValueType.NameReference, ReferenceKind = kind
+            };
         }
     }
 }

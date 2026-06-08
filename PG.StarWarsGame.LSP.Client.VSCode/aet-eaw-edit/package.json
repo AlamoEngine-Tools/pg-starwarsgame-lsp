@@ -15,7 +15,8 @@
   ],
   "activationEvents": [
     "onLanguage:xml",
-    "onLanguage:lua"
+    "onLanguage:lua",
+    "workspaceContains:**/*.pgproj"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -59,16 +60,6 @@
           "format": "uri-reference",
           "markdownDescription": "The path to the [Alamo Engine Tools LSP executable](https://github.com/gruenwaldlk/PG.StarWarsGame.LSP/releases).\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode#` is `false`.",
           "scope": "machine-overridable"
-        },
-        "aet-eaw-edit.lsp.xmlDirectories": {
-          "order": 300,
-          "type": "array",
-          "items": { 
-            "type": "string",
-            "format": "uri-reference"
-          },
-          "default": [],
-          "markdownDescription": "Directories assumed to contain EaW XML game data files. The LSP server auto-detects EaW XML directories via metafiles; add paths here only when auto-detection cannot find them.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
         },
         "aet-eaw-edit.lsp.locale": {
           "order": 400,

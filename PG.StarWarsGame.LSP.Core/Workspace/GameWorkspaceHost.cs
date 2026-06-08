@@ -10,6 +10,7 @@ public sealed class GameWorkspaceHost : IGameWorkspaceHost
 {
     private readonly ConcurrentDictionary<string, TrackedDocument> _docs =
         new(StringComparer.OrdinalIgnoreCase);
+
     private readonly ILogger<GameWorkspaceHost> _logger;
 
     public GameWorkspaceHost(ILogger<GameWorkspaceHost> logger)

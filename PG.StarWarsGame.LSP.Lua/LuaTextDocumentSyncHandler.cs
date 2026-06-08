@@ -16,56 +16,70 @@ namespace PG.StarWarsGame.LSP.Lua;
 public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     private readonly IFileHelper _fileHelper;
+    private readonly IStartupGate _gate;
     private readonly IGameIndexService _indexService;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public LuaTextDocumentSyncHandler(
         IGameWorkspaceHost workspaceHost,
         IGameIndexService indexService,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        IStartupGate gate)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
         _fileHelper = fileHelper;
+        _gate = gate;
     }
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
 
-        _workspaceHost.AddOrUpdate(uri, text, version);
-        await _indexService.UpdateDocumentAsync(uri, text, version, ct);
+        // Buffered during startup; replayed once the Lua schema and index are ready.
+        await _gate.RunOrBufferAsync(async token =>
+        {
+            _workspaceHost.AddOrUpdate(uri, text, version);
+            await _indexService.UpdateDocumentAsync(uri, text, version, token);
+        }, ct);
         return Unit.Value;
     }
 
     public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         var text = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
         var version = request.TextDocument.Version ?? 0;
 
-        _workspaceHost.AddOrUpdate(uri, text, version);
-        await _indexService.UpdateDocumentAsync(uri, text, version, ct);
+        await _gate.RunOrBufferAsync(async token =>
+        {
+            _workspaceHost.AddOrUpdate(uri, text, version);
+            await _indexService.UpdateDocumentAsync(uri, text, version, token);
+        }, ct);
         return Unit.Value;
     }
 
     public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
-        _workspaceHost.Remove(uri);
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
 
-        var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
-        if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
-            using (_indexService.BeginBulkUpdate())
-            {
+        await _gate.RunOrBufferAsync(async token =>
+        {
+            _workspaceHost.Remove(uri);
+
+            var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
+            if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
+                using (_indexService.BeginBulkUpdate())
+                {
+                    _indexService.RemoveDocument(uri);
+                    var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
+                    await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                }
+            else
                 _indexService.RemoveDocument(uri);
-                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, ct);
-                await _indexService.UpdateDocumentAsync(uri, text, 0, ct);
-            }
-        else
-            _indexService.RemoveDocument(uri);
+        }, ct);
 
         return Unit.Value;
     }

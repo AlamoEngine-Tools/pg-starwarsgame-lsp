@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
 public sealed class DynamicEnumExtractorTest
 {
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static readonly ISchemaProvider EmptySchema = new EnumSchemaFake();
     // ── ParseEnumDefinitionFile ───────────────────────────────────────────────
 
     [Fact]
@@ -225,22 +228,26 @@ public sealed class DynamicEnumExtractorTest
         Assert.Equal<IEnumerable<string>>(["Offensive"], dyn["AIGoalCategoryType"]);
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    private static readonly ISchemaProvider EmptySchema = new EnumSchemaFake();
-
-    private static ISchemaProvider WithEnums(params EnumDefinition[] enums) => new EnumSchemaFake(enums);
-
-    private static EnumDefinition DynEnum(string name, string sourceFile) => new()
+    private static ISchemaProvider WithEnums(params EnumDefinition[] enums)
     {
-        Name = name,
-        Kind = EnumKind.DynamicXml,
-        SourceFile = sourceFile,
-        Values = []
-    };
+        return new EnumSchemaFake(enums);
+    }
 
-    private static Func<string, string?> GameConstantsReader(string content) =>
-        path => path.Contains("gameconstants", StringComparison.OrdinalIgnoreCase) ? content : null;
+    private static EnumDefinition DynEnum(string name, string sourceFile)
+    {
+        return new EnumDefinition
+        {
+            Name = name,
+            Kind = EnumKind.DynamicXml,
+            SourceFile = sourceFile,
+            Values = []
+        };
+    }
+
+    private static Func<string, string?> GameConstantsReader(string content)
+    {
+        return path => path.Contains("gameconstants", StringComparison.OrdinalIgnoreCase) ? content : null;
+    }
 }
 
 file sealed class EnumSchemaFake(params EnumDefinition[] enums) : ISchemaProvider
@@ -257,9 +264,28 @@ file sealed class EnumSchemaFake(params EnumDefinition[] enums) : ISchemaProvide
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
-    public XmlTagDefinition? GetTag(string tagName) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-    public EnumDefinition? GetEnum(string enumName) => null;
-    public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+    {
+        return [];
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return null;
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        return null;
+    }
 }

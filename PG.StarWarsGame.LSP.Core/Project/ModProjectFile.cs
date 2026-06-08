@@ -4,6 +4,7 @@
 namespace PG.StarWarsGame.LSP.Core.Project;
 
 public sealed record ModProjectFile(
-    ModinfoData Modinfo,
+    string Name,
+    ModinfoData? Modinfo,
     DirectoryMap Directories,
     IReadOnlyList<ProjectReference> ProjectReferences);

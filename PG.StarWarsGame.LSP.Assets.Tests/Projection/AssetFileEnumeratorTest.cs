@@ -62,10 +62,10 @@ public sealed class AssetFileEnumeratorTest
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [@"C:\Game\Data\Art\Textures\Valid.tga"]  = new(""),
-            [@"C:\Game\Mods\MyMod\Art\Unit.tga"]      = new(""),   // Mods/ not Data/
-            [@"C:\Game\Corrupt.alo"]                   = new(""),   // root-level
-            [@"C:\Game\Tools\Preview.dds"]             = new("")    // Tools/ not Data/
+            [@"C:\Game\Data\Art\Textures\Valid.tga"] = new(""),
+            [@"C:\Game\Mods\MyMod\Art\Unit.tga"] = new(""), // Mods/ not Data/
+            [@"C:\Game\Corrupt.alo"] = new(""), // root-level
+            [@"C:\Game\Tools\Preview.dds"] = new("") // Tools/ not Data/
         });
 
         var result = AssetFileEnumerator.Enumerate(fs, @"C:\Game");

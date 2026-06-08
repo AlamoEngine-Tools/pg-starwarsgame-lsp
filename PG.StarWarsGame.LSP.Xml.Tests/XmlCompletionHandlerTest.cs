@@ -5,8 +5,8 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -47,8 +47,8 @@ public sealed class XmlCompletionHandlerTest
         var storyProposals = new StoryParamValueProposalProvider();
         var boneHelper = new BoneNameCompletionHelper(schema);
         return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
-            completionReg ?? new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry(),
-            new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(), boneHelper), host, schema,
+                completionReg ?? new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry(),
+                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(), boneHelper), host, schema,
             proposals);
     }
 
@@ -1306,7 +1306,7 @@ public sealed class XmlCompletionHandlerTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 

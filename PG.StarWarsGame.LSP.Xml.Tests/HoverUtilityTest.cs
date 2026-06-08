@@ -128,7 +128,7 @@ public sealed class HoverUtilityTest
     public void BuildReferenceHover_NullOrigin_NoPackedSection()
     {
         var hover = HoverUtility.BuildReferenceHover(
-            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", null);
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en");
         var md = hover.Contents.MarkupContent!.Value;
         Assert.DoesNotContain("📦", md);
     }
@@ -145,16 +145,23 @@ public sealed class HoverUtilityTest
 
     // ── BuildAssetReferenceHover ───────────────────────────────────────────────
 
-    private static XmlTagDefinition AssetTag(ReferenceKind kind) => new()
+    private static XmlTagDefinition AssetTag(ReferenceKind kind)
     {
-        Tag = "Icon_Name", ValueType = XmlValueType.NameReference, ReferenceKind = kind
-    };
+        return new XmlTagDefinition
+        {
+            Tag = "Icon_Name", ValueType = XmlValueType.NameReference, ReferenceKind = kind
+        };
+    }
 
-    private static IAssetFileIndex Packed(params string[] paths) =>
-        MergedAssetFileIndex.Merge(paths, []);
+    private static IAssetFileIndex Packed(params string[] paths)
+    {
+        return MergedAssetFileIndex.Merge(paths, []);
+    }
 
-    private static IAssetFileIndex Loose(params string[] paths) =>
-        MergedAssetFileIndex.Merge([], paths);
+    private static IAssetFileIndex Loose(params string[] paths)
+    {
+        return MergedAssetFileIndex.Merge([], paths);
+    }
 
     [Fact]
     public void BuildAssetReferenceHover_PackedAsset_ContainsPathAndPackedMarker()

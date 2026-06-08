@@ -17,23 +17,28 @@ public sealed class ModProjectResolverTest
     private static readonly string RootPath = Path.Combine(RootDir, "root.pgproj");
     private static readonly string DepPath = Path.Combine(DepDir, "dep.pgproj");
 
-    private static string Normalize(string p) => p.Replace('\\', '/').ToLowerInvariant();
+    private static string Normalize(string p)
+    {
+        return p.Replace('\\', '/').ToLowerInvariant();
+    }
 
-    private static string Abs(string projectDir, string rel) =>
-        Normalize(Path.GetFullPath(Path.Combine(projectDir, rel)));
+    private static string Abs(string projectDir, string rel)
+    {
+        return Normalize(Path.GetFullPath(Path.Combine(projectDir, rel)));
+    }
 
     [Fact]
     public void Resolve_SingleProject_PopulatesXmlAndScriptRoots()
     {
         const string json = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": {
-                "xml": ["data/xml"],
-                "scripts": ["data/scripts"]
-              }
-            }
-            """;
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": {
+                                "xml": ["data/xml"],
+                                "scripts": ["data/scripts"]
+                              }
+                            }
+                            """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(json)
@@ -50,18 +55,18 @@ public sealed class ModProjectResolverTest
     public void Resolve_DependencyDirectories_MergedDependencyFirst()
     {
         const string depJson = """
-            {
-              "modinfo": { "name": "Dep" },
-              "directories": { "xml": ["data/xml"] }
-            }
-            """;
+                               {
+                                 "modinfo": { "name": "Dep" },
+                                 "directories": { "xml": ["data/xml"] }
+                               }
+                               """;
         const string rootJson = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": { "xml": ["data/xml"] },
-              "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
-            }
-            """;
+                                {
+                                  "modinfo": { "name": "Root" },
+                                  "directories": { "xml": ["data/xml"] },
+                                  "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
+                                }
+                                """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(rootJson),
@@ -82,14 +87,14 @@ public sealed class ModProjectResolverTest
     public void Resolve_ArtAndAudio_BothMapToAssetRoots()
     {
         const string json = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": {
-                "art": ["data/art"],
-                "audio": ["data/audio"]
-              }
-            }
-            """;
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": {
+                                "art": ["data/art"],
+                                "audio": ["data/audio"]
+                              }
+                            }
+                            """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(json)
@@ -106,11 +111,11 @@ public sealed class ModProjectResolverTest
     public void Resolve_NoXmlEntry_XmlDirectoriesEmpty()
     {
         const string json = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": { "scripts": ["data/scripts"] }
-            }
-            """;
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": { "scripts": ["data/scripts"] }
+                            }
+                            """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(json)
@@ -127,11 +132,11 @@ public sealed class ModProjectResolverTest
     public void Resolve_TextEntries_MapToTextRoots()
     {
         const string json = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": { "text": ["data/text"] }
-            }
-            """;
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": { "text": ["data/text"] }
+                            }
+                            """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(json)
@@ -147,14 +152,14 @@ public sealed class ModProjectResolverTest
     public void Resolve_TextResourceType_TakenFromRootProject()
     {
         const string json = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": {
-                "text": ["data/text"],
-                "textResourceType": "dat"
-              }
-            }
-            """;
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": {
+                                "text": ["data/text"],
+                                "textResourceType": "dat"
+                              }
+                            }
+                            """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(json)
@@ -170,18 +175,18 @@ public sealed class ModProjectResolverTest
     public void Resolve_TextResourceType_RootProjectWinsOverDependency()
     {
         const string depJson = """
-            {
-              "modinfo": { "name": "Dep" },
-              "directories": { "text": ["data/text"], "textResourceType": "dat" }
-            }
-            """;
+                               {
+                                 "modinfo": { "name": "Dep" },
+                                 "directories": { "text": ["data/text"], "textResourceType": "dat" }
+                               }
+                               """;
         const string rootJson = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": { "text": ["data/text"], "textResourceType": "csv" },
-              "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
-            }
-            """;
+                                {
+                                  "modinfo": { "name": "Root" },
+                                  "directories": { "text": ["data/text"], "textResourceType": "csv" },
+                                  "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
+                                }
+                                """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(rootJson),
@@ -198,11 +203,11 @@ public sealed class ModProjectResolverTest
     public void Resolve_TextResourceType_NullWhenAbsent()
     {
         const string json = """
-            {
-              "modinfo": { "name": "Root" },
-              "directories": { "text": ["data/text"] }
-            }
-            """;
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": { "text": ["data/text"] }
+                            }
+                            """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [RootPath] = new(json)

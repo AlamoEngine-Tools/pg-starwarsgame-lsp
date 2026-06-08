@@ -6,10 +6,9 @@ using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Localisation.Baseline;
-using PG.StarWarsGame.Localisation.Data.Config.v2;
-using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -17,23 +16,24 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
-using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
 using Serilog;
-using ILogger = Microsoft.Extensions.Logging.ILogger;
+using CoreServerOptions = PG.StarWarsGame.LSP.Core.Configuration.ServerOptions;
 
 namespace PG.StarWarsGame.LSP.Server;
 
 public static class ServerConfigurator
 {
-    public static LanguageServerOptions Apply(LanguageServerOptions options)
+    public static LanguageServerOptions Apply(LanguageServerOptions options,
+        CoreServerOptions? serverOptions = null)
     {
         return options
             .ConfigureLogging(x => x
@@ -73,6 +73,7 @@ public static class ServerConfigurator
             .WithHandler<NewModProjectCommandHandler>()
             .WithServices(services =>
             {
+                services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
                 services.AddSingleton<ILspConfigurationProvider, LspConfigurationProvider>();
                 services.AddSingleton<IFileSystem, FileSystem>();
                 services.AddSingleton<IFileHelper, FileHelper>();
@@ -91,14 +92,27 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
-                services.AddSingleton<IPreOpenBuffer, PreOpenBuffer>();
-                services.AddSingleton<WorkspaceScanner>();
+
+                // The inbound event gate: buffers client notifications while the linear startup
+                // pipeline runs, then drains them in order. Replaces the old PreOpenBuffer race.
+                services.AddSingleton<IStartupGate, StartupGate>();
+
+                services.AddSingleton<WorkspaceIndexer>();
+                services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
                 services.AddSingleton<ModProjectLoader>();
                 services.AddSingleton<ProjectDependencyGraph>();
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
+                services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
+
+                // Linear startup pipeline and its stage collaborators.
+                services.AddSingleton<ISchemaBootstrapper, SchemaBootstrapper>();
+                services.AddSingleton<IBaselineBootstrapper, BaselineBootstrapper>();
+                services.AddSingleton<IStartupProgress, StartupProgress>();
+                services.AddSingleton<IStartupNotifier, StartupNotifier>();
+                services.AddSingleton<StartupPipeline>();
 
                 services.AddSingleton<BaselineLoader>(sp =>
                     new BaselineLoader(
@@ -122,6 +136,10 @@ public static class ServerConfigurator
             })
             .OnInitialize(async (server, request, ct) =>
             {
+                // Keep this cheap: just load configuration and respond with capabilities so the
+                // client sees the server "ready" immediately. All heavy work (schema, baseline,
+                // indexing) runs in the StartupPipeline launched from OnInitialized, while the
+                // StartupGate buffers any client notifications that arrive in the meantime.
                 var tx = SentrySdk.StartTransaction("lsp.initialize", "server.lifecycle");
                 try
                 {
@@ -134,82 +152,13 @@ public static class ServerConfigurator
                             ? "<null>"
                             : string.Join(", ", request.WorkspaceFolders.Select(f => f.Uri.ToString())));
                     logger.LogInformation("[initialize] InitializationOptions={Options}",
-                        JsonConvert.SerializeObject(request.InitializationOptions,
-                            Formatting.None));
+                        JsonConvert.SerializeObject(request.InitializationOptions, Formatting.None));
 
                     var configProvider = server.Services.GetRequiredService<ILspConfigurationProvider>();
-
                     var configSpan = tx.StartChild("config.load", "Load initialization options");
                     configProvider.LoadFrom(request.InitializationOptions);
                     logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
                     configSpan.Finish(SpanStatus.Ok);
-
-                    var schemaSpan = tx.StartChild("schema.setup", "Configure schema provider");
-                    var src = configProvider.Current.SchemaSource;
-                    ISchemaProvider realProvider;
-                    if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
-                    {
-                        realProvider = new LocalFileSchemaProvider(src.LocalPath,
-                            server.Services.GetRequiredService<IFileSystem>(),
-                            server.Services.GetRequiredService<ILogger<LocalFileSchemaProvider>>());
-                    }
-                    else
-                    {
-                        var http = server.Services.GetRequiredService<IHttpClientFactory>()
-                            .CreateClient(nameof(HttpSchemaProvider));
-                        realProvider = new HttpSchemaProvider(http, src.Url,
-                            server.Services.GetRequiredService<SchemaHttpCache>(),
-                            server.Services.GetRequiredService<ILogger<HttpSchemaProvider>>());
-                    }
-
-                    var proxy = server.Services.GetRequiredService<SchemaProviderProxy>();
-                    proxy.Configure(realProvider);
-                    schemaSpan.Finish(SpanStatus.Ok);
-
-                    var luaProxy = server.Services.GetRequiredService<LuaApiSchemaProxy>();
-                    var cache = server.Services.GetRequiredService<SchemaHttpCache>();
-
-                    if (src.Type == SchemaSourceType.Local && !string.IsNullOrWhiteSpace(src.LocalPath))
-                    {
-                        var luaSchemaPath = DeriveLuaLocalPath(src.LocalPath);
-                        var luaFs = server.Services.GetRequiredService<IFileHelper>().FileSystem;
-                        if (luaFs.File.Exists(luaSchemaPath))
-                        {
-                            luaProxy.Configure(new LuaApiSchemaProvider([luaFs.File.ReadAllText(luaSchemaPath)]));
-                            logger.LogInformation("Lua schema loaded from {Path}", luaSchemaPath);
-                        }
-                        else
-                        {
-                            logger.LogWarning("Lua schema not found at {Path}", luaSchemaPath);
-                        }
-                    }
-                    else
-                    {
-                        var luaHttp = server.Services.GetRequiredService<IHttpClientFactory>()
-                            .CreateClient("LuaSchema");
-                        _ = Task.Run(async () =>
-                        {
-                            var luaUrl = DeriveLuaHttpUrl(src.Url);
-                            await LoadLuaSchemaFromHttpAsync(luaUrl, luaProxy, cache, luaHttp, logger);
-                        });
-                    }
-
-                    if (realProvider is HttpSchemaProvider httpProvider)
-                        _ = Task.Run(async () =>
-                        {
-                            var fetchTx = SentrySdk.StartTransaction("lsp.schema.http-fetch", "schema.load");
-                            try
-                            {
-                                await httpProvider.LoadAsync(CancellationToken.None);
-                                fetchTx.Finish(SpanStatus.Ok);
-                            }
-                            catch (Exception ex)
-                            {
-                                logger.LogError(ex, "HTTP schema load failed");
-                                fetchTx.Finish(SpanStatus.InternalError);
-                            }
-                        });
-                    // LocalFileSchemaProvider already loads synchronously in its constructor.
 
                     tx.Finish(SpanStatus.Ok);
                 }
@@ -226,97 +175,48 @@ public static class ServerConfigurator
                 var tx = SentrySdk.StartTransaction("lsp.initialized", "server.lifecycle");
                 try
                 {
-                    server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
-                    server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
-
                     var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
                     var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
-                    var indexService = server.Services.GetRequiredService<IGameIndexService>();
-                    var baselineLoader = server.Services.GetRequiredService<BaselineLoader>();
 
-                    var baselineSpan = tx.StartChild("baseline.load", "Load baseline index");
-                    BaselineIndex baseline;
-                    try
-                    {
-                        baseline = await baselineLoader.LoadAsync(config.Current.BaselineSource, ct);
-                        baselineSpan.Finish(SpanStatus.Ok);
-                    }
-                    catch (Exception ex)
-                    {
-                        initLogger.LogError(ex, "Baseline load failed; using empty baseline");
-                        baselineSpan.Finish(SpanStatus.InternalError);
-                        baseline = BaselineIndex.Empty;
-                    }
+                    var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
 
-                    indexService.ApplyBaseline(baseline);
-
-                    var locSpan = tx.StartChild("localisation.baseline", "Load baseline localisation keys");
-                    try
-                    {
-                        var locProvider = server.Services.GetRequiredService<IBaselineTranslationProvider>();
-                        var langService = server.Services.GetRequiredService<ILanguageService>();
-                        if (!langService.TryGetByIdentifier(config.Current.Locale, out var language))
-                            language = langService.Default;
-                        var eawDb = locProvider.GetMasterText(GameType.EaW, language!);
-                        var focDb = locProvider.GetMasterText(GameType.FoC, language!);
-                        indexService.ApplyLocalisation(
-                            new TranslationDatabaseLocalisationIndex([eawDb, focDb], language!));
-                        locSpan.Finish(SpanStatus.Ok);
-                    }
-                    catch (Exception ex)
-                    {
-                        initLogger.LogError(ex, "Baseline localisation load failed; localisation keys unavailable");
-                        locSpan.Finish(SpanStatus.InternalError);
-                    }
-
-                    var workspaceFolderPaths = request.WorkspaceFolders
-                        ?.Select(f => f.Uri.GetFileSystemPath())
-                        .Where(p => !string.IsNullOrEmpty(p))
-                        .ToList();
-                    var configWorkspaceRoot = config.Current.WorkspaceRoot;
-
-                    // Build scan roots: start from protocol-level folders or RootUri, then always
-                    // add configWorkspaceRoot if it isn't already covered. The extension sends
-                    // workspaceRoot = the game data directory, which may be a subdirectory of the
-                    // VS Code workspace root — so it must always be included, not used as a fallback.
-                    var folders = new List<string>();
-                    if (workspaceFolderPaths is { Count: > 0 })
-                        folders.AddRange(workspaceFolderPaths);
-                    else if (request.RootUri is not null)
-                    {
-                        var rootPath = request.RootUri.GetFileSystemPath();
-                        if (!string.IsNullOrEmpty(rootPath))
-                            folders.Add(rootPath);
-                    }
-                    if (configWorkspaceRoot is not null &&
-                        !folders.Any(f => string.Equals(f, configWorkspaceRoot, StringComparison.OrdinalIgnoreCase)))
-                        folders.Add(configWorkspaceRoot);
-
+                    // Log whether a .pgproj was found under the scan roots — useful startup breadcrumb.
+                    var detector = server.Services.GetRequiredService<IModProjectDetector>();
+                    var hasPgproj = detector.TryFind(scanRoots, out var pgprojPath);
                     initLogger.LogInformation(
-                        "[initialized] Scan folders={Folders} (WorkspaceFolders={WF}, RootUri={RU}, ConfigRoot={CR})",
-                        string.Join(", ", folders),
-                        request.WorkspaceFolders?.Count() ?? 0,
-                        request.RootUri?.ToString() ?? "<null>",
-                        configWorkspaceRoot ?? "<null>");
-                    if (folders.Count > 0)
+                        "[initialized] scanRoots={Roots} | .pgproj present={Found} path={Path}",
+                        string.Join(", ", scanRoots), hasPgproj, pgprojPath ?? "<none>");
+
+                    // Heavy startup runs on a background task while the StartupGate buffers any client
+                    // notifications that arrive in the meantime. The gate is opened (draining the
+                    // buffer in order) once the pipeline finishes, and the client is told the scan
+                    // completed. Diagnostics publishers are resolved eagerly so they subscribe to
+                    // IndexChanged before the index is populated.
+                    server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
+                    server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
+                    var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
+                    var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
+                    var reload = server.Services.GetRequiredService<IModProjectReloadService>();
+                    var notifier = server.Services.GetRequiredService<IStartupNotifier>();
+                    var gate = server.Services.GetRequiredService<IStartupGate>();
+                    _ = Task.Run(async () =>
                     {
-                        var reloadService = server.Services.GetRequiredService<IModProjectReloadService>();
-                        _ = Task.Run(async () =>
+                        try
                         {
-                            try
-                            {
-                                await reloadService.LoadAsync(folders, CancellationToken.None);
-                            }
-                            catch (Exception ex)
-                            {
-                                initLogger.LogError(ex, "Workspace scan failed");
-                            }
-                            finally
-                            {
-                                server.SendNotification("$/workspaceScanComplete");
-                            }
-                        }, CancellationToken.None);
-                    }
+                            await schema.LoadAsync(CancellationToken.None);
+                            await baseline.LoadAsync(CancellationToken.None);
+                            await reload.LoadAsync(scanRoots, CancellationToken.None);
+                        }
+                        catch (Exception ex)
+                        {
+                            initLogger.LogError(ex, "Startup pipeline failed");
+                        }
+                        finally
+                        {
+                            await gate.OpenAsync();
+                            notifier.NotifyScanComplete();
+                        }
+                    }, CancellationToken.None);
 
                     tx.Finish(SpanStatus.Ok);
                 }
@@ -330,46 +230,35 @@ public static class ServerConfigurator
             });
     }
 
-    private static string DeriveLuaLocalPath(string eawLocalPath)
+    // Builds the scan roots: start from protocol-level workspace folders or RootUri, then always
+    // add the configured workspaceRoot if not already covered. The extension sends
+    // workspaceRoot = the game data directory, which may be a subdirectory of the VS Code
+    // workspace root — so it must always be included, not used as a mere fallback.
+    private static IReadOnlyList<string> ComputeScanRoots(InitializeParams request, string? configWorkspaceRoot)
     {
-        var trimmed = eawLocalPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-        var parent = Path.GetDirectoryName(trimmed) ?? trimmed;
-        return Path.Combine(parent, "lua", "api.d.lua");
-    }
+        var folders = new List<string>();
 
-    private static string DeriveLuaHttpUrl(string eawUrl)
-    {
-        // Treat eawUrl as a base URI and resolve "../lua/api.d.lua" relative to it.
-        // e.g. "https://host/main/eaw/" → "https://host/main/lua/api.d.lua"
-        var baseUri = new Uri(eawUrl.EndsWith('/') ? eawUrl : eawUrl + '/');
-        return new Uri(baseUri, "../lua/api.d.lua").ToString();
-    }
+        var workspaceFolderPaths = request.WorkspaceFolders
+            ?.Select(f => f.Uri.GetFileSystemPath())
+            .Where(p => !string.IsNullOrEmpty(p))
+            .ToList();
 
-    private static async Task LoadLuaSchemaFromHttpAsync(
-        string luaUrl, LuaApiSchemaProxy luaProxy, SchemaHttpCache cache,
-        HttpClient http, ILogger logger)
-    {
-        const string cacheKey = "lua/api.d.lua";
-
-        // Apply any cached version immediately so the parser has a schema while downloading.
-        if (cache.TryLoadText(cacheKey, out var cached))
-            luaProxy.Configure(new LuaApiSchemaProvider([cached]));
-
-        try
+        if (workspaceFolderPaths is { Count: > 0 })
         {
-            var fresh = await http.GetStringAsync(luaUrl);
-            cache.UpdateText(cacheKey, fresh);
-            luaProxy.Configure(new LuaApiSchemaProvider([fresh]));
-            logger.LogInformation("Lua schema loaded from {Url}", luaUrl);
+            folders.AddRange(workspaceFolderPaths!);
         }
-        catch (Exception ex)
+        else if (request.RootUri is not null)
         {
-            if (cached is { Length: > 0 })
-                logger.LogWarning(ex, "Failed to download Lua schema from {Url}; using cached version", luaUrl);
-            else
-                logger.LogWarning(ex,
-                    "Failed to download Lua schema from {Url}; Lua XML references will not be validated", luaUrl);
+            var rootPath = request.RootUri.GetFileSystemPath();
+            if (!string.IsNullOrEmpty(rootPath))
+                folders.Add(rootPath);
         }
+
+        if (configWorkspaceRoot is not null &&
+            !folders.Any(f => string.Equals(f, configWorkspaceRoot, StringComparison.OrdinalIgnoreCase)))
+            folders.Add(configWorkspaceRoot);
+
+        return folders;
     }
 
     private static string? GetSentryDsn()

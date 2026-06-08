@@ -1,10 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -42,15 +43,19 @@ public sealed class XmlInlayHintHandlerTest
             NullLogger<XmlInlayHintHandler>.Instance), index);
     }
 
-    private static LspRange FullRange() =>
-        new(new Position(0, 0), new Position(int.MaxValue, 0));
+    private static LspRange FullRange()
+    {
+        return new LspRange(new Position(0, 0), new Position(int.MaxValue, 0));
+    }
 
-    private static InlayHintParams Params(LspRange? range = null) =>
-        new()
+    private static InlayHintParams Params(LspRange? range = null)
+    {
+        return new InlayHintParams
         {
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(Uri) },
             Range = range ?? FullRange()
         };
+    }
 
     // ── basic hint production ────────────────────────────────────────────────
 
@@ -171,12 +176,27 @@ public sealed class XmlInlayHintHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void Set(string uri, string text) => _docs[uri] = new TrackedDocument(uri, text, 0);
+        public void AddOrUpdate(string uri, string text, int version)
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void AddOrUpdate(string uri, string text, int version) => _docs[uri] = new TrackedDocument(uri, text, version);
-        public void Remove(string uri) => _docs.Remove(uri);
-        public bool TryGet(string uri, out TrackedDocument doc) => _docs.TryGetValue(uri, out doc!);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
+
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
+
         public IEnumerable<TrackedDocument> All => _docs.Values;
+
+        public void Set(string uri, string text)
+        {
+            _docs[uri] = new TrackedDocument(uri, text, 0);
+        }
     }
 
     private sealed class FakeIndexService : IGameIndexService
@@ -185,27 +205,69 @@ public sealed class XmlInlayHintHandlerTest
 
         public ILocalisationIndex Localisation
         {
-            set => _current = _current with { Localisation = value };
+            set => Current = Current with { Localisation = value };
         }
 
-        private GameIndex _current = GameIndex.Empty;
-        public GameIndex Current => _current;
+        public GameIndex Current { get; private set; } = GameIndex.Empty;
 
-        public event Action<GameIndex>? IndexChanged { add { } remove { } }
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public void ApplyLocalisation(ILocalisationIndex index) { }
-        public void ApplyAssetFiles(IAssetFileIndex index) { }
-        public void ApplyModelBones(System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones) { }
-        public IDisposable BeginBulkUpdate() => NullDisp.Instance;
+        public event Action<GameIndex>? IndexChanged
+        {
+            add { }
+            remove { }
+        }
 
-        private sealed class NullDisp : IDisposable { public static readonly NullDisp Instance = new(); public void Dispose() { } }
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisp.Instance;
+        }
+
+        private sealed class NullDisp : IDisposable
+        {
+            public static readonly NullDisp Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+
         private sealed class EmptyStubLoc : ILocalisationIndex
         {
-            public bool ContainsKey(string key) => false;
+            public bool ContainsKey(string key)
+            {
+                return false;
+            }
+
             public IEnumerable<string> Keys => [];
-            public string? GetValue(string key) => null;
+
+            public string? GetValue(string key)
+            {
+                return null;
+            }
         }
     }
 }
@@ -232,16 +294,37 @@ file sealed class LocKeySchemaProvider : ISchemaProvider
         };
     }
 
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public EnumDefinition? GetEnum(string _) => null;
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-    public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
 }
 
 file sealed class ValueLocalisationIndex : ILocalisationIndex
@@ -255,11 +338,23 @@ file sealed class ValueLocalisationIndex : ILocalisationIndex
     }
 
     public ValueLocalisationIndex(string key, string value)
-        : this([(key, value)]) { }
+        : this((key, value))
+    {
+    }
 
-    public ValueLocalisationIndex() : this([]) { }
+    public ValueLocalisationIndex() : this([])
+    {
+    }
 
-    public bool ContainsKey(string key) => _values.ContainsKey(key);
+    public bool ContainsKey(string key)
+    {
+        return _values.ContainsKey(key);
+    }
+
     public IEnumerable<string> Keys => _values.Keys;
-    public string? GetValue(string key) => _values.TryGetValue(key, out var v) ? v : null;
+
+    public string? GetValue(string key)
+    {
+        return _values.TryGetValue(key, out var v) ? v : null;
+    }
 }

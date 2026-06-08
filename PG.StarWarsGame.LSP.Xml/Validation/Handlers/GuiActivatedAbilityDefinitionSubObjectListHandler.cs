@@ -15,5 +15,7 @@ public sealed class GuiActivatedAbilityDefinitionSubObjectListHandler : SingleVa
     protected override XmlValueType TargetType => XmlValueType.GuiActivatedAbilityDefinitionSubObjectList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
-        => [];
+    {
+        return [];
+    }
 }

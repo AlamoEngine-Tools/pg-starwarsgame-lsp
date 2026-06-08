@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -26,7 +27,10 @@ public sealed class LuaTextDocumentSyncHandlerTest
         var host = new FakeGameWorkspaceHost();
         var index = new FakeGameIndexService();
         var fileHelper = new FileHelper(fs ?? new MockFileSystem());
-        return (new LuaTextDocumentSyncHandler(host, index, fileHelper), host, index);
+        // An already-open gate runs handler actions immediately (normal post-startup operation).
+        var gate = new StartupGate();
+        gate.OpenAsync().GetAwaiter().GetResult();
+        return (new LuaTextDocumentSyncHandler(host, index, fileHelper, gate), host, index);
     }
 
     // ── DidOpen ──────────────────────────────────────────────────────────────
@@ -260,7 +264,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 

@@ -352,7 +352,7 @@ public sealed class GamePrepareRenameHandlerTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 
@@ -397,21 +397,35 @@ public sealed class GamePrepareRenameHandlerTest
     {
         public bool HasDirectories => true;
 
-        public bool IsEaWXmlFile(string fileUri) => true;
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return true;
+        }
 
-        public void AddDirectory(string absolutePath) { }
+        public void AddDirectory(string absolutePath)
+        {
+        }
 
-        public void SetDirectories(IEnumerable<string> absolutePaths) { }
+        public void SetDirectories(IEnumerable<string> absolutePaths)
+        {
+        }
     }
 
     private sealed class DenyAllEaWContext : IEaWXmlContext
     {
         public bool HasDirectories => false;
 
-        public bool IsEaWXmlFile(string fileUri) => false;
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return false;
+        }
 
-        public void AddDirectory(string absolutePath) { }
+        public void AddDirectory(string absolutePath)
+        {
+        }
 
-        public void SetDirectories(IEnumerable<string> absolutePaths) { }
+        public void SetDirectories(IEnumerable<string> absolutePaths)
+        {
+        }
     }
 }

@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Core.Assets;
 /// </summary>
 public sealed class MergedAssetFileIndex : IAssetFileIndex
 {
-    private readonly ImmutableHashSet<string> _paths;
     private readonly ImmutableHashSet<string> _packedPaths;
+    private readonly ImmutableHashSet<string> _paths;
 
     public MergedAssetFileIndex(IEnumerable<string> paths)
     {
@@ -26,12 +26,20 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
         _packedPaths = packed;
     }
 
-    public bool Contains(string normalisedPath) => _paths.Contains(normalisedPath);
+    public bool Contains(string normalisedPath)
+    {
+        return _paths.Contains(normalisedPath);
+    }
 
-    public IEnumerable<string> GetByExtension(string ext) =>
-        _paths.Where(p => p.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+    public IEnumerable<string> GetByExtension(string ext)
+    {
+        return _paths.Where(p => p.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+    }
 
-    public bool IsPackedAsset(string normalisedPath) => _packedPaths.Contains(normalisedPath);
+    public bool IsPackedAsset(string normalisedPath)
+    {
+        return _packedPaths.Contains(normalisedPath);
+    }
 
     /// <summary>
     ///     Unions the baseline (packed game) catalog with the workspace (loose) asset paths.

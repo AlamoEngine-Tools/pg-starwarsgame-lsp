@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.Startup;
 using LspFileSystemWatcher = OmniSharp.Extensions.LanguageServer.Protocol.Models.FileSystemWatcher;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -17,24 +18,24 @@ namespace PG.StarWarsGame.LSP.Server;
 public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHandlerBase
 {
     private readonly IFileHelper _fileHelper;
+    private readonly IWorkspaceIndexer _indexer;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
-    private readonly WorkspaceScanner _scanner;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public GameDidChangeWatchedFilesHandler(
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
-        WorkspaceScanner scanner,
+        IWorkspaceIndexer indexer,
         IModProjectReloadService reloadService,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
-        _scanner = scanner;
+        _indexer = indexer;
         _reloadService = reloadService;
         _logger = logger;
     }
@@ -63,9 +64,9 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             if (path is null) continue;
 
             // A changed loose asset file re-globs the asset catalog from the last-scanned roots.
-            if (WorkspaceScanner.IsAssetFile(path))
+            if (WorkspaceIndexer.IsAssetFile(path))
             {
-                _scanner.ApplyAssetCatalog(_scanner.LastAssetRoots ?? []);
+                _indexer.ApplyAssetCatalog(_reloadService.LastAssetRoots ?? []);
                 continue;
             }
 

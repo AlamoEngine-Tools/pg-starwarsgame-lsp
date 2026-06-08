@@ -14,8 +14,10 @@ namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 /// </summary>
 public sealed class AssetFileCompletionProvider : IXmlCompletionProvider
 {
-    public bool CanHandle(XmlTagDefinition tag) =>
-        AllowedExtensions(tag.ReferenceKind) is not null;
+    public bool CanHandle(XmlTagDefinition tag)
+    {
+        return AllowedExtensions(tag.ReferenceKind) is not null;
+    }
 
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)
     {
@@ -55,12 +57,15 @@ public sealed class AssetFileCompletionProvider : IXmlCompletionProvider
         return fileName.StartsWith(partial, StringComparison.OrdinalIgnoreCase);
     }
 
-    private static IReadOnlyList<string>? AllowedExtensions(ReferenceKind kind) => kind switch
+    private static IReadOnlyList<string>? AllowedExtensions(ReferenceKind kind)
     {
-        ReferenceKind.TextureFile => [".tga", ".dds"],
-        ReferenceKind.ModelFile => [".alo"],
-        ReferenceKind.AudioFile => [".wav", ".mp3"],
-        ReferenceKind.MapFile => [".ted"],
-        _ => null
-    };
+        return kind switch
+        {
+            ReferenceKind.TextureFile => [".tga", ".dds"],
+            ReferenceKind.ModelFile => [".alo"],
+            ReferenceKind.AudioFile => [".wav", ".mp3"],
+            ReferenceKind.MapFile => [".ted"],
+            _ => null
+        };
+    }
 }

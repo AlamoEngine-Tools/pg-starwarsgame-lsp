@@ -260,8 +260,8 @@ public sealed class GameIndexTest
         var index = GameIndex.Empty with
         {
             WorkspaceGroupMemberships =
-                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
-                    .Add("Unit_TIE", ImmutableArray.Create(m))
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Unit_TIE", ImmutableArray.Create(m))
         };
 
         var all = index.AllGroupMemberships;
@@ -287,8 +287,8 @@ public sealed class GameIndexTest
                     .Add("Unit_AT_AT", ImmutableArray.Create(baselineMember))
             },
             WorkspaceGroupMemberships =
-                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
-                    .Add("Unit_AT_AT", ImmutableArray.Create(workspaceMember))
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Unit_AT_AT", ImmutableArray.Create(workspaceMember))
         };
 
         var all = index.AllGroupMemberships;
@@ -311,8 +311,8 @@ public sealed class GameIndexTest
                     .Add("Baseline_Group", ImmutableArray.Create(bm))
             },
             WorkspaceGroupMemberships =
-                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
-                    .Add("Workspace_Group", ImmutableArray.Create(wm))
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Workspace_Group", ImmutableArray.Create(wm))
         };
 
         var all = index.AllGroupMemberships;

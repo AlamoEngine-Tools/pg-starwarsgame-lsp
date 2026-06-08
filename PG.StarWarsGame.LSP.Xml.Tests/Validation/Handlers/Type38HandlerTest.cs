@@ -10,6 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 public sealed class Type38HandlerTest
 {
     private static readonly Type38Handler Sut = new();
+
     private static readonly XmlTagDefinition Tag =
         XmlHandlerTestFixtures.MakeTag("Ambient_SFXEvent_Intermittent", XmlValueType.Type38);
 

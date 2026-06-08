@@ -12,15 +12,16 @@
         <Content Include="..\.dockerignore">
             <Link>.dockerignore</Link>
         </Content>
+        <Content Include="appsettings.json" CopyToOutputDirectory="PreserveNewest"/>
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\PG.StarWarsGame.LSP.Assets\PG.StarWarsGame.LSP.Assets.csproj" />
-        <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj" />
-        <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj" />
-        <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj" />
-        <ProjectReference Include="..\PG.StarWarsGame.LSP.Xml\PG.StarWarsGame.LSP.Xml.csproj" />
-        <ProjectReference Include="..\..\PetroglyphTools\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline.csproj" />
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Assets\PG.StarWarsGame.LSP.Assets.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Lua\PG.StarWarsGame.LSP.Lua.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Xml\PG.StarWarsGame.LSP.Xml.csproj"/>
+        <ProjectReference Include="..\..\PetroglyphTools\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline.csproj"/>
     </ItemGroup>
 
     <PropertyGroup>
@@ -37,16 +38,16 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="AlamoEngineTools.Modinfo" Version="8.0.6" />
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
-        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
-        <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9" />
-        <PackageReference Include="Sentry" Version="6.5.0" />
-        <PackageReference Include="Sentry.Extensions.Logging" Version="6.5.0" />
-        <PackageReference Include="Serilog" Version="4.3.1" />
-        <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
-        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+        <PackageReference Include="AlamoEngineTools.Modinfo" Version="8.0.6"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.0"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0"/>
+        <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
+        <PackageReference Include="Sentry" Version="6.5.0"/>
+        <PackageReference Include="Sentry.Extensions.Logging" Version="6.5.0"/>
+        <PackageReference Include="Serilog" Version="4.3.1"/>
+        <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0"/>
+        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0"/>
     </ItemGroup>
 
 </Project>

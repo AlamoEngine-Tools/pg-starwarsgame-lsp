@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 public sealed class ModProjectResolver
 {
     private readonly IFileHelper _fileHelper;
-    private readonly ModProjectLoader _loader;
     private readonly ProjectDependencyGraph _graph;
+    private readonly ModProjectLoader _loader;
     private readonly ILogger<ModProjectResolver> _logger;
 
     public ModProjectResolver(
@@ -82,7 +82,6 @@ public sealed class ModProjectResolver
         var basePrefix = basePath.StartsWith('/') ? "/" : string.Empty;
 
         foreach (var segment in candidate.Split('/', StringSplitOptions.RemoveEmptyEntries))
-        {
             switch (segment)
             {
                 case ".":
@@ -95,7 +94,6 @@ public sealed class ModProjectResolver
                     segments.Add(segment);
                     break;
             }
-        }
 
         return (basePrefix + string.Join('/', segments)).ToLowerInvariant();
     }

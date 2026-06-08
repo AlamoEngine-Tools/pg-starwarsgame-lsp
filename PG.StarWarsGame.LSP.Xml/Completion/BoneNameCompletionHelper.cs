@@ -74,6 +74,8 @@ public sealed class BoneNameCompletionHelper
         return result;
     }
 
-    private static string Normalize(string path) =>
-        path.Replace('\\', '/').ToLowerInvariant();
+    private static string Normalize(string path)
+    {
+        return path.Replace('\\', '/').ToLowerInvariant();
+    }
 }

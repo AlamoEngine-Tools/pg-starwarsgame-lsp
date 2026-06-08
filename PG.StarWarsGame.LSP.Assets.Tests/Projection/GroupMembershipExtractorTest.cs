@@ -10,6 +10,19 @@ namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
 public sealed class GroupMembershipExtractorTest
 {
+    // ── Schema and helpers ────────────────────────────────────────────────────
+
+    private static readonly ISchemaProvider NoGroupSchema = new GroupSchemaFake();
+
+    private static readonly ISchemaProvider OverlapTestSchema = new GroupSchemaFake(
+        new XmlTagDefinition
+        {
+            Tag = "Overlap_Test",
+            ValueType = XmlValueType.NameReference,
+            SemanticType = TagSemanticType.ReferenceGroup,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "SFXEvent", NameTag = "Name" }
+        });
     // ── Guard cases ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -168,7 +181,11 @@ public sealed class GroupMembershipExtractorTest
 
         GroupMembershipExtractor.Extract(
             [("AT_AT_Run", "sfxevents.xml"), ("AT_AT_Shoot", "sfxevents.xml")],
-            path => { readCount++; return xml; },
+            path =>
+            {
+                readCount++;
+                return xml;
+            },
             OverlapTestSchema);
 
         Assert.Equal(1, readCount);
@@ -196,20 +213,6 @@ public sealed class GroupMembershipExtractorTest
         var origin = Assert.IsType<FileOrigin>(member.MemberOrigin);
         Assert.Equal("data/xml/sfxevents.xml", origin.Uri);
     }
-
-    // ── Schema and helpers ────────────────────────────────────────────────────
-
-    private static readonly ISchemaProvider NoGroupSchema = new GroupSchemaFake();
-
-    private static readonly ISchemaProvider OverlapTestSchema = new GroupSchemaFake(
-        new XmlTagDefinition
-        {
-            Tag = "Overlap_Test",
-            ValueType = XmlValueType.NameReference,
-            SemanticType = TagSemanticType.ReferenceGroup,
-            ReferenceKind = ReferenceKind.XmlObject,
-            ObjectType = new GameObjectTypeDefinition { TypeName = "SFXEvent", NameTag = "Name" }
-        });
 }
 
 file sealed class GroupSchemaFake(params XmlTagDefinition[] tags) : ISchemaProvider
@@ -226,9 +229,28 @@ file sealed class GroupSchemaFake(params XmlTagDefinition[] tags) : ISchemaProvi
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
-    public XmlTagDefinition? GetTag(string tagName) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-    public EnumDefinition? GetEnum(string enumName) => null;
-    public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+    {
+        return [];
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return null;
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        return null;
+    }
 }

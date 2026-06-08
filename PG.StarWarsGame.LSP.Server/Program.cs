@@ -5,19 +5,24 @@ using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using OmniSharp.Extensions.LanguageServer.Server;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Server;
 using Serilog;
 
 Console.Error.WriteLine(
     $"[LSP] PID {Environment.ProcessId} args=[{(args.Length == 0 ? "<none>" : string.Join(", ", args))}]");
 
-if (args.Contains("--wait-for-debugger") || Environment.GetEnvironmentVariable("LSP_WAIT_DEBUGGER") == "1")
+var waitForDebugger = args.Contains("--wait-for-debugger") ||
+                      Environment.GetEnvironmentVariable("LSP_WAIT_DEBUGGER") == "1";
+
+if (waitForDebugger)
 {
     Console.Error.WriteLine($"[LSP] Waiting for debugger — PID {Environment.ProcessId}");
     while (!Debugger.IsAttached)
         Thread.Sleep(100);
     Console.Error.WriteLine("[LSP] Debugger attached, continuing startup.");
 }
+
 #if DEBUG
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
@@ -25,6 +30,10 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .CreateLogger();
 #endif
+
+var serverOptions = LoadServerOptions();
+if (waitForDebugger)
+    serverOptions = serverOptions.WithDebugger();
 
 var tcpPortArg = args.FirstOrDefault(a => a.StartsWith("--tcp=", StringComparison.Ordinal));
 if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out var tcpPort))
@@ -43,7 +52,7 @@ if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out va
         var server = await LanguageServer.From(options =>
             ServerConfigurator.Apply(options
                 .WithInput(stream)
-                .WithOutput(stream)));
+                .WithOutput(stream), serverOptions));
         await server.WaitForExit;
         Console.Error.WriteLine("[LSP] Client disconnected — waiting for next connection");
     }
@@ -53,7 +62,23 @@ if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out va
     var server = await LanguageServer.From(options =>
         ServerConfigurator.Apply(options
             .WithInput(Console.OpenStandardInput())
-            .WithOutput(Console.OpenStandardOutput())));
+            .WithOutput(Console.OpenStandardOutput()), serverOptions));
 
     await server.WaitForExit;
+}
+
+static ServerOptions LoadServerOptions()
+{
+    var settingsPath = Path.Combine(AppContext.BaseDirectory, "appsettings.json");
+    if (!File.Exists(settingsPath))
+        return ServerOptions.Default;
+
+    try
+    {
+        return ServerOptions.FromJson(File.ReadAllText(settingsPath));
+    }
+    catch
+    {
+        return ServerOptions.Default;
+    }
 }

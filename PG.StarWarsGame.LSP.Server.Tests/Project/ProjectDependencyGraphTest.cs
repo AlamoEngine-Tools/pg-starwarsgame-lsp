@@ -3,6 +3,7 @@
 
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -13,7 +14,8 @@ public sealed class ProjectDependencyGraphTest
     private static ModProjectFile Project(params string[] references)
     {
         return new ModProjectFile(
-            new ModinfoData("Mod", null, null, null, [], null),
+            "Mod",
+            null,
             new DirectoryMap(),
             references.Select(r => new ProjectReference(r)).ToList());
     }
@@ -128,7 +130,7 @@ public sealed class ProjectDependencyGraphTest
 
     private static ILogger<ProjectDependencyGraph> NullLoggerFactory()
     {
-        return Microsoft.Extensions.Logging.Abstractions.NullLogger<ProjectDependencyGraph>.Instance;
+        return NullLogger<ProjectDependencyGraph>.Instance;
     }
 
     private sealed record LogEntry(LogLevel Level, string Message);
@@ -137,9 +139,15 @@ public sealed class ProjectDependencyGraphTest
     {
         public ConcurrentBag<LogEntry> Entries { get; } = [];
 
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return null;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(
             LogLevel logLevel,

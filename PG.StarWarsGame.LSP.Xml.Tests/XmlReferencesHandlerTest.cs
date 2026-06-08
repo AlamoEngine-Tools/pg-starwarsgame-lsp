@@ -376,7 +376,7 @@ public sealed class XmlReferencesHandlerTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 

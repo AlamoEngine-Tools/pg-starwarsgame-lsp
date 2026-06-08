@@ -2,41 +2,64 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
+/// <summary>
+///     The single workspace index path, shared by startup (via <see cref="StartupPipeline" />), the
+///     reload command, and the <c>.pgproj</c> file watcher. Resolves the project configuration and
+///     drives the <see cref="IWorkspaceIndexer" /> stages in a fixed order. No <c>.pgproj</c> means
+///     no directories to index — the resolver returns null and this becomes a no-op.
+/// </summary>
 public sealed class ModProjectReloadService : IModProjectReloadService
 {
-    private readonly IModProjectDetector _detector;
-    private readonly ModProjectLoader _loader;
+    private readonly IWorkspaceIndexer _indexer;
+    private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
-    private readonly ModProjectResolver _resolver;
-    private readonly WorkspaceScanner _scanner;
+    private readonly IProjectConfigurationResolver _resolver;
 
     private List<string>? _lastRoots;
 
     public ModProjectReloadService(
-        IModProjectDetector detector,
-        ModProjectLoader loader,
-        ModProjectResolver resolver,
-        WorkspaceScanner scanner,
+        IProjectConfigurationResolver resolver,
+        IWorkspaceIndexer indexer,
+        ILocalisationLoader localisation,
         ILogger<ModProjectReloadService> logger)
     {
-        _detector = detector;
-        _loader = loader;
         _resolver = resolver;
-        _scanner = scanner;
+        _indexer = indexer;
+        _localisation = localisation;
         _logger = logger;
     }
+
+    public IReadOnlyList<string>? LastAssetRoots { get; private set; }
 
     public async Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
     {
         var roots = workspaceRoots.ToList();
         _lastRoots = roots;
 
-        var config = ResolveConfiguration(roots);
-        await _scanner.ScanAsync(config, roots, ct);
+        var config = _resolver.Resolve(roots);
+        if (config is null)
+            // No project file (the resolver already logged); nothing to index.
+            return;
+
+        _indexer.PreScanMetafiles(config, roots);
+        await _indexer.IndexDocumentsAsync(config, ct);
+        _indexer.ApplyAssetCatalog(config.AssetRoots);
+        _indexer.ApplyModelBoneCatalog(config.AssetRoots);
+        LastAssetRoots = config.AssetRoots;
+
+        try
+        {
+            await _localisation.LoadAsync(config, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Workspace localisation load failed.");
+        }
     }
 
     public async Task ReloadAsync(CancellationToken ct)
@@ -56,28 +79,5 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         {
             _logger.LogError(ex, "Mod project reload failed.");
         }
-    }
-
-    private WorkspaceConfiguration ResolveConfiguration(List<string> roots)
-    {
-        if (_detector.TryFind(roots, out var pgprojPath) && pgprojPath is not null)
-        {
-            try
-            {
-                var file = _loader.Load(pgprojPath);
-                return _resolver.Resolve(pgprojPath, file);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Failed to load mod project '{Path}'; falling back to workspace heuristic.", pgprojPath);
-            }
-        }
-        else
-        {
-            _logger.LogWarning("No .pgproj found — using workspace heuristic.");
-        }
-
-        return new WorkspaceConfiguration([], roots, roots, roots, null);
     }
 }

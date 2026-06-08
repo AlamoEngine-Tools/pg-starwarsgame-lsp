@@ -5,6 +5,7 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -14,21 +15,24 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
 {
     private readonly IEaWXmlContext _eaWXmlContext;
+    private readonly IFileHelper _fileHelper;
     private readonly IGameWorkspaceHost _workspaceHost;
 
-    public XmlLinkedEditingRangeHandler(IGameWorkspaceHost workspaceHost, IEaWXmlContext eaWXmlContext)
+    public XmlLinkedEditingRangeHandler(IGameWorkspaceHost workspaceHost, IEaWXmlContext eaWXmlContext,
+        IFileHelper fileHelper)
     {
         _workspaceHost = workspaceHost;
         _eaWXmlContext = eaWXmlContext;
+        _fileHelper = fileHelper;
     }
 
     public override Task<LinkedEditingRanges?> Handle(LinkedEditingRangeParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<LinkedEditingRanges?>(null);
 
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult<LinkedEditingRanges?>(null);
 
         var line = request.Position.Line;

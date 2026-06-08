@@ -15,5 +15,7 @@ public sealed class AbilityDefinitionSubObjectListHandler : SingleValueTypeHandl
     protected override XmlValueType TargetType => XmlValueType.AbilityDefinitionSubObjectList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
-        => [];
+    {
+        return [];
+    }
 }

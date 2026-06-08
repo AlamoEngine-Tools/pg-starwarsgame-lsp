@@ -133,12 +133,10 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
     {
         var builder = new StringBuilder(name.Length);
         foreach (var ch in name.Trim())
-        {
             if (char.IsWhiteSpace(ch))
                 builder.Append('_');
             else if (char.IsLetterOrDigit(ch) || ch is '-' or '_' or '.')
                 builder.Append(ch);
-        }
 
         return builder.ToString();
     }

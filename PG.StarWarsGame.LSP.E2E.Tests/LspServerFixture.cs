@@ -149,7 +149,6 @@ public class LspServerFixture : IAsyncLifetime
             UseShellExecute = false,
             CreateNoWindow = true
         };
-
         _process = Process.Start(startInfo)!;
 
         _ = Task.Run(async () =>

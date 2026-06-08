@@ -105,8 +105,8 @@ public sealed class HttpSchemaProvider : ISchemaProvider
         }
         catch
         {
-            // Always signal ReadyAsync so WorkspaceScanner.WaitForSchemaAsync does not
-            // block for its full 30-second timeout when the HTTP fetch fails.
+            // Always signal ReadyAsync so any awaiter (e.g. a caller awaiting the initial
+            // load) is released rather than blocking when the HTTP fetch fails.
             _readyTcs.TrySetResult();
             throw;
         }

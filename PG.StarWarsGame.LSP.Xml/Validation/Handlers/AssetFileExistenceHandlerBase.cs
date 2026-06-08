@@ -58,6 +58,8 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         return false;
     }
 
-    private static string Normalize(string raw) =>
-        raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    private static string Normalize(string raw)
+    {
+        return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    }
 }

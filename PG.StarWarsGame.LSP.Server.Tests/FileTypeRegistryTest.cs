@@ -76,7 +76,7 @@ public sealed class FileTypeRegistryTest
     }
 
     // ── canonical file:/// URI contract ──────────────────────────────────────
-    // WorkspaceScanner always calls IFileHelper.PathToFileUri() before registering,
+    // WorkspaceIndexer always calls IFileHelper.PathToFileUri() before registering,
     // so real keys are canonical file:/// URIs (lowercase, forward-slash).
 
     [Fact]

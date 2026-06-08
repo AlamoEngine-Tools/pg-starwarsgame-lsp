@@ -12,10 +12,13 @@ public sealed class AssetFileCompletionProviderTest
 {
     private static readonly AssetFileCompletionProvider Provider = new();
 
-    private static XmlTagDefinition Tag(ReferenceKind kind) => new()
+    private static XmlTagDefinition Tag(ReferenceKind kind)
     {
-        Tag = "Texture", ValueType = XmlValueType.NameReference, ReferenceKind = kind
-    };
+        return new XmlTagDefinition
+        {
+            Tag = "Texture", ValueType = XmlValueType.NameReference, ReferenceKind = kind
+        };
+    }
 
     private static GameIndex IndexWith(params string[] paths)
     {
@@ -143,8 +146,8 @@ public sealed class AssetFileCompletionProviderTest
     public void GetProposals_PackedBaselineAsset_DescriptionIsPacked()
     {
         var index = IndexWithPacked(
-            baselinePaths: ["data/art/textures/foo.tga"],
-            workspacePaths: []);
+            ["data/art/textures/foo.tga"],
+            []);
 
         var result = Provider.GetProposals(Tag(ReferenceKind.TextureFile), "", index);
 
@@ -156,8 +159,8 @@ public sealed class AssetFileCompletionProviderTest
     public void GetProposals_WorkspaceLooseAsset_DescriptionIsNull()
     {
         var index = IndexWithPacked(
-            baselinePaths: [],
-            workspacePaths: ["data/art/textures/foo.tga"]);
+            [],
+            ["data/art/textures/foo.tga"]);
 
         var result = Provider.GetProposals(Tag(ReferenceKind.TextureFile), "", index);
 
@@ -169,8 +172,8 @@ public sealed class AssetFileCompletionProviderTest
     public void GetProposals_MixedAssets_PackedAndWorkspaceDistinguished()
     {
         var index = IndexWithPacked(
-            baselinePaths: ["data/art/textures/packed.tga"],
-            workspacePaths: ["data/art/textures/loose.tga"]);
+            ["data/art/textures/packed.tga"],
+            ["data/art/textures/loose.tga"]);
 
         var result = Provider.GetProposals(Tag(ReferenceKind.TextureFile), "", index);
 

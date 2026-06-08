@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server;
 ///     (local or HTTP) to be selected in <c>OnInitialize</c> after LSP initialization options
 ///     are known, while still satisfying DI resolution that occurs during server startup.
 /// </summary>
-internal sealed class SchemaProviderProxy : ISchemaProvider
+public sealed class SchemaProviderProxy : ISchemaProvider
 {
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -21,7 +21,7 @@ internal sealed class SchemaProviderProxy : ISchemaProvider
     // Subscribers are stored here so they survive the _inner swap in Configure().
     // The old forwarding pattern (add => _inner.SchemaRefreshed += value) silently
     // subscribed to the empty placeholder, meaning events from the real provider
-    // (HTTP/local) were never delivered to the WorkspaceScanner.
+    // (HTTP/local) were never delivered to downstream subscribers.
     private EventHandler? _schemaRefreshed;
 
     public Task ReadyAsync => _readyTcs.Task;

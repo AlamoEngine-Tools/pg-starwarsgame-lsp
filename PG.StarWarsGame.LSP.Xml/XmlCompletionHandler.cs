@@ -34,14 +34,14 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private readonly BoneNameCompletionHelper _boneHelper;
+
     private readonly IXmlCompletionRegistry _completionRegistry;
 
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
-
-    private readonly BoneNameCompletionHelper _boneHelper;
 
     private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
@@ -74,10 +74,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult(new CompletionList());
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult(new CompletionList());
         var text = doc.Text;
 
@@ -508,11 +508,13 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
                 abilityTypeName = "UnitAbility";
                 return true;
             }
+
             if (tagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
             {
                 abilityTypeName = XmlUtility.ToPascalCase(child.Name);
                 return true;
             }
+
             child = parent;
             parent = parent.ParentNode;
         }

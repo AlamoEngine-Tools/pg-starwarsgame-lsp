@@ -45,14 +45,14 @@ public static class MegAssetCatalogBuilder
     public static (
         ImmutableHashSet<string> assetFiles,
         ImmutableDictionary<string, ImmutableArray<string>> modelBones
-    ) Build(
-        IEnumerable<(string megName, IEnumerable<string> entryPaths)> megEntries,
-        IFileSystem looseFileSystem,
-        string gameRootPath,
-        Func<string, Stream?> openEntry,
-        Func<Stream, IReadOnlyList<string>> extractBones,
-        Func<Stream, IEnumerable<string>>? extractMtdIcons,
-        ILogger logger)
+        ) Build(
+            IEnumerable<(string megName, IEnumerable<string> entryPaths)> megEntries,
+            IFileSystem looseFileSystem,
+            string gameRootPath,
+            Func<string, Stream?> openEntry,
+            Func<Stream, IReadOnlyList<string>> extractBones,
+            Func<Stream, IEnumerable<string>>? extractMtdIcons,
+            ILogger logger)
     {
         // Track source MEG for each normalised path — used for collision detection.
         var pathSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -60,32 +60,30 @@ public static class MegAssetCatalogBuilder
         var bonesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (megName, entryPaths) in megEntries)
+        foreach (var rawPath in entryPaths)
         {
-            foreach (var rawPath in entryPaths)
+            var normalized = ApplySfxConventions(NormalizeMegPath(rawPath), megName);
+            var ext = Path.GetExtension(normalized);
+
+            if (ext.Equals(".mtd", StringComparison.OrdinalIgnoreCase))
             {
-                var normalized = ApplySfxConventions(NormalizeMegPath(rawPath), megName);
-                var ext = Path.GetExtension(normalized);
-
-                if (ext.Equals(".mtd", StringComparison.OrdinalIgnoreCase))
-                {
-                    if (extractMtdIcons is not null)
-                        TryExtractMtdIcons(normalized, openEntry, extractMtdIcons, assetBuilder);
-                    continue;
-                }
-
-                if (!IsAssetExtension(ext)) continue;
-
-                if (pathSource.TryGetValue(normalized, out var prior))
-                    logger.LogWarning(
-                        "Path collision: {Path}\n  First seen in:  {Prior}\n  Overridden by:  {Current}",
-                        normalized, prior, megName);
-
-                pathSource[normalized] = megName;
-                assetBuilder.Add(normalized);
-
-                if (ext.Equals(".alo", StringComparison.OrdinalIgnoreCase))
-                    TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
+                if (extractMtdIcons is not null)
+                    TryExtractMtdIcons(normalized, openEntry, extractMtdIcons, assetBuilder);
+                continue;
             }
+
+            if (!IsAssetExtension(ext)) continue;
+
+            if (pathSource.TryGetValue(normalized, out var prior))
+                logger.LogWarning(
+                    "Path collision: {Path}\n  First seen in:  {Prior}\n  Overridden by:  {Current}",
+                    normalized, prior, megName);
+
+            pathSource[normalized] = megName;
+            assetBuilder.Add(normalized);
+
+            if (ext.Equals(".alo", StringComparison.OrdinalIgnoreCase))
+                TryExtractBones(normalized, openEntry, extractBones, bonesBuilder);
         }
 
         // Merge loose files on top (workspace loose files may extend the MEG catalog).
@@ -98,9 +96,8 @@ public static class MegAssetCatalogBuilder
         {
             var root = looseFileSystem.Path.GetFullPath(gameRootPath);
             if (looseFileSystem.Directory.Exists(root))
-            {
                 foreach (var mtdFile in looseFileSystem.Directory.EnumerateFiles(
-                    root, "*.mtd", SearchOption.AllDirectories))
+                             root, "*.mtd", SearchOption.AllDirectories))
                 {
                     var rel = looseFileSystem.Path.GetRelativePath(root, mtdFile);
                     var normalizedRel = NormalizeMegPath(rel);
@@ -111,9 +108,11 @@ public static class MegAssetCatalogBuilder
                         using var stream = looseFileSystem.File.OpenRead(mtdFile);
                         AddMtdIconNames(stream, extractMtdIcons, assetBuilder);
                     }
-                    catch { /* skip corrupt/unreadable loose MTD files */ }
+                    catch
+                    {
+                        /* skip corrupt/unreadable loose MTD files */
+                    }
                 }
-            }
         }
 
         return (assetBuilder.ToImmutable(),
@@ -125,15 +124,19 @@ public static class MegAssetCatalogBuilder
     ///     Normalises a raw MEG entry path to lowercase forward-slash with no leading separator.
     ///     e.g. <c>DATA\ART\TEXTURES\FOO.TGA</c> → <c>data/art/textures/foo.tga</c>.
     /// </summary>
-    public static string NormalizeMegPath(string rawPath) =>
-        rawPath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    public static string NormalizeMegPath(string rawPath)
+    {
+        return rawPath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    }
 
     /// <summary>
     ///     Applies SFX packaging conventions to an already-normalised MEG entry path.
     ///     <list type="bullet">
     ///         <item>Flat paths (no directory) from SFX MEGs are prefixed with <c>data/audio/sfx/</c>.</item>
-    ///         <item><c>_eng</c> stem suffix is stripped from <c>.wav</c> and <c>.mp3</c> files
-    ///         (localized audio; XML references the base name without the language suffix).</item>
+    ///         <item>
+    ///             <c>_eng</c> stem suffix is stripped from <c>.wav</c> and <c>.mp3</c> files
+    ///             (localized audio; XML references the base name without the language suffix).
+    ///         </item>
     ///     </list>
     /// </summary>
     public static string ApplySfxConventions(string normalizedPath, string megName)
@@ -163,8 +166,10 @@ public static class MegAssetCatalogBuilder
     }
 
     /// <summary>Returns true when the file extension belongs to the tracked asset categories.</summary>
-    public static bool IsAssetExtension(string extension) =>
-        AssetExtensions.Contains(extension);
+    public static bool IsAssetExtension(string extension)
+    {
+        return AssetExtensions.Contains(extension);
+    }
 
     private static void TryExtractMtdIcons(
         string normalizedMtdPath,
@@ -178,7 +183,10 @@ public static class MegAssetCatalogBuilder
             if (stream is null) return;
             AddMtdIconNames(stream, extractIcons, assetBuilder);
         }
-        catch { /* skip corrupt/unreadable MTD entries */ }
+        catch
+        {
+            /* skip corrupt/unreadable MTD entries */
+        }
     }
 
     private static void AddMtdIconNames(

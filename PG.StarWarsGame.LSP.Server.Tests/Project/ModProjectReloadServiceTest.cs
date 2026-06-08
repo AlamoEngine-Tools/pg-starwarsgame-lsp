@@ -2,126 +2,142 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
-using System.Collections.Immutable;
-using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Localisation;
-using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Server;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Project;
 
 public sealed class ModProjectReloadServiceTest
 {
-    private static readonly string DriveRoot = Path.GetPathRoot(Path.GetFullPath("."))!;
-    private static readonly string WorkspaceRoot = Path.Combine(DriveRoot, "mods", "mymod");
-    private static readonly string ProjectPath = Path.Combine(WorkspaceRoot, "mymod.pgproj");
+    private static readonly WorkspaceConfiguration SampleConfig =
+        new(["/ws/data/xml"], ["/ws/data/scripts"], [], ["/ws/data/art", "/ws/data/audio"], null);
 
-    private static string AbsLower(string rel)
+    private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger) Build(
+        WorkspaceConfiguration? resolved)
     {
-        return Path.GetFullPath(Path.Combine(WorkspaceRoot, rel)).Replace('\\', '/').ToLowerInvariant();
+        var indexer = new RecordingIndexer();
+        var logger = new ListLogger();
+        var service = new ModProjectReloadService(
+            new FakeResolver(resolved), indexer, new NullLocalisationLoader(), logger);
+        return (service, indexer, logger);
     }
 
     [Fact]
-    public async Task LoadAsync_NoProjectFile_UsesHeuristicConfig_AndWarns()
+    public async Task LoadAsync_NoProjectFile_DoesNotIndex()
     {
-        var fs = new MockFileSystem();
-        fs.AddDirectory(WorkspaceRoot);
-        var (service, scanner, logger) = Build(fs);
+        var (service, indexer, _) = Build(null);
 
-        await service.LoadAsync([WorkspaceRoot], CancellationToken.None);
+        await service.LoadAsync(["/ws"], CancellationToken.None);
 
-        Assert.NotNull(scanner.LastScannedConfig);
-        Assert.Empty(scanner.LastScannedConfig!.XmlDirectories);
-        Assert.Equal([WorkspaceRoot], scanner.LastScannedConfig.ScriptRoots);
-        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("heuristic"));
+        Assert.Null(indexer.LastConfig);
+        Assert.Equal(0, indexer.IndexCallCount);
     }
 
     [Fact]
-    public async Task LoadAsync_ProjectFileFound_UsesResolvedConfig()
+    public async Task LoadAsync_ProjectFileFound_IndexesResolvedConfig()
     {
-        const string json = """
-            {
-              "modinfo": { "name": "My Mod" },
-              "directories": { "xml": ["data/xml"], "scripts": ["data/scripts"] }
-            }
-            """;
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            [ProjectPath] = new(json)
-        });
-        var (service, scanner, _) = Build(fs);
+        var (service, indexer, _) = Build(SampleConfig);
 
-        await service.LoadAsync([WorkspaceRoot], CancellationToken.None);
+        await service.LoadAsync(["/ws"], CancellationToken.None);
 
-        Assert.NotNull(scanner.LastScannedConfig);
-        Assert.Contains(AbsLower("data/xml"), scanner.LastScannedConfig!.XmlDirectories);
-        Assert.Contains(AbsLower("data/scripts"), scanner.LastScannedConfig.ScriptRoots);
+        Assert.NotNull(indexer.LastConfig);
+        Assert.Equal(["/ws/data/xml"], indexer.LastConfig!.XmlDirectories);
+        Assert.Equal(1, indexer.IndexCallCount);
+        Assert.True(indexer.AssetCatalogApplied);
+        Assert.True(indexer.BonesApplied);
     }
 
     [Fact]
-    public async Task ReloadAsync_BeforeLoadAsync_NoOpWithWarningLog()
+    public async Task LoadAsync_TracksLastAssetRoots()
     {
-        var fs = new MockFileSystem();
-        fs.AddDirectory(WorkspaceRoot);
-        var (service, scanner, logger) = Build(fs);
+        var (service, _, _) = Build(SampleConfig);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(["/ws/data/art", "/ws/data/audio"], service.LastAssetRoots);
+    }
+
+    [Fact]
+    public async Task ReloadAsync_BeforeLoadAsync_NoOpWithWarning()
+    {
+        var (service, indexer, logger) = Build(SampleConfig);
 
         await service.ReloadAsync(CancellationToken.None);
 
-        Assert.Null(scanner.LastScannedConfig);
+        Assert.Null(indexer.LastConfig);
         Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning);
     }
 
     [Fact]
-    public async Task LoadAsync_MalformedProjectFile_FallsBackToHeuristic()
+    public async Task ReloadAsync_AfterLoad_ReindexesSameRoots()
     {
-        const string malformed = "{ this is not valid json ";
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            [ProjectPath] = new(malformed)
-        });
-        var (service, scanner, _) = Build(fs);
+        var (service, indexer, _) = Build(SampleConfig);
+        await service.LoadAsync(["/ws/a", "/ws/b"], CancellationToken.None);
 
-        await service.LoadAsync([WorkspaceRoot], CancellationToken.None);
+        await service.ReloadAsync(CancellationToken.None);
 
-        Assert.NotNull(scanner.LastScannedConfig);
-        Assert.Empty(scanner.LastScannedConfig!.XmlDirectories);
-        Assert.Equal([WorkspaceRoot], scanner.LastScannedConfig.ScriptRoots);
+        Assert.Equal(2, indexer.IndexCallCount);
+        Assert.Equal(["/ws/a", "/ws/b"], indexer.LastRoots);
     }
 
-    private static (ModProjectReloadService Service, WorkspaceScanner Scanner, ListLogger Logger) Build(
-        MockFileSystem fs)
+    // ── fakes ────────────────────────────────────────────────────────────────
+
+    private sealed class FakeResolver : IProjectConfigurationResolver
     {
-        var fileHelper = new FileHelper(fs);
-        var scanner = new WorkspaceScanner(
-            fileHelper,
-            [],
-            new FakeIndexService(),
-            new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance),
-            NullLogger<WorkspaceScanner>.Instance,
-            null,
-            new FileTypeRegistry(),
-            new FakeSchemaProvider(),
-            new EaWXmlContext(fileHelper),
-            new PreOpenBuffer(),
-            new NullLocalisationLoader());
+        private readonly WorkspaceConfiguration? _config;
 
-        var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
-        var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
-        var resolver = new ModProjectResolver(fileHelper, loader, graph,
-            NullLogger<ModProjectResolver>.Instance);
-        var detector = new ModProjectDetector(fileHelper, NullLogger<ModProjectDetector>.Instance);
-        var logger = new ListLogger();
+        public FakeResolver(WorkspaceConfiguration? config)
+        {
+            _config = config;
+        }
 
-        var service = new ModProjectReloadService(detector, loader, resolver, scanner, logger);
-        return (service, scanner, logger);
+        public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
+        {
+            return _config;
+        }
+    }
+
+    private sealed class RecordingIndexer : IWorkspaceIndexer
+    {
+        public WorkspaceConfiguration? LastConfig { get; private set; }
+        public IReadOnlyList<string>? LastRoots { get; private set; }
+        public int IndexCallCount { get; private set; }
+        public bool AssetCatalogApplied { get; private set; }
+        public bool BonesApplied { get; private set; }
+
+        public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
+        {
+            LastConfig = config;
+            LastRoots = roots;
+        }
+
+        public Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
+            Action<int, int>? progress = null)
+        {
+            IndexCallCount++;
+            return Task.FromResult(0);
+        }
+
+        public void ApplyAssetCatalog(IReadOnlyList<string> roots)
+        {
+            AssetCatalogApplied = true;
+        }
+
+        public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
+        {
+            BonesApplied = true;
+        }
+    }
+
+    private sealed class NullLocalisationLoader : ILocalisationLoader
+    {
+        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed record LogEntry(LogLevel Level, string Message);
@@ -130,88 +146,20 @@ public sealed class ModProjectReloadServiceTest
     {
         public ConcurrentBag<LogEntry> Entries { get; } = [];
 
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return null;
+        }
 
-        public bool IsEnabled(LogLevel logLevel) => true;
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
 
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
             Exception? exception, Func<TState, Exception?, string> formatter)
         {
             Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
         }
-    }
-
-    private sealed class FakeSchemaProvider : ISchemaProvider
-    {
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-
-        // Fire immediately on subscription so WaitForSchemaAsync does not time out.
-        public event EventHandler? SchemaRefreshed
-        {
-            add { value?.Invoke(this, EventArgs.Empty); }
-            remove { }
-        }
-
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public GameIndex Current => GameIndex.Empty;
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
-
-        private sealed class NullDisposable : IDisposable
-        {
-            public static readonly NullDisposable Instance = new();
-
-            public void Dispose()
-            {
-            }
-        }
-    }
-
-    private sealed class NullLocalisationLoader : ILocalisationLoader
-    {
-        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct) => Task.CompletedTask;
     }
 }

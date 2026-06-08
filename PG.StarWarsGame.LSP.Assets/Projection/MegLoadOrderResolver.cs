@@ -97,7 +97,6 @@ public static class MegLoadOrderResolver
         }
 
         foreach (var (_, variants) in byPrefix)
-        {
             if (variants.Count == 1)
             {
                 included.Add(variants[0]);
@@ -110,7 +109,6 @@ public static class MegLoadOrderResolver
                 if (english is not null)
                     included.Add(english);
             }
-        }
 
         return included;
     }

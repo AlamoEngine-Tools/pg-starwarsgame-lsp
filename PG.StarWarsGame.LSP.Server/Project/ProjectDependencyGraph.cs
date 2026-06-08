@@ -95,7 +95,6 @@ public sealed class ProjectDependencyGraph
         var basePrefix = basePath.StartsWith('/') ? "/" : string.Empty;
 
         foreach (var segment in candidate.Split('/', StringSplitOptions.RemoveEmptyEntries))
-        {
             switch (segment)
             {
                 case ".":
@@ -108,7 +107,6 @@ public sealed class ProjectDependencyGraph
                     segments.Add(segment);
                     break;
             }
-        }
 
         return basePrefix + string.Join('/', segments);
     }

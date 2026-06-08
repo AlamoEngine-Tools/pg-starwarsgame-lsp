@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO;
 using System.Text;
 using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -149,10 +148,10 @@ internal static class HoverUtility
         var kindLabel = tag.ReferenceKind switch
         {
             ReferenceKind.TextureFile => "Texture",
-            ReferenceKind.ModelFile   => "Model",
-            ReferenceKind.AudioFile   => "Audio",
-            ReferenceKind.MapFile     => "Map",
-            _                         => "Asset"
+            ReferenceKind.ModelFile => "Model",
+            ReferenceKind.AudioFile => "Audio",
+            ReferenceKind.MapFile => "Map",
+            _ => "Asset"
         };
 
         var sb = new StringBuilder();

@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
@@ -24,7 +26,8 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     private static XmlLinkedEditingRangeHandler Build(string text)
     {
         var host = new FakeHost(TestUri, text);
-        return new XmlLinkedEditingRangeHandler(host, new AllowAllEaWContext());
+        return new XmlLinkedEditingRangeHandler(host, new AllowAllEaWContext(),
+            new FileHelper(new MockFileSystem()));
     }
 
     // ── cursor on opening tag name ──────────────────────────────────────────
@@ -116,7 +119,8 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
         var host = new FakeHost(TestUri, "<Foo>\nbar\n</Foo>");
-        var handler = new XmlLinkedEditingRangeHandler(host, new DenyAllEaWContext());
+        var handler = new XmlLinkedEditingRangeHandler(host, new DenyAllEaWContext(),
+            new FileHelper(new MockFileSystem()));
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
 
         Assert.Null(result);

@@ -39,7 +39,7 @@ public static class DynamicEnumExtractor
     public static (
         ImmutableDictionary<string, ImmutableArray<string>> dynamic,
         ImmutableDictionary<string, ImmutableArray<string>> hardcoded
-    ) Extract(ISchemaProvider schema, Func<string, string?> fileReader)
+        ) Extract(ISchemaProvider schema, Func<string, string?> fileReader)
     {
         var dyn = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
         var hard = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>();
@@ -148,8 +148,10 @@ public static class DynamicEnumExtractor
         return ([..all], [..hardcoded]);
     }
 
-    internal static bool IsBoundaryComment(string commentText) =>
-        commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+    internal static bool IsBoundaryComment(string commentText)
+    {
+        return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static XDocument? TryParse(string? xml)
     {

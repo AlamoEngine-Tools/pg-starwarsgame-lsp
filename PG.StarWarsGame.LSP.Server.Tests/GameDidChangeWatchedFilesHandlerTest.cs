@@ -51,23 +51,19 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
         var idx = index ?? new SpyIndexService();
-        var scanner = new WorkspaceScanner(
+        var indexer = new WorkspaceIndexer(
             fileHelper,
             [],
             idx,
-            new GameWorkspaceHost(NullLogger<GameWorkspaceHost>.Instance),
-            NullLogger<WorkspaceScanner>.Instance,
-            null,
             new FileTypeRegistry(),
             new FakeSchemaProvider(),
             new EaWXmlContext(fileHelper),
-            new PreOpenBuffer(),
-            new NullLocalisationLoader());
+            NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
             host ?? new FakeWorkspaceHost(),
             fileHelper,
-            scanner,
+            indexer,
             reload ?? new FakeReloadService(),
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
     }
@@ -221,6 +217,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     {
         public int ReloadCount { get; private set; }
 
+        public IReadOnlyList<string>? LastAssetRoots => null;
+
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {
             return Task.CompletedTask;
@@ -247,16 +245,38 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             remove { }
         }
 
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
     }
 
     private sealed class NullLocalisationLoader : ILocalisationLoader
     {
-        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct) => Task.CompletedTask;
+        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class SpyIndexService : IGameIndexService
@@ -291,7 +311,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 

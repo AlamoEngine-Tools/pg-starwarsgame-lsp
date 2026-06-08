@@ -9,6 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 public sealed class GuiActivatedAbilityDefinitionSubObjectListHandlerTest
 {
     private static readonly GuiActivatedAbilityDefinitionSubObjectListHandler Sut = new();
+
     private static readonly XmlTagDefinition Tag =
         XmlHandlerTestFixtures.MakeTag("Unit_Abilities_Data", XmlValueType.GuiActivatedAbilityDefinitionSubObjectList);
 

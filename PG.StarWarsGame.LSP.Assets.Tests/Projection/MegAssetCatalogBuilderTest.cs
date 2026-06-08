@@ -84,10 +84,10 @@ public sealed class MegAssetCatalogBuilderTest
         var megs = OneMeg("test.meg", [@"DATA\ART\TEXTURES\MEG_TEX.TGA"]);
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["C:/game/data/art/textures/loose_tex.tga"] = new MockFileData("")
+            ["C:/game/data/art/textures/loose_tex.tga"] = new("")
         });
 
-        var (assets, _) = Build(megs, fs, "C:/game");
+        var (assets, _) = Build(megs, fs);
 
         Assert.Contains("data/art/textures/meg_tex.tga", assets);
         Assert.Contains("data/art/textures/loose_tex.tga", assets);
@@ -100,7 +100,7 @@ public sealed class MegAssetCatalogBuilderTest
         // Last-seen entry wins (engine VFS semantics). The path is still in the set.
         var megs = new[]
         {
-            ("first.meg",  (IEnumerable<string>)new[] { @"DATA\ART\TEXTURES\SHARED.TGA" }),
+            ("first.meg", new[] { @"DATA\ART\TEXTURES\SHARED.TGA" }),
             ("second.meg", (IEnumerable<string>)new[] { @"DATA\ART\TEXTURES\SHARED.TGA" })
         };
         var fs = new MockFileSystem();
@@ -166,10 +166,10 @@ public sealed class MegAssetCatalogBuilderTest
     // ── SFX path conventions ──────────────────────────────────────────────────
 
     [Theory]
-    [InlineData("SFX2D_NON_LOCALIZED.MEG", "UNIT_ATTACK.WAV",       "data/audio/sfx/unit_attack.wav")]
-    [InlineData("SFX3D_NON_LOCALIZED.MEG", "AMBIENT_WIND.WAV",      "data/audio/sfx/ambient_wind.wav")]
-    [InlineData("SFX2D_ENGLISH.MEG",       "UNIT_MOVE_ENG.WAV",     "data/audio/sfx/unit_move.wav")]
-    [InlineData("SFX2D_ENGLISH.MEG",       "NO_SUFFIX.WAV",         "data/audio/sfx/no_suffix.wav")]
+    [InlineData("SFX2D_NON_LOCALIZED.MEG", "UNIT_ATTACK.WAV", "data/audio/sfx/unit_attack.wav")]
+    [InlineData("SFX3D_NON_LOCALIZED.MEG", "AMBIENT_WIND.WAV", "data/audio/sfx/ambient_wind.wav")]
+    [InlineData("SFX2D_ENGLISH.MEG", "UNIT_MOVE_ENG.WAV", "data/audio/sfx/unit_move.wav")]
+    [InlineData("SFX2D_ENGLISH.MEG", "NO_SUFFIX.WAV", "data/audio/sfx/no_suffix.wav")]
     public void ApplySfxConventions_FlatSfxEntry_PrefixedAndEngStripped(string megName, string rawPath, string expected)
     {
         Assert.Equal(expected, MegAssetCatalogBuilder.ApplySfxConventions(
@@ -196,7 +196,7 @@ public sealed class MegAssetCatalogBuilderTest
 
     [Theory]
     [InlineData("SFX2D_ENGLISH.MEG", @"DATA\AUDIO\SFX\SOUND_ENG.WAV", "data/audio/sfx/sound.wav")]
-    [InlineData("FoC_Art.meg",        @"DATA\ART\UNIT_ENG.ALO",        "data/art/unit_eng.alo")]
+    [InlineData("FoC_Art.meg", @"DATA\ART\UNIT_ENG.ALO", "data/art/unit_eng.alo")]
     public void ApplySfxConventions_EngSuffix_StrippedOnlyForAudio(string megName, string rawPath, string expected)
     {
         Assert.Equal(expected, MegAssetCatalogBuilder.ApplySfxConventions(
@@ -231,7 +231,11 @@ public sealed class MegAssetCatalogBuilderTest
 
         Func<string, Stream?> openEntry = path =>
             path == "data/art/textures/mt_commandbar.mtd" ? mtdStream : null;
-        IEnumerable<string> ExtractIcons(Stream _) => ["ICON_A.TGA", "ICON_B.TGA"];
+
+        IEnumerable<string> ExtractIcons(Stream _)
+        {
+            return ["ICON_A.TGA", "ICON_B.TGA"];
+        }
 
         var (assets, _) = Build(megs, new MockFileSystem(),
             openEntry: openEntry, extractMtdIcons: ExtractIcons);
@@ -260,7 +264,11 @@ public sealed class MegAssetCatalogBuilderTest
 
         Func<string, Stream?> openEntry = path =>
             path == "data/art/textures/mt_icons.mtd" ? mtdStream : null;
-        IEnumerable<string> ExtractIcons(Stream _) => ["BUTTON_ICON_ATTACK.TGA"];
+
+        IEnumerable<string> ExtractIcons(Stream _)
+        {
+            return ["BUTTON_ICON_ATTACK.TGA"];
+        }
 
         var (assets, _) = Build(megs, new MockFileSystem(),
             openEntry: openEntry, extractMtdIcons: ExtractIcons);
@@ -276,10 +284,13 @@ public sealed class MegAssetCatalogBuilderTest
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [@"C:\game\data\art\textures\mt_commandbar.mtd"] = new MockFileData([0x01, 0x02])
+            [@"C:\game\data\art\textures\mt_commandbar.mtd"] = new([0x01, 0x02])
         });
 
-        IEnumerable<string> ExtractIcons(Stream _) => ["ICON_LOOSE.TGA"];
+        IEnumerable<string> ExtractIcons(Stream _)
+        {
+            return ["ICON_LOOSE.TGA"];
+        }
 
         var (assets, _) = Build([], fs, extractMtdIcons: ExtractIcons);
 
@@ -291,10 +302,13 @@ public sealed class MegAssetCatalogBuilderTest
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [@"C:\game\tools\mt_commandbar.mtd"] = new MockFileData([0x01])
+            [@"C:\game\tools\mt_commandbar.mtd"] = new([0x01])
         });
 
-        IEnumerable<string> ExtractIcons(Stream _) => ["SHOULD_NOT_APPEAR.TGA"];
+        IEnumerable<string> ExtractIcons(Stream _)
+        {
+            return ["SHOULD_NOT_APPEAR.TGA"];
+        }
 
         var (assets, _) = Build([], fs, extractMtdIcons: ExtractIcons);
 
@@ -321,5 +335,7 @@ public sealed class MegAssetCatalogBuilderTest
     }
 
     private static IEnumerable<(string, IEnumerable<string>)> OneMeg(string name, IEnumerable<string> entries)
-        => [(name, entries)];
+    {
+        return [(name, entries)];
+    }
 }

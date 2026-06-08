@@ -48,6 +48,8 @@ public static class AssetFileEnumerator
         return builder.ToImmutable();
     }
 
-    private static string Normalize(string relativePath) =>
-        relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    private static string Normalize(string relativePath)
+    {
+        return relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    }
 }

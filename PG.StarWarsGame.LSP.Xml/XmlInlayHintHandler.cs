@@ -45,7 +45,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<InlayHintContainer?>(null);
 
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult<InlayHintContainer?>(null);
 
         var localisation = _indexService.Current.Localisation;

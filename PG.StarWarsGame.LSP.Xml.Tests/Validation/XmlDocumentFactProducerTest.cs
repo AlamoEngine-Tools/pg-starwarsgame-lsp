@@ -506,17 +506,29 @@ file sealed class SfxEventSchemaProvider : ISchemaProvider
         { TypeName = "SFXEvent", NameTag = "Name" };
 
     public XmlTagDefinition? GetTag(string tagName)
-        => tagName.Equals("Text_ID", StringComparison.OrdinalIgnoreCase) ? GlobalTextId : null;
+    {
+        return tagName.Equals("Text_ID", StringComparison.OrdinalIgnoreCase) ? GlobalTextId : null;
+    }
 
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
 
     public GameObjectTypeDefinition? GetObjectType(string typeName)
-        => typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? SfxEventTypeDef : null;
+    {
+        return typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? SfxEventTypeDef : null;
+    }
 
     public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        => typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? [SfxTextId] : [];
+    {
+        return typeName.Equals("SFXEvent", StringComparison.OrdinalIgnoreCase) ? [SfxTextId] : [];
+    }
 
-    public EnumDefinition? GetEnum(string _) => null;
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
 
     public IReadOnlyList<XmlTagDefinition> AllTags => [GlobalTextId, SfxTextId];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [SfxEventTypeDef];
@@ -537,11 +549,17 @@ file sealed class SfxEventFileTypeRegistry : IFileTypeRegistry
         new Dictionary<string, ImmutableArray<string>>();
 
     public ImmutableArray<string> GetTypesForFile(string _)
-        => ImmutableArray.Create("SFXEvent");
+    {
+        return ImmutableArray.Create("SFXEvent");
+    }
 
-    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) { }
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
 
-    public void UnregisterFile(string normalizedPath) { }
+    public void UnregisterFile(string normalizedPath)
+    {
+    }
 }
 
 file sealed class EmptyFileTypeRegistry : IFileTypeRegistry

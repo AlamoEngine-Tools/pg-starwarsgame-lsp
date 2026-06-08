@@ -69,23 +69,21 @@ public static class GroupMembershipExtractor
             }
 
             foreach (var element in doc.Descendants())
+            foreach (var child in element.Elements())
             {
-                foreach (var child in element.Elements())
-                {
-                    if (!groupTagsByName.TryGetValue(child.Name.LocalName, out var tagDef)) continue;
+                if (!groupTagsByName.TryGetValue(child.Name.LocalName, out var tagDef)) continue;
 
-                    var groupKey = child.Value.Trim();
-                    if (string.IsNullOrEmpty(groupKey)) continue;
+                var groupKey = child.Value.Trim();
+                if (string.IsNullOrEmpty(groupKey)) continue;
 
-                    var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber - 1 : 0;
-                    var memberTypeName = tagDef.ObjectType?.TypeName;
-                    var membership = new GroupMembership(groupKey, memberTypeName,
-                        new FileOrigin(filePath, line, null));
+                var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber - 1 : 0;
+                var memberTypeName = tagDef.ObjectType?.TypeName;
+                var membership = new GroupMembership(groupKey, memberTypeName,
+                    new FileOrigin(filePath, line, null));
 
-                    if (!result.TryGetValue(groupKey, out var list))
-                        result[groupKey] = list = new List<GroupMembership>();
-                    list.Add(membership);
-                }
+                if (!result.TryGetValue(groupKey, out var list))
+                    result[groupKey] = list = new List<GroupMembership>();
+                list.Add(membership);
             }
         }
 

@@ -49,10 +49,10 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         _logger.LogDebug("Hover request at {Line}:{Character}",
             request.Position.Line, request.Position.Character);
 
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<Hover?>(null);
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult<Hover?>(null);
         var hapDoc = XmlUtility.CreateHtmlDocument(doc.Text);
 
@@ -82,7 +82,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
             if (TryBuildReferenceHover(uri, lineIndex, charPos, locale, out var refHover))
                 return Task.FromResult<Hover?>(refHover);
             if (TryBuildAssetHover(node!, lineIndex, charPos, out var assetHover))
-                return Task.FromResult<Hover?>(assetHover);
+                return Task.FromResult(assetHover);
             return Task.FromResult<Hover?>(null);
         }
 
@@ -95,10 +95,8 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
 
         // Ability sub-object field: walk parent chain to find the containing ability type.
         if (typeDef is null)
-        {
             if (TryResolveContainingAbilityType(node, out var abilityTypeName))
                 typeDef = _schema.GetObjectType(abilityTypeName);
-        }
 
         // Registry-based fallback: for files with arbitrary element names, look up the type
         // via the registry and confirm the cursor is on a depth-1 type-container element.
@@ -159,6 +157,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
                 abilityTypeName = XmlUtility.ToPascalCase(n.Name);
                 return true;
             }
+
             // GuiActivatedAbilityDefinitionSubObjectList: all children are Unit_Ability → fixed schema type UnitAbility
             if (parentTag?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
             {
@@ -175,8 +174,8 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
     {
         var tagDef = _schema.GetTag(node.Name);
         if (tagDef is null || tagDef.ReferenceKind is not (
-            ReferenceKind.TextureFile or ReferenceKind.ModelFile or
-            ReferenceKind.AudioFile or ReferenceKind.MapFile))
+                ReferenceKind.TextureFile or ReferenceKind.ModelFile or
+                ReferenceKind.AudioFile or ReferenceKind.MapFile))
         {
             hover = null;
             return false;

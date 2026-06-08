@@ -12,6 +12,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -48,10 +49,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryFactProducer storyProducer,
         ILogger<XmlDiagnosticsPublisher> logger,
         IFileTypeRegistry fileTypeRegistry,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
-            fileTypeRegistry, fileHelper, 100)
+            fileTypeRegistry, fileHelper,
+            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds)
     {
     }
 

@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json;
-using AET.Modinfo.Model;
 using AET.Modinfo.Spec;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using CoreModinfoData = PG.StarWarsGame.LSP.Core.Project.ModinfoData;
+using ModinfoData = AET.Modinfo.Model.ModinfoData;
 
 namespace PG.StarWarsGame.LSP.Server.Project;
 
@@ -35,32 +35,29 @@ public sealed class ModProjectLoader
         var dto = JsonSerializer.Deserialize<ModProjectFileDto>(text, Options)
                   ?? throw new InvalidOperationException($"Failed to parse mod project file '{path}'.");
 
-        if (dto.Modinfo is not { } modinfoElement)
-            throw new InvalidOperationException(
-                $"Mod project file '{path}' is missing the required 'modinfo.name'.");
+        IModinfo? parsed = null;
+        if (dto.Modinfo is { } modinfoElement)
+            try
+            {
+                parsed = ModinfoData.Parse(modinfoElement.GetRawText());
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "Mod project file '{Path}' has an invalid modinfo section; modinfo will be ignored.", path);
+            }
 
-        IModinfo parsed;
-        try
-        {
-            parsed = AET.Modinfo.Model.ModinfoData.Parse(modinfoElement.GetRawText());
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidOperationException(
-                $"Mod project file '{path}' has an invalid 'modinfo' section: {ex.Message}", ex);
-        }
+        var name = dto.Name ?? _fileHelper.FileSystem.Path.GetFileNameWithoutExtension(path);
 
-        if (string.IsNullOrWhiteSpace(parsed.Name))
-            throw new InvalidOperationException(
-                $"Mod project file '{path}' is missing the required 'modinfo.name'.");
-
-        var modinfo = new CoreModinfoData(
-            parsed.Name,
-            parsed.Version?.ToString(),
-            parsed.Summary,
-            parsed.Icon,
-            parsed.Languages.Select(l => new ModinfoLanguageInfo(l.Code, (int)l.Support)).ToList(),
-            parsed.Custom.Count > 0 ? (object)parsed.Custom : null);
+        var modinfo = parsed is null
+            ? null
+            : new CoreModinfoData(
+                parsed.Name ?? string.Empty,
+                parsed.Version?.ToString(),
+                parsed.Summary,
+                parsed.Icon,
+                parsed.Languages.Select(l => new ModinfoLanguageInfo(l.Code, (int)l.Support)).ToList(),
+                parsed.Custom.Count > 0 ? (object)parsed.Custom : null);
 
         var directories = new DirectoryMap(
             Normalize(dto.Directories?.Xml),
@@ -84,7 +81,7 @@ public sealed class ModProjectLoader
             references.Add(new ProjectReference(NormalizePath(raw)));
         }
 
-        return new ModProjectFile(modinfo, directories, references);
+        return new ModProjectFile(name, modinfo, directories, references);
     }
 
     private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? paths)
@@ -99,6 +96,7 @@ public sealed class ModProjectLoader
 
     private sealed class ModProjectFileDto
     {
+        public string? Name { get; init; }
         public JsonElement? Modinfo { get; init; }
         public DirectoryMapDto? Directories { get; init; }
         public List<ProjectReferenceDto>? ProjectReferences { get; init; }

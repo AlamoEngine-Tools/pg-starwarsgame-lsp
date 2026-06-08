@@ -43,7 +43,7 @@ public sealed class XmlDocumentFactProducer(
         foreach (var root in doc.DocumentNode.ChildNodes)
         {
             if (root.NodeType != HtmlNodeType.Element) continue;
-            WalkNodes(root, facts, xmlText, isTypeContainerLevel, documentUri, context: initialContext);
+            WalkNodes(root, facts, xmlText, isTypeContainerLevel, documentUri, initialContext);
         }
 
         // Collect notes hints for every element in the document
@@ -73,12 +73,13 @@ public sealed class XmlDocumentFactProducer(
             foreach (var child in node.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
             {
                 var typeName = schema.GetObjectType(child.Name)?.TypeName
-                            ?? schema.GetObjectType(XmlUtility.ToPascalCase(child.Name))?.TypeName;
+                               ?? schema.GetObjectType(XmlUtility.ToPascalCase(child.Name))?.TypeName;
                 var childContext = typeName is not null
                     ? new TagResolutionContext(typeName, XmlUtility.GetDepth(child), child, context)
                     : context;
                 WalkNodes(child, facts, text, false, documentUri, childContext);
             }
+
             return;
         }
 
@@ -111,7 +112,7 @@ public sealed class XmlDocumentFactProducer(
             // AbilityDefinitionSubObjectList: each child element name IS the ability schema type (PascalCase).
             // GuiActivatedAbilityDefinitionSubObjectList: all children are the same ability type (Unit_Ability → UnitAbility).
             if (tagDef?.ValueType is XmlValueType.AbilityDefinitionSubObjectList
-                                   or XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
+                or XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
             {
                 foreach (var abilityNode in child.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
                 {
@@ -120,6 +121,7 @@ public sealed class XmlDocumentFactProducer(
                         abilityTypeName, XmlUtility.GetDepth(abilityNode), abilityNode, context);
                     WalkNodes(abilityNode, facts, text, false, documentUri, abilityContext);
                 }
+
                 continue;
             }
 
@@ -158,5 +160,7 @@ public sealed class XmlDocumentFactProducer(
     }
 
     private XmlTagDefinition? ResolveTag(string name, TagResolutionContext? context)
-        => XmlTagResolver.Resolve(schema, name, context);
+    {
+        return XmlTagResolver.Resolve(schema, name, context);
+    }
 }

@@ -17,72 +17,77 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 {
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
+    private readonly IStartupGate _gate;
     private readonly IGameIndexService _indexService;
-    private readonly IPreOpenBuffer _preOpenBuffer;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlTextDocumentSyncHandler(IGameWorkspaceHost workspaceHost, IGameIndexService indexService,
-        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IPreOpenBuffer preOpenBuffer)
+        IFileHelper fileHelper, IEaWXmlContext eaWXmlContext, IStartupGate gate)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
-        _preOpenBuffer = preOpenBuffer;
+        _gate = gate;
     }
 
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
 
-        if (!_eaWXmlContext.IsEaWXmlFile(uri))
+        // While the startup pipeline runs, the gate buffers this open and replays it after the
+        // index is built and the EaW directories are known. The IsEaWXmlFile gate is evaluated
+        // inside the thunk so it sees the populated context at run time.
+        await _gate.RunOrBufferAsync(async token =>
         {
-            // EaWXmlContext may not be configured yet (race with WorkspaceScanner).
-            // Buffer so the scanner can replay these after configuring the context.
-            _preOpenBuffer.RecordOpen(uri, text, version);
-            return Unit.Value;
-        }
-
-        _workspaceHost.AddOrUpdate(uri, text, version);
-        await _indexService.UpdateDocumentAsync(uri, text, version, ct);
+            if (!_eaWXmlContext.IsEaWXmlFile(uri)) return;
+            _workspaceHost.AddOrUpdate(uri, text, version);
+            await _indexService.UpdateDocumentAsync(uri, text, version, token);
+        }, ct);
         return Unit.Value;
     }
 
     public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
-        if (!_eaWXmlContext.IsEaWXmlFile(uri)) return Unit.Value;
-
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         var text = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
         var version = request.TextDocument.Version ?? 0;
 
-        _workspaceHost.AddOrUpdate(uri, text, version);
-        await _indexService.UpdateDocumentAsync(uri, text, version, ct);
+        await _gate.RunOrBufferAsync(async token =>
+        {
+            if (!_eaWXmlContext.IsEaWXmlFile(uri)) return;
+            _workspaceHost.AddOrUpdate(uri, text, version);
+            await _indexService.UpdateDocumentAsync(uri, text, version, token);
+        }, ct);
         return Unit.Value;
     }
 
     public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
     {
-        var uri = request.TextDocument.Uri.ToString();
-        if (!_eaWXmlContext.IsEaWXmlFile(uri)) return Unit.Value;
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
 
-        _workspaceHost.Remove(uri);
+        await _gate.RunOrBufferAsync(async token =>
+        {
+            if (!_eaWXmlContext.IsEaWXmlFile(uri)) return;
 
-        var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
-        if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
-            // File still on disk — restore the saved state so workspace-wide references
-            // (cross-file go-to-def, unresolved-ref diagnostics) keep working after close.
-            using (_indexService.BeginBulkUpdate())
-            {
+            _workspaceHost.Remove(uri);
+
+            var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
+            if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
+                // File still on disk — restore the saved state so workspace-wide references
+                // (cross-file go-to-def, unresolved-ref diagnostics) keep working after close.
+                using (_indexService.BeginBulkUpdate())
+                {
+                    _indexService.RemoveDocument(uri);
+                    var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
+                    await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                }
+            else
+                // File was deleted from disk — remove it entirely from the index.
                 _indexService.RemoveDocument(uri);
-                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, ct);
-                await _indexService.UpdateDocumentAsync(uri, text, 0, ct);
-            }
-        else
-            // File was deleted from disk — remove it entirely from the index.
-            _indexService.RemoveDocument(uri);
+        }, ct);
 
         return Unit.Value;
     }

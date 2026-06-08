@@ -8,6 +8,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -39,9 +40,11 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
-        ILogger<LuaDiagnosticsPublisher> logger)
+        ILogger<LuaDiagnosticsPublisher> logger,
+        ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p),
-            indexService, workspaceHost, fileHelper, schemaProvider, logger, 100)
+            indexService, workspaceHost, fileHelper, schemaProvider, logger,
+            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds)
     {
     }
 

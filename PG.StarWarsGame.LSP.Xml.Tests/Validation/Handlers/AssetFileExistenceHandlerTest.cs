@@ -16,8 +16,10 @@ public sealed class AssetFileExistenceHandlerTest
     private static readonly AudioFileExistenceHandler AudioSut = new();
     private static readonly MapFileExistenceHandler MapSut = new();
 
-    private static XmlTagDefinition Tag(ReferenceKind kind) =>
-        XmlHandlerTestFixtures.MakeTag("Texture", XmlValueType.NameReference, referenceKind: kind);
+    private static XmlTagDefinition Tag(ReferenceKind kind)
+    {
+        return XmlHandlerTestFixtures.MakeTag("Texture", XmlValueType.NameReference, referenceKind: kind);
+    }
 
     private static DiagnosticsContext CtxWith(params string[] paths)
     {

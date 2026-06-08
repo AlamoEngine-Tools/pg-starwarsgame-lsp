@@ -88,6 +88,8 @@ public static class BoneNameExtractor
         };
     }
 
-    private static string Normalize(string relativePath) =>
-        relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    private static string Normalize(string relativePath)
+    {
+        return relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+    }
 }

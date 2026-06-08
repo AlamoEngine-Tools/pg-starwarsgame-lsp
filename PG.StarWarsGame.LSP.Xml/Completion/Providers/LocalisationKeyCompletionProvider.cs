@@ -9,8 +9,10 @@ namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 
 public sealed class LocalisationKeyCompletionProvider : IXmlCompletionProvider
 {
-    public bool CanHandle(XmlTagDefinition tag) =>
-        tag.ReferenceKind == ReferenceKind.LocalisationKey;
+    public bool CanHandle(XmlTagDefinition tag)
+    {
+        return tag.ReferenceKind == ReferenceKind.LocalisationKey;
+    }
 
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex index)
     {

@@ -4,16 +4,75 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
+	ClientCapabilities,
 	ExecuteCommandRequest,
+	FeatureState,
 	LanguageClient,
 	LanguageClientOptions,
 	ServerOptions,
+	StaticFeature,
 	Trace,
 	TransportKind,
 } from 'vscode-languageclient/node';
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
+
+/**
+ * Forces every language-feature capability to be advertised STATICALLY (in the initialize response)
+ * rather than via dynamic `registerCapability`.
+ * 
+ * Reporting `dynamicRegistration = false` for each capability makes the server emit it in the static
+ * initialize response instead. Static capabilities are wired up deterministically at connect time,
+ * identically on every run, immune to the batch-abort. `executeCommand` is intentionally left dynamic
+ * (the extension owns those commands and forwards them via direct `sendRequest`, so its registration
+ * failing is harmless).
+ */
+class ForceStaticCapabilitiesFeature implements StaticFeature {
+	// Every textDocument client-capability that exposes a `dynamicRegistration` flag and that this
+	// server actually provides. `synchronization` MUST be included — it is what replays `didOpen`.
+	private static readonly capabilityKeys = [
+		'synchronization',
+		'completion',
+		'hover',
+		'signatureHelp',
+		'declaration',
+		'definition',
+		'typeDefinition',
+		'implementation',
+		'references',
+		'documentHighlight',
+		'documentSymbol',
+		'codeAction',
+		'codeLens',
+		'documentLink',
+		'rename',
+		'foldingRange',
+		'selectionRange',
+		'linkedEditingRange',
+		'inlayHint',
+	] as const;
+
+	fillClientCapabilities(capabilities: ClientCapabilities): void {
+		const textDocument = (capabilities.textDocument ??= {}) as Record<string, { dynamicRegistration?: boolean }>;
+		for (const key of ForceStaticCapabilitiesFeature.capabilityKeys) {
+			const capability = (textDocument[key] ??= {});
+			capability.dynamicRegistration = false;
+		}
+	}
+
+	initialize(): void {
+		// no-op: this feature only adjusts the advertised client capabilities.
+	}
+
+	getState(): FeatureState {
+		return { kind: 'static' };
+	}
+
+	clear(): void {
+		// no-op
+	}
+}
 
 let lspClient: LanguageClient | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
@@ -110,11 +169,15 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			baselineType:      cfg('lsp.source.baseline').get<string>('type', 'http'),
 			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
 			modPaths:          cfg('lsp').get<string[]>('modPaths', []),
-			xmlDirectories:    cfg('lsp').get<string[]>('xmlDirectories', []),
 		},
 	};
 
 	lspClient = new LanguageClient(CLIENT_ID, CLIENT_NAME, serverOptions, clientOptions);
+
+	// Must be registered before start(): forces every language-feature capability to be advertised
+	// statically, so registration is deterministic and immune to the dynamic-batch abort (and so
+	// already-open documents get a didOpen). Otherwise a random subset of features may fail.
+	lspClient.registerFeature(new ForceStaticCapabilitiesFeature());
 
 	if (statusItem) {
 		statusItem.text = '$(loading~spin) AET EaW LSP: starting…';
@@ -247,12 +310,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				placeHolder: 'My Awesome Mod',
 				validateInput: v => v?.trim() ? null : 'Name is required',
 			});
-			if (!name) return;
+			if (!name) {return;}
 			const folders = await vscode.window.showOpenDialog({
 				canSelectFolders: true, canSelectFiles: false, canSelectMany: false,
 				openLabel: 'Select mod root folder',
 			});
-			if (!folders?.length) return;
+			if (!folders?.length) {return;}
 			await lspClient.sendRequest(ExecuteCommandRequest.type, {
 				command: 'aet.newModProject',
 				arguments: [{ name: name.trim(), path: folders[0].fsPath }],
