@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server.Commands;
 
 public sealed class ReloadProjectCommandHandler : ExecuteCommandHandlerBase
 {
-    public const string CommandName = "aet.reloadProject";
+    public const string CommandName = "aet-eaw-edit.lsp.reloadProject";
 
     private readonly IModProjectReloadService _reloadService;
 

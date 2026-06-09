@@ -82,6 +82,17 @@ public sealed class LocalisationKeyExistenceHandlerTest
 
         Assert.Empty(results);
     }
+
+    [Fact]
+    public void AbsentKey_ResultHasCreateLocalisationKeySet()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(LocKeyTag, "TEXT_MISSING");
+        var ctx = CtxWithKeys("TEXT_OTHER");
+
+        var result = Assert.Single(Sut.Handle(fact, ctx));
+
+        Assert.Equal("TEXT_MISSING", result.CreateLocalisationKey);
+    }
 }
 
 file sealed class StubLocalisationIndex : ILocalisationIndex

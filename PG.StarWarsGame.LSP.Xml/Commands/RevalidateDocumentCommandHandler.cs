@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Xml.Commands;
 
 public sealed class RevalidateDocumentCommandHandler : ExecuteCommandHandlerBase
 {
-    public const string CommandName = "aet.revalidateDocument";
+    public const string CommandName = "aet-eaw-edit.lsp.revalidateDocument";
 
     private readonly IXmlDiagnosticsRevalidator _revalidator;
 

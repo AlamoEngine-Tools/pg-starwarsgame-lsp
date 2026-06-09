@@ -29,6 +29,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
     private readonly ILanguageService _langService;
     private readonly ILogger<LocalisationLoader> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
+    private readonly LocalisationProjectRegistry _registry;
     private readonly IXmlTranslationImporter _xmlImporter;
 
     public LocalisationLoader(
@@ -41,6 +42,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         ILspConfigurationProvider configProvider,
         IFileHelper fileHelper,
         IGameIndexService indexService,
+        LocalisationProjectRegistry registry,
         ILogger<LocalisationLoader> logger)
     {
         _baselineProvider = baselineProvider;
@@ -52,6 +54,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         _configProvider = configProvider;
         _fileHelper = fileHelper;
         _indexService = indexService;
+        _registry = registry;
         _logger = logger;
     }
 
@@ -83,6 +86,10 @@ public sealed class LocalisationLoader : ILocalisationLoader
                 ? locConfig.SourcePaths
                 : AutoDetectPaths(config.ModPaths, resourceType);
         }
+
+        _registry.Set(sourcePaths
+            .Select(p => new LocProjectInfo(Path.GetFileName(p), p, resourceType))
+            .ToList());
 
         if (sourcePaths.Count == 0)
         {

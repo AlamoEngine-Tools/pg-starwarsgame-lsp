@@ -342,10 +342,21 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Message = result.Message,
             Range = new Range(new Position(line, col), new Position(line, col + length)),
             Source = AppProperties.LspServerId,
-            Data = result.SuggestedFix is not null
-                ? JToken.FromObject(new { fix = result.SuggestedFix })
-                : null
+            Data = BuildDiagnosticData(result)
         };
+    }
+
+    private static JToken? BuildDiagnosticData(XmlDiagnosticResult result)
+    {
+        if (result.SuggestedFix is null && result.CreateLocalisationKey is null)
+            return null;
+
+        var obj = new JObject();
+        if (result.SuggestedFix is not null)
+            obj["fix"] = result.SuggestedFix;
+        if (result.CreateLocalisationKey is not null)
+            obj["createLocKey"] = result.CreateLocalisationKey;
+        return obj;
     }
 
     private static DiagnosticSeverity? MapSeverity(XmlDiagnosticSeverity severity)

@@ -100,6 +100,61 @@ public sealed class XmlCodeActionHandlerTest
         Assert.Equal("2", actions[1].CodeAction!.Edit!.Changes![docUri].Single().NewText);
     }
 
+    [Fact]
+    public async Task DiagnosticWithCreateLocKey_ReturnsCommandAction()
+    {
+        const string uri = "file:///test.xml";
+        var range = new LspRange(new Position(3, 4), new Position(3, 16));
+        var d = DiagWithCreateLocKey(range, "TEXT_FOO");
+        var request = ParamsWithDiagnostics(uri, d);
+
+        var result = await MakeSut().Handle(request, CancellationToken.None);
+
+        var action = Assert.Single(result!).CodeAction;
+        Assert.NotNull(action);
+        Assert.Equal(CodeActionKind.QuickFix, action.Kind);
+        Assert.Contains("TEXT_FOO", action.Title);
+        Assert.NotNull(action.Command);
+        Assert.Null(action.Edit);
+    }
+
+    [Fact]
+    public async Task DiagnosticWithCreateLocKey_CommandNameAndArgAreCorrect()
+    {
+        const string uri = "file:///test.xml";
+        var range = new LspRange(new Position(3, 4), new Position(3, 16));
+        var request = ParamsWithDiagnostics(uri, DiagWithCreateLocKey(range, "TEXT_BAR"));
+
+        var result = await MakeSut().Handle(request, CancellationToken.None);
+
+        var command = result!.Single().CodeAction!.Command!;
+        Assert.Equal("aet-eaw-edit.lsp.createLocalisationKey", command.Name);
+        var arg = command.Arguments![0];
+        Assert.Equal("TEXT_BAR", arg.Value<string>());
+    }
+
+    [Fact]
+    public async Task DiagnosticWithBothFixAndCreateLocKey_ReturnsTwoActions()
+    {
+        const string uri = "file:///test.xml";
+        var range = new LspRange(new Position(0, 0), new Position(0, 8));
+        var d = new Diagnostic
+        {
+            Range = range,
+            Data = JToken.FromObject(new { fix = "suggested", createLocKey = "TEXT_BOTH" })
+        };
+        var request = ParamsWithDiagnostics(uri, d);
+
+        var result = await MakeSut().Handle(request, CancellationToken.None);
+
+        Assert.Equal(2, result!.Count());
+    }
+
+    private static Diagnostic DiagWithCreateLocKey(LspRange range, string key)
+    {
+        return new Diagnostic { Range = range, Data = JToken.FromObject(new { createLocKey = key }) };
+    }
+
     private sealed class EmptyFixCache : IXmlFixCache
     {
         public string? GetSuggestedFix(string uri, int startLine, int startChar)

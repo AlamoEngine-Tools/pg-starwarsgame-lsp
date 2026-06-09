@@ -20,6 +20,24 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aet-localisation",
+          "title": "AET Localisation",
+          "icon": "resources/icons/localisation.svg"
+        }
+      ]
+    },
+    "views": {
+      "aet-localisation": [
+        {
+          "type": "webview",
+          "id": "aet-eaw-edit.lsp.localisationEditor",
+          "name": "Localisation Editor"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "aet-eaw-edit.lsp.debug.forceStartup",
@@ -35,12 +53,16 @@
         "title": "EaWEdit: Re-validate Workspace"
       },
       {
-        "command": "aet.newModProject",
+        "command": "aet-eaw-edit.lsp.newModProject",
         "title": "EaWEdit: New Mod Project"
       },
       {
-        "command": "aet.reloadProject",
+        "command": "aet-eaw-edit.lsp.reloadProject",
         "title": "EaWEdit: Reload Mod Project"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.initLocalisationProject",
+        "title": "AET: Initialise Localisation Project from Baseline"
       }
     ],
     "configuration": {

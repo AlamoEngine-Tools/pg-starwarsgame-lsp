@@ -606,6 +606,37 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Null(diag.Data);
     }
 
+    [Fact]
+    public void ToLspDiagnostic_WhenHandlerReturnsCreateLocKey_EmbedsCreateLocKey_In_DiagnosticData()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition { Tag = "TextId", ValueType = XmlValueType.NameReference });
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribedWithHandlers(schema, [new CreateLocKeyStubHandler()]);
+
+        workspaceHost.Set("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diag = Assert.Single(published.Single().Diagnostics!);
+        Assert.Equal("TEXT_FOO", diag.Data?["createLocKey"]?.Value<string>());
+    }
+
+    [Fact]
+    public void ToLspDiagnostic_WhenHandlerReturnsBothFixAndCreateLocKey_BothEmbeddedInData()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition { Tag = "TextId", ValueType = XmlValueType.NameReference });
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribedWithHandlers(schema, [new FixAndCreateLocKeyStubHandler()]);
+
+        workspaceHost.Set("file:///test.xml", "<Root><TextId>TEXT_FOO</TextId></Root>");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diag = Assert.Single(published.Single().Diagnostics!);
+        Assert.Equal("suggested_fix", diag.Data?["fix"]?.Value<string>());
+        Assert.Equal("TEXT_FOO", diag.Data?["createLocKey"]?.Value<string>());
+    }
+
     // ── revalidation ────────────────────────────────────────────────────────────
 
     private static (XmlDiagnosticsPublisher publisher,
@@ -734,6 +765,24 @@ public sealed class XmlDiagnosticsPublisherTest
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
         {
             return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "stub warning no fix")];
+        }
+    }
+
+    private sealed class CreateLocKeyStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "missing loc key",
+                CreateLocalisationKey: fact.RawValue)];
+        }
+    }
+
+    private sealed class FixAndCreateLocKeyStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "both set",
+                SuggestedFix: "suggested_fix", CreateLocalisationKey: fact.RawValue)];
         }
     }
 

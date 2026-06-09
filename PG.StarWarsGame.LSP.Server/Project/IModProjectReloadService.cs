@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Workspace;
+
 namespace PG.StarWarsGame.LSP.Server.Project;
 
 public interface IModProjectReloadService
@@ -8,6 +10,13 @@ public interface IModProjectReloadService
     // The asset roots resolved by the most recent successful load. Consumed by the watched-files
     // handler to re-glob loose asset files when one changes on disk. Null until the first load.
     IReadOnlyList<string>? LastAssetRoots { get; }
+
+    // The workspace configuration resolved by the most recent successful load. Null until the
+    // first successful load that finds a .pgproj.
+    WorkspaceConfiguration? LastWorkspaceConfig { get; }
+
+    // The workspace roots passed to the most recent LoadAsync call. Null until the first load.
+    IReadOnlyList<string>? LastWorkspaceRoots { get; }
 
     // Initial load — called from the startup pipeline with the workspace roots from the LSP
     // initialize request. Resolves the .pgproj and indexes the declared directories. A no-op

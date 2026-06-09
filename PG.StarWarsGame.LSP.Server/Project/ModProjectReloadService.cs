@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -35,17 +36,21 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     }
 
     public IReadOnlyList<string>? LastAssetRoots { get; private set; }
+    public WorkspaceConfiguration? LastWorkspaceConfig { get; private set; }
+    public IReadOnlyList<string>? LastWorkspaceRoots { get; private set; }
 
     public async Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
     {
         var roots = workspaceRoots.ToList();
         _lastRoots = roots;
+        LastWorkspaceRoots = roots;
 
         var config = _resolver.Resolve(roots);
         if (config is null)
             // No project file (the resolver already logged); nothing to index.
             return;
 
+        LastWorkspaceConfig = config;
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);
         _indexer.ApplyAssetCatalog(config.AssetRoots);

@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -71,6 +72,11 @@ public static class ServerConfigurator
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithHandler<ReloadProjectCommandHandler>()
             .WithHandler<NewModProjectCommandHandler>()
+            .WithHandler<InitLocalisationProjectCommandHandler>()
+            .WithHandler<CreateLocalisationKeyCommandHandler>()
+            .WithHandler<GetLocalisationProjectsHandler>()
+            .WithHandler<GetBaselineEntriesHandler>()
+            .WithHandler<GetLanguagesHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
@@ -127,7 +133,15 @@ public static class ServerConfigurator
                 services.AddLuaLanguageServices();
                 services.AddXmlLanguageServices();
                 services.SupportLocalisationBaseline();
+                services.AddSingleton<LocalisationProjectRegistry>();
+                services.AddSingleton<ILocalisationProjectRegistry>(
+                    sp => sp.GetRequiredService<LocalisationProjectRegistry>());
                 services.AddSingleton<ILocalisationLoader, LocalisationLoader>();
+                services.AddSingleton<LocalisationIndexChangedNotifier>(sp =>
+                    new LocalisationIndexChangedNotifier(
+                        sp.GetRequiredService<IGameIndexService>(),
+                        method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
+                        sp.GetRequiredService<ILogger<LocalisationIndexChangedNotifier>>()));
 
                 // GameHoverHandler routes by extension to one of these providers.
                 // Registered as interfaces only so DryIoc does not see them as competing IHoverHandler registrations.
@@ -194,6 +208,7 @@ public static class ServerConfigurator
                     // IndexChanged before the index is populated.
                     server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
                     server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
+                    server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
                     var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
                     var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
                     var reload = server.Services.GetRequiredService<IModProjectReloadService>();

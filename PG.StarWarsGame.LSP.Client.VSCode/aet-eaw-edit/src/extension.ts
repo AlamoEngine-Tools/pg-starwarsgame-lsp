@@ -14,6 +14,7 @@ import {
 	Trace,
 	TransportKind,
 } from 'vscode-languageclient/node';
+import { LocalisationEditorViewProvider } from './localisationEditorViewProvider';
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
@@ -74,7 +75,11 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 	}
 }
 
+interface LocProjectInfo { label: string; filePath: string; resourceType: string; }
+interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; }
+
 let lspClient: LanguageClient | undefined;
+let localisationEditorProvider: LocalisationEditorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
 let traceChannel: vscode.OutputChannel | undefined;
 let log: vscode.OutputChannel | undefined;
@@ -170,6 +175,50 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
 			modPaths:          cfg('lsp').get<string[]>('modPaths', []),
 		},
+		middleware: {
+			executeCommand: async (command, args, next) => {
+				if (command !== 'aet-eaw-edit.lsp.createLocalisationKey') {
+					return next(command, args);
+				}
+
+				const keyName = (args[0] as string | undefined) ?? '';
+				if (!keyName) {
+					vscode.window.showWarningMessage('AET: no localisation key name provided.');
+					return;
+				}
+
+				let projects: LocProjectInfo[] = [];
+				try {
+					const result = await lspClient!.sendRequest<GetLocalisationProjectsResult>(
+						'aet/getLocalisationProjects', {});
+					projects = result.projects ?? [];
+				} catch {
+					vscode.window.showWarningMessage('AET: could not fetch localisation projects from server.');
+					return;
+				}
+
+				if (!projects.length) {
+					vscode.window.showWarningMessage(
+						"AET: no localisation projects found. Use 'AET: Initialise Localisation Project from Baseline' first.");
+					return;
+				}
+
+				const picked = await vscode.window.showQuickPick(
+					projects.map(p => ({ label: p.label, description: p.filePath, detail: p.resourceType, filePath: p.filePath })),
+					{ title: `Create localisation key '${keyName}'`, placeHolder: 'Select localisation project' }
+				);
+				if (!picked) { return; }
+
+				const english = await vscode.window.showInputBox({
+					title: `New key: ${keyName}`,
+					prompt: 'English translation text (required)',
+					validateInput: v => (v?.trim() ? null : 'Translation text is required'),
+				});
+				if (english === undefined) { return; }
+
+				await next(command, [keyName, picked.filePath, { ENGLISH: english }]);
+			},
+		},
 	};
 
 	lspClient = new LanguageClient(CLIENT_ID, CLIENT_NAME, serverOptions, clientOptions);
@@ -221,6 +270,11 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			statusItem.text = '$(check) AET EaW LSP';
 		}
 	});
+
+	lspClient.onNotification('aet/localisationIndexUpdated', async () => {
+		logLine('Localisation index updated — refreshing editor panel.');
+		await localisationEditorProvider?.refresh();
+	});
 }
 
 async function stopLspClient(): Promise<void> {
@@ -232,6 +286,14 @@ async function stopLspClient(): Promise<void> {
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
+
+	localisationEditorProvider = new LocalisationEditorViewProvider(() => lspClient);
+	context.subscriptions.push(
+		vscode.window.registerWebviewViewProvider(
+			LocalisationEditorViewProvider.viewId,
+			localisationEditorProvider
+		)
+	);
 
 	statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
 	statusItem.tooltip = CLIENT_NAME;
@@ -303,7 +365,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('aet.newModProject', async () => {
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.newModProject', async () => {
 			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
 			const name = await vscode.window.showInputBox({
 				prompt: 'Mod name',
@@ -317,7 +379,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			});
 			if (!folders?.length) {return;}
 			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet.newModProject',
+				command: 'aet-eaw-edit.lsp.newModProject',
 				arguments: [{ name: name.trim(), path: folders[0].fsPath }],
 			});
 			vscode.window.showInformationMessage(`Mod project '${name.trim()}' created.`);
@@ -325,12 +387,32 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	context.subscriptions.push(
-		vscode.commands.registerCommand('aet.reloadProject', async () => {
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.reloadProject', async () => {
 			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
 			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet.reloadProject',
+				command: 'aet-eaw-edit.lsp.reloadProject',
 				arguments: [],
 			});
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.initLocalisationProject', async () => {
+			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
+			const formatItem = await vscode.window.showQuickPick(
+				[
+					{ label: 'CSV', description: 'Comma-separated values (.csv)' },
+					{ label: 'XML', description: 'eaw-translation v1 XML (.xml)' },
+					{ label: 'NLS', description: 'Java-style properties (.properties)' },
+				],
+				{ title: 'Initialise Localisation Project from Baseline', placeHolder: 'Select output format' }
+			);
+			if (!formatItem) { return; }
+			await lspClient.sendRequest(ExecuteCommandRequest.type, {
+				command: 'aet-eaw-edit.lsp.initLocalisationProject',
+				arguments: [{ format: formatItem.label }],
+			});
+			vscode.window.showInformationMessage(`Localisation project initialised (${formatItem.label}).`);
 		}),
 	);
 

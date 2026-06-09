@@ -59,7 +59,7 @@ public sealed class LocalisationLoaderTest
             }
         };
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_MY_UNIT_NAME"));
@@ -82,7 +82,7 @@ public sealed class LocalisationLoaderTest
             Localisation = new LocalisationConfig { ResourceType = "Csv" }
         };
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_AUTO_DETECT_KEY"));
@@ -97,7 +97,7 @@ public sealed class LocalisationLoaderTest
             Localisation = new LocalisationConfig { ResourceType = "Csv" }
         };
 
-        var (loader, indexService) = BuildLoader(new MockFileSystem(), config);
+        var (loader, indexService, _) = BuildLoader(new MockFileSystem(), config);
         await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.NotNull(indexService.Current.Localisation);
@@ -121,7 +121,7 @@ public sealed class LocalisationLoaderTest
             }
         };
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         var ex = await Record.ExceptionAsync(() =>
             loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None));
 
@@ -146,7 +146,7 @@ public sealed class LocalisationLoaderTest
             }
         };
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("KEY_A"));
@@ -173,7 +173,7 @@ public sealed class LocalisationLoaderTest
 
         var workspaceConfig = new WorkspaceConfiguration([], [], ["/mod/text"], [], "Csv");
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         await loader.LoadAsync(workspaceConfig, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_PGPROJ_KEY"));
@@ -198,7 +198,7 @@ public sealed class LocalisationLoaderTest
 
         var workspaceConfig = new WorkspaceConfiguration([], [], ["/mod/text"], [], null);
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         await loader.LoadAsync(workspaceConfig, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_FALLBACK_TYPE"));
@@ -228,16 +228,98 @@ public sealed class LocalisationLoaderTest
         // TextRoots empty — workspace TextResourceType should be ignored.
         var workspaceConfig = new WorkspaceConfiguration([], [], [], [], "Dat");
 
-        var (loader, indexService) = BuildLoader(fs, config);
+        var (loader, indexService, _) = BuildLoader(fs, config);
         await loader.LoadAsync(workspaceConfig, CancellationToken.None);
 
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_HEURISTIC_KEY"));
     }
 
+    // ── registry-population tests ────────────────────────────────────────────
+
+    [Fact]
+    public async Task LoadAsync_CsvFileAtExplicitSourcePath_RegistryContainsProject()
+    {
+        const string csvPath = "/mod/text/my_text.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [csvPath] = new("key,ENGLISH\nTEXT_X,X")
+        });
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig { ResourceType = "Csv", SourcePaths = [csvPath] }
+        };
+
+        var (loader, _, registry) = BuildLoader(fs, config);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
+
+        Assert.Single(registry.Projects);
+        Assert.Equal(csvPath, registry.Projects[0].FilePath);
+        Assert.Equal("Csv", registry.Projects[0].ResourceType);
+    }
+
+    [Fact]
+    public async Task LoadAsync_MultipleSourcePaths_RegistryContainsAllProjects()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/text/a.csv"] = new("key,ENGLISH\nKEY_A,A"),
+            ["/mod/text/b.csv"] = new("key,ENGLISH\nKEY_B,B")
+        });
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig
+            {
+                ResourceType = "Csv",
+                SourcePaths = ["/mod/text/a.csv", "/mod/text/b.csv"]
+            }
+        };
+
+        var (loader, _, registry) = BuildLoader(fs, config);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
+
+        Assert.Equal(2, registry.Projects.Count);
+    }
+
+    [Fact]
+    public async Task LoadAsync_NoLocalisationFilesFound_RegistryIsEmpty()
+    {
+        var config = new LspConfiguration
+        {
+            ModPaths = ["/mod"],
+            Localisation = new LocalisationConfig { ResourceType = "Csv" }
+        };
+
+        var (loader, _, registry) = BuildLoader(new MockFileSystem(), config);
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
+
+        Assert.Empty(registry.Projects);
+    }
+
+    [Fact]
+    public async Task LoadAsync_TextRootsMode_RegistryContainsDiscoveredFile()
+    {
+        const string csvPath = "/mod/text/localisation.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [csvPath] = new("key,ENGLISH\nTEXT_PGPROJ_KEY,Hello")
+        });
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig { ResourceType = "Dat", SourcePaths = [] }
+        };
+        var workspaceConfig = new WorkspaceConfiguration([], [], ["/mod/text"], [], "Csv");
+
+        var (loader, _, registry) = BuildLoader(fs, config);
+        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+
+        Assert.Single(registry.Projects);
+        Assert.Equal("localisation.csv", Path.GetFileName(registry.Projects[0].FilePath));
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static (LocalisationLoader loader, IGameIndexService indexService) BuildLoader(
-        IFileSystem fs, LspConfiguration config)
+    private static (LocalisationLoader loader, IGameIndexService indexService,
+        LocalisationProjectRegistry registry) BuildLoader(IFileSystem fs, LspConfiguration config)
     {
         var services = new ServiceCollection();
 
@@ -251,10 +333,14 @@ public sealed class LocalisationLoaderTest
             new GameIndexService(sp.GetRequiredService<IFileHelper>(), [],
                 NullLogger<GameIndexService>.Instance));
         services.AddSingleton<ILogger<LocalisationLoader>>(NullLogger<LocalisationLoader>.Instance);
+        services.AddSingleton<LocalisationProjectRegistry>();
+        services.AddSingleton<ILocalisationProjectRegistry>(
+            sp => sp.GetRequiredService<LocalisationProjectRegistry>());
 
         var sp = services.BuildServiceProvider();
         var loader = ActivatorUtilities.CreateInstance<LocalisationLoader>(sp);
-        return (loader, sp.GetRequiredService<IGameIndexService>());
+        return (loader, sp.GetRequiredService<IGameIndexService>(),
+            sp.GetRequiredService<LocalisationProjectRegistry>());
     }
 }
 

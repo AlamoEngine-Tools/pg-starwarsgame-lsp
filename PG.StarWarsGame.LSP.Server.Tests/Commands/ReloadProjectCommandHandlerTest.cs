@@ -25,6 +25,8 @@ public sealed class ReloadProjectCommandHandlerTest
         public int ReloadCallCount { get; private set; }
 
         public IReadOnlyList<string>? LastAssetRoots => null;
+        public PG.StarWarsGame.LSP.Core.Workspace.WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
         {

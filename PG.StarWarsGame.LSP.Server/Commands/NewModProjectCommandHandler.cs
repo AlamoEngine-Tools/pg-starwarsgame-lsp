@@ -15,7 +15,7 @@ namespace PG.StarWarsGame.LSP.Server.Commands;
 
 public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 {
-    public const string CommandName = "aet.newModProject";
+    public const string CommandName = "aet-eaw-edit.lsp.newModProject";
 
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
@@ -32,7 +32,7 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
     {
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
-            _logger.LogWarning("aet.newModProject invoked without arguments; nothing created.");
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without arguments; nothing created.");
             return Unit.Task;
         }
 
@@ -41,13 +41,13 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 
         if (string.IsNullOrWhiteSpace(name))
         {
-            _logger.LogWarning("aet.newModProject invoked without a mod name; nothing created.");
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without a mod name; nothing created.");
             return Unit.Task;
         }
 
         if (string.IsNullOrWhiteSpace(path))
         {
-            _logger.LogWarning("aet.newModProject invoked without a target path; nothing created.");
+            _logger.LogWarning("aet-eaw-edit.lsp.newModProject invoked without a target path; nothing created.");
             return Unit.Task;
         }
 
@@ -58,7 +58,7 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
         if (fs.File.Exists(pgprojPath))
         {
             _logger.LogWarning(
-                "aet.newModProject: project file '{Path}' already exists; nothing created.", pgprojPath);
+                "aet-eaw-edit.lsp.newModProject: project file '{Path}' already exists; nothing created.", pgprojPath);
             return Unit.Task;
         }
 
@@ -66,7 +66,7 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
         WritePgproj(pgprojPath, name);
         WriteModinfo(fs.Path.Combine(path, "modinfo.json"), name);
 
-        _logger.LogInformation("aet.newModProject: created mod project '{Name}' at '{Path}'.", name, path);
+        _logger.LogInformation("aet-eaw-edit.lsp.newModProject: created mod project '{Name}' at '{Path}'.", name, path);
         return Unit.Task;
     }
 

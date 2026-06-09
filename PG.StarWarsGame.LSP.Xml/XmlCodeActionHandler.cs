@@ -23,16 +23,18 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
         var uri = request.TextDocument.Uri;
         var uriString = uri.ToString();
 
-        var actions = request.Context.Diagnostics
-            .Select(d =>
-            {
-                // Prefer data echoed back by the client; fall back to server-side cache
-                var fix = d.Data?["fix"]?.Value<string>()
-                          ?? _fixCache.GetSuggestedFix(uriString, d.Range.Start.Line, d.Range.Start.Character);
-                return fix is not null ? (CommandOrCodeAction?)BuildAction(uri, d, fix) : null;
-            })
-            .Where(a => a is not null)
-            .Cast<CommandOrCodeAction>();
+        var actions = new List<CommandOrCodeAction>();
+        foreach (var d in request.Context.Diagnostics)
+        {
+            var fix = d.Data?["fix"]?.Value<string>()
+                      ?? _fixCache.GetSuggestedFix(uriString, d.Range.Start.Line, d.Range.Start.Character);
+            if (fix is not null)
+                actions.Add(BuildFixAction(uri, d, fix));
+
+            var locKey = d.Data?["createLocKey"]?.Value<string>();
+            if (locKey is not null)
+                actions.Add(BuildCreateLocKeyAction(d, locKey));
+        }
 
         return Task.FromResult<CommandOrCodeActionContainer?>(new CommandOrCodeActionContainer(actions));
     }
@@ -53,7 +55,7 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
         };
     }
 
-    private static CodeAction BuildAction(DocumentUri docUri, Diagnostic d, string fix)
+    private static CodeAction BuildFixAction(DocumentUri docUri, Diagnostic d, string fix)
     {
         return new CodeAction
         {
@@ -67,6 +69,22 @@ public sealed class XmlCodeActionHandler : CodeActionHandlerBase
                 {
                     [docUri] = [new TextEdit { Range = d.Range, NewText = fix }]
                 }
+            }
+        };
+    }
+
+    private static CodeAction BuildCreateLocKeyAction(Diagnostic d, string keyName)
+    {
+        return new CodeAction
+        {
+            Title = $"Create localisation key '{keyName}'",
+            Kind = CodeActionKind.QuickFix,
+            Diagnostics = new Container<Diagnostic>(d),
+            Command = new Command
+            {
+                Name = "aet-eaw-edit.lsp.createLocalisationKey",
+                Title = "Create localisation key",
+                Arguments = new JArray(keyName)
             }
         };
     }

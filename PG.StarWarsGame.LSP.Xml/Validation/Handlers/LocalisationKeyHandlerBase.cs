@@ -31,6 +31,7 @@ public abstract class LocalisationKeyHandlerBase : SingleValueTypeHandlerBase
             return null;
 
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-            $"Localisation key '{key}' was not found in the loaded translation databases.");
+            $"Localisation key '{key}' was not found in the loaded translation databases.",
+            CreateLocalisationKey: key);
     }
 }
