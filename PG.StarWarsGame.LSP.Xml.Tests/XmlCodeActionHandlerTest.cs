@@ -4,6 +4,7 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Xml.CodeActions;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -12,7 +13,11 @@ public sealed class XmlCodeActionHandlerTest
 {
     private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null)
     {
-        return new XmlCodeActionHandler(cache ?? new EmptyFixCache());
+        var registry = new XmlCodeActionRegistry([
+            new FixSuggestionCodeActionProvider(cache ?? new EmptyFixCache()),
+            new CreateLocKeyCodeActionProvider()
+        ]);
+        return new XmlCodeActionHandler(registry);
     }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)

@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Util;
 using IFileHelper = PG.StarWarsGame.LSP.Core.Util.IFileHelper;
 
@@ -22,6 +23,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     private readonly ILogger<XmlInlayHintHandler> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlInlayHintRegistry _registry;
 
     public XmlInlayHintHandler(
         IGameWorkspaceHost workspaceHost,
@@ -29,7 +31,8 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
-        ILogger<XmlInlayHintHandler> logger)
+        ILogger<XmlInlayHintHandler> logger,
+        IXmlInlayHintRegistry registry)
     {
         _workspaceHost = workspaceHost;
         _indexService = indexService;
@@ -37,6 +40,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
         _logger = logger;
+        _registry = registry;
     }
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
@@ -48,11 +52,11 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult<InlayHintContainer?>(null);
 
-        var localisation = _indexService.Current.Localisation;
+        var index = _indexService.Current;
         var range = request.Range;
+        var hapDoc = XmlUtility.CreateHtmlDocument(doc.Text);
         var hints = new List<InlayHint>();
 
-        var hapDoc = XmlUtility.CreateHtmlDocument(doc.Text);
         foreach (var node in hapDoc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
         {
@@ -61,24 +65,15 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
                 continue;
 
             var tagDef = _schema.GetTag(node.Name);
-            if (tagDef?.ReferenceKind != ReferenceKind.LocalisationKey)
+            if (tagDef is null)
                 continue;
 
-            var key = node.InnerText.Trim();
-            if (string.IsNullOrEmpty(key))
-                continue;
-
-            var translated = localisation.GetValue(key) ?? key + ": MISSING";
-
-            hints.Add(new InlayHint
+            var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line);
+            foreach (var hint in _registry.Dispatch(ctx))
             {
-                Position = new Position(line, int.MaxValue),
-                Label = $"= \"{translated}\""!,
-                Kind = InlayHintKind.Type,
-                PaddingLeft = true
-            });
-
-            _logger.LogDebug("InlayHint: {Key} → \"{Value}\" at line {Line}", key, translated, line);
+                _logger.LogDebug("InlayHint at line {Line}", line);
+                hints.Add(hint);
+            }
         }
 
         return Task.FromResult<InlayHintContainer?>(new InlayHintContainer(hints));

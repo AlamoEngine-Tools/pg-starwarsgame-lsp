@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.HoverStrategies;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -40,9 +41,16 @@ public sealed class XmlHoverHandlerTest
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
         var config = new FakeConfigProvider();
+        var fileTypeRegistry = registry ?? new FakeFileTypeRegistry();
+        var strategyRegistry = new XmlHoverStrategyRegistry([
+            new ReferenceHoverStrategy(),
+            new AssetHoverStrategy(),
+            new TagNameHoverStrategy(fileTypeRegistry)
+        ]);
         return (new XmlHoverHandler(host, indexService ?? new FakeIndexService(), schema, config,
-                NullLogger<XmlHoverHandler>.Instance, registry ?? new FakeFileTypeRegistry(),
-                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext()),
+                NullLogger<XmlHoverHandler>.Instance,
+                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
+                strategyRegistry),
             host, schema, config);
     }
 

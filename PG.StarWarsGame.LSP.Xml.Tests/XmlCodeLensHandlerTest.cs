@@ -11,7 +11,9 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
+using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
@@ -65,9 +67,11 @@ public sealed class XmlCodeLensHandlerTest
         IFileHelper? fileHelper = null)
     {
         var svc = new FakeIndexService { Current = index };
+        var registry = new XmlCodeLensRegistry([new ReferencesCodeLensProvider()]);
         return new XmlCodeLensHandler(svc, NullLogger<XmlCodeLensHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
-            fileHelper ?? new FileHelper(new MockFileSystem()));
+            fileHelper ?? new FileHelper(new MockFileSystem()),
+            registry);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -253,7 +257,7 @@ public sealed class XmlCodeLensHandlerTest
     public async Task Resolve_ReturnsLensUnchanged()
     {
         var handler = BuildHandler(GameIndex.Empty);
-        var lens = new CodeLens { Range = new LspRange(new Position(0, 0), new Position(0, 0)) };
+        var lens = new LspCodeLens { Range = new LspRange(new Position(0, 0), new Position(0, 0)) };
 
         var result = await handler.Handle(lens, CancellationToken.None);
 

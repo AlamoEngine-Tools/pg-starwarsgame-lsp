@@ -1,0 +1,11 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
+
+namespace PG.StarWarsGame.LSP.Xml.CodeLens;
+
+public interface IXmlCodeLensRegistry
+{
+    IEnumerable<LspCodeLens> Dispatch(CodeLensSymbolContext ctx);
+}

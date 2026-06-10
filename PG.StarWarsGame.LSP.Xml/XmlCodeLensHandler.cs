@@ -2,14 +2,14 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Xml.CodeLens;
+using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -19,14 +19,20 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlCodeLensHandler> _logger;
+    private readonly IXmlCodeLensRegistry _registry;
 
-    public XmlCodeLensHandler(IGameIndexService indexService, ILogger<XmlCodeLensHandler> logger,
-        IEaWXmlContext eaWXmlContext, IFileHelper fileHelper)
+    public XmlCodeLensHandler(
+        IGameIndexService indexService,
+        ILogger<XmlCodeLensHandler> logger,
+        IEaWXmlContext eaWXmlContext,
+        IFileHelper fileHelper,
+        IXmlCodeLensRegistry registry)
     {
         _indexService = indexService;
         _logger = logger;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
+        _registry = registry;
     }
 
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
@@ -39,54 +45,24 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
         if (!index.Documents.TryGetValue(uri, out var docIndex))
             return Task.FromResult<CodeLensContainer?>(new CodeLensContainer());
 
-        var lenses = new List<CodeLens>();
+        var lenses = new List<LspCodeLens>();
         foreach (var symbol in docIndex.Symbols)
         {
             if (symbol.Origin is not FileOrigin fo)
                 continue;
 
-            var count = index.WorkspaceReferences.TryGetValue(symbol.Id, out var refs) ? refs.Length : 0;
-            var title = count == 1 ? "1 reference" : $"{count} references";
-            var range = new LspRange(new Position(fo.Line, 0), new Position(fo.Line, 0));
-
-            Command? command = null;
-            if (count > 0)
+            var ctx = new CodeLensSymbolContext(symbol, fo, index);
+            foreach (var lens in _registry.Dispatch(ctx))
             {
-                var locations = refs!.Select(r => new
-                {
-                    uri = r.DocumentUri,
-                    range = new
-                    {
-                        start = new { line = r.Line, character = r.Column },
-                        end = new { line = r.Line, character = r.Column + r.Length }
-                    }
-                });
-
-                command = new Command
-                {
-                    Title = title,
-                    Name = "aet-eaw-edit.lsp.showReferences",
-                    Arguments = JArray.FromObject(new object[]
-                    {
-                        fo.Uri,
-                        new { line = fo.Line, character = fo.Column ?? 0 },
-                        locations.ToArray()
-                    })
-                };
+                _logger.LogDebug("CodeLens: {Id} at line {Line}", symbol.Id, fo.Line);
+                lenses.Add(lens);
             }
-            else
-            {
-                command = new Command { Title = title };
-            }
-
-            lenses.Add(new CodeLens { Range = range, Command = command });
-            _logger.LogDebug("CodeLens: {Id} → {Count} reference(s) at line {Line}", symbol.Id, count, fo.Line);
         }
 
         return Task.FromResult<CodeLensContainer?>(new CodeLensContainer(lenses));
     }
 
-    public override Task<CodeLens> Handle(CodeLens request, CancellationToken ct)
+    public override Task<LspCodeLens> Handle(LspCodeLens request, CancellationToken ct)
     {
         return Task.FromResult(request);
     }

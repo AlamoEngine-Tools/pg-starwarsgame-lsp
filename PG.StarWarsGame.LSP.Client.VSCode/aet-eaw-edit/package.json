@@ -24,7 +24,7 @@
       "activitybar": [
         {
           "id": "aet-localisation",
-          "title": "AET Localisation",
+          "title": "EaWEdit: Localisation",
           "icon": "resources/icons/localisation.svg"
         }
       ]
@@ -34,7 +34,7 @@
         {
           "type": "webview",
           "id": "aet-eaw-edit.lsp.localisationEditor",
-          "name": "Localisation Editor"
+          "name": "Editor"
         }
       ]
     },
@@ -62,7 +62,7 @@
       },
       {
         "command": "aet-eaw-edit.lsp.initLocalisationProject",
-        "title": "AET: Initialise Localisation Project from Baseline"
+        "title": "EaWEdit: Initialise Localisation Project from Baseline"
       }
     ],
     "configuration": {

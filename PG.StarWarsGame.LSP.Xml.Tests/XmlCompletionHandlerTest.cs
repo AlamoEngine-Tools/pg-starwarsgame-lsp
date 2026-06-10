@@ -46,10 +46,21 @@ public sealed class XmlCompletionHandlerTest
         var indexService = new FakeIndexService(index);
         var storyProposals = new StoryParamValueProposalProvider();
         var boneHelper = new BoneNameCompletionHelper(schema);
-        return (new XmlCompletionHandler(host, schema, proposals, indexService, storyProposals,
-                completionReg ?? new FakeCompletionRegistry(), registry ?? new FakeFileTypeRegistry(),
-                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(), boneHelper), host, schema,
-            proposals);
+        var fileTypeReg = registry ?? new FakeFileTypeRegistry();
+
+        var tagNameRegistry = new XmlTagNameCompletionStrategyRegistry([
+            new StoryEventTagNameStrategy(),
+            new StandardTagNameStrategy(fileTypeReg)
+        ]);
+        var tagValueRegistry = new XmlTagValueCompletionStrategyRegistry([
+            new StoryParamValueCompletionStrategy(storyProposals),
+            new BoneNameValueCompletionStrategy(boneHelper),
+            new StandardValueCompletionStrategy(proposals, completionReg ?? new FakeCompletionRegistry())
+        ]);
+
+        return (new XmlCompletionHandler(host, schema, indexService, fileTypeReg,
+                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
+                tagNameRegistry, tagValueRegistry), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)

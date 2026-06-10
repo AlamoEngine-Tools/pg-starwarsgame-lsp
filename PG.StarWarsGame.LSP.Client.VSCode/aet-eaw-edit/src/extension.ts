@@ -104,7 +104,7 @@ function validateConfiguration(): boolean {
 	if (!devMode) {
 		if (!cfg('lsp').get<string>('executable')) {
 			vscode.window.showErrorMessage(
-				'AET EaW Edit: LSP is enabled but no server executable is configured. ' +
+				'EaWEdit: LSP is enabled but no server executable is configured. ' +
 				'Set "aet-eaw-edit.lsp.executable" to the path of the LSP server DLL.'
 			);
 			valid = false;
@@ -114,7 +114,7 @@ function validateConfiguration(): boolean {
 	if (cfg('lsp.source.baseline').get<string>('type') === 'local' &&
 		!cfg('lsp.source.baseline').get<string>('localPath')) {
 		vscode.window.showErrorMessage(
-			'AET EaW Edit: Baseline type is "local" but no path is configured. ' +
+			'EaWEdit: Baseline type is "local" but no path is configured. ' +
 			'Set "aet-eaw-edit.lsp.source.baseline.localPath".'
 		);
 		valid = false;
@@ -123,7 +123,7 @@ function validateConfiguration(): boolean {
 	if (cfg('lsp.schema').get<string>('source') === 'local' &&
 		!cfg('lsp.schema').get<string>('localPath')) {
 		vscode.window.showErrorMessage(
-			'AET EaW Edit: Schema source is "local" but no directory is configured. ' +
+			'EaWEdit: Schema source is "local" but no directory is configured. ' +
 			'Set "aet-eaw-edit.lsp.schema.localPath".'
 		);
 		valid = false;
@@ -183,7 +183,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
 				const keyName = (args[0] as string | undefined) ?? '';
 				if (!keyName) {
-					vscode.window.showWarningMessage('AET: no localisation key name provided.');
+					vscode.window.showWarningMessage('EaWEdit: no localisation key name provided.');
 					return;
 				}
 
@@ -193,13 +193,13 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 						'aet/getLocalisationProjects', {});
 					projects = result.projects ?? [];
 				} catch {
-					vscode.window.showWarningMessage('AET: could not fetch localisation projects from server.');
+					vscode.window.showWarningMessage('EaWEdit: could not fetch localisation projects from server.');
 					return;
 				}
 
 				if (!projects.length) {
 					vscode.window.showWarningMessage(
-						"AET: no localisation projects found. Use 'AET: Initialise Localisation Project from Baseline' first.");
+						"EaWEdit: no localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.");
 					return;
 				}
 
@@ -229,7 +229,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 	lspClient.registerFeature(new ForceStaticCapabilitiesFeature());
 
 	if (statusItem) {
-		statusItem.text = '$(loading~spin) AET EaW LSP: starting…';
+		statusItem.text = '$(loading~spin) EaWEdit LSP: starting…';
 		statusItem.show();
 	}
 
@@ -257,17 +257,17 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		logLine(`LSP server failed to start: ${e}`);
 		lspClient = undefined;
 		if (statusItem) {
-			statusItem.text = '$(error) AET EaW LSP: failed to start';
+			statusItem.text = '$(error) EaWEdit LSP: failed to start';
 		}
 		vscode.window.showErrorMessage(
-			`AET EaW Edit: LSP server failed to start. Check that the executable path is correct. (${e})`
+			`EaWEdit: LSP server failed to start. Check that the executable path is correct. (${e})`
 		);
 	});
 
 	lspClient.onNotification('$/workspaceScanComplete', () => {
 		logLine('Workspace scan complete.');
 		if (statusItem) {
-			statusItem.text = '$(check) AET EaW LSP';
+			statusItem.text = '$(check) EaWEdit LSP';
 		}
 	});
 
@@ -299,10 +299,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	statusItem.tooltip = CLIENT_NAME;
 	context.subscriptions.push(statusItem);
 
-	log = vscode.window.createOutputChannel('AET EaW Edit');
+	log = vscode.window.createOutputChannel('EaWEdit');
 	context.subscriptions.push(log);
 
-	traceChannel = vscode.window.createOutputChannel('AET EaW LSP Trace');
+	traceChannel = vscode.window.createOutputChannel('EaWEdit LSP Trace');
 	context.subscriptions.push(traceChannel);
 
 	logLine('Extension activated.');
@@ -344,7 +344,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				await startLspClient(context);
 			} else {
 				vscode.window.showErrorMessage(
-					'AET EaW Edit: No LSP executable configured. Set "aet-eaw-edit.lsp.executable".'
+					'EaWEdit: No LSP executable configured. Set "aet-eaw-edit.lsp.executable".'
 				);
 			}
 		}),
@@ -354,7 +354,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.revalidateWorkspace', async () => {
 			if (!lspClient) {
-				vscode.window.showWarningMessage('AET EaW LSP: server is not running.');
+				vscode.window.showWarningMessage('EaWEdit LSP: server is not running.');
 				return;
 			}
 			await lspClient.sendRequest(ExecuteCommandRequest.type, {
@@ -366,7 +366,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.newModProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
+			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
 			const name = await vscode.window.showInputBox({
 				prompt: 'Mod name',
 				placeHolder: 'My Awesome Mod',
@@ -388,7 +388,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.reloadProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
+			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
 			await lspClient.sendRequest(ExecuteCommandRequest.type, {
 				command: 'aet-eaw-edit.lsp.reloadProject',
 				arguments: [],
@@ -398,7 +398,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.initLocalisationProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('AET EaW LSP: server is not running.'); return; }
+			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
 			const formatItem = await vscode.window.showQuickPick(
 				[
 					{ label: 'CSV', description: 'Comma-separated values (.csv)' },

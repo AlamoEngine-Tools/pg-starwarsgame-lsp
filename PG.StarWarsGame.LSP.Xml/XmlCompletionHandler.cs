@@ -7,7 +7,6 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -19,57 +18,36 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCompletionHandler : CompletionHandlerBase
 {
-    private const int MaxEventParamSlots = 7;
-    private const int MaxRewardParamSlots = 14;
-
-    private static readonly string[] StoryEventStructuralTags =
-    [
-        "Event_Type", "Event_Filter", "Reward_Type", "Reward_Position",
-        "Prereq", "Branch", "Perpetual", "Multiplayer",
-        "Story_Dialog", "Story_Chapter", "Story_Tag", "Story_Var",
-        "Story_Dialog_Popup", "Story_Dialog_SFX",
-        "Inactive_Delay", "Timeout"
-    ];
-
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private readonly BoneNameCompletionHelper _boneHelper;
-
-    private readonly IXmlCompletionRegistry _completionRegistry;
 
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
-
-    private readonly IXmlValueProposalRegistry _proposals;
     private readonly ISchemaProvider _schema;
-    private readonly StoryParamValueProposalProvider _storyProposals;
+    private readonly IXmlTagNameCompletionStrategyRegistry _tagNameRegistry;
+    private readonly IXmlTagValueCompletionStrategyRegistry _tagValueRegistry;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlCompletionHandler(
         IGameWorkspaceHost workspaceHost,
         ISchemaProvider schema,
-        IXmlValueProposalRegistry proposals,
         IGameIndexService indexService,
-        StoryParamValueProposalProvider storyProposals,
-        IXmlCompletionRegistry completionRegistry,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
-        BoneNameCompletionHelper boneHelper)
+        IXmlTagNameCompletionStrategyRegistry tagNameRegistry,
+        IXmlTagValueCompletionStrategyRegistry tagValueRegistry)
     {
         _workspaceHost = workspaceHost;
         _schema = schema;
-        _proposals = proposals;
         _indexService = indexService;
-        _storyProposals = storyProposals;
-        _completionRegistry = completionRegistry;
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
         _eaWXmlContext = eaWXmlContext;
-        _boneHelper = boneHelper;
+        _tagNameRegistry = tagNameRegistry;
+        _tagValueRegistry = tagValueRegistry;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
@@ -95,26 +73,19 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         if (IsTagNameContext(line, character))
         {
             var prefix = ExtractPartialTagName(line, character);
-            // Truncate text just before the partial '<' so HAP sees a well-formed document.
             var anglePos = character - prefix.Length - 1;
             var truncatedDoc = XmlUtility.CreateHtmlDocument(BuildTruncatedText(lines, lineIndex, anglePos));
             var enclosingNode = XmlUtility.FindEnclosingElement(truncatedDoc, lineIndex);
             if (enclosingNode is null)
                 return Task.FromResult(new CompletionList());
 
-            var enclosingType = enclosingNode.Name;
-            var enclosingTagDepth = XmlUtility.GetDepth(enclosingNode);
-
-            // StoryParser context: cursor inside <Event> — use context-aware tag list
-            if (string.Equals(enclosingType, "Event", StringComparison.OrdinalIgnoreCase) &&
-                IsStoryParserDocument(uri))
-            {
-                var storyItems = BuildStoryEventTagCompletions(text, lineIndex, character, prefix);
-                return Task.FromResult(new CompletionList(storyItems));
-            }
-
-            var tagItems = BuildTagNameCompletions(uri, text, enclosingType, enclosingTagDepth, prefix);
-            return Task.FromResult(new CompletionList(tagItems));
+            var isStoryParser = IsStoryParserDocument(uri);
+            var index = _indexService.Current;
+            var tagNameCtx = new TagNameCompletionContext(
+                uri, index, _schema, enclosingNode, enclosingNode.Name,
+                XmlUtility.GetDepth(enclosingNode), prefix, text, lineIndex, character, isStoryParser);
+            var items = _tagNameRegistry.GetCompletions(tagNameCtx);
+            return Task.FromResult(new CompletionList(items));
         }
 
         // Bail out for other cursor-inside-tag positions (attributes, etc.)
@@ -141,359 +112,73 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         if (_schema.GetObjectType(enclosingTag) is not null)
             return Task.FromResult(new CompletionList());
 
-        // StoryParser context: value completion for Event_Param* / Reward_Param* tags
+        // Pre-compute story param context for StoryParamValueCompletionStrategy
         var paramMatch = ParamTagPattern.Match(enclosingTag);
-        if (paramMatch.Success && IsStoryParserDocument(uri))
+        var isStoryParserForValue = IsStoryParserDocument(uri);
+        string? storyParamSide = null;
+        var storyParamPosition = 0;
+        if (paramMatch.Success && isStoryParserForValue)
         {
-            var storyValueItems = BuildStoryParamValueCompletions(text, enclosingTag, paramMatch, lineIndex, character);
-            return Task.FromResult(new CompletionList(storyValueItems));
+            storyParamSide = paramMatch.Groups[1].Value;
+            storyParamPosition = int.Parse(paramMatch.Groups[2].Value) - 1;
         }
 
         // Three-tier type-aware tag lookup (mirrors XmlDocumentFactProducer.ResolveTag):
         //   Tier 1 — ability sub-object context (Type56/57): use the ability schema type
         //   Tier 2 — registered file types: use GetTagsForType for each registered type
         //   Tier 3 — flat fallback
-        var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
-        XmlTagDefinition? tagDef;
-        if (TryResolveContainingAbilityType(enclosingValueNode!, out var containingAbilityType))
+        // Only resolved when not in story-param context (which ignores tagDef entirely).
+        XmlTagDefinition? tagDef = null;
+        if (storyParamSide is null)
         {
-            // single-node context; full ancestor walk lives in XmlDocumentFactProducer
-            var completionContext = new TagResolutionContext(
-                containingAbilityType, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
-            tagDef = XmlTagResolver.Resolve(_schema, enclosingTag, completionContext);
-        }
-        else if (!fileTypes.IsEmpty)
-        {
-            XmlTagDefinition? typeSpecificDef = null;
-            foreach (var typeName in fileTypes)
+            var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
+            if (TryResolveContainingAbilityType(enclosingValueNode!, out var containingAbilityType))
             {
-                typeSpecificDef = _schema.GetTagsForType(typeName)
-                    .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase));
-                if (typeSpecificDef is not null) break;
+                var resCtx = new TagResolutionContext(
+                    containingAbilityType, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
+                tagDef = XmlTagResolver.Resolve(_schema, enclosingTag, resCtx);
+            }
+            else if (!fileTypes.IsEmpty)
+            {
+                XmlTagDefinition? typeSpecificDef = null;
+                foreach (var typeName in fileTypes)
+                {
+                    typeSpecificDef = _schema.GetTagsForType(typeName)
+                        .FirstOrDefault(t => t.Tag.Equals(enclosingTag, StringComparison.OrdinalIgnoreCase));
+                    if (typeSpecificDef is not null) break;
+                }
+
+                // Prefer the registered-type def when it has completions; otherwise fall back to the
+                // flat def which may carry reference info from a different type's YAML.
+                tagDef = typeSpecificDef is not null && HasCompletions(typeSpecificDef)
+                    ? typeSpecificDef
+                    : _schema.GetTag(enclosingTag);
+            }
+            else
+            {
+                tagDef = _schema.GetTag(enclosingTag);
             }
 
-            // Prefer the registered-type def when it has completions; otherwise fall back to the
-            // flat def which may carry reference info from a different type's YAML.
-            tagDef = typeSpecificDef is not null && HasCompletions(typeSpecificDef)
-                ? typeSpecificDef
-                : _schema.GetTag(enclosingTag);
-        }
-        else
-        {
-            tagDef = _schema.GetTag(enclosingTag);
-        }
-
-        if (tagDef is null || !HasCompletions(tagDef))
-            return Task.FromResult(new CompletionList());
-
-        // boneName references resolve against the .alo model(s) named by sibling model tags on the
-        // owning XML object — handled by a dedicated helper that walks the HAP ancestor chain.
-        if (tagDef.ReferenceKind == ReferenceKind.BoneName)
-        {
-            var partial = ExtractPartialValue(line, character);
-            var boneProposals = _boneHelper.GetProposals(enclosingValueNode!, partial, _indexService.Current);
-            return Task.FromResult(new CompletionList(boneProposals.Select(p => new CompletionItem
-            {
-                Label = p.Label,
-                InsertText = p.Label,
-                Kind = CompletionItemKind.Value
-            })));
+            if (tagDef is null || !HasCompletions(tagDef))
+                return Task.FromResult(new CompletionList());
         }
 
         var partialValue = ExtractPartialValue(line, character);
-        var valueProposals = _proposals.GetProposals(tagDef.ValueType, tagDef, partialValue)
-            .Concat(_completionRegistry.GetProposals(tagDef, partialValue, _indexService.Current));
-
-        var valueItems = valueProposals.Select(p => new CompletionItem
-        {
-            Label = p.Label,
-            Detail = p.Detail,
-            LabelDetails = p.Description is not null
-                ? new CompletionItemLabelDetails { Description = p.Description }
-                : null,
-            InsertText = p.InsertText ?? p.Label,
-            Kind = CompletionItemKind.Value
-        });
-
+        var valueIndex = _indexService.Current;
+        var valueCtx = new TagValueCompletionContext(
+            uri, valueIndex, _schema, valueDoc, enclosingValueNode!, enclosingTag, enclosingDepth,
+            tagDef, partialValue, lineIndex, character, isStoryParserForValue, storyParamSide, storyParamPosition);
+        var valueItems = _tagValueRegistry.GetCompletions(valueCtx);
         return Task.FromResult(new CompletionList(valueItems));
     }
 
     private bool IsStoryParserDocument(string documentUri)
-    {
-        return _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
-    }
+        => _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
 
     private bool IsMultiInstanceFile(string documentUri)
     {
         var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri));
         return fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
-    }
-
-    private IEnumerable<CompletionItem> BuildStoryEventTagCompletions(
-        string text, int lineIndex, int character, string prefix)
-    {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-
-        var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
-        var eventDef = ctx.EventType is not null
-            ? _schema.GetEnum("StoryEventType")?.Values
-                .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
-            : null;
-        var rewardDef = ctx.RewardType is not null
-            ? _schema.GetEnum("StoryRewardType")?.Values
-                .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
-            : null;
-
-        var candidates = new List<string>(StoryEventStructuralTags);
-
-        if (eventDef is not null)
-        {
-            var paramCount = eventDef.Params is null
-                ? MaxEventParamSlots
-                : eventDef.Params.Count > 0
-                    ? eventDef.Params.Max(p => p.Position) + 1
-                    : 0;
-            for (var i = 1; i <= paramCount; i++)
-                candidates.Add($"Event_Param{i}");
-        }
-
-        if (rewardDef is not null)
-        {
-            var paramCount = rewardDef.Params is null
-                ? MaxRewardParamSlots
-                : rewardDef.Params.Count > 0
-                    ? rewardDef.Params.Max(p => p.Position) + 1
-                    : 0;
-            for (var i = 1; i <= paramCount; i++)
-                candidates.Add($"Reward_Param{i}");
-        }
-
-        var existing = CollectExistingEventChildTagNames(doc, lineIndex, character);
-
-        return candidates
-            .Where(t => !existing.Contains(t))
-            .Where(t => prefix.Length == 0 || t.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            .Select(t => new CompletionItem
-            {
-                Label = t,
-                Kind = CompletionItemKind.Property,
-                InsertText = $"{t}>$0</{t}>",
-                InsertTextFormat = InsertTextFormat.Snippet
-            });
-    }
-
-    private IEnumerable<CompletionItem> BuildStoryParamValueCompletions(
-        string text, string enclosingTag, Match paramMatch, int lineIndex, int character)
-    {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-
-        var ctx = StoryEventCompletionContextReader.Read(doc, lineIndex, character);
-        var side = paramMatch.Groups[1].Value;
-        var position = int.Parse(paramMatch.Groups[2].Value);
-        var schemaPos = position - 1; // Event_Param1 → position 0
-
-        ParamDefinition? paramDef;
-        if (string.Equals(side, "Event", StringComparison.OrdinalIgnoreCase))
-        {
-            var typeDef = ctx.EventType is not null
-                ? _schema.GetEnum("StoryEventType")?.Values
-                    .FirstOrDefault(v => string.Equals(v.Name, ctx.EventType, StringComparison.OrdinalIgnoreCase))
-                : null;
-            paramDef = typeDef?.Params?.FirstOrDefault(p => p.Position == schemaPos);
-        }
-        else
-        {
-            var typeDef = ctx.RewardType is not null
-                ? _schema.GetEnum("StoryRewardType")?.Values
-                    .FirstOrDefault(v => string.Equals(v.Name, ctx.RewardType, StringComparison.OrdinalIgnoreCase))
-                : null;
-            paramDef = typeDef?.Params?.FirstOrDefault(p => p.Position == schemaPos);
-        }
-
-        if (paramDef is null)
-            return [];
-
-        var partialValue = ExtractPartialValue(text.Split('\n')[lineIndex].TrimEnd('\r'), character);
-        var proposals = _storyProposals.GetProposals(paramDef, partialValue, _indexService.Current);
-
-        return proposals.Select(p => new CompletionItem
-        {
-            Label = p.Label,
-            Detail = p.Detail,
-            InsertText = p.InsertText ?? p.Label,
-            Kind = CompletionItemKind.Value
-        });
-    }
-
-    private static HashSet<string> CollectExistingEventChildTagNames(HtmlDocument doc, int lineIndex, int character)
-    {
-        var cursorLine = lineIndex + 1; // 1-based
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        HtmlNode? enclosingEvent = null;
-        foreach (var node in doc.DocumentNode.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element &&
-                                 string.Equals(n.Name, "event", StringComparison.OrdinalIgnoreCase)))
-            if (node.Line <= cursorLine)
-                enclosingEvent = node;
-            else
-                break;
-
-        if (enclosingEvent is null) return result;
-        foreach (var child in enclosingEvent.ChildNodes)
-            if (child.NodeType == HtmlNodeType.Element)
-                result.Add(child.Name);
-        return result;
-    }
-
-    private IEnumerable<CompletionItem> BuildTagNameCompletions(
-        string uri, string text, string parentName, int depth, string prefix)
-    {
-        var fileTypes = _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(uri));
-
-        IReadOnlyList<XmlTagDefinition> candidates;
-        if (!fileTypes.IsEmpty)
-        {
-            // Only offer field-tag completions at the correct depth for the file's type structure.
-            var isMultiInstance = fileTypes.Any(t => _schema.GetObjectType(t)?.NameTag is not null);
-            var expectedDepth = isMultiInstance ? 2 : 1;
-            if (depth != expectedDepth)
-            {
-                var subItems = TryBuildSubObjectListCompletions(parentName, prefix);
-                if (subItems is not null)
-                    return subItems;
-
-                // Allow completions at deeper levels when parent is an ability sub-object type.
-                var abilityType = _schema.GetObjectType(XmlUtility.ToPascalCase(parentName));
-                if (abilityType is null)
-                    return [];
-                candidates = _schema.GetTagsForType(abilityType.TypeName);
-            }
-            else
-            {
-                var tagsList = new List<XmlTagDefinition>();
-                foreach (var typeName in fileTypes)
-                    tagsList.AddRange(_schema.GetTagsForType(typeName));
-                candidates = tagsList;
-            }
-        }
-        else
-        {
-            var subItems = TryBuildSubObjectListCompletions(parentName, prefix);
-            if (subItems is not null)
-                return subItems;
-
-            // Fallback for unregistered files: use element name as type name, with PascalCase conversion
-            // for ability class elements (e.g., Lucky_Shot_Attack_Ability → LuckyShotAttackAbility).
-            var typeDef = _schema.GetObjectType(parentName)
-                          ?? _schema.GetObjectType(XmlUtility.ToPascalCase(parentName));
-            if (typeDef is null)
-                return [];
-            candidates = _schema.GetTagsForType(typeDef.TypeName);
-        }
-
-        // Find already-present direct children of the parent element in the current document
-        var existingTags = CollectExistingChildTagNames(text, parentName);
-
-        return candidates
-            .Where(t => t.MultipleAllowed || !existingTags.Contains(t.Tag))
-            .Where(t => prefix.Length == 0 || t.Tag.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-            .Select(t => new CompletionItem
-            {
-                Label = t.Tag,
-                Kind = CompletionItemKind.Property,
-                InsertText = $"{t.Tag}>$0</{t.Tag}>",
-                InsertTextFormat = InsertTextFormat.Snippet
-            });
-    }
-
-    private IEnumerable<CompletionItem>? TryBuildSubObjectListCompletions(string parentName, string prefix)
-    {
-        var parentTagDef = _schema.GetTag(parentName);
-
-        if (parentTagDef?.ValueType == XmlValueType.GuiActivatedAbilityDefinitionSubObjectList)
-        {
-            const string label = "Unit_Ability";
-            if (prefix.Length > 0 && !label.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                return [];
-            return
-            [
-                new CompletionItem
-                {
-                    Label = label,
-                    Kind = CompletionItemKind.Property,
-                    InsertText = "Unit_Ability>\n    <Type>$0</Type>\n</Unit_Ability>",
-                    InsertTextFormat = InsertTextFormat.Snippet
-                }
-            ];
-        }
-
-        if (parentTagDef?.ValueType == XmlValueType.AbilityDefinitionSubObjectList)
-            return _schema.AllObjectTypes
-                .Where(t => t.TypeName.EndsWith("Ability", StringComparison.OrdinalIgnoreCase))
-                .Select(t => XmlUtility.ToSnakeCase(t.TypeName))
-                .Where(name => prefix.Length == 0 || name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
-                .Select(name => new CompletionItem
-                {
-                    Label = name,
-                    Kind = CompletionItemKind.Property,
-                    InsertText = $"{name} Name=\"$1\">\n    $0\n</{name}>",
-                    InsertTextFormat = InsertTextFormat.Snippet
-                });
-
-        return null;
-    }
-
-    private static HashSet<string> CollectExistingChildTagNames(string text, string parentName)
-    {
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-
-        var result = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        // HtmlAgilityPack lowercases element names; XPath is case-sensitive.
-        var parent = doc.DocumentNode.SelectSingleNode($"//{parentName.ToLowerInvariant()}");
-        if (parent is null) return result;
-
-        foreach (var child in parent.ChildNodes)
-            if (child.NodeType == HtmlNodeType.Element)
-                result.Add(child.Name);
-        return result;
-    }
-
-    public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
-    {
-        return Task.FromResult(request);
-    }
-
-    protected override CompletionRegistrationOptions CreateRegistrationOptions(
-        CompletionCapability capability, ClientCapabilities clientCapabilities)
-    {
-        return new CompletionRegistrationOptions
-        {
-            DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
-            TriggerCharacters = new Container<string>(">", "<"),
-            ResolveProvider = false
-        };
-    }
-
-    // ── position helpers ─────────────────────────────────────────────────────
-
-    /// <summary>
-    ///     Returns true when the cursor sits inside a tag bracket (e.g. on an attribute or tag name).
-    ///     Scans leftward: if we hit '&lt;' before '&gt;' the cursor is inside a tag.
-    /// </summary>
-    private static bool IsCursorInsideTagBracket(string line, int character)
-    {
-        var bound = Math.Min(character, line.Length);
-        for (var i = bound - 1; i >= 0; i--)
-        {
-            if (line[i] == '>') return false;
-            if (line[i] == '<') return true;
-        }
-
-        return false;
     }
 
     private bool TryResolveContainingAbilityType(HtmlNode node, out string? abilityTypeName)
@@ -531,16 +216,20 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
                tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
     }
 
-    /// <summary>Extracts the token being typed at the cursor (for prefix filtering).</summary>
-    private static string ExtractPartialValue(string line, int character)
+    /// <summary>
+    ///     Returns true when the cursor sits inside a tag bracket (e.g. on an attribute or tag name).
+    ///     Scans leftward: if we hit '&lt;' before '&gt;' the cursor is inside a tag.
+    /// </summary>
+    private static bool IsCursorInsideTagBracket(string line, int character)
     {
         var bound = Math.Min(character, line.Length);
-        var i = bound - 1;
-        while (i >= 0 && line[i] != '>' && line[i] != ',' && line[i] != ';'
-               && line[i] != '|' && line[i] != '/' && line[i] != '\\'
-               && !char.IsWhiteSpace(line[i]))
-            i--;
-        return line[(i + 1)..bound];
+        for (var i = bound - 1; i >= 0; i--)
+        {
+            if (line[i] == '>') return false;
+            if (line[i] == '<') return true;
+        }
+
+        return false;
     }
 
     /// <summary>
@@ -551,7 +240,6 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static bool IsTagNameContext(string line, int character)
     {
         var bound = Math.Min(character, line.Length);
-        // Walk left past any partial identifier characters already typed
         var i = bound - 1;
         while (i >= 0 && (char.IsLetterOrDigit(line[i]) || line[i] == '_' || line[i] == '-'))
             i--;
@@ -565,7 +253,18 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         var i = bound - 1;
         while (i >= 0 && (char.IsLetterOrDigit(line[i]) || line[i] == '_' || line[i] == '-'))
             i--;
-        // i now points at '<' or whitespace; partial starts at i+1
+        return line[(i + 1)..bound];
+    }
+
+    /// <summary>Extracts the token being typed at the cursor (for prefix filtering).</summary>
+    private static string ExtractPartialValue(string line, int character)
+    {
+        var bound = Math.Min(character, line.Length);
+        var i = bound - 1;
+        while (i >= 0 && line[i] != '>' && line[i] != ',' && line[i] != ';'
+               && line[i] != '|' && line[i] != '/' && line[i] != '\\'
+               && !char.IsWhiteSpace(line[i]))
+            i--;
         return line[(i + 1)..bound];
     }
 
@@ -586,5 +285,21 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         }
 
         return sb.ToString();
+    }
+
+    public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
+    {
+        return Task.FromResult(request);
+    }
+
+    protected override CompletionRegistrationOptions CreateRegistrationOptions(
+        CompletionCapability capability, ClientCapabilities clientCapabilities)
+    {
+        return new CompletionRegistrationOptions
+        {
+            DocumentSelector = TextDocumentSelector.ForLanguage("xml"),
+            TriggerCharacters = new Container<string>(">", "<"),
+            ResolveProvider = false
+        };
     }
 }

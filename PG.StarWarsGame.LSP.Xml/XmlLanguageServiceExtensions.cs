@@ -7,6 +7,10 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Completion.Providers;
+using PG.StarWarsGame.LSP.Xml.CodeActions;
+using PG.StarWarsGame.LSP.Xml.CodeLens;
+using PG.StarWarsGame.LSP.Xml.HoverStrategies;
+using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -149,8 +153,38 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCompletionProvider, LocalisationKeyCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, AssetFileCompletionProvider>();
 
-        // boneName completion helper (resolved into XmlCompletionHandler via DI)
+        // boneName completion helper (resolved into BoneNameValueCompletionStrategy via DI)
         services.AddSingleton<BoneNameCompletionHelper>();
+
+        // Tag-name completion strategies — add IXmlTagNameCompletionStrategy implementations here
+        services.AddSingleton<IXmlTagNameCompletionStrategyRegistry, XmlTagNameCompletionStrategyRegistry>();
+        services.AddSingleton<IXmlTagNameCompletionStrategy, StoryEventTagNameStrategy>();
+        services.AddSingleton<IXmlTagNameCompletionStrategy, StandardTagNameStrategy>();
+
+        // Tag-value completion strategies — add IXmlTagValueCompletionStrategy implementations here
+        services.AddSingleton<IXmlTagValueCompletionStrategyRegistry, XmlTagValueCompletionStrategyRegistry>();
+        services.AddSingleton<IXmlTagValueCompletionStrategy, StoryParamValueCompletionStrategy>();
+        services.AddSingleton<IXmlTagValueCompletionStrategy, BoneNameValueCompletionStrategy>();
+        services.AddSingleton<IXmlTagValueCompletionStrategy, StandardValueCompletionStrategy>();
+
+        // Code action providers — add IXmlCodeActionProvider implementations here to register new providers
+        services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
+        services.AddSingleton<IXmlCodeActionProvider, FixSuggestionCodeActionProvider>();
+        services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
+
+        // Hover strategies — add IXmlHoverStrategy implementations here to register new strategies
+        services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();
+        services.AddSingleton<IXmlHoverStrategy, ReferenceHoverStrategy>();
+        services.AddSingleton<IXmlHoverStrategy, AssetHoverStrategy>();
+        services.AddSingleton<IXmlHoverStrategy, TagNameHoverStrategy>();
+
+        // Code lens providers — add IXmlCodeLensProvider implementations here to register new providers
+        services.AddSingleton<IXmlCodeLensRegistry, XmlCodeLensRegistry>();
+        services.AddSingleton<IXmlCodeLensProvider, ReferencesCodeLensProvider>();
+
+        // Inlay hint providers — add IXmlInlayHintProvider implementations here to register new providers
+        services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();
+        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyInlayHintProvider>();
 
         return services;
     }

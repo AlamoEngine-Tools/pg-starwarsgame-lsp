@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -34,13 +35,15 @@ public sealed class XmlInlayHintHandlerTest
         if (localisation is not null)
             index.Localisation = localisation;
 
+        var registry = new XmlInlayHintRegistry([new LocalisationKeyInlayHintProvider()]);
         return (new XmlInlayHintHandler(
             host,
             index,
             schema ?? new EmptySchemaProvider(),
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
-            NullLogger<XmlInlayHintHandler>.Instance), index);
+            NullLogger<XmlInlayHintHandler>.Instance,
+            registry), index);
     }
 
     private static LspRange FullRange()
@@ -164,7 +167,8 @@ public sealed class XmlInlayHintHandlerTest
             host, index, new EmptySchemaProvider(),
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
-            NullLogger<XmlInlayHintHandler>.Instance);
+            NullLogger<XmlInlayHintHandler>.Instance,
+            new XmlInlayHintRegistry([]));
 
         var result = await handler.Handle(Params(), CancellationToken.None);
         Assert.Null(result);
