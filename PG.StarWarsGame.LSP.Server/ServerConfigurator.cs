@@ -77,6 +77,7 @@ public static class ServerConfigurator
             .WithHandler<GetLocalisationProjectsHandler>()
             .WithHandler<GetBaselineEntriesHandler>()
             .WithHandler<GetLanguagesHandler>()
+            .WithHandler<ExportLocalisationToDatHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);

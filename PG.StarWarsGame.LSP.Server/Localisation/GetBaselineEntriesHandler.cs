@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Data.Config.v2;
 using PG.StarWarsGame.Localisation.Services;
 
@@ -13,41 +14,39 @@ public sealed class GetBaselineEntriesHandler
 {
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ILanguageService _langService;
+    private readonly ITranslationDatabaseFactory _factory;
 
     public GetBaselineEntriesHandler(
         IBaselineTranslationProvider baselineProvider,
-        ILanguageService langService)
+        ILanguageService langService,
+        ITranslationDatabaseFactory factory)
     {
         _baselineProvider = baselineProvider;
         _langService = langService;
+        _factory = factory;
     }
 
     public Task<GetBaselineEntriesResult> Handle(
         GetBaselineEntriesParams request, CancellationToken ct)
     {
-        var languages = _langService.OfficiallySupported;
+        var languages = _langService.OfficiallySupported();
         var eawDb = _baselineProvider.GetMasterText(GameType.EaW, languages);
         var focDb = _baselineProvider.GetMasterText(GameType.FoC, languages);
 
-        var merged = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var db in new[] { eawDb, focDb })
-        {
-            foreach (var entry in db)
-            {
-                if (!merged.TryGetValue(entry.Key, out var trans))
-                {
-                    trans = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                    merged[entry.Key] = trans;
-                }
-                foreach (var kvp in entry.Translations)
-                    trans[kvp.Key.LanguageIdentifier] = kvp.Value;
-            }
-        }
+        var merged = _factory.CreateKeyed(languages);
+        foreach (var entry in eawDb)
+            foreach (var kv in entry.Translations)
+                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var entry in focDb)
+            foreach (var kv in entry.Translations)
+                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
 
         var entries = merged
-            .Select(kvp => new BaselineEntry(kvp.Key, kvp.Value))
+            .Select(e => new BaselineEntry(
+                e.Key,
+                e.Translations.ToDictionary(kv => kv.Key.LanguageIdentifier, kv => kv.Value)))
             .ToList();
+
         return Task.FromResult(new GetBaselineEntriesResult(entries));
     }
 }

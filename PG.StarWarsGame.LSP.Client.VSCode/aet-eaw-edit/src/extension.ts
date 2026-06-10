@@ -287,7 +287,7 @@ async function stopLspClient(): Promise<void> {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 
-	localisationEditorProvider = new LocalisationEditorViewProvider(() => lspClient);
+	localisationEditorProvider = new LocalisationEditorViewProvider(context.extensionUri, () => lspClient);
 	context.subscriptions.push(
 		vscode.window.registerWebviewViewProvider(
 			LocalisationEditorViewProvider.viewId,

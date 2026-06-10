@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -76,6 +77,7 @@ public sealed class GetBaselineEntriesHandlerTest
 
         return new GetBaselineEntriesHandler(
             sp.GetRequiredService<IBaselineTranslationProvider>(),
-            sp.GetRequiredService<ILanguageService>());
+            sp.GetRequiredService<ILanguageService>(),
+            sp.GetRequiredService<ITranslationDatabaseFactory>());
     }
 }

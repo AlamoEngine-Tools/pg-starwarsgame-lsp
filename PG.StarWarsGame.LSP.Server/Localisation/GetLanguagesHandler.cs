@@ -15,7 +15,7 @@ public sealed class GetLanguagesHandler
 
     public Task<GetLanguagesResult> Handle(GetLanguagesParams request, CancellationToken ct)
     {
-        var languages = _langService.OfficiallySupported
+        var languages = _langService.OfficiallySupported()
             .Select(l => l.LanguageIdentifier)
             .ToList();
         return Task.FromResult(new GetLanguagesResult(languages));

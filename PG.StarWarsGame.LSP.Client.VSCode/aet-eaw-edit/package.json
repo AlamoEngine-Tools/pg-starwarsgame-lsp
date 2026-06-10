@@ -88,13 +88,29 @@
           "type": "string",
           "default": "en",
           "markdownDescription": "Language locale used for hover text and diagnostics.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": ["en", "de", "fr", "es", "it", "pl", "ru"],
-          "enumItemLabels": ["English", "German", "French", "Spanish", "Italian", "Polish", "Russian"]
+          "enum": [
+            "en",
+            "de",
+            "fr",
+            "es",
+            "it",
+            "pl",
+            "ru"
+          ],
+          "enumItemLabels": [
+            "English",
+            "German",
+            "French",
+            "Spanish",
+            "Italian",
+            "Polish",
+            "Russian"
+          ]
         },
         "aet-eaw-edit.lsp.modPaths": {
           "order": 500,
           "type": "array",
-          "items": { 
+          "items": {
             "type": "string",
             "format": "uri-reference"
           },
@@ -106,8 +122,16 @@
           "type": "string",
           "default": "http",
           "markdownDescription": "Where to load the EaW baseline index from. Use `http` to download automatically; `local` to point at a file; `none` to disable baseline loading.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": ["http", "local", "none"],
-          "enumItemLabels": ["Download automatically (recommended)", "Local file", "Disabled"]
+          "enum": [
+            "http",
+            "local",
+            "none"
+          ],
+          "enumItemLabels": [
+            "Download automatically (recommended)",
+            "Local file",
+            "Disabled"
+          ]
         },
         "aet-eaw-edit.lsp.source.baseline.localPath": {
           "order": 700,
@@ -122,8 +146,14 @@
           "type": "string",
           "default": "http",
           "markdownDescription": "Where to load the EaW XML schema from. Use `http` to fetch from GitHub (default); use `local` to point at a local copy.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": ["http", "local"],
-          "enumItemLabels": ["GitHub (recommended)", "Local directory"]
+          "enum": [
+            "http",
+            "local"
+          ],
+          "enumItemLabels": [
+            "GitHub (recommended)",
+            "Local directory"
+          ]
         },
         "aet-eaw-edit.lsp.schema.url": {
           "order": 900,
@@ -219,8 +249,16 @@
           "type": "string",
           "default": "off",
           "markdownDescription": "LSP wire-protocol trace level. Set to `messages` or `verbose` to log traffic in the output panel for debugging.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": ["off", "messages", "verbose"],
-          "enumItemLabels": ["Off", "Messages", "Verbose"]
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "enumItemLabels": [
+            "Off",
+            "Messages",
+            "Verbose"
+          ]
         },
         "aet-eaw-edit.lsp.debug.waitForDebugger": {
           "order": 2000,
@@ -240,18 +278,19 @@
     "test": "vscode-test"
   },
   "devDependencies": {
-    "@types/vscode": "^1.107.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "25.9.1",
+    "@types/vscode": "^1.107.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
-    "eslint": "^10.4.0",
-    "typescript": "^6.0.0",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^10.4.0",
+    "typescript": "^6.0.0"
   },
   "dependencies": {
-		"vscode-languageclient": "^9.0.1"
+    "@vscode/codicons": "^0.0.45",
+    "vscode-languageclient": "^9.0.1"
   },
   "bugs": {
     "url": "https://github.com/gruenwaldlk/PG.StarWarsGame.LSP/issues",

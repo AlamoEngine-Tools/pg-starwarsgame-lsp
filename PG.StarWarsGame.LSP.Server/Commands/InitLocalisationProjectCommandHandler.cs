@@ -117,7 +117,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             return Unit.Value;
         }
 
-        var languages = _langService.OfficiallySupported;
+        var languages = _langService.OfficiallySupported();
         var eawDb = _baselineProvider.GetMasterText(GameType.EaW, languages);
         var focDb = _baselineProvider.GetMasterText(GameType.FoC, languages);
 
