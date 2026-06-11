@@ -1,9 +1,9 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.Localisation.Baseline;
-using PG.StarWarsGame.Localisation.Data.Config.v2;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -62,8 +62,8 @@ public sealed class BaselineBootstrapper : IBaselineBootstrapper
         {
             if (!_languageService.TryGetByIdentifier(_config.Current.Locale, out var language))
                 language = _languageService.Default;
-            var eawDb = _localisationProvider.GetMasterText(GameType.EaW, language!);
-            var focDb = _localisationProvider.GetMasterText(GameType.FoC, language!);
+            var eawDb = _localisationProvider.GetMasterText(GameContext.EaW, language!);
+            var focDb = _localisationProvider.GetMasterText(GameContext.FoC, language!);
             _indexService.ApplyLocalisation(
                 new TranslationDatabaseLocalisationIndex([eawDb, focDb], language!));
         }

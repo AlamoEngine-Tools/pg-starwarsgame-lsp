@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using MediatR;
@@ -9,7 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Data.Config.v2;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
@@ -118,8 +118,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         }
 
         var languages = _langService.OfficiallySupported();
-        var eawDb = _baselineProvider.GetMasterText(GameType.EaW, languages);
-        var focDb = _baselineProvider.GetMasterText(GameType.FoC, languages);
+        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
+        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
 
         var merged = _factory.CreateKeyed(languages);
         foreach (var entry in eawDb)

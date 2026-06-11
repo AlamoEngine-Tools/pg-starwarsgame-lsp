@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Xml.Linq;
@@ -7,7 +7,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Data.Config.v2;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
@@ -66,8 +66,8 @@ public sealed class ExportLocalisationToDatHandler
             return Task.FromResult(new ExportLocalisationToDatResult([], $"File not found: {request.ProjectFilePath}"));
 
         var languages = _langService.OfficiallySupported();
-        var eawDb = _baselineProvider.GetMasterText(GameType.EaW, languages);
-        var focDb = _baselineProvider.GetMasterText(GameType.FoC, languages);
+        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
+        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
 
         var merged = _factory.CreateKeyed(languages);
         foreach (var entry in eawDb)

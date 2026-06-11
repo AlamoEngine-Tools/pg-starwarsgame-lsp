@@ -219,6 +219,46 @@ public sealed class LuaDefinitionHandlerTest
         Assert.Null(result);
     }
 
+    // ── disk fallback (vscode restore race) ──────────────────────────────────
+
+    [Fact]
+    public async Task Handle_FileOnDiskNotInHost_RequireDefinitionFallsBackToDisk()
+    {
+        // Simulates the vscode-languageclient restored-tab race: file on disk, no didOpen sent yet.
+        var scriptPath = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "script.lua");
+        var targetPath = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "foo", "bar.lua");
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [scriptPath] = new MockFileData("require(\"foo/bar\")"),
+            [targetPath] = new MockFileData("-- bar module")
+        });
+        var fileHelper = new FileHelper(fileSystem);
+        var scriptUri = fileHelper.PathToFileUri(scriptPath);
+        var targetUri = fileHelper.PathToFileUri(targetPath);
+
+        var docIndex = new DocumentIndex(scriptUri, 1, [], []);
+        var targetDocIndex = new DocumentIndex(targetUri, 1, [], []);
+        var index = MakeIndex(documents: [(scriptUri, docIndex), (targetUri, targetDocIndex)]);
+
+        // No document in workspace host — simulates not-yet-synced state
+        var handler = new LuaDefinitionHandler(
+            new FakeIndexService { Current = index },
+            new FakeWorkspaceHost(),
+            fileHelper,
+            NullLogger<LuaDefinitionHandler>.Instance);
+
+        var result = await handler.Handle(
+            new DefinitionParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(scriptUri) },
+                Position = new Position(0, 10)
+            },
+            CancellationToken.None);
+
+        var loc = Assert.Single(result!.Select(l => l.Location!));
+        Assert.Equal(targetUri, loc.Uri.ToString());
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static GameIndex MakeIndex(

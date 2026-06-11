@@ -3,9 +3,8 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 
-namespace PG.StarWarsGame.LSP.Server;
+namespace PG.StarWarsGame.LSP.Core.Workspace;
 
 public sealed class EaWXmlContext : IEaWXmlContext
 {

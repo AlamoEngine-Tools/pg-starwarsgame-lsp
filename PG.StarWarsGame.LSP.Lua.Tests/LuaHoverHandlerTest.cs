@@ -263,6 +263,40 @@ public sealed class LuaHoverHandlerTest
         Assert.Null(result);
     }
 
+    // ── disk fallback (vscode restore race) ──────────────────────────────────
+
+    [Fact]
+    public async Task Handle_FileOnDiskNotInHost_RequireHoverFallsBackToDisk()
+    {
+        // Simulates the vscode-languageclient restored-tab race: file exists on disk but
+        // the client has not yet sent didOpen, so the workspace host has no tracked document.
+        var path = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "script.lua");
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [path] = new MockFileData("require(\"SomeModule\")")
+        });
+        var fileHelper = new FileHelper(fileSystem);
+        var uri = fileHelper.PathToFileUri(path);
+
+        var handler = new LuaHoverHandler(
+            new FakeIndexService { Current = GameIndex.Empty },
+            new FakeWorkspaceHost(),  // empty — no document tracked
+            fileHelper,
+            new LuaApiSchemaProvider([]),
+            NullLogger<LuaHoverHandler>.Instance);
+
+        // Cursor inside "SomeModule" — require hover should produce a result from disk content
+        var result = await handler.Handle(
+            new HoverParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },
+                Position = new Position(0, 12)
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(result);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class FakeIndexService : IGameIndexService

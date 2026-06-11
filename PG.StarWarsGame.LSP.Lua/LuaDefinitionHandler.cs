@@ -74,7 +74,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         }
 
         // Path B: require() argument — parse AST and resolve.
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
         var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);

@@ -42,7 +42,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(new CompletionList());
 
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult(new CompletionList());
 
         var line = request.Position.Line;

@@ -7,6 +7,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Schema;
+using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 

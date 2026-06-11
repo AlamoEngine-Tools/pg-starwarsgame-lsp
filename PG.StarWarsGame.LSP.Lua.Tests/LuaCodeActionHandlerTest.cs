@@ -1,9 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -11,9 +13,11 @@ namespace PG.StarWarsGame.LSP.Lua.Tests;
 
 public sealed class LuaCodeActionHandlerTest
 {
-    private static LuaCodeActionHandler MakeSut(IGameWorkspaceHost? host = null)
+    private static LuaCodeActionHandler MakeSut(IGameWorkspaceHost? host = null, IFileHelper? fileHelper = null)
     {
-        return new LuaCodeActionHandler(host ?? new FakeWorkspaceHost());
+        return new LuaCodeActionHandler(
+            host ?? new FakeWorkspaceHost(),
+            fileHelper ?? new FileHelper(new MockFileSystem()));
     }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)
@@ -354,6 +358,35 @@ public sealed class LuaCodeActionHandlerTest
             e.Range.Start.Line == 2 && e.Range.Start.Character == 0 &&
             e.Range.End.Line == 2 && e.Range.End.Character == 0 &&
             e.NewText == "    local x = 1\n");
+    }
+
+    // ── disk fallback (vscode restore race) ──────────────────────────────────
+
+    [Fact]
+    public async Task Handle_EngineUpvalue_FileOnDiskNotInHost_MoveActionProduced()
+    {
+        // Simulates the vscode-languageclient restored-tab race: file on disk, no didOpen sent yet.
+        const string docText = "local x = 1\nfunction Foo()\n    return x\nend";
+        var path = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "s.lua");
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [path] = new MockFileData(docText)
+        });
+        var fileHelper = new FileHelper(fileSystem);
+        var uri = fileHelper.PathToFileUri(path);
+
+        // No document in workspace host
+        var diag = EngineUpvalueDiag(2, 11, 12, 0, 1, uri);
+        var request = new CodeActionParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },
+            Range = new LspRange(new Position(0, 0), new Position(0, 0)),
+            Context = new CodeActionContext { Diagnostics = new Container<Diagnostic>(diag) }
+        };
+
+        var result = await MakeSut(fileHelper: fileHelper).Handle(request, CancellationToken.None);
+
+        Assert.Contains(result!, a => a.CodeAction?.Title?.Contains("inside") == true);
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

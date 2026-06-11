@@ -17,6 +17,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
+using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -148,6 +149,11 @@ public static class ServerConfigurator
                 // Registered as interfaces only so DryIoc does not see them as competing IHoverHandler registrations.
                 services.AddSingleton<IXmlHoverProvider, XmlHoverHandler>();
                 services.AddSingleton<ILuaHoverProvider, LuaHoverHandler>();
+
+                // GameRenameHandler and GamePrepareRenameHandler route by extension to these providers.
+                // Registered as interfaces only — same pattern as hover to avoid competing OmniSharp registrations.
+                services.AddSingleton<IXmlRenameProvider, XmlRenameHandler>();
+                services.AddSingleton<ILuaRenameProvider, LuaRenameHandler>();
             })
             .OnInitialize(async (server, request, ct) =>
             {

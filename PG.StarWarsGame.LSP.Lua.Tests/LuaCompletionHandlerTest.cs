@@ -328,6 +328,54 @@ public sealed class LuaCompletionHandlerTest
         Assert.DoesNotContain(result.Items, i => i.Label == "somescript");
     }
 
+    // ── disk fallback (vscode restore race) ──────────────────────────────────
+
+    [Fact]
+    public async Task Handle_FileOnDiskNotInHost_CompletionFallsBackToDisk()
+    {
+        // Simulates the vscode-languageclient restored-tab race: file on disk, no didOpen sent yet.
+        var path = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "script.lua");
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            // cursor will be at col 21 — inside the "UNIT" string argument
+            [path] = new MockFileData("Find_First_Object(\"UNIT\")")
+        });
+        var fileHelper = new FileHelper(fileSystem);
+        var uri = fileHelper.PathToFileUri(path);
+
+        var schema = new LuaApiSchemaProvider([
+            """
+            ---@param objectName string
+            ---@xmlref XmlObject:Unit
+            function Find_First_Object(objectName) end
+            """
+        ]);
+        var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
+            new FileOrigin("file:///units.xml", 0, null), null);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(uri, new DocumentIndex(uri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var handler = new LuaCompletionHandler(
+            new FakeIndexService { Current = index },
+            new FakeWorkspaceHost(),  // empty — no document tracked
+            fileHelper,
+            schema,
+            NullLogger<LuaCompletionHandler>.Instance);
+
+        var result = await handler.Handle(
+            new CompletionParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(uri) },
+                Position = new Position(0, 21)
+            },
+            CancellationToken.None);
+
+        Assert.Contains(result.Items, i => i.Label == "UNIT_A");
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class FakeIndexService : IGameIndexService

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 

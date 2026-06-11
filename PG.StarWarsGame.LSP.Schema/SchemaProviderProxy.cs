@@ -2,9 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Schema;
 
-namespace PG.StarWarsGame.LSP.Server;
+namespace PG.StarWarsGame.LSP.Schema;
 
 /// <summary>
 ///     A late-binding proxy for <see cref="ISchemaProvider" /> that allows the real provider
@@ -16,7 +15,7 @@ public sealed class SchemaProviderProxy : ISchemaProvider
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-    private ISchemaProvider _inner = SchemaIndex.EmptyProvider;
+    private volatile ISchemaProvider _inner = SchemaIndex.EmptyProvider;
 
     // Subscribers are stored here so they survive the _inner swap in Configure().
     // The old forwarding pattern (add => _inner.SchemaRefreshed += value) silently

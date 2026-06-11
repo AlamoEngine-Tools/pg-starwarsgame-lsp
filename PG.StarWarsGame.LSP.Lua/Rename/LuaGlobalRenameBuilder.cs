@@ -1,0 +1,108 @@
+// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+// Licensed under the MIT license. See LICENSE file in the project root for details.
+
+using Loretta.CodeAnalysis.Lua;
+using Loretta.CodeAnalysis.Lua.Syntax;
+using Microsoft.Extensions.Logging;
+using OmniSharp.Extensions.LanguageServer.Protocol;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+
+namespace PG.StarWarsGame.LSP.Lua.Rename;
+
+public static class LuaGlobalRenameBuilder
+{
+    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
+
+    public static WorkspaceEdit? Build(
+        string id, string newName, GameIndex index,
+        IGameWorkspaceHost workspaceHost, IFileHelper fileHelper, ILogger logger)
+    {
+        var changes = new Dictionary<DocumentUri, List<TextEdit>>();
+
+        // Definition edits — find `function <id>(` in the definition file.
+        if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
+            foreach (var sym in defs)
+            {
+                if (sym.Kind != GameSymbolKind.LuaGlobal) continue;
+                if (sym.Origin is not FileOrigin fo) continue;
+                var text = GetText(fo.Uri, workspaceHost, fileHelper);
+                if (text is null) continue;
+                var range = FindFunctionNameRange(text, id);
+                if (range is null) continue;
+                AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = range });
+            }
+
+        // Reference edits — use indexed LuaGlobal refs (O(1) lookup, no per-file re-parse).
+        if (index.WorkspaceReferences.TryGetValue(id, out var refs))
+            foreach (var r in refs)
+            {
+                if (r.ExpectedKind != GameSymbolKind.LuaGlobal) continue;
+                AddEdit(changes, r.DocumentUri, new TextEdit
+                {
+                    NewText = newName,
+                    Range = new LspRange(
+                        new Position(r.Line, r.Column),
+                        new Position(r.Line, r.Column + r.Length))
+                });
+            }
+
+        if (changes.Count == 0)
+            return null;
+
+        logger.LogDebug("Rename LuaGlobal {Id} → {NewName}: {Count} file(s)", id, newName, changes.Count);
+        return new WorkspaceEdit
+        {
+            Changes = changes.ToDictionary(kvp => kvp.Key, kvp => (IEnumerable<TextEdit>)kvp.Value)
+        };
+    }
+
+    internal static LspRange? FindFunctionNameRange(string text, string globalName)
+    {
+        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
+        var root = tree.GetRoot();
+
+        foreach (var funcDecl in root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())
+        {
+            if (funcDecl.Name is not SimpleFunctionNameSyntax simpleName) continue;
+            if (!string.Equals(simpleName.Name.Text, globalName, StringComparison.OrdinalIgnoreCase)) continue;
+
+            var span = simpleName.Name.GetLocation().GetLineSpan();
+            var start = span.StartLinePosition;
+            var end = span.EndLinePosition;
+            return new LspRange(
+                new Position(start.Line, start.Character),
+                new Position(end.Line, end.Character));
+        }
+
+        return null;
+    }
+
+    private static string? GetText(string uri, IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
+    {
+        if (workspaceHost.TryGet(uri, out var doc))
+            return doc.Text;
+        var path = fileHelper.FileUriToPath(uri);
+        if (path is null) return null;
+        try
+        {
+            return fileHelper.FileSystem.File.ReadAllText(path);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static void AddEdit(
+        Dictionary<DocumentUri, List<TextEdit>> changes, string uri, TextEdit edit)
+    {
+        var key = DocumentUri.From(uri);
+        if (!changes.TryGetValue(key, out var list))
+            changes[key] = list = [];
+        list.Add(edit);
+    }
+}

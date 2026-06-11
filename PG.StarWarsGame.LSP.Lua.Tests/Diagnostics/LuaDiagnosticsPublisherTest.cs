@@ -98,6 +98,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var diag = Assert.Single(Assert.Single(published).Diagnostics!);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_MISSING", diag.Message);
+        Assert.Contains("no object with this name exists", diag.Message);
     }
 
     [Fact]
@@ -115,7 +116,7 @@ public sealed class LuaDiagnosticsPublisherTest
     }
 
     [Fact]
-    public void OnIndexChanged_TypeMismatch_EmitsWarningDiagnostic()
+    public void OnIndexChanged_TypeMismatch_EmitsErrorDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
         workspaceHost.Set(LuaUri, """Find_Player("UNIT_A")""");
@@ -127,9 +128,24 @@ public sealed class LuaDiagnosticsPublisherTest
         indexService.Fire(index);
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics!);
-        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_A", diag.Message);
         Assert.Contains("Faction", diag.Message);
+    }
+
+    [Fact]
+    public void OnIndexChanged_TypeMismatch_GameObjectType_NoDiagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri, """Spawn_Object("UNIT_A")""");
+        var symbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
+            new FileOrigin(XmlUri, 0, null), null);
+        // GameObjectType is a wildcard — any XmlObject matches, no diagnostic expected.
+        var index = IndexWithLuaRef(LuaUri, "UNIT_A", "GameObjectType", symbol);
+
+        indexService.Fire(index);
+
+        Assert.Empty(Assert.Single(published).Diagnostics!);
     }
 
     [Fact]

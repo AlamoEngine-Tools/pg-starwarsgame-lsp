@@ -3,8 +3,9 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
-namespace PG.StarWarsGame.LSP.Server.Tests;
+namespace PG.StarWarsGame.LSP.Core.Tests.Workspace;
 
 public sealed class EaWXmlContextTest
 {

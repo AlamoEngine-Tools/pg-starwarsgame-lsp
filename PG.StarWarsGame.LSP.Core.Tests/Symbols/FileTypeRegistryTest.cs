@@ -2,8 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
-namespace PG.StarWarsGame.LSP.Server.Tests;
+namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
 public sealed class FileTypeRegistryTest
 {

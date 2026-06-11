@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -12,11 +13,13 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 {
+    private readonly IFileHelper _fileHelper;
     private readonly IGameWorkspaceHost _workspaceHost;
 
-    public LuaCodeActionHandler(IGameWorkspaceHost workspaceHost)
+    public LuaCodeActionHandler(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
     {
         _workspaceHost = workspaceHost;
+        _fileHelper = fileHelper;
     }
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken ct)
@@ -127,8 +130,8 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
     private CommandOrCodeAction? BuildMoveLocalIntoFunctionAction(
         DocumentUri docUri, Diagnostic d, int declLine, int funcDeclLine)
     {
-        var uriString = docUri.ToString();
-        if (!_workspaceHost.TryGet(uriString, out var doc))
+        var uriString = _fileHelper.NormalizeUri(docUri.ToString());
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uriString, out var doc))
             return null;
 
         var lines = doc.Text.Split('\n');

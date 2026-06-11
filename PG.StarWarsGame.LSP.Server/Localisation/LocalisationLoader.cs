@@ -1,11 +1,11 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Data.Config.v2;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
@@ -66,8 +66,8 @@ public sealed class LocalisationLoader : ILocalisationLoader
         if (!_langService.TryGetByIdentifier(config.Locale, out var language))
             language = _langService.Default;
 
-        var eawDb = _baselineProvider.GetMasterText(GameType.EaW, language!);
-        var focDb = _baselineProvider.GetMasterText(GameType.FoC, language!);
+        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, language!);
+        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, language!);
 
         IReadOnlyList<string> sourcePaths;
         string resourceType;

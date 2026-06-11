@@ -12,16 +12,7 @@ public sealed class TypeMismatchHandler : XmlDiagnosticsHandler<XmlReferenceFact
         if (fact.Resolved is null || fact.ExpectedTypeName is null)
             return [];
 
-        if (string.Equals(fact.ExpectedTypeName, "GameObjectType", StringComparison.OrdinalIgnoreCase))
-            return [];
-
-        if (fact.Resolved.TypeName == fact.ExpectedTypeName)
-            return [];
-
-        return
-        [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Type mismatch for '{fact.TargetId}': expected '{fact.ExpectedTypeName}' but found '{fact.Resolved.TypeName}'.")
-        ];
+        var eval = ReferenceResolutionEvaluator.Evaluate(fact.TargetId, fact.ExpectedTypeName, fact.Resolved);
+        return eval is { } r ? [new XmlDiagnosticResult(r.Severity, r.Message)] : [];
     }
 }

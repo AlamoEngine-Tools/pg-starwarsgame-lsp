@@ -46,7 +46,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<Hover?>(null);
 
-        if (!_workspaceHost.TryGet(uri, out var doc))
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
             return Task.FromResult<Hover?>(null);
 
         var line = request.Position.Line;

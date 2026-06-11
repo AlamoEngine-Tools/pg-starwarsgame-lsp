@@ -121,29 +121,26 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             if (reference.ExpectedKind != GameSymbolKind.XmlObject) continue;
 
             var resolved = index.Resolve(reference.TargetId);
+            var eval = ReferenceResolutionEvaluator.Evaluate(reference.TargetId, reference.ExpectedTypeName, resolved);
+            if (eval is null) continue;
+
             var range = new LspRange(
                 new LspPosition(reference.Line, reference.Column),
                 new LspPosition(reference.Line, reference.Column + reference.Length));
 
-            if (resolved is null)
-                diagnostics.Add(new LspDiagnostic
+            diagnostics.Add(new LspDiagnostic
+            {
+                Severity = eval.Value.Severity switch
                 {
-                    Severity = LspDiagnosticSeverity.Error,
-                    Message = $"'{reference.TargetId}' could not be resolved to any known game object.",
-                    Range = range,
-                    Source = AppProperties.LspServerId
-                });
-            else if (reference.ExpectedTypeName is not null &&
-                     !string.Equals(resolved.TypeName, reference.ExpectedTypeName,
-                         StringComparison.OrdinalIgnoreCase))
-                diagnostics.Add(new LspDiagnostic
-                {
-                    Severity = LspDiagnosticSeverity.Warning,
-                    Message =
-                        $"'{reference.TargetId}' is a '{resolved.TypeName}', expected '{reference.ExpectedTypeName}'.",
-                    Range = range,
-                    Source = AppProperties.LspServerId
-                });
+                    XmlDiagnosticSeverity.Error => LspDiagnosticSeverity.Error,
+                    XmlDiagnosticSeverity.Warning => LspDiagnosticSeverity.Warning,
+                    XmlDiagnosticSeverity.Information => LspDiagnosticSeverity.Information,
+                    _ => LspDiagnosticSeverity.Hint
+                },
+                Message = eval.Value.Message,
+                Range = range,
+                Source = AppProperties.LspServerId
+            });
         }
     }
 }

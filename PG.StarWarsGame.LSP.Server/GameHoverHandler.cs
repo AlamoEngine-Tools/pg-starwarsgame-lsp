@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
 
@@ -12,21 +13,24 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GameHoverHandler : HoverHandlerBase
 {
+    private readonly IFileHelper _fileHelper;
     private readonly ILogger<GameHoverHandler> _logger;
     private readonly ILuaHoverProvider _lua;
     private readonly IXmlHoverProvider _xml;
 
-    public GameHoverHandler(IXmlHoverProvider xml, ILuaHoverProvider lua, ILogger<GameHoverHandler> logger)
+    public GameHoverHandler(IXmlHoverProvider xml, ILuaHoverProvider lua, IFileHelper fileHelper,
+        ILogger<GameHoverHandler> logger)
     {
         _xml = xml;
         _lua = lua;
+        _fileHelper = fileHelper;
         _logger = logger;
     }
 
     public override Task<Hover?> Handle(HoverParams request, CancellationToken ct)
     {
         _logger.LogDebug("Hover request received: {0}", request.TextDocument.Uri);
-        var uri = request.TextDocument.Uri.ToString();
+        var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogDebug("Routing to lua hover handlers.");

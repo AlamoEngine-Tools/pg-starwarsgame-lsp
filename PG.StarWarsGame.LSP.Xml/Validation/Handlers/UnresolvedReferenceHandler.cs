@@ -12,10 +12,7 @@ public sealed class UnresolvedReferenceHandler : XmlDiagnosticsHandler<XmlRefere
         if (fact.Resolved is not null)
             return [];
 
-        return
-        [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Cannot resolve reference '{fact.TargetId}': no object with this name exists in the workspace.")
-        ];
+        var eval = ReferenceResolutionEvaluator.Evaluate(fact.TargetId, fact.ExpectedTypeName, null);
+        return eval is { } r ? [new XmlDiagnosticResult(r.Severity, r.Message)] : [];
     }
 }

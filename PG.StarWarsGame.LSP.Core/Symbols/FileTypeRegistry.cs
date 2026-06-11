@@ -3,9 +3,8 @@
 
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Symbols;
 
-namespace PG.StarWarsGame.LSP.Server;
+namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 public sealed class FileTypeRegistry : IFileTypeRegistry
 {
