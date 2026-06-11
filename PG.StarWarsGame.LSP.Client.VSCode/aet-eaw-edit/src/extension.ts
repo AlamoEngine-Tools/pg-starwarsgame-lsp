@@ -133,7 +133,7 @@ function validateConfiguration(): boolean {
 }
 
 async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
-	const serverExe = 'dotnet';
+	let serverExe = 'dotnet';
 	const devMode = cfg('lsp.devMode').get<boolean>('enabled', false);
 	const waitForDebugger = cfg('lsp.debug').get<boolean>('waitForDebugger', false);
 
@@ -147,7 +147,13 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		logLine(`Dev mode: starting from source — ${serverExe} ${serverArgs.join(' ')}`);
 	} else {
 		const serverPath = cfg('lsp').get<string>('executable')!;
-		serverArgs = waitForDebugger ? [serverPath, '--wait-for-debugger'] : [serverPath];
+		// .dll → framework-dependent: launch via `dotnet <path>`.
+		// Anything else (self-contained .exe / Linux binary) → invoke directly.
+		const isDll = serverPath.toLowerCase().endsWith('.dll');
+		serverExe = isDll ? 'dotnet' : serverPath;
+		serverArgs = isDll
+			? (waitForDebugger ? [serverPath, '--wait-for-debugger'] : [serverPath])
+			: (waitForDebugger ? ['--wait-for-debugger'] : []);
 		logLine(`Starting LSP server: ${serverExe} ${serverArgs.join(' ')}`);
 	}
 
