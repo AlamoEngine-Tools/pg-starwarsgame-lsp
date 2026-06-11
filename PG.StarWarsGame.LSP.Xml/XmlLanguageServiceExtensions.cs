@@ -4,11 +4,11 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Xml.CodeActions;
+using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Completion.Providers;
-using PG.StarWarsGame.LSP.Xml.CodeActions;
-using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
 using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Validation;
@@ -184,7 +184,8 @@ public static class XmlLanguageServiceExtensions
 
         // Inlay hint providers — add IXmlInlayHintProvider implementations here to register new providers
         services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();
-        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
 
         return services;
     }

@@ -35,7 +35,7 @@ public sealed class XmlInlayHintHandlerTest
         if (localisation is not null)
             index.Localisation = localisation;
 
-        var registry = new XmlInlayHintRegistry([new LocalisationKeyInlayHintProvider()]);
+        var registry = new XmlInlayHintRegistry([new LocalisationKeySingleValueInlayHintProvider()]);
         return (new XmlInlayHintHandler(
             host,
             index,

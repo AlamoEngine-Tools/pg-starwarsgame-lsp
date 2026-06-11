@@ -11,7 +11,7 @@ using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.InlayHints;
 
-public sealed class LocalisationKeyInlayHintProviderTest
+public sealed class LocalisationKeySingleValueInlayHintProviderTest
 {
     private static InlayHintContext MakeCtx(
         string tagName,
@@ -23,7 +23,8 @@ public sealed class LocalisationKeyInlayHintProviderTest
         hapDoc.LoadHtml($"<{tagName}>{innerText}</{tagName}>");
         var node = hapDoc.DocumentNode.SelectSingleNode($"//{tagName.ToLower()}")!;
 
-        var tagDef = new XmlTagDefinition { Tag = tagName, ValueType = XmlValueType.NameReference, ReferenceKind = referenceKind };
+        var tagDef = new XmlTagDefinition
+            { Tag = tagName, ValueType = XmlValueType.NameReference, ReferenceKind = referenceKind };
         var index = localisation is not null
             ? GameIndex.Empty with { Localisation = localisation }
             : GameIndex.Empty;
@@ -37,7 +38,7 @@ public sealed class LocalisationKeyInlayHintProviderTest
         var loc = new StubLocalisationIndex("TEXT_NAME", "X-Wing Fighter");
         var ctx = MakeCtx("Text_ID", "TEXT_NAME", ReferenceKind.LocalisationKey, loc);
 
-        var provider = new LocalisationKeyInlayHintProvider();
+        var provider = new LocalisationKeySingleValueInlayHintProvider();
         var hints = provider.Handle(ctx).ToList();
 
         var hint = Assert.Single(hints);
@@ -52,7 +53,7 @@ public sealed class LocalisationKeyInlayHintProviderTest
         var loc = new StubLocalisationIndex();
         var ctx = MakeCtx("Text_ID", "TEXT_MISSING", ReferenceKind.LocalisationKey, loc);
 
-        var provider = new LocalisationKeyInlayHintProvider();
+        var provider = new LocalisationKeySingleValueInlayHintProvider();
         var hints = provider.Handle(ctx).ToList();
 
         var hint = Assert.Single(hints);
@@ -64,7 +65,7 @@ public sealed class LocalisationKeyInlayHintProviderTest
     {
         var ctx = MakeCtx("Name", "X_Wing", ReferenceKind.None);
 
-        var provider = new LocalisationKeyInlayHintProvider();
+        var provider = new LocalisationKeySingleValueInlayHintProvider();
         var hints = provider.Handle(ctx).ToList();
 
         Assert.Empty(hints);
@@ -76,7 +77,7 @@ public sealed class LocalisationKeyInlayHintProviderTest
         var loc = new StubLocalisationIndex();
         var ctx = MakeCtx("Text_ID", "", ReferenceKind.LocalisationKey, loc);
 
-        var provider = new LocalisationKeyInlayHintProvider();
+        var provider = new LocalisationKeySingleValueInlayHintProvider();
         var hints = provider.Handle(ctx).ToList();
 
         Assert.Empty(hints);
@@ -88,7 +89,7 @@ public sealed class LocalisationKeyInlayHintProviderTest
         var loc = new StubLocalisationIndex();
         var ctx = MakeCtx("Text_ID", "   ", ReferenceKind.LocalisationKey, loc);
 
-        var provider = new LocalisationKeyInlayHintProvider();
+        var provider = new LocalisationKeySingleValueInlayHintProvider();
         var hints = provider.Handle(ctx).ToList();
 
         Assert.Empty(hints);
@@ -107,10 +108,23 @@ file sealed class StubLocalisationIndex : ILocalisationIndex
         foreach (var (k, v) in pairs) _values[k] = v;
     }
 
-    public StubLocalisationIndex(string key, string value) : this((key, value)) { }
-    public StubLocalisationIndex() : this([]) { }
+    public StubLocalisationIndex(string key, string value) : this((key, value))
+    {
+    }
 
-    public bool ContainsKey(string key) => _values.ContainsKey(key);
+    public StubLocalisationIndex() : this([])
+    {
+    }
+
+    public bool ContainsKey(string key)
+    {
+        return _values.ContainsKey(key);
+    }
+
     public IEnumerable<string> Keys => _values.Keys;
-    public string? GetValue(string key) => _values.TryGetValue(key, out var v) ? v : null;
+
+    public string? GetValue(string key)
+    {
+        return _values.TryGetValue(key, out var v) ? v : null;
+    }
 }
