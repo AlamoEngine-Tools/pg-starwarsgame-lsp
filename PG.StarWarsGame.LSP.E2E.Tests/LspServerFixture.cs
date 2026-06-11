@@ -42,7 +42,7 @@ public class LspServerFixture : IAsyncLifetime
     /// </summary>
     public Task ScanCompleted => _scanCompleteTcs.Task;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         TestDataDirectory = Path.Combine(
             Path.GetDirectoryName(typeof(LspServerFixture).Assembly.Location)!,
@@ -56,7 +56,7 @@ public class LspServerFixture : IAsyncLifetime
             await InitializeSpawnedAsync(workspacePath);
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         if (_client is IAsyncDisposable asyncClient)
             await asyncClient.DisposeAsync();

@@ -135,7 +135,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             if (TryResolveContainingAbilityType(enclosingValueNode!, out var containingAbilityType))
             {
                 var resCtx = new TagResolutionContext(
-                    containingAbilityType, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
+                    containingAbilityType!, XmlUtility.GetDepth(enclosingValueNode!), enclosingValueNode!);
                 tagDef = XmlTagResolver.Resolve(_schema, enclosingTag, resCtx);
             }
             else if (!fileTypes.IsEmpty)

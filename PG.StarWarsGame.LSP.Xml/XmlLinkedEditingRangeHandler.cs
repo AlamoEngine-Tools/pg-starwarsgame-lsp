@@ -26,14 +26,14 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
         _fileHelper = fileHelper;
     }
 
-    public override Task<LinkedEditingRanges?> Handle(LinkedEditingRangeParams request, CancellationToken ct)
+    public override Task<LinkedEditingRanges> Handle(LinkedEditingRangeParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
-            return Task.FromResult<LinkedEditingRanges?>(null);
+            return Task.FromResult<LinkedEditingRanges>(null!);
 
         if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
-            return Task.FromResult<LinkedEditingRanges?>(null);
+            return Task.FromResult<LinkedEditingRanges>(null!);
 
         var line = request.Position.Line;
         var character = request.Position.Character;
@@ -43,14 +43,14 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
 
         var node = FindNodeAtPosition(htmlDoc, line, character);
         if (node is null)
-            return Task.FromResult<LinkedEditingRanges?>(null);
+            return Task.FromResult<LinkedEditingRanges>(null!);
 
         var openRange = GetOpeningTagNameRange(node);
         var closeRange = GetClosingTagNameRange(node);
         if (openRange is null || closeRange is null)
-            return Task.FromResult<LinkedEditingRanges?>(null);
+            return Task.FromResult<LinkedEditingRanges>(null!);
 
-        return Task.FromResult<LinkedEditingRanges?>(new LinkedEditingRanges
+        return Task.FromResult<LinkedEditingRanges>(new LinkedEditingRanges
         {
             Ranges = new Container<LspRange>(openRange, closeRange),
             WordPattern = @"[a-zA-Z_][a-zA-Z0-9_]*"

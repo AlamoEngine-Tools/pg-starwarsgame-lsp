@@ -1,0 +1,44 @@
+name: PG.StarWarsGame.LSP Build & Test
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-test:
+    name: Build & Test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - uses: actions/setup-dotnet@v5
+      with:
+        dotnet-version: 10.0.x
+
+    - name: Build
+      run: dotnet build PG.StarWarsGame.LSP.slnx --configuration Release
+
+    - name: Unit & Integration Tests
+      # E2E tests require /foc (game data) and /schema (EaW YAML) which are in .gitignore.
+      # Run each project individually — solution-wide run with all E2E tests filtered produces
+      # exit code 8 (MTP ZeroTestsRan policy) even when all other tests pass.
+      # xunit v3 + MTP uses --filter-not-trait, not --filter.
+      run: |
+        dotnet test PG.StarWarsGame.LSP.Core.Tests/PG.StarWarsGame.LSP.Core.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        dotnet test PG.StarWarsGame.LSP.Schema.Tests/PG.StarWarsGame.LSP.Schema.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        dotnet test PG.StarWarsGame.LSP.Assets.Tests/PG.StarWarsGame.LSP.Assets.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        dotnet test PG.StarWarsGame.LSP.Xml.Tests/PG.StarWarsGame.LSP.Xml.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        dotnet test PG.StarWarsGame.LSP.Lua.Tests/PG.StarWarsGame.LSP.Lua.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        dotnet test PG.StarWarsGame.LSP.Server.Tests/PG.StarWarsGame.LSP.Server.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github

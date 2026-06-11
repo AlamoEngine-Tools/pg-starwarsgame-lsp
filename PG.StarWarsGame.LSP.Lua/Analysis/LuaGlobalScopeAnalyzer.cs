@@ -348,7 +348,7 @@ internal static class LuaGlobalScopeAnalyzer
                         new HashSet<string>(StringComparer.OrdinalIgnoreCase) { r.ResolvedUri! },
                         index.Documents, fileHelper);
                     return t.Contains(thisUri);
-                }).Arg;
+                })!.Arg;
 
             var span = callNode.GetLocation().GetLineSpan();
             var start = span.StartLinePosition;

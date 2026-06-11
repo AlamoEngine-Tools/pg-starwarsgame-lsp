@@ -2,8 +2,10 @@
 
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <!-- VSTHRD103: Loretta GetRoot() is intentionally synchronous in LSP handlers -->
+        <!-- VSTHRD200: LSP provider interfaces use Handle() to match OmniSharp naming -->
+        <NoWarn>VSTHRD103;VSTHRD200</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>

@@ -8,6 +8,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
+using PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation;
 
@@ -18,13 +19,15 @@ public sealed class XmlDocumentFactProducerTest
     private static XmlDocumentFactProducer Build(
         ISchemaProvider? schema = null,
         IFileTypeRegistry? registry = null,
-        IXmlStructuralValidator? validator = null)
+        IXmlStructuralValidator? validator = null,
+        IEnumerable<IXmlCrossTagRule>? crossTagRules = null)
     {
         return new XmlDocumentFactProducer(
             new FileHelper(new MockFileSystem()),
             schema ?? new SingleTagSchemaProvider(),
             registry ?? new EmptyFileTypeRegistry(),
-            validator ?? new XmlStructuralValidator());
+            validator ?? new XmlStructuralValidator(),
+            crossTagRules ?? []);
     }
 
     // ── tag value facts ───────────────────────────────────────────────────────
@@ -264,6 +267,31 @@ public sealed class XmlDocumentFactProducerTest
         var sf = Assert.Single(facts.OfType<XmlStructureFact>());
         Assert.True(sf.Line >= 0);
         Assert.True(sf.Column >= 0);
+    }
+
+    // ── cross-tag rule integration ────────────────────────────────────────────
+
+    [Fact]
+    public void CrossTagRule_integrated_via_Pass3_emits_SquadronOffsetsMismatchFact()
+    {
+        const string xml = "<Root><Obj>" +
+                           "<Squadron_Units>A, B</Squadron_Units>" +
+                           "<Squadron_Offsets>0,0,0</Squadron_Offsets>" +
+                           "</Obj></Root>";
+        var facts = Build(crossTagRules: [new SquadronOffsetsRule()]).Produce(xml, Uri);
+        var fact = Assert.Single(facts.OfType<SquadronOffsetsMismatchFact>());
+        Assert.Equal(2, fact.TotalUnits);
+        Assert.Equal(1, fact.TotalOffsets);
+    }
+
+    [Fact]
+    public void No_CrossTagRules_registered_does_not_emit_SquadronOffsetsMismatchFact()
+    {
+        const string xml = "<Root><Obj>" +
+                           "<Squadron_Units>A, B</Squadron_Units>" +
+                           "</Obj></Root>";
+        var facts = Build().Produce(xml, Uri);
+        Assert.Empty(facts.OfType<SquadronOffsetsMismatchFact>());
     }
 }
 

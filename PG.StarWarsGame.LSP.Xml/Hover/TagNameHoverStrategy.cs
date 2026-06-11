@@ -28,7 +28,7 @@ internal sealed class TagNameHoverStrategy : IXmlHoverStrategy
 
         if (typeDef is null)
             if (TryResolveContainingAbilityType(ctx.Node, ctx, out var abilityTypeName))
-                typeDef = ctx.Schema.GetObjectType(abilityTypeName);
+                typeDef = ctx.Schema.GetObjectType(abilityTypeName!);
 
         if (typeDef is null)
         {

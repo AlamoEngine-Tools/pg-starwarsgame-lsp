@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Xml.Completion.Providers;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
 using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Validation;
+using PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -133,8 +134,12 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamUnknownSlotHandler>();
 
+        // Cross-tag validation handler
+        services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
+
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
+        services.AddSingleton<IXmlCrossTagRule, SquadronOffsetsRule>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
@@ -171,6 +176,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
         services.AddSingleton<IXmlCodeActionProvider, FixSuggestionCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
+        services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
 
         // Hover strategies — add IXmlHoverStrategy implementations here to register new strategies
         services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();

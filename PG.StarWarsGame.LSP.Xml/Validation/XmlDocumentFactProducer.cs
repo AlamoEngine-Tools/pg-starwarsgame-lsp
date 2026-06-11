@@ -14,9 +14,12 @@ public sealed class XmlDocumentFactProducer(
     IFileHelper fileHelper,
     ISchemaProvider schema,
     IFileTypeRegistry fileTypeRegistry,
-    IXmlStructuralValidator structuralValidator)
+    IXmlStructuralValidator structuralValidator,
+    IEnumerable<IXmlCrossTagRule>? crossTagRules = null)
     : IXmlDocumentFactProducer
 {
+    private readonly IReadOnlyList<IXmlCrossTagRule> _crossTagRules = crossTagRules?.ToList() ?? [];
+
     public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
     {
         var facts = new List<XmlFact>();
@@ -156,6 +159,17 @@ public sealed class XmlDocumentFactProducer(
             }
 
             WalkNodes(child, facts, text, false, documentUri, context);
+        }
+
+        // Pass 3: cross-tag rules evaluated on the current object's full child set
+        if (_crossTagRules.Count > 0)
+        {
+            var readOnly = childGroups.ToDictionary(
+                kv => kv.Key,
+                kv => (IReadOnlyList<HtmlNode>)kv.Value,
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var rule in _crossTagRules)
+                facts.AddRange(rule.Evaluate(node, readOnly, documentUri));
         }
     }
 

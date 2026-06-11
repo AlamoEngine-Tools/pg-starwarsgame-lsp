@@ -15,4 +15,5 @@ public record XmlDiagnosticResult(
     int? OverrideColumn = null,
     int? OverrideLength = null,
     string? SuggestedFix = null,
-    string? CreateLocalisationKey = null);
+    string? CreateLocalisationKey = null,
+    string? SquadronSyncJson = null);

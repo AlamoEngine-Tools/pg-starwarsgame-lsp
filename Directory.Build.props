@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+
+    <PropertyGroup>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <LangVersion>latest</LangVersion>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <AnalysisLevel>latest</AnalysisLevel>
+        <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Authors>Alamo Engine Tools and Contributors</Authors>
+        <Copyright>Copyright © 2026 Alamo Engine Tools and contributors. All rights reserved.</Copyright>
+        <Company>Alamo Engine Tools</Company>
+    </PropertyGroup>
+
+</Project>

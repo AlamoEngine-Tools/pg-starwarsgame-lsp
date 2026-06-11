@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
@@ -72,6 +73,7 @@ public sealed class GetBaselineEntriesHandlerTest
     private static GetBaselineEntriesHandler BuildHandler()
     {
         var services = new ServiceCollection();
+        services.AddSingleton<IFileSystem>(new FileSystem());
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 

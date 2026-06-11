@@ -5,7 +5,6 @@ using System.Collections.Immutable;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
 using PG.StarWarsGame.LSP.Xml.Util;
 

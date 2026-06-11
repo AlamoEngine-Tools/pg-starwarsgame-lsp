@@ -1,13 +1,12 @@
-﻿FROM mcr.microsoft.com/dotnet/runtime:9.0 AS base
+FROM mcr.microsoft.com/dotnet/runtime:10.0 AS base
 USER $APP_UID
 WORKDIR /app
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
-COPY ["PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj", "PG.StarWarsGame.LSP.Server/"]
-RUN dotnet restore "PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj"
 COPY . .
+RUN dotnet restore "PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj"
 WORKDIR "/src/PG.StarWarsGame.LSP.Server"
 RUN dotnet build "./PG.StarWarsGame.LSP.Server.csproj" -c $BUILD_CONFIGURATION -o /app/build
 

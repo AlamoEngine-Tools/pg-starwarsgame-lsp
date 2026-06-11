@@ -4,8 +4,6 @@
 using System.Text;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
-using Xunit.Abstractions;
-
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
 /// <summary>

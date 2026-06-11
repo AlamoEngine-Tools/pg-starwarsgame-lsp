@@ -26,7 +26,7 @@ internal abstract class LocalisationKeyInlayHintProviderBase : IXmlInlayHintProv
         return new InlayHint
             {
                 Position = new Position(ctx.Line, int.MaxValue),
-                Label = $"\"{translated}\""!,
+                Label = ((StringOrInlayHintLabelParts?)$"\"{translated}\"")!,
                 Kind = InlayHintKind.Type,
                 PaddingLeft = true
             }

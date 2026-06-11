@@ -348,7 +348,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     private static JToken? BuildDiagnosticData(XmlDiagnosticResult result)
     {
-        if (result.SuggestedFix is null && result.CreateLocalisationKey is null)
+        if (result.SuggestedFix is null && result.CreateLocalisationKey is null &&
+            result.SquadronSyncJson is null)
             return null;
 
         var obj = new JObject();
@@ -356,6 +357,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             obj["fix"] = result.SuggestedFix;
         if (result.CreateLocalisationKey is not null)
             obj["createLocKey"] = result.CreateLocalisationKey;
+        if (result.SquadronSyncJson is not null)
+            obj["squadronSync"] = JToken.Parse(result.SquadronSyncJson);
         return obj;
     }
 

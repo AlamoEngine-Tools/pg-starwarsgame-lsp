@@ -4,6 +4,7 @@
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -30,14 +31,11 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
             return [];
 
         var normalised = Normalize(value);
-        if (Exists(ctx.Index.AssetFiles, normalised))
-            return [];
-
-        return
-        [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"{AssetNoun} file '{value}' was not found in the game data or workspace asset files.")
-        ];
+        return (from se in normalised
+                where !Exists(ctx.Index.AssetFiles, se)
+                select new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                    $"{AssetNoun} file '{se}' was not found in the game data or workspace asset files."))
+            .ToList();
     }
 
     private bool Exists(IAssetFileIndex index, string normalised)
@@ -58,8 +56,9 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         return false;
     }
 
-    private static string Normalize(string raw)
+    private static IEnumerable<string> Normalize(string raw)
     {
-        return raw.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+        return ListValueConstants.PrepareValueForSplit(raw)
+            .Split(ListValueConstants.GetListSeparators(), StringSplitOptions.RemoveEmptyEntries);
     }
 }
