@@ -18,17 +18,20 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
     private readonly IModProjectDetector _detector;
     private readonly ModProjectLoader _loader;
     private readonly ILogger<ProjectConfigurationResolver> _logger;
+    private readonly IUserNotifier _notifier;
     private readonly ModProjectResolver _resolver;
 
     public ProjectConfigurationResolver(
         IModProjectDetector detector,
         ModProjectLoader loader,
         ModProjectResolver resolver,
+        IUserNotifier notifier,
         ILogger<ProjectConfigurationResolver> logger)
     {
         _detector = detector;
         _loader = loader;
         _resolver = resolver;
+        _notifier = notifier;
         _logger = logger;
     }
 
@@ -45,6 +48,13 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
             {
                 _logger.LogError(ex,
                     "Failed to load mod project '{Path}'; no directories will be indexed.", pgprojPath);
+
+                // Surface a clear, actionable message to the user as an editor notification rather than
+                // failing silently. ModProjectLoadException already carries a user-facing message.
+                var message = ex is ModProjectLoadException
+                    ? ex.Message
+                    : $"Could not load mod project '{pgprojPath}': {ex.Message}";
+                _notifier.ShowError(message);
                 return null;
             }
 

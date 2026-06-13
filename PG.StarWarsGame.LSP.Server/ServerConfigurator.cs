@@ -122,6 +122,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IBaselineBootstrapper, BaselineBootstrapper>();
                 services.AddSingleton<IStartupProgress, StartupProgress>();
                 services.AddSingleton<IStartupNotifier, StartupNotifier>();
+                services.AddSingleton<IUserNotifier, WindowUserNotifier>();
                 services.AddSingleton<StartupPipeline>();
 
                 services.AddSingleton<BaselineLoader>(sp =>

@@ -338,6 +338,58 @@ public sealed class ModProjectLoaderTest
     }
 
     [Fact]
+    public void Load_ProjectReferencesNotAnArray_ThrowsClearExceptionMentioningField()
+    {
+        // EaWX Revan's Revenge wrote projectReferences as a single object instead of an array.
+        // The raw JsonException ("could not be converted to List`1...") is cryptic; the loader must
+        // translate it into a clear, actionable message.
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "projectReferences": { "path": "../data/eawx-core.pgproj" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("projectReferences", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("array", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("mymod.pgproj", ex.Message);
+    }
+
+    [Fact]
+    public void Load_MalformedJson_ThrowsClearExceptionMentioningFileAndLocation()
+    {
+        var loader = Build("""
+                           {
+                             "name": "Mod",
+                             "directories": { "xml": [ }
+                           }
+                           """, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("mymod.pgproj", ex.Message);
+        Assert.Contains("line", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_ObjectFormProjectReferences_StillSupported()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "projectReferences": [ { "path": "../base/base.pgproj" } ]
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Single(model.ProjectReferences);
+        Assert.Equal("../base/base.pgproj", model.ProjectReferences[0].Path);
+    }
+
+    [Fact]
     public void Load_MixedCasePaths_NormalizedToLowercaseForwardSlashes()
     {
         const string json = """

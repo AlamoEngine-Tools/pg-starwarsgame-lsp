@@ -22,13 +22,29 @@ public sealed class ProjectConfigurationResolverTest
 
     private static ProjectConfigurationResolver Build(MockFileSystem fs)
     {
+        return Build(fs, out _);
+    }
+
+    private static ProjectConfigurationResolver Build(MockFileSystem fs, out RecordingUserNotifier notifier)
+    {
         var fileHelper = new FileHelper(fs);
         var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
         var graph = new ProjectDependencyGraph(NullLogger<ProjectDependencyGraph>.Instance);
         var resolver = new ModProjectResolver(fileHelper, loader, graph, NullLogger<ModProjectResolver>.Instance);
         var detector = new ModProjectDetector(fileHelper, NullLogger<ModProjectDetector>.Instance);
-        return new ProjectConfigurationResolver(detector, loader, resolver,
+        notifier = new RecordingUserNotifier();
+        return new ProjectConfigurationResolver(detector, loader, resolver, notifier,
             NullLogger<ProjectConfigurationResolver>.Instance);
+    }
+
+    private sealed class RecordingUserNotifier : IUserNotifier
+    {
+        public List<string> Errors { get; } = [];
+
+        public void ShowError(string message)
+        {
+            Errors.Add(message);
+        }
     }
 
     [Fact]
@@ -74,5 +90,21 @@ public sealed class ProjectConfigurationResolverTest
         var config = Build(fs).Resolve([WorkspaceRoot]);
 
         Assert.Null(config);
+    }
+
+    [Fact]
+    public void Resolve_MalformedProjectFile_ShowsUserErrorNotification()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("""{ "projectReferences": { "path": "../core/core.pgproj" } }""")
+        });
+
+        var config = Build(fs, out var notifier).Resolve([WorkspaceRoot]);
+
+        Assert.Null(config);
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains("mymod.pgproj", message);
+        Assert.Contains("projectReferences", message, StringComparison.OrdinalIgnoreCase);
     }
 }

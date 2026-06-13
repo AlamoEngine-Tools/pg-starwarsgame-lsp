@@ -32,8 +32,20 @@ public sealed class ModProjectLoader
     public ModProjectFile Load(string path)
     {
         var text = _fileHelper.FileSystem.File.ReadAllText(path);
-        var dto = JsonSerializer.Deserialize<ModProjectFileDto>(text, Options)
-                  ?? throw new InvalidOperationException($"Failed to parse mod project file '{path}'.");
+        var fileName = _fileHelper.FileSystem.Path.GetFileName(path);
+
+        ModProjectFileDto? dto;
+        try
+        {
+            dto = JsonSerializer.Deserialize<ModProjectFileDto>(text, Options);
+        }
+        catch (JsonException ex)
+        {
+            throw new ModProjectLoadException(BuildLoadErrorMessage(fileName, ex), ex);
+        }
+
+        if (dto is null)
+            throw new ModProjectLoadException($"Could not load mod project '{fileName}': the file is empty.");
 
         IModinfo? parsed = null;
         if (dto.Modinfo is { } modinfoElement)
@@ -92,6 +104,24 @@ public sealed class ModProjectLoader
     private static string NormalizePath(string path)
     {
         return path.Replace('\\', '/').ToLowerInvariant();
+    }
+
+    // Translates System.Text.Json's cryptic deserialization failures into a clear, user-facing
+    // message: which file, where in it, and how to fix it. Shown verbatim as an editor notification.
+    private static string BuildLoadErrorMessage(string fileName, JsonException ex)
+    {
+        var location = ex.LineNumber is { } line
+            ? $" at line {line + 1}" +
+              (ex.BytePositionInLine is { } col ? $", column {col + 1}" : string.Empty)
+            : string.Empty;
+
+        var hint = ex.Path is { } jsonPath
+                   && jsonPath.Contains("projectReferences", StringComparison.OrdinalIgnoreCase)
+            ? "'projectReferences' must be an array of references — either path strings or " +
+              "{ \"path\": \"...\" } objects, e.g. [ { \"path\": \"../core/core.pgproj\" } ]."
+            : "the file is not valid JSON or does not match the .pgproj schema.";
+
+        return $"Could not load mod project '{fileName}'{location}: {hint}";
     }
 
     private sealed class ModProjectFileDto
