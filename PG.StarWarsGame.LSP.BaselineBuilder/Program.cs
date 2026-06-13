@@ -26,56 +26,72 @@ using PG.StarWarsGame.LSP.Schema.Providers;
 
 // ── Shared options ────────────────────────────────────────────────────────────
 
-var outputOption = new Option<FileInfo>(["--output", "-o"], "Output .baseline file path") { IsRequired = true };
-var schemaOption = new Option<DirectoryInfo?>(["--schema", "-s"],
-    "Path to schema/eaw/ directory (auto-detected from the binary location if omitted)");
+var outputOption = new Option<FileInfo>("--output", "-o")
+{
+    Description = "Output .baseline file path",
+    Required = true
+};
+var schemaOption = new Option<DirectoryInfo?>("--schema", "-s")
+{
+    Description = "Path to schema/eaw/ directory (auto-detected from the binary location if omitted)"
+};
 
 // ── eaw verb ──────────────────────────────────────────────────────────────────
 
-var eawPathOption = new Option<DirectoryInfo>(["--path", "-p"], "EaW game data directory") { IsRequired = true };
+var eawPathOption = new Option<DirectoryInfo>("--path", "-p")
+{
+    Description = "EaW game data directory",
+    Required = true
+};
 
 var eawCommand = new Command("eaw",
     "Build an Empire at War baseline. " +
-    "Note: full EaW engine support is not yet implemented; game-object and SFX projection uses FoC-mode against the EaW path.");
-eawCommand.AddOption(eawPathOption);
-eawCommand.AddOption(outputOption);
-eawCommand.AddOption(schemaOption);
-eawCommand.SetHandler(async context =>
+    "Note: full EaW engine support is not yet implemented; game-object and SFX projection uses FoC-mode against the EaW path.")
 {
-    var eawPath = context.ParseResult.GetValueForOption(eawPathOption)!.FullName;
-    var output = context.ParseResult.GetValueForOption(outputOption)!.FullName;
-    var schema = context.ParseResult.GetValueForOption(schemaOption)?.FullName ?? FindSchemaPath();
-    context.ExitCode = await RunAsync(eawPath, null, output, schema);
+    eawPathOption, outputOption, schemaOption
+};
+eawCommand.SetAction((parseResult, _) =>
+{
+    var eawPath = parseResult.GetValue(eawPathOption)!.FullName;
+    var output = parseResult.GetValue(outputOption)!.FullName;
+    var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindSchemaPath();
+    return RunAsync(eawPath, null, output, schema);
 });
 
 // ── foc verb ──────────────────────────────────────────────────────────────────
 
-var focEawOption = new Option<DirectoryInfo>(["--eaw", "-e"],
-    "EaW game data directory — loaded first as the base asset layer") { IsRequired = true };
-var focFocOption = new Option<DirectoryInfo>(["--foc", "-f"],
-    "FoC game data directory") { IsRequired = true };
+var focEawOption = new Option<DirectoryInfo>("--eaw", "-e")
+{
+    Description = "EaW game data directory — loaded first as the base asset layer",
+    Required = true
+};
+var focFocOption = new Option<DirectoryInfo>("--foc", "-f")
+{
+    Description = "FoC game data directory",
+    Required = true
+};
 
 var focCommand = new Command("foc",
-    "Build a Forces of Corruption baseline. EaW assets are loaded first; FoC assets override them.");
-focCommand.AddOption(focEawOption);
-focCommand.AddOption(focFocOption);
-focCommand.AddOption(outputOption);
-focCommand.AddOption(schemaOption);
-focCommand.SetHandler(async context =>
+    "Build a Forces of Corruption baseline. EaW assets are loaded first; FoC assets override them.")
 {
-    var eawPath = context.ParseResult.GetValueForOption(focEawOption)!.FullName;
-    var focPath = context.ParseResult.GetValueForOption(focFocOption)!.FullName;
-    var output = context.ParseResult.GetValueForOption(outputOption)!.FullName;
-    var schema = context.ParseResult.GetValueForOption(schemaOption)?.FullName ?? FindSchemaPath();
-    context.ExitCode = await RunAsync(focPath, eawPath, output, schema);
+    focEawOption, focFocOption, outputOption, schemaOption
+};
+focCommand.SetAction((parseResult, _) =>
+{
+    var eawPath = parseResult.GetValue(focEawOption)!.FullName;
+    var focPath = parseResult.GetValue(focFocOption)!.FullName;
+    var output = parseResult.GetValue(outputOption)!.FullName;
+    var schema = parseResult.GetValue(schemaOption)?.FullName ?? FindSchemaPath();
+    return RunAsync(focPath, eawPath, output, schema);
 });
 
 // ── Root command ──────────────────────────────────────────────────────────────
 
-var rootCommand = new RootCommand("PG Star Wars Game LSP Baseline Builder");
-rootCommand.AddCommand(eawCommand);
-rootCommand.AddCommand(focCommand);
-return await rootCommand.InvokeAsync(args);
+var rootCommand = new RootCommand("PG Star Wars Game LSP Baseline Builder")
+{
+    eawCommand, focCommand
+};
+return await rootCommand.Parse(args).InvokeAsync();
 
 // ── Main logic ────────────────────────────────────────────────────────────────
 

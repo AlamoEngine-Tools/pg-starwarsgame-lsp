@@ -300,20 +300,20 @@
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
+    "@vscode/test-electron": "^3.0.0",
     "eslint": "^10.5.0",
     "typescript": "^6.0.0"
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.45",
-    "vscode-languageclient": "^9.0.1"
+    "vscode-languageclient": "^10.0.0"
   },
   "bugs": {
-    "url": "https://github.com/gruenwaldlk/PG.StarWarsGame.LSP/issues",
+    "url": "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues",
     "email": "gruenwald.lk@outlook.com"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/gruenwaldlk/PG.StarWarsGame.LSP.git"
+    "url": "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp.git"
   }
 }

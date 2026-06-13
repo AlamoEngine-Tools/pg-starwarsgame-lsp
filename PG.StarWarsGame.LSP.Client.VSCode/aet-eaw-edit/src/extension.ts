@@ -126,7 +126,7 @@ let lspClient: LanguageClient | undefined;
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
 let localisationEditorProvider: LocalisationEditorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
-let traceChannel: vscode.OutputChannel | undefined;
+let traceChannel: vscode.LogOutputChannel | undefined;
 let log: vscode.OutputChannel | undefined;
 
 function logLine(msg: string): void {
@@ -361,7 +361,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	log = vscode.window.createOutputChannel('EaWEdit');
 	context.subscriptions.push(log);
 
-	traceChannel = vscode.window.createOutputChannel('EaWEdit LSP Trace');
+	traceChannel = vscode.window.createOutputChannel('EaWEdit LSP Trace', { log: true });
 	context.subscriptions.push(traceChannel);
 
 	logLine('Extension activated.');
