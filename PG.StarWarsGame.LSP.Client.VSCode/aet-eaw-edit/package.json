@@ -138,8 +138,15 @@
           "type": "string",
           "default": "",
           "format": "uri-reference",
-          "markdownDescription": "Path to a local baseline `.msgpack` file.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
+          "markdownDescription": "Path to a local baseline `.aet` file.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
           "scope": "machine-overridable"
+        },
+        "aet-eaw-edit.lsp.source.baseline.url": {
+          "order": 750,
+          "type": "string",
+          "default": "",
+          "format": "uri-reference",
+          "markdownDescription": "Custom HTTP URL for the baseline `.aet` file. Leave empty to use the default source.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `http`."
         },
         "aet-eaw-edit.lsp.schema.source": {
           "order": 800,

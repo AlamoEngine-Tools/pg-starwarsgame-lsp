@@ -31,7 +31,7 @@ public sealed class BaselineLoader
         return config.Type switch
         {
             BaselineSourceType.Local => LoadLocalAsync(config.LocalPath, ct),
-            BaselineSourceType.Http => LoadHttpAsync(config.FocUrl, ct),
+            BaselineSourceType.Http => LoadHttpAsync(config.Url, ct),
             _ => Task.FromResult(BaselineIndex.Empty)
         };
     }

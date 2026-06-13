@@ -7,11 +7,8 @@ public record BaselineSourceConfig
 {
     public BaselineSourceType Type { get; init; } = BaselineSourceType.Http;
 
-    public string EawUrl { get; init; } =
-        "https://github.com/AlamoEngine-Tools/pg-eaw-baselines/releases/latest/download/eaw-baseline.json";
-
-    public string FocUrl { get; init; } =
-        "https://github.com/AlamoEngine-Tools/pg-eaw-baselines/releases/latest/download/foc-baseline.json";
+    public string Url { get; init; } =
+        "https://raw.githubusercontent.com/AlamoEngine-Tools/eaw-baseline/refs/heads/main/foc/aet-pg-swg-lsp-foc-baseline.aet";
 
     public string? LocalPath { get; init; }
 }

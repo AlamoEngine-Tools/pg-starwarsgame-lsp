@@ -127,7 +127,7 @@ public sealed class BaselineLoaderTest
         var config = new BaselineSourceConfig
         {
             Type = BaselineSourceType.Http,
-            FocUrl = "https://example.com/foc-baseline.bin"
+            Url = "https://example.com/foc-baseline.bin"
         };
 
         var result = await loader.LoadAsync(config, CancellationToken.None);
@@ -147,7 +147,7 @@ public sealed class BaselineLoaderTest
         var config = new BaselineSourceConfig
         {
             Type = BaselineSourceType.Http,
-            FocUrl = "https://example.com/foc-baseline.bin"
+            Url = "https://example.com/foc-baseline.bin"
         };
 
         await loader.LoadAsync(config, CancellationToken.None);
@@ -168,7 +168,7 @@ public sealed class BaselineLoaderTest
         var config = new BaselineSourceConfig
         {
             Type = BaselineSourceType.Http,
-            FocUrl = "https://example.com/foc-baseline.bin"
+            Url = "https://example.com/foc-baseline.bin"
         };
 
         var result = await loader.LoadAsync(config, CancellationToken.None);
@@ -185,7 +185,7 @@ public sealed class BaselineLoaderTest
         var config = new BaselineSourceConfig
         {
             Type = BaselineSourceType.Http,
-            FocUrl = "https://example.com/foc-baseline.bin"
+            Url = "https://example.com/foc-baseline.bin"
         };
 
         var result = await loader.LoadAsync(config, CancellationToken.None);

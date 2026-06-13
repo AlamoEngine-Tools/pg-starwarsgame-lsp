@@ -109,6 +109,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var schemaLocalPath = TryGetString(elem, "schemaLocalPath");
         var baselineLocalPath = TryGetString(elem, "baselineLocalPath");
         var baselineType = TryGetString(elem, "baselineType");
+        var baselineUrl = TryGetString(elem, "baselineUrl");
 
         var modPaths = new List<string>();
         if (elem.TryGetProperty("modPaths", out var modPathsElem) &&
@@ -137,7 +138,9 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
                 ? new BaselineSourceConfig { Type = BaselineSourceType.None }
                 : !string.IsNullOrWhiteSpace(baselineLocalPath)
                     ? new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = baselineLocalPath }
-                    : new BaselineSourceConfig()
+                    : !string.IsNullOrWhiteSpace(baselineUrl)
+                        ? new BaselineSourceConfig { Url = baselineUrl }
+                        : new BaselineSourceConfig()
         };
     }
 
@@ -155,6 +158,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
                 ? overlay.SchemaSource
                 : file.SchemaSource,
             BaselineSource = overlay.BaselineSource.Type != BaselineSourceType.Http
+                             || overlay.BaselineSource.Url != new BaselineSourceConfig().Url
                 ? overlay.BaselineSource
                 : file.BaselineSource
         };

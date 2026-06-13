@@ -178,6 +178,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			schemaUrl:         schemaSource === 'http' ? (cfg('lsp.schema').get<string>('url') || undefined) : undefined,
 			schemaLocalPath:   schemaSource === 'local' ? (cfg('lsp.schema').get<string>('localPath') || undefined) : undefined,
 			baselineType:      cfg('lsp.source.baseline').get<string>('type', 'http'),
+			baselineUrl:       cfg('lsp.source.baseline').get<string>('type', 'http') === 'http'
+			                       ? (cfg('lsp.source.baseline').get<string>('url') || undefined)
+			                       : undefined,
 			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
 			modPaths:          cfg('lsp').get<string[]>('modPaths', []),
 		},
