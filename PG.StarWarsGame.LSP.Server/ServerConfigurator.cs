@@ -24,6 +24,7 @@ using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
@@ -79,6 +80,7 @@ public static class ServerConfigurator
             .WithHandler<GetBaselineEntriesHandler>()
             .WithHandler<GetLanguagesHandler>()
             .WithHandler<ExportLocalisationToDatHandler>()
+            .WithHandler<GetEffectiveObjectHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);

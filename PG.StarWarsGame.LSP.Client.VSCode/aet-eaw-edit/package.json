@@ -1,12 +1,13 @@
 {
   "name": "aet-eaw-edit",
   "displayName": "Alamo Engine Tools - Empire at War Edit",
-  "description": "",
+  "description": "A LSP server for modding the game Star Wars: Empire at War and its expansion Star Wars: Empire at War: Forces of Corruption",
   "author": {
     "name": "Lukas Grünwald"
   },
   "publisher": "AlamoEngineTools",
   "version": "0.0.1",
+  "icon": "resources/icons/alamo-engine-tools.png",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -25,13 +26,14 @@
         {
           "id": "aet-localisation",
           "title": "EaWEdit: Localisation",
-          "icon": "resources/icons/localisation.svg"
+          "icon": "resources/icons/alamo-engine-tools.png"
         }
       ]
     },
     "views": {
       "aet-localisation": [
         {
+          "icon": "resources/icons/localisation.svg",
           "type": "webview",
           "id": "aet-eaw-edit.lsp.localisationEditor",
           "name": "Editor"
@@ -63,6 +65,10 @@
       {
         "command": "aet-eaw-edit.lsp.initLocalisationProject",
         "title": "EaWEdit: Initialise Localisation Project from Baseline"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.showEffectiveObject",
+        "title": "EaWEdit: Show Effective Object (Variant Inheritance)"
       }
     ],
     "configuration": {
@@ -277,9 +283,10 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run compile",
+    "vscode:prepublish": "npm run bundle",
+    "bundle": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "watch": "npm run bundle -- --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
@@ -288,13 +295,13 @@
   "devDependencies": {
     "@vscode/vsce": "^3.5.0",
     "@types/mocha": "^10.0.10",
-    "@types/node": "25.9.1",
+    "@types/node": "25.9.3",
     "@types/vscode": "^1.107.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
-    "eslint": "^10.4.0",
+    "eslint": "^10.5.0",
     "typescript": "^6.0.0"
   },
   "dependencies": {

@@ -63,4 +63,13 @@ public sealed record BaselineIndex(
     /// </summary>
     public ImmutableDictionary<string, ImmutableArray<string>> ModelBones { get; init; } =
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     Full child-tag tree of each shipped GameObject, keyed case-insensitively by object id. Built
+    ///     offline by the BaselineBuilder; consumed by the effective-object merge engine so that variants
+    ///     (<c>Variant_Of_Existing_Type</c>) whose base is a shipped object can be resolved. Empty for
+    ///     objects whose tags were not captured.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<BaselineTag>> ObjectTags { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<BaselineTag>>(StringComparer.OrdinalIgnoreCase);
 }

@@ -38,6 +38,14 @@ internal static class YamlSchemaParser
                 logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' — defaulting to Default",
                     entry.SemanticType, entry.Tag);
 
+            var variantMode = VariantMode.Replace;
+            if (entry.VariantMode is not null && !Enum.TryParse(entry.VariantMode, true, out variantMode))
+            {
+                logger?.LogWarning("Unknown variantMode '{VariantMode}' for tag '{Tag}' — defaulting to Replace",
+                    entry.VariantMode, entry.Tag);
+                variantMode = VariantMode.Replace;
+            }
+
             TagValidationOverride? validationOverride = null;
             if (entry.ValidationOverride is { } vo && !string.IsNullOrEmpty(vo.ValidationId))
             {
@@ -81,6 +89,7 @@ internal static class YamlSchemaParser
                 Description = entry.Description,
                 Notes = entry.Notes,
                 MultipleAllowed = entry.MultipleAllowed,
+                VariantMode = variantMode,
                 ValidationOverride = validationOverride
             });
         }

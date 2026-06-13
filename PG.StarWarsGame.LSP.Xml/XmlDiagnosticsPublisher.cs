@@ -19,6 +19,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Xml.Validation;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -36,6 +37,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IStoryFactProducer _storyProducer;
+    private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlDiagnosticsPublisher(
@@ -50,11 +52,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         ILogger<XmlDiagnosticsPublisher> logger,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
+        IXmlVariantFactProducer variantProducer,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
-            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds)
+            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
+            variantProducer)
     {
     }
 
@@ -70,7 +74,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         ILogger<XmlDiagnosticsPublisher> logger,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
-        int debounceMs = 0)
+        int debounceMs = 0,
+        IXmlVariantFactProducer? variantProducer = null)
         : base(publish, indexService, workspaceHost, debounceMs)
     {
         _indexService = indexService;
@@ -83,6 +88,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _logger = logger;
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
+        _variantProducer = variantProducer;
     }
 
     protected override string FileExtension => ".xml";
@@ -130,6 +136,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var facts = new List<XmlFact>();
         facts.AddRange(_documentProducer.Produce(text, uri));
         facts.AddRange(_indexProducer.Produce(canonicalUri, index));
+        if (_variantProducer is not null)
+            facts.AddRange(_variantProducer.Produce(canonicalUri, text, index));
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(text, uri));
 

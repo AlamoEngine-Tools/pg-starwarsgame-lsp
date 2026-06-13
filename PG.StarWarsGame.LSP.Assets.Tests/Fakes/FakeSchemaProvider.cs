@@ -26,9 +26,20 @@ internal sealed class FakeSchemaProvider : ISchemaProvider
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
+    /// <summary>Tag names that <see cref="GetTag" /> should report as <c>VariantParent</c> tags.</summary>
+    public HashSet<string> VariantTagNames { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public XmlTagDefinition? GetTag(string tagName)
     {
-        return null;
+        return VariantTagNames.Contains(tagName)
+            ? new XmlTagDefinition
+            {
+                Tag = tagName,
+                ValueType = XmlValueType.TypeReference,
+                ReferenceKind = ReferenceKind.XmlObject,
+                SemanticType = TagSemanticType.VariantParent
+            }
+            : null;
     }
 
     public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)

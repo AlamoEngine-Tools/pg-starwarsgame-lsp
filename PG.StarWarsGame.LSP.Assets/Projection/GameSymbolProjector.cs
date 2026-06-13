@@ -23,27 +23,50 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         string sourceManifestHash)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
+        var objectTags = ImmutableDictionary.CreateBuilder<string, ImmutableArray<BaselineTag>>(
+            StringComparer.OrdinalIgnoreCase);
 
         foreach (var entry in gameObjects)
         {
             var typeName = ResolveTypeName(entry.ClassificationName);
+            var tags = entry.Tags ?? [];
             var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, typeName,
-                ResolveOrigin(entry.Location), null);
+                ResolveOrigin(entry.Location), null, ResolveVariantBaseId(tags));
             builder[sym.Id] = sym;
+            if (tags.Count > 0)
+                objectTags[entry.Name] = [.. tags];
         }
 
         foreach (var entry in sfxEvents)
         {
+            var tags = entry.Tags ?? [];
             var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "SFXEvent",
-                ResolveOrigin(entry.Location), null);
+                ResolveOrigin(entry.Location), null, ResolveVariantBaseId(tags));
             builder[sym.Id] = sym;
+            if (tags.Count > 0)
+                objectTags[entry.Name] = [.. tags];
         }
 
         return new BaselineIndex(builder.ToImmutable(), DateTimeOffset.UtcNow,
             sourceManifestHash,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+            ImmutableDictionary<string, ImmutableArray<string>>.Empty)
+        {
+            ObjectTags = objectTags.ToImmutable()
+        };
+    }
+
+    /// <summary>
+    ///     Returns the base object id from a <c>Variant_Of_Existing_Type</c> tag among the object's tags,
+    ///     identified via the schema's <see cref="TagSemanticType.VariantParent" /> semantic type, or null.
+    /// </summary>
+    private string? ResolveVariantBaseId(IReadOnlyList<BaselineTag> tags)
+    {
+        foreach (var tag in tags)
+            if (schema.GetTag(tag.TagName)?.SemanticType == TagSemanticType.VariantParent)
+                return tag.Value;
+        return null;
     }
 
     private string ResolveTypeName(string classificationName)

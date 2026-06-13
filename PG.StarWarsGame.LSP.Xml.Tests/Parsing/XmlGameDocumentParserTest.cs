@@ -60,6 +60,18 @@ public sealed class XmlGameDocumentParserTest
         return new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.Float };
     }
 
+    private static XmlTagDefinition VariantTag()
+    {
+        return new XmlTagDefinition
+        {
+            Tag = "Variant_Of_Existing_Type",
+            ValueType = XmlValueType.TypeReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            SemanticType = TagSemanticType.VariantParent,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+        };
+    }
+
     private static XmlTagDefinition GroupRefTag(string tag, string referenceType)
     {
         return new XmlTagDefinition
@@ -99,10 +111,9 @@ public sealed class XmlGameDocumentParserTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("units.xml", ["Unit"]);
 
-        var result = await Build(schema, registry).ParseAsync(
-            "file:///units.xml",
-            """<GameObjectFiles><Unit Name="UNIT_REBEL"><Max_Health>200</Max_Health></Unit></GameObjectFiles>""",
-            1, default);
+        var result = await Build(schema, registry).ParseAsync("file:///units.xml",
+            """<GameObjectFiles><Unit Name="UNIT_REBEL"><Max_Health>200</Max_Health></Unit></GameObjectFiles>""", 1,
+            TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("UNIT_REBEL", sym.Id);
@@ -114,10 +125,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Unknown_Element_Emits_No_Symbol()
     {
-        var result = await Build().ParseAsync(
-            "file:///f.xml",
-            """<UnknownType Name="FOO"/>""",
-            1, default);
+        var result = await Build().ParseAsync("file:///f.xml", """<UnknownType Name="FOO"/>""", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -128,10 +137,9 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("GameConstants", null)); // singleton: no Name attribute
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            "<GameConstants><Credits_Per_CP>50</Credits_Per_CP></GameConstants>",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            "<GameConstants><Credits_Per_CP>50</Credits_Per_CP></GameConstants>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -142,10 +150,8 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            "<Unit><Max_Health>200</Max_Health></Unit>", // no Name attribute
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml", "<Unit><Max_Health>200</Max_Health></Unit>", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -158,15 +164,13 @@ public sealed class XmlGameDocumentParserTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("f.xml", ["Unit"]);
 
-        var result = await Build(schema, registry).ParseAsync(
-            "file:///f.xml",
-            """
-            <Units>
-              <Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit>
-              <Unit Name="UNIT_B"><Max_Health>200</Max_Health></Unit>
-            </Units>
-            """,
-            1, default);
+        var result = await Build(schema, registry).ParseAsync("file:///f.xml", """
+                                                                               <Units>
+                                                                                 <Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit>
+                                                                                 <Unit Name="UNIT_B"><Max_Health>200</Max_Health></Unit>
+                                                                               </Units>
+                                                                               """, 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Symbols.Length);
         Assert.Contains(result.Symbols, s => s.Id == "UNIT_A");
@@ -181,10 +185,8 @@ public sealed class XmlGameDocumentParserTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("sfx.xml", ["SFXEvent"]);
 
-        var result = await Build(schema, registry).ParseAsync(
-            "file:///sfx.xml",
-            """<SFXEvents><SFXEvent Name="SFX_LASER"/></SFXEvents>""",
-            1, default);
+        var result = await Build(schema, registry).ParseAsync("file:///sfx.xml",
+            """<SFXEvents><SFXEvent Name="SFX_LASER"/></SFXEvents>""", 1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("SFXEvent", sym.TypeName);
@@ -199,10 +201,8 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Unit"));
         schema.AddTag(RefTag("Spawn_Unit", "Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("UNIT_B", reference.TargetId);
@@ -218,10 +218,8 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Unit"));
         schema.AddTag(PlainTag("Max_Health")); // plain float — not a reference
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Unit Name="UNIT_A"><Max_Health>200</Max_Health></Unit>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><Max_Health>200</Max_Health></Unit>""", 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -233,13 +231,90 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Unit"));
         schema.AddTag(RefTag("Spawn_Unit", "Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///units.xml",
-            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///units.xml",
+            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("file:///units.xml", reference.DocumentUri);
+    }
+
+    // ── variant inheritance (Variant_Of_Existing_Type) ──────────────────────
+
+    [Fact]
+    public async Task ParseAsync_VariantParent_Tag_Sets_VariantBaseId_And_Emits_Typed_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        schema.AddTag(VariantTag());
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("ships.xml", ["SpaceUnit"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///ships.xml",
+            """<GameObjectFiles><SpaceUnit Name="VARIANT_A"><Variant_Of_Existing_Type>BASE_SHIP</Variant_Of_Existing_Type></SpaceUnit></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("BASE_SHIP", sym.VariantBaseId);
+
+        // Exactly one reference: the typed variant base reference (not a duplicate wildcard one).
+        var reference = Assert.Single(result.References);
+        Assert.Equal("BASE_SHIP", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Equal("SpaceUnit", reference.ExpectedTypeName); // enclosing object's type, not GameObjectType
+    }
+
+    [Fact]
+    public async Task ParseAsync_NonVariant_Object_Has_Null_VariantBaseId()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("units.xml", ["Unit"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///units.xml",
+            """<GameObjectFiles><Unit Name="UNIT_A"><Max_Health>100</Max_Health></Unit></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Null(sym.VariantBaseId);
+    }
+
+    [Fact]
+    public async Task ParseAsync_VariantParent_EmptyValue_NoBaseId_NoReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        schema.AddTag(VariantTag());
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("ships.xml", ["SpaceUnit"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///ships.xml",
+            """<GameObjectFiles><SpaceUnit Name="VARIANT_A"><Variant_Of_Existing_Type></Variant_Of_Existing_Type></SpaceUnit></GameObjectFiles>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Null(sym.VariantBaseId);
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_SubObject_VariantParent_Sets_VariantBaseId_And_Emits_Typed_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+        schema.AddTag(VariantTag());
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"><Variant_Of_Existing_Type>Base_Ability</Variant_Of_Existing_Type></Lucky_Shot_Attack_Ability></Abilities></U>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Base_Ability", sym.VariantBaseId);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Base_Ability", reference.TargetId);
+        Assert.Equal("LuckyShotAttackAbility", reference.ExpectedTypeName);
     }
 
     // ── robustness ───────────────────────────────────────────────────────────
@@ -251,10 +326,8 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Unit"));
 
         // Unclosed tag — HtmlAgilityPack recovers gracefully
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml", """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B""", 1,
+            TestContext.Current.CancellationToken);
 
         // May return partial results — must not throw
         Assert.NotNull(result);
@@ -263,7 +336,7 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Empty_Document_Returns_Empty_Index()
     {
-        var result = await Build().ParseAsync("file:///f.xml", "", 1, default);
+        var result = await Build().ParseAsync("file:///f.xml", "", 1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
         Assert.Empty(result.References);
@@ -272,7 +345,7 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Sets_DocumentUri_And_Version()
     {
-        var result = await Build().ParseAsync("file:///f.xml", "<X/>", 7, default);
+        var result = await Build().ParseAsync("file:///f.xml", "<X/>", 7, TestContext.Current.CancellationToken);
 
         Assert.Equal("file:///f.xml", result.DocumentUri);
         Assert.Equal(7, result.Version);
@@ -287,10 +360,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Squadron"));
         schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Squadron Name="SQ_1"><Squadron_Units>X_Wing, A_Wing, B_Wing</Squadron_Units></Squadron>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Squadron Name="SQ_1"><Squadron_Units>X_Wing, A_Wing, B_Wing</Squadron_Units></Squadron>""", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result.References.Length);
         Assert.Contains(result.References, r => r.TargetId == "X_Wing");
@@ -305,10 +377,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Squadron"));
         schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Squadron Name="SQ_1"><Squadron_Units>X_Wing A_Wing B_Wing</Squadron_Units></Squadron>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Squadron Name="SQ_1"><Squadron_Units>X_Wing A_Wing B_Wing</Squadron_Units></Squadron>""", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result.References.Length);
         Assert.Contains(result.References, r => r.TargetId == "X_Wing");
@@ -323,10 +394,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Unit"));
         schema.AddTag(ListRefTag("Transport_Units", "Unit", XmlValueType.PerFactionObjectList));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Unit Name="UNIT_A"><Transport_Units>Pirates, Ship_A, Ship_B</Transport_Units></Unit>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><Transport_Units>Pirates, Ship_A, Ship_B</Transport_Units></Unit>""", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.References.Length);
         Assert.DoesNotContain(result.References, r => r.TargetId == "Pirates");
@@ -342,10 +412,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddTag(ListRefTag("Required_Special_Structures", "GameObjectType",
             XmlValueType.GameObjectTypeReferenceList, TagSemanticType.PrerequisiteExpression));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Unit Name="UNIT_A"><Required_Special_Structures>A | B, C</Required_Special_Structures></Unit>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><Required_Special_Structures>A | B, C</Required_Special_Structures></Unit>""", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Equal(3, result.References.Length);
         Assert.Contains(result.References, r => r.TargetId == "A");
@@ -360,10 +429,9 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Squadron"));
         schema.AddTag(ListRefTag("Squadron_Units", "Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Squadron Name="SQ_1"><Squadron_Units></Squadron_Units></Squadron>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Squadron Name="SQ_1"><Squadron_Units></Squadron_Units></Squadron>""", 1,
+            TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -375,10 +443,8 @@ public sealed class XmlGameDocumentParserTest
         schema.AddType(Type("Unit"));
         schema.AddTag(RefTag("Spawn_Unit", "Unit"));
 
-        var result = await Build(schema).ParseAsync(
-            "file:///f.xml",
-            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""",
-            1, default);
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B</Spawn_Unit></Unit>""", 1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("UNIT_B", reference.TargetId);
@@ -399,8 +465,8 @@ public sealed class XmlGameDocumentParserTest
         const string xml =
             "<?xml version=\"1.0\"?>\n<GameObjectFiles>\n\t<SpaceUnit Name=\"Broadside_Class_Cruiser\">\n\t\t<Text_ID>TEST</Text_ID>\n\t</SpaceUnit>\n</GameObjectFiles>";
 
-        var result = await Build(schema, registry).ParseAsync(
-            "file:///spaceunits.xml", xml, 1, default);
+        var result = await Build(schema, registry)
+            .ParseAsync("file:///spaceunits.xml", xml, 1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("Broadside_Class_Cruiser", sym.Id); // ID must not include ">
@@ -423,10 +489,9 @@ public sealed class XmlGameDocumentParserTest
 
         // Line 1 (0-based): "<SpaceUnit Name="SHIP_A">..." — value "SHIP_A" starts at col 17
         // "<SpaceUnit Name=\"" = 17 chars (0-16), so value starts at col 17
-        var result = await Build(schema, registry).ParseAsync(
-            "file:///ships.xml",
-            "<GameObjectFiles>\n<SpaceUnit Name=\"SHIP_A\"><Hp>100</Hp></SpaceUnit>\n</GameObjectFiles>",
-            1, default);
+        var result = await Build(schema, registry).ParseAsync("file:///ships.xml",
+            "<GameObjectFiles>\n<SpaceUnit Name=\"SHIP_A\"><Hp>100</Hp></SpaceUnit>\n</GameObjectFiles>", 1,
+            TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         var origin = Assert.IsType<FileOrigin>(sym.Origin);
@@ -445,7 +510,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema, registry).ParseAsync(
             "file:///ships.xml",
             "<GameObjectFiles>\n    <SpaceUnit Name=\"SHIP_B\"><Hp>50</Hp></SpaceUnit>\n</GameObjectFiles>",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         var origin = Assert.IsType<FileOrigin>(sym.Origin);
@@ -465,7 +530,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync( // no registry
             "file:///units.xml",
             """<Units><Unit Name="UNIT_A"/></Units>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -485,7 +550,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema, registry).ParseAsync(
             "file:///f.xml",
             """<WhateverWrapper><SomeTag Name="HP_A"/></WhateverWrapper>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("HP_A", sym.Id);
@@ -504,7 +569,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema, registry).ParseAsync(
             "file:///movies.xml",
             "<BinkMovies><BinkMovie/></BinkMovies>",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -522,7 +587,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema, registry).ParseAsync(
             "file:///f.xml",
             """<WhateverWrapper><SomeTag Name="HP_A"><Attached_To>BONE_X</Attached_To></SomeTag></WhateverWrapper>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("HP_A", sym.Id);
@@ -543,7 +608,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<Unit Name="UNIT_A"><Garrison_Units>X_Wing Y_Wing</Garrison_Units></Unit>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.References.Length);
         Assert.Contains(result.References, r => r.TargetId == "X_Wing");
@@ -560,7 +625,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<Unit Name="UNIT_A"><Garrison_Units>X_Wing</Garrison_Units></Unit>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("X_Wing", reference.TargetId);
@@ -576,7 +641,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<Unit Name="UNIT_A"><Garrison_Units>X_Wing,Y_Wing</Garrison_Units></Unit>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.References.Length);
         Assert.Contains(result.References, r => r.TargetId == "X_Wing");
@@ -598,7 +663,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<Unit Name="INFANTRY"><Behavior>BehaviorModule_AAGUN_Fire</Behavior></Unit>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -615,7 +680,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
             """<SFXEvents><SFXEvent Name="SFX_LASER"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent></SFXEvents>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);
     }
@@ -630,7 +695,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
             """<SFXEvents><SFXEvent Name="SFX_LASER"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent></SFXEvents>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var gm = Assert.Single(result.GroupMemberships);
         Assert.Equal("Unit_AT_AT", gm.Membership.GroupKey);
@@ -648,7 +713,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
             "<SFXEvents>\n<SFXEvent Name=\"SFX_LASER\"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>\n</SFXEvents>",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var gm = Assert.Single(result.GroupMemberships);
         var origin = Assert.IsType<FileOrigin>(gm.Membership.MemberOrigin);
@@ -669,7 +734,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
             "<SFXEvents>\n<SFXEvent Name=\"SFX_LASER\"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>\n</SFXEvents>",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var gm = Assert.Single(result.GroupMemberships);
         Assert.Equal("Unit_AT_AT".Length, gm.TagLength);
@@ -685,7 +750,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///sfx.xml",
             """<SFXEvents><SFXEvent Name="SFX_LASER"><Overlap_Test></Overlap_Test></SFXEvent></SFXEvents>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.GroupMemberships);
     }
@@ -705,7 +770,7 @@ public sealed class XmlGameDocumentParserTest
               <SFXEvent Name="SFX_B"><Overlap_Test>Unit_AT_AT</Overlap_Test></SFXEvent>
             </SFXEvents>
             """,
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.GroupMemberships.Length);
         Assert.All(result.GroupMemberships, gm => Assert.Equal("Unit_AT_AT", gm.Membership.GroupKey));
@@ -732,7 +797,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></U>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("My_Ability", sym.Id);
@@ -751,7 +816,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="Ability_A"/><Force_Cloak_Ability Name="Ability_B"/></Abilities></U>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Equal(2, result.Symbols.Length);
         Assert.Contains(result.Symbols, s => s.Id == "Ability_A" && s.TypeName == "LuckyShotAttackAbility");
@@ -768,7 +833,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Base_Power_Ability Name="My_Ability"/></Abilities></U>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -783,7 +848,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability/></Abilities></U>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);
     }
@@ -800,7 +865,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             "<U>\n<Abilities SubObjectList=\"Yes\">\n<Combat_Bonus_Ability Name=\"MY_BONUS\"/>\n</Abilities>\n</U>",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var sym = Assert.Single(result.Symbols);
         var origin = Assert.IsType<FileOrigin>(sym.Origin);
@@ -824,7 +889,7 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<U><Unit_Abilities_Data SubObjectList="Yes"><Unit_Ability><GUI_Activated_Ability_Name>My_Special_Ability</GUI_Activated_Ability_Name></Unit_Ability></Unit_Abilities_Data></U>""",
-            1, default);
+            1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
         Assert.Equal("My_Special_Ability", reference.TargetId);

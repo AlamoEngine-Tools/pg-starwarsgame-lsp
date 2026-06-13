@@ -62,6 +62,26 @@ public sealed class SchemaIndexTest
         Assert.Equal(XmlValueType.NameReference, index.GetTag("Text_ID")!.ValueType);
     }
 
+    [Fact]
+    public void ResolveTag_VariantMode_FlowsToDefinition()
+    {
+        var raw = new RawTagDefinition
+        {
+            Tag = "Mass", ValueType = XmlValueType.Float, VariantMode = VariantMode.Merge
+        };
+        var index = Build([("Foo", [raw])]);
+
+        Assert.Equal(VariantMode.Merge, index.GetTag("Mass")!.VariantMode);
+    }
+
+    [Fact]
+    public void ResolveTag_NoVariantMode_DefaultsToReplace()
+    {
+        var index = Build([("Foo", [Tag("Health")])]);
+
+        Assert.Equal(VariantMode.Replace, index.GetTag("Health")!.VariantMode);
+    }
+
     // ── GetAllTagDefinitions ────────────────────────────────────────────────
 
     [Fact]

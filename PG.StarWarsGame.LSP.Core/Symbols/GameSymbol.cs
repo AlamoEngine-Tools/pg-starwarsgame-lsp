@@ -11,5 +11,8 @@ public sealed record GameSymbol(
     [property: Key(1)] GameSymbolKind Kind,
     [property: Key(2)] string? TypeName,
     [property: Key(3)] SymbolOrigin Origin,
-    [property: Key(4)] string? Description
+    [property: Key(4)] string? Description,
+    // Id of the base object this symbol is a variant of (from Variant_Of_Existing_Type), or null.
+    // Nullable with a default so existing 5-arg construction and older MessagePack snapshots remain valid.
+    [property: Key(5)] string? VariantBaseId = null
 );

@@ -366,6 +366,49 @@ public sealed class BaselineSerializerTest
             b => Assert.Equal("turret_bone", b));
     }
 
+    // ── ObjectTags (variant inheritance support) ─────────────────────────────
+
+    [Fact]
+    public void RoundTrip_ObjectTags()
+    {
+        var baseline = Baseline() with
+        {
+            ObjectTags = ImmutableDictionary<string, ImmutableArray<BaselineTag>>.Empty
+                .Add("UNIT_A", [new BaselineTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 3)])
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.Single(result.ObjectTags);
+        var tag = Assert.Single(result.ObjectTags["UNIT_A"]);
+        Assert.Equal("Max_Health", tag.TagName);
+        Assert.Equal("100", tag.Value);
+        Assert.Equal("<Max_Health>100</Max_Health>", tag.Fragment);
+        Assert.Equal(3, tag.StartLine);
+    }
+
+    [Fact]
+    public void RoundTrip_ObjectTags_CaseInsensitiveKey()
+    {
+        var baseline = Baseline() with
+        {
+            ObjectTags = ImmutableDictionary<string, ImmutableArray<BaselineTag>>.Empty
+                .Add("Unit_A", [new BaselineTag("Mass", "5", "<Mass>5</Mass>", 0)])
+        };
+
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+
+        Assert.True(result.ObjectTags.ContainsKey("UNIT_A"));
+    }
+
+    [Fact]
+    public void RoundTrip_EmptyBaseline_ObjectTagsEmpty()
+    {
+        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+
+        Assert.Empty(result.ObjectTags);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private static BaselineIndex Baseline(params GameSymbol[] symbols)

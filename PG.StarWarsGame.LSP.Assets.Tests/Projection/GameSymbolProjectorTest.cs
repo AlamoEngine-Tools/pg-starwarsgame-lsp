@@ -133,6 +133,62 @@ public sealed class GameSymbolProjectorTest
         Assert.Equal("abc123", result.SourceManifestHash);
     }
 
+    // ── Object tag trees (variant inheritance support) ───────────────────────
+
+    private static BaselineTag Tag(string name, string value)
+    {
+        return new BaselineTag(name, value, $"<{name}>{value}</{name}>", 0);
+    }
+
+    private static ProjectableEntry EntryWithTags(string name, string classification, params BaselineTag[] tags)
+    {
+        return new ProjectableEntry(name, classification, new XmlLocationInfo("DATA\\XML\\UNITS.XML", 5), tags);
+    }
+
+    [Fact]
+    public void Project_EntryWithTags_PopulatesObjectTags()
+    {
+        var entry = EntryWithTags("UNIT_A", "COMBAT_BONUS_ABILITY",
+            Tag("Max_Health", "100"), Tag("Mass", "5"));
+        var result = Build().Project([entry], [], "hash");
+
+        Assert.True(result.ObjectTags.ContainsKey("UNIT_A"));
+        Assert.Equal(2, result.ObjectTags["UNIT_A"].Length);
+        Assert.Contains(result.ObjectTags["UNIT_A"], t => t.TagName == "Max_Health" && t.Value == "100");
+    }
+
+    [Fact]
+    public void Project_EntryWithoutTags_NoObjectTagsEntry()
+    {
+        var entry = Entry("UNIT_B", "COMBAT_BONUS_ABILITY");
+        var result = Build().Project([entry], [], "hash");
+
+        Assert.False(result.ObjectTags.ContainsKey("UNIT_B"));
+    }
+
+    [Fact]
+    public void Project_VariantTag_SetsVariantBaseIdOnSymbol()
+    {
+        var schema = new FakeSchemaProvider("CombatBonusAbility");
+        schema.VariantTagNames.Add("Variant_Of_Existing_Type");
+        var projector = new GameSymbolProjector(schema);
+
+        var entry = EntryWithTags("VARIANT_A", "COMBAT_BONUS_ABILITY",
+            Tag("Variant_Of_Existing_Type", "BASE_OBJ"));
+        var result = projector.Project([entry], [], "hash");
+
+        Assert.Equal("BASE_OBJ", result.Symbols["VARIANT_A"].VariantBaseId);
+    }
+
+    [Fact]
+    public void Project_NonVariantEntry_VariantBaseIdNull()
+    {
+        var entry = EntryWithTags("UNIT_C", "COMBAT_BONUS_ABILITY", Tag("Max_Health", "100"));
+        var result = Build().Project([entry], [], "hash");
+
+        Assert.Null(result.Symbols["UNIT_C"].VariantBaseId);
+    }
+
     // ── Dynamic enum extraction is delegated to DynamicEnumExtractor ──────────
 
     [Fact]

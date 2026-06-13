@@ -50,6 +50,12 @@ public record XmlTagDefinition
     public bool MultipleAllowed { get; init; }
 
     /// <summary>
+    ///     How this tag composes with the same tag on a base object when the enclosing GameObject is a
+    ///     variant (declares <c>Variant_Of_Existing_Type</c>). Defaults to <see cref="VariantMode.Replace" />.
+    /// </summary>
+    public VariantMode VariantMode { get; init; }
+
+    /// <summary>
     ///     Optional override that controls how custom named validation handlers compose with the default type handler.
     ///     <c>null</c> means "run all registered handlers for this fact type" (default behaviour).
     /// </summary>

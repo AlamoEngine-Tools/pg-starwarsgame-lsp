@@ -78,7 +78,52 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 interface LocProjectInfo { label: string; filePath: string; resourceType: string; }
 interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; }
 
+interface GetEffectiveObjectResult {
+	found: boolean;
+	cyclic: boolean;
+	cycleObjectId?: string;
+	chain: string[];
+	xml: string;
+	typeName?: string;
+}
+
+/** URI scheme for the read-only "effective object" virtual documents (variant inheritance). */
+const EFFECTIVE_SCHEME = 'aet-effective';
+
+/**
+ * Serves the merged "effective" form of a variant GameObject as a read-only virtual XML document.
+ * The object id is carried in the URI query; content is fetched from the server via
+ * `aet/getEffectiveObject`. Read-only is implicit for TextDocumentContentProvider documents.
+ */
+class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvider {
+	private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+	readonly onDidChange = this._onDidChange.event;
+
+	/** Signals VS Code to re-fetch content for an already-open virtual document. */
+	refresh(uri: vscode.Uri): void {
+		this._onDidChange.fire(uri);
+	}
+
+	async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+		const objectId = uri.query || uri.path.replace(/^\//, '').replace(/\.xml$/i, '');
+		if (!lspClient) {
+			return '<!-- EaWEdit: LSP server is not running. -->';
+		}
+		try {
+			const result = await lspClient.sendRequest<GetEffectiveObjectResult>(
+				'aet/getEffectiveObject', { objectId });
+			if (!result.found) {
+				return `<!-- EaWEdit: no object named '${objectId}' was found in the workspace. -->`;
+			}
+			return result.xml;
+		} catch (e) {
+			return `<!-- EaWEdit: failed to resolve effective object '${objectId}': ${e} -->`;
+		}
+	}
+}
+
 let lspClient: LanguageClient | undefined;
+let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
 let localisationEditorProvider: LocalisationEditorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
 let traceChannel: vscode.OutputChannel | undefined;
@@ -304,6 +349,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		)
 	);
 
+	effectiveObjectProvider = new EffectiveObjectContentProvider();
+	context.subscriptions.push(
+		vscode.workspace.registerTextDocumentContentProvider(EFFECTIVE_SCHEME, effectiveObjectProvider)
+	);
+
 	statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
 	statusItem.tooltip = CLIENT_NAME;
 	context.subscriptions.push(statusItem);
@@ -443,6 +493,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				);
 				vscode.commands.executeCommand('editor.action.showReferences', uri, pos, locations);
 			})
+	);
+
+	// Opens the read-only "effective object" virtual document for a variant GameObject. Triggered by
+	// the "show effective object" code lens (objectId passed as the first argument), or from the command
+	// palette (prompts for the object name).
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.showEffectiveObject', async (objectIdArg?: string) => {
+			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+
+			let objectId = objectIdArg;
+			if (!objectId) {
+				objectId = await vscode.window.showInputBox({
+					title: 'Show Effective Object',
+					prompt: 'Name of the variant GameObject to resolve',
+					validateInput: v => (v?.trim() ? null : 'Object name is required'),
+				});
+			}
+			if (!objectId?.trim()) { return; }
+			objectId = objectId.trim();
+
+			const uri = vscode.Uri.from({ scheme: EFFECTIVE_SCHEME, path: `/${objectId}.xml`, query: objectId });
+			effectiveObjectProvider?.refresh(uri);
+			const doc = await vscode.workspace.openTextDocument(uri);
+			await vscode.window.showTextDocument(doc, { preview: true });
+		})
 	);
 
 	if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration()) {

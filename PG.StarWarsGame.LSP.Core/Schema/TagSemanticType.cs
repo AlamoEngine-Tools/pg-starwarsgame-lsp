@@ -28,5 +28,14 @@ public enum TagSemanticType
     ///     <see cref="PG.StarWarsGame.LSP.Core.Symbols.GroupMembership" />
     ///     entry is produced linking the group key to the parent object's definition position.
     /// </summary>
-    ReferenceGroup
+    ReferenceGroup,
+
+    /// <summary>
+    ///     Declares that the enclosing GameObject is a variant of an existing object: the tag's value
+    ///     is the id of the base object (which must be the same GameObject type). The variant inherits
+    ///     the base's tags, then applies its own per the each tag's <see cref="VariantMode" />.
+    ///     <c>referenceKind</c> is <c>xmlObject</c>; the target type is the enclosing object's own type,
+    ///     resolved from the ancestor chain rather than a fixed <c>referenceType</c>.
+    /// </summary>
+    VariantParent
 }

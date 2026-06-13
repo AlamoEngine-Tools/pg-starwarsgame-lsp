@@ -125,7 +125,13 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     var manifestHash = ComputeManifestHash(enginePath);
     Console.WriteLine($"Manifest hash: {manifestHash}");
 
-    // Adapt engine entries to ProjectableEntry
+    // Adapt engine entries to ProjectableEntry.
+    // TODO(variant-inheritance): populate the 4th arg (ProjectableEntry.Tags) with the object's child
+    // tags so the baseline carries each shipped object's tag tree. Each tag should be a
+    // BaselineTag(TagName, Value, Fragment, StartLine) where Value is the trimmed inner text, Fragment
+    // is the verbatim outer XML, and StartLine is the 0-based source line. This requires reading the
+    // engine GameObjectType's underlying XML element/children via the PetroglyphTools API. Until wired,
+    // ObjectTags is empty and variants whose base is a shipped object cannot be fully merged.
     var gameObjects = engine.GameObjectTypeManager.GameObjectTypes
         .Select(t => new ProjectableEntry(t.Name, t.ClassificationName, t.Location))
         .ToList();

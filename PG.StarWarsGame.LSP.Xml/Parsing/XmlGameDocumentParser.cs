@@ -40,10 +40,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         doc.LoadHtml(text);
 
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
-        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, text, registeredTypes, ct);
-        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, text, ct));
 
+        // References are collected first so the symbol passes can append the typed variant-base
+        // reference for each object they index (the enclosing object's type is only known here).
         var references = CollectReferences(doc, canonicalUri, text, ct);
+        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, text, registeredTypes, references, ct);
+        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, text, references, ct));
+
         var groupMemberships = CollectGroupMemberships(doc, canonicalUri, text, ct);
 
         return ValueTask.FromResult(new DocumentIndex(
@@ -54,7 +57,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,
-        string text, ImmutableArray<string> registeredTypes, CancellationToken ct)
+        string text, ImmutableArray<string> registeredTypes, List<GameReference> references, CancellationToken ct)
     {
         var typeDef = registeredTypes
             .Select(t => _schema.GetObjectType(t))
@@ -79,12 +82,45 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             else
             {
                 var col = FindNameAttributeValueColumn(node, typeDef.NameTag, text);
+                var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, text);
+                if (variantRef is not null) references.Add(variantRef);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
-                    new FileOrigin(documentUri, node.Line - 1, col), null));
+                    new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId));
             }
         }
 
         return symbols;
+    }
+
+    /// <summary>
+    ///     Detects a <c>Variant_Of_Existing_Type</c> child (a tag with
+    ///     <see cref="TagSemanticType.VariantParent" />) on an object node and returns its base id plus
+    ///     a typed <see cref="GameReference" /> to that base. <paramref name="enclosingTypeName" /> is the
+    ///     variant object's own type, so the base must be of the same type — this lets the existing
+    ///     unresolved-reference and type-mismatch handlers validate the inheritance link for free.
+    /// </summary>
+    private (string? BaseId, GameReference? Reference) ResolveVariant(
+        HtmlNode objectNode, string enclosingTypeName, string documentUri, string text)
+    {
+        foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            var tagDef = _schema.GetTag(child.Name);
+            if (tagDef?.SemanticType != TagSemanticType.VariantParent) continue;
+
+            var innerText = child.InnerText;
+            var trimmed = innerText.Trim();
+            if (trimmed.Length == 0) return (null, null);
+
+            var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
+            var absPos = child.InnerStartIndex + tokenOffset;
+            var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+
+            var reference = new GameReference(trimmed, GameSymbolKind.XmlObject,
+                enclosingTypeName, documentUri, line, column, trimmed.Length);
+            return (trimmed, reference);
+        }
+
+        return (null, null);
     }
 
     private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, string text)
@@ -108,6 +144,9 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var tagDef = _schema.GetTag(child.Name);
                 if (tagDef?.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
+                // Variant base references are emitted by the symbol passes with the enclosing
+                // object's type as ExpectedTypeName; skip here to avoid a duplicate wildcard-typed one.
+                if (tagDef.SemanticType == TagSemanticType.VariantParent) continue;
 
                 var innerText = child.InnerText;
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
@@ -218,7 +257,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSubObjectListSymbols(
-        HtmlDocument doc, string documentUri, string text, CancellationToken ct)
+        HtmlDocument doc, string documentUri, string text, List<GameReference> references, CancellationToken ct)
     {
         var symbols = new List<GameSymbol>();
 
@@ -242,8 +281,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     if (string.IsNullOrEmpty(id)) continue;
 
                     var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, text);
+                    var (variantBaseId, variantRef) = ResolveVariant(abilityNode, typeName, documentUri, text);
+                    if (variantRef is not null) references.Add(variantRef);
                     symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-                        new FileOrigin(documentUri, abilityNode.Line - 1, col), null));
+                        new FileOrigin(documentUri, abilityNode.Line - 1, col), null, variantBaseId));
                 }
             }
         }

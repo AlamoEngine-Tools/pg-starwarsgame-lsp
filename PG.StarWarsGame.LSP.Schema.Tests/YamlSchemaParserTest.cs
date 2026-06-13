@@ -40,6 +40,81 @@ public sealed class YamlSchemaParserTest
     }
 
     [Fact]
+    public void ParseTagFile_VariantMode_MappedCorrectly()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Mass
+                                type: Float
+                                variantMode: merge
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(VariantMode.Merge, tag.VariantMode);
+    }
+
+    [Fact]
+    public void ParseTagFile_NoVariantMode_DefaultsToReplace()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Speed
+                                type: Float
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(VariantMode.Replace, tag.VariantMode);
+    }
+
+    [Fact]
+    public void ParseTagFile_VariantMode_Ignored_CaseInsensitive()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Type
+                                type: NameReference
+                                variantMode: IGNORED
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(VariantMode.Ignored, tag.VariantMode);
+    }
+
+    [Fact]
+    public void ParseTagFile_UnknownVariantMode_DefaultsToReplace()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Foo
+                                type: Float
+                                variantMode: bogus
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(VariantMode.Replace, tag.VariantMode);
+    }
+
+    [Fact]
+    public void ParseTagFile_SemanticType_VariantParent_Parsed()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Variant_Of_Existing_Type
+                                type: NameReference
+                                referenceKind: xmlObject
+                                semanticType: VariantParent
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(TagSemanticType.VariantParent, tag.SemanticType);
+    }
+
+    [Fact]
     public void ParseTagFile_MultipleAllowed_DefaultsFalse()
     {
         const string yaml = """

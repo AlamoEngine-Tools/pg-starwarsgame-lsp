@@ -4,6 +4,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Variants;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
@@ -187,11 +189,21 @@ public static class XmlLanguageServiceExtensions
         // Code lens providers — add IXmlCodeLensProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeLensRegistry, XmlCodeLensRegistry>();
         services.AddSingleton<IXmlCodeLensProvider, ReferencesCodeLensProvider>();
+        services.AddSingleton<IXmlCodeLensProvider, VariantCodeLensProvider>();
 
         // Inlay hint providers — add IXmlInlayHintProvider implementations here to register new providers
         services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
+
+        // Variant inheritance (Variant_Of_Existing_Type) — workspace tag source feeds the
+        // EffectiveObjectResolver; shadows shipped-game baseline tags.
+        services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
+        services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();
 
         return services;
     }

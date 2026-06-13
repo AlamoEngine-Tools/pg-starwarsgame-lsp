@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="MessagePack" Version="2.5.187"/>
+        <PackageReference Include="MessagePack" Version="3.1.7"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.8"/>
         <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
@@ -18,9 +18,6 @@
     </ItemGroup>
 
     <Target Name="CopyPgprojSchema" AfterTargets="Build">
-        <Copy SourceFiles="Resources\pgproj.schema.json"
-              DestinationFiles="..\vscode-client\resources\pgproj.schema.json"
-              SkipUnchangedFiles="true"/>
         <Copy SourceFiles="Resources\pgproj.schema.json"
               DestinationFiles="..\PG.StarWarsGame.LSP.Client.VSCode\aet-eaw-edit\resources\pgproj.schema.json"
               SkipUnchangedFiles="true"/>

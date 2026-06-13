@@ -22,7 +22,8 @@ public static class BaselineSerializer
             FileTypeMap = ToSerializedArray(baseline.FileTypeMap),
             GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships),
             AssetFiles = baseline.AssetFiles.ToArray(),
-            ModelBones = ToSerializedArray(baseline.ModelBones)
+            ModelBones = ToSerializedArray(baseline.ModelBones),
+            ObjectTags = ToSerializedObjectTags(baseline.ObjectTags)
         };
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
@@ -50,12 +51,30 @@ public static class BaselineSerializer
         var assetFiles = dto.AssetFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         var modelBones = (dto.ModelBones ?? []).ToImmutableDictionary(
             e => e.Name, e => e.Values.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
+        var objectTags = FromSerializedObjectTags(dto.ObjectTags ?? []);
         return new BaselineIndex(symbols, builtAt, dto.SourceManifestHash, enums, hardcoded, fileTypeMap)
         {
             GroupMemberships = groupMemberships,
             AssetFiles = assetFiles,
-            ModelBones = modelBones
+            ModelBones = modelBones,
+            ObjectTags = objectTags
         };
+    }
+
+    private static SerializedObjectTags[] ToSerializedObjectTags(
+        ImmutableDictionary<string, ImmutableArray<BaselineTag>> dict)
+    {
+        return dict.Select(kv => new SerializedObjectTags { Name = kv.Key, Tags = kv.Value.ToArray() })
+            .ToArray();
+    }
+
+    private static ImmutableDictionary<string, ImmutableArray<BaselineTag>> FromSerializedObjectTags(
+        SerializedObjectTags[] arr)
+    {
+        return arr.ToImmutableDictionary(
+            e => e.Name,
+            e => e.Tags.ToImmutableArray(),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     private static SerializedEnumValues[] ToSerializedArray(
