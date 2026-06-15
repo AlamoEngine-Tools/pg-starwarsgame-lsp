@@ -219,6 +219,70 @@ public sealed class ModProjectResolverTest
         Assert.Null(config.TextResourceType);
     }
 
+    [Fact]
+    public void Resolve_SingleProject_EmitsOneLayerRankZero()
+    {
+        const string json = """
+                            {
+                              "name": "Root",
+                              "directories": { "xml": ["data/xml"], "textResourceType": "csv" }
+                            }
+                            """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new(json)
+        });
+        var (resolver, root) = Build(fs);
+
+        var config = resolver.Resolve(RootPath, root);
+
+        var layer = Assert.Single(config.Layers);
+        Assert.Equal(0, layer.Rank);
+        Assert.Equal("Root", layer.Name);
+        Assert.Contains(Abs(RootDir, "data/xml"), layer.XmlDirectories);
+        Assert.Equal("csv", layer.TextResourceType);
+    }
+
+    [Fact]
+    public void Resolve_WithDependency_EmitsLayersDependencyRankZeroRootHighest_PerLayerResourceType()
+    {
+        const string depJson = """
+                               {
+                                 "name": "Dep",
+                                 "directories": {
+                                   "xml": ["data/xml"], "text": ["data/text"], "textResourceType": "csv"
+                                 }
+                               }
+                               """;
+        const string rootJson = """
+                                {
+                                  "name": "Root",
+                                  "directories": { "xml": ["data/xml"], "textResourceType": "xml" },
+                                  "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
+                                }
+                                """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new(rootJson),
+            [DepPath] = new(depJson)
+        });
+        var (resolver, root) = Build(fs);
+
+        var config = resolver.Resolve(RootPath, root);
+
+        Assert.Equal(2, config.Layers.Count);
+        Assert.Equal(0, config.Layers[0].Rank);
+        Assert.Equal("Dep", config.Layers[0].Name);
+        // The dependency keeps its OWN resource type — not collapsed to the root's. This is the
+        // fix for dependency .csv text being skipped when the root declares a different type.
+        Assert.Equal("csv", config.Layers[0].TextResourceType);
+        Assert.Contains(Abs(DepDir, "data/text"), config.Layers[0].TextRoots);
+
+        Assert.Equal(1, config.Layers[1].Rank);
+        Assert.Equal("Root", config.Layers[1].Name);
+        Assert.Equal("xml", config.Layers[1].TextResourceType);
+    }
+
     private static (ModProjectResolver Resolver, ModProjectFile Root) Build(MockFileSystem fs)
     {
         var fileHelper = new FileHelper(fs);

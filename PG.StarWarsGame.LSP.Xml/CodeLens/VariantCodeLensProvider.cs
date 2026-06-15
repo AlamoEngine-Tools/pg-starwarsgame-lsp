@@ -34,20 +34,49 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
                 }
             };
 
-        var count = CountVariants(ctx.Index, ctx.Symbol.Id);
-        if (count == 0) return null;
+        var variants = CollectVariants(ctx.Index, ctx.Symbol.Id);
+        if (variants.Count == 0) return null;
 
-        var title = count == 1 ? "1 variant" : $"{count.ToString(CultureInfo.InvariantCulture)} variants";
-        return new LspCodeLens { Range = range, Command = new Command { Title = title } };
+        var title = variants.Count == 1
+            ? "1 variant"
+            : $"{variants.Count.ToString(CultureInfo.InvariantCulture)} variants";
+
+        // Open the references peek showing just the child variant objects (their definition sites).
+        var locations = variants.Select(o => new
+        {
+            uri = o.Uri,
+            range = new
+            {
+                start = new { line = o.Line, character = o.Column ?? 0 },
+                end = new { line = o.Line, character = o.Column ?? 0 }
+            }
+        });
+
+        return new LspCodeLens
+        {
+            Range = range,
+            Command = new Command
+            {
+                Title = title,
+                Name = "aet-eaw-edit.lsp.showReferences",
+                Arguments = JArray.FromObject(new object[]
+                {
+                    ctx.Origin.Uri,
+                    new { line = ctx.Origin.Line, character = ctx.Origin.Column ?? 0 },
+                    locations.ToArray()
+                })
+            }
+        };
     }
 
-    private static int CountVariants(GameIndex index, string baseId)
+    private static IReadOnlyList<FileOrigin> CollectVariants(GameIndex index, string baseId)
     {
-        var count = 0;
+        var origins = new List<FileOrigin>();
         foreach (var defs in index.WorkspaceDefinitions.Values)
         foreach (var sym in defs)
-            if (string.Equals(sym.VariantBaseId, baseId, StringComparison.OrdinalIgnoreCase))
-                count++;
-        return count;
+            if (string.Equals(sym.VariantBaseId, baseId, StringComparison.OrdinalIgnoreCase)
+                && sym.Origin is FileOrigin fo)
+                origins.Add(fo);
+        return origins;
     }
 }

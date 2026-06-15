@@ -190,6 +190,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeLensRegistry, XmlCodeLensRegistry>();
         services.AddSingleton<IXmlCodeLensProvider, ReferencesCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, VariantCodeLensProvider>();
+        services.AddSingleton<IXmlCodeLensProvider, OverrideCodeLensProvider>();
 
         // Inlay hint providers — add IXmlInlayHintProvider implementations here to register new providers
         services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();

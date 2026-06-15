@@ -234,6 +234,67 @@ public sealed class LocalisationLoaderTest
         Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_HEURISTIC_KEY"));
     }
 
+    // ── layered (project-reference) localisation ─────────────────────────────
+
+    [Fact]
+    public async Task LoadAsync_LayeredProjects_DependencyCsvLoaded_EvenWhenRootResourceTypeDiffers()
+    {
+        // The "missing texts" bug: the dependency ships CSV, the root uses a different type.
+        // The dependency's CSV must still be imported (as CSV), not skipped.
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/dep/text/core.csv"] = new("key,ENGLISH\nTEXT_DEP_KEY,From Core")
+        });
+
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig { ResourceType = "Csv" }
+        };
+
+        var workspaceConfig = WorkspaceConfiguration.Empty with
+        {
+            Layers =
+            [
+                new ProjectLayer(0, "Core", [], [], ["/dep/text"], [], "Csv"),
+                new ProjectLayer(1, "Root", [], [], ["/rev/text"], [], "Xml")
+            ]
+        };
+
+        var (loader, indexService, _) = BuildLoader(fs, config);
+        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_DEP_KEY"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_LayeredProjects_HigherLayerTranslationWins()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/dep/text/core.csv"] = new("key,ENGLISH\nTEXT_SHARED,From Core"),
+            ["/rev/text/rev.csv"] = new("key,ENGLISH\nTEXT_SHARED,From Rev")
+        });
+
+        var config = new LspConfiguration
+        {
+            Localisation = new LocalisationConfig { ResourceType = "Csv" }
+        };
+
+        var workspaceConfig = WorkspaceConfiguration.Empty with
+        {
+            Layers =
+            [
+                new ProjectLayer(0, "Core", [], [], ["/dep/text"], [], "Csv"),
+                new ProjectLayer(1, "Root", [], [], ["/rev/text"], [], "Csv")
+            ]
+        };
+
+        var (loader, indexService, _) = BuildLoader(fs, config);
+        await loader.LoadAsync(workspaceConfig, CancellationToken.None);
+
+        Assert.Equal("From Rev", indexService.Current.Localisation.GetValue("TEXT_SHARED"));
+    }
+
     // ── registry-population tests ────────────────────────────────────────────
 
     [Fact]

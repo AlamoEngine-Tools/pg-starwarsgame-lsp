@@ -77,16 +77,19 @@ public sealed record GameIndex(
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
-            return ws[0];
+            // Highest project layer wins. OrderByDescending is stable, so a same-rank collision
+            // (a real duplicate) deterministically yields the first-inserted definition.
+            return ws.Length == 1 ? ws[0] : ws.OrderByDescending(LayerRankOf).First();
         return Baseline.Symbols.GetValueOrDefault(id);
     }
 
-    // Array length > 1 in WorkspaceDefinitions is a duplicate-ID error, not a valid
-    // pattern. ResolveAll is used by the diagnostics publisher to find all offending sites.
+    // Workspace definitions ordered highest layer first, then the baseline. Multiple workspace
+    // entries at the SAME rank are a duplicate-ID error; the diagnostics publisher uses this to find
+    // all offending sites. Cross-layer entries are valid overrides.
     public IEnumerable<GameSymbol> ResolveAll(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws))
-            foreach (var s in ws)
+            foreach (var s in ws.OrderByDescending(LayerRankOf))
                 yield return s;
         if (Baseline.Symbols.TryGetValue(id, out var b))
             yield return b;
@@ -96,8 +99,28 @@ public sealed record GameIndex(
     {
         var winner = Resolve(id);
         if (winner is null) return null;
-        var shadowed = Baseline.Symbols.GetValueOrDefault(id);
-        // Only report as shadowed if the winner came from workspace (different object reference)
+
+        // The shadowed definition is the next layer below the winner: a lower-ranked workspace
+        // definition if one exists, otherwise the baseline symbol.
+        GameSymbol? shadowed = null;
+        if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 1)
+        {
+            var winnerRank = LayerRankOf(winner);
+            shadowed = ws.OrderByDescending(LayerRankOf).FirstOrDefault(s => LayerRankOf(s) < winnerRank);
+        }
+
+        shadowed ??= Baseline.Symbols.GetValueOrDefault(id);
+
+        // Only report a shadow when it is a different object than the winner.
         return (winner, !ReferenceEquals(winner, shadowed) ? shadowed : null);
+    }
+
+    // Precedence rank of the project layer that owns a workspace symbol, read from its originating
+    // document. Symbols not tied to a tracked document (e.g. baseline) resolve to 0.
+    public int LayerRankOf(GameSymbol symbol)
+    {
+        return symbol.Origin is FileOrigin fo && Documents.TryGetValue(fo.Uri, out var doc)
+            ? doc.LayerRank
+            : 0;
     }
 }

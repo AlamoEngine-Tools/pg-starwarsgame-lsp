@@ -17,6 +17,7 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 public sealed class ModProjectReloadService : IModProjectReloadService
 {
     private readonly IWorkspaceIndexer _indexer;
+    private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
     private readonly IProjectConfigurationResolver _resolver;
@@ -27,11 +28,13 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         IProjectConfigurationResolver resolver,
         IWorkspaceIndexer indexer,
         ILocalisationLoader localisation,
+        IProjectLayerMap layerMap,
         ILogger<ModProjectReloadService> logger)
     {
         _resolver = resolver;
         _indexer = indexer;
         _localisation = localisation;
+        _layerMap = layerMap;
         _logger = logger;
     }
 
@@ -51,6 +54,9 @@ public sealed class ModProjectReloadService : IModProjectReloadService
             return;
 
         LastWorkspaceConfig = config;
+        // Publish layer precedence before indexing so each document is stamped with its rank
+        // (indexing itself stays parallel — correctness comes from the rank, not insertion order).
+        _layerMap.SetLayers(config.Layers);
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);
         _indexer.ApplyAssetCatalog(config.AssetRoots);

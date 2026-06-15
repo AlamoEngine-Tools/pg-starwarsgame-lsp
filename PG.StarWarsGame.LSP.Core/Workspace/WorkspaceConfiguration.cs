@@ -11,4 +11,11 @@ public sealed record WorkspaceConfiguration(
     string? TextResourceType)
 {
     public static readonly WorkspaceConfiguration Empty = new([], [], [], [], null);
+
+    /// <summary>
+    ///     The resolved project hierarchy in precedence order (dependencies low, root project
+    ///     highest). Drives layer-rank resolution and per-layer localisation loading. The flattened
+    ///     directory lists above are retained as the union across all layers.
+    /// </summary>
+    public IReadOnlyList<ProjectLayer> Layers { get; init; } = [];
 }

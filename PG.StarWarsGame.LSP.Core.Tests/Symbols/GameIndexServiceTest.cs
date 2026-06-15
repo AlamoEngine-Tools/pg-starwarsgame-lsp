@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
@@ -394,6 +395,25 @@ public sealed class GameIndexServiceTest
         Assert.Single(svcB.Current.WorkspaceDefinitions["DUP"]);
     }
 
+    // ── Layer rank stamping ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateDocument_StampsLayerRank_AndHigherLayerWinsResolve()
+    {
+        var layerMap = new StubLayerMap(uri => uri.Contains("/rev/", StringComparison.Ordinal) ? 1 : 0);
+        var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new PerUriParser("UNIT_A")], NullLogger<GameIndexService>.Instance, layerMap);
+
+        await svc.UpdateDocumentAsync("file:///core/u.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///rev/u.xml", "<X/>", 1, default);
+
+        Assert.Equal(0, svc.Current.Documents["file:///core/u.xml"].LayerRank);
+        Assert.Equal(1, svc.Current.Documents["file:///rev/u.xml"].LayerRank);
+
+        var winner = svc.Current.Resolve("UNIT_A");
+        Assert.Equal("file:///rev/u.xml", ((FileOrigin)winner!.Origin).Uri);
+    }
+
     // ── BeginBulkUpdate ──────────────────────────────────────────────────────
 
     [Fact]
@@ -550,6 +570,55 @@ public sealed class GameIndexServiceTest
         await aTask;
 
         Assert.False(aCancelled);
+    }
+
+    // Emits one symbol of the given id whose origin is the document's own URI, so different files
+    // produce distinct same-id definitions that can be ranked.
+    private sealed class PerUriParser : IGameDocumentParser
+    {
+        private readonly string _symbolId;
+
+        public PerUriParser(string symbolId)
+        {
+            _symbolId = symbolId;
+        }
+
+        public bool CanParse(string ext)
+        {
+            return ext == ".xml";
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            var symbol = new GameSymbol(_symbolId, GameSymbolKind.XmlObject, "Unit",
+                new FileOrigin(uri, 1, null), null);
+            return ValueTask.FromResult(new DocumentIndex(uri, version,
+                ImmutableArray.Create(symbol), ImmutableArray<GameReference>.Empty));
+        }
+    }
+
+    private sealed class StubLayerMap : IProjectLayerMap
+    {
+        private readonly Func<string, int> _rank;
+
+        public StubLayerMap(Func<string, int> rank)
+        {
+            _rank = rank;
+        }
+
+        public void SetLayers(IReadOnlyList<ProjectLayer> layers)
+        {
+        }
+
+        public int GetRank(string fileUri)
+        {
+            return _rank(fileUri);
+        }
+
+        public string? GetLayerName(int rank)
+        {
+            return null;
+        }
     }
 
     private sealed class FakeParser : IGameDocumentParser

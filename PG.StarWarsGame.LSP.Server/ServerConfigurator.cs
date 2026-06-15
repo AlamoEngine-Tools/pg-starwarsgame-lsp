@@ -97,6 +97,7 @@ public static class ServerConfigurator
 
                 services.AddSingleton<EaWXmlContext>();
                 services.AddSingleton<IEaWXmlContext>(sp => sp.GetRequiredService<EaWXmlContext>());
+                services.AddSingleton<IProjectLayerMap, ProjectLayerMap>();
 
                 services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();

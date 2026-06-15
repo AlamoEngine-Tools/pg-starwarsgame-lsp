@@ -49,7 +49,7 @@ public sealed class XmlCodeLensProviderRegistrationTest
     [Fact]
     public void Registered_provider_count_is_locked()
     {
-        const int expectedProviderCount = 2;
+        const int expectedProviderCount = 3;
         Assert.Equal(expectedProviderCount, RegisteredProviderTypes().Count);
     }
 

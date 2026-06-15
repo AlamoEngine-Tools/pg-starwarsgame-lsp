@@ -68,39 +68,76 @@ public sealed class LocalisationLoader : ILocalisationLoader
         var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, language!);
         var focDb = _baselineProvider.GetMasterText(GameContext.FoC, language!);
 
-        IReadOnlyList<string> sourcePaths;
-        string resourceType;
+        var registryEntries = new List<LocProjectInfo>();
+        var layerDbs = new List<IKeyedTranslationDatabase>();
 
-        if (workspaceConfig.TextRoots.Count > 0)
+        // pgproj mode is driven by the resolved project layers (or flat TextRoots as a single
+        // synthetic layer). Each layer is loaded with its OWN resource type so a dependency's CSV is
+        // never skipped because the root project declares a different type. Higher layers come first
+        // so they win under the index's first-wins lookup.
+        var textLayers = ResolveTextLayers(workspaceConfig);
+        if (textLayers.Count > 0)
         {
-            // pgproj mode: TextRoots replace SourcePaths; TextResourceType replaces locConfig.ResourceType.
-            resourceType = workspaceConfig.TextResourceType ?? locConfig.ResourceType;
-            sourcePaths = EnumerateFromTextRoots(workspaceConfig.TextRoots, resourceType);
+            foreach (var layer in textLayers)
+            {
+                var layerType = layer.TextResourceType ?? locConfig.ResourceType;
+                var paths = EnumerateFromTextRoots(layer.TextRoots, layerType);
+                if (paths.Count == 0) continue;
+
+                var db = _factory.CreateKeyed([language!]);
+                foreach (var path in paths)
+                {
+                    await TryImportFileAsync(path, layerType, language!, db, ct);
+                    registryEntries.Add(new LocProjectInfo(Path.GetFileName(path), path, layerType));
+                }
+
+                layerDbs.Add(db);
+            }
         }
         else
         {
-            // Heuristic mode: user config unchanged.
-            resourceType = locConfig.ResourceType;
-            sourcePaths = locConfig.SourcePaths.Count > 0
+            // Heuristic (no-pgproj) mode: user config unchanged.
+            var resourceType = locConfig.ResourceType;
+            var sourcePaths = locConfig.SourcePaths.Count > 0
                 ? locConfig.SourcePaths
                 : AutoDetectPaths(config.ModPaths, resourceType);
+
+            if (sourcePaths.Count > 0)
+            {
+                var db = _factory.CreateKeyed([language!]);
+                foreach (var path in sourcePaths)
+                {
+                    await TryImportFileAsync(path, resourceType, language!, db, ct);
+                    registryEntries.Add(new LocProjectInfo(Path.GetFileName(path), path, resourceType));
+                }
+
+                layerDbs.Add(db);
+            }
         }
 
-        _registry.Set(sourcePaths
-            .Select(p => new LocProjectInfo(Path.GetFileName(p), p, resourceType))
-            .ToList());
+        _registry.Set(registryEntries);
 
-        if (sourcePaths.Count == 0)
-        {
-            _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex([eawDb, focDb], language!));
-            return;
-        }
+        // Workspace layers (highest precedence first) shadow the shipped baseline.
+        var databases = new List<IKeyedTranslationDatabase>(layerDbs) { eawDb, focDb };
+        _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex(databases, language!));
+    }
 
-        var wsDb = _factory.CreateKeyed([language!]);
-        foreach (var path in sourcePaths)
-            await TryImportFileAsync(path, resourceType, language!, wsDb, ct);
+    // Project layers that carry text, highest precedence first. Falls back to a single synthetic
+    // layer when only flat TextRoots are present (older callers / no resolved layers). An empty
+    // result means heuristic mode.
+    private static IReadOnlyList<ProjectLayer> ResolveTextLayers(WorkspaceConfiguration workspaceConfig)
+    {
+        if (workspaceConfig.Layers.Count > 0)
+            return workspaceConfig.Layers.OrderByDescending(l => l.Rank).ToList();
 
-        _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex([eawDb, focDb, wsDb], language!));
+        if (workspaceConfig.TextRoots.Count > 0)
+            return
+            [
+                new ProjectLayer(0, "workspace", [], [], workspaceConfig.TextRoots, [],
+                    workspaceConfig.TextResourceType)
+            ];
+
+        return [];
     }
 
     private IReadOnlyList<string> EnumerateFromTextRoots(IReadOnlyList<string> textRoots, string resourceType)

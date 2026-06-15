@@ -116,6 +116,109 @@ public sealed class GameIndexTest
         Assert.Equal(workspace, index.Resolve("UNIT_A"));
     }
 
+    // ── Layered precedence (project references) ───────────────────────────────
+
+    // Builds an index where each (symbol, rank) lives in its own document carrying that LayerRank,
+    // mirroring how the service stamps ranks. Symbols must have distinct origin URIs.
+    private static GameIndex WithLayers(params (GameSymbol Symbol, int Rank)[] entries)
+    {
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty;
+        foreach (var (symbol, rank) in entries)
+        {
+            var uri = ((FileOrigin)symbol.Origin).Uri;
+            docs = docs.SetItem(uri, new DocumentIndex(uri, 0,
+                ImmutableArray.Create(symbol), ImmutableArray<GameReference>.Empty, LayerRank: rank));
+        }
+
+        var defs = entries
+            .GroupBy(e => e.Symbol.Id, StringComparer.OrdinalIgnoreCase)
+            .ToImmutableDictionary(g => g.Key, g => g.Select(e => e.Symbol).ToImmutableArray(),
+                StringComparer.OrdinalIgnoreCase);
+
+        return GameIndex.Empty with { Documents = docs, WorkspaceDefinitions = defs };
+    }
+
+    private static GameSymbol At(string id, string uri)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri, 1, null), null);
+    }
+
+    [Fact]
+    public void Resolve_SameIdAcrossLayers_HighestRankWins()
+    {
+        var core = At("UNIT_A", "file:///core/units.xml");
+        var rev = At("UNIT_A", "file:///rev/units.xml");
+
+        // Insert the lower-rank symbol first so a naive "ws[0]" would pick the wrong one.
+        var index = WithLayers((core, 0), (rev, 1));
+
+        Assert.Equal(rev, index.Resolve("UNIT_A"));
+    }
+
+    [Fact]
+    public void Resolve_SameIdAcrossLayers_OrderIndependent()
+    {
+        var core = At("UNIT_A", "file:///core/units.xml");
+        var rev = At("UNIT_A", "file:///rev/units.xml");
+
+        // Higher-rank symbol inserted first — winner must still be by rank, not position.
+        var index = WithLayers((rev, 1), (core, 0));
+
+        Assert.Equal(rev, index.Resolve("UNIT_A"));
+    }
+
+    [Fact]
+    public void ResolveWithShadow_ReportsLowerLayerAsShadowed()
+    {
+        var core = At("UNIT_A", "file:///core/units.xml");
+        var rev = At("UNIT_A", "file:///rev/units.xml");
+        var index = WithLayers((core, 0), (rev, 1));
+
+        var result = index.ResolveWithShadow("UNIT_A");
+
+        Assert.NotNull(result);
+        Assert.Equal(rev, result!.Value.Winner);
+        Assert.Equal(core, result.Value.Shadowed);
+    }
+
+    [Fact]
+    public void ResolveWithShadow_TopLayerShadowsBaseline()
+    {
+        var baseline = Symbol("UNIT_A");
+        var rev = At("UNIT_A", "file:///rev/units.xml");
+        var index = WithLayers((rev, 1)) with { Baseline = Baseline(baseline) };
+
+        var result = index.ResolveWithShadow("UNIT_A");
+
+        Assert.Equal(rev, result!.Value.Winner);
+        Assert.Equal(baseline, result.Value.Shadowed);
+    }
+
+    [Fact]
+    public void ResolveAll_OrdersByRankDescendingThenBaseline()
+    {
+        var core = At("UNIT_A", "file:///core/units.xml");
+        var rev = At("UNIT_A", "file:///rev/units.xml");
+        var baseline = Symbol("UNIT_A");
+        var index = WithLayers((core, 0), (rev, 1)) with { Baseline = Baseline(baseline) };
+
+        var all = index.ResolveAll("UNIT_A").ToList();
+
+        Assert.Equal([rev, core, baseline], all);
+    }
+
+    [Fact]
+    public void Resolve_SameRankCollision_ReturnsADefinitionAndResolveAllSeesBoth()
+    {
+        // Two definitions in the SAME layer (same rank) is a real duplicate, not an override.
+        var a = At("UNIT_A", "file:///rev/a.xml");
+        var b = At("UNIT_A", "file:///rev/b.xml");
+        var index = WithLayers((a, 1), (b, 1));
+
+        Assert.NotNull(index.Resolve("UNIT_A"));
+        Assert.Equal(2, index.ResolveAll("UNIT_A").Count());
+    }
+
     [Fact]
     public void Resolve_CaseInsensitive_Matches_Symbol_When_CaseDiffers()
     {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 
@@ -40,7 +41,7 @@ public sealed class VariantCodeLensProviderTest
     }
 
     [Fact]
-    public void Handle_BaseSymbol_EmitsVariantCountLens()
+    public void Handle_BaseSymbol_EmitsVariantsLensThatOpensChildrenInReferences()
     {
         var b = Sym("B");
         var index = IndexWith(b, Sym("V1", "B"), Sym("V2", "B"));
@@ -49,6 +50,10 @@ public sealed class VariantCodeLensProviderTest
 
         Assert.NotNull(lens);
         Assert.Equal("2 variants", lens!.Command!.Title);
+        // Clicking must open the references peek (previously the lens had no command and did nothing).
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command.Name);
+        var locations = (JArray)lens.Command.Arguments![2]!;
+        Assert.Equal(2, locations.Count);
     }
 
     [Fact]

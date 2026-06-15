@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -14,18 +15,22 @@ public sealed class GameIndexService : IGameIndexService
 {
     private readonly IFileHelper _fileHelper;
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts = new();
+    private readonly IProjectLayerMap? _layerMap;
     private readonly ILogger<GameIndexService> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private GameIndex _current = GameIndex.Empty;
     private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
     private int _suppressionDepth;
 
+    // layerMap is optional so minimal test setups can omit it (rank defaults to 0); production wires
+    // the registered IProjectLayerMap so each document is stamped with its project layer's precedence.
     public GameIndexService(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
-        ILogger<GameIndexService> logger)
+        ILogger<GameIndexService> logger, IProjectLayerMap? layerMap = null)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
         _logger = logger;
+        _layerMap = layerMap;
     }
 
     public GameIndex Current => Volatile.Read(ref _current);
@@ -73,6 +78,11 @@ public sealed class GameIndexService : IGameIndexService
             _inflightCts.TryRemove(new KeyValuePair<string, CancellationTokenSource>(uri, cts));
             cts.Dispose();
         }
+
+        // Stamp the owning project layer's precedence (and name) so same-id overrides resolve by
+        // rank and the override hint can name the shadowed layer.
+        var layerRank = _layerMap?.GetRank(uri) ?? 0;
+        newDoc = newDoc with { LayerRank = layerRank, LayerName = _layerMap?.GetLayerName(layerRank) };
 
         GameIndex snapshot, updated;
         do

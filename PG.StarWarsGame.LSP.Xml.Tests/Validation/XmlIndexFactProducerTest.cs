@@ -90,6 +90,59 @@ public sealed class XmlIndexFactProducerTest
     }
 
     [Fact]
+    public void CrossLayerOverride_DoesNotEmitDuplicateFact()
+    {
+        // A same-id definition in a different project layer is a valid override (surfaced as a code
+        // lens), not a duplicate — so no XmlSymbolFact is produced for it.
+        var core = MakeSym("UNIT_A", "file:///core/u.xml", 0);
+        var rev = MakeSym("UNIT_A", "file:///rev/u.xml", 0);
+
+        var coreDoc = new DocumentIndex("file:///core/u.xml", 1,
+            ImmutableArray.Create(core), ImmutableArray<GameReference>.Empty, LayerRank: 0, LayerName: "Core");
+        var revDoc = new DocumentIndex("file:///rev/u.xml", 1,
+            ImmutableArray.Create(rev), ImmutableArray<GameReference>.Empty, LayerRank: 1, LayerName: "Rev");
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_A", ImmutableArray.Create(core, rev));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///core/u.xml", coreDoc)
+                .Add("file:///rev/u.xml", revDoc),
+            defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        Assert.DoesNotContain(Sut.Produce("file:///rev/u.xml", index), f => f is XmlSymbolFact);
+        Assert.DoesNotContain(Sut.Produce("file:///core/u.xml", index), f => f is XmlSymbolFact);
+    }
+
+    [Fact]
+    public void SameLayerCollision_InDifferentFiles_StillEmitsDuplicateFact()
+    {
+        var a = MakeSym("UNIT_A", "file:///rev/a.xml", 0);
+        var b = MakeSym("UNIT_A", "file:///rev/b.xml", 0);
+
+        var aDoc = new DocumentIndex("file:///rev/a.xml", 1,
+            ImmutableArray.Create(a), ImmutableArray<GameReference>.Empty, LayerRank: 1, LayerName: "Rev");
+        var bDoc = new DocumentIndex("file:///rev/b.xml", 1,
+            ImmutableArray.Create(b), ImmutableArray<GameReference>.Empty, LayerRank: 1, LayerName: "Rev");
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_A", ImmutableArray.Create(a, b));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///rev/a.xml", aDoc)
+                .Add("file:///rev/b.xml", bDoc),
+            defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var facts = Sut.Produce("file:///rev/a.xml", index).OfType<XmlSymbolFact>().ToList();
+        var f = Assert.Single(facts);
+        Assert.Equal(2, f.AllDefinitions.Count);
+    }
+
+    [Fact]
     public void Resolved_reference_emits_reference_fact_with_resolved_symbol()
     {
         var target = MakeSym("Target1", "file:///b.xml", 0);

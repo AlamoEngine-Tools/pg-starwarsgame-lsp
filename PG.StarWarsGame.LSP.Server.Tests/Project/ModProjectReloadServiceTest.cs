@@ -21,7 +21,8 @@ public sealed class ModProjectReloadServiceTest
         var indexer = new RecordingIndexer();
         var logger = new ListLogger();
         var service = new ModProjectReloadService(
-            new FakeResolver(resolved), indexer, new NullLocalisationLoader(), logger);
+            new FakeResolver(resolved), indexer, new NullLocalisationLoader(),
+            new RecordingLayerMap(), logger);
         return (service, indexer, logger);
     }
 
@@ -83,7 +84,47 @@ public sealed class ModProjectReloadServiceTest
         Assert.Equal(["/ws/a", "/ws/b"], indexer.LastRoots);
     }
 
+    [Fact]
+    public async Task LoadAsync_PublishesConfigLayersToLayerMapBeforeIndexing()
+    {
+        var layerMap = new RecordingLayerMap();
+        var indexer = new RecordingIndexer();
+        var layers = new List<ProjectLayer>
+        {
+            new(0, "Core", ["/ws/dep/xml"], [], [], [], null),
+            new(1, "Root", ["/ws/data/xml"], [], [], [], null)
+        };
+        var config = SampleConfig with { Layers = layers };
+        var service = new ModProjectReloadService(
+            new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, new ListLogger());
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.NotNull(layerMap.LastLayers);
+        Assert.Equal(["Core", "Root"], layerMap.LastLayers!.Select(l => l.Name));
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
+
+    private sealed class RecordingLayerMap : IProjectLayerMap
+    {
+        public IReadOnlyList<ProjectLayer>? LastLayers { get; private set; }
+
+        public void SetLayers(IReadOnlyList<ProjectLayer> layers)
+        {
+            LastLayers = layers;
+        }
+
+        public int GetRank(string fileUri)
+        {
+            return 0;
+        }
+
+        public string? GetLayerName(int rank)
+        {
+            return null;
+        }
+    }
 
     private sealed class FakeResolver : IProjectConfigurationResolver
     {

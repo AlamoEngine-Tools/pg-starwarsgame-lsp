@@ -36,23 +36,37 @@ public sealed class ModProjectResolver
         var text = new List<string>();
         var assets = new List<string>();
         string? textResourceType = null;
+        var layers = new List<ProjectLayer>(ordered.Count);
 
-        foreach (var (path, file) in ordered)
+        // ordered runs dependencies-first, root last, so the index is the precedence rank
+        // (dependencies low, root project highest).
+        for (var rank = 0; rank < ordered.Count; rank++)
         {
+            var (path, file) = ordered[rank];
             var projectDir = GetDirectory(path);
 
-            xml.AddRange(file.Directories.Xml.Select(d => Combine(projectDir, d)));
-            scripts.AddRange(file.Directories.Scripts.Select(d => Combine(projectDir, d)));
-            text.AddRange(file.Directories.Text.Select(d => Combine(projectDir, d)));
-            assets.AddRange(file.Directories.Art.Select(d => Combine(projectDir, d)));
-            assets.AddRange(file.Directories.Audio.Select(d => Combine(projectDir, d)));
+            var layerXml = file.Directories.Xml.Select(d => Combine(projectDir, d)).ToList();
+            var layerScripts = file.Directories.Scripts.Select(d => Combine(projectDir, d)).ToList();
+            var layerText = file.Directories.Text.Select(d => Combine(projectDir, d)).ToList();
+            var layerAssets = file.Directories.Art.Select(d => Combine(projectDir, d))
+                .Concat(file.Directories.Audio.Select(d => Combine(projectDir, d))).ToList();
+
+            xml.AddRange(layerXml);
+            scripts.AddRange(layerScripts);
+            text.AddRange(layerText);
+            assets.AddRange(layerAssets);
 
             // Root project is last in the ordered list so its value overwrites dependencies.
             if (file.Directories.TextResourceType is not null)
                 textResourceType = file.Directories.TextResourceType;
+
+            // Per-layer TextResourceType is preserved so each project's localisation loads with its
+            // own format (a dependency's .csv must not be skipped because the root uses another type).
+            layers.Add(new ProjectLayer(rank, file.Name, layerXml, layerScripts, layerText, layerAssets,
+                file.Directories.TextResourceType));
         }
 
-        return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType);
+        return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType) { Layers = layers };
     }
 
     private ModProjectFile? LoadReference(string absolutePath)
