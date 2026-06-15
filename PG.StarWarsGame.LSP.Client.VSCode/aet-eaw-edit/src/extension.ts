@@ -134,6 +134,29 @@ function logLine(msg: string): void {
 	log?.appendLine(`[${ts}] ${msg}`);
 }
 
+/**
+ * vscode-languageclient v10 types `traceOutputChannel` as `LogOutputChannel` and writes protocol
+ * trace via its `trace()` method — which a real `LogOutputChannel` hides unless its (user-controlled)
+ * log level is set to Trace, and which prefixes every line with a level/timestamp. That breaks the
+ * LSP trace view, where the `traceServer` setting (via `setTrace`) is meant to control visibility and
+ * the JSON should appear verbatim. Adapt a plain `OutputChannel` to the `LogOutputChannel` shape so
+ * every level writes through unchanged.
+ */
+function createTraceChannel(name: string): vscode.LogOutputChannel {
+	const channel = vscode.window.createOutputChannel(name);
+	const logLevelEmitter = new vscode.EventEmitter<vscode.LogLevel>();
+	const write = (message: string, ..._args: unknown[]): void => channel.appendLine(message);
+	return Object.assign(channel, {
+		logLevel: vscode.LogLevel.Trace,
+		onDidChangeLogLevel: logLevelEmitter.event,
+		trace: write,
+		debug: write,
+		info: write,
+		warn: write,
+		error: write,
+	}) as unknown as vscode.LogOutputChannel;
+}
+
 function cfg(section: string) {
 	return vscode.workspace.getConfiguration(`aet-eaw-edit.${section}`);
 }
@@ -226,8 +249,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			baselineUrl:       cfg('lsp.source.baseline').get<string>('type', 'http') === 'http'
 			                       ? (cfg('lsp.source.baseline').get<string>('url') || undefined)
 			                       : undefined,
-			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
-			modPaths:          cfg('lsp').get<string[]>('modPaths', []),
+			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined
 		},
 		middleware: {
 			executeCommand: async (command, args, next) => {
@@ -361,7 +383,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	log = vscode.window.createOutputChannel('EaWEdit');
 	context.subscriptions.push(log);
 
-	traceChannel = vscode.window.createOutputChannel('EaWEdit LSP Trace', { log: true });
+	traceChannel = createTraceChannel('EaWEdit LSP Trace');
 	context.subscriptions.push(traceChannel);
 
 	logLine('Extension activated.');

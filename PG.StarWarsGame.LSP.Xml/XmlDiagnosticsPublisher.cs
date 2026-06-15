@@ -246,9 +246,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                     Severity = DiagnosticSeverity.Warning,
                     Message =
                         $"'{token}' is below the hard-coded section boundary. Add new damage/armor types above the boundary comment.",
-                    Range = new Range(
-                        new Position(tokenLine0, tokenCol0),
-                        new Position(tokenLine0, tokenCol0 + token.Length)),
+                    Range = SafeRange(tokenLine0, tokenCol0, token.Length),
                     Source = AppProperties.LspServerId
                 });
             }
@@ -321,9 +319,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 Severity = DiagnosticSeverity.Error,
                 Message =
                     $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
-                Range = new Range(
-                    new Position(line0, col0),
-                    new Position(line0, col0 + token.Length)),
+                Range = SafeRange(line0, col0, token.Length),
                 Source = AppProperties.LspServerId
             });
         }
@@ -348,16 +344,40 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         {
             Severity = MapSeverity(result.Severity),
             Message = result.Message,
-            Range = new Range(new Position(line, col), new Position(line, col + length)),
+            Range = SafeRange(line, col, length),
             Source = AppProperties.LspServerId,
+            Tags = MapTags(result.Tags),
             Data = BuildDiagnosticData(result)
         };
+    }
+
+    private static Container<DiagnosticTag>? MapTags(IReadOnlyList<XmlDiagnosticTag>? tags)
+    {
+        if (tags is null || tags.Count == 0)
+            return null;
+
+        return new Container<DiagnosticTag>(tags.Select(t => t switch
+        {
+            XmlDiagnosticTag.Unnecessary => DiagnosticTag.Unnecessary,
+            XmlDiagnosticTag.Deprecated => DiagnosticTag.Deprecated,
+            _ => throw new ArgumentOutOfRangeException(nameof(tags), t, null)
+        }));
+    }
+
+    // LSP positions must be non-negative; a stray negative line/column (e.g. from an HtmlAgilityPack
+    // index of -1) would crash the client's diagnostic conversion, so clamp every published range.
+    private static Range SafeRange(int line, int col, int length)
+    {
+        line = Math.Max(0, line);
+        col = Math.Max(0, col);
+        var end = Math.Max(col, col + length);
+        return new Range(new Position(line, col), new Position(line, end));
     }
 
     private static JToken? BuildDiagnosticData(XmlDiagnosticResult result)
     {
         if (result.SuggestedFix is null && result.CreateLocalisationKey is null &&
-            result.SquadronSyncJson is null)
+            result.SquadronSyncJson is null && !result.RemoveRedundantOverride)
             return null;
 
         var obj = new JObject();
@@ -367,6 +387,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             obj["createLocKey"] = result.CreateLocalisationKey;
         if (result.SquadronSyncJson is not null)
             obj["squadronSync"] = JToken.Parse(result.SquadronSyncJson);
+        if (result.RemoveRedundantOverride)
+            obj["removeRedundantOverride"] = true;
         return obj;
     }
 

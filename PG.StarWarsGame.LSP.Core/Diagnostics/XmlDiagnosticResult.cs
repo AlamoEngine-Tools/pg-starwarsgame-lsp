@@ -16,4 +16,6 @@ public record XmlDiagnosticResult(
     int? OverrideLength = null,
     string? SuggestedFix = null,
     string? CreateLocalisationKey = null,
-    string? SquadronSyncJson = null);
+    string? SquadronSyncJson = null,
+    IReadOnlyList<XmlDiagnosticTag>? Tags = null,
+    bool RemoveRedundantOverride = false);

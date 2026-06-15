@@ -397,4 +397,15 @@ public sealed class XmlUtilityTest
         Assert.Equal(0, line);
         Assert.Equal(0, col);
     }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-100)]
+    public void OffsetToPosition_NegativeOffset_ClampsColumnToZero(int offset)
+    {
+        // HtmlAgilityPack can report InnerStartIndex/-1; a negative column would crash the LSP client.
+        var (line, col) = XmlUtility.OffsetToPosition("anything", offset);
+        Assert.Equal(0, line);
+        Assert.Equal(0, col);
+    }
 }

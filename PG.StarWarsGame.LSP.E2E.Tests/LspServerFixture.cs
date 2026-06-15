@@ -218,10 +218,7 @@ public class LspServerFixture : IAsyncLifetime
             gamePath = LspTestEnvironment.GamePath,
             baselineLocalPath = LspTestEnvironment.BaselineLocalPath,
             baselineType = LspTestEnvironment.BaselineLocalPath is null ? "None" : null,
-            locale = LspTestEnvironment.Locale,
-            modPaths = LspTestEnvironment.ModPaths.Count > 0
-                ? LspTestEnvironment.ModPaths.ToArray()
-                : null
+            locale = LspTestEnvironment.Locale
         };
     }
 }

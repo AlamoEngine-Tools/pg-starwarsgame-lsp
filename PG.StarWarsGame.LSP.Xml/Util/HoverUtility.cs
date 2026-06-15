@@ -116,6 +116,8 @@ internal static class HoverUtility
         AppendNotes(sb, type.Notes, locale);
         if (origin is MegArchiveOrigin meg)
             AppendPackedOrigin(sb, meg);
+        else if (origin is FileOrigin { IsNavigable: false } shipped)
+            AppendShippedOrigin(sb, shipped);
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -191,6 +193,17 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine("---");
         sb.Append($"📦 Packed in `{archiveName}` → `{meg.InternalPath}`");
+    }
+
+    // A baseline symbol projected from shipped game data carries a game-relative path (not a file://
+    // URI). The exact .meg is not retained, so flag it as packaged base-game data, mirroring how
+    // packed binary assets are badged.
+    private static void AppendShippedOrigin(StringBuilder sb, FileOrigin shipped)
+    {
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.Append($"📦 Packed in the base game — `{shipped.Uri.Replace('\\', '/')}`");
     }
 
     private static void AppendNotes(StringBuilder sb, IReadOnlyDictionary<string, string> notes, string locale)

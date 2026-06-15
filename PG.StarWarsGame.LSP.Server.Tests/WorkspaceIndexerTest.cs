@@ -55,6 +55,64 @@ public sealed class WorkspaceIndexerTest
     }
 
     [Fact]
+    public void PreScanMetafiles_SubdirEntry_RegistersUnderEveryXmlRoot_PreservingSubdir()
+    {
+        // Real case: the mod (rev) ships GameObjectFiles.xml listing subdirectory paths that resolve
+        // to object files in its dependency (core). The type must be registered at the subdir path
+        // under BOTH xml roots — not stripped to a bare filename under the metafile's own directory.
+        var revRoot = Root("rev");
+        var revXml = Path.Combine(revRoot, "data", "xml");
+        var coreXml = Path.Combine(Root("core"), "data", "xml");
+        var metafilePath = Path.Combine(revXml, "gameobjectfiles.xml");
+
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new(
+                "<Game_Object_Files><File>Units\\Death_Clones.xml</File></Game_Object_Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+
+        // config.XmlDirectories spans both projects (dependency first, root last).
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
+
+        var fh = new FileHelper(fs);
+        var coreKey = fh.PathToFileUri(Path.Combine(coreXml, "Units", "Death_Clones.xml"));
+        var revKey = fh.PathToFileUri(Path.Combine(revXml, "Units", "Death_Clones.xml"));
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(coreKey).ToArray());
+        Assert.Equal(["GameObjectType"], registry.GetTypesForFile(revKey).ToArray());
+    }
+
+    [Fact]
+    public void PreScanMetafiles_MetafileShippedByDependency_IsFoundAndRegistersTypes()
+    {
+        // The metafile lives in the dependency (core), not in the open workspace (rev). It must still
+        // be discovered via the declared xml roots, and its (subdir) entries registered.
+        var revRoot = Root("rev");
+        var revXml = Path.Combine(revRoot, "data", "xml");
+        var coreXml = Path.Combine(Root("core"), "data", "xml");
+        var metafilePath = Path.Combine(coreXml, "hardpointdatafiles.xml"); // shipped by core
+
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [metafilePath] = new(
+                "<HardPointDataFiles><File>HardPoints\\HP_Weapons.xml</File></HardPointDataFiles>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/hardpointdatafiles.xml", MetafileType.FileRegistry, ["HardPoint"]));
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
+
+        var fh = new FileHelper(fs);
+        var coreKey = fh.PathToFileUri(Path.Combine(coreXml, "HardPoints", "HP_Weapons.xml"));
+        Assert.Equal(["HardPoint"], registry.GetTypesForFile(coreKey).ToArray());
+    }
+
+    [Fact]
     public void PreScanMetafiles_SeedsXmlDirectories_IntoContext()
     {
         var root = Root("ws");

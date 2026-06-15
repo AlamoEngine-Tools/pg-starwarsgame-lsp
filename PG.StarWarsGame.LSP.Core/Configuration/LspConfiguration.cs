@@ -8,7 +8,6 @@ public record LspConfiguration
     public string? WorkspaceRoot { get; init; }
     public string? GamePath { get; init; }
     public string? ExpansionPath { get; init; }
-    public IReadOnlyList<string> ModPaths { get; init; } = [];
     public string Locale { get; init; } = "en";
     public SchemaSourceConfig SchemaSource { get; init; } = new();
     public BaselineSourceConfig BaselineSource { get; init; } = new();

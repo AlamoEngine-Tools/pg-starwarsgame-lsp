@@ -96,11 +96,9 @@ public sealed class LocalisationLoader : ILocalisationLoader
         }
         else
         {
-            // Heuristic (no-pgproj) mode: user config unchanged.
+            // Fallback for a workspace with no resolved project: honour explicitly configured paths.
             var resourceType = locConfig.ResourceType;
-            var sourcePaths = locConfig.SourcePaths.Count > 0
-                ? locConfig.SourcePaths
-                : AutoDetectPaths(config.ModPaths, resourceType);
+            var sourcePaths = locConfig.SourcePaths;
 
             if (sourcePaths.Count > 0)
             {
@@ -149,22 +147,6 @@ public sealed class LocalisationLoader : ILocalisationLoader
             if (!_fileHelper.FileSystem.Directory.Exists(dir)) continue;
             results.AddRange(_fileHelper.FileSystem.Directory
                 .EnumerateFiles(dir, $"*{ext}", SearchOption.TopDirectoryOnly));
-        }
-
-        return results;
-    }
-
-    private IReadOnlyList<string> AutoDetectPaths(IReadOnlyList<string> modPaths, string resourceType)
-    {
-        var ext = ResourceTypeToExtension(resourceType);
-        var results = new List<string>();
-        foreach (var modPath in modPaths)
-        {
-            var textDir = _fileHelper.FileSystem.Path.Combine(modPath, "Data", "Text");
-            if (!_fileHelper.FileSystem.Directory.Exists(textDir)) continue;
-            var files = _fileHelper.FileSystem.Directory
-                .EnumerateFiles(textDir, $"*{ext}", SearchOption.TopDirectoryOnly);
-            results.AddRange(files);
         }
 
         return results;

@@ -42,10 +42,6 @@ public static class LspTestEnvironment
     public static string Locale =>
         Environment.GetEnvironmentVariable("LSP_LOCALE") ?? "en";
 
-    public static IReadOnlyList<string> ModPaths =>
-        (Environment.GetEnvironmentVariable("LSP_MOD_PATHS") ?? string.Empty)
-        .Split(';', StringSplitOptions.RemoveEmptyEntries);
-
     /// <summary>
     ///     When set, the fixture connects to an already-running server on this TCP port
     ///     instead of spawning a child process. Useful for attaching a debugger.

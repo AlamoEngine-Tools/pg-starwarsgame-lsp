@@ -174,10 +174,12 @@ public sealed class XmlTextDocumentSyncHandlerTest
     }
 
     [Fact]
-    public async Task DidClose_WhenFileExistsOnDisk_ReindexesAtVersionZero()
+    public async Task DidClose_WhenFileExistsOnDisk_RestoresDiskContentWithoutRemoveOrBulk()
     {
-        // File exists on disk — close should restore the on-disk state in the index
-        // rather than removing it, so cross-file references continue to resolve.
+        // File exists on disk — close restores the on-disk state via a single UpdateDocument so
+        // cross-file references keep resolving. It no longer removes-then-re-adds (which dropped the
+        // document's symbols mid-flight) nor wraps the work in a bulk update; the index's own
+        // unchanged-content fast path makes the common (unedited) case a cheap no-op.
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [DiskPath] = new(DiskContent) });
         var (handler, _, index) = Build(fs);
@@ -187,11 +189,10 @@ public sealed class XmlTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Single(index.RemoveCalls);
+        Assert.Empty(index.RemoveCalls);
         Assert.Single(index.UpdateCalls);
         Assert.Equal(DiskContent, index.UpdateCalls[0].Text);
-        Assert.Equal(0, index.UpdateCalls[0].Version);
-        Assert.Equal(1, index.BulkUpdateCount);
+        Assert.Equal(0, index.BulkUpdateCount);
     }
 
     [Fact]

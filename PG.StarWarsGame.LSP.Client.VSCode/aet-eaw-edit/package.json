@@ -112,17 +112,7 @@
             "Polish",
             "Russian"
           ]
-        },
-        "aet-eaw-edit.lsp.modPaths": {
-          "order": 500,
-          "type": "array",
-          "items": {
-            "type": "string",
-            "format": "uri-reference"
-          },
-          "default": [],
-          "markdownDescription": "Additional directories containing mod files to index alongside the workspace.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
-        },
+        },  
         "aet-eaw-edit.lsp.source.baseline.type": {
           "order": 600,
           "type": "string",
@@ -283,10 +273,12 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "npm run bundle",
-    "bundle": "esbuild src/extension.ts --bundle --outfile=out/extension.js --external:vscode --platform=node --format=cjs",
+    "vscode:prepublish": "npm run check-types && npm run bundle -- --production",
+    "bundle": "node esbuild.js",
     "compile": "tsc -p ./",
-    "watch": "npm run bundle -- --watch",
+    "check-types": "tsc -p ./ --noEmit",
+    "watch": "node esbuild.js --watch",
+    "watch:tsc": "tsc -p ./ --noEmit --watch",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
@@ -301,6 +293,7 @@
     "@typescript-eslint/parser": "^8.50.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^3.0.0",
+    "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "typescript": "^6.0.0"
   },

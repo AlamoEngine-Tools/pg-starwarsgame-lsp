@@ -4,17 +4,68 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"type": "npm",
-			"script": "watch",
-			"problemMatcher": "$tsc-watch",
-			"isBackground": true,
-			"presentation": {
-				"reveal": "never"
-			},
+			// Default build task / preLaunchTask target. Runs the esbuild bundler and the
+			// TypeScript type-checker as parallel background watchers. The debugger launches
+			// once BOTH report a settled build via their background problem matchers.
+			"label": "watch",
+			"dependsOn": [
+				"npm: watch",
+				"npm: watch:tsc"
+			],
+			"dependsOrder": "parallel",
 			"group": {
 				"kind": "build",
 				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "never"
+			},
+			"problemMatcher": []
+		},
+		{
+			// esbuild bundler (produces out/extension.js). esbuild does NOT type-check;
+			// that is why watch:tsc runs alongside it.
+			"type": "npm",
+			"script": "watch",
+			"label": "npm: watch",
+			"isBackground": true,
+			"presentation": {
+				"group": "watch",
+				"reveal": "never"
+			},
+			"problemMatcher": {
+				"owner": "esbuild",
+				"source": "esbuild",
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				],
+				"pattern": {
+					"regexp": "^\\s*(.+?):(\\d+):(\\d+):\\s+(error|warning):\\s+(.+)$",
+					"file": 1,
+					"line": 2,
+					"column": 3,
+					"severity": 4,
+					"message": 5
+				},
+				"background": {
+					"activeOnStart": true,
+					"beginsPattern": "^\\[watch\\] build started",
+					"endsPattern": "^\\[watch\\] build finished"
+				}
 			}
+		},
+		{
+			// Type-checking only (--noEmit so it never overwrites the esbuild bundle).
+			"type": "npm",
+			"script": "watch:tsc",
+			"label": "npm: watch:tsc",
+			"isBackground": true,
+			"presentation": {
+				"group": "watch",
+				"reveal": "never"
+			},
+			"problemMatcher": "$tsc-watch"
 		}
 	]
 }

@@ -10,4 +10,13 @@ public sealed record FileOrigin(
     [property: Key(0)] string Uri,
     [property: Key(1)] int Line,
     [property: Key(2)] int? Column
-) : SymbolOrigin;
+) : SymbolOrigin
+{
+    /// <summary>
+    ///     True when <see cref="Uri" /> is a real editor-openable <c>file://</c> URI. Baseline symbols
+    ///     projected from shipped game files carry a game-relative path (e.g. <c>DATA\XML\Foo.xml</c>)
+    ///     that the editor cannot open, so navigation handlers must not emit a location for them.
+    /// </summary>
+    [IgnoreMember]
+    public bool IsNavigable => Uri.StartsWith("file://", StringComparison.OrdinalIgnoreCase);
+}

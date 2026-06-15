@@ -49,7 +49,8 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
         {
             foreach (var m in members)
             {
-                if (m.MemberOrigin is not FileOrigin fo) continue;
+                // Baseline members carry a non-openable game-relative path — skip them.
+                if (m.MemberOrigin is not FileOrigin { IsNavigable: true } fo) continue;
                 var col = fo.Column ?? 0;
                 locations.Add(new Location
                 {
@@ -75,7 +76,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
         if (request.Context.IncludeDeclaration && index.WorkspaceDefinitions.TryGetValue(id, out var defs))
             foreach (var s in defs)
             {
-                if (s.Origin is not FileOrigin fo) continue;
+                if (s.Origin is not FileOrigin { IsNavigable: true } fo) continue;
                 locations.Add(new Location
                 {
                     Uri = fo.Uri,

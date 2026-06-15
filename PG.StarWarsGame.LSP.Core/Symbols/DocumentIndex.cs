@@ -16,5 +16,8 @@ public sealed record DocumentIndex(
     // same-id override resolution in GameIndex; 0 by default so existing construction stays valid.
     int LayerRank = 0,
     // Display name of the owning project layer, used in the "overrides X from <project>" hint.
-    string? LayerName = null
+    string? LayerName = null,
+    // Stable hash of the source text this index was parsed from. Lets the index skip an expensive
+    // re-parse when a document is re-opened or closed with unchanged content. Null = not computed.
+    long? ContentHash = null
 );

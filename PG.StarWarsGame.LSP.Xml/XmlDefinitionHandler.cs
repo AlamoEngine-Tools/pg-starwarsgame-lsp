@@ -47,8 +47,10 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
         var symbol = index.Resolve(hit.Value.Id);
-        if (symbol is null || symbol.Origin is not FileOrigin fo)
+        if (symbol is null || symbol.Origin is not FileOrigin { IsNavigable: true } fo)
         {
+            // Baseline symbols carry a game-relative path (DATA\XML\…) the editor cannot open;
+            // resolving to one means there is no workspace definition to navigate to.
             _logger.LogDebug("Go-to-def: {Id} resolved to non-navigable origin {origin}", hit.Value.Id, symbol?.Origin);
             return Task.FromResult<LocationOrLocationLinks?>(null);
         }

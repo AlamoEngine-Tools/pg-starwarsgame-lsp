@@ -30,7 +30,6 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     private readonly IPropertiesTranslationExporter _nlsExporter;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly ILanguageService _langService;
-    private readonly ILspConfigurationProvider _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly IModProjectReloadService _reloadService;
     private readonly ILogger<InitLocalisationProjectCommandHandler> _logger;
@@ -42,7 +41,6 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         IPropertiesTranslationExporter nlsExporter,
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
-        ILspConfigurationProvider configProvider,
         IFileHelper fileHelper,
         IModProjectReloadService reloadService,
         ILogger<InitLocalisationProjectCommandHandler> logger)
@@ -53,7 +51,6 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         _nlsExporter = nlsExporter;
         _factory = factory;
         _langService = langService;
-        _configProvider = configProvider;
         _fileHelper = fileHelper;
         _reloadService = reloadService;
         _logger = logger;
@@ -100,13 +97,10 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         }
         else
         {
-            var config = _configProvider.Current;
-            if (config.ModPaths.Count == 0)
-            {
-                _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: no text roots or mod paths configured.");
-                return Unit.Value;
-            }
-            targetDir = fs.Path.Combine(config.ModPaths[0], "Data", "Text");
+            _logger.LogWarning(
+                "aet-eaw-edit.lsp.initLocalisationProject: no text directories declared in the project; " +
+                "add a 'text' directory to the .pgproj before initialising a localisation project.");
+            return Unit.Value;
         }
 
         var targetPath = fs.Path.Combine(targetDir, fileName);

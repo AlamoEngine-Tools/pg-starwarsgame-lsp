@@ -212,6 +212,26 @@ public sealed class XmlGameDocumentParserTest
     }
 
     [Fact]
+    public async Task ParseAsync_ContainerSharingReferenceTagName_DoesNotEmitWholeObjectAsReference()
+    {
+        // A <Faction Name="X">…</Faction> object definition shares its tag name with the <Faction>
+        // reference tag used elsewhere. Its InnerText (the entire object) must NOT be captured as one
+        // giant bogus reference — only leaf elements are reference values.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Faction"));
+        schema.AddTag(RefTag("Faction", "Faction"));
+
+        var result = await Build(schema).ParseAsync("file:///factions.xml",
+            """
+            <Factions>
+                <Faction Name="Rebel"><Text_ID>TEXT_X</Text_ID><Color>1,2,3,4</Color></Faction>
+            </Factions>
+            """, 1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
     public async Task ParseAsync_Non_XmlObject_Reference_Tag_Emits_No_Reference()
     {
         var schema = new FakeSchemaProvider();

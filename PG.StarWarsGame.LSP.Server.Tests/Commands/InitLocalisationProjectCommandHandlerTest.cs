@@ -148,8 +148,9 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     }
 
     [Fact]
-    public async Task Handle_NoModPaths_NoFileCreated()
+    public async Task Handle_NoTextRoots_NoFileCreated()
     {
+        // No resolved project text directory → strict warn-and-return, nothing written.
         var (handler, fs, reload) = BuildHandler(null);
 
         await handler.Handle(Request("Csv"), CancellationToken.None);
@@ -250,14 +251,18 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         services.SupportLocalisationBaseline();
         var sp = services.BuildServiceProvider();
 
-        var lspConfig = new LspConfiguration
-        {
-            ModPaths = modPath != null ? [modPath] : []
-        };
+        // The target directory now comes from the resolved project's text roots. A non-null modPath is
+        // mapped to a single text root (<modPath>/Data/Text) so existing format/content tests still
+        // produce a file; passing null leaves no text root, exercising the warn-and-return path.
+        var effectiveConfig = workspaceConfig
+                              ?? (modPath != null
+                                  ? new WorkspaceConfiguration(
+                                      [], [], [mockFs.Path.Combine(modPath, "Data", "Text")], [], null)
+                                  : null);
 
         var reload = new SpyReloadService
         {
-            LastWorkspaceConfig = workspaceConfig,
+            LastWorkspaceConfig = effectiveConfig,
             LastWorkspaceRoots = workspaceRoots
         };
         var handler = new InitLocalisationProjectCommandHandler(
@@ -267,7 +272,6 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             sp.GetRequiredService<IPropertiesTranslationExporter>(),
             sp.GetRequiredService<ITranslationDatabaseFactory>(),
             sp.GetRequiredService<ILanguageService>(),
-            new StubLspConfigProvider(lspConfig),
             new FileHelper(mockFs),
             reload,
             NullLogger<InitLocalisationProjectCommandHandler>.Instance);
@@ -290,12 +294,5 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             WasReloaded = true;
             return Task.CompletedTask;
         }
-    }
-
-    private sealed class StubLspConfigProvider : ILspConfigurationProvider
-    {
-        public StubLspConfigProvider(LspConfiguration config) => Current = config;
-        public LspConfiguration Current { get; }
-        public void LoadFrom(object? options) { }
     }
 }

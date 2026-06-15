@@ -76,17 +76,22 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
             var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
             if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
+            {
                 // File still on disk — restore the saved state so workspace-wide references
                 // (cross-file go-to-def, unresolved-ref diagnostics) keep working after close.
-                using (_indexService.BeginBulkUpdate())
-                {
-                    _indexService.RemoveDocument(uri);
-                    var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
-                    await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                }
+                // UpdateDocumentAsync skips the re-parse when the buffer already matched disk (the
+                // common case for a viewed-but-unedited file), avoiding an expensive re-index and the
+                // symbol-removal flicker that briefly drops resolution back to the baseline. Pass the
+                // current version so an unsaved-edit revert is not dropped as stale.
+                var version = _indexService.Current.Documents.GetValueOrDefault(uri)?.Version ?? 0;
+                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
+                await _indexService.UpdateDocumentAsync(uri, text, version, token);
+            }
             else
+            {
                 // File was deleted from disk — remove it entirely from the index.
                 _indexService.RemoveDocument(uri);
+            }
         }, ct);
 
         return Unit.Value;

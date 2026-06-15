@@ -12,8 +12,9 @@ public record LocalisationConfig
     public string ResourceType { get; init; } = "Csv";
 
     /// <summary>
-    ///     Explicit paths to localisation files. When empty the loader auto-detects from
-    ///     <see cref="LspConfiguration.ModPaths" /> by looking for <c>Data/Text/</c> sub-directories.
+    ///     Explicit paths to localisation files. Normally the loader takes localisation from the
+    ///     resolved <c>.pgproj</c> project layers' text directories; these paths are a fallback used
+    ///     only when no project is resolved.
     /// </summary>
     public IReadOnlyList<string> SourcePaths { get; init; } = [];
 }

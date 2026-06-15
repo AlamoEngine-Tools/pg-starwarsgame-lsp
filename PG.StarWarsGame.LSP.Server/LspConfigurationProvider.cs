@@ -111,13 +111,6 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var baselineType = TryGetString(elem, "baselineType");
         var baselineUrl = TryGetString(elem, "baselineUrl");
 
-        var modPaths = new List<string>();
-        if (elem.TryGetProperty("modPaths", out var modPathsElem) &&
-            modPathsElem.ValueKind == JsonValueKind.Array)
-            foreach (var item in modPathsElem.EnumerateArray())
-                if (item.ValueKind == JsonValueKind.String && item.GetString() is { } s)
-                    modPaths.Add(s);
-
         _logger.LogInformation(
             "ParseInitOptions: schemaLocalPath={LocalPath}, schemaUrl={Url}, baselineType={BaselineType}",
             schemaLocalPath ?? "<null>", schemaUrl ?? "<null>", baselineType ?? "<null>");
@@ -127,7 +120,6 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             WorkspaceRoot = workspaceRoot,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
-            ModPaths = modPaths,
             Locale = locale ?? "en",
             SchemaSource = !string.IsNullOrWhiteSpace(schemaLocalPath)
                 ? new SchemaSourceConfig { Type = SchemaSourceType.Local, LocalPath = schemaLocalPath }
@@ -151,7 +143,6 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
-            ModPaths = overlay.ModPaths.Count > 0 ? overlay.ModPaths : file.ModPaths,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,
             SchemaSource = overlay.SchemaSource.Type == SchemaSourceType.Local
                            || overlay.SchemaSource.Url != new SchemaSourceConfig().Url

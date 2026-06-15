@@ -42,6 +42,21 @@ public static class XmlUtility
         return GetOpeningTagStartColumn(node) + node.Name.Length;
     }
 
+    /// <summary>
+    ///     Recovers the original (case-preserving) tag name for <paramref name="node" /> from the
+    ///     source <paramref name="text" />. HtmlAgilityPack lowercases <see cref="HtmlNode.Name" />,
+    ///     which is wrong for user-facing messages on the case-sensitive EaW/FoC XML format.
+    /// </summary>
+    public static string GetOriginalTagName(HtmlNode node, string text)
+    {
+        var start = node.StreamPosition + 1; // skip '<'
+        if (start <= 0 || start >= text.Length) return node.Name;
+        var i = start;
+        while (i < text.Length && !char.IsWhiteSpace(text[i]) && text[i] != '>' && text[i] != '/')
+            i++;
+        return i > start ? text[start..i] : node.Name;
+    }
+
     public static bool TryGetRootNode(HtmlDocument doc, out HtmlNode? rootNode)
     {
         rootNode = doc.DocumentNode
@@ -256,6 +271,8 @@ public static class XmlUtility
                 lineStart = i + 1;
             }
 
-        return (line, offset - lineStart);
+        // A negative offset (e.g. an HtmlAgilityPack InnerStartIndex of -1, or an IndexOf miss) would
+        // otherwise yield a negative column, which LSP positions forbid — clamp to 0.
+        return (line, Math.Max(0, offset - lineStart));
     }
 }

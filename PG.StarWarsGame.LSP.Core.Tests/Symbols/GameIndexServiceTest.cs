@@ -395,6 +395,40 @@ public sealed class GameIndexServiceTest
         Assert.Single(svcB.Current.WorkspaceDefinitions["DUP"]);
     }
 
+    // ── unchanged-content re-parse skip ──────────────────────────────────────
+
+    [Fact]
+    public async Task UpdateDocument_SameContent_SkipsReparse_ButStillFiresIndexChanged()
+    {
+        var parser = new CountingParser(Doc("", 0, [Symbol("UNIT_A")]));
+        var svc = Build(parser);
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        Assert.Equal(1, parser.ParseCount);
+
+        var fired = 0;
+        svc.IndexChanged += _ => fired++;
+
+        // Re-opening the same content (e.g. didOpen after the workspace scan) must NOT re-parse the
+        // (potentially huge) document, but must still notify so diagnostics re-publish.
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 2, default);
+
+        Assert.Equal(1, parser.ParseCount);
+        Assert.Equal(1, fired);
+    }
+
+    [Fact]
+    public async Task UpdateDocument_ChangedContent_Reparses()
+    {
+        var parser = new CountingParser(Doc("", 0, [Symbol("UNIT_A")]));
+        var svc = Build(parser);
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<Y/>", 2, default);
+
+        Assert.Equal(2, parser.ParseCount);
+    }
+
     // ── Layer rank stamping ──────────────────────────────────────────────────
 
     [Fact]
@@ -618,6 +652,31 @@ public sealed class GameIndexServiceTest
         public string? GetLayerName(int rank)
         {
             return null;
+        }
+    }
+
+    // Like FakeParser but records how many times it actually parses, to assert the unchanged-content
+    // fast path skips re-parsing.
+    private sealed class CountingParser : IGameDocumentParser
+    {
+        private readonly DocumentIndex _result;
+
+        public CountingParser(DocumentIndex result)
+        {
+            _result = result;
+        }
+
+        public int ParseCount { get; private set; }
+
+        public bool CanParse(string ext)
+        {
+            return ext == ".xml";
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            ParseCount++;
+            return ValueTask.FromResult(_result with { DocumentUri = uri, Version = version });
         }
     }
 

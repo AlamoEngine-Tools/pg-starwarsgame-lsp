@@ -147,6 +147,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 // Variant base references are emitted by the symbol passes with the enclosing
                 // object's type as ExpectedTypeName; skip here to avoid a duplicate wildcard-typed one.
                 if (tagDef.SemanticType == TagSemanticType.VariantParent) continue;
+                // A reference value is leaf text. An element that itself contains child elements is an
+                // object definition whose tag name collides with a reference tag (e.g. the
+                // <Faction Name="X">…</Faction> container vs. a <Faction>X</Faction> reference) — using
+                // its InnerText would capture the whole object as one bogus reference.
+                if (HasChildElement(child)) continue;
 
                 var innerText = child.InnerText;
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
@@ -183,6 +188,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var tagDef = _schema.GetTag(child.Name);
                 if (tagDef?.SemanticType != TagSemanticType.ReferenceGroup) continue;
                 if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
+                // Skip object-definition containers whose name collides with a reference-group tag.
+                if (HasChildElement(child)) continue;
 
                 var innerText = child.InnerText;
                 var trimmed = innerText.Trim();
@@ -216,6 +223,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
 
         return memberships;
+    }
+
+    // True when the element contains a nested child element, marking it as a container/object
+    // definition rather than a leaf reference value.
+    private static bool HasChildElement(HtmlNode node)
+    {
+        return node.ChildNodes.Any(n => n.NodeType == HtmlNodeType.Element);
     }
 
     private static string GetNameAttribute(HtmlNode node, string nameTag)

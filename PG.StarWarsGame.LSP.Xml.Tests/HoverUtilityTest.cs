@@ -143,6 +143,19 @@ public sealed class HoverUtilityTest
         Assert.DoesNotContain("📦", md);
     }
 
+    [Fact]
+    public void BuildReferenceHover_ShippedGamePathOrigin_ContainsPackedSection()
+    {
+        // Baseline symbols carry a non-openable game-relative path (not file://); show that the
+        // source is packaged base-game data, just like a packed binary asset.
+        var origin = new FileOrigin(@"DATA\XML\SFXEVENTSUNITSGROUND.XML", 0, 0);
+        var hover = HoverUtility.BuildReferenceHover(
+            MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", origin);
+        var md = hover.Contents.MarkupContent!.Value;
+        Assert.Contains("📦", md);
+        Assert.Contains("base game", md);
+    }
+
     // ── BuildAssetReferenceHover ───────────────────────────────────────────────
 
     private static XmlTagDefinition AssetTag(ReferenceKind kind)

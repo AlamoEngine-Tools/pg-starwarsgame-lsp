@@ -49,6 +49,17 @@ public sealed class GameIndexService : IGameIndexService
         var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
         if (parser is null) return;
 
+        // Fast path: identical content is already indexed (re-opening or closing an unedited file).
+        // Skip the expensive re-parse, but still notify so diagnostics re-publish for the document.
+        var contentHash = ComputeContentHash(text);
+        if (Volatile.Read(ref _current).Documents.GetValueOrDefault(uri) is { } indexed
+            && indexed.ContentHash == contentHash)
+        {
+            _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
+            RaiseIndexChanged(Volatile.Read(ref _current));
+            return;
+        }
+
         // Cancel any in-flight parse for this URI and register the new one.
         // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored.
         var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -80,9 +91,15 @@ public sealed class GameIndexService : IGameIndexService
         }
 
         // Stamp the owning project layer's precedence (and name) so same-id overrides resolve by
-        // rank and the override hint can name the shadowed layer.
+        // rank and the override hint can name the shadowed layer, plus the content hash for the
+        // unchanged-content fast path above.
         var layerRank = _layerMap?.GetRank(uri) ?? 0;
-        newDoc = newDoc with { LayerRank = layerRank, LayerName = _layerMap?.GetLayerName(layerRank) };
+        newDoc = newDoc with
+        {
+            LayerRank = layerRank,
+            LayerName = _layerMap?.GetLayerName(layerRank),
+            ContentHash = contentHash
+        };
 
         GameIndex snapshot, updated;
         do
@@ -274,6 +291,22 @@ public sealed class GameIndexService : IGameIndexService
     private string NormalizeUri(string uri)
     {
         return _fileHelper.NormalizeUri(uri);
+    }
+
+    // FNV-1a 64-bit over the UTF-16 code units — stable within a session, allocation-free, and with
+    // ample collision resistance to gate the unchanged-content re-parse skip.
+    private static long ComputeContentHash(string text)
+    {
+        const ulong offset = 14695981039346656037;
+        const ulong prime = 1099511628211;
+        var hash = offset;
+        foreach (var c in text)
+        {
+            hash ^= c;
+            hash *= prime;
+        }
+
+        return unchecked((long)hash);
     }
 
     private sealed class BulkUpdateScope : IDisposable

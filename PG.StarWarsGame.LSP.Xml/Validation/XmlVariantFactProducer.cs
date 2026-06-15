@@ -58,7 +58,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             if (tagDef?.SemanticType == TagSemanticType.VariantParent)
                 continue; // the variant-declaration tag itself is not a real tag
 
-            var name = OriginalTagName(child, text); // HAP lowercases child.Name; recover for messages
+            var name = XmlUtility.GetOriginalTagName(child, text); // HAP lowercases child.Name; recover for messages
             var line = XmlUtility.GetLine(child);
             var col = XmlUtility.GetOpeningTagStartColumn(child);
             var len = name.Length;
@@ -74,16 +74,6 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
                 string.Equals(baseVal, child.InnerText.Trim(), StringComparison.Ordinal))
                 facts.Add(new VariantRedundantOverrideFact(documentUri, line, col, len, name));
         }
-    }
-
-    private static string OriginalTagName(HtmlNode node, string text)
-    {
-        var start = node.StreamPosition + 1; // skip '<'
-        if (start <= 0 || start >= text.Length) return node.Name;
-        var i = start;
-        while (i < text.Length && !char.IsWhiteSpace(text[i]) && text[i] != '>' && text[i] != '/')
-            i++;
-        return i > start ? text[start..i] : node.Name;
     }
 
     private static IReadOnlyDictionary<string, string> BaseValues(EffectiveObjectResolver resolver, string? baseId)

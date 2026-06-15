@@ -67,36 +67,51 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         {
             if (def.MetafileType == MetafileType.Special) continue;
 
-            if (def.MetafileType == MetafileType.FileRegistry)
+            // A metafile (or DirectContent file) may be shipped by any layer — the mod or a
+            // dependency — so look under the workspace roots AND every declared xml root, and use
+            // every copy found. Only fall back to the baseline when no copy exists anywhere.
+            var copies = LocateInLayers(def.Path, roots, xmlRoots);
+            if (copies.Count == 0)
             {
-                var metafilePath = _fileHelper.FindInWorkspace(roots.ToList(), def.Path);
-                if (metafilePath is not null)
-                {
-                    var dir = _fileHelper.FileSystem.Path.GetDirectoryName(metafilePath)!;
-                    _eaWXmlContext.AddDirectory(dir);
-                    RegisterFromMetafile(metafilePath, def);
-                }
-                else
-                {
-                    FallbackFromBaseline(baseline, def, xmlRoots);
-                }
+                FallbackFromBaseline(baseline, def, xmlRoots);
+                continue;
             }
-            else // DirectContent
+
+            foreach (var path in copies)
             {
-                var contentPath = _fileHelper.FindInWorkspace(roots.ToList(), def.Path);
-                if (contentPath is not null)
-                {
-                    var dir = _fileHelper.FileSystem.Path.GetDirectoryName(contentPath)!;
-                    _eaWXmlContext.AddDirectory(dir);
-                    _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(contentPath),
-                        def.Types.ToImmutableArray());
-                }
-                else
-                {
-                    FallbackFromBaseline(baseline, def, xmlRoots);
-                }
+                _eaWXmlContext.AddDirectory(_fileHelper.FileSystem.Path.GetDirectoryName(path)!);
+                if (def.MetafileType == MetafileType.FileRegistry)
+                    RegisterFromMetafile(path, def, xmlRoots);
+                else // DirectContent: the file itself carries the type
+                    _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(path), def.Types.ToImmutableArray());
             }
         }
+    }
+
+    // Locates every existing copy of a metafile/content file (identified by its game-relative
+    // <paramref name="defPath" />) across the workspace roots and every declared xml root, so a
+    // metafile shipped by a dependency is found rather than silently missed.
+    private IReadOnlyList<string> LocateInLayers(
+        string defPath, IReadOnlyList<string> roots, IReadOnlyList<string> xmlRoots)
+    {
+        var found = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        void TryAdd(string? path)
+        {
+            if (string.IsNullOrEmpty(path) || !_fileHelper.FileSystem.File.Exists(path)) return;
+            if (seen.Add(_fileHelper.NormalizeUri(path)))
+                found.Add(path);
+        }
+
+        TryAdd(_fileHelper.FindInWorkspace(roots.ToList(), defPath));
+
+        // Metafiles live directly in the xml directory, keyed by the def's filename.
+        var fileName = _fileHelper.FileSystem.Path.GetFileName(defPath);
+        foreach (var xmlRoot in xmlRoots)
+            TryAdd(_fileHelper.FileSystem.Path.Combine(xmlRoot, fileName));
+
+        return found;
     }
 
     /// <summary>
@@ -225,7 +240,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 _fileHelper.FileSystem.Directory.EnumerateFiles(folder, "*", SearchOption.AllDirectories));
     }
 
-    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def)
+    private void RegisterFromMetafile(string metafilePath, MetafileDefinition def, IReadOnlyList<string> xmlRoots)
     {
         string xmlContent;
         try
@@ -249,41 +264,53 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             return;
         }
 
-        // All game entries live in the same directory as the metafile (e.g. DATA\XML\).
-        // Resolving relative to the metafile's directory works whether the workspace root
-        // is the game root (…/data/xml/foo.xml) or is the XML directory itself (…/foo.xml).
-        var metafileDir = _fileHelper.FileSystem.Path.GetDirectoryName(metafilePath) ?? string.Empty;
-
+        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
         var types = def.Types.ToImmutableArray();
         foreach (var elem in xdoc.Descendants()
                      .Where(e => e.Name.LocalName.Equals("File", StringComparison.OrdinalIgnoreCase)))
         {
             var filename = elem.Value.Trim();
             if (string.IsNullOrEmpty(filename)) continue;
-            var normalizedRel = _fileHelper.NormalizeGamePath(filename);
-            var entryName = _fileHelper.FileSystem.Path.GetFileName(
-                normalizedRel.Replace('/', _fileHelper.FileSystem.Path.DirectorySeparatorChar));
-            _fileTypeRegistry.RegisterFile(
-                _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(metafileDir, entryName)), types);
+
+            // Metafile entries are paths relative to the XML directory, but may be a bare filename,
+            // include subdirectories ("Units\Foo.xml"), or be fully qualified ("Data\XML\Foo.xml").
+            // Normalise to an xml-dir-relative path (subdirectories PRESERVED) and resolve it against
+            // EVERY xml root, so a mod's registry can type files that live in a dependency project and
+            // files in subdirectories are no longer dropped.
+            var rel = ToXmlRelativePath(_fileHelper.NormalizeGamePath(filename)).Replace('/', sep);
+            foreach (var xmlRoot in xmlRoots)
+                _fileTypeRegistry.RegisterFile(
+                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, rel)), types);
         }
     }
 
-    // pgproj mode: XML dirs point directly at the data folder, so only the filename portion of
-    // the baseline key is needed (mirrors RegisterFromMetafile). No heuristic workspace-root path.
+    // Falls back to the shipped baseline's file→type map when a metafile is absent from the workspace.
+    // Preserves subdirectories and resolves each key against every xml root (mirrors RegisterFromMetafile).
     private void FallbackFromBaseline(BaselineIndex baseline, MetafileDefinition def,
         IReadOnlyList<string> xmlRoots)
     {
         if (xmlRoots.Count == 0) return;
 
+        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
         foreach (var (relativePath, types) in baseline.FileTypeMap)
         {
             if (!types.Any(t => def.Types.Contains(t, StringComparer.OrdinalIgnoreCase))) continue;
 
-            var relSystemPath = relativePath.Replace('/', _fileHelper.FileSystem.Path.DirectorySeparatorChar);
-            var filename = _fileHelper.FileSystem.Path.GetFileName(relSystemPath);
+            var rel = ToXmlRelativePath(relativePath).Replace('/', sep);
             foreach (var xmlRoot in xmlRoots)
                 _fileTypeRegistry.RegisterFile(
-                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, filename)), types);
+                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, rel)), types);
         }
+    }
+
+    // Metafile entries and baseline keys come in two forms: xml-dir-relative ("units/foo.xml") or
+    // game-root-relative ("data/xml/units/foo.xml"). Strip the leading data/xml prefix when present so
+    // both collapse to an xml-dir-relative path, with any subdirectories preserved.
+    private static string ToXmlRelativePath(string normalizedGamePath)
+    {
+        const string xmlPrefix = "data/xml/";
+        return normalizedGamePath.StartsWith(xmlPrefix, StringComparison.Ordinal)
+            ? normalizedGamePath[xmlPrefix.Length..]
+            : normalizedGamePath;
     }
 }

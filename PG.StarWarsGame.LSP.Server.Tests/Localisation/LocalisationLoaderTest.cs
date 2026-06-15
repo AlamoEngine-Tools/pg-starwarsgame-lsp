@@ -66,34 +66,10 @@ public sealed class LocalisationLoaderTest
     }
 
     [Fact]
-    public async Task LoadAsync_CsvFileAutoDetectedFromModPath_WorkspaceKeyAppearsInIndex()
-    {
-        const string csvPath = "/mod/Data/Text/localisation.csv";
-        const string csvContent = "key,ENGLISH\nTEXT_AUTO_DETECT_KEY,Some Value";
-
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            [csvPath] = new(csvContent)
-        });
-
-        var config = new LspConfiguration
-        {
-            ModPaths = ["/mod"],
-            Localisation = new LocalisationConfig { ResourceType = "Csv" }
-        };
-
-        var (loader, indexService, _) = BuildLoader(fs, config);
-        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
-
-        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_AUTO_DETECT_KEY"));
-    }
-
-    [Fact]
     public async Task LoadAsync_NoLocalisationFilesFound_DoesNotThrowAndIndexIsNonNull()
     {
         var config = new LspConfiguration
         {
-            ModPaths = ["/mod"],
             Localisation = new LocalisationConfig { ResourceType = "Csv" }
         };
 
@@ -346,7 +322,6 @@ public sealed class LocalisationLoaderTest
     {
         var config = new LspConfiguration
         {
-            ModPaths = ["/mod"],
             Localisation = new LocalisationConfig { ResourceType = "Csv" }
         };
 

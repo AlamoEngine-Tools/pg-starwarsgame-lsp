@@ -47,7 +47,6 @@ public sealed class LspConfigurationProviderTest : IDisposable
 
         Assert.Null(provider.Current.GamePath);
         Assert.Equal("en", provider.Current.Locale);
-        Assert.Empty(provider.Current.ModPaths);
     }
 
     // ── init options extraction ──────────────────────────────────────────────
@@ -122,15 +121,6 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
     }
 
-    [Fact]
-    public void LoadFrom_WithModPaths_Extracted()
-    {
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { modPaths = new[] { "/mod/a", "/mod/b" } }));
-        Assert.Equal(2, provider.Current.ModPaths.Count);
-        Assert.Contains("/mod/a", provider.Current.ModPaths);
-    }
-
     // ── workspace config file ────────────────────────────────────────────────
 
     [Fact]
@@ -197,35 +187,6 @@ public sealed class LspConfigurationProviderTest : IDisposable
         provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
 
         Assert.Equal("de", provider.Current.Locale);
-    }
-
-    [Fact]
-    public void Merge_OverlayModPathsOverrideFile()
-    {
-        File.WriteAllText(
-            Path.Combine(_tempDir, ".pg-lsp.json"),
-            JsonSerializer.Serialize(new { ModPaths = new[] { "/file-mod" } }));
-
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        provider.LoadFrom(Json(new { workspaceRoot = _tempDir, modPaths = new[] { "/overlay-mod" } }));
-
-        Assert.Single(provider.Current.ModPaths);
-        Assert.Equal("/overlay-mod", provider.Current.ModPaths[0]);
-    }
-
-    [Fact]
-    public void Merge_EmptyOverlayModPaths_FileValueKept()
-    {
-        File.WriteAllText(
-            Path.Combine(_tempDir, ".pg-lsp.json"),
-            JsonSerializer.Serialize(new { ModPaths = new[] { "/from-file" } }));
-
-        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
-        // No modPaths in init options → overlay has empty list → file's value should be kept
-        provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
-
-        Assert.Single(provider.Current.ModPaths);
-        Assert.Equal("/from-file", provider.Current.ModPaths[0]);
     }
 
     // ── MockFileSystem tests ─────────────────────────────────────────────────

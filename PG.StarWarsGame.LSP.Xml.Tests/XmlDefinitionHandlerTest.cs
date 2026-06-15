@@ -131,6 +131,21 @@ public sealed class XmlDefinitionHandlerTest
         Assert.Null(result);
     }
 
+    [Fact]
+    public async Task Handle_SymbolWithGameRelativeFileOrigin_ReturnsNull()
+    {
+        // Baseline symbols carry a game-relative path (e.g. DATA\XML\…), not a file:// URI; the editor
+        // cannot open it, so go-to must return null rather than navigate to a nonexistent file.
+        var doc = DocWithRef(TestUri, "SFX_X", 0, 4, 5);
+        var symbol = new GameSymbol("SFX_X", GameSymbolKind.Asset, "SFXEvent",
+            new FileOrigin("DATA\\XML\\SFXEVENTSUNITSGROUND.XML", 0, 0), null);
+        var index = IndexWith(doc, symbol);
+        var handler = BuildHandler(index);
+
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
+        Assert.Null(result);
+    }
+
     // ── successful navigation ─────────────────────────────────────────────────
 
     [Fact]

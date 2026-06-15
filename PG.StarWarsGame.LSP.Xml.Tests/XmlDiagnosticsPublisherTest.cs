@@ -607,6 +607,23 @@ public sealed class XmlDiagnosticsPublisherTest
     }
 
     [Fact]
+    public void ToLspDiagnostic_WhenHandlerReturnsUnnecessaryTag_SetsDiagnosticTag_And_RemovalData()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribedWithHandlers(schema, [new UnnecessaryRemovableStubHandler()]);
+
+        workspaceHost.Set("file:///test.xml", "<Root><Priority>1.5</Priority></Root>");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diag = Assert.Single(published.Single().Diagnostics!);
+        Assert.NotNull(diag.Tags);
+        Assert.Contains(DiagnosticTag.Unnecessary, diag.Tags!);
+        Assert.True(diag.Data?["removeRedundantOverride"]?.Value<bool>());
+    }
+
+    [Fact]
     public void ToLspDiagnostic_WhenHandlerReturnsCreateLocKey_EmbedsCreateLocKey_In_DiagnosticData()
     {
         var schema = new FakeSchemaProvider();
@@ -783,6 +800,15 @@ public sealed class XmlDiagnosticsPublisherTest
         {
             return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "both set",
                 SuggestedFix: "suggested_fix", CreateLocalisationKey: fact.RawValue)];
+        }
+    }
+
+    private sealed class UnnecessaryRemovableStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "redundant override",
+                Tags: [XmlDiagnosticTag.Unnecessary], RemoveRedundantOverride: true)];
         }
     }
 
