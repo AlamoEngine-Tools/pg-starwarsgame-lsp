@@ -73,13 +73,35 @@ public sealed class GetEffectiveObjectHandlerTest
 
     private sealed class NullSchema : ISchemaProvider
     {
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
@@ -96,15 +118,15 @@ public sealed class GetEffectiveObjectHandlerTest
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
             new(StringComparer.OrdinalIgnoreCase);
 
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
+
         public FakeTagSource With(string id, params VariantTag[] tags)
         {
             _byId[id] = tags;
             return this;
-        }
-
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
-        {
-            return _byId.GetValueOrDefault(objectId);
         }
     }
 
@@ -117,15 +139,39 @@ public sealed class GetEffectiveObjectHandlerTest
 
         public GameIndex Current { get; }
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public void ApplyLocalisation(ILocalisationIndex index) { }
-        public void ApplyAssetFiles(IAssetFileIndex index) { }
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-        public IDisposable BeginBulkUpdate() => new NoopScope();
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return new NoopScope();
+        }
 
         public event Action<GameIndex>? IndexChanged
         {
@@ -135,7 +181,9 @@ public sealed class GetEffectiveObjectHandlerTest
 
         private sealed class NoopScope : IDisposable
         {
-            public void Dispose() { }
+            public void Dispose()
+            {
+            }
         }
     }
 }

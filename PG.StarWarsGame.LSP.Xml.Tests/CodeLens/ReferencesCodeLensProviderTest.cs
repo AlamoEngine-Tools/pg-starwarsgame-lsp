@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 
@@ -14,10 +13,14 @@ public sealed class ReferencesCodeLensProviderTest
     private const string RefUri = "file:///other.xml";
 
     private static GameSymbol SymAt(string id, int line)
-        => new(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(DocUri, line, null), null);
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(DocUri, line, null), null);
+    }
 
     private static GameReference Ref(string id, int line)
-        => new(id, GameSymbolKind.XmlObject, "Unit", RefUri, line, 0, 5);
+    {
+        return new GameReference(id, GameSymbolKind.XmlObject, "Unit", RefUri, line, 0, 5);
+    }
 
     private static GameIndex IndexWithRefs(GameSymbol symbol, params GameReference[] refs)
     {

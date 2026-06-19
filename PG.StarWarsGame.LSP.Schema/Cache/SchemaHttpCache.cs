@@ -22,7 +22,7 @@ public sealed class SchemaHttpCache
         _logger = logger;
         _dir = _fileHelper.FileSystem.Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-            ".pg-swg-lsp", "schema");
+            ".aetswg", "schema");
     }
 
     private string ChecksumPath => _fileHelper.FileSystem.Path.Combine(_dir, "_index.sha256");

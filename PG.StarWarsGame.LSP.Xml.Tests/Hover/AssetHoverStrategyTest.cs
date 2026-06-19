@@ -28,14 +28,14 @@ public sealed class AssetHoverStrategyTest
         var index = assetFiles is null
             ? GameIndex.Empty
             : new GameIndex(
-                BaselineIndex.Empty with { },
-                ImmutableDictionary<string, DocumentIndex>.Empty,
-                ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
-                ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
-            { AssetFiles = assetFiles };
+                    BaselineIndex.Empty with { },
+                    ImmutableDictionary<string, DocumentIndex>.Empty,
+                    ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+                    ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
+                { AssetFiles = assetFiles };
         return new HoverContext(DocUri, index, schema,
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
-            isOnTagName: false, line, character, "en");
+            false, line, character, "en");
     }
 
     private static StubSchemaProvider SchemaWithTag(
@@ -52,7 +52,9 @@ public sealed class AssetHoverStrategyTest
     }
 
     private static IAssetFileIndex WithLooseFile(string path)
-        => MergedAssetFileIndex.Merge([], [path]);
+    {
+        return MergedAssetFileIndex.Merge([], [path]);
+    }
 
     [Fact]
     public void Handle_IsOnTagName_ReturnsNull()
@@ -62,7 +64,7 @@ public sealed class AssetHoverStrategyTest
         XmlUtility.TryFindNode(hapDoc, 0, out var node);
         var ctx = new HoverContext(DocUri, GameIndex.Empty, new StubSchemaProvider(),
             hapDoc, rootNode!, node ?? new HtmlDocument().DocumentNode,
-            isOnTagName: true, 0, 1, "en");
+            true, 0, 1, "en");
         Assert.Null(new AssetHoverStrategy().Handle(ctx));
     }
 
@@ -120,18 +122,46 @@ public sealed class AssetHoverStrategyTest
         private readonly Dictionary<string, XmlTagDefinition> _tags =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void SetTag(string name, XmlTagDefinition tag) => _tags[name] = tag;
+        public XmlTagDefinition? GetTag(string name)
+        {
+            return _tags.GetValueOrDefault(name);
+        }
 
-        public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public GameObjectTypeDefinition? GetObjectType(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-        public EnumDefinition? GetEnum(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void SetTag(string name, XmlTagDefinition tag)
+        {
+            _tags[name] = tag;
+        }
     }
 }

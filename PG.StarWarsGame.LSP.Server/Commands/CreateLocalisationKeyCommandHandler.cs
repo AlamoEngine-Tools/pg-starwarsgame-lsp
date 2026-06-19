@@ -21,8 +21,8 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
     private const string XmlNs = "http://www.example.org/eaw-translation/";
 
     private readonly IFileHelper _fileHelper;
-    private readonly IModProjectReloadService _reloadService;
     private readonly ILogger<CreateLocalisationKeyCommandHandler> _logger;
+    private readonly IModProjectReloadService _reloadService;
 
     public CreateLocalisationKeyCommandHandler(
         IFileHelper fileHelper,
@@ -179,14 +179,10 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
         // build element
         var translationData = new XElement(ns + "TranslationData");
         if (translations is not null)
-        {
             foreach (var prop in translations.Properties())
-            {
                 translationData.Add(new XElement(ns + "Translation",
                     new XAttribute("Language", prop.Name),
                     prop.Value.Value<string>() ?? string.Empty));
-            }
-        }
 
         var newEntry = new XElement(ns + "Localisation",
             new XAttribute("key", keyName),
@@ -195,7 +191,7 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
         root.Add(newEntry);
 
         var sb = new StringBuilder();
-        using var writer = new System.IO.StringWriter(sb);
+        using var writer = new StringWriter(sb);
         xdoc.Save(writer);
         await fs.File.WriteAllTextAsync(filePath, sb.ToString(), ct);
         return true;

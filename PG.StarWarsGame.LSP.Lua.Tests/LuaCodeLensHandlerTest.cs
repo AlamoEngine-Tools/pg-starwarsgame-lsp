@@ -261,6 +261,10 @@ public sealed class LuaCodeLensHandlerTest
             return Task.CompletedTask;
         }
 
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
         public void RemoveDocument(string uri)
         {
         }

@@ -21,9 +21,9 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlInlayHintHandler> _logger;
+    private readonly IXmlInlayHintRegistry _registry;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
-    private readonly IXmlInlayHintRegistry _registry;
 
     public XmlInlayHintHandler(
         IGameWorkspaceHost workspaceHost,

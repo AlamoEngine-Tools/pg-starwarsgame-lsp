@@ -14,7 +14,9 @@ internal sealed class StandardTagNameStrategy : IXmlTagNameCompletionStrategy
     private readonly IFileTypeRegistry _fileTypeRegistry;
 
     public StandardTagNameStrategy(IFileTypeRegistry fileTypeRegistry)
-        => _fileTypeRegistry = fileTypeRegistry;
+    {
+        _fileTypeRegistry = fileTypeRegistry;
+    }
 
     public IEnumerable<CompletionItem> Handle(TagNameCompletionContext ctx)
     {

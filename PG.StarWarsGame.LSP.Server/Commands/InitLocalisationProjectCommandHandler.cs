@@ -9,12 +9,11 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -26,13 +25,13 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ICsvTranslationExporter _csvExporter;
-    private readonly IXmlTranslationExporter _xmlExporter;
-    private readonly IPropertiesTranslationExporter _nlsExporter;
     private readonly ITranslationDatabaseFactory _factory;
-    private readonly ILanguageService _langService;
     private readonly IFileHelper _fileHelper;
-    private readonly IModProjectReloadService _reloadService;
+    private readonly ILanguageService _langService;
     private readonly ILogger<InitLocalisationProjectCommandHandler> _logger;
+    private readonly IPropertiesTranslationExporter _nlsExporter;
+    private readonly IModProjectReloadService _reloadService;
+    private readonly IXmlTranslationExporter _xmlExporter;
 
     public InitLocalisationProjectCommandHandler(
         IBaselineTranslationProvider baselineProvider,
@@ -90,9 +89,11 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             var workspaceRoot = _reloadService.LastWorkspaceRoots?.FirstOrDefault();
             if (workspaceRoot is null)
             {
-                _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: multiple text roots but no workspace root available.");
+                _logger.LogWarning(
+                    "aet-eaw-edit.lsp.initLocalisationProject: multiple text roots but no workspace root available.");
                 return Unit.Value;
             }
+
             targetDir = fs.Path.Combine(workspaceRoot, "Data", "Text");
         }
         else
@@ -107,7 +108,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
         if (fs.File.Exists(targetPath))
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: '{Path}' already exists; not overwriting.", targetPath);
+            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: '{Path}' already exists; not overwriting.",
+                targetPath);
             return Unit.Value;
         }
 
@@ -117,11 +119,11 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
         var merged = _factory.CreateKeyed(languages);
         foreach (var entry in eawDb)
-            foreach (var kv in entry.Translations)
-                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var kv in entry.Translations)
+            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
         foreach (var entry in focDb)
-            foreach (var kv in entry.Translations)
-                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var kv in entry.Translations)
+            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
 
         var content = format.ToLowerInvariant() switch
         {
@@ -146,13 +148,16 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         return Unit.Value;
     }
 
-    private static string? FormatToFilename(string format) => format.ToLowerInvariant() switch
+    private static string? FormatToFilename(string format)
     {
-        "csv" => "MasterTextFile.csv",
-        "xml" => "MasterTextFile.xml",
-        "nls" => "MasterTextFile.properties",
-        _ => null
-    };
+        return format.ToLowerInvariant() switch
+        {
+            "csv" => "MasterTextFile.csv",
+            "xml" => "MasterTextFile.xml",
+            "nls" => "MasterTextFile.properties",
+            _ => null
+        };
+    }
 
     protected override ExecuteCommandRegistrationOptions CreateRegistrationOptions(
         ExecuteCommandCapability capability, ClientCapabilities clientCapabilities)

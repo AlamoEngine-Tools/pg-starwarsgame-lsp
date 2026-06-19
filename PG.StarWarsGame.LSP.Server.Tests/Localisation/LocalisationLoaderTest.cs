@@ -370,8 +370,7 @@ public sealed class LocalisationLoaderTest
                 NullLogger<GameIndexService>.Instance));
         services.AddSingleton<ILogger<LocalisationLoader>>(NullLogger<LocalisationLoader>.Instance);
         services.AddSingleton<LocalisationProjectRegistry>();
-        services.AddSingleton<ILocalisationProjectRegistry>(
-            sp => sp.GetRequiredService<LocalisationProjectRegistry>());
+        services.AddSingleton<ILocalisationProjectRegistry>(sp => sp.GetRequiredService<LocalisationProjectRegistry>());
 
         var sp = services.BuildServiceProvider();
         var loader = ActivatorUtilities.CreateInstance<LocalisationLoader>(sp);

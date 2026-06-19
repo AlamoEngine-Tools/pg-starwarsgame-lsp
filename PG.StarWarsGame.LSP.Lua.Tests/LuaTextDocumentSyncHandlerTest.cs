@@ -246,6 +246,10 @@ public sealed class LuaTextDocumentSyncHandlerTest
             return Task.CompletedTask;
         }
 
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
         public void RemoveDocument(string uri)
         {
             RemoveCalls.Add(uri);

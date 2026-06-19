@@ -273,14 +273,14 @@ public sealed class LuaHoverHandlerTest
         var path = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "script.lua");
         var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [path] = new MockFileData("require(\"SomeModule\")")
+            [path] = new("require(\"SomeModule\")")
         });
         var fileHelper = new FileHelper(fileSystem);
         var uri = fileHelper.PathToFileUri(path);
 
         var handler = new LuaHoverHandler(
             new FakeIndexService { Current = GameIndex.Empty },
-            new FakeWorkspaceHost(),  // empty — no document tracked
+            new FakeWorkspaceHost(), // empty — no document tracked
             fileHelper,
             new LuaApiSchemaProvider([]),
             NullLogger<LuaHoverHandler>.Instance);
@@ -307,6 +307,10 @@ public sealed class LuaHoverHandlerTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
         }
 
         public void RemoveDocument(string uri)

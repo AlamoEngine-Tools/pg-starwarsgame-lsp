@@ -20,9 +20,9 @@ namespace PG.StarWarsGame.LSP.Xml.Variants;
 public sealed class WorkspaceVariantTagSource : IVariantTagSource
 {
     private const string NameAttribute = "Name";
+    private readonly object _gate = new();
 
     private readonly IGameWorkspaceHost _host;
-    private readonly object _gate = new();
 
     private Dictionary<string, IReadOnlyList<VariantTag>> _byId = new(StringComparer.OrdinalIgnoreCase);
     private string? _signature;

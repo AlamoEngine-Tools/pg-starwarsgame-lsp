@@ -42,7 +42,7 @@ public sealed class XmlObjectRenameBuilderTest
         var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new MegArchiveOrigin("data.meg", "units.xml", 0, 0), null);
         var index = BuildIndex(
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
             SchemaWithUnit(), new FakeWorkspaceHost(), new FileHelper(new MockFileSystem()),
@@ -69,7 +69,7 @@ public sealed class XmlObjectRenameBuilderTest
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         var index = BuildIndex(
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
             SchemaWithUnit(), host, new FileHelper(new MockFileSystem()),
@@ -94,8 +94,8 @@ public sealed class XmlObjectRenameBuilderTest
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         var index = BuildIndex(
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [r]));
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [r]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
             SchemaWithUnit(), host, new FileHelper(new MockFileSystem()),
@@ -119,8 +119,8 @@ public sealed class XmlObjectRenameBuilderTest
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(XmlUri, "<Unit Name=\"UNIT_A\"/>", 1);
         var index = BuildIndex(
-            defs: ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [luaRef]));
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [luaRef]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
             SchemaWithUnit(), host, new FileHelper(new MockFileSystem()),
@@ -137,12 +137,19 @@ public sealed class XmlObjectRenameBuilderTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
@@ -152,17 +159,48 @@ public sealed class XmlObjectRenameBuilderTest
         private readonly Dictionary<string, GameObjectTypeDefinition> _types =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void RegisterType(GameObjectTypeDefinition def) => _types[def.TypeName] = def;
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void RegisterType(GameObjectTypeDefinition def)
+        {
+            _types[def.TypeName] = def;
+        }
     }
 }

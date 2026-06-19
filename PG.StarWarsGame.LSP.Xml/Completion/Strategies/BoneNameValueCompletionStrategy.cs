@@ -11,7 +11,9 @@ internal sealed class BoneNameValueCompletionStrategy : IXmlTagValueCompletionSt
     private readonly BoneNameCompletionHelper _boneHelper;
 
     public BoneNameValueCompletionStrategy(BoneNameCompletionHelper boneHelper)
-        => _boneHelper = boneHelper;
+    {
+        _boneHelper = boneHelper;
+    }
 
     public IEnumerable<CompletionItem> Handle(TagValueCompletionContext ctx)
     {

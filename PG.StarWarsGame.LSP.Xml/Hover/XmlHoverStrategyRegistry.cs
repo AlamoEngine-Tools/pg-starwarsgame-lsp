@@ -10,8 +10,12 @@ internal sealed class XmlHoverStrategyRegistry : IXmlHoverStrategyRegistry
     private readonly IReadOnlyList<IXmlHoverStrategy> _strategies;
 
     public XmlHoverStrategyRegistry(IEnumerable<IXmlHoverStrategy> strategies)
-        => _strategies = strategies.ToList();
+    {
+        _strategies = strategies.ToList();
+    }
 
     public Hover? Dispatch(HoverContext ctx)
-        => _strategies.Select(s => s.Handle(ctx)).FirstOrDefault(h => h is not null);
+    {
+        return _strategies.Select(s => s.Handle(ctx)).FirstOrDefault(h => h is not null);
+    }
 }

@@ -10,8 +10,12 @@ internal sealed class XmlInlayHintRegistry : IXmlInlayHintRegistry
     private readonly IReadOnlyList<IXmlInlayHintProvider> _providers;
 
     public XmlInlayHintRegistry(IEnumerable<IXmlInlayHintProvider> providers)
-        => _providers = providers.ToList();
+    {
+        _providers = providers.ToList();
+    }
 
     public IEnumerable<InlayHint> Dispatch(InlayHintContext ctx)
-        => _providers.SelectMany(p => p.Handle(ctx));
+    {
+        return _providers.SelectMany(p => p.Handle(ctx));
+    }
 }

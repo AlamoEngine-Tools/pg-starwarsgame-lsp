@@ -5,10 +5,10 @@ using System.IO.Abstractions.TestingHelpers;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeActions;
 
@@ -25,15 +25,15 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
     //  line 6:   </Unit>
     //  line 7: </Units>
     private const string Xml = """
-        <Units>
-          <Unit Name="Base">
-            <Max_Speed>1.0</Max_Speed>
-          </Unit>
-          <Unit Name="Derived" Variant_Of_Existing_Type="Base">
-            <Max_Speed>1.0</Max_Speed>
-          </Unit>
-        </Units>
-        """;
+                               <Units>
+                                 <Unit Name="Base">
+                                   <Max_Speed>1.0</Max_Speed>
+                                 </Unit>
+                                 <Unit Name="Derived" Variant_Of_Existing_Type="Base">
+                                   <Max_Speed>1.0</Max_Speed>
+                                 </Unit>
+                               </Units>
+                               """;
 
     private static RemoveRedundantOverrideCodeActionProvider BuildProvider(string xml)
     {
@@ -44,7 +44,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
 
     private static XmlCodeActionContext MakeCtx(int diagnosticLine, bool withMarker)
     {
-        JObject? data = withMarker ? new JObject { ["removeRedundantOverride"] = true } : null;
+        var data = withMarker ? new JObject { ["removeRedundantOverride"] = true } : null;
         var diagnostic = new Diagnostic
         {
             Range = new LspRange(new Position(diagnosticLine, 4), new Position(diagnosticLine, 13)),
@@ -58,7 +58,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
     public void No_marker_returns_empty()
     {
         var provider = BuildProvider(Xml);
-        Assert.Empty(provider.Handle(MakeCtx(diagnosticLine: 5, withMarker: false)));
+        Assert.Empty(provider.Handle(MakeCtx(5, false)));
     }
 
     [Fact]
@@ -66,7 +66,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
     {
         var provider = BuildProvider(Xml);
 
-        var action = Assert.Single(provider.Handle(MakeCtx(diagnosticLine: 5, withMarker: true)));
+        var action = Assert.Single(provider.Handle(MakeCtx(5, true)));
 
         Assert.Equal(CodeActionKind.QuickFix, action.CodeAction!.Kind);
         Assert.Contains("Max_Speed", action.CodeAction!.Title);
@@ -77,7 +77,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
     {
         var provider = BuildProvider(Xml);
 
-        var action = provider.Handle(MakeCtx(diagnosticLine: 5, withMarker: true)).Single();
+        var action = provider.Handle(MakeCtx(5, true)).Single();
         var edit = Assert.Single(action.CodeAction!.Edit!.Changes!.Values.First());
 
         Assert.Equal("", edit.NewText);
@@ -98,9 +98,15 @@ file sealed class FakeRemoveOverrideWorkspaceHost : IGameWorkspaceHost
         _text = text;
     }
 
-    public IEnumerable<TrackedDocument> All => [new TrackedDocument(_normalizedUri, _text, 1)];
-    public void AddOrUpdate(string uri, string text, int version) { }
-    public void Remove(string uri) { }
+    public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
+
+    public void AddOrUpdate(string uri, string text, int version)
+    {
+    }
+
+    public void Remove(string uri)
+    {
+    }
 
     public bool TryGet(string uri, out TrackedDocument doc)
     {

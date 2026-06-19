@@ -16,7 +16,7 @@ public sealed class BaselineLoaderTest
 {
     private static string CacheDir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".pg-swg-lsp", "baselines");
+        ".aetswg", "baselines");
 
     private static BaselineIndex MakeBaseline()
     {

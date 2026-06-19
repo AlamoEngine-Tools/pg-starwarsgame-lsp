@@ -264,21 +264,60 @@ public sealed class EffectiveObjectResolverTest
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
             new(StringComparer.OrdinalIgnoreCase);
 
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
+
         public FakeTagSource With(string id, params VariantTag[] tags)
         {
             _byId[id] = tags;
             return this;
-        }
-
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
-        {
-            return _byId.GetValueOrDefault(objectId);
         }
     }
 
     private sealed class FakeSchema : ISchemaProvider
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
+
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return _tags.GetValueOrDefault(tagName);
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
 
         public FakeSchema WithMode(string tag, VariantMode mode)
         {
@@ -294,31 +333,6 @@ public sealed class EffectiveObjectResolverTest
                 ReferenceKind = ReferenceKind.XmlObject, SemanticType = TagSemanticType.VariantParent
             };
             return this;
-        }
-
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return _tags.GetValueOrDefault(tagName);
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
         }
     }
 }

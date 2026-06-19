@@ -8,14 +8,12 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -222,12 +220,14 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static ExecuteCommandParams Request(string format) =>
-        new()
+    private static ExecuteCommandParams Request(string format)
+    {
+        return new ExecuteCommandParams
         {
             Command = InitLocalisationProjectCommandHandler.CommandName,
             Arguments = new JArray(JObject.FromObject(new { format }))
         };
+    }
 
     private static string ReadOutput(MockFileSystem fs, string fileName)
     {
@@ -286,8 +286,10 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         public WorkspaceConfiguration? LastWorkspaceConfig { get; init; }
         public IReadOnlyList<string>? LastWorkspaceRoots { get; init; }
 
-        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
         public Task ReloadAsync(CancellationToken ct)
         {

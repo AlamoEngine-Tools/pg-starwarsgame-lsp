@@ -30,7 +30,7 @@ public sealed class EffectiveObjectResolver
     {
         var root = _index.Resolve(objectId);
         if (root is null)
-            return new EffectiveObject(objectId, null, Found: false, Cyclic: false, null,
+            return new EffectiveObject(objectId, null, false, false, null,
                 ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
 
         var (chain, cyclic, cycleAt) = BuildChain(root);
@@ -59,7 +59,7 @@ public sealed class EffectiveObjectResolver
             .Select(name => ToEffectiveTag(state[name], root.Id, single))
             .ToImmutableArray();
 
-        return new EffectiveObject(root.Id, root.TypeName, Found: true, cyclic, cycleAt,
+        return new EffectiveObject(root.Id, root.TypeName, true, cyclic, cycleAt,
             chain.Select(c => c.Id).ToImmutableArray(), tags);
     }
 
@@ -134,7 +134,7 @@ public sealed class EffectiveObjectResolver
             order.Add(tag.TagName);
 
         state[tag.TagName] = new Accum(tag.TagName, value, fragment, layerId, tag.Origin, mode,
-            EverInBase: hadPrev || (prev?.EverInBase ?? false));
+            hadPrev || (prev?.EverInBase ?? false));
     }
 
     private static EffectiveTag ToEffectiveTag(Accum a, string topId, bool single)

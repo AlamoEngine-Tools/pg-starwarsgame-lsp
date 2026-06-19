@@ -41,7 +41,8 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         var hit = XmlPositionResolver.FindAtPosition(docIndex, request.Position.Line, request.Position.Character);
         if (hit is null) return null;
 
-        return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _workspaceHost, _fileHelper, _logger);
+        return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _workspaceHost, _fileHelper,
+            _logger);
     }
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
@@ -52,14 +53,8 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         var hit = XmlPositionResolver.FindAtPosition(docIndex, line, character);
         if (hit is null) return null;
 
-        if (IsBlockedByArchiveOrigin(hit.Value.Id, index)) return null;
+        if (!index.IsLeafOwned(hit.Value.Id)) return null;
 
         return new RangeOrPlaceholderRange(hit.Value.Range);
-    }
-
-    private static bool IsBlockedByArchiveOrigin(string id, GameIndex index)
-    {
-        return index.WorkspaceDefinitions.TryGetValue(id, out var defs) &&
-               defs.Any(s => s.Origin is not FileOrigin);
     }
 }

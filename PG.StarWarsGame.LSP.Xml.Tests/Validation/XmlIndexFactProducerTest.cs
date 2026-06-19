@@ -191,4 +191,106 @@ public sealed class XmlIndexFactProducerTest
         Assert.Equal("Missing", f.TargetId);
         Assert.Null(f.Resolved);
     }
+
+    [Fact]
+    public void SameLayerDifferentType_SameId_DoesNotEmitDuplicateFact()
+    {
+        // Two symbols with the same ID but different TypeNames in the same layer.
+        // The engine allows this; cross-type same-ID is a shadow (warning), not a duplicate (error).
+        var faction = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("file:///leaf/factions.xml", 0, 0), null);
+        var unit = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin("file:///leaf/units.xml", 0, 0), null);
+
+        var factionDoc = new DocumentIndex("file:///leaf/factions.xml", 1,
+            ImmutableArray.Create(faction), ImmutableArray<GameReference>.Empty,
+            LayerRank: 1, LayerName: "Leaf");
+        var unitDoc = new DocumentIndex("file:///leaf/units.xml", 1,
+            ImmutableArray.Create(unit), ImmutableArray<GameReference>.Empty,
+            LayerRank: 1, LayerName: "Leaf");
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("REBEL", ImmutableArray.Create(faction, unit));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///leaf/factions.xml", factionDoc)
+                .Add("file:///leaf/units.xml", unitDoc),
+            defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        Assert.DoesNotContain(Sut.Produce("file:///leaf/factions.xml", index), f => f is XmlSymbolFact);
+        Assert.DoesNotContain(Sut.Produce("file:///leaf/units.xml", index), f => f is XmlSymbolFact);
+    }
+
+    [Fact]
+    public void TypedReference_ResolvesPreferMatchingTypeName()
+    {
+        // A reference that declares ExpectedTypeName="Faction" should resolve to the Faction
+        // definition even when a higher-ranked SpaceUnit with the same ID exists.
+        var faction = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("file:///dep/factions.xml", 0, 0), null);
+        var unit = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin("file:///leaf/units.xml", 0, 0), null);
+
+        var factionDoc = new DocumentIndex("file:///dep/factions.xml", 1,
+            ImmutableArray.Create(faction), ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var unitDoc = new DocumentIndex("file:///leaf/units.xml", 1,
+            ImmutableArray.Create(unit), ImmutableArray<GameReference>.Empty, LayerRank: 1);
+
+        // The reference is in a third document
+        var reference = new GameReference("REBEL", GameSymbolKind.XmlObject, "Faction",
+            "file:///leaf/refs.xml", 5, 0, 5);
+        var refDoc = new DocumentIndex("file:///leaf/refs.xml", 1,
+            ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(reference), LayerRank: 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("REBEL", ImmutableArray.Create(faction, unit));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/factions.xml", factionDoc)
+                .Add("file:///leaf/units.xml", unitDoc)
+                .Add("file:///leaf/refs.xml", refDoc),
+            defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var facts = Sut.Produce("file:///leaf/refs.xml", index).OfType<XmlReferenceFact>().ToList();
+        var f = Assert.Single(facts);
+        Assert.NotNull(f.Resolved);
+        Assert.Equal("Faction", f.Resolved!.TypeName);
+    }
+
+    [Fact]
+    public void TypedReference_FallsBackToUntypedWhenNoTypeMatch()
+    {
+        // When no symbol with the expected TypeName exists, fall back to the untyped winner
+        // so TypeMismatchHandler fires rather than UnresolvedReferenceHandler.
+        var unit = new GameSymbol("REBEL", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin("file:///leaf/units.xml", 0, 0), null);
+        var unitDoc = new DocumentIndex("file:///leaf/units.xml", 1,
+            ImmutableArray.Create(unit), ImmutableArray<GameReference>.Empty, LayerRank: 1);
+
+        // Reference expects "Planet" but no Planet exists
+        var reference = new GameReference("REBEL", GameSymbolKind.XmlObject, "Planet",
+            "file:///leaf/refs.xml", 5, 0, 5);
+        var refDoc = new DocumentIndex("file:///leaf/refs.xml", 1,
+            ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(reference), LayerRank: 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("REBEL", ImmutableArray.Create(unit));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///leaf/units.xml", unitDoc)
+                .Add("file:///leaf/refs.xml", refDoc),
+            defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var facts = Sut.Produce("file:///leaf/refs.xml", index).OfType<XmlReferenceFact>().ToList();
+        var f = Assert.Single(facts);
+        // Not null: falls back to untyped SpaceUnit; TypeMismatchHandler will handle the mismatch
+        Assert.NotNull(f.Resolved);
+        Assert.Equal("SpaceUnit", f.Resolved!.TypeName);
+    }
 }

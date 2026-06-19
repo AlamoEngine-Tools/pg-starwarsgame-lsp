@@ -26,7 +26,7 @@ if (waitForDebugger)
 #if DEBUG
 Log.Logger = new LoggerConfiguration()
     .Enrich.FromLogContext()
-    .WriteTo.File("pg-swg-lsp-.log", rollingInterval: RollingInterval.Day)
+    .WriteTo.File("aetswg-.log", rollingInterval: RollingInterval.Day)
     .MinimumLevel.Debug()
     .CreateLogger();
 #endif

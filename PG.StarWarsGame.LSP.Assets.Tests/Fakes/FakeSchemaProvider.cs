@@ -14,6 +14,9 @@ internal sealed class FakeSchemaProvider : ISchemaProvider
         _knownTypes = new HashSet<string>(knownTypeNames, StringComparer.OrdinalIgnoreCase);
     }
 
+    /// <summary>Tag names that <see cref="GetTag" /> should report as <c>VariantParent</c> tags.</summary>
+    public HashSet<string> VariantTagNames { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public event EventHandler? SchemaRefreshed
     {
         add { }
@@ -25,9 +28,6 @@ internal sealed class FakeSchemaProvider : ISchemaProvider
     public IReadOnlyList<EnumDefinition> AllEnums => [];
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-    /// <summary>Tag names that <see cref="GetTag" /> should report as <c>VariantParent</c> tags.</summary>
-    public HashSet<string> VariantTagNames { get; } = new(StringComparer.OrdinalIgnoreCase);
 
     public XmlTagDefinition? GetTag(string tagName)
     {

@@ -10,8 +10,12 @@ internal sealed class XmlTagValueCompletionStrategyRegistry : IXmlTagValueComple
     private readonly IReadOnlyList<IXmlTagValueCompletionStrategy> _strategies;
 
     public XmlTagValueCompletionStrategyRegistry(IEnumerable<IXmlTagValueCompletionStrategy> strategies)
-        => _strategies = strategies.ToList();
+    {
+        _strategies = strategies.ToList();
+    }
 
     public IEnumerable<CompletionItem> GetCompletions(TagValueCompletionContext ctx)
-        => _strategies.SelectMany(s => s.Handle(ctx));
+    {
+        return _strategies.SelectMany(s => s.Handle(ctx));
+    }
 }

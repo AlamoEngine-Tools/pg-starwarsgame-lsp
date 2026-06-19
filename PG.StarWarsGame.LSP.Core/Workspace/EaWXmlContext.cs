@@ -10,6 +10,7 @@ public sealed class EaWXmlContext : IEaWXmlContext
 {
     private readonly IFileHelper _fileHelper;
     private ImmutableHashSet<string> _directories = ImmutableHashSet<string>.Empty;
+    private ImmutableHashSet<string> _leafDirectories = ImmutableHashSet<string>.Empty;
 
     public EaWXmlContext(IFileHelper fileHelper)
     {
@@ -28,6 +29,12 @@ public sealed class EaWXmlContext : IEaWXmlContext
         if (normalized.Contains("/ai/", StringComparison.Ordinal)) return false;
 
         return _directories.Any(dir => normalized.StartsWith(dir, StringComparison.Ordinal));
+    }
+
+    public bool IsLeafFile(string fileUri)
+    {
+        var normalized = _fileHelper.NormalizeUri(fileUri);
+        return _leafDirectories.Any(dir => normalized.StartsWith(dir, StringComparison.Ordinal));
     }
 
     public void AddDirectory(string absolutePath)
@@ -51,5 +58,19 @@ public sealed class EaWXmlContext : IEaWXmlContext
         }
 
         Volatile.Write(ref _directories, next);
+    }
+
+    public void SetLeafDirectories(IEnumerable<string> absolutePaths)
+    {
+        var next = ImmutableHashSet<string>.Empty;
+        foreach (var path in absolutePaths)
+        {
+            var uri = path.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                ? _fileHelper.NormalizeUri(path)
+                : _fileHelper.PathToFileUri(path);
+            next = next.Add(uri.TrimEnd('/') + '/');
+        }
+
+        Volatile.Write(ref _leafDirectories, next);
     }
 }

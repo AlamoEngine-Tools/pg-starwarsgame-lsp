@@ -493,6 +493,10 @@ fabric.properties
 
 # End of https://www.toptal.com/developers/gitignore/api/csharp,rider,visualstudiocode
 
+# AET tool cache directories (project-local and home); teams may opt in to sharing
+# project-local caches by removing the .aetswg/ line from their project's .aetswg/.gitignore
+.aetswg/
+
 # ignore the schema dir and shcema generator scripts
 /schema
 /baseline

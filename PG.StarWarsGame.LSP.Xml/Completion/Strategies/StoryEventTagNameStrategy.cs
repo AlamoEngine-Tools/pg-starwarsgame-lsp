@@ -44,7 +44,9 @@ internal sealed class StoryEventTagNameStrategy : IXmlTagNameCompletionStrategy
         {
             var paramCount = eventDef.Params is null
                 ? MaxEventParamSlots
-                : eventDef.Params.Count > 0 ? eventDef.Params.Max(p => p.Position) + 1 : 0;
+                : eventDef.Params.Count > 0
+                    ? eventDef.Params.Max(p => p.Position) + 1
+                    : 0;
             for (var i = 1; i <= paramCount; i++)
                 candidates.Add($"Event_Param{i}");
         }
@@ -53,7 +55,9 @@ internal sealed class StoryEventTagNameStrategy : IXmlTagNameCompletionStrategy
         {
             var paramCount = rewardDef.Params is null
                 ? MaxRewardParamSlots
-                : rewardDef.Params.Count > 0 ? rewardDef.Params.Max(p => p.Position) + 1 : 0;
+                : rewardDef.Params.Count > 0
+                    ? rewardDef.Params.Max(p => p.Position) + 1
+                    : 0;
             for (var i = 1; i <= paramCount; i++)
                 candidates.Add($"Reward_Param{i}");
         }

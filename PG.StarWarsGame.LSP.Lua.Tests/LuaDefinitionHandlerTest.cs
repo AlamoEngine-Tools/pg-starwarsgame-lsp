@@ -229,8 +229,8 @@ public sealed class LuaDefinitionHandlerTest
         var targetPath = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "foo", "bar.lua");
         var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [scriptPath] = new MockFileData("require(\"foo/bar\")"),
-            [targetPath] = new MockFileData("-- bar module")
+            [scriptPath] = new("require(\"foo/bar\")"),
+            [targetPath] = new("-- bar module")
         });
         var fileHelper = new FileHelper(fileSystem);
         var scriptUri = fileHelper.PathToFileUri(scriptPath);
@@ -285,6 +285,10 @@ public sealed class LuaDefinitionHandlerTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
         }
 
         public void RemoveDocument(string uri)

@@ -32,10 +32,14 @@ public sealed class ReferenceHoverStrategyTest
     }
 
     private static GameReference Ref(int line, int col, int len)
-        => new("EMPIRE", GameSymbolKind.XmlObject, "Faction", DocUri, line, col, len);
+    {
+        return new GameReference("EMPIRE", GameSymbolKind.XmlObject, "Faction", DocUri, line, col, len);
+    }
 
     private static GameSymbol Symbol(string typeName)
-        => new("EMPIRE", GameSymbolKind.XmlObject, typeName, new FileOrigin(OtherUri, 0, null), null);
+    {
+        return new GameSymbol("EMPIRE", GameSymbolKind.XmlObject, typeName, new FileOrigin(OtherUri, 0, null), null);
+    }
 
     private static GameIndex IndexWith(GameReference? reference, GameSymbol? symbol)
     {
@@ -94,7 +98,7 @@ public sealed class ReferenceHoverStrategyTest
         var strategy = new ReferenceHoverStrategy();
         var schema = SchemaWithType("Faction");
         var index = IndexWith(Ref(1, 13, 6), Symbol("Faction")); // ref at col 13-18
-        var ctx = MakeCtx(index, schema: schema, line: 1, character: 14);
+        var ctx = MakeCtx(index, schema, line: 1, character: 14);
 
         var hover = strategy.Handle(ctx);
 
@@ -118,7 +122,7 @@ public sealed class ReferenceHoverStrategyTest
     {
         var strategy = new ReferenceHoverStrategy();
         var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"));
-        var ctx = MakeCtx(index, schema: new StubSchemaProvider(), line: 1, character: 14);
+        var ctx = MakeCtx(index, new StubSchemaProvider(), line: 1, character: 14);
         Assert.Null(strategy.Handle(ctx));
     }
 
@@ -128,18 +132,46 @@ public sealed class ReferenceHoverStrategyTest
     {
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new();
 
-        public void AddType(GameObjectTypeDefinition type) => _types[type.TypeName] = type;
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
 
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-        public EnumDefinition? GetEnum(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void AddType(GameObjectTypeDefinition type)
+        {
+            _types[type.TypeName] = type;
+        }
     }
 }

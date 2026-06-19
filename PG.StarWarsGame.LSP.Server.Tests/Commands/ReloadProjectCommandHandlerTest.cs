@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -25,7 +26,7 @@ public sealed class ReloadProjectCommandHandlerTest
         public int ReloadCallCount { get; private set; }
 
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public PG.StarWarsGame.LSP.Core.Workspace.WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public WorkspaceConfiguration? LastWorkspaceConfig => null;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

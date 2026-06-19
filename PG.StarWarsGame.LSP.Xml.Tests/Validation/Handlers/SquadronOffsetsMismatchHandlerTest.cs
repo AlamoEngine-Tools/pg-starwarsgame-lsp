@@ -15,14 +15,14 @@ public sealed class SquadronOffsetsMismatchHandlerTest
         return new SquadronOffsetsMismatchFact(
             "file:///test.xml", 0, 0, 8,
             totalUnits, totalOffsets,
-            UnitTagLocations: [],
-            OffsetTagLocations: []);
+            [],
+            []);
     }
 
     [Fact]
     public void Too_few_offsets_returns_warning_with_add_message()
     {
-        var fact = MakeFact(totalUnits: 5, totalOffsets: 2);
+        var fact = MakeFact(5, 2);
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
@@ -34,7 +34,7 @@ public sealed class SquadronOffsetsMismatchHandlerTest
     [Fact]
     public void Too_many_offsets_returns_warning_with_remove_message()
     {
-        var fact = MakeFact(totalUnits: 3, totalOffsets: 7);
+        var fact = MakeFact(3, 7);
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
@@ -46,7 +46,7 @@ public sealed class SquadronOffsetsMismatchHandlerTest
     [Fact]
     public void Zero_offsets_returns_warning_with_add_all_message()
     {
-        var fact = MakeFact(totalUnits: 4, totalOffsets: 0);
+        var fact = MakeFact(4, 0);
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
@@ -56,7 +56,7 @@ public sealed class SquadronOffsetsMismatchHandlerTest
     [Fact]
     public void Handler_sets_SquadronSyncJson_with_expected_offsets()
     {
-        var fact = MakeFact(totalUnits: 5, totalOffsets: 2);
+        var fact = MakeFact(5, 2);
         var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.NotNull(d.SquadronSyncJson);

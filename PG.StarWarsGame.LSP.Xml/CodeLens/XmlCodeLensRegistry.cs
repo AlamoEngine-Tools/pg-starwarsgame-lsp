@@ -10,8 +10,12 @@ internal sealed class XmlCodeLensRegistry : IXmlCodeLensRegistry
     private readonly IReadOnlyList<IXmlCodeLensProvider> _providers;
 
     public XmlCodeLensRegistry(IEnumerable<IXmlCodeLensProvider> providers)
-        => _providers = providers.ToList();
+    {
+        _providers = providers.ToList();
+    }
 
     public IEnumerable<LspCodeLens> Dispatch(CodeLensSymbolContext ctx)
-        => _providers.Select(p => p.Handle(ctx)).Where(l => l is not null).Select(l => l!);
+    {
+        return _providers.Select(p => p.Handle(ctx)).Where(l => l is not null).Select(l => l!);
+    }
 }

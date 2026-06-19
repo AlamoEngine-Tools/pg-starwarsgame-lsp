@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Variants;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
@@ -16,6 +15,7 @@ using PG.StarWarsGame.LSP.Xml.InlayHints;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
+using PG.StarWarsGame.LSP.Xml.Variants;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -206,6 +206,11 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();
+
+        // Layer-shadow and cross-type shadow warnings
+        services.AddSingleton<IXmlLayerShadowFactProducer, XmlLayerShadowFactProducer>();
+        services.AddSingleton<IXmlDiagnosticsHandler, CrossLayerShadowHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, CrossTypeShadowHandler>();
 
         return services;
     }

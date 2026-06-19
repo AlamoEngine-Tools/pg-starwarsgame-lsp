@@ -43,5 +43,7 @@ public sealed class SquadronOffsetsRule : IXmlCrossTagRule
     }
 
     private static (int Line, int Column, int Length) ToLocation(HtmlNode n)
-        => (XmlUtility.GetLine(n), XmlUtility.GetTagBracketColumn(n), XmlUtility.GetOpeningTagLength(n));
+    {
+        return (XmlUtility.GetLine(n), XmlUtility.GetTagBracketColumn(n), XmlUtility.GetOpeningTagLength(n));
+    }
 }

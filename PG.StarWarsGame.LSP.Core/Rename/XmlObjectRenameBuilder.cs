@@ -18,18 +18,16 @@ public static class XmlObjectRenameBuilder
         string id, string newName, GameIndex index, ISchemaProvider schema,
         IGameWorkspaceHost workspaceHost, IFileHelper fileHelper, ILogger logger)
     {
-        // Block rename if any definition is not workspace-owned.
-        if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
-            if (defs.Any(s => s.Origin is not FileOrigin))
-            {
-                logger.LogDebug("Rename blocked: {Id} has non-FileOrigin definition", id);
-                return null;
-            }
+        if (!index.IsLeafOwned(id))
+        {
+            logger.LogDebug("Rename blocked: {Id} is not exclusively defined in the leaf layer", id);
+            return null;
+        }
 
         var changes = new Dictionary<DocumentUri, List<TextEdit>>();
 
         // XML definition edits — locate the name-attribute value in the definition file.
-        if (index.WorkspaceDefinitions.TryGetValue(id, out defs))
+        if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
             foreach (var sym in defs)
             {
                 if (sym.Origin is not FileOrigin fo) continue;

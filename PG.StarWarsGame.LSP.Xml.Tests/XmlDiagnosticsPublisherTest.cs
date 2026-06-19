@@ -789,8 +789,11 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
         {
-            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "missing loc key",
-                CreateLocalisationKey: fact.RawValue)];
+            return
+            [
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "missing loc key",
+                    CreateLocalisationKey: fact.RawValue)
+            ];
         }
     }
 
@@ -798,8 +801,11 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
         {
-            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "both set",
-                SuggestedFix: "suggested_fix", CreateLocalisationKey: fact.RawValue)];
+            return
+            [
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, "both set",
+                    SuggestedFix: "suggested_fix", CreateLocalisationKey: fact.RawValue)
+            ];
         }
     }
 
@@ -807,8 +813,11 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
         {
-            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "redundant override",
-                Tags: [XmlDiagnosticTag.Unnecessary], RemoveRedundantOverride: true)];
+            return
+            [
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "redundant override",
+                    Tags: [XmlDiagnosticTag.Unnecessary], RemoveRedundantOverride: true)
+            ];
         }
     }
 
@@ -884,6 +893,10 @@ public sealed class XmlDiagnosticsPublisherTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
         }
 
         public void RemoveDocument(string uri)

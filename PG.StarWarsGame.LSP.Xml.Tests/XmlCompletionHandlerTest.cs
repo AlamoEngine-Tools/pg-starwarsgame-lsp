@@ -59,8 +59,8 @@ public sealed class XmlCompletionHandlerTest
         ]);
 
         return (new XmlCompletionHandler(host, schema, indexService, fileTypeReg,
-                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
-                tagNameRegistry, tagValueRegistry), host, schema, proposals);
+            new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
+            tagNameRegistry, tagValueRegistry), host, schema, proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -1298,6 +1298,10 @@ public sealed class XmlCompletionHandlerTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
         }
 
         public void RemoveDocument(string uri)

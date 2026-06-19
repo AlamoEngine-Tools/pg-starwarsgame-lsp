@@ -47,12 +47,14 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         // Try game-object reference first (cursor on a string literal whose value is a known XmlObject).
         var xmlObjectId = FindXmlObjectAtCursor(text, request.Position.Line, request.Position.Character, index);
         if (xmlObjectId is not null)
-            return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _workspaceHost, _fileHelper, _logger);
+            return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _workspaceHost,
+                _fileHelper, _logger);
 
         // Fall back to Lua global (cursor on an identifier that is a known LuaGlobal).
         var luaGlobalId = FindLuaGlobalAtCursor(text, request.Position.Line, request.Position.Character, index);
         if (luaGlobalId is not null)
-            return LuaGlobalRenameBuilder.Build(luaGlobalId, request.NewName, index, _workspaceHost, _fileHelper, _logger);
+            return LuaGlobalRenameBuilder.Build(luaGlobalId, request.NewName, index, _workspaceHost, _fileHelper,
+                _logger);
 
         return null;
     }
@@ -65,7 +67,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
             var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
             if (hit is not null)
             {
-                if (IsBlockedByArchiveOrigin(hit.Value.Id, index)) return null;
+                if (!index.IsLeafOwned(hit.Value.Id)) return null;
 
                 var range = hit.Value.Range;
                 // Zero-length means cursor is on a declaration; extend by the symbol name length.
@@ -107,7 +109,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
             if (character < innerStart || character > innerEnd) continue;
 
             if (!IsKnownXmlObject(value, index)) continue;
-            if (IsBlockedByArchiveOrigin(value, index)) return null;
+            if (!index.IsLeafOwned(value)) return null;
 
             return new RangeOrPlaceholderRange(new LspRange(
                 new Position(line, innerStart),
@@ -166,12 +168,6 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
     {
         return index.WorkspaceDefinitions.TryGetValue(name, out var defs) &&
                defs.Any(s => s.Kind == GameSymbolKind.LuaGlobal);
-    }
-
-    private static bool IsBlockedByArchiveOrigin(string id, GameIndex index)
-    {
-        return index.WorkspaceDefinitions.TryGetValue(id, out var defs) &&
-               defs.Any(s => s.Origin is not FileOrigin);
     }
 
     private static bool LocationContainsPosition(LorLocation location, int line, int character)

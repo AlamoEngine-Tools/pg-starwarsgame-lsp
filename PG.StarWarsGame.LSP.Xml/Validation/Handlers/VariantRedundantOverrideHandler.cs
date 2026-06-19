@@ -7,7 +7,8 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class VariantRedundantOverrideHandler : XmlDiagnosticsHandler<VariantRedundantOverrideFact>
 {
-    protected override IEnumerable<XmlDiagnosticResult> Handle(VariantRedundantOverrideFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> Handle(VariantRedundantOverrideFact fact,
+        DiagnosticsContext ctx)
     {
         return
         [

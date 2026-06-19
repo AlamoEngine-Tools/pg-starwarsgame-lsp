@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -58,6 +59,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new FileTypeRegistry(),
             new FakeSchemaProvider(),
             new EaWXmlContext(fileHelper),
+            new NullProjectIndexCache(),
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
@@ -218,7 +220,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         public int ReloadCount { get; private set; }
 
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public PG.StarWarsGame.LSP.Core.Workspace.WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public WorkspaceConfiguration? LastWorkspaceConfig => null;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -293,6 +295,10 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
             Updates.Add((uri, text));
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
         }
 
         public void RemoveDocument(string uri)

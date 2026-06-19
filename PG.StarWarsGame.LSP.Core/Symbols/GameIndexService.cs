@@ -126,6 +126,32 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    public void InjectDocument(DocumentIndex document)
+    {
+        var uri = NormalizeUri(document.DocumentUri);
+        if (document.DocumentUri != uri)
+            document = document with { DocumentUri = uri };
+
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            var existing = snapshot.Documents.GetValueOrDefault(uri);
+            if (existing is not null && existing.Version > document.Version)
+            {
+                _logger.LogDebug("Dropping injected document for {Uri}: committed v{Current} is newer",
+                    uri, existing.Version);
+                return;
+            }
+
+            updated = ApplyDocumentIndex(snapshot, document);
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        _logger.LogDebug("Injected {Uri} ({Symbols} symbols, {Refs} refs)",
+            uri, document.Symbols.Length, document.References.Length);
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
     public void RemoveDocument(string uri)
     {
         uri = NormalizeUri(uri);

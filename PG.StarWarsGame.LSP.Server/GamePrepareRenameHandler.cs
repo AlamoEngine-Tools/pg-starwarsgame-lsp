@@ -36,9 +36,11 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
         var index = _indexService.Current;
 
         if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(_xmlProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character, index));
+            return Task.FromResult(_xmlProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character,
+                index));
         if (uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(_luaProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character, index));
+            return Task.FromResult(_luaProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character,
+                index));
 
         return Task.FromResult<RangeOrPlaceholderRange?>(null);
     }

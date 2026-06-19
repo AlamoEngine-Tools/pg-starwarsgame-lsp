@@ -10,8 +10,12 @@ internal sealed class XmlCodeActionRegistry : IXmlCodeActionRegistry
     private readonly IReadOnlyList<IXmlCodeActionProvider> _providers;
 
     public XmlCodeActionRegistry(IEnumerable<IXmlCodeActionProvider> providers)
-        => _providers = providers.ToList();
+    {
+        _providers = providers.ToList();
+    }
 
     public IEnumerable<CommandOrCodeAction> Dispatch(XmlCodeActionContext ctx)
-        => _providers.SelectMany(p => p.Handle(ctx));
+    {
+        return _providers.SelectMany(p => p.Handle(ctx));
+    }
 }

@@ -22,18 +22,22 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             if (!index.WorkspaceDefinitions.TryGetValue(sym.Id, out var all) || all.Length <= 1)
                 continue;
 
-            // Only a collision WITHIN the same project layer is a duplicate. Definitions from other
-            // layers (a dependency vs the workspace) are valid overrides, surfaced as a code lens
-            // (see OverrideCodeLensProvider), not a diagnostic — so they are excluded here.
+            // Only a collision WITHIN the same project layer AND same TypeName is a duplicate.
+            // Cross-layer definitions are valid overrides (surfaced as code lens, not diagnostic).
+            // Cross-type definitions (same ID, different TypeName) are shadows, not duplicates —
+            // the engine allows distinct types to share an ID; they are warned separately.
             var myRank = index.LayerRankOf(sym);
             var sameLayer = all.Where(s => index.LayerRankOf(s) == myRank).ToList();
-            if (sameLayer.Count > 1)
-                facts.Add(new XmlSymbolFact(documentUri, fo.Line, fo.Column ?? 0, 0, sym.Id, sameLayer));
+            var sameTypeSameLayer = sameLayer
+                .Where(s => string.Equals(s.TypeName, sym.TypeName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (sameTypeSameLayer.Count > 1)
+                facts.Add(new XmlSymbolFact(documentUri, fo.Line, fo.Column ?? 0, 0, sym.Id, sameTypeSameLayer));
         }
 
         foreach (var reference in doc.References)
         {
-            var resolved = index.Resolve(reference.TargetId);
+            var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
             facts.Add(new XmlReferenceFact(
                 documentUri,
                 reference.Line,

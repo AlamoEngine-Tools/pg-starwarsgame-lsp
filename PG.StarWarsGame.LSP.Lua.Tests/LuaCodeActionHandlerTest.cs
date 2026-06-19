@@ -370,7 +370,7 @@ public sealed class LuaCodeActionHandlerTest
         var path = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "s.lua");
         var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            [path] = new MockFileData(docText)
+            [path] = new(docText)
         });
         var fileHelper = new FileHelper(fileSystem);
         var uri = fileHelper.PathToFileUri(path);

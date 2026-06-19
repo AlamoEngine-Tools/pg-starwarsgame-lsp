@@ -13,8 +13,8 @@ public sealed class GetBaselineEntriesHandler
     : IJsonRpcRequestHandler<GetBaselineEntriesParams, GetBaselineEntriesResult>
 {
     private readonly IBaselineTranslationProvider _baselineProvider;
-    private readonly ILanguageService _langService;
     private readonly ITranslationDatabaseFactory _factory;
+    private readonly ILanguageService _langService;
 
     public GetBaselineEntriesHandler(
         IBaselineTranslationProvider baselineProvider,
@@ -35,11 +35,11 @@ public sealed class GetBaselineEntriesHandler
 
         var merged = _factory.CreateKeyed(languages);
         foreach (var entry in eawDb)
-            foreach (var kv in entry.Translations)
-                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var kv in entry.Translations)
+            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
         foreach (var entry in focDb)
-            foreach (var kv in entry.Translations)
-                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var kv in entry.Translations)
+            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
 
         var entries = merged
             .Select(e => new BaselineEntry(

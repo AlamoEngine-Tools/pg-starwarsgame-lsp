@@ -220,4 +220,60 @@ public sealed class EaWXmlContextTest
 
         Assert.False(ctx.IsEaWXmlFile(ToUri(Path.Combine(dir, "foo.xml"))));
     }
+
+    // ── IsLeafFile / SetLeafDirectories ───────────────────────────────────────
+
+    [Fact]
+    public void IsLeafFile_BeforeSetLeafDirectories_ReturnsFalse()
+    {
+        var ctx = Build();
+        var uri = ToUri(Path.Combine(Root("leaf"), "data", "xml", "foo.xml"));
+        Assert.False(ctx.IsLeafFile(uri));
+    }
+
+    [Fact]
+    public void IsLeafFile_FileUnderLeafDirectory_ReturnsTrue()
+    {
+        var leafDir = Path.Combine(Root("leaf"), "data", "xml");
+        var ctx = Build();
+        ctx.SetLeafDirectories([leafDir]);
+
+        var uri = ToUri(Path.Combine(leafDir, "foo.xml"));
+        Assert.True(ctx.IsLeafFile(uri));
+    }
+
+    [Fact]
+    public void IsLeafFile_FileInSubdirectoryOfLeaf_ReturnsTrue()
+    {
+        var leafDir = Path.Combine(Root("leaf"), "data", "xml");
+        var ctx = Build();
+        ctx.SetLeafDirectories([leafDir]);
+
+        var uri = ToUri(Path.Combine(leafDir, "sub", "foo.xml"));
+        Assert.True(ctx.IsLeafFile(uri));
+    }
+
+    [Fact]
+    public void IsLeafFile_FileUnderDependencyDirectoryOnly_ReturnsFalse()
+    {
+        var depDir = Path.Combine(Root("dep"), "data", "xml");
+        var leafDir = Path.Combine(Root("leaf"), "data", "xml");
+        var ctx = Build();
+        ctx.SetLeafDirectories([leafDir]);
+
+        var uri = ToUri(Path.Combine(depDir, "foo.xml"));
+        Assert.False(ctx.IsLeafFile(uri));
+    }
+
+    [Fact]
+    public void SetLeafDirectories_EmptyList_ClearsLeafSet()
+    {
+        var leafDir = Path.Combine(Root("leaf"), "data", "xml");
+        var ctx = Build();
+        ctx.SetLeafDirectories([leafDir]);
+        ctx.SetLeafDirectories([]);
+
+        var uri = ToUri(Path.Combine(leafDir, "foo.xml"));
+        Assert.False(ctx.IsLeafFile(uri));
+    }
 }

@@ -143,6 +143,17 @@ public sealed class GameIndexTest
         return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri, 1, null), null);
     }
 
+    private static GameSymbol AtTyped(string id, string uri, string typeName)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(uri, 1, null), null);
+    }
+
+    private static GameSymbol InArchive(string id)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, "Unit",
+            new MegArchiveOrigin("data.meg", "units.xml", 0, 0), null);
+    }
+
     [Fact]
     public void Resolve_SameIdAcrossLayers_HighestRankWins()
     {
@@ -397,6 +408,144 @@ public sealed class GameIndexTest
         var all = index.AllGroupMemberships;
 
         Assert.Equal(2, all["Unit_AT_AT"].Length);
+    }
+
+    // ── LeafLayerRank ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void LeafLayerRank_NoDocuments_ReturnsZero()
+    {
+        Assert.Equal(0, GameIndex.Empty.LeafLayerRank);
+    }
+
+    [Fact]
+    public void LeafLayerRank_ReturnsMaxDocumentRank()
+    {
+        var a = At("A", "file:///dep/a.xml");
+        var b = At("B", "file:///leaf/b.xml");
+        var index = WithLayers((a, 0), (b, 1));
+        Assert.Equal(1, index.LeafLayerRank);
+    }
+
+    // ── IsLeafOwned ───────────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsLeafOwned_SymbolNotInWorkspace_ReturnsFalse()
+    {
+        Assert.False(GameIndex.Empty.IsLeafOwned("NOPE"));
+    }
+
+    [Fact]
+    public void IsLeafOwned_ArchiveOrigin_ReturnsFalse()
+    {
+        var sym = InArchive("UNIT_A");
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions
+                .Add("UNIT_A", [sym])
+        };
+        Assert.False(index.IsLeafOwned("UNIT_A"));
+    }
+
+    [Fact]
+    public void IsLeafOwned_DependencyLayerFileOrigin_ReturnsFalse()
+    {
+        var dep = At("UNIT_A", "file:///dep/units.xml");
+        var leafPlaceholder = At("OTHER", "file:///leaf/other.xml");
+        var index = WithLayers((dep, 0), (leafPlaceholder, 1));
+        // LeafLayerRank == 1, but UNIT_A is at rank 0
+        Assert.False(index.IsLeafOwned("UNIT_A"));
+    }
+
+    [Fact]
+    public void IsLeafOwned_LeafLayerFileOrigin_ReturnsTrue()
+    {
+        var leaf = At("UNIT_A", "file:///leaf/units.xml");
+        var dep = At("OTHER", "file:///dep/other.xml");
+        var index = WithLayers((dep, 0), (leaf, 1));
+        Assert.True(index.IsLeafOwned("UNIT_A"));
+    }
+
+    [Fact]
+    public void IsLeafOwned_MixedLeafAndDepLayer_ReturnsFalse()
+    {
+        var dep = At("UNIT_A", "file:///dep/units.xml");
+        var leaf = At("UNIT_A", "file:///leaf/units.xml");
+        var index = WithLayers((dep, 0), (leaf, 1));
+        // Both layers define UNIT_A → not exclusively leaf-owned
+        Assert.False(index.IsLeafOwned("UNIT_A"));
+    }
+
+    [Fact]
+    public void IsLeafOwned_FlatWorkspace_AllAtRankZero_ReturnsTrue()
+    {
+        var sym = At("UNIT_A", "file:///units.xml");
+        var index = WithLayers((sym, 0));
+        // LeafLayerRank == 0, symbol is at rank 0 → leaf-owned in flat workspace
+        Assert.True(index.IsLeafOwned("UNIT_A"));
+    }
+
+    // ── IsLeafSymbol ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void IsLeafSymbol_MatchesLeafLayerRank()
+    {
+        var dep = At("A", "file:///dep/a.xml");
+        var leaf = At("B", "file:///leaf/b.xml");
+        var index = WithLayers((dep, 0), (leaf, 1));
+        Assert.False(index.IsLeafSymbol(dep));
+        Assert.True(index.IsLeafSymbol(leaf));
+    }
+
+    // ── Resolve(id, preferredTypeName) ────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_WithMatchingType_PrefersTypeMatch()
+    {
+        var faction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
+        var unit = AtTyped("REBEL", "file:///dep/units.xml", "Unit");
+        var index = WithLayers((faction, 1), (unit, 0));
+        // Faction has higher rank but we ask for Unit — type match wins over rank
+        Assert.Equal(unit, index.Resolve("REBEL", "Unit"));
+    }
+
+    [Fact]
+    public void Resolve_WithMatchingType_HighestRankAmongTypeMatches()
+    {
+        var unitDep = AtTyped("REBEL", "file:///dep/units.xml", "Unit");
+        var unitLeaf = AtTyped("REBEL", "file:///leaf/units.xml", "Unit");
+        var index = WithLayers((unitDep, 0), (unitLeaf, 1));
+        // Both are Unit — highest rank wins among type-matches
+        Assert.Equal(unitLeaf, index.Resolve("REBEL", "Unit"));
+    }
+
+    [Fact]
+    public void Resolve_WithMatchingType_NoTypeMatch_FallsBackToUntypedWinner()
+    {
+        var faction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
+        var index = WithLayers((faction, 1));
+        // No Planet definition exists — fall back to untyped winner (Faction)
+        Assert.Equal(faction, index.Resolve("REBEL", "Planet"));
+    }
+
+    [Fact]
+    public void Resolve_WithMatchingType_ChecksBaseline()
+    {
+        var baselineUnit = AtTyped("REBEL", "file:///units.xml", "Unit");
+        var wsFaction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
+        var index = WithLayers((wsFaction, 1)) with { Baseline = Baseline(baselineUnit) };
+        // Unit lives only in baseline — typed resolve should find it
+        Assert.Equal(baselineUnit, index.Resolve("REBEL", "Unit"));
+    }
+
+    [Fact]
+    public void Resolve_NullPreferredType_BehavesAsUntyped()
+    {
+        var faction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
+        var unit = AtTyped("REBEL", "file:///dep/units.xml", "Unit");
+        var index = WithLayers((faction, 1), (unit, 0));
+        // null type → untyped resolve → highest rank (Faction at rank 1)
+        Assert.Equal(faction, index.Resolve("REBEL", null));
     }
 
     [Fact]

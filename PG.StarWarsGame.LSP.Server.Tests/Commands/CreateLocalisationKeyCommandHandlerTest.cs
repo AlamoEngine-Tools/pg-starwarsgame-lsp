@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -14,6 +15,9 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Commands;
 
 public sealed class CreateLocalisationKeyCommandHandlerTest
 {
+    // ── XML ──────────────────────────────────────────────────────────────────
+
+    private const string XmlNs = "http://www.example.org/eaw-translation/";
     // ── CSV ──────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -23,7 +27,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string existing = "key,ENGLISH\nTEXT_EXISTING,Hello World\n";
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_NEW", path, new() { ["ENGLISH"] = "New Entry" }),
+        await handler.Handle(Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "New Entry" }),
             CancellationToken.None);
 
         var lines = fs.File.ReadAllText(path).Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -38,7 +42,8 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string existing = "key,ENGLISH,GERMAN\nTEXT_X,English,German\n";
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_NEW", path, new() { ["ENGLISH"] = "Hello", ["GERMAN"] = "Hallo" }),
+        await handler.Handle(
+            Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "Hello", ["GERMAN"] = "Hallo" }),
             CancellationToken.None);
 
         var content = fs.File.ReadAllText(path);
@@ -52,7 +57,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string existing = "key,ENGLISH\nTEXT_DUPE,Value\n";
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_DUPE", path, new() { ["ENGLISH"] = "Another" }),
+        await handler.Handle(Request("TEXT_DUPE", path, new Dictionary<string, string> { ["ENGLISH"] = "Another" }),
             CancellationToken.None);
 
         var lines = fs.File.ReadAllText(path).Split('\n', StringSplitOptions.RemoveEmptyEntries);
@@ -68,7 +73,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string existing = "TEXT_EXISTING=Hello World\n";
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_NEW", path, new() { ["ENGLISH"] = "New Value" }),
+        await handler.Handle(Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "New Value" }),
             CancellationToken.None);
 
         var content = fs.File.ReadAllText(path);
@@ -82,16 +87,12 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string existing = "TEXT_DUPE=Existing\n";
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_DUPE", path, new() { ["ENGLISH"] = "New" }),
+        await handler.Handle(Request("TEXT_DUPE", path, new Dictionary<string, string> { ["ENGLISH"] = "New" }),
             CancellationToken.None);
 
         var lines = fs.File.ReadAllText(path).Split('\n', StringSplitOptions.RemoveEmptyEntries);
         Assert.Single(lines);
     }
-
-    // ── XML ──────────────────────────────────────────────────────────────────
-
-    private const string XmlNs = "http://www.example.org/eaw-translation/";
 
     [Fact]
     public async Task Handle_XmlFile_AddsLocalisationElement()
@@ -100,7 +101,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         var existing = BuildXml();
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_NEW", path, new() { ["ENGLISH"] = "Hello" }),
+        await handler.Handle(Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "Hello" }),
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
@@ -115,7 +116,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string path = "/mod/Data/Text/MasterTextFile.xml";
         var (handler, fs, _) = BuildHandler(path, BuildXml());
 
-        await handler.Handle(Request("TEXT_NEW", path, new() { ["ENGLISH"] = "Hello XML" }),
+        await handler.Handle(Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "Hello XML" }),
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
@@ -133,7 +134,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         var existing = BuildXml(("TEXT_DUPE", "ENGLISH", "Existing"));
         var (handler, fs, _) = BuildHandler(path, existing);
 
-        await handler.Handle(Request("TEXT_DUPE", path, new() { ["ENGLISH"] = "New" }),
+        await handler.Handle(Request("TEXT_DUPE", path, new Dictionary<string, string> { ["ENGLISH"] = "New" }),
             CancellationToken.None);
 
         var xdoc = XDocument.Parse(fs.File.ReadAllText(path));
@@ -165,7 +166,8 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string path = "/mod/a.csv";
         var (handler, _, reload) = BuildHandler(path, "key,ENGLISH\n");
 
-        await handler.Handle(Request("", path, new() { ["ENGLISH"] = "v" }), CancellationToken.None);
+        await handler.Handle(Request("", path, new Dictionary<string, string> { ["ENGLISH"] = "v" }),
+            CancellationToken.None);
 
         Assert.False(reload.WasReloaded);
     }
@@ -176,7 +178,8 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string path = "/mod/a.csv";
         var (handler, _, reload) = BuildHandler(path, "key,ENGLISH\n");
 
-        await handler.Handle(Request("TEXT_NEW", "", new() { ["ENGLISH"] = "v" }), CancellationToken.None);
+        await handler.Handle(Request("TEXT_NEW", "", new Dictionary<string, string> { ["ENGLISH"] = "v" }),
+            CancellationToken.None);
 
         Assert.False(reload.WasReloaded);
     }
@@ -186,7 +189,8 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
     {
         var (handler, _, reload) = BuildHandler(null, null);
 
-        await handler.Handle(Request("TEXT_NEW", "/nonexistent.csv", new() { ["ENGLISH"] = "v" }),
+        await handler.Handle(
+            Request("TEXT_NEW", "/nonexistent.csv", new Dictionary<string, string> { ["ENGLISH"] = "v" }),
             CancellationToken.None);
 
         Assert.False(reload.WasReloaded);
@@ -198,7 +202,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         const string path = "/mod/a.csv";
         var (handler, _, reload) = BuildHandler(path, "key,ENGLISH\n");
 
-        await handler.Handle(Request("TEXT_NEW", path, new() { ["ENGLISH"] = "v" }),
+        await handler.Handle(Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "v" }),
             CancellationToken.None);
 
         Assert.True(reload.WasReloaded);
@@ -207,26 +211,26 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static ExecuteCommandParams Request(
-        string keyName, string filePath, Dictionary<string, string> translations) =>
-        new()
+        string keyName, string filePath, Dictionary<string, string> translations)
+    {
+        return new ExecuteCommandParams
         {
             Command = CreateLocalisationKeyCommandHandler.CommandName,
             Arguments = new JArray(keyName, filePath, JObject.FromObject(translations))
         };
+    }
 
     private static string BuildXml(params (string Key, string Lang, string Value)[] entries)
     {
         var ns = XNamespace.Get(XmlNs);
         var root = new XElement(ns + "LocalisationData");
         foreach (var (key, lang, value) in entries)
-        {
             root.Add(new XElement(ns + "Localisation",
                 new XAttribute("key", key),
                 new XElement(ns + "TranslationData",
                     new XElement(ns + "Translation",
                         new XAttribute("Language", lang),
                         value))));
-        }
         return new XDocument(root).ToString();
     }
 
@@ -250,11 +254,13 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
     {
         public bool WasReloaded { get; private set; }
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public PG.StarWarsGame.LSP.Core.Workspace.WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public WorkspaceConfiguration? LastWorkspaceConfig => null;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
-        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct) =>
-            Task.CompletedTask;
+        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
 
         public Task ReloadAsync(CancellationToken ct)
         {

@@ -178,6 +178,34 @@ public sealed class LuaRenameHandlerTest
         Assert.Null(result);
     }
 
+    [Fact]
+    public void HandleRename_CursorOnXmlObjectString_DependencyLayerDefinition_ReturnsNull()
+    {
+        // Symbol is FileOrigin in a dep-layer doc (rank 0); rename must be blocked.
+        var depSym = XmlSymbolAt("UNIT_DEP", "file:///dep/units.xml", 5);
+        var depDoc = new DocumentIndex("file:///dep/units.xml", 1, [depSym],
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var luaDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty, LayerRank: 1);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_DEP\")", 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_DEP", [depSym]);
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            .Add("UNIT_DEP", [LuaRef("UNIT_DEP", LuaUri, 0, 7, 8)]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/units.xml", depDoc)
+                .Add(LuaUri, luaDoc),
+            defs,
+            refs);
+
+        var result = MakeHandler(host).HandleRename(LuaUri, RenameAt(0, 8, "UNIT_NEW"), index);
+        Assert.Null(result);
+    }
+
     // ── HandleRename: LuaGlobal path ──────────────────────────────────────────
 
     [Fact]
@@ -255,6 +283,63 @@ public sealed class LuaRenameHandlerTest
         Assert.Equal(9, defEdit.Range.Start.Character);
         Assert.Equal(12, defEdit.Range.End.Character);
         Assert.Equal("Bar", defEdit.NewText);
+    }
+
+    [Fact]
+    public void HandleRename_LuaGlobal_DependencyLayerDefinition_ReturnsNull()
+    {
+        // LuaGlobal defined in a dep-layer doc (rank 0); the rename builder must block it.
+        var depSym = LuaGlobal("DepFunc", "file:///dep/lib.lua");
+        var depDoc = new DocumentIndex("file:///dep/lib.lua", 1, [depSym],
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var callerRef = LuaGlobalRef("DepFunc", LuaUri, 0, 0, 7);
+        var leafDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, [callerRef],
+            LayerRank: 1);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate("file:///dep/lib.lua", "function DepFunc() end", 1);
+        host.AddOrUpdate(LuaUri, "DepFunc()", 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("DepFunc", [depSym]);
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            .Add("DepFunc", [callerRef]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/lib.lua", depDoc)
+                .Add(LuaUri, leafDoc),
+            defs,
+            refs);
+
+        var result = MakeHandler(host).HandleRename(LuaUri, RenameAt(0, 0, "NewFunc"), index);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void HandleRename_LuaGlobal_ArchiveOrigin_ReturnsNull()
+    {
+        // LuaGlobal with MegArchiveOrigin; the builder currently silently produces a ref-only
+        // edit — after the upfront IsLeafOwned guard it must return null.
+        var archiveSym = new GameSymbol("ArchiveFunc", GameSymbolKind.LuaGlobal, null,
+            new MegArchiveOrigin("scripts.meg", "lib.lua", 0, 0), null);
+        var callerRef = LuaGlobalRef("ArchiveFunc", LuaUri, 0, 0, 11);
+        var leafDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, [callerRef],
+            LayerRank: 1);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "ArchiveFunc()", 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("ArchiveFunc", [archiveSym]);
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            .Add("ArchiveFunc", [callerRef]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, leafDoc),
+            defs,
+            refs);
+
+        var result = MakeHandler(host).HandleRename(LuaUri, RenameAt(0, 0, "NewFunc"), index);
+        Assert.Null(result);
     }
 
     [Fact]
@@ -361,6 +446,57 @@ public sealed class LuaRenameHandlerTest
     }
 
     [Fact]
+    public void HandlePrepare_XmlObjectString_DependencyLayerDefinition_ReturnsNull()
+    {
+        // Symbol is FileOrigin in a dep-layer doc (rank 0); leaf Lua doc is rank 1.
+        // Prepare-rename on the string literal must return null.
+        var depSym = XmlSymbolAt("UNIT_DEP", "file:///dep/units.xml", 5);
+        var depDoc = new DocumentIndex("file:///dep/units.xml", 1, [depSym],
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var luaDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty, LayerRank: 1);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Spawn(\"UNIT_DEP\")", 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_DEP", [depSym]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/units.xml", depDoc)
+                .Add(LuaUri, luaDoc),
+            defs);
+
+        var result = MakeHandler(host).HandlePrepare(LuaUri, 0, 8, index);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void HandlePrepare_LuaGlobal_DependencyLayerDefinition_ReturnsNull()
+    {
+        // LuaGlobal defined in a dep-layer doc (rank 0); cursor is on a ref in the leaf doc (rank 1).
+        // Prepare-rename must return null.
+        var depSym = new GameSymbol("DepFunc", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin("file:///dep/lib.lua", 0, null), null);
+        var depDoc = new DocumentIndex("file:///dep/lib.lua", 1, [depSym],
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var callerRef = LuaGlobalRef("DepFunc", LuaUri, 0, 0, 7);
+        var luaDoc = new DocumentIndex(LuaUri, 1, ImmutableArray<GameSymbol>.Empty, [callerRef],
+            LayerRank: 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("DepFunc", [depSym]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/lib.lua", depDoc)
+                .Add(LuaUri, luaDoc),
+            defs);
+
+        var result = MakeHandler().HandlePrepare(LuaUri, 0, 3, index);
+        Assert.Null(result);
+    }
+
+    [Fact]
     public void HandlePrepare_CursorOnUnknownString_ReturnsNull()
     {
         var luaDoc = MakeDoc(LuaUri);
@@ -387,12 +523,19 @@ public sealed class LuaRenameHandlerTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
@@ -402,36 +545,97 @@ public sealed class LuaRenameHandlerTest
         private readonly Dictionary<string, GameObjectTypeDefinition> _types =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void RegisterType(GameObjectTypeDefinition def) => _types[def.TypeName] = def;
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void RegisterType(GameObjectTypeDefinition def)
+        {
+            _types[def.TypeName] = def;
+        }
     }
 
     private sealed class FakeGameIndexService : IGameIndexService
     {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
+        public GameIndex Current { get; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public void ApplyLocalisation(ILocalisationIndex index) { }
-        public void ApplyAssetFiles(IAssetFileIndex index) { }
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

@@ -166,6 +166,10 @@ public sealed class DiagnosticsPublisherBaseTest
             return Task.CompletedTask;
         }
 
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
         public void RemoveDocument(string uri)
         {
         }

@@ -155,7 +155,7 @@ public sealed class StartupPipelineTest
 
         public IReadOnlyList<string>? LastRoots { get; private set; }
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public PG.StarWarsGame.LSP.Core.Workspace.WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public WorkspaceConfiguration? LastWorkspaceConfig => null;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -174,7 +174,7 @@ public sealed class StartupPipelineTest
     private sealed class ThrowingReloadService : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public PG.StarWarsGame.LSP.Core.Workspace.WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public WorkspaceConfiguration? LastWorkspaceConfig => null;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

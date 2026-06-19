@@ -3,8 +3,8 @@
 
 using System.Globalization;
 using Newtonsoft.Json.Linq;
-using PG.StarWarsGame.LSP.Core.Symbols;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 

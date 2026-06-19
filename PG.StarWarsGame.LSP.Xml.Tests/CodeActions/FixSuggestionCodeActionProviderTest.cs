@@ -14,7 +14,10 @@ public sealed class FixSuggestionCodeActionProviderTest
     private static readonly DocumentUri TestUri = DocumentUri.From("file:///test.xml");
     private static readonly LspRange TestRange = new(new Position(0, 5), new Position(0, 10));
 
-    private static XmlCodeActionContext Ctx(Diagnostic d) => new(TestUri, d);
+    private static XmlCodeActionContext Ctx(Diagnostic d)
+    {
+        return new XmlCodeActionContext(TestUri, d);
+    }
 
     [Fact]
     public void DiagnosticWithDataFix_ReturnsReplaceAction()
@@ -37,7 +40,7 @@ public sealed class FixSuggestionCodeActionProviderTest
     public void DiagnosticWithCachedFix_ReturnsReplaceAction()
     {
         var d = new Diagnostic { Range = TestRange, Data = null };
-        var cache = new StubFixCache(fix: "cached");
+        var cache = new StubFixCache("cached");
         var provider = new FixSuggestionCodeActionProvider(cache);
 
         var results = provider.Handle(Ctx(d)).ToList();
@@ -61,7 +64,7 @@ public sealed class FixSuggestionCodeActionProviderTest
     public void DataFixTakesPrecedenceOverCache()
     {
         var d = new Diagnostic { Range = TestRange, Data = JToken.FromObject(new { fix = "data-fix" }) };
-        var cache = new StubFixCache(fix: "cache-fix");
+        var cache = new StubFixCache("cache-fix");
         var provider = new FixSuggestionCodeActionProvider(cache);
 
         var results = provider.Handle(Ctx(d)).ToList();
@@ -75,16 +78,39 @@ public sealed class FixSuggestionCodeActionProviderTest
 
 file sealed class EmptyFixCache : IXmlFixCache
 {
-    public string? GetSuggestedFix(string uri, int line, int character) => null;
-    public void SetSuggestedFix(string uri, int line, int character, string fix) { }
-    public void ClearSuggestedFixes(string uri) { }
+    public string? GetSuggestedFix(string uri, int line, int character)
+    {
+        return null;
+    }
+
+    public void SetSuggestedFix(string uri, int line, int character, string fix)
+    {
+    }
+
+    public void ClearSuggestedFixes(string uri)
+    {
+    }
 }
 
 file sealed class StubFixCache : IXmlFixCache
 {
     private readonly string? _fix;
-    public StubFixCache(string? fix) => _fix = fix;
-    public string? GetSuggestedFix(string uri, int line, int character) => _fix;
-    public void SetSuggestedFix(string uri, int line, int character, string fix) { }
-    public void ClearSuggestedFixes(string uri) { }
+
+    public StubFixCache(string? fix)
+    {
+        _fix = fix;
+    }
+
+    public string? GetSuggestedFix(string uri, int line, int character)
+    {
+        return _fix;
+    }
+
+    public void SetSuggestedFix(string uri, int line, int character, string fix)
+    {
+    }
+
+    public void ClearSuggestedFixes(string uri)
+    {
+    }
 }

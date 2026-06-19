@@ -18,7 +18,8 @@ public sealed class XmlInlayHintRegistryTest
         hapDoc.LoadHtml("<Name>foo</Name>");
         var node = hapDoc.DocumentNode.SelectSingleNode("//name")!;
         var tagDef = new XmlTagDefinition { Tag = "Name", ValueType = XmlValueType.Boolean };
-        return new InlayHintContext("file:///test.xml", GameIndex.Empty, new EmptySchemaProvider(), hapDoc, node, tagDef, 0);
+        return new InlayHintContext("file:///test.xml", GameIndex.Empty, new EmptySchemaProvider(), hapDoc, node,
+            tagDef, 0);
     }
 
     [Fact]
@@ -73,6 +74,14 @@ public sealed class XmlInlayHintRegistryTest
 file sealed class StubProvider : IXmlInlayHintProvider
 {
     private readonly IReadOnlyList<InlayHint> _hints;
-    public StubProvider(IReadOnlyList<InlayHint> hints) => _hints = hints;
-    public IEnumerable<InlayHint> Handle(InlayHintContext ctx) => _hints;
+
+    public StubProvider(IReadOnlyList<InlayHint> hints)
+    {
+        _hints = hints;
+    }
+
+    public IEnumerable<InlayHint> Handle(InlayHintContext ctx)
+    {
+        return _hints;
+    }
 }

@@ -24,7 +24,7 @@ public sealed class BaselineLoader
 
     private string CacheDir => _fileHelper.FileSystem.Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".pg-swg-lsp", "baselines");
+        ".aetswg", "baselines");
 
     public Task<BaselineIndex> LoadAsync(BaselineSourceConfig config, CancellationToken ct)
     {

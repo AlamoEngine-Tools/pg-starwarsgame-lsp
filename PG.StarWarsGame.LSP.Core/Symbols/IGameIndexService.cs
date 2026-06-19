@@ -12,6 +12,14 @@ public interface IGameIndexService
     GameIndex Current { get; }
 
     Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct);
+
+    /// <summary>
+    ///     Applies a pre-built <see cref="DocumentIndex" /> (e.g. from a project index cache) without
+    ///     re-parsing. The document's <see cref="DocumentIndex.LayerRank" />, <see cref="DocumentIndex.LayerName" />,
+    ///     and all symbol/reference data are preserved as-is.
+    /// </summary>
+    void InjectDocument(DocumentIndex document);
+
     void RemoveDocument(string uri);
     void ApplyBaseline(BaselineIndex baseline);
     void ApplyLocalisation(ILocalisationIndex index);

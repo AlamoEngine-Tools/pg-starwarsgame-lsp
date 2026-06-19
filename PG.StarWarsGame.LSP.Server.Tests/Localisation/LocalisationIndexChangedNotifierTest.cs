@@ -78,22 +78,52 @@ public sealed class LocalisationIndexChangedNotifierTest
 
         public event Action<GameIndex>? IndexChanged;
 
-        public void Raise(GameIndex index) => IndexChanged?.Invoke(index);
-
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-            => Task.CompletedTask;
+        {
+            return Task.CompletedTask;
+        }
 
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public void ApplyLocalisation(ILocalisationIndex index) { }
-        public void ApplyAssetFiles(IAssetFileIndex index) { }
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
+
+        public void Raise(GameIndex index)
+        {
+            IndexChanged?.Invoke(index);
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 }

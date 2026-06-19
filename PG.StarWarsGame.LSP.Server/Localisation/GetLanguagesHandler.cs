@@ -11,7 +11,10 @@ public sealed class GetLanguagesHandler
 {
     private readonly ILanguageService _langService;
 
-    public GetLanguagesHandler(ILanguageService langService) => _langService = langService;
+    public GetLanguagesHandler(ILanguageService langService)
+    {
+        _langService = langService;
+    }
 
     public Task<GetLanguagesResult> Handle(GetLanguagesParams request, CancellationToken ct)
     {

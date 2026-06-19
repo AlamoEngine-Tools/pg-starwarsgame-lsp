@@ -1,9 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -144,12 +144,19 @@ public sealed class SquadronOffsetsRuleTest
 
 file sealed class EmptyFileTypeRegistry : IFileTypeRegistry
 {
-    public IReadOnlyDictionary<string, System.Collections.Immutable.ImmutableArray<string>> All =>
-        new Dictionary<string, System.Collections.Immutable.ImmutableArray<string>>();
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
+        new Dictionary<string, ImmutableArray<string>>();
 
-    public System.Collections.Immutable.ImmutableArray<string> GetTypesForFile(string _) =>
-        System.Collections.Immutable.ImmutableArray<string>.Empty;
+    public ImmutableArray<string> GetTypesForFile(string _)
+    {
+        return ImmutableArray<string>.Empty;
+    }
 
-    public void RegisterFile(string fileUri, System.Collections.Immutable.ImmutableArray<string> typeNames) { }
-    public void UnregisterFile(string fileUri) { }
+    public void RegisterFile(string fileUri, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string fileUri)
+    {
+    }
 }

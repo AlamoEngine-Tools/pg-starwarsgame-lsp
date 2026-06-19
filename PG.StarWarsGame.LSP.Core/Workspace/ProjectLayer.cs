@@ -18,4 +18,6 @@ public sealed record ProjectLayer(
     IReadOnlyList<string> ScriptRoots,
     IReadOnlyList<string> TextRoots,
     IReadOnlyList<string> AssetRoots,
-    string? TextResourceType);
+    string? TextResourceType,
+    // Normalised absolute path to the .pgproj file. Null when there is no pgproj (heuristic scan).
+    string? ProjectPath = null);

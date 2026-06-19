@@ -42,7 +42,8 @@ public sealed class WorkspaceVariantTagSourceTest
     {
         var host = new FakeHost();
         host.AddOrUpdate("file:///u.xml",
-            "<GameObjectFiles>\n<SpaceUnit Name=\"V\">\n<Max_Health>100</Max_Health>\n</SpaceUnit>\n</GameObjectFiles>", 1);
+            "<GameObjectFiles>\n<SpaceUnit Name=\"V\">\n<Max_Health>100</Max_Health>\n</SpaceUnit>\n</GameObjectFiles>",
+            1);
 
         var tag = Assert.Single(new WorkspaceVariantTagSource(host).TryGetTags("V")!);
 

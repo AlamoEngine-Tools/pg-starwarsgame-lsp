@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -22,13 +23,21 @@ public sealed class WorkspaceIndexerTest
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) Build(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
-        params IGameDocumentParser[] parsers)
+        IProjectIndexCache? cache = null, params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
         var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
-            NullLogger<WorkspaceIndexer>.Instance);
+            cache ?? new NullProjectIndexCache(), NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
+    }
+
+    // Overload kept for callers that pass parsers without a cache
+    private static (WorkspaceIndexer Indexer, EaWXmlContext Context) Build(
+        MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
+        params IGameDocumentParser[] parsers)
+    {
+        return Build(fs, svc, registry, schema, null, parsers);
     }
 
     // ── PreScanMetafiles ─────────────────────────────────────────────────────
@@ -330,7 +339,171 @@ public sealed class WorkspaceIndexerTest
         Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
     }
 
+    // ── IndexDocumentsAsync with cache ──────────────────────────────────────
+
+    [Fact]
+    public async Task IndexDocumentsAsync_WithLayers_NoSnapshot_ParsesNormally()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var cache = new FakeProjectIndexCache(); // no snapshot stored
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(svc.Calls); // parsed normally
+        Assert.Empty(svc.InjectedDocuments);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_WithLayers_CacheHit_InjectsWithoutParsing()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fileContent = "<Root/>"u8.ToArray();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "units.xml")] = new(fileContent)
+        });
+        var svc = new FakeIndexService();
+
+        // Build a snapshot whose hash matches the file content
+        var fh = new FileHelper(fs);
+        var relPath = "data/xml/units.xml";
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
+        var entry = new ProjectFileEntry
+        {
+            RelativePath = relPath, ContentHash = hash,
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files = [entry]
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Empty(svc.Calls); // no re-parse
+        Assert.Single(svc.InjectedDocuments); // injected from cache
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_WithLayers_StaleHash_Reparses()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        // Snapshot with a wrong hash
+        var entry = new ProjectFileEntry
+        {
+            RelativePath = "data/xml/units.xml", ContentHash = "stale_hash",
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "old",
+            DependencyHashes = [],
+            Files = [entry]
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(svc.Calls); // re-parsed
+        Assert.Empty(svc.InjectedDocuments);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_WithLayers_WritesSnapshotAfterIndexing()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var cache = new FakeProjectIndexCache();
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.True(cache.SavedPaths.Contains(pgproj));
+        var saved = cache.Saved[pgproj];
+        Assert.Equal(ProjectIndexSnapshot.CurrentSchemaVersion, saved.SchemaVersion);
+        Assert.Single(saved.Files);
+    }
+
+    private static WorkspaceConfiguration ConfigWithLayer(string xmlDir, string pgprojPath)
+    {
+        var layer = new ProjectLayer(0, "TestMod", [xmlDir], [], [], [], null, pgprojPath);
+        return new WorkspaceConfiguration([xmlDir], [], [], [], null) { Layers = [layer] };
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
+
+    private sealed class FakeProjectIndexCache : IProjectIndexCache
+    {
+        private readonly Dictionary<string, ProjectIndexSnapshot> _snapshots = [];
+        public readonly HashSet<string> HygienePaths = [];
+        public readonly Dictionary<string, ProjectIndexSnapshot> Saved = [];
+        public readonly HashSet<string> SavedPaths = [];
+
+        public ProjectIndexSnapshot? this[string pgprojPath]
+        {
+            set => _snapshots[pgprojPath] = value!;
+        }
+
+        public ProjectIndexSnapshot? TryLoad(string pgprojPath)
+        {
+            return _snapshots.GetValueOrDefault(pgprojPath);
+        }
+
+        public void Save(string pgprojPath, ProjectIndexSnapshot snapshot)
+        {
+            SavedPaths.Add(pgprojPath);
+            Saved[pgprojPath] = snapshot;
+        }
+
+        public void EnsureGitHygiene(string pgprojPath)
+        {
+            HygienePaths.Add(pgprojPath);
+        }
+    }
 
     private sealed class FakeParser : IGameDocumentParser
     {
@@ -402,6 +575,8 @@ public sealed class WorkspaceIndexerTest
     private sealed class FakeIndexService : IGameIndexService
     {
         public readonly List<(string Uri, int Version)> Calls = [];
+
+        public readonly List<DocumentIndex> InjectedDocuments = [];
         public int BeginBulkUpdateCallCount;
 
         public FakeIndexService(GameIndex? current = null)
@@ -413,7 +588,7 @@ public sealed class WorkspaceIndexerTest
 
         public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelBones { get; private set; }
 
-        public GameIndex Current { get; }
+        public GameIndex Current { get; private set; }
 
         public event Action<GameIndex>? IndexChanged
         {
@@ -427,9 +602,21 @@ public sealed class WorkspaceIndexerTest
             lock (Calls)
             {
                 Calls.Add((uri, version));
+                var doc = new DocumentIndex(uri, version,
+                    ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
+                Current = Current with { Documents = Current.Documents.SetItem(uri, doc) };
             }
 
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
+            lock (InjectedDocuments)
+            {
+                InjectedDocuments.Add(document);
+                Current = Current with { Documents = Current.Documents.SetItem(document.DocumentUri, document) };
+            }
         }
 
         public void RemoveDocument(string uri)

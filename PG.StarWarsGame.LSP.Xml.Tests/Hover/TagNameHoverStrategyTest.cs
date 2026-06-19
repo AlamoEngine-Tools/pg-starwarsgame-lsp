@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
@@ -31,14 +30,16 @@ public sealed class TagNameHoverStrategyTest
     }
 
     private static TagNameHoverStrategy Strategy(IFileTypeRegistry? registry = null)
-        => new(registry ?? new EmptyFileTypeRegistry());
+    {
+        return new TagNameHoverStrategy(registry ?? new EmptyFileTypeRegistry());
+    }
 
     // ── guard: not on tag name ────────────────────────────────────────────────
 
     [Fact]
     public void Handle_NotOnTagName_ReturnsNull()
     {
-        var (ctx, _) = MakeCtx("<Root><Max_Speed>500</Max_Speed></Root>", 0, isOnTagName: false);
+        var (ctx, _) = MakeCtx("<Root><Max_Speed>500</Max_Speed></Root>", 0, false);
         Assert.Null(Strategy().Handle(ctx));
     }
 
@@ -110,39 +111,83 @@ public sealed class TagNameHoverStrategyTest
     {
         private readonly Dictionary<string, XmlTagDefinition> _tags =
             new(StringComparer.OrdinalIgnoreCase);
+
         private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType =
             new(StringComparer.OrdinalIgnoreCase);
+
         private readonly Dictionary<string, GameObjectTypeDefinition> _types =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void SetTag(string name, XmlTagDefinition tag) => _tags[name] = tag;
-        public void AddType(GameObjectTypeDefinition type) => _types[type.TypeName] = type;
+        public XmlTagDefinition? GetTag(string name)
+        {
+            return _tags.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return _tagsByType.TryGetValue(typeName, out var list) ? list : [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void SetTag(string name, XmlTagDefinition tag)
+        {
+            _tags[name] = tag;
+        }
+
+        public void AddType(GameObjectTypeDefinition type)
+        {
+            _types[type.TypeName] = type;
+        }
+
         public void AddTagForType(string typeName, XmlTagDefinition tag)
         {
             if (!_tagsByType.TryGetValue(typeName, out var list))
                 _tagsByType[typeName] = list = [];
             list.Add(tag);
         }
-
-        public XmlTagDefinition? GetTag(string name) => _tags.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-            => _tagsByType.TryGetValue(typeName, out var list) ? list : [];
-        public EnumDefinition? GetEnum(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
     }
 
     private sealed class EmptyFileTypeRegistry : IFileTypeRegistry
     {
-        public ImmutableArray<string> GetTypesForFile(string _) => [];
-        public void RegisterFile(string _, ImmutableArray<string> __) { }
-        public void UnregisterFile(string _) { }
+        public ImmutableArray<string> GetTypesForFile(string _)
+        {
+            return [];
+        }
+
+        public void RegisterFile(string _, ImmutableArray<string> __)
+        {
+        }
+
+        public void UnregisterFile(string _)
+        {
+        }
+
         public IReadOnlyDictionary<string, ImmutableArray<string>> All
             => ImmutableDictionary<string, ImmutableArray<string>>.Empty;
     }
@@ -152,10 +197,24 @@ public sealed class TagNameHoverStrategyTest
         private readonly Dictionary<string, ImmutableArray<string>> _map =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void Register(string uri, string[] types) => _map[uri] = [..types];
-        public ImmutableArray<string> GetTypesForFile(string path) => _map.GetValueOrDefault(path);
-        public void RegisterFile(string _, ImmutableArray<string> __) { }
-        public void UnregisterFile(string _) { }
+        public ImmutableArray<string> GetTypesForFile(string path)
+        {
+            return _map.GetValueOrDefault(path);
+        }
+
+        public void RegisterFile(string _, ImmutableArray<string> __)
+        {
+        }
+
+        public void UnregisterFile(string _)
+        {
+        }
+
         public IReadOnlyDictionary<string, ImmutableArray<string>> All => _map;
+
+        public void Register(string uri, string[] types)
+        {
+            _map[uri] = [..types];
+        }
     }
 }

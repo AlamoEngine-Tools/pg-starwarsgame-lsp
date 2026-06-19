@@ -37,16 +37,6 @@ public sealed class ProjectConfigurationResolverTest
             NullLogger<ProjectConfigurationResolver>.Instance);
     }
 
-    private sealed class RecordingUserNotifier : IUserNotifier
-    {
-        public List<string> Errors { get; } = [];
-
-        public void ShowError(string message)
-        {
-            Errors.Add(message);
-        }
-    }
-
     [Fact]
     public void Resolve_NoProjectFile_ReturnsNull()
     {
@@ -106,5 +96,15 @@ public sealed class ProjectConfigurationResolverTest
         var message = Assert.Single(notifier.Errors);
         Assert.Contains("mymod.pgproj", message);
         Assert.Contains("projectReferences", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private sealed class RecordingUserNotifier : IUserNotifier
+    {
+        public List<string> Errors { get; } = [];
+
+        public void ShowError(string message)
+        {
+            Errors.Add(message);
+        }
     }
 }

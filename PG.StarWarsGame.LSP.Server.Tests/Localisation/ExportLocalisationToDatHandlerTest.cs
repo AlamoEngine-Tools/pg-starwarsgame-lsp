@@ -3,12 +3,9 @@
 
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
-using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.Commons;
 using PG.StarWarsGame.Files.DAT.Services;
-using PG.StarWarsGame.Localisation;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -23,6 +20,11 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class ExportLocalisationToDatHandlerTest
 {
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private const string CsvPath = "/mod/Data/Text/MasterTextFile.csv";
+    private const string CsvContent = "key,ENGLISH\nMY_TEST_KEY,Hello World\n";
+
     [Fact]
     public async Task Handle_WhenProjectFilePathIsNull_ReturnsErrorResult()
     {
@@ -39,7 +41,8 @@ public sealed class ExportLocalisationToDatHandlerTest
     {
         var (handler, _, _) = BuildHandler();
 
-        var result = await handler.Handle(new ExportLocalisationToDatParams("/nonexistent/file.csv"), CancellationToken.None);
+        var result = await handler.Handle(new ExportLocalisationToDatParams("/nonexistent/file.csv"),
+            CancellationToken.None);
 
         Assert.NotNull(result.Error);
         Assert.Empty(result.WrittenFiles);
@@ -48,7 +51,7 @@ public sealed class ExportLocalisationToDatHandlerTest
     [Fact]
     public async Task Handle_WithValidCsvProject_WritesDatFilePerLanguageWithContent()
     {
-        var (handler, _, langCount) = BuildHandler(withCsvFile: true);
+        var (handler, _, langCount) = BuildHandler(true);
 
         var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
 
@@ -59,7 +62,7 @@ public sealed class ExportLocalisationToDatHandlerTest
     [Fact]
     public async Task Handle_WithValidCsvProject_SkipsLanguagesWithNoContent()
     {
-        var (handler, fs, _) = BuildHandler(withCsvFile: true);
+        var (handler, fs, _) = BuildHandler(true);
 
         var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
 
@@ -90,7 +93,7 @@ public sealed class ExportLocalisationToDatHandlerTest
     [Fact]
     public async Task Handle_WithValidCsvProject_ReturnedPathsMatchWrittenFiles()
     {
-        var (handler, fs, _) = BuildHandler(withCsvFile: true);
+        var (handler, fs, _) = BuildHandler(true);
 
         var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
 
@@ -100,17 +103,12 @@ public sealed class ExportLocalisationToDatHandlerTest
     [Fact]
     public async Task Handle_WithValidCsvProject_WrittenDatFilesAreNonEmpty()
     {
-        var (handler, fs, _) = BuildHandler(withCsvFile: true);
+        var (handler, fs, _) = BuildHandler(true);
 
         var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
 
         Assert.All(result.WrittenFiles, path => Assert.True(fs.File.ReadAllBytes(path).Length > 0));
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    private const string CsvPath = "/mod/Data/Text/MasterTextFile.csv";
-    private const string CsvContent = "key,ENGLISH\nMY_TEST_KEY,Hello World\n";
 
     private static (ExportLocalisationToDatHandler handler, MockFileSystem fs, int languageCount)
         BuildHandler(bool withCsvFile = false)
@@ -137,6 +135,7 @@ public sealed class ExportLocalisationToDatHandlerTest
             services.SupportLocalisationBaseline();
             sp = services.BuildServiceProvider();
         }
+
         return new ExportLocalisationToDatHandler(
             sp.GetRequiredService<ICsvTranslationImporter>(),
             sp.GetRequiredService<IXmlTranslationImporter>(),

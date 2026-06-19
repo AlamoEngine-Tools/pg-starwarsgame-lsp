@@ -338,7 +338,7 @@ public sealed class LuaCompletionHandlerTest
         var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             // cursor will be at col 21 — inside the "UNIT" string argument
-            [path] = new MockFileData("Find_First_Object(\"UNIT\")")
+            [path] = new("Find_First_Object(\"UNIT\")")
         });
         var fileHelper = new FileHelper(fileSystem);
         var uri = fileHelper.PathToFileUri(path);
@@ -360,7 +360,7 @@ public sealed class LuaCompletionHandlerTest
 
         var handler = new LuaCompletionHandler(
             new FakeIndexService { Current = index },
-            new FakeWorkspaceHost(),  // empty — no document tracked
+            new FakeWorkspaceHost(), // empty — no document tracked
             fileHelper,
             schema,
             NullLogger<LuaCompletionHandler>.Instance);
@@ -386,6 +386,10 @@ public sealed class LuaCompletionHandlerTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
         }
 
         public void RemoveDocument(string uri)

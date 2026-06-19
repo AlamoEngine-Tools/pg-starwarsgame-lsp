@@ -8,8 +8,8 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 public sealed class LocalisationIndexChangedNotifier
 {
-    private readonly Action<string> _sendNotification;
     private readonly ILogger<LocalisationIndexChangedNotifier> _logger;
+    private readonly Action<string> _sendNotification;
 
     public LocalisationIndexChangedNotifier(
         IGameIndexService indexService,

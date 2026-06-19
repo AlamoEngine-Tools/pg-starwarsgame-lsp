@@ -15,7 +15,7 @@ public sealed class EffectiveObjectXmlRendererTest
 
     private static EffectiveObject Object(params EffectiveTag[] tags)
     {
-        return new EffectiveObject("V", "SpaceUnit", Found: true, Cyclic: false, null,
+        return new EffectiveObject("V", "SpaceUnit", true, false, null,
             ["V", "B"], tags.ToImmutableArray());
     }
 
@@ -64,7 +64,7 @@ public sealed class EffectiveObjectXmlRendererTest
     [Fact]
     public void Render_CyclicObject_IncludesWarning()
     {
-        var obj = new EffectiveObject("A", "SpaceUnit", Found: true, Cyclic: true, "A",
+        var obj = new EffectiveObject("A", "SpaceUnit", true, true, "A",
             ["A"], ImmutableArray<EffectiveTag>.Empty);
 
         var xml = EffectiveObjectXmlRenderer.Render(obj);
@@ -77,7 +77,7 @@ public sealed class EffectiveObjectXmlRendererTest
     {
         var tag = new EffectiveTag("Block", "x",
             "<Block>\n  <Inner>x</Inner>\n</Block>", VariantProvenance.Inherited, "B", null);
-        var obj = new EffectiveObject("V", "SpaceUnit", Found: true, Cyclic: false, null,
+        var obj = new EffectiveObject("V", "SpaceUnit", true, false, null,
             ["V", "B"], [tag]);
 
         var xml = EffectiveObjectXmlRenderer.Render(obj);

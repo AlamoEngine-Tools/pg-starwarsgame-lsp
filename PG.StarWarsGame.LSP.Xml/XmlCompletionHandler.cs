@@ -173,7 +173,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     }
 
     private bool IsStoryParserDocument(string documentUri)
-        => _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
+    {
+        return _fileTypeRegistry.GetTypesForFile(_fileHelper.NormalizeUri(documentUri)).Contains("StoryParser");
+    }
 
     private bool IsMultiInstanceFile(string documentUri)
     {

@@ -14,7 +14,10 @@ public sealed class CreateLocKeyCodeActionProviderTest
     private static readonly DocumentUri TestUri = DocumentUri.From("file:///test.xml");
     private static readonly LspRange TestRange = new(new Position(1, 0), new Position(1, 10));
 
-    private static XmlCodeActionContext Ctx(Diagnostic d) => new(TestUri, d);
+    private static XmlCodeActionContext Ctx(Diagnostic d)
+    {
+        return new XmlCodeActionContext(TestUri, d);
+    }
 
     [Fact]
     public void DiagnosticWithCreateLocKey_ReturnsCreateAction()

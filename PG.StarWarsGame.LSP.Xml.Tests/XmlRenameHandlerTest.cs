@@ -327,6 +327,57 @@ public sealed class XmlRenameHandlerTest
         Assert.Null(result);
     }
 
+    [Fact]
+    public void HandlePrepare_SymbolFromDependencyLayer_ReturnsNull()
+    {
+        // Symbol exists as FileOrigin but lives in a dependency-layer doc (rank 0);
+        // the leaf doc (rank 1) only has a reference to it — prepare-rename must return null.
+        var depSym = XmlSymbolAt("UNIT_DEP", "file:///dep/units.xml", 5);
+        var depDoc = new DocumentIndex("file:///dep/units.xml", 1, [depSym],
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var r = XmlRef("UNIT_DEP", XmlUri, 0, 4, 8);
+        var leafDoc = new DocumentIndex(XmlUri, 1, ImmutableArray<GameSymbol>.Empty, [r],
+            LayerRank: 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_DEP", [depSym]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/units.xml", depDoc)
+                .Add(XmlUri, leafDoc),
+            defs);
+
+        var result = MakeHandler().HandlePrepare(XmlUri, 0, 5, index);
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void HandleRename_SymbolFromDependencyLayer_ReturnsNull()
+    {
+        // Cursor on a reference to a dep-layer symbol (FileOrigin, rank 0) in a leaf doc (rank 1).
+        // The rename builder must block because IsLeafOwned returns false.
+        var depSym = XmlSymbolAt("UNIT_DEP", "file:///dep/units.xml", 5);
+        var depDoc = new DocumentIndex("file:///dep/units.xml", 1, [depSym],
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+        var r = XmlRef("UNIT_DEP", XmlUri, 0, 4, 8);
+        var leafDoc = new DocumentIndex(XmlUri, 1, ImmutableArray<GameSymbol>.Empty, [r],
+            LayerRank: 1);
+
+        var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("UNIT_DEP", [depSym]);
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+            .Add("UNIT_DEP", [r]);
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///dep/units.xml", depDoc)
+                .Add(XmlUri, leafDoc),
+            defs,
+            refs);
+
+        var result = MakeHandler().HandleRename(XmlUri, RenameAt(0, 5, "UNIT_NEW"), index);
+        Assert.Null(result);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class FakeWorkspaceHost : IGameWorkspaceHost
@@ -334,12 +385,19 @@ public sealed class XmlRenameHandlerTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version)
-            => _docs[uri] = new TrackedDocument(uri, text, version);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
 
         public bool TryGet(string uri, out TrackedDocument doc)
-            => _docs.TryGetValue(uri, out doc!);
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
@@ -349,33 +407,102 @@ public sealed class XmlRenameHandlerTest
         private readonly Dictionary<string, GameObjectTypeDefinition> _types =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public void RegisterType(GameObjectTypeDefinition def) => _types[def.TypeName] = def;
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string name) => _types.GetValueOrDefault(name);
+
+        public GameObjectTypeDefinition? GetObjectType(string name)
+        {
+            return _types.GetValueOrDefault(name);
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public EnumDefinition? GetEnum(string _) => null;
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
+
+        public void RegisterType(GameObjectTypeDefinition def)
+        {
+            _types[def.TypeName] = def;
+        }
     }
 
     private sealed class AllowAllContext : IEaWXmlContext
     {
         public bool HasDirectories => true;
-        public bool IsEaWXmlFile(string fileUri) => true;
-        public void AddDirectory(string absolutePath) { }
-        public void SetDirectories(IEnumerable<string> absolutePaths) { }
+
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return true;
+        }
+
+        public bool IsLeafFile(string fileUri)
+        {
+            return true;
+        }
+
+        public void AddDirectory(string absolutePath)
+        {
+        }
+
+        public void SetDirectories(IEnumerable<string> absolutePaths)
+        {
+        }
+
+        public void SetLeafDirectories(IEnumerable<string> absolutePaths)
+        {
+        }
     }
 
     private sealed class DenyAllContext : IEaWXmlContext
     {
         public bool HasDirectories => false;
-        public bool IsEaWXmlFile(string fileUri) => false;
-        public void AddDirectory(string absolutePath) { }
-        public void SetDirectories(IEnumerable<string> absolutePaths) { }
+
+        public bool IsEaWXmlFile(string fileUri)
+        {
+            return false;
+        }
+
+        public bool IsLeafFile(string fileUri)
+        {
+            return false;
+        }
+
+        public void AddDirectory(string absolutePath)
+        {
+        }
+
+        public void SetDirectories(IEnumerable<string> absolutePaths)
+        {
+        }
+
+        public void SetLeafDirectories(IEnumerable<string> absolutePaths)
+        {
+        }
     }
 }

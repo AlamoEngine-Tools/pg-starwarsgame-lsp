@@ -10,7 +10,10 @@ internal sealed class FixSuggestionCodeActionProvider : IXmlCodeActionProvider
 {
     private readonly IXmlFixCache _fixCache;
 
-    public FixSuggestionCodeActionProvider(IXmlFixCache fixCache) => _fixCache = fixCache;
+    public FixSuggestionCodeActionProvider(IXmlFixCache fixCache)
+    {
+        _fixCache = fixCache;
+    }
 
     public IEnumerable<CommandOrCodeAction> Handle(XmlCodeActionContext ctx)
     {

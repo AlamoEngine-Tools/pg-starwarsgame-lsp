@@ -321,6 +321,59 @@ public sealed class GameIndexServiceTest
         Assert.True(svc2.Current.WorkspaceReferences.ContainsKey("NEW_TARGET"));
     }
 
+    // ── InjectDocument ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void InjectDocument_AddsDocumentToIndex()
+    {
+        var svc = Build();
+        var sym = Symbol("UNIT_A");
+        var doc = Doc("file:///f.xml", 0, [sym]);
+
+        svc.InjectDocument(doc);
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
+    [Fact]
+    public void InjectDocument_FiresIndexChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.IndexChanged += idx => fired = idx;
+
+        svc.InjectDocument(Doc("file:///f.xml", 0));
+
+        Assert.NotNull(fired);
+    }
+
+    [Fact]
+    public void InjectDocument_NormalizesUri()
+    {
+        var svc = Build();
+
+        svc.InjectDocument(Doc("file:///F.XML", 0, [Symbol("A")]));
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        Assert.False(svc.Current.Documents.ContainsKey("file:///F.XML"));
+    }
+
+    [Fact]
+    public async Task InjectDocument_HigherVersionAlreadyCommitted_DropsInjection()
+    {
+        var sym = Symbol("UNIT_A");
+        var svc = Build(new FakeParser(Doc("", 0, [sym])));
+        // Commit version 5 via UpdateDocumentAsync
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 5, default);
+
+        // Inject version 0 (stale) — should be ignored
+        svc.InjectDocument(Doc("file:///f.xml", 0, []));
+
+        // Original v5 doc (with UNIT_A) is preserved
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
     // ── RemoveDocument ───────────────────────────────────────────────────────
 
     [Fact]

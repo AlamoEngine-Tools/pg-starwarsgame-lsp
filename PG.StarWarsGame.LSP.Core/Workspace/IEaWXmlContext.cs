@@ -7,8 +7,10 @@ public interface IEaWXmlContext
 {
     bool HasDirectories { get; }
     bool IsEaWXmlFile(string fileUri);
+    bool IsLeafFile(string fileUri);
 
     void AddDirectory(string absolutePath);
 
     void SetDirectories(IEnumerable<string> absolutePaths);
+    void SetLeafDirectories(IEnumerable<string> absolutePaths);
 }

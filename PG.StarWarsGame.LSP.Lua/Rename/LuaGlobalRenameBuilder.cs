@@ -21,6 +21,12 @@ public static class LuaGlobalRenameBuilder
         string id, string newName, GameIndex index,
         IGameWorkspaceHost workspaceHost, IFileHelper fileHelper, ILogger logger)
     {
+        if (!index.IsLeafOwned(id))
+        {
+            logger.LogDebug("Rename blocked: {Id} is not exclusively defined in the leaf layer", id);
+            return null;
+        }
+
         var changes = new Dictionary<DocumentUri, List<TextEdit>>();
 
         // Definition edits — find `function <id>(` in the definition file.

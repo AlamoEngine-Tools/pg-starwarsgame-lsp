@@ -36,6 +36,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly ISchemaProvider _schema;
+    private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IStoryFactProducer _storyProducer;
     private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
@@ -53,12 +54,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
         IXmlVariantFactProducer variantProducer,
+        IXmlLayerShadowFactProducer shadowProducer,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            variantProducer)
+            variantProducer, shadowProducer)
     {
     }
 
@@ -75,7 +77,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
         int debounceMs = 0,
-        IXmlVariantFactProducer? variantProducer = null)
+        IXmlVariantFactProducer? variantProducer = null,
+        IXmlLayerShadowFactProducer? shadowProducer = null)
         : base(publish, indexService, workspaceHost, debounceMs)
     {
         _indexService = indexService;
@@ -89,6 +92,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _fileTypeRegistry = fileTypeRegistry;
         _fileHelper = fileHelper;
         _variantProducer = variantProducer;
+        _shadowProducer = shadowProducer;
     }
 
     protected override string FileExtension => ".xml";
@@ -138,6 +142,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         facts.AddRange(_indexProducer.Produce(canonicalUri, index));
         if (_variantProducer is not null)
             facts.AddRange(_variantProducer.Produce(canonicalUri, text, index));
+        if (_shadowProducer is not null)
+            facts.AddRange(_shadowProducer.Produce(canonicalUri, text, index));
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(text, uri));
 

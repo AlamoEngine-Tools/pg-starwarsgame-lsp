@@ -14,10 +14,10 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 public sealed class ProjectLayerMap : IProjectLayerMap
 {
     private readonly IFileHelper _fileHelper;
+    private ImmutableDictionary<int, string> _names = ImmutableDictionary<int, string>.Empty;
 
     // Snapshots replaced atomically by SetLayers; readers take a single Volatile.Read.
     private ImmutableArray<(string Prefix, int Rank)> _prefixes = [];
-    private ImmutableDictionary<int, string> _names = ImmutableDictionary<int, string>.Empty;
     private int _topRank;
 
     public ProjectLayerMap(IFileHelper fileHelper)

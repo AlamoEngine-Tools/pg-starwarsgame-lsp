@@ -19,7 +19,7 @@ public sealed class SchemaHttpCacheTest
 
     private static readonly string CacheDir = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-        ".pg-swg-lsp", "schema");
+        ".aetswg", "schema");
 
     private static SchemaHttpCache BuildCache(MockFileSystem fs)
     {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion;
 
@@ -10,7 +11,9 @@ internal sealed class StoryParamValueCompletionStrategy : IXmlTagValueCompletion
     private readonly StoryParamValueProposalProvider _storyProposals;
 
     public StoryParamValueCompletionStrategy(StoryParamValueProposalProvider storyProposals)
-        => _storyProposals = storyProposals;
+    {
+        _storyProposals = storyProposals;
+    }
 
     public IEnumerable<CompletionItem> Handle(TagValueCompletionContext ctx)
     {
@@ -18,7 +21,7 @@ internal sealed class StoryParamValueCompletionStrategy : IXmlTagValueCompletion
 
         var storyCtx = StoryEventCompletionContextReader.Read(ctx.Doc, ctx.LineIndex, ctx.Character);
 
-        Core.Schema.ParamDefinition? paramDef;
+        ParamDefinition? paramDef;
         if (string.Equals(ctx.StoryParamSide, "Event", StringComparison.OrdinalIgnoreCase))
         {
             var typeDef = storyCtx.EventType is not null

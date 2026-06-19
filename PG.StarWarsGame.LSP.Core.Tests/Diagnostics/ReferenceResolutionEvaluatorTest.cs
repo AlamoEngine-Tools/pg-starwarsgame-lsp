@@ -8,8 +8,10 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 
 public sealed class ReferenceResolutionEvaluatorTest
 {
-    private static GameSymbol Symbol(string id, string typeName) =>
-        new(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///a.xml", 0, null), null);
+    private static GameSymbol Symbol(string id, string typeName)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin("file:///a.xml", 0, null), null);
+    }
 
     // ── unresolved ────────────────────────────────────────────────────────────
 

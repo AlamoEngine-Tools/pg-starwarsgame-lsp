@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -20,6 +21,7 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -108,6 +110,7 @@ public static class ServerConfigurator
                 // pipeline runs, then drains them in order. Replaces the old PreOpenBuffer race.
                 services.AddSingleton<IStartupGate, StartupGate>();
 
+                services.AddSingleton<IProjectIndexCache, ProjectIndexCache>();
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
@@ -140,8 +143,8 @@ public static class ServerConfigurator
                 services.AddXmlLanguageServices();
                 services.SupportLocalisationBaseline();
                 services.AddSingleton<LocalisationProjectRegistry>();
-                services.AddSingleton<ILocalisationProjectRegistry>(
-                    sp => sp.GetRequiredService<LocalisationProjectRegistry>());
+                services.AddSingleton<ILocalisationProjectRegistry>(sp =>
+                    sp.GetRequiredService<LocalisationProjectRegistry>());
                 services.AddSingleton<ILocalisationLoader, LocalisationLoader>();
                 services.AddSingleton<LocalisationIndexChangedNotifier>(sp =>
                     new LocalisationIndexChangedNotifier(

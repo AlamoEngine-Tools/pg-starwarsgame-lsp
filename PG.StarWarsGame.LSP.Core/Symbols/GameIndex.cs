@@ -74,6 +74,10 @@ public sealed record GameIndex(
         }
     }
 
+    // The highest LayerRank among all indexed documents; 0 when no documents exist.
+    public int LeafLayerRank =>
+        Documents.Count == 0 ? 0 : Documents.Values.Max(d => d.LayerRank);
+
     public GameSymbol? Resolve(string id)
     {
         if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
@@ -122,5 +126,46 @@ public sealed record GameIndex(
         return symbol.Origin is FileOrigin fo && Documents.TryGetValue(fo.Uri, out var doc)
             ? doc.LayerRank
             : 0;
+    }
+
+    // True iff every workspace definition of <id> is a FileOrigin symbol in the leaf layer.
+    // Returns false when the id is absent, any definition has a non-FileOrigin origin, or any
+    // definition lives in a dependency layer (rank < LeafLayerRank).
+    public bool IsLeafOwned(string id)
+    {
+        return WorkspaceDefinitions.TryGetValue(id, out var defs)
+               && defs.Length > 0
+               && defs.All(s => s.Origin is FileOrigin && LayerRankOf(s) == LeafLayerRank);
+    }
+
+    // True iff the given symbol belongs to the leaf (highest-rank) layer.
+    public bool IsLeafSymbol(GameSymbol symbol)
+    {
+        return LayerRankOf(symbol) == LeafLayerRank;
+    }
+
+    // Resolve with optional type preference. Among all definitions of <id>, prefer those whose
+    // TypeName matches <preferredTypeName> (highest rank among type-matches); fall back to the
+    // untyped winner if no type-match exists.
+    public GameSymbol? Resolve(string id, string? preferredTypeName)
+    {
+        if (preferredTypeName is null) return Resolve(id);
+
+        if (WorkspaceDefinitions.TryGetValue(id, out var ws) && ws.Length > 0)
+        {
+            var typeMatch = ws
+                .Where(s => string.Equals(s.TypeName, preferredTypeName, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(LayerRankOf)
+                .FirstOrDefault();
+            if (typeMatch is not null) return typeMatch;
+        }
+
+        if (Baseline.Symbols.TryGetValue(id, out var b) &&
+            string.Equals(b.TypeName, preferredTypeName, StringComparison.OrdinalIgnoreCase))
+            return b;
+
+        // No type-matched definition found — fall back to untyped resolution so TypeMismatchHandler
+        // fires rather than UnresolvedReferenceHandler.
+        return Resolve(id);
     }
 }

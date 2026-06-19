@@ -7,11 +7,11 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Util;
 
@@ -20,16 +20,16 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class ExportLocalisationToDatHandler
     : IJsonRpcRequestHandler<ExportLocalisationToDatParams, ExportLocalisationToDatResult>
 {
-    private readonly ICsvTranslationImporter _csvImporter;
-    private readonly IXmlTranslationImporter _xmlImporter;
-    private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly IBaselineTranslationProvider _baselineProvider;
-    private readonly ITranslationDatabaseFactory _factory;
-    private readonly ILanguageService _langService;
+    private readonly ICsvTranslationImporter _csvImporter;
     private readonly IDatTranslationExporter _datExporter;
     private readonly IDatFileService _datFileService;
+    private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
+    private readonly ILanguageService _langService;
     private readonly ILogger<ExportLocalisationToDatHandler> _logger;
+    private readonly IPropertiesTranslationImporter _nlsImporter;
+    private readonly IXmlTranslationImporter _xmlImporter;
 
     public ExportLocalisationToDatHandler(
         ICsvTranslationImporter csvImporter,
@@ -71,11 +71,11 @@ public sealed class ExportLocalisationToDatHandler
 
         var merged = _factory.CreateKeyed(languages);
         foreach (var entry in eawDb)
-            foreach (var kv in entry.Translations)
-                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var kv in entry.Translations)
+            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
         foreach (var entry in focDb)
-            foreach (var kv in entry.Translations)
-                merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        foreach (var kv in entry.Translations)
+            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
 
         var ext = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         try
@@ -85,7 +85,10 @@ public sealed class ExportLocalisationToDatHandler
             {
                 case ".csv":
                     using (var reader = new StreamReader(fileStream))
+                    {
                         _csvImporter.Import(reader, merged);
+                    }
+
                     break;
                 case ".xml":
                     using (var reader = new StreamReader(fileStream))
@@ -93,10 +96,14 @@ public sealed class ExportLocalisationToDatHandler
                         var xdoc = XDocument.Load(reader);
                         _xmlImporter.Import(xdoc, merged);
                     }
+
                     break;
                 case ".properties":
                     using (var reader = new StreamReader(fileStream))
+                    {
                         _nlsImporter.Import(reader, _langService.Default, merged);
+                    }
+
                     break;
                 default:
                     return Task.FromResult(new ExportLocalisationToDatResult([], $"Unsupported format: {ext}"));

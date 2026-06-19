@@ -9,7 +9,6 @@ using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
 
@@ -57,7 +56,7 @@ public sealed class GameRenameHandlerTest
     public async Task Handle_XmlFile_RoutesToXmlProvider()
     {
         var xmlEdit = new WorkspaceEdit();
-        var result = await BuildHandler(xmlProvider: new StubProvider(xmlEdit))
+        var result = await BuildHandler(new StubProvider(xmlEdit))
             .Handle(RenameAt(XmlUri), CancellationToken.None);
         Assert.Same(xmlEdit, result);
     }
@@ -74,7 +73,7 @@ public sealed class GameRenameHandlerTest
     [Fact]
     public async Task Handle_XmlFile_XmlProviderReturnsNull_ReturnsNull()
     {
-        var result = await BuildHandler(xmlProvider: new NullXmlProvider())
+        var result = await BuildHandler(new NullXmlProvider())
             .Handle(RenameAt(XmlUri), CancellationToken.None);
         Assert.Null(result);
     }
@@ -83,40 +82,96 @@ public sealed class GameRenameHandlerTest
 
     private sealed class FakeIndexService : IGameIndexService
     {
-        public GameIndex Current { get; set; } = GameIndex.Empty;
+        public GameIndex Current { get; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public void ApplyLocalisation(ILocalisationIndex index) { }
-        public void ApplyAssetFiles(IAssetFileIndex index) { }
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
     private sealed class NullXmlProvider : IXmlRenameProvider
     {
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index) => null;
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index) => null;
+        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        {
+            return null;
+        }
+
+        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        {
+            return null;
+        }
     }
 
     private sealed class NullLuaProvider : ILuaRenameProvider
     {
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index) => null;
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index) => null;
+        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        {
+            return null;
+        }
+
+        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        {
+            return null;
+        }
     }
 
     private sealed class StubProvider : IXmlRenameProvider, ILuaRenameProvider
     {
         private readonly WorkspaceEdit _edit;
-        public StubProvider(WorkspaceEdit edit) => _edit = edit;
-        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index) => _edit;
-        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index) => null;
+
+        public StubProvider(WorkspaceEdit edit)
+        {
+            _edit = edit;
+        }
+
+        public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
+        {
+            return _edit;
+        }
+
+        public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
+        {
+            return null;
+        }
     }
 }
