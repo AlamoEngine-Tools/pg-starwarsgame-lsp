@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {
@@ -18,6 +19,8 @@ import { LocalisationEditorViewProvider } from './localisationEditorViewProvider
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
+const RELEASES_URL = 'https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases';
+const REQUIRED_SERVER_VERSION = '0.1.0';
 
 /**
  * Forces every language-feature capability to be advertised STATICALLY (in the initialize response)
@@ -170,11 +173,29 @@ function validateConfiguration(): boolean {
 	const devMode = cfg('lsp.devMode').get<boolean>('enabled', false);
 
 	if (!devMode) {
-		if (!cfg('lsp').get<string>('executable')) {
-			vscode.window.showErrorMessage(
+		const serverExePath = cfg('lsp').get<string>('executable');
+		if (!serverExePath) {
+			void vscode.window.showErrorMessage(
 				'EaWEdit: LSP is enabled but no server executable is configured. ' +
-				'Set "aet-eaw-edit.lsp.executable" to the path of the LSP server DLL.'
-			);
+				`Download version ${REQUIRED_SERVER_VERSION} from the releases page, ` +
+				'then set "aet-eaw-edit.lsp.executable".',
+				'Download'
+			).then(choice => {
+				if (choice === 'Download') {
+					void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
+				}
+			});
+			valid = false;
+		} else if (!fs.existsSync(serverExePath)) {
+			void vscode.window.showErrorMessage(
+				`EaWEdit: LSP server not found at "${serverExePath}". ` +
+				`Download version ${REQUIRED_SERVER_VERSION} from the releases page.`,
+				'Download'
+			).then(choice => {
+				if (choice === 'Download') {
+					void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
+				}
+			});
 			valid = false;
 		}
 	}
@@ -319,6 +340,19 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		await lspClient?.setTrace(resolvedTrace);
 		logLine('LSP server started and initialized.');
 
+		const serverVersion = lspClient?.initializeResult?.serverInfo?.version;
+		logLine(`Server version reported: ${serverVersion ?? '(none)'}`);
+		if (serverVersion !== REQUIRED_SERVER_VERSION) {
+			const msg = serverVersion
+				? `EaWEdit: server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Some features may not work correctly.`
+				: `EaWEdit: the server did not report a version. Download version ${REQUIRED_SERVER_VERSION} from the releases page.`;
+			void vscode.window.showWarningMessage(msg, 'Download').then(choice => {
+				if (choice === 'Download') {
+					void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
+				}
+			});
+		}
+
 		// vscode-languageclient's hookConfigurationChanged reads aet.pg.swg.lsp.trace.server
 		// (the CLIENT_ID namespace), which is not in settings, so it resets trace to Off on
 		// every VS Code config change. Register our own listener — after hookConfigurationChanged's
@@ -335,9 +369,17 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		if (statusItem) {
 			statusItem.text = '$(error) EaWEdit LSP: failed to start';
 		}
-		vscode.window.showErrorMessage(
-			`EaWEdit: LSP server failed to start. Check that the executable path is correct. (${e})`
-		);
+		void vscode.window.showErrorMessage(
+			'EaWEdit: LSP server failed to start. Check the EaWEdit output channel for details.',
+			'Show Output',
+			'Download'
+		).then(choice => {
+			if (choice === 'Show Output') {
+				log?.show(true);
+			} else if (choice === 'Download') {
+				void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
+			}
+		});
 	});
 
 	lspClient.onNotification('$/workspaceScanComplete', () => {

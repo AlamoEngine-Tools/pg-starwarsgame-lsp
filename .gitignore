@@ -512,3 +512,4 @@ docs/
 *.ps1
 *.md
 *.MD
+/dist

@@ -5,6 +5,9 @@ logs/**
 .gitignore
 .yarnrc
 vsc-extension-quickstart.md
+esbuild.js
+package-lock.json
+out/localisationEditorViewProvider.js
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map

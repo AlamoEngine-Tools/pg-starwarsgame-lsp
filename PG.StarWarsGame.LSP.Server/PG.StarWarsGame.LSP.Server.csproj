@@ -22,27 +22,12 @@
         <ProjectReference Include="..\..\PetroglyphTools\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline\PG.StarWarsGame.Localisation.Baseline.csproj"/>
     </ItemGroup>
 
-    <PropertyGroup>
-        <!-- Set via CI secret: dotnet publish -p:SentryDsn=<secret>
-             Falls back to the SENTRY_DSN env var if the MSBuild property is not supplied. -->
-        <SentryDsn Condition="'$(SentryDsn)' == ''">$(SENTRY_DSN)</SentryDsn>
-    </PropertyGroup>
-
-    <ItemGroup>
-        <AssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
-            <_Parameter1>SentryDsn</_Parameter1>
-            <_Parameter2>$(SentryDsn)</_Parameter2>
-        </AssemblyAttribute>
-    </ItemGroup>
-
     <ItemGroup>
         <PackageReference Include="AlamoEngineTools.Modinfo" Version="8.0.6"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9"/>
         <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9"/>
         <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
-        <PackageReference Include="Sentry" Version="6.6.0"/>
-        <PackageReference Include="Sentry.Extensions.Logging" Version="6.6.0"/>
         <PackageReference Include="Serilog" Version="4.3.1"/>
         <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0"/>
         <PackageReference Include="Serilog.Sinks.File" Version="7.0.0"/>

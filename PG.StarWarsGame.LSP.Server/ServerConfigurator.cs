@@ -40,6 +40,14 @@ public static class ServerConfigurator
     public static LanguageServerOptions Apply(LanguageServerOptions options,
         CoreServerOptions? serverOptions = null)
     {
+        options.ServerInfo = new ServerInfo
+        {
+            Name = "PG.StarWarsGame.LSP",
+            Version = typeof(ServerConfigurator).Assembly
+                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                ?? "unknown"
+        };
+
         return options
             .ConfigureLogging(x => x
                 .SetMinimumLevel(LogLevel.Information)
@@ -47,14 +55,7 @@ public static class ServerConfigurator
 #if DEBUG
                 .AddSerilog(dispose: true)
 #endif
-                .AddSentry(o =>
-                {
-                    o.Dsn = GetSentryDsn();
-                    o.Debug = true;
-                    o.AutoSessionTracking = true;
-                    o.TracesSampleRate = 1.0;
-                    o.EnableLogs = true;
-                }))
+                )
             .WithHandler<LuaTextDocumentSyncHandler>()
             .WithHandler<LuaCompletionHandler>()
             .WithHandler<LuaCodeActionHandler>()
@@ -168,92 +169,68 @@ public static class ServerConfigurator
                 // client sees the server "ready" immediately. All heavy work (schema, baseline,
                 // indexing) runs in the StartupPipeline launched from OnInitialized, while the
                 // StartupGate buffers any client notifications that arrive in the meantime.
-                var tx = SentrySdk.StartTransaction("lsp.initialize", "server.lifecycle");
-                try
-                {
-                    var logger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
+                var logger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
 
-                    logger.LogInformation("[initialize] RootUri={RootUri} RootPath={RootPath}",
-                        request.RootUri, request.RootPath);
-                    logger.LogInformation("[initialize] WorkspaceFolders={Folders}",
-                        request.WorkspaceFolders is null
-                            ? "<null>"
-                            : string.Join(", ", request.WorkspaceFolders.Select(f => f.Uri.ToString())));
-                    logger.LogInformation("[initialize] InitializationOptions={Options}",
-                        JsonConvert.SerializeObject(request.InitializationOptions, Formatting.None));
+                logger.LogInformation("[initialize] RootUri={RootUri} RootPath={RootPath}",
+                    request.RootUri, request.RootPath);
+                logger.LogInformation("[initialize] WorkspaceFolders={Folders}",
+                    request.WorkspaceFolders is null
+                        ? "<null>"
+                        : string.Join(", ", request.WorkspaceFolders.Select(f => f.Uri.ToString())));
+                logger.LogInformation("[initialize] InitializationOptions={Options}",
+                    JsonConvert.SerializeObject(request.InitializationOptions, Formatting.None));
 
-                    var configProvider = server.Services.GetRequiredService<ILspConfigurationProvider>();
-                    var configSpan = tx.StartChild("config.load", "Load initialization options");
-                    configProvider.LoadFrom(request.InitializationOptions);
-                    logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
-                    configSpan.Finish(SpanStatus.Ok);
-
-                    tx.Finish(SpanStatus.Ok);
-                }
-                catch (Exception)
-                {
-                    tx.Finish(SpanStatus.InternalError);
-                    throw;
-                }
+                var configProvider = server.Services.GetRequiredService<ILspConfigurationProvider>();
+                configProvider.LoadFrom(request.InitializationOptions);
+                logger.LogInformation("Loaded configuration: {@Config}", configProvider.Current);
 
                 await Task.CompletedTask;
             })
             .OnInitialized(async (server, request, response, ct) =>
             {
-                var tx = SentrySdk.StartTransaction("lsp.initialized", "server.lifecycle");
-                try
+                var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
+                var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
+
+                var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
+
+                // Log whether a .pgproj was found under the scan roots — useful startup breadcrumb.
+                var detector = server.Services.GetRequiredService<IModProjectDetector>();
+                var hasPgproj = detector.TryFind(scanRoots, out var pgprojPath);
+                initLogger.LogInformation(
+                    "[initialized] scanRoots={Roots} | .pgproj present={Found} path={Path}",
+                    string.Join(", ", scanRoots), hasPgproj, pgprojPath ?? "<none>");
+
+                // Heavy startup runs on a background task while the StartupGate buffers any client
+                // notifications that arrive in the meantime. The gate is opened (draining the
+                // buffer in order) once the pipeline finishes, and the client is told the scan
+                // completed. Diagnostics publishers are resolved eagerly so they subscribe to
+                // IndexChanged before the index is populated.
+                server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
+                server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
+                server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
+                var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
+                var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
+                var reload = server.Services.GetRequiredService<IModProjectReloadService>();
+                var notifier = server.Services.GetRequiredService<IStartupNotifier>();
+                var gate = server.Services.GetRequiredService<IStartupGate>();
+                _ = Task.Run(async () =>
                 {
-                    var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
-                    var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
-
-                    var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
-
-                    // Log whether a .pgproj was found under the scan roots — useful startup breadcrumb.
-                    var detector = server.Services.GetRequiredService<IModProjectDetector>();
-                    var hasPgproj = detector.TryFind(scanRoots, out var pgprojPath);
-                    initLogger.LogInformation(
-                        "[initialized] scanRoots={Roots} | .pgproj present={Found} path={Path}",
-                        string.Join(", ", scanRoots), hasPgproj, pgprojPath ?? "<none>");
-
-                    // Heavy startup runs on a background task while the StartupGate buffers any client
-                    // notifications that arrive in the meantime. The gate is opened (draining the
-                    // buffer in order) once the pipeline finishes, and the client is told the scan
-                    // completed. Diagnostics publishers are resolved eagerly so they subscribe to
-                    // IndexChanged before the index is populated.
-                    server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
-                    server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
-                    server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
-                    var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
-                    var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
-                    var reload = server.Services.GetRequiredService<IModProjectReloadService>();
-                    var notifier = server.Services.GetRequiredService<IStartupNotifier>();
-                    var gate = server.Services.GetRequiredService<IStartupGate>();
-                    _ = Task.Run(async () =>
+                    try
                     {
-                        try
-                        {
-                            await schema.LoadAsync(CancellationToken.None);
-                            await baseline.LoadAsync(CancellationToken.None);
-                            await reload.LoadAsync(scanRoots, CancellationToken.None);
-                        }
-                        catch (Exception ex)
-                        {
-                            initLogger.LogError(ex, "Startup pipeline failed");
-                        }
-                        finally
-                        {
-                            await gate.OpenAsync();
-                            notifier.NotifyScanComplete();
-                        }
-                    }, CancellationToken.None);
-
-                    tx.Finish(SpanStatus.Ok);
-                }
-                catch (Exception)
-                {
-                    tx.Finish(SpanStatus.InternalError);
-                    throw;
-                }
+                        await schema.LoadAsync(CancellationToken.None);
+                        await baseline.LoadAsync(CancellationToken.None);
+                        await reload.LoadAsync(scanRoots, CancellationToken.None);
+                    }
+                    catch (Exception ex)
+                    {
+                        initLogger.LogError(ex, "Startup pipeline failed");
+                    }
+                    finally
+                    {
+                        await gate.OpenAsync();
+                        notifier.NotifyScanComplete();
+                    }
+                }, CancellationToken.None);
 
                 await Task.CompletedTask;
             });
@@ -288,19 +265,5 @@ public static class ServerConfigurator
             folders.Add(configWorkspaceRoot);
 
         return folders;
-    }
-
-    private static string? GetSentryDsn()
-    {
-        // Preferred: baked in at publish time via -p:SentryDsn=<CI secret>
-        var fromMetadata = typeof(ServerConfigurator).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .FirstOrDefault(a => a.Key == "SentryDsn")?.Value;
-        if (!string.IsNullOrEmpty(fromMetadata))
-            return fromMetadata;
-
-        // Local dev fallback: set via SENTRY_DSN in .env.sentry loaded by the run configuration
-        var fromEnv = Environment.GetEnvironmentVariable("SENTRY_DSN");
-        return string.IsNullOrEmpty(fromEnv) ? "" : fromEnv;
     }
 }

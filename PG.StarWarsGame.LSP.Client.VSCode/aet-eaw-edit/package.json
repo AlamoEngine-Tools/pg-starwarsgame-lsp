@@ -1,17 +1,33 @@
 {
   "name": "aet-eaw-edit",
   "displayName": "Alamo Engine Tools - Empire at War Edit",
-  "description": "A LSP server for modding the game Star Wars: Empire at War and its expansion Star Wars: Empire at War: Forces of Corruption",
+  "description": "Editor intelligence for Star Wars: Empire at War and Forces of Corruption mod development — XML completions, diagnostics, hover, go-to-definition, rename, and Lua support.",
   "author": {
     "name": "Lukas Grünwald"
   },
   "publisher": "AlamoEngineTools",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "preview": true,
+  "keywords": [
+    "star wars",
+    "empire at war",
+    "forces of corruption",
+    "eaw",
+    "foc",
+    "modding",
+    "alamo engine",
+    "petroglyph",
+    "xml",
+    "lua",
+    "lsp"
+  ],
   "icon": "resources/icons/alamo-engine-tools.png",
   "engines": {
     "vscode": "^1.107.0"
   },
   "categories": [
+    "Programming Languages",
+    "Linters",
     "Other"
   ],
   "activationEvents": [
@@ -86,7 +102,7 @@
           "type": "string",
           "default": "",
           "format": "uri-reference",
-          "markdownDescription": "The path to the LSP server binary.\n\n- **Self-contained release** (`.exe` on Windows, no extension on Linux): point directly at the executable.\n- **Framework-dependent build** (`.dll`): point at the DLL — `dotnet` will be used to launch it.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
+          "markdownDescription": "Path to `PG.StarWarsGame.LSP.Server.exe`. Download the server archive from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases), extract it, and point this setting at the `.exe`.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
           "scope": "machine-overridable"
         },
         "aet-eaw-edit.lsp.locale": {
