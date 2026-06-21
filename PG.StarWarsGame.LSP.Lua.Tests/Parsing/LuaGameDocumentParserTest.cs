@@ -316,11 +316,13 @@ public sealed class LuaGameDocumentParserTest
     }
 
     [Fact]
-    public async Task ParseAsync_RelativeRequire_IsExcluded()
+    public async Task ParseAsync_RelativeRequire_IsIncludedInRequireArgs()
     {
+        // Relative requires are stored in RequireArgs so callers that have the callerUri
+        // (hover, go-to-def, diagnostics, completion) can resolve them at query time.
         var result = await Build().ParseAsync(
             "file:///s.lua", """require("./relative/path")""", 1, default);
-        Assert.Empty(result.RequireArgs);
+        Assert.Equal("./relative/path", Assert.Single(result.RequireArgs));
     }
 
     [Fact]

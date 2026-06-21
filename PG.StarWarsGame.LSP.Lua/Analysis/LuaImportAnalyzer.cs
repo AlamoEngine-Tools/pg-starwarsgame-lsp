@@ -31,9 +31,10 @@ internal static class LuaImportAnalyzer
             var requireArg = ExtractStringArg(call);
             if (requireArg is null) continue;
 
-            if (LuaRequireResolver.IsRelative(requireArg)) continue;
-
-            if (LuaRequireResolver.Resolve(requireArg, documents, fileHelper) is null)
+            var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper, documentUri);
+            // Unresolved relative requires are silently skipped — target may be outside the workspace.
+            // Unresolved absolute requires are a real error.
+            if (resolved is null && !LuaRequireResolver.IsRelative(requireArg))
                 diagnostics.Add(BuildDiagnostic(call, requireArg));
         }
 

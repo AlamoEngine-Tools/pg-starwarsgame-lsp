@@ -207,7 +207,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         {
             if (call.Expression is not IdentifierNameSyntax { Name: "require" }) continue;
             var arg = ExtractRequireStringArg(call);
-            if (arg is null || LuaRequireResolver.IsRelative(arg)) continue;
+            if (arg is null) continue;
             builder.Add(arg);
         }
 

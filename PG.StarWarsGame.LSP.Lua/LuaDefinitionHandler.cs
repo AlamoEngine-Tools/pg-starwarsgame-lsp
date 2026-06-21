@@ -78,7 +78,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
         var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);
-        var resolved = TryResolveRequireAtPosition(tree.GetRoot(), line, character, index.Documents, _fileHelper);
+        var resolved = TryResolveRequireAtPosition(tree.GetRoot(), line, character, index.Documents, _fileHelper, uri);
         if (resolved is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
@@ -94,7 +94,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 
     private static string? TryResolveRequireAtPosition(
         SyntaxNode root, int line, int character,
-        IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
+        IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper, string callerUri)
     {
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
         {
@@ -117,10 +117,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             if (line == startLine && character < startChar) continue;
             if (line == endLine && character > endChar) continue;
 
-            if (LuaRequireResolver.IsRelative(requireArg))
-                return null;
-
-            return LuaRequireResolver.Resolve(requireArg, documents, fileHelper);
+            return LuaRequireResolver.Resolve(requireArg, documents, fileHelper, callerUri);
         }
 
         return null;

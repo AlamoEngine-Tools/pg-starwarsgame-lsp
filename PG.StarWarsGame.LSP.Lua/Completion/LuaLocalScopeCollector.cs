@@ -154,8 +154,7 @@ internal static class LuaLocalScopeCollector
 
         foreach (var arg in docIndex.RequireArgs)
         {
-            if (LuaRequireResolver.IsRelative(arg)) continue;
-            var resolved = LuaRequireResolver.Resolve(arg, index.Documents, fileHelper);
+            var resolved = LuaRequireResolver.Resolve(arg, index.Documents, fileHelper, normalizedUri);
             if (resolved is not null) directRequired.Add(resolved);
         }
 
