@@ -298,6 +298,88 @@ public sealed class LuaGameDocumentParserTest
 
     // ── RequireArgs ───────────────────────────────────────────────────────────
 
+    // ── Description extraction ────────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_SingleLineDocComment_DescriptionExtracted()
+    {
+        const string text = """
+                            --- Does something useful.
+                            function Foo() end
+                            """;
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Does something useful.", sym.Description);
+    }
+
+    [Fact]
+    public async Task ParseAsync_MultiLineDocComment_DescriptionJoinedWithNewlines()
+    {
+        const string text = """
+                            --- Line one.
+                            --- Line two.
+                            function Foo() end
+                            """;
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Line one.\nLine two.", sym.Description);
+    }
+
+    [Fact]
+    public async Task ParseAsync_BlankLineBetweenCommentAndFunction_DescriptionIsNull()
+    {
+        const string text = "--- Separated.\n\nfunction Foo() end";
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Null(sym.Description);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AnnotationLinesExcludedFromDescription()
+    {
+        const string text = """
+                            --- Does something.
+                            ---@param x number
+                            ---@return boolean
+                            function Foo() end
+                            """;
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("Does something.", sym.Description);
+    }
+
+    [Fact]
+    public async Task ParseAsync_OnlyAnnotations_DescriptionIsNull()
+    {
+        const string text = """
+                            ---@param x number
+                            function Foo() end
+                            """;
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Null(sym.Description);
+    }
+
+    [Fact]
+    public async Task ParseAsync_NoDocComment_DescriptionIsNull()
+    {
+        var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Null(sym.Description);
+    }
+
+    [Fact]
+    public async Task ParseAsync_RegularCommentNotDocComment_DescriptionIsNull()
+    {
+        // Single-dash `--` comments are NOT doc comments; only `---` lines count.
+        const string text = "-- not a doc comment\nfunction Foo() end";
+        var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
+        var sym = Assert.Single(result.Symbols);
+        Assert.Null(sym.Description);
+    }
+
+    // ── RequireArgs ───────────────────────────────────────────────────────────
+
     [Fact]
     public async Task ParseAsync_NoRequireCalls_RequireArgs_IsEmpty()
     {

@@ -78,10 +78,61 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
                 GameSymbolKind.LuaGlobal,
                 null,
                 new FileOrigin(documentUri, position.Line, position.Character),
-                null));
+                ExtractDocComment(funcDecl)));
         }
 
         return symbols;
+    }
+
+    // Walks the leading trivia of the function declaration backwards to collect
+    // the `---`-prefixed doc comment block immediately above it. Stops at blank
+    // lines or non-comment trivia. Annotation lines (---@...) are skipped so
+    // only prose description text is returned.
+    private static string? ExtractDocComment(FunctionDeclarationStatementSyntax funcDecl)
+    {
+        var trivia = funcDecl.GetFirstToken().LeadingTrivia;
+        var lines = new List<string>();
+        var seenEol = false;
+
+        for (var i = trivia.Count - 1; i >= 0; i--)
+        {
+            var text = trivia[i].ToFullString();
+
+            // End-of-line trivia: one EOL is normal inter-line spacing; two in a row = blank line.
+            if (text is "\n" or "\r\n" or "\r")
+            {
+                if (seenEol) break;
+                seenEol = true;
+                continue;
+            }
+
+            // Horizontal whitespace (indentation) — skip without affecting EOL tracking.
+            if (string.IsNullOrWhiteSpace(text))
+                continue;
+
+            var trimmed = text.TrimStart();
+
+            // Must start with `---` to be a doc comment; bare `--` comments stop collection.
+            if (!trimmed.StartsWith("---", StringComparison.Ordinal))
+                break;
+
+            // Annotation lines (---@...) are not prose — skip but continue scanning upward.
+            if (trimmed.StartsWith("---@", StringComparison.Ordinal))
+            {
+                seenEol = false;
+                continue;
+            }
+
+            // Strip the `--- ` prefix and accumulate.
+            var content = trimmed[3..].TrimStart(' ', '\t');
+            if (content.Length > 0)
+                lines.Add(content);
+            seenEol = false;
+        }
+
+        if (lines.Count == 0) return null;
+        lines.Reverse();
+        return string.Join("\n", lines);
     }
 
     private List<GameReference> CollectReferences(
