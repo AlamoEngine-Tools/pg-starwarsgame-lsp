@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.1.0
+## 0.1.2
+
+- Hotfix for URI encoding/decoding issues causing cash misses. See [#20](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/20).
+
+## 0.1.1
 
 First public preview release.
 
