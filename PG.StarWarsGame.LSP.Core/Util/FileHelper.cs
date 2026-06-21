@@ -23,9 +23,9 @@ public sealed class FileHelper : IFileHelper
     public string NormalizeUri(string pathOrUri)
     {
         if (pathOrUri.StartsWith("file:///", StringComparison.OrdinalIgnoreCase))
-            return PathToFileUri(pathOrUri[8..]);
+            return PathToFileUri(Uri.UnescapeDataString(pathOrUri[8..]));
         if (pathOrUri.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            return PathToFileUri(pathOrUri[7..]);
+            return PathToFileUri(Uri.UnescapeDataString(pathOrUri[7..]));
         return PathToFileUri(pathOrUri);
     }
 
