@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.RegularExpressions;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
 namespace PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -51,9 +52,13 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         Dictionary<string, FunctionEntry> functions,
         Dictionary<string, List<LuaTypeMember>> typeMembers)
     {
-        var pendingParams = new List<PendingParam>();
-        string? pendingDescription = null;
-        string? pendingReturnType = null;
+        // Accumulate comment lines (--- stripped) for EmmyLuaAnnotationParser.
+        var commentLines = new List<string>();
+        // Track @xmlref pairing: each entry is (paramIndex, rawXmlRefToken).
+        // @xmlref applies to the IMMEDIATELY PRECEDING @param, so we track the
+        // current param index as we encounter @param lines.
+        var xmlRefPairs = new List<(int ParamIndex, string RawToken)>();
+        var paramCount  = 0;
 
         foreach (var rawLine in content.Split('\n'))
         {
@@ -61,94 +66,90 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
 
             if (line.StartsWith("---@param", StringComparison.Ordinal))
             {
-                var parts = line[3..].Trim().Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
-                if (parts.Length >= 2)
-                    pendingParams.Add(new PendingParam(parts[1], null));
-            }
-            else if (line.StartsWith("---@return", StringComparison.Ordinal))
-            {
-                // ---@return TypeName [optional description]
-                var after = line[3..].Trim()["@return".Length..].Trim();
-                var typePart = after.Split(' ', 2)[0].Trim();
-                if (typePart.Length > 0)
-                    pendingReturnType = typePart;
+                commentLines.Add(line[3..].TrimStart(' ', '\t'));
+                paramCount++;
             }
             else if (line.StartsWith("---@xmlref", StringComparison.Ordinal))
             {
-                if (pendingParams.Count > 0)
+                // Pair with the most-recently-seen @param (paramCount - 1, 0-indexed)
+                if (paramCount > 0)
                 {
-                    var token = line[3..].Trim().Split(' ', 2)[1].Trim();
-                    var commentIdx = token.IndexOf("--", StringComparison.Ordinal);
-                    if (commentIdx >= 0) token = token[..commentIdx].Trim();
-
-                    string? typeConstraint = null;
-                    var colonIdx = token.IndexOf(':', StringComparison.Ordinal);
-                    if (colonIdx >= 0)
-                        typeConstraint = token[(colonIdx + 1)..].Trim();
-
-                    pendingParams[^1] = pendingParams[^1] with { XmlRefTypeName = typeConstraint ?? "" };
+                    var token    = line[3..].Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                    var rawToken = token.Length > 1 ? token[1].Trim() : "";
+                    var commentI = rawToken.IndexOf("--", StringComparison.Ordinal);
+                    if (commentI >= 0) rawToken = rawToken[..commentI].Trim();
+                    xmlRefPairs.Add((paramCount - 1, rawToken));
                 }
-            }
-            else if (line.StartsWith("---@", StringComparison.Ordinal))
-            {
-                // other EmmyLua annotation — ignore but don't reset state
+                // Feed to parser as-is so it silently skips @xmlref (Tier 3)
+                commentLines.Add(line[3..].TrimStart(' ', '\t'));
             }
             else if (line.StartsWith("---", StringComparison.Ordinal))
             {
-                var text = line[3..].TrimStart();
-                if (text.Length > 0)
-                    pendingDescription = pendingDescription is null ? text : pendingDescription + " " + text;
+                var stripped = line[3..];
+                if (stripped.Length > 0 && (stripped[0] == ' ' || stripped[0] == '\t'))
+                    stripped = stripped[1..];
+                commentLines.Add(stripped);
             }
             else if (line.StartsWith("function ", StringComparison.Ordinal))
             {
+                var annotations = EmmyLuaAnnotationParser.Parse(commentLines);
+
                 // Try member function: TypeName.Method or TypeName:Method
                 var memberMatch = MemberFunctionDeclRegex().Match(line);
                 if (memberMatch.Success)
                 {
-                    var typeName = memberMatch.Groups["type"].Value;
+                    var typeName   = memberMatch.Groups["type"].Value;
                     var methodName = memberMatch.Groups["method"].Value;
-                    var isMethod = memberMatch.Groups["sep"].Value == ":";
+                    var isMethod   = memberMatch.Groups["sep"].Value == ":";
 
                     if (!typeMembers.TryGetValue(typeName, out var memberList))
                         typeMembers[typeName] = memberList = [];
 
-                    memberList.Add(new LuaTypeMember(methodName, isMethod, pendingDescription, pendingReturnType));
-                    pendingParams.Clear();
-                    pendingDescription = null;
-                    pendingReturnType = null;
-                    continue;
+                    var retType = annotations.Returns.IsDefaultOrEmpty
+                        ? null : annotations.Returns[0].Type.Raw;
+                    memberList.Add(new LuaTypeMember(methodName, isMethod, annotations.Description, retType));
                 }
-
-                // Simple global function
-                var match = FunctionDeclRegex().Match(line);
-                if (match.Success)
+                else
                 {
-                    var name = match.Groups["name"].Value;
-                    var xmlRefs = new List<XmlRefEntry>();
-                    for (var i = 0; i < pendingParams.Count; i++)
+                    var match = FunctionDeclRegex().Match(line);
+                    if (match.Success)
                     {
-                        if (pendingParams[i].XmlRefTypeName is not { } xmlRef) continue;
-                        var typeName = xmlRef.Length == 0 ? null : xmlRef;
-                        xmlRefs.Add(new XmlRefEntry(i, typeName));
+                        var name    = match.Groups["name"].Value;
+                        var xmlRefs = BuildXmlRefs(xmlRefPairs);
+                        var retType = annotations.Returns.IsDefaultOrEmpty
+                            ? null : annotations.Returns[0].Type.Raw;
+                        functions[name] = new FunctionEntry(xmlRefs, annotations.Description, retType);
                     }
-
-                    functions[name] = new FunctionEntry(xmlRefs, pendingDescription, pendingReturnType);
                 }
 
-                pendingParams.Clear();
-                pendingDescription = null;
-                pendingReturnType = null;
+                commentLines.Clear();
+                xmlRefPairs.Clear();
+                paramCount = 0;
             }
             else
             {
                 if (line.Length == 0 || !line.StartsWith("---", StringComparison.Ordinal))
                 {
-                    pendingParams.Clear();
-                    pendingDescription = null;
-                    pendingReturnType = null;
+                    commentLines.Clear();
+                    xmlRefPairs.Clear();
+                    paramCount = 0;
                 }
             }
         }
+    }
+
+    private static List<XmlRefEntry> BuildXmlRefs(List<(int ParamIndex, string RawToken)> pairs)
+    {
+        var result = new List<XmlRefEntry>(pairs.Count);
+        foreach (var (paramIdx, rawToken) in pairs)
+        {
+            string? typeConstraint = null;
+            var colonI = rawToken.IndexOf(':', StringComparison.Ordinal);
+            if (colonI >= 0)
+                typeConstraint = rawToken[(colonI + 1)..].Trim();
+            result.Add(new XmlRefEntry(paramIdx, typeConstraint?.Length == 0 ? null : typeConstraint));
+        }
+        return result;
     }
 
     [GeneratedRegex(@"^function\s+(?<name>[A-Za-z_]\w*)\s*\(")]
@@ -161,6 +162,4 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         IReadOnlyList<XmlRefEntry> XmlRefs,
         string? Description,
         string? ReturnTypeName);
-
-    private record struct PendingParam(string Name, string? XmlRefTypeName);
 }

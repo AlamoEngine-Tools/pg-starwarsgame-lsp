@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Parsing;
@@ -84,55 +85,52 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         return symbols;
     }
 
-    // Walks the leading trivia of the function declaration backwards to collect
-    // the `---`-prefixed doc comment block immediately above it. Stops at blank
-    // lines or non-comment trivia. Annotation lines (---@...) are skipped so
-    // only prose description text is returned.
+    // Collects all `---`-prefixed comment lines (both prose and annotation) immediately
+    // above the function, strips the `---` marker, and passes them to EmmyLuaAnnotationParser.
+    // Returns only the prose description from the parsed result; the full EmmyLuaAnnotations
+    // will be stored in ILuaAnnotationRepository once Issue #7 is implemented.
     private static string? ExtractDocComment(FunctionDeclarationStatementSyntax funcDecl)
     {
-        var trivia = funcDecl.GetFirstToken().LeadingTrivia;
-        var lines = new List<string>();
+        var lines = CollectDocCommentLines(funcDecl);
+        if (lines.Count == 0) return null;
+        var annotations = EmmyLuaAnnotationParser.Parse(lines);
+        return annotations.Description;
+    }
+
+    // Walks leading trivia backwards, collecting `---`-prefixed lines (prose + annotations).
+    // Stops at blank lines (two consecutive EOLs) or non-doc-comment trivia.
+    private static IReadOnlyList<string> CollectDocCommentLines(FunctionDeclarationStatementSyntax funcDecl)
+    {
+        var trivia  = funcDecl.GetFirstToken().LeadingTrivia;
+        var lines   = new List<string>();
         var seenEol = false;
 
         for (var i = trivia.Count - 1; i >= 0; i--)
         {
             var text = trivia[i].ToFullString();
 
-            // End-of-line trivia: one EOL is normal inter-line spacing; two in a row = blank line.
             if (text is "\n" or "\r\n" or "\r")
             {
-                if (seenEol) break;
+                if (seenEol) break; // two consecutive EOLs = blank line → stop
                 seenEol = true;
                 continue;
             }
 
-            // Horizontal whitespace (indentation) — skip without affecting EOL tracking.
-            if (string.IsNullOrWhiteSpace(text))
-                continue;
+            if (string.IsNullOrWhiteSpace(text)) continue; // indentation — skip
 
             var trimmed = text.TrimStart();
+            if (!trimmed.StartsWith("---", StringComparison.Ordinal)) break; // bare `--` → stop
 
-            // Must start with `---` to be a doc comment; bare `--` comments stop collection.
-            if (!trimmed.StartsWith("---", StringComparison.Ordinal))
-                break;
-
-            // Annotation lines (---@...) are not prose — skip but continue scanning upward.
-            if (trimmed.StartsWith("---@", StringComparison.Ordinal))
-            {
-                seenEol = false;
-                continue;
-            }
-
-            // Strip the `--- ` prefix and accumulate.
-            var content = trimmed[3..].TrimStart(' ', '\t');
-            if (content.Length > 0)
-                lines.Add(content);
+            // Strip exactly the "---" prefix plus one optional space/tab
+            var content = trimmed[3..];
+            if (content.Length > 0 && (content[0] == ' ' || content[0] == '\t'))
+                content = content[1..];
+            lines.Add(content);
             seenEol = false;
         }
 
-        if (lines.Count == 0) return null;
         lines.Reverse();
-        return string.Join("\n", lines);
+        return lines;
     }
 
     private List<GameReference> CollectReferences(
