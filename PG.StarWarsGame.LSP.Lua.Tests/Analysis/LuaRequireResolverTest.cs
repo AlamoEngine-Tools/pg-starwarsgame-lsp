@@ -105,6 +105,67 @@ public sealed class LuaRequireResolverTest
         Assert.NotNull(result);
     }
 
+    // ── relative require resolution ───────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_RelativeDotSlash_WithCallerUri_ResolvesCorrectly()
+    {
+        const string callerUri  = "file:///scripts/ai/foo.lua";
+        const string siblingUri = "file:///scripts/ai/sibling.lua";
+        var docs = MakeDocs([(siblingUri, 0)]);
+
+        var result = LuaRequireResolver.Resolve("./sibling", docs, s_fileHelper, callerUri);
+
+        Assert.Equal(siblingUri, result);
+    }
+
+    [Fact]
+    public void Resolve_RelativeDotDotSlash_WithCallerUri_ResolvesCorrectly()
+    {
+        const string callerUri = "file:///scripts/ai/foo.lua";
+        const string libUri    = "file:///scripts/lib.lua";
+        var docs = MakeDocs([(libUri, 0)]);
+
+        var result = LuaRequireResolver.Resolve("../lib", docs, s_fileHelper, callerUri);
+
+        Assert.Equal(libUri, result);
+    }
+
+    [Fact]
+    public void Resolve_RelativeTwoDotDot_WithCallerUri_ResolvesCorrectly()
+    {
+        const string callerUri = "file:///scripts/ai/sub/foo.lua";
+        const string rootUri   = "file:///scripts/lib.lua";
+        var docs = MakeDocs([(rootUri, 0)]);
+
+        var result = LuaRequireResolver.Resolve("../../lib", docs, s_fileHelper, callerUri);
+
+        Assert.Equal(rootUri, result);
+    }
+
+    [Fact]
+    public void Resolve_RelativeNotFound_WithCallerUri_ReturnsNull()
+    {
+        const string callerUri = "file:///scripts/ai/foo.lua";
+        var docs = MakeDocs([(callerUri, 0)]);
+
+        var result = LuaRequireResolver.Resolve("./nonexistent", docs, s_fileHelper, callerUri);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Resolve_RelativeWithoutCallerUri_ReturnsNull()
+    {
+        var docs = MakeDocs("file:///scripts/ai/sibling.lua");
+
+        var result = LuaRequireResolver.Resolve("./sibling", docs, s_fileHelper);
+
+        Assert.Null(result);
+    }
+
+    // ── layer-rank tests ──────────────────────────────────────────────────────
+
     [Fact]
     public void Resolve_MultipleLayerMatches_ReturnsHighestRankUri()
     {

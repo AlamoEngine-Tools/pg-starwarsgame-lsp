@@ -63,7 +63,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         var root = tree.GetRoot();
 
         // Phase 2: require() module hover.
-        var requireHover = TryBuildRequireHover(root, line, character, index.Documents, _fileHelper);
+        var requireHover = TryBuildRequireHover(root, line, character, index.Documents, _fileHelper, uri);
         if (requireHover is not null)
             return Task.FromResult<Hover?>(requireHover);
 
@@ -115,7 +115,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     }
 
     private static Hover? TryBuildRequireHover(SyntaxNode root, int line, int character,
-        IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
+        IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper, string callerUri)
     {
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
         {
@@ -142,7 +142,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(startLine, startChar),
                 new Position(endLine, endChar));
 
-            var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper);
+            var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper, callerUri);
             string markdown;
             if (resolved is not null)
             {
