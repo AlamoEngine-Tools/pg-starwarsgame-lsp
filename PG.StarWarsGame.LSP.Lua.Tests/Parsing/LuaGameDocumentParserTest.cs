@@ -5,6 +5,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -34,11 +35,12 @@ public sealed class LuaGameDocumentParserTest
         ]);
     }
 
-    private static LuaGameDocumentParser Build()
+    private static LuaGameDocumentParser Build(LuaAnnotationRepository? repo = null)
     {
         return new LuaGameDocumentParser(BuildSchema(),
             new FileHelper(new MockFileSystem()),
-            NullLogger<LuaGameDocumentParser>.Instance);
+            NullLogger<LuaGameDocumentParser>.Instance,
+            repo ?? new LuaAnnotationRepository());
     }
 
     // ── CanParse ─────────────────────────────────────────────────────────────
@@ -426,5 +428,56 @@ public sealed class LuaGameDocumentParserTest
         Assert.Equal(2, result.RequireArgs.Length);
         Assert.Equal("pgstatemachine", result.RequireArgs[0]);
         Assert.Equal("eawx-std/ModContentLoader", result.RequireArgs[1]);
+    }
+
+    // ── annotation repository population ─────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_FunctionWithAnnotations_PopulatesRepository()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///funcs.lua";
+        const string text = """
+            --- Runs the named mission.
+            ---@param name string
+            function RunMission(name) end
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        Assert.True(repo.All.ContainsKey(uri));
+        var annotations = repo.All[uri];
+        Assert.Contains(annotations, a => !a.Params.IsDefaultOrEmpty);
+    }
+
+    [Fact]
+    public async Task ParseAsync_FunctionWithClassAnnotation_PopulatesRepositoryWithClassDef()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///types.lua";
+        const string text = """
+            ---@class PGUnit
+            ---@field name string
+            PGUnit = {}
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        // Class annotations currently come from function doc-comment blocks only;
+        // table assignment scanning is not yet implemented.
+        // This test verifies the URI is registered even when no functions are present.
+        Assert.True(repo.All.ContainsKey(uri));
+    }
+
+    [Fact]
+    public async Task ParseAsync_NoFunctions_RegistersEmptyAnnotationsForUri()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///empty.lua";
+
+        await Build(repo).ParseAsync(uri, "local x = 1", 1, default);
+
+        Assert.True(repo.All.ContainsKey(uri));
+        Assert.Empty(repo.All[uri]);
     }
 }

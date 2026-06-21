@@ -11,6 +11,8 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -23,12 +25,14 @@ public sealed class WorkspaceIndexerTest
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) Build(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
-        IProjectIndexCache? cache = null, params IGameDocumentParser[] parsers)
+        IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
+        params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
         var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
-            cache ?? new NullProjectIndexCache(), NullLogger<WorkspaceIndexer>.Instance);
+            cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
+            NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
     }
 
@@ -37,7 +41,7 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return Build(fs, svc, registry, schema, null, parsers);
+        return Build(fs, svc, registry, schema, null, null, parsers);
     }
 
     // ── PreScanMetafiles ─────────────────────────────────────────────────────
@@ -354,7 +358,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var cache = new FakeProjectIndexCache(); // no snapshot stored
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -396,7 +400,7 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -433,7 +437,7 @@ public sealed class WorkspaceIndexerTest
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -456,7 +460,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var cache = new FakeProjectIndexCache();
         var config = ConfigWithLayer(xmlDir, pgproj);
-        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache,
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
             new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
@@ -472,6 +476,28 @@ public sealed class WorkspaceIndexerTest
     {
         var layer = new ProjectLayer(0, "TestMod", [xmlDir], [], [], [], null, pgprojPath);
         return new WorkspaceConfiguration([xmlDir], [], [], [], null) { Layers = [layer] };
+    }
+
+    // ── annotation repository ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task IndexDocumentsAsync_Flat_RebuildIndexCalledAfterIndexing()
+    {
+        var root = Root("ws");
+        var scriptDir = Path.Combine(root, "data", "scripts");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(scriptDir, "mission.lua")] = new("function RunMission() end")
+        });
+        var svc = new FakeIndexService();
+        var spy = new SpyAnnotationRepository();
+        var config = new WorkspaceConfiguration([], [scriptDir], [], [], null);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            null, spy, new FakeParser());
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Equal(1, spy.RebuildCallCount);
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
@@ -655,5 +681,17 @@ public sealed class WorkspaceIndexerTest
             {
             }
         }
+    }
+
+    private sealed class SpyAnnotationRepository : ILuaAnnotationRepository
+    {
+        public int RebuildCallCount { get; private set; }
+
+        public void Update(string uri, ImmutableArray<EmmyLuaAnnotations> annotations) { }
+        public void Remove(string uri) { }
+        public IReadOnlyDictionary<string, ImmutableArray<EmmyLuaAnnotations>> All =>
+            new Dictionary<string, ImmutableArray<EmmyLuaAnnotations>>();
+        public ILuaTypeIndex Current => LuaTypeIndex.Empty;
+        public void RebuildIndex() => RebuildCallCount++;
     }
 }

@@ -18,6 +18,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
+    private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaGameDocumentParser> _logger;
     private readonly ILuaApiSchemaProvider _schemaProvider;
@@ -25,11 +26,13 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
     public LuaGameDocumentParser(
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper,
-        ILogger<LuaGameDocumentParser> logger)
+        ILogger<LuaGameDocumentParser> logger,
+        ILuaAnnotationRepository annotationRepository)
     {
         _schemaProvider = schemaProvider;
         _fileHelper = fileHelper;
         _logger = logger;
+        _annotationRepository = annotationRepository;
     }
 
     public bool CanParse(string fileExtension)
@@ -44,20 +47,24 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         var tree = LuaSyntaxTree.ParseText(text, s_parseOptions, canonicalUri);
         var root = tree.GetRoot(ct);
 
-        var symbols = CollectSymbols(root, canonicalUri);
+        var (symbols, annotations) = CollectSymbols(root, canonicalUri);
         var references = CollectReferences(root, canonicalUri, tree);
         var requireArgs = CollectRequireArgs(root);
 
+        _annotationRepository.Update(canonicalUri, [.. annotations]);
+
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,
-            symbols.ToImmutableArray(),
+            [.. symbols],
             references.ToImmutableArray(),
             requireArgs));
     }
 
-    private List<GameSymbol> CollectSymbols(SyntaxNode root, string documentUri)
+    private (List<GameSymbol> Symbols, List<EmmyLuaAnnotations> Annotations) CollectSymbols(
+        SyntaxNode root, string documentUri)
     {
         var symbols = new List<GameSymbol>();
+        var annotations = new List<EmmyLuaAnnotations>();
 
         foreach (var node in root.DescendantNodes())
         {
@@ -73,28 +80,25 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             if (string.IsNullOrEmpty(id))
                 continue;
 
+            var ann = ExtractAnnotations(funcDecl);
+            annotations.Add(ann);
+
             var position = simpleName.Name.GetLocation().GetLineSpan().StartLinePosition;
             symbols.Add(new GameSymbol(
                 id,
                 GameSymbolKind.LuaGlobal,
                 null,
                 new FileOrigin(documentUri, position.Line, position.Character),
-                ExtractDocComment(funcDecl)));
+                ann.Description));
         }
 
-        return symbols;
+        return (symbols, annotations);
     }
 
-    // Collects all `---`-prefixed comment lines (both prose and annotation) immediately
-    // above the function, strips the `---` marker, and passes them to EmmyLuaAnnotationParser.
-    // Returns only the prose description from the parsed result; the full EmmyLuaAnnotations
-    // will be stored in ILuaAnnotationRepository once Issue #7 is implemented.
-    private static string? ExtractDocComment(FunctionDeclarationStatementSyntax funcDecl)
+    private static EmmyLuaAnnotations ExtractAnnotations(FunctionDeclarationStatementSyntax funcDecl)
     {
         var lines = CollectDocCommentLines(funcDecl);
-        if (lines.Count == 0) return null;
-        var annotations = EmmyLuaAnnotationParser.Parse(lines);
-        return annotations.Description;
+        return lines.Count == 0 ? EmmyLuaAnnotations.Empty : EmmyLuaAnnotationParser.Parse(lines);
     }
 
     // Walks leading trivia backwards, collecting `---`-prefixed lines (prose + annotations).
