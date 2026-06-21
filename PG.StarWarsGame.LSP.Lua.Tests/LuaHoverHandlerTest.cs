@@ -226,6 +226,30 @@ public sealed class LuaHoverHandlerTest
     }
 
     [Fact]
+    public async Task Handle_CursorOnWorkspaceLuaGlobal_WithDescription_ReturnsHoverWithDescription()
+    {
+        const string desc = "Runs the named mission script.";
+        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), desc);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "RunMission()", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.Contains("RunMission", content);
+        Assert.Contains(desc, content);
+    }
+
+    [Fact]
     public async Task Handle_CursorOnEngineGlobal_ReturnsHoverWithDescription()
     {
         var schema = new LuaApiSchemaProvider([

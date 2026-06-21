@@ -210,17 +210,30 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 new Position(end.Line, end.Character));
 
             // Workspace LuaGlobal takes precedence over engine global.
-            if (index.WorkspaceDefinitions.TryGetValue(id.Name, out var defs) &&
-                defs.Any(s => s.Kind == GameSymbolKind.LuaGlobal))
-                return new Hover
+            if (index.WorkspaceDefinitions.TryGetValue(id.Name, out var defs))
+            {
+                var luaGlobal = defs.FirstOrDefault(s => s.Kind == GameSymbolKind.LuaGlobal);
+                if (luaGlobal is not null)
                 {
-                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                    var sb = new StringBuilder();
+                    sb.Append($"**function** `{id.Name}`");
+                    if (luaGlobal.Description is not null)
                     {
-                        Kind = MarkupKind.Markdown,
-                        Value = $"**function** `{id.Name}`"
-                    }),
-                    Range = range
-                };
+                        sb.AppendLine();
+                        sb.Append(luaGlobal.Description);
+                    }
+
+                    return new Hover
+                    {
+                        Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+                        {
+                            Kind = MarkupKind.Markdown,
+                            Value = sb.ToString()
+                        }),
+                        Range = range
+                    };
+                }
+            }
 
             // Engine global: show name and description from schema.
             if (schema.AllFunctionNames.Contains(id.Name))
