@@ -4,6 +4,7 @@
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticSeverity;
@@ -17,12 +18,11 @@ internal static class LuaImportAnalyzer
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
     public static IReadOnlyList<LspDiagnostic> Analyze(
-        string documentUri, string text, IEnumerable<string> workspaceUris, IFileHelper fileHelper)
+        string documentUri, string text, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
     {
         var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
-        var uriList = workspaceUris as ICollection<string> ?? workspaceUris.ToList();
 
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
         {
@@ -33,7 +33,7 @@ internal static class LuaImportAnalyzer
 
             if (LuaRequireResolver.IsRelative(requireArg)) continue;
 
-            if (LuaRequireResolver.Resolve(requireArg, uriList, fileHelper) is null)
+            if (LuaRequireResolver.Resolve(requireArg, documents, fileHelper) is null)
                 diagnostics.Add(BuildDiagnostic(call, requireArg));
         }
 
