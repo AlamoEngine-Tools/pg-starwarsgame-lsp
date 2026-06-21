@@ -43,9 +43,11 @@ public static class ServerConfigurator
         options.ServerInfo = new ServerInfo
         {
             Name = "PG.StarWarsGame.LSP",
-            Version = typeof(ServerConfigurator).Assembly
+            // InformationalVersion carries SemVer build metadata ("+<gitHash>") appended by the
+            // SDK. Strip it so the client version check gets a clean "major.minor.patch" string.
+            Version = (typeof(ServerConfigurator).Assembly
                 .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                ?? "unknown"
+                ?? "unknown").Split('+')[0]
         };
 
         return options
