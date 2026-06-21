@@ -90,6 +90,24 @@ public sealed class FileHelperTest
         Assert.Equal("file:///test.xml", sut.NormalizeUri("file:///test.xml"));
     }
 
+    [Fact]
+    public void NormalizeUri_PercentEncodedDriveLetter_DecodesBeforeNormalising()
+    {
+        // VS Code on Windows sometimes sends file:///c%3A/... (colon percent-encoded).
+        // NormalizeUri must decode it so index lookups match filesystem-derived URIs.
+        var sut = Build();
+        Assert.Equal("file:///c:/game/file.xml", sut.NormalizeUri("file:///c%3A/game/file.xml"));
+    }
+
+    [Fact]
+    public void NormalizeUri_PercentEncodedSpacesInPath_DecodesBeforeNormalising()
+    {
+        var sut = Build();
+        Assert.Equal(
+            "file:///c:/program files (x86)/steam/game.xml",
+            sut.NormalizeUri("file:///c%3A/Program%20Files%20%28x86%29/Steam/game.xml"));
+    }
+
     // ── UrisEqual ─────────────────────────────────────────────────────────────
 
     [Fact]
