@@ -25,14 +25,13 @@ internal static class LuaFileClassifier
             if (IsLibraryUri(uri))
                 shared.Add(uri);
 
-        var workspaceUris = documents.Keys;
         foreach (var (_, doc) in documents)
         {
             if (doc.RequireArgs.IsDefaultOrEmpty) continue;
             foreach (var arg in doc.RequireArgs)
             {
                 if (LuaRequireResolver.IsRelative(arg)) continue;
-                var resolved = LuaRequireResolver.Resolve(arg, workspaceUris, fileHelper);
+                var resolved = LuaRequireResolver.Resolve(arg, documents, fileHelper);
                 if (resolved is not null)
                     shared.Add(resolved);
             }

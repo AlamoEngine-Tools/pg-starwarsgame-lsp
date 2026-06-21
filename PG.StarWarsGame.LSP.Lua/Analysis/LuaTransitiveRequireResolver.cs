@@ -15,7 +15,6 @@ internal static class LuaTransitiveRequireResolver
     {
         var visited = new HashSet<string>(directRequiredUris, StringComparer.OrdinalIgnoreCase);
         var queue = new Queue<string>(directRequiredUris);
-        var workspaceUris = allDocuments.Keys;
 
         while (queue.Count > 0)
         {
@@ -26,7 +25,7 @@ internal static class LuaTransitiveRequireResolver
             foreach (var arg in doc.RequireArgs)
             {
                 if (LuaRequireResolver.IsRelative(arg)) continue;
-                var resolved = LuaRequireResolver.Resolve(arg, workspaceUris, fileHelper);
+                var resolved = LuaRequireResolver.Resolve(arg, allDocuments, fileHelper);
                 if (resolved is null) continue;
                 if (visited.Add(resolved))
                     queue.Enqueue(resolved);

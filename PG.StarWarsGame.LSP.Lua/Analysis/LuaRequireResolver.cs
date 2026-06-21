@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis;
@@ -17,11 +18,14 @@ internal static class LuaRequireResolver
                requireArg.StartsWith("..\\", StringComparison.Ordinal);
     }
 
-    // Searches workspaceUris for any file whose path ends with the require target.
-    // workspaceUris must already be normalized (i.e., from GameIndex.Documents.Keys).
-    // Returns the matching URI or null if not found.
+    // Searches documents for any file whose path ends with the require target.
+    // When multiple layers define the same file, the entry with the highest LayerRank wins,
+    // consistent with how XML overrides work across mod layers.
     // Returns null without being an error when the require is relative (call IsRelative first).
-    public static string? Resolve(string requireArg, IEnumerable<string> workspaceUris, IFileHelper fileHelper)
+    public static string? Resolve(
+        string requireArg,
+        IReadOnlyDictionary<string, DocumentIndex> documents,
+        IFileHelper fileHelper)
     {
         if (IsRelative(requireArg))
             return null;
@@ -29,10 +33,19 @@ internal static class LuaRequireResolver
         var normalized = fileHelper.NormalizeGamePath(requireArg);
         var searchSuffix = "/" + normalized + ".lua";
 
-        foreach (var uri in workspaceUris)
-            if (uri.EndsWith(searchSuffix, StringComparison.Ordinal))
-                return uri;
+        string? bestUri = null;
+        var bestRank = int.MinValue;
 
-        return null;
+        foreach (var (uri, doc) in documents)
+        {
+            if (!uri.EndsWith(searchSuffix, StringComparison.Ordinal)) continue;
+            if (doc.LayerRank > bestRank)
+            {
+                bestRank = doc.LayerRank;
+                bestUri = uri;
+            }
+        }
+
+        return bestUri;
     }
 }

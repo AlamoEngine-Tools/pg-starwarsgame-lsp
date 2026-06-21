@@ -36,11 +36,10 @@ internal static class LuaGlobalScopeAnalyzer
     {
         var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
-        var workspaceUris = index.Documents.Keys;
         var diagnostics = new List<LspDiagnostic>();
 
         // Phase 1: collect resolved require calls.
-        var requireCalls = CollectRequireCalls(root, workspaceUris, fileHelper);
+        var requireCalls = CollectRequireCalls(root, index.Documents, fileHelper);
         var requiredUris = new HashSet<string>(
             requireCalls.Where(r => r.ResolvedUri is not null).Select(r => r.ResolvedUri!),
             StringComparer.OrdinalIgnoreCase);
@@ -84,9 +83,8 @@ internal static class LuaGlobalScopeAnalyzer
     }
 
     private static List<RequireCall> CollectRequireCalls(
-        SyntaxNode root, IEnumerable<string> workspaceUris, IFileHelper fileHelper)
+        SyntaxNode root, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
     {
-        var uriList = workspaceUris as ICollection<string> ?? workspaceUris.ToList();
         var calls = new List<RequireCall>();
 
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
@@ -98,7 +96,7 @@ internal static class LuaGlobalScopeAnalyzer
 
             if (LuaRequireResolver.IsRelative(arg)) continue;
 
-            var resolved = LuaRequireResolver.Resolve(arg, uriList, fileHelper);
+            var resolved = LuaRequireResolver.Resolve(arg, documents, fileHelper);
             calls.Add(new RequireCall(arg, resolved, call));
         }
 

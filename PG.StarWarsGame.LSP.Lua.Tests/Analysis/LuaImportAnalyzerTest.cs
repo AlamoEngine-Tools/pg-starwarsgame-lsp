@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 
@@ -14,12 +15,19 @@ public sealed class LuaImportAnalyzerTest
 
     private static readonly IFileHelper s_fileHelper = new FileHelper(new MockFileSystem());
 
-    private static readonly string[] EmptyWorkspace = [];
+    private static readonly IReadOnlyDictionary<string, DocumentIndex> EmptyWorkspace =
+        new Dictionary<string, DocumentIndex>();
 
-    private static readonly string[] WorkspaceWithLib =
-    [
-        "file:///data/scripts/library/pgstatemachine.lua"
-    ];
+    private static readonly IReadOnlyDictionary<string, DocumentIndex> WorkspaceWithLib =
+        MakeDocs("file:///data/scripts/library/pgstatemachine.lua");
+
+    private static Dictionary<string, DocumentIndex> MakeDocs(params string[] uris)
+    {
+        var dict = new Dictionary<string, DocumentIndex>(StringComparer.OrdinalIgnoreCase);
+        foreach (var uri in uris)
+            dict[uri] = new DocumentIndex(uri, 1, [], []);
+        return dict;
+    }
 
     [Fact]
     public void Analyze_NoRequireCalls_NoDiagnostics()

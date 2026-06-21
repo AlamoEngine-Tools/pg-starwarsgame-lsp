@@ -150,13 +150,12 @@ internal static class LuaLocalScopeCollector
     {
         if (docIndex is null || docIndex.RequireArgs.IsDefaultOrEmpty) return;
 
-        var workspaceUris = index.Documents.Keys;
         var directRequired = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var arg in docIndex.RequireArgs)
         {
             if (LuaRequireResolver.IsRelative(arg)) continue;
-            var resolved = LuaRequireResolver.Resolve(arg, workspaceUris, fileHelper);
+            var resolved = LuaRequireResolver.Resolve(arg, index.Documents, fileHelper);
             if (resolved is not null) directRequired.Add(resolved);
         }
 
