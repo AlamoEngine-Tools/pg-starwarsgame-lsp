@@ -8,10 +8,10 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="HtmlAgilityPack" Version="1.12.4"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.9"/>
-        <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
+        <PackageReference Include="HtmlAgilityPack"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+        <PackageReference Include="OmniSharp.Extensions.LanguageServer"/>
     </ItemGroup>
 
     <ItemGroup>

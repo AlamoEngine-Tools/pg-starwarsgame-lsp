@@ -23,14 +23,14 @@
     </ItemGroup>
 
     <ItemGroup>
-        <PackageReference Include="AlamoEngineTools.Modinfo" Version="8.0.6"/>
-        <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9"/>
-        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.9"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.9"/>
-        <PackageReference Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
-        <PackageReference Include="Serilog" Version="4.3.1"/>
-        <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0"/>
-        <PackageReference Include="Serilog.Sinks.File" Version="7.0.0"/>
+        <PackageReference Include="AlamoEngineTools.Modinfo"/>
+        <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+        <PackageReference Include="Microsoft.Extensions.Http"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Console"/>
+        <PackageReference Include="OmniSharp.Extensions.LanguageServer"/>
+        <PackageReference Include="Serilog"/>
+        <PackageReference Include="Serilog.Extensions.Logging"/>
+        <PackageReference Include="Serilog.Sinks.File"/>
     </ItemGroup>
 
 </Project>
