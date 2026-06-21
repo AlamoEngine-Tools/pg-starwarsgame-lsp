@@ -217,4 +217,77 @@ public sealed class LuaApiSchemaProviderTest
         Assert.Equal(0, entry.ParamIndex);
         Assert.Null(entry.ExpectedTypeName);
     }
+
+    // ── GetClassDefinition ────────────────────────────────────────────────────
+
+    [Fact]
+    public void GetClassDefinition_ReturnsNull_WhenNotRegistered()
+    {
+        var provider = Build("function Foo() end");
+        Assert.Null(provider.GetClassDefinition("NoSuchType"));
+    }
+
+    [Fact]
+    public void GetClassDefinition_ReturnsClass_WhenDeclaredInContent()
+    {
+        var provider = Build("""
+            ---@class PGUnit
+            ---@field name string
+            ---@field id integer
+            PGUnit = {}
+            """);
+
+        var cls = provider.GetClassDefinition("PGUnit");
+        Assert.NotNull(cls);
+        Assert.Equal("PGUnit", cls!.Name);
+        Assert.Equal(2, cls.Fields.Length);
+        Assert.Equal("name", cls.Fields[0].Name);
+        Assert.Equal("id", cls.Fields[1].Name);
+    }
+
+    [Fact]
+    public void GetClassDefinition_LookupIsCaseInsensitive()
+    {
+        var provider = Build("""
+            ---@class GameEntity
+            GameEntity = {}
+            """);
+
+        Assert.NotNull(provider.GetClassDefinition("gameentity"));
+        Assert.NotNull(provider.GetClassDefinition("GAMEENTITY"));
+    }
+
+    [Fact]
+    public void GetClassDefinition_DoesNotInterfereWithFunctionParsing()
+    {
+        var provider = Build("""
+            ---@class PGUnit
+            PGUnit = {}
+            ---@param typeName string
+            ---@xmlref XmlObject
+            function Find_First_Object(typeName) end
+            """);
+
+        Assert.NotNull(provider.GetClassDefinition("PGUnit"));
+        Assert.Contains("Find_First_Object", provider.AllFunctionNames);
+    }
+
+    [Fact]
+    public void LuaApiSchemaProxy_GetClassDefinition_ReturnsNull_BeforeConfigure()
+    {
+        var proxy = new LuaApiSchemaProxy();
+        Assert.Null(proxy.GetClassDefinition("Anything"));
+    }
+
+    [Fact]
+    public void LuaApiSchemaProxy_GetClassDefinition_DelegatesToInnerAfterConfigure()
+    {
+        var proxy = new LuaApiSchemaProxy();
+        proxy.Configure(Build("""
+            ---@class PGUnit
+            PGUnit = {}
+            """));
+
+        Assert.NotNull(proxy.GetClassDefinition("PGUnit"));
+    }
 }

@@ -205,9 +205,8 @@ public sealed class LuaLocalScopeCollectorTest
             return null;
         }
 
-        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName)
-        {
-            return [];
-        }
+        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) => [];
+
+        public PG.StarWarsGame.LSP.Lua.Analysis.Annotations.LuaClassDefinition? GetClassDefinition(string typeName) => null;
     }
 }

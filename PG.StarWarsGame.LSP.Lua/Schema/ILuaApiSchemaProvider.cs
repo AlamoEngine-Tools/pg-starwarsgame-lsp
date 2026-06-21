@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+
 namespace PG.StarWarsGame.LSP.Lua.Schema;
 
 /// <summary>
@@ -37,6 +39,13 @@ public interface ILuaApiSchemaProvider
     ///     / <c>function TypeName:X</c> declarations). Empty when the type is unknown.
     /// </summary>
     IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName);
+
+    /// <summary>
+    ///     Returns the <c>---@class</c> definition for the given type name as declared in
+    ///     the engine API schema (<c>api.d.lua</c>), or <c>null</c> if not found.
+    ///     Lookup is case-insensitive.
+    /// </summary>
+    LuaClassDefinition? GetClassDefinition(string typeName);
 }
 
 /// <summary>Describes one XML object reference parameter in a C++ API function.</summary>
