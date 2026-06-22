@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -16,6 +17,7 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCompletionHandler : CompletionHandlerBase
 {
+    private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCompletionHandler> _logger;
@@ -27,12 +29,14 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
+        ILuaAnnotationRepository annotationRepository,
         ILogger<LuaCompletionHandler> logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
+        _annotationRepository = annotationRepository;
         _logger = logger;
     }
 
@@ -115,7 +119,8 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             {
                 var scope = LuaLocalScopeCollector.CollectAt(
                     text, line, character, uri, index, _schemaProvider, _fileHelper);
-                return new CompletionList(LuaMemberCompletionProvider.Provide(memberCtx, scope, _schemaProvider));
+                return new CompletionList(LuaMemberCompletionProvider.Provide(
+                    memberCtx, scope, _schemaProvider, _annotationRepository.Current));
             }
 
             default:

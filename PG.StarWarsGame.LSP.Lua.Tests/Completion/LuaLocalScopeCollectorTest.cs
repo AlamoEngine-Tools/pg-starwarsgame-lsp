@@ -183,6 +183,66 @@ public sealed class LuaLocalScopeCollectorTest
         Assert.Contains(entries, e => e.Name == "table" && e.Kind == ScopeEntryKind.Lua51Builtin);
     }
 
+    // ── @type annotation extraction ───────────────────────────────────────────
+
+    [Fact]
+    public void Local_WithTypeAnnotation_HasTypeNameSet()
+    {
+        const string text = """
+            ---@type PGUnit
+            local myUnit = nil
+            |
+            """;
+        var (src, line, ch) = ExtractCursor(text);
+        var entries = Collect(src, line, ch);
+        var entry = entries.FirstOrDefault(e => e.Name == "myUnit");
+        Assert.NotNull(entry);
+        Assert.Equal("PGUnit", entry!.TypeName);
+    }
+
+    [Fact]
+    public void Local_WithoutTypeAnnotation_HasNullTypeName()
+    {
+        const string text = """
+            local myVar = nil
+            |
+            """;
+        var (src, line, ch) = ExtractCursor(text);
+        var entries = Collect(src, line, ch);
+        var entry = entries.FirstOrDefault(e => e.Name == "myVar");
+        Assert.NotNull(entry);
+        Assert.Null(entry!.TypeName);
+    }
+
+    [Fact]
+    public void Local_WithDocCommentButNoTypeAnnotation_HasNullTypeName()
+    {
+        const string text = """
+            --- Just a description, no @type.
+            local helper = nil
+            |
+            """;
+        var (src, line, ch) = ExtractCursor(text);
+        var entries = Collect(src, line, ch);
+        var entry = entries.FirstOrDefault(e => e.Name == "helper");
+        Assert.NotNull(entry);
+        Assert.Null(entry!.TypeName);
+    }
+
+    // Parses a text block with a | cursor marker, returns (text, line, character).
+    private static (string Text, int Line, int Character) ExtractCursor(string raw)
+    {
+        var lines = raw.ReplaceLineEndings("\n").Split('\n');
+        for (var i = 0; i < lines.Length; i++)
+        {
+            var col = lines[i].IndexOf('|');
+            if (col < 0) continue;
+            lines[i] = lines[i].Remove(col, 1);
+            return (string.Join('\n', lines), i, col);
+        }
+        throw new InvalidOperationException("No | cursor marker found in text.");
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class FakeSchemaProvider(params string[] names) : ILuaApiSchemaProvider

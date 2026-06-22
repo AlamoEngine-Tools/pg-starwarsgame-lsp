@@ -110,41 +110,8 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         return lines.Count == 0 ? EmmyLuaAnnotations.Empty : EmmyLuaAnnotationParser.Parse(lines);
     }
 
-    // Walks leading trivia backwards, collecting `---`-prefixed lines (prose + annotations).
-    // Stops at blank lines (two consecutive EOLs) or non-doc-comment trivia.
-    private static IReadOnlyList<string> CollectDocCommentLines(SyntaxNode node)
-    {
-        var trivia  = node.GetFirstToken().LeadingTrivia;
-        var lines   = new List<string>();
-        var seenEol = false;
-
-        for (var i = trivia.Count - 1; i >= 0; i--)
-        {
-            var text = trivia[i].ToFullString();
-
-            if (text is "\n" or "\r\n" or "\r")
-            {
-                if (seenEol) break; // two consecutive EOLs = blank line → stop
-                seenEol = true;
-                continue;
-            }
-
-            if (string.IsNullOrWhiteSpace(text)) continue; // indentation — skip
-
-            var trimmed = text.TrimStart();
-            if (!trimmed.StartsWith("---", StringComparison.Ordinal)) break; // bare `--` → stop
-
-            // Strip exactly the "---" prefix plus one optional space/tab
-            var content = trimmed[3..];
-            if (content.Length > 0 && (content[0] == ' ' || content[0] == '\t'))
-                content = content[1..];
-            lines.Add(content);
-            seenEol = false;
-        }
-
-        lines.Reverse();
-        return lines;
-    }
+    private static IReadOnlyList<string> CollectDocCommentLines(SyntaxNode node) =>
+        LuaDocCommentScanner.CollectLeadingDocLines(node);
 
     private List<GameReference> CollectReferences(
         SyntaxNode root, string documentUri, SyntaxTree tree)

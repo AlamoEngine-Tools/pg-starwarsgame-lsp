@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -39,6 +40,7 @@ public sealed class LuaCompletionHandlerTest
             host ?? new FakeWorkspaceHost(),
             new FileHelper(new MockFileSystem()),
             schema,
+            new LuaAnnotationRepository(),
             NullLogger<LuaCompletionHandler>.Instance);
     }
 
@@ -363,6 +365,7 @@ public sealed class LuaCompletionHandlerTest
             new FakeWorkspaceHost(), // empty — no document tracked
             fileHelper,
             schema,
+            new LuaAnnotationRepository(),
             NullLogger<LuaCompletionHandler>.Instance);
 
         var result = await handler.Handle(
