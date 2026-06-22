@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -20,6 +21,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
+    private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaHoverHandler> _logger;
@@ -31,12 +33,14 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         IGameWorkspaceHost workspaceHost,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
+        ILuaAnnotationRepository annotationRepository,
         ILogger<LuaHoverHandler> logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
+        _annotationRepository = annotationRepository;
         _logger = logger;
     }
 
@@ -67,8 +71,9 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (requireHover is not null)
             return Task.FromResult<Hover?>(requireHover);
 
-        // Phase 3: Lua identifier hover (workspace global or engine global).
-        var identHover = TryBuildIdentifierHover(root, line, character, index, _schemaProvider);
+        // Phase 3: Lua identifier hover (workspace global, engine global, or type).
+        var identHover = TryBuildIdentifierHover(root, line, character, index, _schemaProvider,
+            _annotationRepository);
         return Task.FromResult(identHover);
     }
 
@@ -192,7 +197,8 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     }
 
     private static Hover? TryBuildIdentifierHover(
-        SyntaxNode root, int line, int character, GameIndex index, ILuaApiSchemaProvider schema)
+        SyntaxNode root, int line, int character, GameIndex index, ILuaApiSchemaProvider schema,
+        ILuaAnnotationRepository repository)
     {
         foreach (var id in root.DescendantNodes().OfType<IdentifierNameSyntax>())
         {
@@ -235,7 +241,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 }
             }
 
-            // Engine global: show name and description from schema.
+            // Engine global function: show name and description from schema.
             if (schema.AllFunctionNames.Contains(id.Name))
             {
                 var sb = new StringBuilder();
@@ -257,8 +263,73 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                     Range = range
                 };
             }
+
+            // Workspace type (class, alias, enum) from the annotation repository.
+            var typeIndex = repository.Current;
+            var typeHover = TryBuildTypeHover(id.Name, range, typeIndex, schema);
+            if (typeHover is not null)
+                return typeHover;
         }
 
         return null;
     }
+
+    private static Hover? TryBuildTypeHover(
+        string name, LspRange range, ILuaTypeIndex typeIndex, ILuaApiSchemaProvider schema)
+    {
+        // Workspace @class
+        if (typeIndex.GetClass(name) is { } cls)
+            return BuildClassHover(cls, range);
+
+        // Engine API @class (from api.d.lua)
+        if (schema.GetClassDefinition(name) is { } apiCls)
+            return BuildClassHover(apiCls, range);
+
+        // Workspace @alias
+        if (typeIndex.GetAlias(name) is { } alias)
+        {
+            var variants = string.Join(" | ", alias.Variants.Select(v => v.Raw));
+            var md = variants.Length > 0
+                ? $"**alias** `{alias.Name}` = {variants}"
+                : $"**alias** `{alias.Name}`";
+            return BuildHover(md, range);
+        }
+
+        // Workspace @enum
+        if (typeIndex.GetEnum(name) is { } en)
+            return BuildHover($"**enum** `{en.Name}`", range);
+
+        return null;
+    }
+
+    private static Hover BuildClassHover(LuaClassDefinition cls, LspRange range)
+    {
+        var sb = new StringBuilder();
+        sb.Append($"**class** `{cls.Name}`");
+        if (cls.Description is not null)
+        {
+            sb.AppendLine();
+            sb.Append(cls.Description);
+        }
+
+        if (!cls.Fields.IsDefaultOrEmpty)
+        {
+            sb.AppendLine();
+            foreach (var field in cls.Fields)
+                sb.AppendLine($"`{field.Name}` — {field.Type.Raw}");
+        }
+
+        return BuildHover(sb.ToString().TrimEnd(), range);
+    }
+
+    private static Hover BuildHover(string markdown, LspRange range) =>
+        new()
+        {
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = markdown
+            }),
+            Range = range
+        };
 }

@@ -68,44 +68,53 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
 
         foreach (var node in root.DescendantNodes())
         {
-            if (node is not FunctionDeclarationStatementSyntax funcDecl)
-                continue;
+            if (node is FunctionDeclarationStatementSyntax funcDecl)
+            {
+                // Only simple top-level names become global symbols.
+                // Member names (A.B) and method names (A:B) are module-scoped, not globals.
+                if (funcDecl.Name is not SimpleFunctionNameSyntax simpleName)
+                    continue;
 
-            // Only simple top-level names become global symbols.
-            // Member names (A.B) and method names (A:B) are module-scoped, not globals.
-            if (funcDecl.Name is not SimpleFunctionNameSyntax simpleName)
-                continue;
+                var id = simpleName.Name.Text;
+                if (string.IsNullOrEmpty(id))
+                    continue;
 
-            var id = simpleName.Name.Text;
-            if (string.IsNullOrEmpty(id))
-                continue;
+                var ann = ExtractAnnotations(funcDecl);
+                annotations.Add(ann);
 
-            var ann = ExtractAnnotations(funcDecl);
-            annotations.Add(ann);
-
-            var position = simpleName.Name.GetLocation().GetLineSpan().StartLinePosition;
-            symbols.Add(new GameSymbol(
-                id,
-                GameSymbolKind.LuaGlobal,
-                null,
-                new FileOrigin(documentUri, position.Line, position.Character),
-                ann.Description));
+                var position = simpleName.Name.GetLocation().GetLineSpan().StartLinePosition;
+                symbols.Add(new GameSymbol(
+                    id,
+                    GameSymbolKind.LuaGlobal,
+                    null,
+                    new FileOrigin(documentUri, position.Line, position.Character),
+                    ann.Description));
+            }
+            else if (node is StatementSyntax stmt and not LocalFunctionDeclarationStatementSyntax)
+            {
+                // Scan non-function statements for @class / @alias / @enum doc blocks.
+                // These drive the workspace type index and appear in .d.lua declaration files
+                // and in regular .lua files that define user-facing types.
+                var ann = ExtractAnnotations(stmt);
+                if (ann.ClassDef is not null || ann.AliasDef is not null || ann.EnumDef is not null)
+                    annotations.Add(ann);
+            }
         }
 
         return (symbols, annotations);
     }
 
-    private static EmmyLuaAnnotations ExtractAnnotations(FunctionDeclarationStatementSyntax funcDecl)
+    private static EmmyLuaAnnotations ExtractAnnotations(SyntaxNode node)
     {
-        var lines = CollectDocCommentLines(funcDecl);
+        var lines = CollectDocCommentLines(node);
         return lines.Count == 0 ? EmmyLuaAnnotations.Empty : EmmyLuaAnnotationParser.Parse(lines);
     }
 
     // Walks leading trivia backwards, collecting `---`-prefixed lines (prose + annotations).
     // Stops at blank lines (two consecutive EOLs) or non-doc-comment trivia.
-    private static IReadOnlyList<string> CollectDocCommentLines(FunctionDeclarationStatementSyntax funcDecl)
+    private static IReadOnlyList<string> CollectDocCommentLines(SyntaxNode node)
     {
-        var trivia  = funcDecl.GetFirstToken().LeadingTrivia;
+        var trivia  = node.GetFirstToken().LeadingTrivia;
         var lines   = new List<string>();
         var seenEol = false;
 
