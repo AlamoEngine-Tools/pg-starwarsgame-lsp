@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -60,6 +61,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new FakeSchemaProvider(),
             new EaWXmlContext(fileHelper),
             new NullProjectIndexCache(),
+            new LuaAnnotationRepository(),
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,

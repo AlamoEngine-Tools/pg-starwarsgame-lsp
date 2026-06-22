@@ -3,4 +3,4 @@
 
 namespace PG.StarWarsGame.LSP.Lua.Completion;
 
-internal sealed record ScopeEntry(string Name, ScopeEntryKind Kind, string? Detail);
+internal sealed record ScopeEntry(string Name, ScopeEntryKind Kind, string? Detail, string? TypeName = null);

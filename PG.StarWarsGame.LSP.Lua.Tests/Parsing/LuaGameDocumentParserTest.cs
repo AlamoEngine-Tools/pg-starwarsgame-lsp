@@ -5,6 +5,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -34,11 +35,12 @@ public sealed class LuaGameDocumentParserTest
         ]);
     }
 
-    private static LuaGameDocumentParser Build()
+    private static LuaGameDocumentParser Build(LuaAnnotationRepository? repo = null)
     {
         return new LuaGameDocumentParser(BuildSchema(),
             new FileHelper(new MockFileSystem()),
-            NullLogger<LuaGameDocumentParser>.Instance);
+            NullLogger<LuaGameDocumentParser>.Instance,
+            repo ?? new LuaAnnotationRepository());
     }
 
     // ── CanParse ─────────────────────────────────────────────────────────────
@@ -426,5 +428,115 @@ public sealed class LuaGameDocumentParserTest
         Assert.Equal(2, result.RequireArgs.Length);
         Assert.Equal("pgstatemachine", result.RequireArgs[0]);
         Assert.Equal("eawx-std/ModContentLoader", result.RequireArgs[1]);
+    }
+
+    // ── annotation repository population ─────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_FunctionWithAnnotations_PopulatesRepository()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///funcs.lua";
+        const string text = """
+            --- Runs the named mission.
+            ---@param name string
+            function RunMission(name) end
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        Assert.True(repo.All.ContainsKey(uri));
+        var annotations = repo.All[uri];
+        Assert.Contains(annotations, a => !a.Params.IsDefaultOrEmpty);
+    }
+
+    [Fact]
+    public async Task ParseAsync_ClassDeclarationAboveAssignment_PopulatesRepositoryWithClassDef()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///types.lua";
+        const string text = """
+            ---@class PGUnit
+            ---@field name string
+            ---@field id integer
+            PGUnit = {}
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        repo.RebuildIndex();
+        var cls = repo.Current.GetClass("PGUnit");
+        Assert.NotNull(cls);
+        Assert.Equal("PGUnit", cls!.Name);
+        Assert.Equal(2, cls.Fields.Length);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AliasDeclarationAboveAssignment_PopulatesRepositoryWithAliasDef()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///types.lua";
+        const string text = """
+            ---@alias GameCommandType string
+            GameCommandType = nil
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        repo.RebuildIndex();
+        Assert.NotNull(repo.Current.GetAlias("GameCommandType"));
+    }
+
+    [Fact]
+    public async Task ParseAsync_EnumDeclarationAboveAssignment_PopulatesRepositoryWithEnumDef()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///types.lua";
+        const string text = """
+            ---@enum PlanetStatus
+            PlanetStatus = { Owned = 0, Contested = 1 }
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        repo.RebuildIndex();
+        Assert.NotNull(repo.Current.GetEnum("PlanetStatus"));
+    }
+
+    [Fact]
+    public async Task ParseAsync_MixedDeclarationFile_PopulatesAllTypeKinds()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///api.d.lua";
+        const string text = """
+            ---@class GameEntity
+            ---@field id integer
+            GameEntity = {}
+
+            ---@alias GameEntityId integer
+            GameEntityId = nil
+
+            --- Finds by name.
+            ---@param name string
+            function Find_Entity(name) end
+            """;
+
+        await Build(repo).ParseAsync(uri, text, 1, default);
+
+        repo.RebuildIndex();
+        Assert.NotNull(repo.Current.GetClass("GameEntity"));
+        Assert.NotNull(repo.Current.GetAlias("GameEntityId"));
+    }
+
+    [Fact]
+    public async Task ParseAsync_NoFunctions_RegistersEmptyAnnotationsForUri()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string uri = "file:///empty.lua";
+
+        await Build(repo).ParseAsync(uri, "local x = 1", 1, default);
+
+        Assert.True(repo.All.ContainsKey(uri));
+        Assert.Empty(repo.All[uri]);
     }
 }

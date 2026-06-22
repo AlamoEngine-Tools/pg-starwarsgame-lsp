@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Schema;
 
@@ -10,18 +11,18 @@ namespace PG.StarWarsGame.LSP.Schema;
 ///     (local or HTTP) to be selected in <c>OnInitialize</c> after LSP initialization options
 ///     are known, while still satisfying DI resolution that occurs during server startup.
 /// </summary>
-public sealed class SchemaProviderProxy : ISchemaProvider
+public sealed class SchemaProviderProxy : LateBindingProxy<ISchemaProvider>, ISchemaProvider
 {
     private readonly TaskCompletionSource _readyTcs =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-    private volatile ISchemaProvider _inner = SchemaIndex.EmptyProvider;
 
     // Subscribers are stored here so they survive the _inner swap in Configure().
     // The old forwarding pattern (add => _inner.SchemaRefreshed += value) silently
     // subscribed to the empty placeholder, meaning events from the real provider
     // (HTTP/local) were never delivered to downstream subscribers.
     private EventHandler? _schemaRefreshed;
+
+    public SchemaProviderProxy() : base(SchemaIndex.EmptyProvider) { }
 
     public Task ReadyAsync => _readyTcs.Task;
 
@@ -31,46 +32,8 @@ public sealed class SchemaProviderProxy : ISchemaProvider
         remove => _schemaRefreshed -= value;
     }
 
-    public XmlTagDefinition? GetTag(string tagName)
+    protected override void OnConfigured(ISchemaProvider inner)
     {
-        return _inner.GetTag(tagName);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-    {
-        return _inner.GetAllTagDefinitions(tagName);
-    }
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => _inner.AllTags;
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
-    {
-        return _inner.GetObjectType(typeName);
-    }
-
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => _inner.AllObjectTypes;
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-    {
-        return _inner.GetTagsForType(typeName);
-    }
-
-    public EnumDefinition? GetEnum(string enumName)
-    {
-        return _inner.GetEnum(enumName);
-    }
-
-    public IReadOnlyList<EnumDefinition> AllEnums => _inner.AllEnums;
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _inner.AllHardcodedSets;
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => _inner.AllMetafiles;
-
-    /// <summary>
-    ///     Called from <c>OnInitialize</c> once the schema source configuration is known.
-    ///     Replaces the placeholder inner provider and signals <see cref="ISchemaProvider.ReadyAsync" />.
-    /// </summary>
-    public void Configure(ISchemaProvider inner)
-    {
-        _inner = inner;
         // Forward SchemaRefreshed from the real provider to our stored delegates.
         inner.SchemaRefreshed += (s, e) => _schemaRefreshed?.Invoke(s, e);
         // Chain: ready when the inner provider is ready.
@@ -82,4 +45,25 @@ public sealed class SchemaProviderProxy : ISchemaProvider
         if (inner.ReadyAsync.IsCompleted)
             _readyTcs.TrySetResult();
     }
+
+    public XmlTagDefinition? GetTag(string tagName) => Inner.GetTag(tagName);
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) =>
+        Inner.GetAllTagDefinitions(tagName);
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => Inner.AllTags;
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName) =>
+        Inner.GetObjectType(typeName);
+
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => Inner.AllObjectTypes;
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) =>
+        Inner.GetTagsForType(typeName);
+
+    public EnumDefinition? GetEnum(string enumName) => Inner.GetEnum(enumName);
+
+    public IReadOnlyList<EnumDefinition> AllEnums => Inner.AllEnums;
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => Inner.AllHardcodedSets;
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => Inner.AllMetafiles;
 }

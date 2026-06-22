@@ -1,7 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -28,10 +31,11 @@ public sealed class LuaMemberCompletionProviderTest
     private static IEnumerable<CompletionItem> Provide(
         string? receiverName,
         bool isMethod,
-        IReadOnlyList<ScopeEntry>? scope = null)
+        IReadOnlyList<ScopeEntry>? scope = null,
+        ILuaTypeIndex? typeIndex = null)
     {
         var ctx = new MemberAccessContext(receiverName, isMethod);
-        return LuaMemberCompletionProvider.Provide(ctx, scope ?? [], Schema);
+        return LuaMemberCompletionProvider.Provide(ctx, scope ?? [], Schema, typeIndex ?? LuaTypeIndex.Empty);
     }
 
     // ── return type resolution ────────────────────────────────────────────────
@@ -120,5 +124,80 @@ public sealed class LuaMemberCompletionProviderTest
     public void GetMembersOf_UnknownType_ReturnsEmpty()
     {
         Assert.Empty(Schema.GetMembersOf("UnknownType"));
+    }
+
+    // ── workspace type index members ─────────────────────────────────────────
+
+    [Fact]
+    public void Provide_TypeAnnotatedLocal_WorkspaceClassFields_AreOffered()
+    {
+        // Build a workspace type index with PGUnit having "health" and "name" fields.
+        var repo = new LuaAnnotationRepository();
+        var cls = new LuaClassDefinition("PGUnit", false,
+            ImmutableArray<string>.Empty,
+            [
+                new LuaFieldDefinition("health", false, new LuaTypeRef("integer"), null),
+                new LuaFieldDefinition("name", false, new LuaTypeRef("string"), null)
+            ], null);
+        repo.Update("file:///types.lua", [EmmyLuaAnnotations.Empty with { ClassDef = cls }]);
+        repo.RebuildIndex();
+
+        // Local variable "myUnit" annotated with @type PGUnit
+        var scope = new List<ScopeEntry>
+        {
+            new("myUnit", ScopeEntryKind.LocalVariable, null, TypeName: "PGUnit")
+        };
+
+        var items = Provide("myUnit", false, scope, repo.Current).ToList();
+
+        Assert.Contains(items, i => i.Label == "health");
+        Assert.Contains(items, i => i.Label == "name");
+        Assert.All(items, i => Assert.Equal(CompletionItemKind.Field, i.Kind));
+    }
+
+    [Fact]
+    public void Provide_TypeAnnotatedLocal_MethodCall_NoFieldsOffered()
+    {
+        var repo = new LuaAnnotationRepository();
+        var cls = new LuaClassDefinition("PGUnit", false,
+            ImmutableArray<string>.Empty,
+            [new LuaFieldDefinition("health", false, new LuaTypeRef("integer"), null)],
+            null);
+        repo.Update("file:///types.lua", [EmmyLuaAnnotations.Empty with { ClassDef = cls }]);
+        repo.RebuildIndex();
+
+        var scope = new List<ScopeEntry>
+        {
+            new("myUnit", ScopeEntryKind.LocalVariable, null, TypeName: "PGUnit")
+        };
+
+        // IsMethodCall=true → workspace class fields should not appear (they are dot-access only)
+        var items = Provide("myUnit", true, scope, repo.Current).ToList();
+        Assert.DoesNotContain(items, i => i.Label == "health");
+    }
+
+    [Fact]
+    public void Provide_EngineApiReturnType_IsWorkspaceClass_FieldsOffered()
+    {
+        // Engine function returns a workspace-defined type — cross-lookup scenario.
+        var repo = new LuaAnnotationRepository();
+        var cls = new LuaClassDefinition("PlayerObject", false,
+            ImmutableArray<string>.Empty,
+            [new LuaFieldDefinition("credits", false, new LuaTypeRef("integer"), null)],
+            null);
+        repo.Update("file:///types.lua", [EmmyLuaAnnotations.Empty with { ClassDef = cls }]);
+        repo.RebuildIndex();
+
+        // Schema already knows Find_Player returns PlayerObject (via @return).
+        var scope = new List<ScopeEntry>
+        {
+            new("Find_Player", ScopeEntryKind.EngineApi, null)
+        };
+
+        var items = Provide("Find_Player", false, scope, repo.Current).ToList();
+
+        // Existing engine member "Faction" still present; new workspace field "credits" also present.
+        Assert.Contains(items, i => i.Label == "Faction");
+        Assert.Contains(items, i => i.Label == "credits");
     }
 }

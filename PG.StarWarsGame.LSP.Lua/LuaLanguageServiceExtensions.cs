@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
@@ -13,6 +14,8 @@ public static class LuaLanguageServiceExtensions
 {
     public static IServiceCollection AddLuaLanguageServices(this IServiceCollection services)
     {
+        services.AddSingleton<LuaAnnotationRepository>();
+        services.AddSingleton<ILuaAnnotationRepository>(sp => sp.GetRequiredService<LuaAnnotationRepository>());
         services.AddSingleton<LuaApiSchemaProxy>();
         services.AddSingleton<ILuaApiSchemaProvider>(sp => sp.GetRequiredService<LuaApiSchemaProxy>());
         services.AddSingleton<IGameDocumentParser, LuaGameDocumentParser>();

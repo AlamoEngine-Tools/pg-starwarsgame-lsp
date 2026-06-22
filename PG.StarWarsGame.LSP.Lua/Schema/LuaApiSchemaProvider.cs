@@ -8,6 +8,7 @@ namespace PG.StarWarsGame.LSP.Lua.Schema;
 
 public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
 {
+    private readonly IReadOnlyDictionary<string, LuaClassDefinition> _classes;
     private readonly IReadOnlyDictionary<string, FunctionEntry> _functions;
     private readonly IReadOnlyDictionary<string, IReadOnlyList<LuaTypeMember>> _typeMembers;
 
@@ -15,13 +16,15 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     {
         var functions = new Dictionary<string, FunctionEntry>(StringComparer.OrdinalIgnoreCase);
         var typeMembers = new Dictionary<string, List<LuaTypeMember>>(StringComparer.OrdinalIgnoreCase);
+        var classes = new Dictionary<string, LuaClassDefinition>(StringComparer.OrdinalIgnoreCase);
         foreach (var content in fileContents)
-            ParseContent(content, functions, typeMembers);
+            ParseContent(content, functions, typeMembers, classes);
         _functions = functions;
         _typeMembers = typeMembers.ToDictionary(
             kvp => kvp.Key,
             kvp => (IReadOnlyList<LuaTypeMember>)kvp.Value,
             StringComparer.OrdinalIgnoreCase);
+        _classes = classes;
         AllFunctionNames = new HashSet<string>(functions.Keys, StringComparer.OrdinalIgnoreCase);
     }
 
@@ -47,10 +50,16 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         return _typeMembers.TryGetValue(typeName, out var members) ? members : [];
     }
 
+    public LuaClassDefinition? GetClassDefinition(string typeName)
+    {
+        return _classes.GetValueOrDefault(typeName);
+    }
+
     private static void ParseContent(
         string content,
         Dictionary<string, FunctionEntry> functions,
-        Dictionary<string, List<LuaTypeMember>> typeMembers)
+        Dictionary<string, List<LuaTypeMember>> typeMembers,
+        Dictionary<string, LuaClassDefinition> classes)
     {
         // Accumulate comment lines (--- stripped) for EmmyLuaAnnotationParser.
         var commentLines = new List<string>();
@@ -130,6 +139,13 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
             {
                 if (line.Length == 0 || !line.StartsWith("---", StringComparison.Ordinal))
                 {
+                    if (commentLines.Count > 0)
+                    {
+                        var ann = EmmyLuaAnnotationParser.Parse(commentLines);
+                        if (ann.ClassDef is { } cls)
+                            classes[cls.Name] = cls;
+                    }
+
                     commentLines.Clear();
                     xmlRefPairs.Clear();
                     paramCount = 0;

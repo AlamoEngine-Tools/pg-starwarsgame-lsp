@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Schema;
@@ -61,5 +62,22 @@ public sealed class LuaApiSchemaProxyTest
         proxy.Configure(second);
         Assert.DoesNotContain("Foo", proxy.AllFunctionNames);
         Assert.Contains("Bar", proxy.AllFunctionNames);
+    }
+
+    // ── LateBindingProxy<T> contract ─────────────────────────────────────────
+
+    [Fact]
+    public void Configure_Null_Throws()
+    {
+        // LuaApiSchemaProxy extends LateBindingProxy<ILuaApiSchemaProvider>;
+        // the base class must reject null to keep the Inner invariant.
+        var proxy = new LuaApiSchemaProxy();
+        Assert.Throws<ArgumentNullException>(() => proxy.Configure(null!));
+    }
+
+    [Fact]
+    public void LateBindingProxy_IsBaseOf_LuaApiSchemaProxy()
+    {
+        Assert.True(typeof(LuaApiSchemaProxy).IsSubclassOf(typeof(LateBindingProxy<ILuaApiSchemaProvider>)));
     }
 }

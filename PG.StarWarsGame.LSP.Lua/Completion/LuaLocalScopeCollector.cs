@@ -8,6 +8,7 @@ using Loretta.CodeAnalysis.Text;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua.Completion;
@@ -93,9 +94,18 @@ internal static class LuaLocalScopeCollector
             var enclosingFuncSpan = GetEnclosingFunctionFullSpan(local);
             if (enclosingFuncSpan.HasValue && !enclosingFuncSpan.Value.Contains(cursorOffset)) continue;
 
+            var typeName = ExtractTypeAnnotation(local);
             foreach (var nameDecl in local.Names)
-                entries.Add(new ScopeEntry(nameDecl.Name, ScopeEntryKind.LocalVariable, null));
+                entries.Add(new ScopeEntry(nameDecl.Name, ScopeEntryKind.LocalVariable, null, typeName));
         }
+    }
+
+    private static string? ExtractTypeAnnotation(SyntaxNode node)
+    {
+        var lines = LuaDocCommentScanner.CollectLeadingDocLines(node);
+        if (lines.Count == 0) return null;
+        var ann = EmmyLuaAnnotationParser.Parse(lines);
+        return ann.TypeAnnotation is { IsEmpty: false } t ? t.Raw : null;
     }
 
     private static void CollectParameters(

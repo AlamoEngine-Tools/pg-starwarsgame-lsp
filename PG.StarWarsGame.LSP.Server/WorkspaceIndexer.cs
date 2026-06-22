@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -30,6 +31,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private static readonly HashSet<string> AssetExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".tga", ".dds", ".alo", ".wav", ".mp3", ".ted" };
 
+    private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IProjectIndexCache _cache;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
@@ -41,7 +43,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
-        IEaWXmlContext eaWXmlContext, IProjectIndexCache cache, ILogger<WorkspaceIndexer> logger)
+        IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
+        ILuaAnnotationRepository annotationRepository, ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -50,6 +53,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
+        _annotationRepository = annotationRepository;
         _logger = logger;
     }
 
@@ -106,9 +110,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     public async Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
         Action<int, int>? progress = null)
     {
-        return config.Layers.Count > 0
+        var count = config.Layers.Count > 0
             ? await IndexByLayerAsync(config, ct, progress)
             : await IndexFlatAsync(config, ct, progress);
+        _annotationRepository.RebuildIndex();
+        return count;
     }
 
     /// <summary>
