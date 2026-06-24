@@ -81,6 +81,31 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         return new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocation()));
     }
 
+    private LocationOrLocationLinks? ResolveEnumDefinition(string id, GameIndex index)
+    {
+        // id format: "enum:{EnumName}/{ValueName}"
+        var slash = id.IndexOf('/', "enum:".Length);
+        if (slash < 0) return null;
+
+        var enumName = id["enum:".Length..slash];
+        var valueName = id[(slash + 1)..];
+
+        if (!index.WorkspaceEnumValueDefinitions.TryGetValue(enumName, out var valueMap))
+            return null;
+        if (!valueMap.TryGetValue(valueName, out var origin) || !origin.IsNavigable)
+            return null;
+
+        var location = new Location
+        {
+            Uri = origin.Uri,
+            Range = new LspRange(new Position(origin.Line, origin.Column ?? 0),
+                new Position(origin.Line, origin.Column ?? 0))
+        };
+
+        _logger.LogDebug("Go-to-def (enum): {Id} → {Uri}:{Line}", id, origin.Uri, origin.Line);
+        return new LocationOrLocationLinks(new LocationOrLocationLink(location));
+    }
+
     protected override DefinitionRegistrationOptions CreateRegistrationOptions(
         DefinitionCapability capability, ClientCapabilities clientCapabilities)
     {

@@ -41,13 +41,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
 
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
-        ILuaAnnotationRepository annotationRepository, IGameWorkspaceHost workspaceHost,
-        ILogger<WorkspaceIndexer> logger)
+        ILuaAnnotationRepository annotationRepository, ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -57,7 +55,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
         _annotationRepository = annotationRepository;
-        _workspaceHost = workspaceHost;
         _logger = logger;
     }
 
@@ -225,7 +222,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                 var uri = _fileHelper.PathToFileUri(file);
                 await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                 var done = Interlocked.Increment(ref indexed);
                 progress?.Invoke(done, files.Count);
             });
@@ -292,7 +288,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                         ? NormalizePath(_fileHelper.FileSystem.Path.GetRelativePath(projectDir, file))
                         : file;
 
-                    var (hash, text) = ProjectFileHasher.ReadAndHash(file, _fileHelper.FileSystem);
+                    var hash = ProjectFileHasher.ComputeFileHash(file, _fileHelper.FileSystem);
                     layerEntries.Add((relPath, uri, hash));
 
                     if (cacheHits is not null
@@ -303,10 +299,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     }
                     else
                     {
+                        var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                         await _indexService.UpdateDocumentAsync(uri, text, 0, token);
                     }
 
-                    _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                     var done = Interlocked.Increment(ref indexed);
                     progress?.Invoke(done, totalFiles);
                 });
@@ -421,10 +417,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 return cached.Content;
 
             // Filename-only search across every xml root, recursing into subdirectories.
-            // Iterate in reverse so the highest-rank (root project) directory is checked first;
-            // config.XmlDirectories is deps-first / root-last (see ModProjectResolver.Resolve).
+            // EnumerateFiles with a filename pattern is equivalent to ApplyAssetCatalog's approach
+            // and correctly finds e.g. Data/Xml/Enum/surfacefxtriggertype.xml when the root is Data/Xml.
             var fileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep));
-            foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
+            foreach (var xmlRoot in xmlRoots)
             {
                 if (!_fileHelper.FileSystem.Directory.Exists(xmlRoot)) continue;
                 var match = _fileHelper.FileSystem.Directory
