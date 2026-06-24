@@ -343,6 +343,171 @@ public sealed class WorkspaceIndexerTest
         Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
     }
 
+    // ── Dynamic enum catalog ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_ParsesEnumFile_AndPublishesValues()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var enumFilePath = Path.Combine(xmlDir, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><GENERIC_TRACK>0</GENERIC_TRACK><MY_MOD_TRACK>99</MY_MOD_TRACK></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.Contains("GENERIC_TRACK", vals);
+        Assert.Contains("MY_MOD_TRACK", vals);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_MissingEnumFile_PublishesEmptyDict()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var fs = new MockFileSystem();
+        fs.AddDirectory(xmlDir);
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.Empty(svc.AppliedWorkspaceDynamicEnumValues!);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_SearchesByFilenameOnly_NotFullPath()
+    {
+        var root = Root("ws");
+        // The enum file is directly in the xml root, not in an enum subdirectory.
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var enumFilePath = Path.Combine(xmlDir, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><CUSTOM>1</CUSTOM></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.Contains("CUSTOM", vals);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_EnumFileInSubdirectory_IsFound()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var enumSubDir = Path.Combine(xmlDir, "enum");
+        var enumFilePath = Path.Combine(enumSubDir, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><GENERIC_TRACK>0</GENERIC_TRACK></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]); // pass parent dir, not the enum subdir
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.Contains("GENERIC_TRACK", vals);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_AnchorFormatEnum_PublishesEnumValueDefinitionsWithExactPosition()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var filePath = Path.Combine(xmlDir, "gameconstants.xml");
+        const string xml = "<GameConstants><Damage_Types>EXPLOSIVE ENERGY</Damage_Types></GameConstants>";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [filePath] = new(xml) });
+        var enumDef = new EnumDefinition
+        {
+            Name = "DamageType", Kind = EnumKind.DynamicXml,
+            SourceFile = "data/xml/gameconstants.xml$Damage_Types", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
+        Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!.TryGetValue("DamageType", out var valueMap));
+        Assert.True(valueMap!.TryGetValue("EXPLOSIVE", out var explosiveOrigin));
+        Assert.True(explosiveOrigin!.IsNavigable);
+        Assert.True(valueMap.TryGetValue("ENERGY", out var energyOrigin));
+        // ENERGY comes after EXPLOSIVE in the same line, so its column must be greater
+        Assert.True(energyOrigin!.Column > explosiveOrigin.Column);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_FileFormatEnum_PublishesEnumValueDefinitions()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var enumFilePath = Path.Combine(xmlDir, "surfacefxtriggertype.xml");
+        const string xml = """
+                           <EnumDefinition>
+                               <GENERIC_TRACK>0</GENERIC_TRACK>
+                               <MY_MOD_TRACK>99</MY_MOD_TRACK>
+                           </EnumDefinition>
+                           """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [enumFilePath] = new(xml) });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
+        Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!
+            .TryGetValue("SurfaceFXTriggerType", out var valueMap));
+        Assert.True(valueMap!.TryGetValue("GENERIC_TRACK", out var origin));
+        Assert.True(origin!.IsNavigable);
+        Assert.True(origin.Line > 0); // must be inside the file, past the root element
+    }
+
     // ── IndexDocumentsAsync with cache ──────────────────────────────────────
 
     [Fact]
@@ -598,6 +763,24 @@ public sealed class WorkspaceIndexerTest
         }
     }
 
+    private sealed class FakeSchemaWithEnums(params EnumDefinition[] enums) : ISchemaProvider
+    {
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => enums;
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
+        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public XmlTagDefinition? GetTag(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+        public GameObjectTypeDefinition? GetObjectType(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public EnumDefinition? GetEnum(string name) =>
+            enums.FirstOrDefault(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class FakeIndexService : IGameIndexService
     {
         public readonly List<(string Uri, int Version)> Calls = [];
@@ -613,6 +796,16 @@ public sealed class WorkspaceIndexerTest
         public IAssetFileIndex? AppliedAssetFiles { get; private set; }
 
         public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelBones { get; private set; }
+
+        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedWorkspaceDynamicEnumValues
+        {
+            get; private set;
+        }
+
+        public ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>? AppliedWorkspaceEnumValueDefinitions
+        {
+            get; private set;
+        }
 
         public GameIndex Current { get; private set; }
 
@@ -665,6 +858,17 @@ public sealed class WorkspaceIndexerTest
         public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
             AppliedModelBones = bones;
+        }
+
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+            AppliedWorkspaceDynamicEnumValues = values;
+        }
+
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+            AppliedWorkspaceEnumValueDefinitions = definitions;
         }
 
         public IDisposable BeginBulkUpdate()

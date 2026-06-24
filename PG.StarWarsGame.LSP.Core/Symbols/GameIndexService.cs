@@ -217,6 +217,31 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { WorkspaceDynamicEnumValues = values };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    public void ApplyWorkspaceEnumValueDefinitions(
+        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { WorkspaceEnumValueDefinitions = definitions };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
     private void EndBulkUpdate()
     {
         if (Interlocked.Decrement(ref _suppressionDepth) > 0)

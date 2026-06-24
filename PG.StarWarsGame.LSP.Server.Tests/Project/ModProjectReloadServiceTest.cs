@@ -148,6 +148,7 @@ public sealed class ModProjectReloadServiceTest
         public int IndexCallCount { get; private set; }
         public bool AssetCatalogApplied { get; private set; }
         public bool BonesApplied { get; private set; }
+        public bool DynamicEnumCatalogApplied { get; private set; }
 
         public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
         {
@@ -160,6 +161,11 @@ public sealed class ModProjectReloadServiceTest
         {
             IndexCallCount++;
             return Task.FromResult(0);
+        }
+
+        public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots)
+        {
+            DynamicEnumCatalogApplied = true;
         }
 
         public void ApplyAssetCatalog(IReadOnlyList<string> roots)

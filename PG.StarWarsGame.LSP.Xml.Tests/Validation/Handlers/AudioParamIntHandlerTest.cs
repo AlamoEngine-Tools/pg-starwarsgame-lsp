@@ -35,11 +35,19 @@ public sealed class AudioParamIntHandlerTest
     }
 
     [Theory]
-    [InlineData("-1", "0")]
-    [InlineData("128", "127")]
+    [InlineData("-1")]
+    [InlineData("128")]
+    [InlineData("200")]
+    public void Integers_outside_MIDI_range_are_valid(string value)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Theory]
     [InlineData("1.5", "1")]
-    [InlineData("200.9", "127")]
-    public void Out_of_range_or_float_returns_warning_with_clamped_fix(string value, string expectedFix)
+    [InlineData("200.9", "200")]
+    public void Float_returns_warning_with_truncated_fix(string value, string expectedFix)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);

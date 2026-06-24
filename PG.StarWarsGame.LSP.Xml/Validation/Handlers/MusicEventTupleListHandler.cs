@@ -6,9 +6,9 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class MusicEventWeightedListHandler : CommaSeparatedPairHandlerBase
+public sealed class TupleListHandler : CommaSeparatedPairHandlerBase
 {
-    protected override XmlValueType TargetType => XmlValueType.MusicEventWeightedList;
+    protected override XmlValueType TargetType => XmlValueType.TupleList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {

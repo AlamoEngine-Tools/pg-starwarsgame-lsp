@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Completion;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -25,9 +26,11 @@ public sealed class GameObjectReferenceCompletionProvider : IXmlCompletionProvid
 
         return workspaceSymbols.Concat(baselineSymbols)
             .Where(s => isWildcard || string.Equals(s.TypeName, typeName, StringComparison.OrdinalIgnoreCase))
-            .Where(s => partialValue.Length == 0 ||
-                        s.Id.StartsWith(partialValue, StringComparison.OrdinalIgnoreCase))
-            .Select(s => new ValueProposal { Label = s.Id, Detail = s.Description })
+            .Select(s => (Symbol: s, DisplayId: ReferenceResolutionEvaluator.StripOwnerPrefix(s.Id)))
+            .Where(t => partialValue.Length == 0 ||
+                        t.DisplayId.StartsWith(partialValue, StringComparison.OrdinalIgnoreCase))
+            .Select(t => new ValueProposal { Label = t.DisplayId, Detail = t.Symbol.Description })
+            .Distinct()
             .ToList();
     }
 }

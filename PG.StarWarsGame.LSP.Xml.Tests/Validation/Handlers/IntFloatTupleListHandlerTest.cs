@@ -38,6 +38,15 @@ public sealed class IntFloatTupleListHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
 
+    [Theory]
+    [InlineData("1, 0.5,")]
+    [InlineData("1 0.5 2 1.0 ")]
+    public void Trailing_separator_is_tolerated(string value)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
     [Fact]
     public void Wrong_type_returns_no_diagnostics()
     {

@@ -397,6 +397,15 @@ public sealed class LuaDiagnosticsPublisherTest
         {
         }
 
+        public void ApplyWorkspaceDynamicEnumValues(
+            ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             return NullDisposable.Instance;

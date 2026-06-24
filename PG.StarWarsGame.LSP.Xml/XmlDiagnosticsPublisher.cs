@@ -2,8 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
-using System.Xml;
-using System.Xml.Linq;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -147,12 +145,16 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(text, uri));
 
+        var lines = text.Split('\n');
         var allDiags = new List<Diagnostic>();
         foreach (var fact in facts)
-        foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
-            allDiags.Add(ToLspDiagnostic(fact, result));
+        {
+            if (fact is XmlSymbolFact symbolFact && IsDuplicateSymbolSuppressed(lines, symbolFact.Line))
+                continue;
+            foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
+                allDiags.Add(ToLspDiagnostic(fact, result));
+        }
 
-        allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, text, index));
         allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, text, index));
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
@@ -171,92 +173,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Uri = DocumentUri.From(uri),
             Diagnostics = new Container<Diagnostic>(allDiags)
         });
-    }
-
-    internal IReadOnlyList<Diagnostic> CollectEnumBoundaryDiagnostics(
-        string documentUri, string text, GameIndex index)
-    {
-        var hardcoded = index.Baseline.HardcodedEnumValues;
-        if (hardcoded.IsEmpty) return [];
-        var uriPath = _fileHelper.NormalizeUri(documentUri);
-        if (!Path.GetFileName(uriPath).Equals("gameconstants.xml", StringComparison.OrdinalIgnoreCase)) return [];
-
-        XDocument doc;
-        try
-        {
-            doc = XDocument.Parse(text, LoadOptions.SetLineInfo);
-        }
-        catch
-        {
-            return [];
-        }
-
-        var diagnostics = new List<Diagnostic>();
-
-        foreach (var (enumName, tagName) in
-                 (IEnumerable<(string, string)>)[("DamageType", "Damage_Types"), ("ArmorType", "Armor_Types")])
-        {
-            if (!hardcoded.TryGetValue(enumName, out var knownHardcoded)) continue;
-            var knownSet = new HashSet<string>(knownHardcoded, StringComparer.OrdinalIgnoreCase);
-
-            var el = doc.Descendants(tagName).FirstOrDefault();
-            if (el is null) continue;
-
-            var pastBoundary = false;
-            foreach (var node in el.Nodes())
-            {
-                if (node is XComment c && IsBoundaryComment(c.Value))
-                {
-                    pastBoundary = true;
-                    continue;
-                }
-
-                if (!pastBoundary || node is not XText textNode) continue;
-
-                var li = (IXmlLineInfo)textNode;
-                EmitTokenDiagnostics(textNode.Value, li.LineNumber, li.LinePosition,
-                    knownSet, diagnostics);
-            }
-        }
-
-        return diagnostics;
-    }
-
-    private void EmitTokenDiagnostics(
-        string raw, int startLine, int startCol,
-        HashSet<string> knownSet, List<Diagnostic> diagnostics)
-    {
-        var lines = raw.Split('\n');
-        for (var li = 0; li < lines.Length; li++)
-        {
-            var line = lines[li].TrimEnd('\r');
-            var lineNumber = startLine + li;
-            var col = 0;
-
-            while (col < line.Length)
-            {
-                while (col < line.Length && char.IsWhiteSpace(line[col])) col++;
-                if (col >= line.Length) break;
-
-                var tokenStart = col;
-                while (col < line.Length && !char.IsWhiteSpace(line[col])) col++;
-                var token = line[tokenStart..col];
-
-                if (knownSet.Contains(token)) continue;
-
-                // 0-based column: first line of text node starts at startCol-1, subsequent at 0
-                var tokenCol0 = (li == 0 ? startCol - 1 : 0) + tokenStart;
-                var tokenLine0 = lineNumber - 1;
-                diagnostics.Add(new Diagnostic
-                {
-                    Severity = DiagnosticSeverity.Warning,
-                    Message =
-                        $"'{token}' is below the hard-coded section boundary. Add new damage/armor types above the boundary comment.",
-                    Range = SafeRange(tokenLine0, tokenCol0, token.Length),
-                    Source = AppProperties.LspServerId
-                });
-            }
-        }
     }
 
     internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
@@ -331,9 +247,19 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         }
     }
 
-    private static bool IsBoundaryComment(string commentText)
+    // Scans up to 5 lines before the symbol's line for a `<!-- lsp:suppress duplicate-symbol -->`
+    // annotation. Returns true when found, indicating the duplicate diagnostic should be suppressed.
+    private static bool IsDuplicateSymbolSuppressed(string[] lines, int symbolLine0)
     {
-        return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+        var start = Math.Max(0, symbolLine0 - 5);
+        var end = Math.Min(symbolLine0, lines.Length - 1);
+        for (var i = start; i <= end; i++)
+        {
+            if (lines[i].Contains("lsp:suppress duplicate-symbol", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsStoryParserDocument(string documentUri)

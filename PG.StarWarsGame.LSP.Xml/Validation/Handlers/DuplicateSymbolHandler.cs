@@ -8,6 +8,11 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact>
 {
+    // Engine placeholder names that are intentionally reused across files (e.g. Default SFXEvent,
+    // Default TradeRouteLine). Duplicate detection is downgraded to Information for these.
+    private static readonly HashSet<string> PlaceholderNames =
+        new(["Default", "Null", "None"], StringComparer.OrdinalIgnoreCase);
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlSymbolFact fact, DiagnosticsContext ctx)
     {
         var others = fact.AllDefinitions
@@ -20,9 +25,12 @@ public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact
             return [];
 
         var othersText = string.Join(", ", others.Select(s => ((FileOrigin)s.Origin).Uri));
+        var severity = PlaceholderNames.Contains(fact.SymbolId)
+            ? XmlDiagnosticSeverity.Information
+            : XmlDiagnosticSeverity.Error;
         return
         [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+            new XmlDiagnosticResult(severity,
                 $"Duplicate symbol '{fact.SymbolId}': also defined in {othersText}.")
         ];
     }

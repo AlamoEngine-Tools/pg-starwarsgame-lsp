@@ -12,16 +12,35 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        var parts = SplitOnFirstComma(fact.RawValue.Trim());
-        if (parts.Length != 2 || parts[0].Trim().Length == 0 ||
-            !LenientFloatParser.TryParse(parts[1].Trim(), out var probability) ||
-            probability < 0.0f || probability > 1.0f)
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{fact.RawValue.Trim()}' is not a valid spawn probability entry for <{fact.Tag.Tag}>. Expected: UnitTypeName, Float [0.0, 1.0].")
-            ];
+        var trimmed = fact.RawValue.Trim();
+        if (trimmed.Length == 0)
+            return [Error(fact, trimmed)];
 
-        return [];
+        var parts = trimmed.Split(',')
+            .Select(p => p.Trim())
+            .Where(p => p.Length > 0)
+            .ToArray();
+
+        if (parts.Length == 0 || parts.Length % 2 != 0)
+            return [Error(fact, trimmed)];
+
+        for (var i = 0; i < parts.Length; i += 2)
+        {
+            if (!LenientFloatParser.TryParse(parts[i + 1], out var probability) ||
+                probability < 0.0f || probability > 1.0f)
+                return [Error(fact, trimmed)];
+        }
+
+        var results = new List<XmlDiagnosticResult>();
+        for (var i = 0; i < parts.Length; i += 2)
+        {
+            var d = TryValidateGameObjectName(parts[i], fact.Tag.Tag, ctx.Index);
+            if (d is not null) results.Add(d);
+        }
+        return results;
     }
+
+    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed) =>
+        new(XmlDiagnosticSeverity.Error,
+            $"'{trimmed}' is not a valid spawn probability table for <{fact.Tag.Tag}>. Expected pairs of UnitTypeName, Float [0.0, 1.0].");
 }

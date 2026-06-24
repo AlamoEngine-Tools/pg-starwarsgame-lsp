@@ -37,5 +37,14 @@ public enum TagSemanticType
     ///     <c>referenceKind</c> is <c>xmlObject</c>; the target type is the enclosing object's own type,
     ///     resolved from the ancestor chain rather than a fixed <c>referenceType</c>.
     /// </summary>
-    VariantParent
+    VariantParent,
+
+    /// <summary>
+    ///     The reference target is scoped to the enclosing game object: the parser prefixes the target
+    ///     name with the owning object's ID and a <c>$</c> separator (e.g. <c>MY_UNIT$Medic_Healing</c>).
+    ///     Used by <c>GUI_Activated_Ability_Name</c> to cross-reference an ability defined in the same
+    ///     game object's <c>Abilities</c> list without colliding with same-named abilities in other units.
+    ///     Display layers strip the owner prefix when showing the value to the user.
+    /// </summary>
+    OwnerScopedReference
 }

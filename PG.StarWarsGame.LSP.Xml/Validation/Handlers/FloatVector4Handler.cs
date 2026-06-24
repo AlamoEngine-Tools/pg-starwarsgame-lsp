@@ -14,7 +14,7 @@ public sealed partial class FloatVector4Handler : SingleValueTypeHandlerBase
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         var trimmed = fact.RawValue.Trim();
-        var parts = Separator().Split(trimmed);
+        var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
         if (parts.Length != 4 || parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
             return
             [

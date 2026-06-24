@@ -29,6 +29,37 @@ public sealed class DuplicateSymbolHandlerTest
         Assert.Contains("b.xml", d.Message);
     }
 
+    // ── Placeholder name downgrade ───────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Default")]
+    [InlineData("DEFAULT")]
+    [InlineData("default")]
+    [InlineData("Null")]
+    [InlineData("NULL")]
+    [InlineData("None")]
+    [InlineData("NONE")]
+    public void Placeholder_name_duplicate_emits_information_not_error(string id)
+    {
+        var sym1 = MakeSymbol(id, "file:///a.xml", 0);
+        var sym2 = MakeSymbol(id, "file:///b.xml", 0);
+        var fact = new XmlSymbolFact("file:///a.xml", 0, 0, 0, id, [sym1, sym2]);
+        var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Information, d.Severity);
+    }
+
+    [Fact]
+    public void Non_placeholder_name_still_emits_error()
+    {
+        var sym1 = MakeSymbol("X_Wing", "file:///a.xml", 0);
+        var sym2 = MakeSymbol("X_Wing", "file:///b.xml", 0);
+        var fact = new XmlSymbolFact("file:///a.xml", 0, 0, 0, "X_Wing", [sym1, sym2]);
+        var results = Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
     [Fact]
     public void Multiple_other_definitions_all_listed()
     {

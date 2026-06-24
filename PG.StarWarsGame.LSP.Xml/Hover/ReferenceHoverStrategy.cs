@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.HoverStrategies;
@@ -29,6 +30,7 @@ internal sealed class ReferenceHoverStrategy : IXmlHoverStrategy
         if (typeDef is null)
             return null;
 
-        return HoverUtility.BuildReferenceHover(typeDef, symbol.Id, reference, ctx.Locale, symbol.Origin);
+        var displayId = ReferenceResolutionEvaluator.StripOwnerPrefix(symbol.Id);
+        return HoverUtility.BuildReferenceHover(typeDef, displayId, reference, ctx.Locale, symbol.Origin);
     }
 }

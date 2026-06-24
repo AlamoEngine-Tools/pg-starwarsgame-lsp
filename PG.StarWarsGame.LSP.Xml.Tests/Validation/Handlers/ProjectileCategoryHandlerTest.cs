@@ -14,10 +14,21 @@ public sealed class ProjectileCategoryHandlerTest
     private static readonly XmlTagDefinition Tag =
         XmlHandlerTestFixtures.MakeTag("Projectile_Category", XmlValueType.ProjectileCategory);
 
+    private static XmlTagDefinition TagWithEnum(params string[] values)
+    {
+        var enumDef = new EnumDefinition
+        {
+            Name = "ProjectileCategory",
+            Kind = EnumKind.SchemaFixed,
+            Values = values.Select(v => new EnumValueDefinition { Name = v }).ToList()
+        };
+        return XmlHandlerTestFixtures.MakeTag("Projectile_Category", XmlValueType.ProjectileCategory, enumDef: enumDef);
+    }
+
     [Theory]
     [InlineData("Laser")]
     [InlineData("Missile")]
-    public void Non_empty_values_return_no_diagnostics(string value)
+    public void Non_empty_values_without_enum_return_no_diagnostics(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
@@ -39,6 +50,38 @@ public sealed class ProjectileCategoryHandlerTest
         var floatTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx)
             .ToList();
+        Assert.Empty(results);
+    }
+
+    // ── Schema enum validation ────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("Laser")]
+    [InlineData("MISSILE")]
+    [InlineData("laser")]
+    public void Known_value_with_schema_enum_returns_no_diagnostics(string value)
+    {
+        var tag = TagWithEnum("Laser", "MISSILE", "BOMB");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void Unknown_value_with_schema_enum_returns_error()
+    {
+        var tag = TagWithEnum("Laser", "MISSILE", "BOMB");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "GARBAGE"), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+        Assert.Contains("GARBAGE", d.Message);
+    }
+
+    [Fact]
+    public void No_enum_on_tag_skips_value_validation()
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "ANYTHING_GOES"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
 }

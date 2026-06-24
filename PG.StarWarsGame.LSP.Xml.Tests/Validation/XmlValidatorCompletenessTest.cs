@@ -35,9 +35,7 @@ public sealed class XmlValidatorCompletenessTest
                 }
             })
             .OfType<IXmlDiagnosticsHandler>()
-            .Select(h => h.HandledValueType)
-            .Where(v => v is not null)
-            .Select(v => v!.Value)
+            .SelectMany(h => h.HandledValueTypes)
             .ToHashSet();
 
         var gaps = allTypes.Except(coveredTypes).OrderBy(v => v.ToString()).ToList();

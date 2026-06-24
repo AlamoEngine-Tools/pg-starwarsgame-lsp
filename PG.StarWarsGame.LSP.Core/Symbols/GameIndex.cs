@@ -54,6 +54,25 @@ public sealed record GameIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
+    ///     Dynamic enum values discovered by scanning the workspace XML enum files — values the mod has
+    ///     added or overridden beyond the shipped baseline. Keyed case-insensitively by enum name
+    ///     (e.g. <c>SurfaceFXTriggerType</c>). Unioned with <see cref="BaselineIndex.DynamicEnumValues" />
+    ///     by <c>NamedEnumValueHandlerBase</c> so workspace-defined values are never flagged as unknown.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableArray<string>> WorkspaceDynamicEnumValues { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    ///     File origins for individual values in workspace-defined <see cref="EnumKind.DynamicXml" /> enum
+    ///     files. Outer key: enum name (case-insensitive, e.g. <c>SurfaceFXTriggerType</c>).
+    ///     Inner key: value name (case-insensitive). Used by go-to-definition on enum-value references.
+    /// </summary>
+    public ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> WorkspaceEnumValueDefinitions
+    { get; init; } =
+        ImmutableDictionary.Create<string, ImmutableDictionary<string, FileOrigin>>(
+            StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     ///     Merged (baseline ∪ workspace) group memberships. Prefer this over
     ///     <see cref="WorkspaceGroupMemberships" /> in LSP handlers so shipped-game members are included
     ///     alongside mod-workspace members when resolving group keys.

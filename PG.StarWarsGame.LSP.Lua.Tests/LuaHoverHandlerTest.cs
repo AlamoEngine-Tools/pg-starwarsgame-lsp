@@ -457,6 +457,15 @@ public sealed class LuaHoverHandlerTest
         {
         }
 
+        public void ApplyWorkspaceDynamicEnumValues(
+            ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             return NullDisposable.Instance;

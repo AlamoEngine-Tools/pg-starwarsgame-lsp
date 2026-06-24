@@ -44,6 +44,15 @@ public sealed class IntListHandlerTest
         Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
+    [Theory]
+    [InlineData("1, 2, 3,")]
+    [InlineData("10 20 ")]
+    public void Trailing_separator_is_tolerated(string value)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
     [Fact]
     public void Non_int_list_tag_returns_no_diagnostics()
     {

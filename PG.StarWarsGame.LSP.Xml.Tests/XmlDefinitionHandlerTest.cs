@@ -243,6 +243,58 @@ public sealed class XmlDefinitionHandlerTest
         Assert.Null(result);
     }
 
+    // ── enum reference go-to-definition ──────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_EnumReference_NavigatesToEnumValueDefinition()
+    {
+        const string enumFilePath = "file:///enum/surfacefxtriggertype.xml";
+        var enumRef = new GameReference("enum:SurfaceFXTriggerType/GENERIC_TRACK",
+            null, null, TestUri, 0, 4, 13);
+        var callerDoc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(enumRef));
+
+        var origin = new FileOrigin(enumFilePath, 2, null);
+        var enumDefs = ImmutableDictionary.Create<string, ImmutableDictionary<string, FileOrigin>>(
+                StringComparer.OrdinalIgnoreCase)
+            .Add("SurfaceFXTriggerType",
+                ImmutableDictionary.Create<string, FileOrigin>(StringComparer.OrdinalIgnoreCase)
+                    .Add("GENERIC_TRACK", origin));
+
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(TestUri, callerDoc),
+            ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
+            ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase))
+        {
+            WorkspaceEnumValueDefinitions = enumDefs
+        };
+
+        var handler = BuildHandler(index);
+        var result = await handler.Handle(At(0, 6), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var link = Assert.Single(result!);
+        Assert.True(link.IsLocation);
+        Assert.Equal(enumFilePath, link.Location!.Uri.ToString());
+        Assert.Equal(2, link.Location.Range.Start.Line);
+    }
+
+    [Fact]
+    public async Task Handle_EnumReference_UnknownValue_ReturnsNull()
+    {
+        var enumRef = new GameReference("enum:SurfaceFXTriggerType/MISSING_VALUE",
+            null, null, TestUri, 0, 4, 13);
+        var callerDoc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(enumRef));
+
+        // No WorkspaceEnumValueDefinitions for this enum.
+        var index = IndexWith(callerDoc);
+        var handler = BuildHandler(index);
+
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
+        Assert.Null(result);
+    }
+
     // ── EaW directory gating ─────────────────────────────────────────────────
 
     [Fact]
@@ -287,6 +339,13 @@ public sealed class XmlDefinitionHandlerTest
 
         public void ApplyModelBones(
             ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 
