@@ -155,4 +155,37 @@ public sealed class GameWorkspaceHostTest
 
         Assert.Empty(host.All);
     }
+
+    // ── PublishDiagnostics ───────────────────────────────────────────────────
+
+    [Fact]
+    public void AddOrUpdate_DefaultPublishDiagnostics_IsTrue()
+    {
+        var host = Build();
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 1);
+
+        Assert.True(host.TryGet("file:///a.xml", out var doc));
+        Assert.True(doc.PublishDiagnostics);
+    }
+
+    [Fact]
+    public void AddOrUpdate_WithPublishDiagnosticsFalse_StoresFlag()
+    {
+        var host = Build();
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 1, publishDiagnostics: false);
+
+        Assert.True(host.TryGet("file:///a.xml", out var doc));
+        Assert.False(doc.PublishDiagnostics);
+    }
+
+    [Fact]
+    public void AddOrUpdate_UpgradesPublishDiagnosticsFalseToTrue()
+    {
+        var host = Build();
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 1, publishDiagnostics: false);
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 2, publishDiagnostics: true);
+
+        Assert.True(host.TryGet("file:///a.xml", out var doc));
+        Assert.True(doc.PublishDiagnostics);
+    }
 }

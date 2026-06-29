@@ -15,6 +15,18 @@ public static class ProjectFileHasher
         return Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
     }
 
+    // Reads the file once and returns both the SHA-256 hash and the decoded text.
+    // Preserves the cache-hit hash contract: bytes are hashed before decoding so existing
+    // snapshot entries remain valid.
+    public static (string Hash, string Text) ReadAndHash(string absolutePath, IFileSystem fs)
+    {
+        var bytes = fs.File.ReadAllBytes(absolutePath);
+        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
+        using var ms = new MemoryStream(bytes);
+        using var reader = new StreamReader(ms, detectEncodingFromByteOrderMarks: true);
+        return (hash, reader.ReadToEnd());
+    }
+
     // Sorts entries by relative path so the hash is stable regardless of enumeration order.
     public static string ComputeProjectHash(IEnumerable<(string relativePath, string fileHash)> entries)
     {

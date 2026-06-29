@@ -18,10 +18,10 @@ public sealed class GameWorkspaceHost : IGameWorkspaceHost
         _logger = logger;
     }
 
-    public void AddOrUpdate(string uri, string text, int version)
+    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
     {
         var isNew = !_docs.ContainsKey(uri);
-        _docs[uri] = new TrackedDocument(uri, text, version);
+        _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         _logger.LogDebug("{Action} {Uri} (version={Version}, length={Length})",
             isNew ? "Opened" : "Updated", uri, version, text.Length);
     }

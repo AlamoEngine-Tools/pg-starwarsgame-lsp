@@ -28,12 +28,7 @@ public sealed class WorkspaceIndexerTest
         IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
         params IGameDocumentParser[] parsers)
     {
-        var fh = new FileHelper(fs);
-        var ctx = new EaWXmlContext(fh);
-        var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
-            cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
-            NullLogger<WorkspaceIndexer>.Instance);
-        return (indexer, ctx);
+        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, parsers);
     }
 
     // Overload kept for callers that pass parsers without a cache
@@ -41,7 +36,21 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return Build(fs, svc, registry, schema, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, null, null, null, parsers);
+    }
+
+    private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
+        MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
+        IProjectIndexCache? cache, ILuaAnnotationRepository? repo, IGameWorkspaceHost? workspaceHost,
+        params IGameDocumentParser[] parsers)
+    {
+        var fh = new FileHelper(fs);
+        var ctx = new EaWXmlContext(fh);
+        var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
+            cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
+            workspaceHost ?? new NullWorkspaceHost(),
+            NullLogger<WorkspaceIndexer>.Instance);
+        return (indexer, ctx);
     }
 
     // ── PreScanMetafiles ─────────────────────────────────────────────────────
@@ -920,6 +929,97 @@ public sealed class WorkspaceIndexerTest
         }
     }
 
+    // ── WorkspaceHost population ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task IndexDocumentsAsync_FlatScan_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "a.xml")] = new("<Root/>"),
+            [Path.Combine(xmlDir, "b.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var host = new SpyWorkspaceHost();
+        var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null, null,
+            host, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Equal(2, host.Calls.Count);
+        Assert.All(host.Calls, c => Assert.False(c.PublishDiagnostics));
+        Assert.All(host.Calls, c => Assert.Equal(0, c.Version));
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_LayeredScan_CacheMiss_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var host = new SpyWorkspaceHost();
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            null, null, host, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(host.Calls);
+        Assert.False(host.Calls[0].PublishDiagnostics);
+        Assert.Equal(0, host.Calls[0].Version);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_LayeredScan_CacheHit_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fileContent = "<Root/>"u8.ToArray();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new(fileContent)
+        });
+        var svc = new FakeIndexService();
+        var host = new SpyWorkspaceHost();
+
+        var fh = new FileHelper(fs);
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
+        var entry = new ProjectFileEntry
+        {
+            RelativePath = "data/xml/units.xml", ContentHash = hash,
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything", DependencyHashes = [], Files = [entry]
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            cache, null, host, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(host.Calls); // even cache-hit adds to host
+        Assert.False(host.Calls[0].PublishDiagnostics);
+        Assert.Equal(0, host.Calls[0].Version);
+        Assert.Equal("<Root/>", host.Calls[0].Text);
+    }
+
     private sealed class SpyAnnotationRepository : ILuaAnnotationRepository
     {
         public int RebuildCallCount { get; private set; }
@@ -930,5 +1030,25 @@ public sealed class WorkspaceIndexerTest
             new Dictionary<string, ImmutableArray<EmmyLuaAnnotations>>();
         public ILuaTypeIndex Current => LuaTypeIndex.Empty;
         public void RebuildIndex() => RebuildCallCount++;
+    }
+
+    private sealed class NullWorkspaceHost : IGameWorkspaceHost
+    {
+        public IEnumerable<TrackedDocument> All => [];
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true) { }
+        public void Remove(string uri) { }
+        public bool TryGet(string uri, out TrackedDocument doc) { doc = null!; return false; }
+    }
+
+    private sealed class SpyWorkspaceHost : IGameWorkspaceHost
+    {
+        public List<(string Uri, string Text, int Version, bool PublishDiagnostics)> Calls { get; } = [];
+        public IEnumerable<TrackedDocument> All => [];
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
+        {
+            lock (Calls) Calls.Add((uri, text, version, publishDiagnostics));
+        }
+        public void Remove(string uri) { }
+        public bool TryGet(string uri, out TrackedDocument doc) { doc = null!; return false; }
     }
 }

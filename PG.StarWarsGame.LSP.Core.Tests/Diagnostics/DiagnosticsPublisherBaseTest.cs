@@ -129,6 +129,17 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Single(published); // published after debounce
     }
 
+    [Fact]
+    public void OnIndexChanged_SkipsDocumentsWithPublishDiagnosticsFalse()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.AddOrUpdate("file:///a.xml", "content", 1, publishDiagnostics: false);
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.Empty(published);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class ConcretePublisher : DiagnosticsPublisherBase
@@ -156,7 +167,7 @@ public sealed class DiagnosticsPublisherBaseTest
         }
     }
 
-    private sealed class FakeIndexService : IGameIndexService
+    private sealed class FakeIndexService  : IGameIndexService
     {
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
@@ -222,9 +233,9 @@ public sealed class DiagnosticsPublisherBaseTest
             _docs.Remove(uri);
         }
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs[uri] = new TrackedDocument(uri, text, version);
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         }
 
         public bool TryGet(string uri, out TrackedDocument doc)

@@ -62,6 +62,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new EaWXmlContext(fileHelper),
             new NullProjectIndexCache(),
             new LuaAnnotationRepository(),
+            host ?? new FakeWorkspaceHost(),
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
@@ -352,9 +353,9 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs[uri] = new TrackedDocument(uri, text, version);
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         }
 
         public void Remove(string uri)

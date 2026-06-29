@@ -41,11 +41,13 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
-        ILuaAnnotationRepository annotationRepository, ILogger<WorkspaceIndexer> logger)
+        ILuaAnnotationRepository annotationRepository, IGameWorkspaceHost workspaceHost,
+        ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -55,6 +57,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
         _annotationRepository = annotationRepository;
+        _workspaceHost = workspaceHost;
         _logger = logger;
     }
 
@@ -222,6 +225,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                 var uri = _fileHelper.PathToFileUri(file);
                 await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                 var done = Interlocked.Increment(ref indexed);
                 progress?.Invoke(done, files.Count);
             });
@@ -288,7 +292,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                         ? NormalizePath(_fileHelper.FileSystem.Path.GetRelativePath(projectDir, file))
                         : file;
 
-                    var hash = ProjectFileHasher.ComputeFileHash(file, _fileHelper.FileSystem);
+                    var (hash, text) = ProjectFileHasher.ReadAndHash(file, _fileHelper.FileSystem);
                     layerEntries.Add((relPath, uri, hash));
 
                     if (cacheHits is not null
@@ -299,10 +303,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     }
                     else
                     {
-                        var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                         await _indexService.UpdateDocumentAsync(uri, text, 0, token);
                     }
 
+                    _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                     var done = Interlocked.Increment(ref indexed);
                     progress?.Invoke(done, totalFiles);
                 });

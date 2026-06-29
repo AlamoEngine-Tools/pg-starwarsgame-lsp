@@ -86,6 +86,7 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
                 var version = _indexService.Current.Documents.GetValueOrDefault(uri)?.Version ?? 0;
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
                 await _indexService.UpdateDocumentAsync(uri, text, version, token);
+                _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
             }
             else
             {

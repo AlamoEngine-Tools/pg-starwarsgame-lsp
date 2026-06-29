@@ -86,6 +86,7 @@ public abstract class DiagnosticsPublisherBase
     private void RunPublish(GameIndex index)
     {
         var openDocs = _workspaceHost.All
+            .Where(d => d.PublishDiagnostics)
             .Where(d => Path.GetExtension(d.Uri).Equals(FileExtension, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));

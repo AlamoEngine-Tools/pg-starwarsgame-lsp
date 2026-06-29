@@ -339,9 +339,9 @@ public sealed class LuaDiagnosticsPublisherTest
             _docs.Remove(uri);
         }
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs[uri] = new TrackedDocument(uri, text, version);
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         }
 
         public bool TryGet(string uri, out TrackedDocument doc)

@@ -882,7 +882,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
             Set(uri, text, version);
         }
