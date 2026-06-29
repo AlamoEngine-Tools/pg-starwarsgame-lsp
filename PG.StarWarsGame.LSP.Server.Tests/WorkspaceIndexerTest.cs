@@ -508,6 +508,39 @@ public sealed class WorkspaceIndexerTest
         Assert.True(origin.Line > 0); // must be inside the file, past the root element
     }
 
+    [Fact]
+    public void ApplyDynamicEnumCatalog_RootProjectOverridesDependency_UsesRootValues()
+    {
+        // dep has surfacefxtriggertype.xml with DEP_TRACK; root has it with ROOT_TRACK.
+        // config.XmlDirectories is [depXml, rootXml] (deps-first, root-last).
+        // Root's file must win because it has the higher layer rank.
+        var depXml = Path.Combine(Root("dep"), "data", "xml");
+        var rootXml = Path.Combine(Root("root"), "data", "xml");
+        var depFile = Path.Combine(depXml, "surfacefxtriggertype.xml");
+        var rootFile = Path.Combine(rootXml, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [depFile] = new("<EnumDefinition><DEP_TRACK>0</DEP_TRACK></EnumDefinition>"),
+            [rootFile] = new("<EnumDefinition><ROOT_TRACK>0</ROOT_TRACK></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        // Pass roots in deps-first / root-last order (same as ModProjectResolver produces).
+        indexer.ApplyDynamicEnumCatalog([depXml, rootXml]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        var vals = svc.AppliedWorkspaceDynamicEnumValues!["SurfaceFXTriggerType"];
+        Assert.Contains("ROOT_TRACK", vals);   // root project's value is present
+        Assert.DoesNotContain("DEP_TRACK", vals); // dependency value is suppressed by override
+    }
+
     // ── IndexDocumentsAsync with cache ──────────────────────────────────────
 
     [Fact]

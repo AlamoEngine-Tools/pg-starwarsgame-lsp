@@ -417,10 +417,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 return cached.Content;
 
             // Filename-only search across every xml root, recursing into subdirectories.
-            // EnumerateFiles with a filename pattern is equivalent to ApplyAssetCatalog's approach
-            // and correctly finds e.g. Data/Xml/Enum/surfacefxtriggertype.xml when the root is Data/Xml.
+            // Iterate in reverse so the highest-rank (root project) directory is checked first;
+            // config.XmlDirectories is deps-first / root-last (see ModProjectResolver.Resolve).
             var fileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep));
-            foreach (var xmlRoot in xmlRoots)
+            foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
             {
                 if (!_fileHelper.FileSystem.Directory.Exists(xmlRoot)) continue;
                 var match = _fileHelper.FileSystem.Directory
