@@ -26,22 +26,36 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
 
         var results = new List<XmlDiagnosticResult>();
 
-        if (ctx.Index.Baseline.DynamicEnumValues.TryGetValue("DamageType", out var damageTypes) && damageTypes.Length > 0)
+        var knownDamageTypes = MergedEnumValues(ctx, "DamageType");
+        if (knownDamageTypes is not null)
         {
             var damageValue = parts[0].Trim();
-            if (!new HashSet<string>(damageTypes, StringComparer.OrdinalIgnoreCase).Contains(damageValue))
+            if (!knownDamageTypes.Contains(damageValue))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"'{damageValue}' is not a known DamageType value."));
         }
 
-        if (ctx.Index.Baseline.DynamicEnumValues.TryGetValue("ArmorType", out var armorTypes) && armorTypes.Length > 0)
+        var knownArmorTypes = MergedEnumValues(ctx, "ArmorType");
+        if (knownArmorTypes is not null)
         {
             var armorValue = parts[1].Trim();
-            if (!new HashSet<string>(armorTypes, StringComparer.OrdinalIgnoreCase).Contains(armorValue))
+            if (!knownArmorTypes.Contains(armorValue))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"'{armorValue}' is not a known ArmorType value."));
         }
 
         return results;
+    }
+
+    // Returns null when neither source has any values (skip validation).
+    private static HashSet<string>? MergedEnumValues(DiagnosticsContext ctx, string enumName)
+    {
+        ctx.Index.Baseline.DynamicEnumValues.TryGetValue(enumName, out var baseline);
+        ctx.Index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspace);
+        if (baseline.IsDefaultOrEmpty && workspace.IsDefaultOrEmpty) return null;
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!baseline.IsDefaultOrEmpty) foreach (var v in baseline) set.Add(v);
+        if (!workspace.IsDefaultOrEmpty) foreach (var v in workspace) set.Add(v);
+        return set;
     }
 }
