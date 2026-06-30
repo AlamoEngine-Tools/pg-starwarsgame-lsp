@@ -77,7 +77,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         int debounceMs = 0,
         IXmlVariantFactProducer? variantProducer = null,
         IXmlLayerShadowFactProducer? shadowProducer = null)
-        : base(publish, indexService, workspaceHost, debounceMs)
+        : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;

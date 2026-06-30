@@ -75,6 +75,7 @@ public static class ServerConfigurator
             .WithHandler<XmlCodeLensHandler>()
             .WithHandler<XmlLinkedEditingRangeHandler>()
             .WithHandler<XmlInlayHintHandler>()
+            .WithHandler<LuaInlayHintHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()
             .WithHandler<RevalidateDocumentCommandHandler>()
             .WithHandler<ReloadProjectCommandHandler>()

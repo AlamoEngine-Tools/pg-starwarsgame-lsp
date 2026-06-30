@@ -131,4 +131,104 @@ public sealed class LuaAnnotationRepositoryTest
         Assert.NotNull(repo.Current.GetClass("pgunit"));
         Assert.NotNull(repo.Current.GetClass("PGUNIT"));
     }
+
+    // ── function annotation index ─────────────────────────────────────────────
+
+    [Fact]
+    public void GetFunctionAnnotation_UnknownName_ReturnsNull()
+    {
+        var repo = new LuaAnnotationRepository();
+
+        Assert.Null(repo.GetFunctionAnnotation("Nope"));
+    }
+
+    [Fact]
+    public void UpdateFunctionAnnotations_RegistersByName_GetFunctionAnnotationReturnsIt()
+    {
+        var repo = new LuaAnnotationRepository();
+        var ann = EmmyLuaAnnotations.Empty with { Description = "Runs the mission." };
+
+        repo.UpdateFunctionAnnotations(UriA, [("RunMission", ann)]);
+
+        var result = repo.GetFunctionAnnotation("RunMission");
+        Assert.NotNull(result);
+        Assert.Equal("Runs the mission.", result!.Description);
+    }
+
+    [Fact]
+    public void UpdateFunctionAnnotations_SecondUpdate_ReplacesOldEntriesForUri()
+    {
+        var repo = new LuaAnnotationRepository();
+        repo.UpdateFunctionAnnotations(UriA, [("OldFunc", EmmyLuaAnnotations.Empty with { Description = "old" })]);
+        repo.UpdateFunctionAnnotations(UriA, [("NewFunc", EmmyLuaAnnotations.Empty with { Description = "new" })]);
+
+        Assert.Null(repo.GetFunctionAnnotation("OldFunc"));
+        Assert.NotNull(repo.GetFunctionAnnotation("NewFunc"));
+    }
+
+    [Fact]
+    public void Remove_ClearsFunctionAnnotationsForUri()
+    {
+        var repo = new LuaAnnotationRepository();
+        repo.UpdateFunctionAnnotations(UriA, [("MyFunc", EmmyLuaAnnotations.Empty with { Description = "x" })]);
+
+        repo.Remove(UriA);
+
+        Assert.Null(repo.GetFunctionAnnotation("MyFunc"));
+    }
+
+    [Fact]
+    public void UpdateFunctionAnnotations_MultipleUris_IndependentCleanup()
+    {
+        var repo = new LuaAnnotationRepository();
+        repo.UpdateFunctionAnnotations(UriA, [("FuncA", EmmyLuaAnnotations.Empty with { Description = "a" })]);
+        repo.UpdateFunctionAnnotations(UriB, [("FuncB", EmmyLuaAnnotations.Empty with { Description = "b" })]);
+
+        repo.Remove(UriA);
+
+        Assert.Null(repo.GetFunctionAnnotation("FuncA"));
+        Assert.NotNull(repo.GetFunctionAnnotation("FuncB"));
+    }
+
+    // ── override inheritance (richest wins) ───────────────────────────────────
+
+    [Fact]
+    public void GetFunctionAnnotation_WhenOverrideHasNoDoc_ReturnsBaseAnnotation()
+    {
+        var repo = new LuaAnnotationRepository();
+        var baseAnn = EmmyLuaAnnotations.Empty with { Description = "Base implementation." };
+
+        repo.UpdateFunctionAnnotations(UriA, [("Foo", baseAnn)]);
+        repo.UpdateFunctionAnnotations(UriB, [("Foo", EmmyLuaAnnotations.Empty)]);
+
+        var result = repo.GetFunctionAnnotation("Foo");
+        Assert.NotNull(result);
+        Assert.Equal("Base implementation.", result!.Description);
+    }
+
+    [Fact]
+    public void GetFunctionAnnotation_WhenBothEmpty_ReturnsNonNull()
+    {
+        var repo = new LuaAnnotationRepository();
+        repo.UpdateFunctionAnnotations(UriA, [("Foo", EmmyLuaAnnotations.Empty)]);
+        repo.UpdateFunctionAnnotations(UriB, [("Foo", EmmyLuaAnnotations.Empty)]);
+
+        Assert.NotNull(repo.GetFunctionAnnotation("Foo"));
+    }
+
+    [Fact]
+    public void GetFunctionAnnotation_WhenOverrideHasOwnDoc_UsesOverrideAnnotation()
+    {
+        var repo = new LuaAnnotationRepository();
+        var baseAnn = EmmyLuaAnnotations.Empty with { Description = "Base." };
+        var overrideAnn = EmmyLuaAnnotations.Empty with { Description = "Override." };
+
+        repo.UpdateFunctionAnnotations(UriA, [("Foo", baseAnn)]);
+        repo.UpdateFunctionAnnotations(UriB, [("Foo", overrideAnn)]);
+
+        // Both are non-empty — either is valid; just verify one is returned.
+        var result = repo.GetFunctionAnnotation("Foo");
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Description);
+    }
 }

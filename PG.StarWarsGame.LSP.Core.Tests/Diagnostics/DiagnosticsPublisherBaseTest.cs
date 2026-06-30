@@ -140,6 +140,43 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Empty(published);
     }
 
+    // ── error isolation ───────────────────────────────────────────────────────
+
+    [Fact]
+    public void PublishForDocument_Throws_DoesNotAbortOtherDocuments()
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeIndexService();
+        var workspaceHost = new FakeWorkspaceHost();
+        // a.xml throws; b.xml should still receive diagnostics
+        var publisher = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
+            throwingUri: "file:///a.xml");
+        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.Add("file:///b.xml", "content");
+
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.True(published.Any(p => p.Uri.ToString() == "file:///b.xml"),
+            "b.xml should receive diagnostics even though a.xml threw");
+    }
+
+    [Fact]
+    public void PublishForDocument_Throws_EmptyDiagnosticsPublishedForFailedDocument()
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeIndexService();
+        var workspaceHost = new FakeWorkspaceHost();
+        var publisher = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
+            throwingUri: "file:///a.xml");
+        workspaceHost.Add("file:///a.xml", "content");
+
+        indexService.Fire(GameIndex.Empty);
+
+        var forA = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
+        Assert.NotNull(forA);
+        Assert.Empty(forA!.Diagnostics);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class ConcretePublisher : DiagnosticsPublisherBase
@@ -159,6 +196,35 @@ public sealed class DiagnosticsPublisherBaseTest
 
         protected override void PublishForDocument(string uri, string text, GameIndex index)
         {
+            Publish(new PublishDiagnosticsParams
+            {
+                Uri = DocumentUri.From(uri),
+                Diagnostics = new Container<Diagnostic>()
+            });
+        }
+    }
+
+    private sealed class ThrowingPublisher : DiagnosticsPublisherBase
+    {
+        private readonly string _throwingUri;
+
+        public ThrowingPublisher(
+            Action<PublishDiagnosticsParams> publish,
+            IGameIndexService indexService,
+            IGameWorkspaceHost workspaceHost,
+            string throwingUri)
+            : base(publish, indexService, workspaceHost, debounceMs: 0)
+        {
+            _throwingUri = throwingUri;
+        }
+
+        protected override string FileExtension => ".xml";
+
+        protected override void PublishForDocument(string uri, string text, GameIndex index)
+        {
+            if (uri == _throwingUri)
+                throw new InvalidOperationException("Simulated document processing failure");
+
             Publish(new PublishDiagnosticsParams
             {
                 Uri = DocumentUri.From(uri),

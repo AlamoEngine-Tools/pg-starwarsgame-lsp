@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -17,6 +19,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 public abstract class DiagnosticsPublisherBase
 {
     private readonly int _debounceMs;
+    private readonly ILogger _logger;
     private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly object _publishLock = new();
     private readonly IGameWorkspaceHost _workspaceHost;
@@ -27,11 +30,13 @@ public abstract class DiagnosticsPublisherBase
         Action<PublishDiagnosticsParams> publish,
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
-        int debounceMs = 100)
+        int debounceMs = 100,
+        ILogger? logger = null)
     {
         _publish = publish;
         _workspaceHost = workspaceHost;
         _debounceMs = debounceMs;
+        _logger = logger ?? NullLogger.Instance;
         indexService.IndexChanged += OnIndexChanged;
     }
 
@@ -92,7 +97,17 @@ public abstract class DiagnosticsPublisherBase
         var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
 
         foreach (var doc in openDocs)
-            PublishForDocument(doc.Uri, doc.Text, index);
+        {
+            try
+            {
+                PublishForDocument(doc.Uri, doc.Text, index);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Unhandled exception publishing diagnostics for {Uri}; sending empty diagnostics", doc.Uri);
+                _publish(EmptyParams(doc.Uri));
+            }
+        }
 
         foreach (var uri in _lastPublishedUris)
             if (!openUris.Contains(uri))

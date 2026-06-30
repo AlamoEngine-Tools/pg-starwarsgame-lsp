@@ -539,4 +539,98 @@ public sealed class LuaGameDocumentParserTest
         Assert.True(repo.All.ContainsKey(uri));
         Assert.Empty(repo.All[uri]);
     }
+
+    // ── function annotation index ─────────────────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_GlobalFunctionWithDocComment_RegistersFunctionAnnotationByName()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string lua = """
+            --- Runs the mission.
+            ---@param missionName string The mission to run.
+            ---@return boolean
+            function RunMission(missionName) end
+            """;
+
+        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
+
+        var ann = repo.GetFunctionAnnotation("RunMission");
+        Assert.NotNull(ann);
+        Assert.Equal("Runs the mission.", ann!.Description);
+        Assert.Single(ann.Params);
+        Assert.Equal("missionName", ann.Params[0].Name);
+        Assert.Single(ann.Returns);
+        Assert.Equal("boolean", ann.Returns[0].Type.Raw);
+    }
+
+    [Fact]
+    public async Task ParseAsync_GlobalFunctionWithoutDocComment_RegistersEmptyAnnotationByName()
+    {
+        var repo = new LuaAnnotationRepository();
+
+        await Build(repo).ParseAsync("file:///s.lua", "function NoDoc() end", 1, default);
+
+        var ann = repo.GetFunctionAnnotation("NoDoc");
+        Assert.NotNull(ann);
+        Assert.Null(ann!.Description);
+        Assert.True(ann.Params.IsDefaultOrEmpty);
+    }
+
+    [Fact]
+    public async Task ParseAsync_LocalFunctionWithDocComment_RegistersFunctionAnnotationByName()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string lua = """
+            --- Local helper.
+            ---@param x number
+            local function Helper(x) end
+            """;
+
+        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
+
+        var ann = repo.GetFunctionAnnotation("Helper");
+        Assert.NotNull(ann);
+        Assert.Equal("Local helper.", ann!.Description);
+        Assert.Single(ann.Params);
+        Assert.Equal("x", ann.Params[0].Name);
+    }
+
+    [Fact]
+    public async Task ParseAsync_MemberFunctionWithDocComment_RegistersFunctionAnnotationBySimpleName()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string lua = """
+            --- Sets the value.
+            ---@param value number
+            function Obj.SetValue(value) end
+            """;
+
+        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
+
+        var ann = repo.GetFunctionAnnotation("SetValue");
+        Assert.NotNull(ann);
+        Assert.Equal("Sets the value.", ann!.Description);
+        Assert.Single(ann.Params);
+        Assert.Equal("value", ann.Params[0].Name);
+    }
+
+    [Fact]
+    public async Task ParseAsync_MethodFunctionWithDocComment_RegistersFunctionAnnotationBySimpleName()
+    {
+        var repo = new LuaAnnotationRepository();
+        const string lua = """
+            --- Gets the value.
+            ---@return number
+            function Obj:GetValue() end
+            """;
+
+        await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
+
+        var ann = repo.GetFunctionAnnotation("GetValue");
+        Assert.NotNull(ann);
+        Assert.Equal("Gets the value.", ann!.Description);
+        Assert.Single(ann.Returns);
+        Assert.Equal("number", ann.Returns[0].Type.Raw);
+    }
 }

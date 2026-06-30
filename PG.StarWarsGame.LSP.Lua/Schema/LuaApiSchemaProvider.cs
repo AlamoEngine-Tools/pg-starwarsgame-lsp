@@ -45,6 +45,11 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         return _functions.TryGetValue(functionName, out var entry) ? entry.ReturnTypeName : null;
     }
 
+    public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName)
+    {
+        return _functions.TryGetValue(functionName, out var entry) ? entry.Params : [];
+    }
+
     public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName)
     {
         return _typeMembers.TryGetValue(typeName, out var members) ? members : [];
@@ -127,7 +132,10 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                         var xmlRefs = BuildXmlRefs(xmlRefPairs);
                         var retType = annotations.Returns.IsDefaultOrEmpty
                             ? null : annotations.Returns[0].Type.Raw;
-                        functions[name] = new FunctionEntry(xmlRefs, annotations.Description, retType);
+                        var @params = annotations.Params.IsDefaultOrEmpty
+                            ? (IReadOnlyList<LuaParamAnnotation>)[]
+                            : [.. annotations.Params];
+                        functions[name] = new FunctionEntry(xmlRefs, annotations.Description, retType, @params);
                     }
                 }
 
@@ -177,5 +185,6 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
     private sealed record FunctionEntry(
         IReadOnlyList<XmlRefEntry> XmlRefs,
         string? Description,
-        string? ReturnTypeName);
+        string? ReturnTypeName,
+        IReadOnlyList<LuaParamAnnotation> Params);
 }

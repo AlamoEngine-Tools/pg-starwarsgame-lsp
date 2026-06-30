@@ -32,6 +32,9 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
     public LuaClassDefinition? GetClassDefinition(string typeName) =>
         Inner.GetClassDefinition(typeName);
 
+    public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName) =>
+        Inner.GetFunctionParams(functionName);
+
     private sealed class EmptyProvider : ILuaApiSchemaProvider
     {
         public IReadOnlySet<string> AllFunctionNames =>
@@ -42,5 +45,6 @@ public sealed class LuaApiSchemaProxy : LateBindingProxy<ILuaApiSchemaProvider>,
         public string? GetReturnTypeName(string functionName) => null;
         public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) => [];
         public LuaClassDefinition? GetClassDefinition(string typeName) => null;
+        public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName) => [];
     }
 }

@@ -72,6 +72,35 @@ public sealed class LuaHoverHandlerTest
     // ── XML reference hover ───────────────────────────────────────────────────
 
     [Fact]
+    public async Task Handle_CursorOnLuaGlobalCallSite_LuaGlobalReferenceInIndex_DoesNotShowXmlObjectHover()
+    {
+        // LuaGameDocumentParser emits a LuaGlobal reference at the call-site position for
+        // every user-defined function call. Before the fix, TryBuildXmlRefHover would match
+        // that reference and emit a spurious "XmlObject: RunMission" hover.
+        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var luaGlobalRef = new GameReference("RunMission", GameSymbolKind.LuaGlobal, null,
+            LuaUri, 0, 0, 10);
+
+        var docIndex = new DocumentIndex(LuaUri, 1, [], [luaGlobalRef]);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(LuaUri, docIndex),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "RunMission()", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
+        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.DoesNotContain("XmlObject", content);
+        Assert.Contains("RunMission", content);
+    }
+
+    [Fact]
     public async Task Handle_CursorOnXmlRef_ReturnsHoverWithTypeAndId()
     {
         const string xmlUri = "file:///units.xml";
@@ -275,6 +304,99 @@ public sealed class LuaHoverHandlerTest
         var content = GetMarkdown(result!);
         Assert.Contains("Find_First_Object", content);
         Assert.Contains("Finds the first game object", content);
+    }
+
+    // ── richer hover content ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CursorOnWorkspaceLuaGlobal_FullAnnotation_ShowsParamsAndReturns()
+    {
+        var sym = new GameSymbol("RunMission", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), "Runs the mission.");
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("RunMission", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var repo = new LuaAnnotationRepository();
+        repo.UpdateFunctionAnnotations(LibUri, [("RunMission", EmmyLuaAnnotations.Empty with
+        {
+            Description = "Runs the mission.",
+            Params = [new LuaParamAnnotation("missionName", false, new LuaTypeRef("string"), "The mission to run.")],
+            Returns = [new LuaReturnAnnotation(new LuaTypeRef("boolean"), null, null)]
+        })]);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "RunMission()", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host, repo);
+        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.Contains("RunMission", content);
+        Assert.Contains("Runs the mission.", content);
+        Assert.Contains("missionName", content);
+        Assert.Contains("string", content);
+        Assert.Contains("boolean", content);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnWorkspaceLuaGlobal_DeprecatedAnnotation_ShowsDeprecatedMarker()
+    {
+        var sym = new GameSymbol("OldFunc", GameSymbolKind.LuaGlobal, null,
+            new FileOrigin(LibUri, 0, null), null);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("OldFunc", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var repo = new LuaAnnotationRepository();
+        repo.UpdateFunctionAnnotations(LibUri, [("OldFunc", EmmyLuaAnnotations.Empty with
+        {
+            IsDeprecated = true,
+            Description = "Use NewFunc instead."
+        })]);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "OldFunc()", 1);
+
+        var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host, repo);
+        var result = await handler.Handle(HoverAt(0, 4), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.Contains("Deprecated", content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Use NewFunc instead.", content);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnEngineGlobal_WithParams_ShowsParamNamesInHover()
+    {
+        var schema = new LuaApiSchemaProvider([
+            """
+            --- Finds the first object by type name.
+            ---@param typeName string The XML object type name.
+            ---@xmlref XmlObject
+            ---@return GameObject
+            function Find_First_Object(typeName) end
+            """
+        ]);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
+
+        var handler = BuildHandler(GameIndex.Empty, schema, host);
+        var result = await handler.Handle(HoverAt(0, 5), CancellationToken.None);
+
+        Assert.NotNull(result);
+        var content = GetMarkdown(result!);
+        Assert.Contains("Find_First_Object", content);
+        Assert.Contains("typeName", content);
+        Assert.Contains("string", content);
+        Assert.Contains("GameObject", content);
     }
 
     [Fact]
