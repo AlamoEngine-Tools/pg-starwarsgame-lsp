@@ -224,7 +224,9 @@ public static class XmlUtility
                 ? GetLine(node.EndNode) // explicit, valid closing tag
                 : ReferenceEquals(node.EndNode, node)
                     ? GetLine(node) // self-closing (<Tag />) — own line only
-                    : int.MaxValue; // no close / synthetic — open to end
+                    : node.EndNode is null || node.ChildNodes.Any(c => c.NodeType == HtmlNodeType.Element)
+                        ? int.MaxValue   // null=truncated doc; with children=synthetic close on container
+                        : GetLine(node); // synthetic close (EndNode.Line=0), no children — leaf
             if (cursorLine > endLine) continue;
 
             var depth = GetDepth(node);

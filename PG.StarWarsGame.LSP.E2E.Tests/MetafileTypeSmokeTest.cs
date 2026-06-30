@@ -14,13 +14,31 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 ///     The smallest available file listed in each metafile is used for generic tests.
 /// </summary>
 [Trait("Category", "E2E")]
-public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>
+public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAsyncDisposable
 {
+    private readonly List<DocumentUri> _openedUris = [];
     private readonly LspServerFixture _fixture;
 
     public MetafileTypeSmokeTest(LspServerFixture fixture)
     {
         _fixture = fixture;
+    }
+
+    /// <summary>
+    ///     Closes all documents opened during this test so that large files (e.g.
+    ///     CommandBarComponents.xml) do not accumulate across tests and cause
+    ///     subsequent RunPublish calls to time out.
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var uri in _openedUris)
+            _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = uri }
+            });
+
+        if (_openedUris.Count > 0)
+            await Task.Delay(500);
     }
 
     private static string XmlDir =>
@@ -192,7 +210,8 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>
         await WaitForScanAsync();
         var filePath = Path.Combine(XmlDir, "CommandBarComponents.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
+        // CommandBarComponents.xml is 683 KB — allow extra time in debug builds.
+        var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(60));
         await OpenAndWaitAsync(filePath);
         var diags = await received;
         Assert.Equal(uri, diags.Uri);
@@ -419,6 +438,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>
     private async Task<(DocumentUri uri, string[] lines)> OpenAndWaitAsync(string filePath)
     {
         var uri = DocumentUri.FromFileSystemPath(filePath);
+        _openedUris.Add(uri);
         var lines = await File.ReadAllLinesAsync(filePath);
 
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
@@ -468,8 +488,8 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>
 
     private async Task WaitForScanAsync()
     {
-        var completed = await Task.WhenAny(_fixture.ScanStarted, Task.Delay(TimeSpan.FromSeconds(60)));
-        if (completed != _fixture.ScanStarted)
+        var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(60)));
+        if (completed != _fixture.ScanCompleted)
             throw new Exception("$XunitDynamicSkip$Workspace scan did not complete within 60 s.");
     }
 

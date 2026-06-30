@@ -45,6 +45,13 @@ internal sealed class TagNameHoverStrategy : IXmlHoverStrategy
 
         if (typeDef is not null)
         {
+            // When the hovered element IS the type root (e.g. <Faction> in a Faction file), always
+            // return the type hover directly. XmlObjectTagResolver's global-tag fallback would
+            // otherwise match a same-named global tag (e.g. FactionReference) and produce the
+            // wrong content.
+            if (ctx.Node.Name.Equals(typeDef.TypeName, StringComparison.OrdinalIgnoreCase))
+                return HoverUtility.BuildTypeHover(typeDef, ctx.Node, ctx.Locale);
+
             var resCtx = new TagResolutionContext(typeDef.TypeName, XmlUtility.GetDepth(ctx.Node), ctx.Node);
             var typedTagDef = XmlTagResolver.Resolve(ctx.Schema, ctx.Node.Name, resCtx);
 

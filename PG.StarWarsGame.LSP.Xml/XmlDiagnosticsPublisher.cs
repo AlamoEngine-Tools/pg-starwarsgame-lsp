@@ -181,6 +181,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var hardcodedSets = _schema.AllHardcodedSets;
         if (hardcodedSets.Count == 0) return [];
 
+        // Skip the expensive HAP re-parse for file types whose schema has no hardcoded-ref tags.
+        // Files with unknown/unregistered types fall through to the full walk (defensive).
+        var normalizedUri = _fileHelper.NormalizeUri(documentUri);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(normalizedUri);
+        if (!fileTypes.IsDefaultOrEmpty &&
+            !fileTypes.Any(t => _schema.GetTagsForType(t)
+                                       .Any(tag => tag.ReferenceKind == ReferenceKind.HardcodedSet)))
+            return [];
+
         var diagnostics = new List<Diagnostic>();
         var doc = new HtmlDocument();
         doc.LoadHtml(text);
