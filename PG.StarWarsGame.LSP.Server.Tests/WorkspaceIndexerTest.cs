@@ -1030,6 +1030,8 @@ public sealed class WorkspaceIndexerTest
             new Dictionary<string, ImmutableArray<EmmyLuaAnnotations>>();
         public ILuaTypeIndex Current => LuaTypeIndex.Empty;
         public void RebuildIndex() => RebuildCallCount++;
+        public void UpdateFunctionAnnotations(string uri, IReadOnlyList<(string Name, EmmyLuaAnnotations Ann)> functions) { }
+        public EmmyLuaAnnotations? GetFunctionAnnotation(string name) => null;
     }
 
     private sealed class NullWorkspaceHost : IGameWorkspaceHost
