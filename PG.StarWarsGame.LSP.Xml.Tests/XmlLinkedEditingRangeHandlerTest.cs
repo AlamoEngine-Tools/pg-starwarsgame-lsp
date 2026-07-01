@@ -144,7 +144,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     {
         public IEnumerable<TrackedDocument> All => [new(uri, text, 1)];
 
-        public void AddOrUpdate(string u, string t, int v)
+        public void AddOrUpdate(string u, string t, int v, bool publishDiagnostics = true)
         {
         }
 

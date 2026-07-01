@@ -172,6 +172,24 @@ public sealed class LuaTextDocumentSyncHandlerTest
         Assert.Empty(index.UpdateCalls);
     }
 
+    [Fact]
+    public async Task DidClose_WhenFileExistsOnDisk_RestoresHostEntry_WithPublishDiagnosticsFalse()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [DiskPath] = new(DiskContent) });
+        var (handler, host, _) = Build(fs);
+
+        await handler.Handle(new DidCloseTextDocumentParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
+        }, CancellationToken.None);
+
+        Assert.Single(host.AddOrUpdateCalls);
+        Assert.Equal(DiskUri, host.AddOrUpdateCalls[0].Uri);
+        Assert.Equal(DiskContent, host.AddOrUpdateCalls[0].Text);
+        Assert.False(host.AddOrUpdateCalls[0].PublishDiagnostics);
+    }
+
     // ── DidSave ──────────────────────────────────────────────────────────────
 
     [Fact]
@@ -205,9 +223,9 @@ public sealed class LuaTextDocumentSyncHandlerTest
         public List<Call> AddOrUpdateCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            AddOrUpdateCalls.Add(new Call(uri, text, version));
+            AddOrUpdateCalls.Add(new Call(uri, text, version, publishDiagnostics));
         }
 
         public void Remove(string uri)
@@ -223,7 +241,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
 
         public IEnumerable<TrackedDocument> All => [];
 
-        public record Call(string Uri, string Text, int Version);
+        public record Call(string Uri, string Text, int Version, bool PublishDiagnostics = true);
     }
 
     internal sealed class FakeGameIndexService : IGameIndexService
@@ -269,6 +287,15 @@ public sealed class LuaTextDocumentSyncHandlerTest
 
         public void ApplyModelBones(
             ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public void ApplyWorkspaceDynamicEnumValues(
+            ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 

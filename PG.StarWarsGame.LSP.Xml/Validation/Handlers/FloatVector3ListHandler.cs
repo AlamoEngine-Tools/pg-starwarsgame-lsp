@@ -21,7 +21,7 @@ public sealed partial class FloatVector3ListHandler : SingleValueTypeHandlerBase
                     $"'' is not a valid Float3 list for <{fact.Tag.Tag}>.")
             ];
 
-        var parts = Separator().Split(trimmed);
+        var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
         if (parts.Length == 0 || parts.Length % 3 != 0)
             return
             [

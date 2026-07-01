@@ -6,20 +6,22 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class UvSlotIndexHandler : SingleValueTypeHandlerBase
+public sealed class UvSlotIndexHandler : NumberValueHandlerBase
 {
     protected override XmlValueType TargetType => XmlValueType.UvSlotIndex;
 
-    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
+    protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
+        XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        var trimmed = fact.RawValue.Trim();
-        if (!int.TryParse(trimmed, out var value) || value < 0 || value > 3)
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid UV slot index for <{fact.Tag.Tag}>. Expected an integer in [0, 3].")
-            ];
+        if (int.TryParse(trimmed, out var value) && value >= 0 && value <= 3)
+            return [];
 
-        return [];
+        var corrected = ((int)Math.Clamp(Math.Truncate(floatVal), 0.0, 3.0)).ToString();
+        return
+        [
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"'{trimmed}' is not a valid UV slot index for <{fact.Tag.Tag}>. Expected an integer in [0, 3]. Did you mean {corrected}?",
+                SuggestedFix: corrected)
+        ];
     }
 }

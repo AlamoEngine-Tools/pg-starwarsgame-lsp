@@ -20,4 +20,6 @@ public interface IWorkspaceIndexer
     void ApplyAssetCatalog(IReadOnlyList<string> roots);
 
     void ApplyModelBoneCatalog(IReadOnlyList<string> roots);
+
+    void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots);
 }

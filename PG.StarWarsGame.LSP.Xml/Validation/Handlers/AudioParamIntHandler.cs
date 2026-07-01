@@ -13,14 +13,14 @@ public sealed class AudioParamIntHandler : NumberValueHandlerBase
     protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
         XmlTagValueFact fact, string trimmed, double floatVal, DiagnosticsContext ctx)
     {
-        if (int.TryParse(trimmed, out var value) && value >= 0 && value <= 127)
+        if (int.TryParse(trimmed, out _))
             return [];
 
-        var corrected = ((int)Math.Clamp(Math.Truncate(floatVal), 0.0, 127.0)).ToString();
+        var corrected = ((int)Math.Truncate(floatVal)).ToString();
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{trimmed}' is not a valid audio parameter integer for <{fact.Tag.Tag}>. Expected [0, 127]. Did you mean {corrected}?",
+                $"'{trimmed}' is not a valid audio parameter integer for <{fact.Tag.Tag}>. Did you mean {corrected}?",
                 SuggestedFix: corrected)
         ];
     }

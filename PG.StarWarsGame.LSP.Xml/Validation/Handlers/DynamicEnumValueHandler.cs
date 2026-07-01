@@ -7,7 +7,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed partial class DynamicEnumValueHandler : SingleValueTypeHandlerBase
+public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
 {
     private static readonly char[] ValueSeparators = ['|', ','];
     protected override XmlValueType TargetType => XmlValueType.DynamicEnumValue;
@@ -42,35 +42,42 @@ public sealed partial class DynamicEnumValueHandler : SingleValueTypeHandlerBase
                 ];
         }
 
-        if (fact.Tag.Enum is { Kind: EnumKind.SchemaFixed, Values.Count: > 0 } enumDef)
-        {
-            var known = enumDef.Values
-                .Select(v => v.Name)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var enumDef = fact.Tag.Enum;
+        if (enumDef is null)
+            return [];
 
-            foreach (var seg in trimmed.Split(ValueSeparators,
-                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                if (!known.Contains(seg))
-                    return
-                    [
-                        new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                            $"'{seg}' is not a known value for enum '{enumDef.Name}' on <{fact.Tag.Tag}>.")
-                    ];
+        // SchemaFixed: known at compile time — unknown value is an Error.
+        if (enumDef.Kind == EnumKind.SchemaFixed)
+        {
+            var valid = GetValidValues(enumDef, ctx);
+            if (valid is not null)
+            {
+                foreach (var seg in trimmed.Split(ValueSeparators,
+                             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                    if (!valid.Contains(seg))
+                        return
+                        [
+                            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+                                $"'{seg}' is not a known value for enum '{enumDef.Name}' on <{fact.Tag.Tag}>.")
+                        ];
+            }
         }
 
-        if (fact.Tag.Enum is { Kind: EnumKind.DynamicXml } dynEnumDef
-            && ctx.Index.Baseline.DynamicEnumValues.TryGetValue(dynEnumDef.Name, out var knownValues)
-            && knownValues.Length > 0)
+        // DynamicXml: defined in data files — unknown value is a Warning (baseline may be incomplete).
+        if (enumDef.Kind == EnumKind.DynamicXml)
         {
-            var knownSet = new HashSet<string>(knownValues, StringComparer.OrdinalIgnoreCase);
-            foreach (var seg in trimmed.Split(ValueSeparators,
-                         StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                if (!knownSet.Contains(seg))
-                    return
-                    [
-                        new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                            $"'{seg}' is not a known {dynEnumDef.Name} value.")
-                    ];
+            var valid = GetValidValues(enumDef, ctx);
+            if (valid is not null)
+            {
+                foreach (var seg in trimmed.Split(ValueSeparators,
+                             StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+                    if (!valid.Contains(seg))
+                        return
+                        [
+                            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                                $"'{seg}' is not a known {enumDef.Name} value.")
+                        ];
+            }
         }
 
         return [];

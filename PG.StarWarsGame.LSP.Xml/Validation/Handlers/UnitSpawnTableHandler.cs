@@ -21,6 +21,7 @@ public sealed class UnitSpawnTableHandler : CommaSeparatedPairHandlerBase
                     $"'{fact.RawValue.Trim()}' is not a valid unit spawn entry for <{fact.Tag.Tag}>. Expected: UnitTypeName, Integer >= -1.")
             ];
 
-        return [];
+        var d = TryValidateGameObjectName(parts[0].Trim(), fact.Tag.Tag, ctx.Index);
+        return d is not null ? [d] : [];
     }
 }

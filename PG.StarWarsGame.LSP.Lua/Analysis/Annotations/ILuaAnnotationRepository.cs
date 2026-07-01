@@ -13,4 +13,7 @@ public interface ILuaAnnotationRepository
     IReadOnlyDictionary<string, ImmutableArray<EmmyLuaAnnotations>> All { get; }
     ILuaTypeIndex Current { get; }
     void RebuildIndex();
+
+    void UpdateFunctionAnnotations(string uri, IReadOnlyList<(string Name, EmmyLuaAnnotations Ann)> functions);
+    EmmyLuaAnnotations? GetFunctionAnnotation(string name);
 }

@@ -89,9 +89,9 @@ public sealed class WorkspaceVariantTagSourceTest
 
         public IEnumerable<TrackedDocument> All => _docs;
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs.Add(new TrackedDocument(uri, text, version));
+            _docs.Add(new TrackedDocument(uri, text, version, publishDiagnostics));
         }
 
         public void Remove(string uri)

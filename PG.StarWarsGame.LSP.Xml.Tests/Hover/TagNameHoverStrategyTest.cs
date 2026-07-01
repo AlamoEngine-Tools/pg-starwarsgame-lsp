@@ -90,6 +90,33 @@ public sealed class TagNameHoverStrategyTest
         Assert.Contains("SpaceUnit", hover!.Contents.MarkupContent!.Value);
     }
 
+    [Fact]
+    public void Handle_TypeRootElement_WhenGlobalTagSameName_ReturnsTypeHoverNotGlobalTagHover()
+    {
+        // <Faction> is both the type root element AND has a same-named global tag (FactionReference).
+        // The type hover must win; XmlObjectTagResolver's global fallback must be suppressed.
+        var (ctx, schema) = MakeCtx("<Factions>\n<Faction Name=\"Rebels\"/>\n</Factions>", 1);
+        schema.AddType(new GameObjectTypeDefinition
+        {
+            TypeName = "Faction",
+            NameTag = "Name",
+            Description = new Dictionary<string, string> { ["en"] = "A playable or AI faction" }
+        });
+        schema.SetTag("faction", new XmlTagDefinition
+        {
+            Tag = "Faction",
+            ValueType = XmlValueType.FactionReference,
+            Description = new Dictionary<string, string> { ["en"] = "A faction reference" }
+        });
+
+        var hover = Strategy().Handle(ctx);
+
+        Assert.NotNull(hover);
+        var content = hover!.Contents.MarkupContent!.Value;
+        Assert.Contains("A playable or AI faction", content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("A faction reference", content, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── registry-based type container ─────────────────────────────────────────
 
     [Fact]

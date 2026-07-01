@@ -17,6 +17,9 @@ public abstract class XmlDiagnosticsHandler<TFact> : IXmlDiagnosticsHandler
 
     public virtual XmlValueType? HandledValueType => null;
 
+    public virtual IEnumerable<XmlValueType> HandledValueTypes =>
+        HandledValueType.HasValue ? [HandledValueType.Value] : [];
+
     public IEnumerable<XmlDiagnosticResult> Handle(XmlFact fact, DiagnosticsContext ctx)
     {
         return fact is TFact typed ? Handle(typed, ctx) : [];

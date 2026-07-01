@@ -24,15 +24,26 @@ public sealed class UvSlotIndexHandlerTest
     }
 
     [Theory]
-    [InlineData("-1")]
-    [InlineData("4")]
     [InlineData("abc")]
     [InlineData("")]
-    public void Invalid_uv_slot_indices_return_error(string value)
+    public void Non_numeric_returns_error(string value)
     {
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Theory]
+    [InlineData("-1", "0")]
+    [InlineData("4", "3")]
+    [InlineData("2.5", "2")]
+    [InlineData("5", "3")]
+    public void Out_of_range_or_float_returns_warning_with_clamped_fix(string value, string expectedFix)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(expectedFix, d.SuggestedFix);
     }
 
     [Fact]

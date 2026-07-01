@@ -408,8 +408,12 @@ public sealed class XmlGameDocumentParserTest
     }
 
     [Fact]
-    public async Task ParseAsync_PerFactionObjectList_Skips_First_Token()
+    public async Task ParseAsync_PerFactionObjectList_Emits_Reference_Per_Token()
     {
+        // PerFactionObjectList is a map<Faction, List<GameObjectType>>. All tokens — faction names
+        // and game objects alike — are emitted as references to enable go-to-definition.
+        // Structural + faction-identity validation is owned by PerFactionObjectListHandler;
+        // game object existence is validated by the reference pipeline.
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Unit"));
         schema.AddTag(ListRefTag("Transport_Units", "Unit", XmlValueType.PerFactionObjectList));
@@ -418,8 +422,8 @@ public sealed class XmlGameDocumentParserTest
             """<Unit Name="UNIT_A"><Transport_Units>Pirates, Ship_A, Ship_B</Transport_Units></Unit>""", 1,
             TestContext.Current.CancellationToken);
 
-        Assert.Equal(2, result.References.Length);
-        Assert.DoesNotContain(result.References, r => r.TargetId == "Pirates");
+        Assert.Equal(3, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "Pirates");
         Assert.Contains(result.References, r => r.TargetId == "Ship_A");
         Assert.Contains(result.References, r => r.TargetId == "Ship_B");
     }
@@ -915,6 +919,158 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("My_Special_Ability", reference.TargetId);
         Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
         Assert.Null(reference.ExpectedTypeName);
+    }
+
+    // ── Owner-scoped ability symbol indexing ─────────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_Scopes_Symbol_To_Enclosing_Owner()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<GameObjectType Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></GameObjectType>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("MY_UNIT$My_Ability", sym.Id);
+        Assert.Equal("LuckyShotAttackAbility", sym.TypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityDefinitionSubObjectList_No_Owner_Id_Uses_Bare_Ability_Name()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+        // No GameObjectType registered, so parent has no known NameTag
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></U>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("My_Ability", sym.Id);
+    }
+
+    [Fact]
+    public async Task ParseAsync_OwnerScopedReference_Prefixes_With_Enclosing_Object_Name()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "GUI_Activated_Ability_Name",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            SemanticType = TagSemanticType.OwnerScopedReference
+        });
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<GameObjectType Name="MY_UNIT"><Unit_Abilities_Data><Unit_Ability><GUI_Activated_Ability_Name>My_Special_Ability</GUI_Activated_Ability_Name></Unit_Ability></Unit_Abilities_Data></GameObjectType>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("MY_UNIT$My_Special_Ability", reference.TargetId);
+    }
+
+    [Fact]
+    public async Task ParseAsync_OwnerScopedReference_No_Enclosing_Owner_Uses_Bare_Name()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "GUI_Activated_Ability_Name",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            SemanticType = TagSemanticType.OwnerScopedReference
+        });
+        // No GameObjectType registered
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Unit_Ability><GUI_Activated_Ability_Name>My_Special_Ability</GUI_Activated_Ability_Name></Unit_Ability></U>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("My_Special_Ability", reference.TargetId);
+    }
+
+    // ── enum reference extraction ────────────────────────────────────────────
+
+    private static XmlTagDefinition DynamicEnumTag(string tag, string enumName)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = tag,
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.Enum,
+            Enum = new EnumDefinition { Name = enumName, Kind = EnumKind.DynamicXml, Values = [] }
+        };
+    }
+
+    private static XmlTagDefinition SchemaFixedEnumTag(string tag, string enumName)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = tag,
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.Enum,
+            Enum = new EnumDefinition
+            {
+                Name = enumName, Kind = EnumKind.SchemaFixed,
+                Values = [new EnumValueDefinition { Name = "VALUE_A" }]
+            }
+        };
+    }
+
+    [Fact]
+    public async Task ParseAsync_DynamicEnum_Tag_Emits_Enum_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(DynamicEnumTag("SurfaceFX_Name", "SurfaceFXTriggerType"));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            "<Unit><SurfaceFX_Name>GENERIC_TRACK</SurfaceFX_Name></Unit>",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("enum:SurfaceFXTriggerType/GENERIC_TRACK", reference.TargetId);
+        Assert.Equal("file:///f.xml", reference.DocumentUri);
+    }
+
+    [Fact]
+    public async Task ParseAsync_DynamicEnum_Tag_Multi_Value_Emits_One_Reference_Per_Token()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(DynamicEnumTag("SurfaceFX_Name", "SurfaceFXTriggerType"));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            "<Unit><SurfaceFX_Name>GENERIC_TRACK, INFANTRY_TERRAIN_MODIFIER</SurfaceFX_Name></Unit>",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "enum:SurfaceFXTriggerType/GENERIC_TRACK");
+        Assert.Contains(result.References, r => r.TargetId == "enum:SurfaceFXTriggerType/INFANTRY_TERRAIN_MODIFIER");
+    }
+
+    [Fact]
+    public async Task ParseAsync_SchemaFixed_Enum_Tag_Emits_No_Reference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SchemaFixedEnumTag("Ship_Class", "ShipClassType"));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            "<Unit><Ship_Class>Frigate</Ship_Class></Unit>",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
     }
 
     // ── FakeSchemaProvider ───────────────────────────────────────────────────

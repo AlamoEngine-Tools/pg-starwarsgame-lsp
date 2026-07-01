@@ -300,6 +300,37 @@ public sealed class XmlUtilityTest
     }
 
     [Fact]
+    public void FindEnclosingElement_LeafWithSyntheticAutoClosedEndNode_DoesNotStealEnclosingFromSiblingContainer()
+    {
+        // HAP auto-closes block elements like <p> when the next block element starts, producing a
+        // synthetic EndNode with Line=0.  Both <p> leaves land at depth=1 with endLine=int.MaxValue.
+        // <div> is also at depth=1 (a true sibling because it is a block element that HAP places
+        // at the same level).  The first <p> is visited first in document order: with endLine=
+        // int.MaxValue it "contains" the cursor, wins the depth=1 slot, and prevents <div> from
+        // ever being considered (same depth, strict > comparison).
+        //
+        // line 0: <Root>
+        // line 1:   <p>leaf0  ← synthetic EndNode(Line=0) → int.MaxValue → steals cursor
+        // line 2:   <p>leaf1  ← same
+        // line 3:   <div>     ← depth=1 sibling; loses because depth not > 1
+        // line 4:     (cursor — should return div, not p)
+        // line 5:   </div>
+        // line 6: </Root>
+        const string xml =
+            "<Root>\n" +
+            "  <p>leaf0\n" +
+            "  <p>leaf1\n" +
+            "  <div>\n" +
+            "    \n" +
+            "  </div>\n" +
+            "</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(xml);
+        var node = XmlUtility.FindEnclosingElement(doc, 4); // cursor inside <div>
+        Assert.NotNull(node);
+        Assert.Equal("div", node!.Name, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void FindEnclosingElement_CursorAfterAllElements_ReturnsNull()
     {
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Child>x</Child>\n</Root>");

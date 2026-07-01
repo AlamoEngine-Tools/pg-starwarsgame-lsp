@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.Text;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
@@ -84,6 +85,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 
         foreach (var reference in docIndex.References)
         {
+            if (reference.ExpectedKind != GameSymbolKind.XmlObject) continue;
             if (reference.Line != line) continue;
             if (character < reference.Column || character > reference.Column + reference.Length) continue;
 
@@ -221,47 +223,26 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 var luaGlobal = defs.FirstOrDefault(s => s.Kind == GameSymbolKind.LuaGlobal);
                 if (luaGlobal is not null)
                 {
-                    var sb = new StringBuilder();
-                    sb.Append($"**function** `{id.Name}`");
-                    if (luaGlobal.Description is not null)
-                    {
-                        sb.AppendLine();
-                        sb.Append(luaGlobal.Description);
-                    }
-
-                    return new Hover
-                    {
-                        Contents = new MarkedStringsOrMarkupContent(new MarkupContent
-                        {
-                            Kind = MarkupKind.Markdown,
-                            Value = sb.ToString()
-                        }),
-                        Range = range
-                    };
+                    var ann = repository.GetFunctionAnnotation(id.Name);
+                    // If no annotation is indexed yet, synthesise one from the symbol description.
+                    if (ann is null && luaGlobal.Description is not null)
+                        ann = EmmyLuaAnnotations.Empty with { Description = luaGlobal.Description };
+                    return BuildHover(BuildFunctionHoverMarkdown(id.Name, ann), range);
                 }
             }
 
-            // Engine global function: show name and description from schema.
+            // Engine global function: show name, params, and return type from schema.
             if (schema.AllFunctionNames.Contains(id.Name))
             {
-                var sb = new StringBuilder();
-                sb.Append($"**function** `{id.Name}`");
-                var desc = schema.GetFunctionDescription(id.Name);
-                if (desc is not null)
+                var ann = EmmyLuaAnnotations.Empty with
                 {
-                    sb.AppendLine();
-                    sb.Append(desc);
-                }
-
-                return new Hover
-                {
-                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
-                    {
-                        Kind = MarkupKind.Markdown,
-                        Value = sb.ToString()
-                    }),
-                    Range = range
+                    Description = schema.GetFunctionDescription(id.Name),
+                    Params = schema.GetFunctionParams(id.Name).ToImmutableArray(),
+                    Returns = schema.GetReturnTypeName(id.Name) is { } ret
+                        ? [new LuaReturnAnnotation(new LuaTypeRef(ret), null, null)]
+                        : ImmutableArray<LuaReturnAnnotation>.Empty
                 };
+                return BuildHover(BuildFunctionHoverMarkdown(id.Name, ann), range);
             }
 
             // Workspace type (class, alias, enum) from the annotation repository.
@@ -320,6 +301,79 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         }
 
         return BuildHover(sb.ToString().TrimEnd(), range);
+    }
+
+    private static string BuildFunctionHoverMarkdown(string name, EmmyLuaAnnotations? ann)
+    {
+        var sb = new StringBuilder();
+
+        // Signature line with param names if available.
+        if (ann is not null && !ann.Params.IsDefaultOrEmpty)
+        {
+            var paramList = string.Join(", ", ann.Params.Select(p => p.IsOptional ? p.Name + "?" : p.Name));
+            sb.Append($"**function** `{name}({paramList})`");
+        }
+        else
+        {
+            sb.Append($"**function** `{name}`");
+        }
+
+        if (ann is null)
+            return sb.ToString();
+
+        if (ann.IsDeprecated)
+        {
+            sb.AppendLine();
+            sb.Append("*⚠ Deprecated*");
+        }
+
+        if (ann.Description is not null)
+        {
+            sb.AppendLine();
+            sb.Append(ann.Description);
+        }
+
+        if (!ann.Params.IsDefaultOrEmpty)
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.Append("**Parameters:**");
+            foreach (var p in ann.Params)
+            {
+                sb.AppendLine();
+                var pName = p.IsOptional ? $"`{p.Name}?`" : $"`{p.Name}`";
+                if (p.Description is not null)
+                    sb.Append($"- {pName} `{p.Type.Raw}` — {p.Description}");
+                else
+                    sb.Append($"- {pName} `{p.Type.Raw}`");
+            }
+        }
+
+        if (!ann.Returns.IsDefaultOrEmpty)
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            if (ann.Returns.Length == 1)
+            {
+                var r = ann.Returns[0];
+                sb.Append($"**Returns:** `{r.Type.Raw}`");
+                if (r.Description is not null)
+                    sb.Append($" — {r.Description}");
+            }
+            else
+            {
+                sb.Append("**Returns:**");
+                foreach (var r in ann.Returns)
+                {
+                    sb.AppendLine();
+                    var line = $"- `{r.Type.Raw}`";
+                    if (r.Description is not null) line += $" — {r.Description}";
+                    sb.Append(line);
+                }
+            }
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private static Hover BuildHover(string markdown, LspRange range) =>

@@ -59,6 +59,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _layerMap.SetLayers(config.Layers);
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);
+        _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);
         _indexer.ApplyAssetCatalog(config.AssetRoots);
         _indexer.ApplyModelBoneCatalog(config.AssetRoots);
         LastAssetRoots = config.AssetRoots;

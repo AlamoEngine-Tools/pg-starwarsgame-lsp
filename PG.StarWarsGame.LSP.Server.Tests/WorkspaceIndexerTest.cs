@@ -28,12 +28,7 @@ public sealed class WorkspaceIndexerTest
         IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
         params IGameDocumentParser[] parsers)
     {
-        var fh = new FileHelper(fs);
-        var ctx = new EaWXmlContext(fh);
-        var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
-            cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
-            NullLogger<WorkspaceIndexer>.Instance);
-        return (indexer, ctx);
+        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, parsers);
     }
 
     // Overload kept for callers that pass parsers without a cache
@@ -41,7 +36,21 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return Build(fs, svc, registry, schema, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, null, null, null, parsers);
+    }
+
+    private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
+        MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
+        IProjectIndexCache? cache, ILuaAnnotationRepository? repo, IGameWorkspaceHost? workspaceHost,
+        params IGameDocumentParser[] parsers)
+    {
+        var fh = new FileHelper(fs);
+        var ctx = new EaWXmlContext(fh);
+        var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
+            cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
+            workspaceHost ?? new NullWorkspaceHost(),
+            NullLogger<WorkspaceIndexer>.Instance);
+        return (indexer, ctx);
     }
 
     // ── PreScanMetafiles ─────────────────────────────────────────────────────
@@ -343,6 +352,204 @@ public sealed class WorkspaceIndexerTest
         Assert.Equal(["root", "muzzle_bone"], svc.AppliedModelBones!["data/art/models/shipped.alo"].ToArray());
     }
 
+    // ── Dynamic enum catalog ─────────────────────────────────────────────────
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_ParsesEnumFile_AndPublishesValues()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var enumFilePath = Path.Combine(xmlDir, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><GENERIC_TRACK>0</GENERIC_TRACK><MY_MOD_TRACK>99</MY_MOD_TRACK></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.Contains("GENERIC_TRACK", vals);
+        Assert.Contains("MY_MOD_TRACK", vals);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_MissingEnumFile_PublishesEmptyDict()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var fs = new MockFileSystem();
+        fs.AddDirectory(xmlDir);
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.Empty(svc.AppliedWorkspaceDynamicEnumValues!);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_SearchesByFilenameOnly_NotFullPath()
+    {
+        var root = Root("ws");
+        // The enum file is directly in the xml root, not in an enum subdirectory.
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var enumFilePath = Path.Combine(xmlDir, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><CUSTOM>1</CUSTOM></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.Contains("CUSTOM", vals);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_EnumFileInSubdirectory_IsFound()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var enumSubDir = Path.Combine(xmlDir, "enum");
+        var enumFilePath = Path.Combine(enumSubDir, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><GENERIC_TRACK>0</GENERIC_TRACK></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]); // pass parent dir, not the enum subdir
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        Assert.True(svc.AppliedWorkspaceDynamicEnumValues!.TryGetValue("SurfaceFXTriggerType", out var vals));
+        Assert.Contains("GENERIC_TRACK", vals);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_AnchorFormatEnum_PublishesEnumValueDefinitionsWithExactPosition()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var filePath = Path.Combine(xmlDir, "gameconstants.xml");
+        const string xml = "<GameConstants><Damage_Types>EXPLOSIVE ENERGY</Damage_Types></GameConstants>";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [filePath] = new(xml) });
+        var enumDef = new EnumDefinition
+        {
+            Name = "DamageType", Kind = EnumKind.DynamicXml,
+            SourceFile = "data/xml/gameconstants.xml$Damage_Types", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
+        Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!.TryGetValue("DamageType", out var valueMap));
+        Assert.True(valueMap!.TryGetValue("EXPLOSIVE", out var explosiveOrigin));
+        Assert.True(explosiveOrigin!.IsNavigable);
+        Assert.True(valueMap.TryGetValue("ENERGY", out var energyOrigin));
+        // ENERGY comes after EXPLOSIVE in the same line, so its column must be greater
+        Assert.True(energyOrigin!.Column > explosiveOrigin.Column);
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_FileFormatEnum_PublishesEnumValueDefinitions()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var enumFilePath = Path.Combine(xmlDir, "surfacefxtriggertype.xml");
+        const string xml = """
+                           <EnumDefinition>
+                               <GENERIC_TRACK>0</GENERIC_TRACK>
+                               <MY_MOD_TRACK>99</MY_MOD_TRACK>
+                           </EnumDefinition>
+                           """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [enumFilePath] = new(xml) });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.NotNull(svc.AppliedWorkspaceEnumValueDefinitions);
+        Assert.True(svc.AppliedWorkspaceEnumValueDefinitions!
+            .TryGetValue("SurfaceFXTriggerType", out var valueMap));
+        Assert.True(valueMap!.TryGetValue("GENERIC_TRACK", out var origin));
+        Assert.True(origin!.IsNavigable);
+        Assert.True(origin.Line > 0); // must be inside the file, past the root element
+    }
+
+    [Fact]
+    public void ApplyDynamicEnumCatalog_RootProjectOverridesDependency_UsesRootValues()
+    {
+        // dep has surfacefxtriggertype.xml with DEP_TRACK; root has it with ROOT_TRACK.
+        // config.XmlDirectories is [depXml, rootXml] (deps-first, root-last).
+        // Root's file must win because it has the higher layer rank.
+        var depXml = Path.Combine(Root("dep"), "data", "xml");
+        var rootXml = Path.Combine(Root("root"), "data", "xml");
+        var depFile = Path.Combine(depXml, "surfacefxtriggertype.xml");
+        var rootFile = Path.Combine(rootXml, "surfacefxtriggertype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [depFile] = new("<EnumDefinition><DEP_TRACK>0</DEP_TRACK></EnumDefinition>"),
+            [rootFile] = new("<EnumDefinition><ROOT_TRACK>0</ROOT_TRACK></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+            SourceFile = "surfacefxtriggertype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        // Pass roots in deps-first / root-last order (same as ModProjectResolver produces).
+        indexer.ApplyDynamicEnumCatalog([depXml, rootXml]);
+
+        Assert.NotNull(svc.AppliedWorkspaceDynamicEnumValues);
+        var vals = svc.AppliedWorkspaceDynamicEnumValues!["SurfaceFXTriggerType"];
+        Assert.Contains("ROOT_TRACK", vals);   // root project's value is present
+        Assert.DoesNotContain("DEP_TRACK", vals); // dependency value is suppressed by override
+    }
+
     // ── IndexDocumentsAsync with cache ──────────────────────────────────────
 
     [Fact]
@@ -598,6 +805,24 @@ public sealed class WorkspaceIndexerTest
         }
     }
 
+    private sealed class FakeSchemaWithEnums(params EnumDefinition[] enums) : ISchemaProvider
+    {
+        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+        public IReadOnlyList<XmlTagDefinition> AllTags => [];
+        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => enums;
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+
+        public event EventHandler? SchemaRefreshed { add { } remove { } }
+
+        public XmlTagDefinition? GetTag(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
+        public GameObjectTypeDefinition? GetObjectType(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public EnumDefinition? GetEnum(string name) =>
+            enums.FirstOrDefault(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+    }
+
     private sealed class FakeIndexService : IGameIndexService
     {
         public readonly List<(string Uri, int Version)> Calls = [];
@@ -613,6 +838,16 @@ public sealed class WorkspaceIndexerTest
         public IAssetFileIndex? AppliedAssetFiles { get; private set; }
 
         public ImmutableDictionary<string, ImmutableArray<string>>? AppliedModelBones { get; private set; }
+
+        public ImmutableDictionary<string, ImmutableArray<string>>? AppliedWorkspaceDynamicEnumValues
+        {
+            get; private set;
+        }
+
+        public ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>? AppliedWorkspaceEnumValueDefinitions
+        {
+            get; private set;
+        }
 
         public GameIndex Current { get; private set; }
 
@@ -667,6 +902,17 @@ public sealed class WorkspaceIndexerTest
             AppliedModelBones = bones;
         }
 
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+            AppliedWorkspaceDynamicEnumValues = values;
+        }
+
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+            AppliedWorkspaceEnumValueDefinitions = definitions;
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             Interlocked.Increment(ref BeginBulkUpdateCallCount);
@@ -683,6 +929,97 @@ public sealed class WorkspaceIndexerTest
         }
     }
 
+    // ── WorkspaceHost population ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task IndexDocumentsAsync_FlatScan_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "a.xml")] = new("<Root/>"),
+            [Path.Combine(xmlDir, "b.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var host = new SpyWorkspaceHost();
+        var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null, null,
+            host, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Equal(2, host.Calls.Count);
+        Assert.All(host.Calls, c => Assert.False(c.PublishDiagnostics));
+        Assert.All(host.Calls, c => Assert.Equal(0, c.Version));
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_LayeredScan_CacheMiss_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var host = new SpyWorkspaceHost();
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            null, null, host, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(host.Calls);
+        Assert.False(host.Calls[0].PublishDiagnostics);
+        Assert.Equal(0, host.Calls[0].Version);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_LayeredScan_CacheHit_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fileContent = "<Root/>"u8.ToArray();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new(fileContent)
+        });
+        var svc = new FakeIndexService();
+        var host = new SpyWorkspaceHost();
+
+        var fh = new FileHelper(fs);
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
+        var entry = new ProjectFileEntry
+        {
+            RelativePath = "data/xml/units.xml", ContentHash = hash,
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything", DependencyHashes = [], Files = [entry]
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
+            cache, null, host, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(host.Calls); // even cache-hit adds to host
+        Assert.False(host.Calls[0].PublishDiagnostics);
+        Assert.Equal(0, host.Calls[0].Version);
+        Assert.Equal("<Root/>", host.Calls[0].Text);
+    }
+
     private sealed class SpyAnnotationRepository : ILuaAnnotationRepository
     {
         public int RebuildCallCount { get; private set; }
@@ -693,5 +1030,27 @@ public sealed class WorkspaceIndexerTest
             new Dictionary<string, ImmutableArray<EmmyLuaAnnotations>>();
         public ILuaTypeIndex Current => LuaTypeIndex.Empty;
         public void RebuildIndex() => RebuildCallCount++;
+        public void UpdateFunctionAnnotations(string uri, IReadOnlyList<(string Name, EmmyLuaAnnotations Ann)> functions) { }
+        public EmmyLuaAnnotations? GetFunctionAnnotation(string name) => null;
+    }
+
+    private sealed class NullWorkspaceHost : IGameWorkspaceHost
+    {
+        public IEnumerable<TrackedDocument> All => [];
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true) { }
+        public void Remove(string uri) { }
+        public bool TryGet(string uri, out TrackedDocument doc) { doc = null!; return false; }
+    }
+
+    private sealed class SpyWorkspaceHost : IGameWorkspaceHost
+    {
+        public List<(string Uri, string Text, int Version, bool PublishDiagnostics)> Calls { get; } = [];
+        public IEnumerable<TrackedDocument> All => [];
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
+        {
+            lock (Calls) Calls.Add((uri, text, version, publishDiagnostics));
+        }
+        public void Remove(string uri) { }
+        public bool TryGet(string uri, out TrackedDocument doc) { doc = null!; return false; }
     }
 }

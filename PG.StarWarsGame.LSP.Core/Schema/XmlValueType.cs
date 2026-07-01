@@ -132,7 +132,7 @@ public enum XmlValueType
     Type51 = 51,
 
     /// <summary>Weighted list of music events.</summary>
-    MusicEventWeightedList = 52,
+    TupleList = 52,
 
     /// <summary>Per-faction object list pair (faction name + space-separated object names).</summary>
     PerFactionObjectList = 53,

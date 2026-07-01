@@ -25,6 +25,9 @@ public interface IGameIndexService
     void ApplyLocalisation(ILocalisationIndex index);
     void ApplyAssetFiles(IAssetFileIndex index);
     void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones);
+    void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values);
+    void ApplyWorkspaceEnumValueDefinitions(
+        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions);
 
     /// <summary>
     ///     Suppresses <see cref="IndexChanged" /> while the returned scope is alive.

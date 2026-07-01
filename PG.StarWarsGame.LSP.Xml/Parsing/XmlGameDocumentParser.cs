@@ -142,7 +142,17 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             foreach (var child in node.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
             {
                 var tagDef = _schema.GetTag(child.Name);
-                if (tagDef?.ReferenceKind != ReferenceKind.XmlObject) continue;
+                if (tagDef is null) continue;
+
+                if (tagDef.ReferenceKind == ReferenceKind.Enum &&
+                    tagDef.Enum?.Kind == EnumKind.DynamicXml)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectEnumReferences(child, tagDef.Enum.Name, text, documentUri, references);
+                    continue;
+                }
+
+                if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
                 // Variant base references are emitted by the symbol passes with the enclosing
                 // object's type as ExpectedTypeName; skip here to avoid a duplicate wildcard-typed one.
@@ -154,13 +164,18 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 if (HasChildElement(child)) continue;
 
                 var innerText = child.InnerText;
+                var ownerPrefix = tagDef.SemanticType == TagSemanticType.OwnerScopedReference
+                    ? FindEnclosingObjectId(node)
+                    : null;
+
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
                     var absPos = child.InnerStartIndex + tokenOffset;
                     var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+                    var targetId = ownerPrefix is not null ? $"{ownerPrefix}${name}" : name;
 
                     references.Add(new GameReference(
-                        name,
+                        targetId,
                         GameSymbolKind.XmlObject,
                         tagDef.ObjectType?.TypeName,
                         documentUri,
@@ -172,6 +187,25 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
 
         return references;
+    }
+
+    private static void CollectEnumReferences(HtmlNode child, string enumName,
+        string text, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
+        {
+            var absPos = child.InnerStartIndex + tokenOffset;
+            var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+            references.Add(new GameReference(
+                $"enum:{enumName}/{token}",
+                null,
+                null,
+                documentUri,
+                line,
+                column,
+                token.Length));
+        }
     }
 
     private List<DocumentGroupMembership> CollectGroupMemberships(HtmlDocument doc, string documentUri,
@@ -227,6 +261,26 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     // True when the element contains a nested child element, marking it as a container/object
     // definition rather than a leaf reference value.
+    // Walks up from node to find the nearest ancestor that is a registered game object type,
+    // then returns that ancestor's name-attribute value. Used for OwnerScopedReference tags.
+    private string? FindEnclosingObjectId(HtmlNode node)
+    {
+        var current = node.ParentNode;
+        while (current is { NodeType: HtmlNodeType.Element })
+        {
+            var typeDef = _schema.GetObjectType(XmlUtility.ToPascalCase(current.Name));
+            if (typeDef?.NameTag is not null)
+            {
+                var id = GetNameAttribute(current, typeDef.NameTag);
+                return string.IsNullOrEmpty(id) ? null : id;
+            }
+
+            current = current.ParentNode;
+        }
+
+        return null;
+    }
+
     private static bool HasChildElement(HtmlNode node)
     {
         return node.ChildNodes.Any(n => n.NodeType == HtmlNodeType.Element);
@@ -246,10 +300,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var multiValue = tagDef.SemanticType == TagSemanticType.PrerequisiteExpression
                          || tagDef.ValueType is XmlValueType.GameObjectTypeReferenceList
                              or XmlValueType.TypeReferenceList
-                             or XmlValueType.NameReferenceList;
-        var skipFirst = tagDef.ValueType == XmlValueType.PerFactionObjectList;
+                             or XmlValueType.NameReferenceList
+                             or XmlValueType.PerFactionObjectList;
 
-        if (!multiValue && !skipFirst)
+        if (!multiValue)
         {
             var trimmed = innerText.Trim();
             if (trimmed.Length > 0)
@@ -257,17 +311,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             yield break;
         }
 
-        var first = skipFirst;
         foreach (var (token, offset) in XmlUtility.SplitListWithOffsets(innerText))
-        {
-            if (first)
-            {
-                first = false;
-                continue;
-            }
-
             yield return (token, offset);
-        }
     }
 
     private List<GameSymbol> CollectSubObjectListSymbols(
@@ -284,6 +329,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var tagDef = _schema.GetTag(child.Name);
                 if (tagDef?.ValueType != XmlValueType.AbilityDefinitionSubObjectList) continue;
 
+                // Find the enclosing game object's ID so abilities can be scoped to their owner,
+                // preventing false duplicate-symbol errors when two units share an ability name.
+                var ownerTypeDef = _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name));
+                var ownerId = ownerTypeDef?.NameTag is not null
+                    ? GetNameAttribute(node, ownerTypeDef.NameTag)
+                    : null;
+
                 foreach (var abilityNode in child.ChildNodes
                              .Where(n => n.NodeType == HtmlNodeType.Element))
                 {
@@ -291,9 +343,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     var objectType = _schema.GetObjectType(typeName);
                     if (objectType?.NameTag is null) continue;
 
-                    var id = GetNameAttribute(abilityNode, objectType.NameTag);
-                    if (string.IsNullOrEmpty(id)) continue;
+                    var abilityName = GetNameAttribute(abilityNode, objectType.NameTag);
+                    if (string.IsNullOrEmpty(abilityName)) continue;
 
+                    var id = string.IsNullOrEmpty(ownerId) ? abilityName : $"{ownerId}${abilityName}";
                     var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, text);
                     var (variantBaseId, variantRef) = ResolveVariant(abilityNode, typeName, documentUri, text);
                     if (variantRef is not null) references.Add(variantRef);

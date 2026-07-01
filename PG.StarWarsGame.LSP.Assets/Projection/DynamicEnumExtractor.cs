@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.Xml;
 using System.Xml.Linq;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
@@ -86,6 +88,107 @@ public static class DynamicEnumExtractor
 
         return (dyn.ToImmutable(), hard.ToImmutable());
     }
+
+    /// <summary>
+    ///     Finds a named child element inside <paramref name="xml" /> and returns each whitespace/comma-
+    ///     separated token in its text content with an exact 0-based (line, column) location.
+    ///     Stops at the first "ABOVE this point" boundary comment so hardcoded-only tokens are excluded.
+    /// </summary>
+    public static IReadOnlyList<(string Name, FileOrigin Origin)> ParseElementTextWithLocations(
+        string? xml, string elementName, string uri)
+    {
+        if (string.IsNullOrEmpty(xml)) return [];
+
+        XDocument doc;
+        try { doc = XDocument.Parse(xml, LoadOptions.SetLineInfo); }
+        catch (XmlException) { return []; }
+
+        var el = doc.Descendants(elementName).FirstOrDefault();
+        if (el is null) return [];
+
+        var result = new List<(string Name, FileOrigin Origin)>();
+        foreach (var node in el.Nodes())
+        {
+            if (node is XComment comment && IsBoundaryComment(comment.Value))
+                break;
+
+            if (node is not XText textNode) continue;
+
+            var text = textNode.Value;
+            var li = (IXmlLineInfo)textNode;
+            var startLine = li.HasLineInfo() ? li.LineNumber - 1 : 0;
+            var startCol = li.HasLineInfo() ? li.LinePosition - 1 : 0;
+
+            foreach (var (token, offset) in SplitTokensWithOffsets(text))
+            {
+                var (line, col) = AdvancePosition(text, offset, startLine, startCol);
+                result.Add((token, new FileOrigin(uri, line, col)));
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    ///     Parses an <c>&lt;EnumDefinition&gt;</c> XML document and returns each child element's name paired
+    ///     with its 0-based line number in <paramref name="uri" />.
+    /// </summary>
+    public static IReadOnlyList<(string Name, FileOrigin Origin)> ParseEnumDefinitionFileWithLocations(
+        string? xml, string uri)
+    {
+        if (string.IsNullOrEmpty(xml)) return [];
+
+        XDocument doc;
+        try
+        {
+            doc = XDocument.Parse(xml, LoadOptions.SetLineInfo);
+        }
+        catch (XmlException)
+        {
+            return [];
+        }
+
+        var root = doc.Root;
+        if (root is null) return [];
+
+        var result = new List<(string Name, FileOrigin Origin)>();
+        foreach (var element in root.Elements())
+        {
+            var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber - 1 : 0;
+            result.Add((element.Name.LocalName, new FileOrigin(uri, line, null)));
+        }
+
+        return result;
+    }
+
+    // Walk `offset` characters through `text`, starting at (startLine, startCol),
+    // tracking newlines to compute the final 0-based (line, col).
+    private static (int Line, int Col) AdvancePosition(string text, int offset, int startLine, int startCol)
+    {
+        int line = startLine, col = startCol;
+        for (var i = 0; i < offset && i < text.Length; i++)
+        {
+            if (text[i] == '\n') { line++; col = 0; }
+            else if (text[i] != '\r') { col++; }
+        }
+
+        return (line, col);
+    }
+
+    private static IEnumerable<(string Token, int Offset)> SplitTokensWithOffsets(string text)
+    {
+        var i = 0;
+        while (i < text.Length)
+        {
+            while (i < text.Length && IsTokenSeparator(text[i])) i++;
+            if (i >= text.Length) break;
+            var start = i;
+            while (i < text.Length && !IsTokenSeparator(text[i])) i++;
+            yield return (text[start..i], start);
+        }
+    }
+
+    private static bool IsTokenSeparator(char c) => c is ' ' or '\t' or '\r' or '\n' or ',';
 
     /// <summary>
     ///     Parses an <c>&lt;EnumDefinition&gt;</c> XML document and returns the child element names as enum values.

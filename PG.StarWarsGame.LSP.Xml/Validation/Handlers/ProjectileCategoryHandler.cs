@@ -1,24 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-public sealed class ProjectileCategoryHandler : SingleValueTypeHandlerBase
+public sealed class ProjectileCategoryHandler : NamedEnumValueHandlerBase
 {
     protected override XmlValueType TargetType => XmlValueType.ProjectileCategory;
-
-    protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
-    {
-        if (fact.RawValue.Trim().Length == 0)
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid projectile category for <{fact.Tag.Tag}>.")
-            ];
-
-        return [];
-    }
 }

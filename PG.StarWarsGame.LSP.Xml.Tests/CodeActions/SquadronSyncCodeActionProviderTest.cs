@@ -187,7 +187,7 @@ file sealed class FakeWorkspaceHost : IGameWorkspaceHost
 
     public IEnumerable<TrackedDocument> All => [new(_normalizedUri, _text, 1)];
 
-    public void AddOrUpdate(string uri, string text, int version)
+    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
     {
     }
 

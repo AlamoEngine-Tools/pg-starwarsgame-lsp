@@ -34,7 +34,10 @@ public static class XmlLanguageServiceExtensions
 
         // XmlTagValueFact handlers (format validators)
         services.AddSingleton<IXmlDiagnosticsHandler, DeprecatedTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ContextNamePairHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ContextNameListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, PresenceInducedAnimationsHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioFileFormatHandler>();
@@ -50,7 +53,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, FloatVector3Handler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FloatVector3ListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FloatVector4Handler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, HardwareUIntHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, UintHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IntListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IntValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NormalizedFloatHandler>();
@@ -89,7 +92,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, ForceDeploymentListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnitSpawnTableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnitSpawnProbabilityTableHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, MusicEventWeightedListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, TupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ConditionalSpeechEventHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FloatTupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IntFloatTupleListHandler>();
@@ -100,7 +103,6 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, SfxCountHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SfxPercentageHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ShipClassTypeHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, UintValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UvSlotIndexHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VendorIdHexHandler>();
 

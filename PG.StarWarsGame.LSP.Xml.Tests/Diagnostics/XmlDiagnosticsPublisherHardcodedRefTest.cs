@@ -198,7 +198,45 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         Assert.Contains("AirUnit", diag.Message);
     }
 
+    // ── file-type fast-path ──────────────────────────────────────────────────
+
+    [Fact]
+    public void CollectHardcodedRefDiagnostics_SkipsWalk_WhenFileTypeHasNoHardcodedRefTags()
+    {
+        // File type "CommandBarComponent" has no hardcoded-ref tags (GetTagsForType returns []).
+        // Even though there is a global "Behavior" hardcoded tag, the walk should be skipped
+        // for this file type, so no diagnostic is emitted for an invalid value.
+        var schema = new StubHardcodedSchemaProvider(
+            BehaviorTag("Behavior"),
+            BehaviorModuleSet(Value("GenericTransport")));
+        var registry = new StubFileTypeRegistryWithTypes("file:///units.xml", ["CommandBarComponent"]);
+        var publisher = BuildPublisher(schema, registry);
+
+        const string xml =
+            "<CommandBarComponents><CommandBarComponent><Behavior>TYPO_MODULE</Behavior></CommandBarComponent></CommandBarComponents>";
+
+        var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
+
+        Assert.Empty(diags);
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
+
+    private static XmlDiagnosticsPublisher BuildPublisher(ISchemaProvider schema, IFileTypeRegistry registry)
+    {
+        return new XmlDiagnosticsPublisher(
+            _ => { },
+            new StubIndexService(),
+            new StubWorkspaceHost(),
+            schema,
+            new XmlDiagnosticsHandlerRegistry([]),
+            new StubDocumentFactProducer(),
+            new StubIndexFactProducer(),
+            new StubStoryFactProducer(),
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            registry,
+            new FileHelper(new MockFileSystem()));
+    }
 }
 
 file sealed class StubHardcodedSchemaProvider : ISchemaProvider
@@ -321,6 +359,13 @@ file sealed class StubIndexService : IGameIndexService
         ImmutableDictionary<string, ImmutableArray<string>> bones)
     {
     }
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
 
     public IDisposable BeginBulkUpdate()
     {
@@ -355,13 +400,42 @@ file sealed class StubFileTypeRegistry : IFileTypeRegistry
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => new Dictionary<string, ImmutableArray<string>>();
 }
 
+file sealed class StubFileTypeRegistryWithTypes : IFileTypeRegistry
+{
+    private readonly Dictionary<string, ImmutableArray<string>> _types;
+
+    public StubFileTypeRegistryWithTypes(string uri, string[] types)
+    {
+        _types = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase)
+        {
+            [uri] = types.ToImmutableArray()
+        };
+    }
+
+    public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+    {
+        return _types.TryGetValue(normalizedPath, out var types) ? types : ImmutableArray<string>.Empty;
+    }
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string normalizedPath)
+    {
+    }
+
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
+        new Dictionary<string, ImmutableArray<string>>(_types);
+}
+
 file sealed class StubWorkspaceHost : IGameWorkspaceHost
 {
     private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-    public void AddOrUpdate(string uri, string text, int version)
+    public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
     {
-        _docs[uri] = new TrackedDocument(uri, text, version);
+        _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
     }
 
     public void Remove(string uri)

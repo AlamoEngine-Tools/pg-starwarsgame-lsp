@@ -15,10 +15,17 @@ public interface IXmlDiagnosticsHandler
 
     /// <summary>
     ///     The <see cref="XmlValueType" /> this handler validates, or <c>null</c> if the handler
-    ///     is not scoped to a single value type (e.g. structural or named-override handlers).
-    ///     Used by coverage checks to verify that every value type has at least one validator.
+    ///     covers multiple types or is not scoped to a single value type.
+    ///     Prefer <see cref="HandledValueTypes" /> for coverage checks.
     /// </summary>
     XmlValueType? HandledValueType => null;
+
+    /// <summary>
+    ///     All <see cref="XmlValueType" />s this handler validates. Defaults to
+    ///     a single-element array when <see cref="HandledValueType" /> is non-null, or empty otherwise.
+    ///     Override in handlers that cover more than one value type.
+    /// </summary>
+    IEnumerable<XmlValueType> HandledValueTypes => HandledValueType.HasValue ? [HandledValueType.Value] : [];
 
     IEnumerable<XmlDiagnosticResult> Handle(XmlFact fact, DiagnosticsContext ctx);
 }

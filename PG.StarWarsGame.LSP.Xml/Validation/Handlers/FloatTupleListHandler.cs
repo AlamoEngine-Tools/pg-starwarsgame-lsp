@@ -21,7 +21,7 @@ public sealed partial class FloatTupleListHandler : SingleValueTypeHandlerBase
                     $"'' is not a valid float tuple list for <{fact.Tag.Tag}>.")
             ];
 
-        var parts = Separator().Split(trimmed);
+        var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
         if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))
             return
             [
