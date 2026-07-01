@@ -857,6 +857,12 @@ public sealed class WorkspaceIndexerTest
             remove { }
         }
 
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
