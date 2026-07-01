@@ -43,6 +43,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     public override async Task<Unit> Handle(DidChangeWatchedFilesParams request, CancellationToken ct)
     {
         using var bulk = _indexService.BeginBulkUpdate();
+        var localisationTextChanged = false;
         foreach (var change in request.Changes)
         {
             var uri = _fileHelper.NormalizeUri(change.Uri.ToString());
@@ -54,13 +55,24 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 continue;
             }
 
+            var path = _fileHelper.FileUriToPath(uri);
+
+            // A changed/created/deleted file under any project layer's text root (csv/properties/
+            // loc-xml) needs a scoped localisation reload, never document indexing — no
+            // IGameDocumentParser understands those formats, so routing them through the generic
+            // path below is always a silent no-op. Batch to one reload per notification below.
+            if (path is not null && IsUnderTextRoot(path))
+            {
+                localisationTextChanged = true;
+                continue;
+            }
+
             if (change.Type == FileChangeType.Deleted)
             {
                 _indexService.RemoveDocument(uri);
                 continue;
             }
 
-            var path = _fileHelper.FileUriToPath(uri);
             if (path is null) continue;
 
             // A changed loose asset file re-globs the asset catalog from the last-scanned roots.
@@ -86,7 +98,27 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             }
         }
 
+        if (localisationTextChanged)
+            await _reloadService.ReloadLocalisationAsync(ct);
+
         return Unit.Value;
+    }
+
+    private bool IsUnderTextRoot(string path)
+    {
+        var textRoots = _reloadService.LastWorkspaceConfig?.TextRoots;
+        if (textRoots is null || textRoots.Count == 0) return false;
+
+        var fileUri = _fileHelper.PathToFileUri(path);
+        foreach (var root in textRoots)
+        {
+            var rootUri = _fileHelper.PathToFileUri(root);
+            var rootPrefix = rootUri.EndsWith('/') ? rootUri : rootUri + "/";
+            if (fileUri.StartsWith(rootPrefix, StringComparison.Ordinal))
+                return true;
+        }
+
+        return false;
     }
 
     protected override DidChangeWatchedFilesRegistrationOptions CreateRegistrationOptions(
@@ -97,7 +129,9 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             Watchers = new Container<LspFileSystemWatcher>(
                 new LspFileSystemWatcher { GlobPattern = "**/*.xml" },
                 new LspFileSystemWatcher { GlobPattern = "**/*.lua" },
-                new LspFileSystemWatcher { GlobPattern = "**/*.pgproj" })
+                new LspFileSystemWatcher { GlobPattern = "**/*.pgproj" },
+                new LspFileSystemWatcher { GlobPattern = "**/*.csv" },
+                new LspFileSystemWatcher { GlobPattern = "**/*.properties" })
         };
     }
 }

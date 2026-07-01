@@ -3,4 +3,7 @@
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
-public sealed record LocProjectInfo(string Label, string FilePath, string ResourceType);
+// ProjectName/Rank identify which .pgproj layer (root or dependency) this file belongs to —
+// Label alone can collide across layers (e.g. two projects both using "MasterTextFile.csv").
+public sealed record LocProjectInfo(
+    string Label, string FilePath, string ResourceType, string ProjectName, int Rank);

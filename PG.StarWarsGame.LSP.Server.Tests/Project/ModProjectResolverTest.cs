@@ -129,12 +129,12 @@ public sealed class ModProjectResolverTest
     }
 
     [Fact]
-    public void Resolve_TextEntries_MapToTextRoots()
+    public void Resolve_LocalisationDirectory_MapsToTextRoots()
     {
         const string json = """
                             {
                               "modinfo": { "name": "Root" },
-                              "directories": { "text": ["data/text"] }
+                              "localisation": { "type": "CSV", "directory": "data/text" }
                             }
                             """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -154,10 +154,7 @@ public sealed class ModProjectResolverTest
         const string json = """
                             {
                               "modinfo": { "name": "Root" },
-                              "directories": {
-                                "text": ["data/text"],
-                                "textResourceType": "dat"
-                              }
+                              "localisation": { "type": "DAT", "directory": "data/text" }
                             }
                             """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -168,7 +165,7 @@ public sealed class ModProjectResolverTest
 
         var config = resolver.Resolve(RootPath, root);
 
-        Assert.Equal("dat", config.TextResourceType);
+        Assert.Equal("DAT", config.TextResourceType);
     }
 
     [Fact]
@@ -177,13 +174,13 @@ public sealed class ModProjectResolverTest
         const string depJson = """
                                {
                                  "modinfo": { "name": "Dep" },
-                                 "directories": { "text": ["data/text"], "textResourceType": "dat" }
+                                 "localisation": { "type": "DAT", "directory": "data/text" }
                                }
                                """;
         const string rootJson = """
                                 {
                                   "modinfo": { "name": "Root" },
-                                  "directories": { "text": ["data/text"], "textResourceType": "csv" },
+                                  "localisation": { "type": "CSV", "directory": "data/text" },
                                   "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
                                 }
                                 """;
@@ -196,7 +193,7 @@ public sealed class ModProjectResolverTest
 
         var config = resolver.Resolve(RootPath, root);
 
-        Assert.Equal("csv", config.TextResourceType);
+        Assert.Equal("CSV", config.TextResourceType);
     }
 
     [Fact]
@@ -205,7 +202,7 @@ public sealed class ModProjectResolverTest
         const string json = """
                             {
                               "modinfo": { "name": "Root" },
-                              "directories": { "text": ["data/text"] }
+                              "directories": { "xml": ["data/xml"] }
                             }
                             """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -220,12 +217,33 @@ public sealed class ModProjectResolverTest
     }
 
     [Fact]
+    public void Resolve_NoLocalisationNode_TextRootsEmpty()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Root" },
+                              "directories": { "xml": ["data/xml"] }
+                            }
+                            """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new(json)
+        });
+        var (resolver, root) = Build(fs);
+
+        var config = resolver.Resolve(RootPath, root);
+
+        Assert.Empty(config.TextRoots);
+    }
+
+    [Fact]
     public void Resolve_SingleProject_EmitsOneLayerRankZero()
     {
         const string json = """
                             {
                               "name": "Root",
-                              "directories": { "xml": ["data/xml"], "textResourceType": "csv" }
+                              "directories": { "xml": ["data/xml"] },
+                              "localisation": { "type": "CSV", "directory": "data/text" }
                             }
                             """;
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -240,7 +258,7 @@ public sealed class ModProjectResolverTest
         Assert.Equal(0, layer.Rank);
         Assert.Equal("Root", layer.Name);
         Assert.Contains(Abs(RootDir, "data/xml"), layer.XmlDirectories);
-        Assert.Equal("csv", layer.TextResourceType);
+        Assert.Equal("CSV", layer.TextResourceType);
     }
 
     [Fact]
@@ -249,15 +267,15 @@ public sealed class ModProjectResolverTest
         const string depJson = """
                                {
                                  "name": "Dep",
-                                 "directories": {
-                                   "xml": ["data/xml"], "text": ["data/text"], "textResourceType": "csv"
-                                 }
+                                 "directories": { "xml": ["data/xml"] },
+                                 "localisation": { "type": "CSV", "directory": "data/text" }
                                }
                                """;
         const string rootJson = """
                                 {
                                   "name": "Root",
-                                  "directories": { "xml": ["data/xml"], "textResourceType": "xml" },
+                                  "directories": { "xml": ["data/xml"] },
+                                  "localisation": { "type": "XML", "directory": "data/text" },
                                   "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
                                 }
                                 """;
@@ -275,12 +293,12 @@ public sealed class ModProjectResolverTest
         Assert.Equal("Dep", config.Layers[0].Name);
         // The dependency keeps its OWN resource type — not collapsed to the root's. This is the
         // fix for dependency .csv text being skipped when the root declares a different type.
-        Assert.Equal("csv", config.Layers[0].TextResourceType);
+        Assert.Equal("CSV", config.Layers[0].TextResourceType);
         Assert.Contains(Abs(DepDir, "data/text"), config.Layers[0].TextRoots);
 
         Assert.Equal(1, config.Layers[1].Rank);
         Assert.Equal("Root", config.Layers[1].Name);
-        Assert.Equal("xml", config.Layers[1].TextResourceType);
+        Assert.Equal("XML", config.Layers[1].TextResourceType);
     }
 
     private static (ModProjectResolver Resolver, ModProjectFile Root) Build(MockFileSystem fs)

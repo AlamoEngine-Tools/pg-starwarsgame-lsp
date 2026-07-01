@@ -25,4 +25,10 @@ public interface IModProjectReloadService
 
     // Re-load using the workspace roots from the last LoadAsync call. Called on .pgproj file change.
     Task ReloadAsync(CancellationToken ct);
+
+    // Re-runs only the localisation load against the last resolved WorkspaceConfiguration — skips
+    // the full XML/Lua/asset/bone/enum rescan. For frequent, localisation-only triggers (grid
+    // edits, watched text-file changes) where a full ReloadAsync would be needlessly expensive.
+    // No-op (logged) if LoadAsync hasn't run yet.
+    Task ReloadLocalisationAsync(CancellationToken ct);
 }

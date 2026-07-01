@@ -18,7 +18,7 @@ public sealed class LocalisationProjectRegistryTest
     public void Set_SingleProject_ProjectIsReturned()
     {
         var registry = new LocalisationProjectRegistry();
-        var info = new LocProjectInfo("MasterTextFile.csv", "/mod/Data/Text/MasterTextFile.csv", "Csv");
+        var info = new LocProjectInfo("MasterTextFile.csv", "/mod/Data/Text/MasterTextFile.csv", "Csv", "Root", 0);
 
         registry.Set([info]);
 
@@ -34,8 +34,8 @@ public sealed class LocalisationProjectRegistryTest
         var registry = new LocalisationProjectRegistry();
         var projects = new[]
         {
-            new LocProjectInfo("a.csv", "/mod/a.csv", "Csv"),
-            new LocProjectInfo("b.csv", "/mod/b.csv", "Csv")
+            new LocProjectInfo("a.csv", "/mod/a.csv", "Csv", "Root", 0),
+            new LocProjectInfo("b.csv", "/mod/b.csv", "Csv", "Root", 0)
         };
 
         registry.Set(projects);
@@ -47,7 +47,7 @@ public sealed class LocalisationProjectRegistryTest
     public void Set_ReplacesExistingProjects()
     {
         var registry = new LocalisationProjectRegistry();
-        registry.Set([new LocProjectInfo("first.csv", "/mod/first.csv", "Csv")]);
+        registry.Set([new LocProjectInfo("first.csv", "/mod/first.csv", "Csv", "Root", 0)]);
         registry.Set([]);
 
         Assert.Empty(registry.Projects);

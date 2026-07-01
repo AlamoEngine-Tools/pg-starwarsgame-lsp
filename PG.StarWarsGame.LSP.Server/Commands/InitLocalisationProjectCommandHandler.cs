@@ -9,12 +9,10 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
-using PG.StarWarsGame.Localisation.IO.Csv;
-using PG.StarWarsGame.Localisation.IO.Properties;
-using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Commands;
@@ -24,83 +22,83 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     public const string CommandName = "aet-eaw-edit.lsp.initLocalisationProject";
 
     private readonly IBaselineTranslationProvider _baselineProvider;
-    private readonly ICsvTranslationExporter _csvExporter;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
+    private readonly IModProjectFileWriter _fileWriter;
     private readonly ILanguageService _langService;
     private readonly ILogger<InitLocalisationProjectCommandHandler> _logger;
-    private readonly IPropertiesTranslationExporter _nlsExporter;
     private readonly IModProjectReloadService _reloadService;
-    private readonly IXmlTranslationExporter _xmlExporter;
+    private readonly ILocalisationSeedFileWriter _seedWriter;
 
     public InitLocalisationProjectCommandHandler(
         IBaselineTranslationProvider baselineProvider,
-        ICsvTranslationExporter csvExporter,
-        IXmlTranslationExporter xmlExporter,
-        IPropertiesTranslationExporter nlsExporter,
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
         IFileHelper fileHelper,
         IModProjectReloadService reloadService,
+        IModProjectFileWriter fileWriter,
+        ILocalisationSeedFileWriter seedWriter,
         ILogger<InitLocalisationProjectCommandHandler> logger)
     {
         _baselineProvider = baselineProvider;
-        _csvExporter = csvExporter;
-        _xmlExporter = xmlExporter;
-        _nlsExporter = nlsExporter;
         _factory = factory;
         _langService = langService;
         _fileHelper = fileHelper;
         _reloadService = reloadService;
+        _fileWriter = fileWriter;
+        _seedWriter = seedWriter;
         _logger = logger;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        if (request.Arguments?.FirstOrDefault() is not JObject args)
-        {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject invoked without arguments.");
-            return Unit.Value;
-        }
-
-        var format = args.Value<string>("format");
-        if (string.IsNullOrWhiteSpace(format))
-        {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: missing format argument.");
-            return Unit.Value;
-        }
-
-        var fileName = FormatToFilename(format);
-        if (fileName is null)
-        {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: unsupported format '{Format}'.", format);
-            return Unit.Value;
-        }
-
         var fs = _fileHelper.FileSystem;
-        var textRoots = _reloadService.LastWorkspaceConfig?.TextRoots ?? [];
-        string targetDir;
-        if (textRoots.Count == 1)
-        {
-            targetDir = textRoots[0];
-        }
-        else if (textRoots.Count > 1)
-        {
-            var workspaceRoot = _reloadService.LastWorkspaceRoots?.FirstOrDefault();
-            if (workspaceRoot is null)
-            {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.initLocalisationProject: multiple text roots but no workspace root available.");
-                return Unit.Value;
-            }
+        var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
+            .OrderByDescending(l => l.Rank).FirstOrDefault();
 
-            targetDir = fs.Path.Combine(workspaceRoot, "Data", "Text");
+        string format;
+        string targetDir;
+        string? bootstrapDirectory = null;
+
+        if (rootLayer is { TextResourceType: { } rootType, TextRoots.Count: > 0 })
+        {
+            // The root .pgproj already declares a localisation node — it wins over any
+            // client-supplied format/directory, which are ignored entirely.
+            format = rootType;
+            targetDir = rootLayer.TextRoots[0];
         }
         else
         {
-            _logger.LogWarning(
-                "aet-eaw-edit.lsp.initLocalisationProject: no text directories declared in the project; " +
-                "add a 'text' directory to the .pgproj before initialising a localisation project.");
+            // Bootstrap case: no existing localisation config. Both format and directory must
+            // come from the client (it prompts using the VS Code setting only as a last resort).
+            var args = request.Arguments?.FirstOrDefault() as JObject;
+            var clientFormat = args?.Value<string>("format");
+            var clientDirectory = args?.Value<string>("directory");
+            if (string.IsNullOrWhiteSpace(clientFormat) || string.IsNullOrWhiteSpace(clientDirectory))
+            {
+                _logger.LogWarning(
+                    "aet-eaw-edit.lsp.initLocalisationProject: no existing localisation config and no " +
+                    "format/directory provided to bootstrap one.");
+                return Unit.Value;
+            }
+
+            if (rootLayer?.ProjectPath is not { } pgprojPath)
+            {
+                _logger.LogWarning(
+                    "aet-eaw-edit.lsp.initLocalisationProject: no .pgproj found; cannot bootstrap a " +
+                    "localisation project.");
+                return Unit.Value;
+            }
+
+            format = clientFormat;
+            bootstrapDirectory = clientDirectory;
+            targetDir = fs.Path.Combine(fs.Path.GetDirectoryName(pgprojPath)!, clientDirectory);
+        }
+
+        var fileName = LocalisationFormatUtility.ToSeedFileName(format);
+        if (fileName is null)
+        {
+            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: unsupported format '{Format}'.", format);
             return Unit.Value;
         }
 
@@ -125,38 +123,30 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         foreach (var kv in entry.Translations)
             merged.SetTranslation(entry.Key, kv.Key, kv.Value);
 
-        var content = format.ToLowerInvariant() switch
-        {
-            "csv" => _csvExporter.Export(merged),
-            "xml" => _xmlExporter.Export(merged).ToString(),
-            "nls" => _nlsExporter.Export(merged, _langService.Default),
-            _ => null
-        };
-
-        if (content is null)
+        var writtenPath = await _seedWriter.WriteAsync(merged, format, targetDir, ct);
+        if (writtenPath is null)
         {
             _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: unsupported format '{Format}'.", format);
             return Unit.Value;
         }
 
-        fs.Directory.CreateDirectory(targetDir);
-        await fs.File.WriteAllTextAsync(targetPath, content, ct);
-        _logger.LogInformation("aet-eaw-edit.lsp.initLocalisationProject: created '{Path}'.", targetPath);
+        _logger.LogInformation("aet-eaw-edit.lsp.initLocalisationProject: created '{Path}'.", writtenPath);
 
-        await _reloadService.ReloadAsync(ct);
+        if (bootstrapDirectory is not null)
+        {
+            // Bootstrapped: persist the new localisation node so the project is self-describing
+            // from now on, then fully re-resolve the .pgproj (a scoped reload wouldn't pick up
+            // the new config since it reuses the stale WorkspaceConfiguration).
+            await _fileWriter.SetLocalisationAsync(
+                rootLayer!.ProjectPath!, format.ToUpperInvariant(), bootstrapDirectory, ct);
+            await _reloadService.ReloadAsync(ct);
+        }
+        else
+        {
+            await _reloadService.ReloadLocalisationAsync(ct);
+        }
 
         return Unit.Value;
-    }
-
-    private static string? FormatToFilename(string format)
-    {
-        return format.ToLowerInvariant() switch
-        {
-            "csv" => "MasterTextFile.csv",
-            "xml" => "MasterTextFile.xml",
-            "nls" => "MasterTextFile.properties",
-            _ => null
-        };
     }
 
     protected override ExecuteCommandRegistrationOptions CreateRegistrationOptions(

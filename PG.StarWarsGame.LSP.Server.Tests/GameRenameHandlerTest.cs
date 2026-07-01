@@ -84,6 +84,7 @@ public sealed class GameRenameHandlerTest
     {
         public GameIndex Current { get; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

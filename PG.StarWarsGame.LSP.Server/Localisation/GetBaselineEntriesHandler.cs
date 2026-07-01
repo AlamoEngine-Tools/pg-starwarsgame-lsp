@@ -15,15 +15,21 @@ public sealed class GetBaselineEntriesHandler
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly ILanguageService _langService;
+    private readonly ILocalisationLayerRegistry _layerRegistry;
+    private readonly ILocalisationProjectRegistry _projectRegistry;
 
     public GetBaselineEntriesHandler(
         IBaselineTranslationProvider baselineProvider,
         ILanguageService langService,
-        ITranslationDatabaseFactory factory)
+        ITranslationDatabaseFactory factory,
+        ILocalisationProjectRegistry projectRegistry,
+        ILocalisationLayerRegistry layerRegistry)
     {
         _baselineProvider = baselineProvider;
         _langService = langService;
         _factory = factory;
+        _projectRegistry = projectRegistry;
+        _layerRegistry = layerRegistry;
     }
 
     public Task<GetBaselineEntriesResult> Handle(
@@ -34,12 +40,8 @@ public sealed class GetBaselineEntriesHandler
         var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
 
         var merged = _factory.CreateKeyed(languages);
-        foreach (var entry in eawDb)
-        foreach (var kv in entry.Translations)
-            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
-        foreach (var entry in focDb)
-        foreach (var kv in entry.Translations)
-            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        LocalisationLayerMerge.MergeBaselineAndLowerLayers(
+            merged, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
 
         var entries = merged
             .Select(e => new BaselineEntry(
@@ -48,5 +50,16 @@ public sealed class GetBaselineEntriesHandler
             .ToList();
 
         return Task.FromResult(new GetBaselineEntriesResult(entries));
+    }
+
+    // The rank of the layer that owns projectFilePath — everything strictly below it (dependency
+    // layers) is "inherited" for that file. Null (baseline only) when no file was specified or it
+    // isn't a currently registered localisation project file.
+    private int? ResolveBelowRank(string? projectFilePath)
+    {
+        if (string.IsNullOrEmpty(projectFilePath)) return null;
+        var project = _projectRegistry.Projects.FirstOrDefault(
+            p => string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
+        return project?.Rank;
     }
 }

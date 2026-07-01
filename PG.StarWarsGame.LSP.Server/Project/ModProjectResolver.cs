@@ -47,7 +47,9 @@ public sealed class ModProjectResolver
 
             var layerXml = file.Directories.Xml.Select(d => Combine(projectDir, d)).ToList();
             var layerScripts = file.Directories.Scripts.Select(d => Combine(projectDir, d)).ToList();
-            var layerText = file.Directories.Text.Select(d => Combine(projectDir, d)).ToList();
+            var layerText = file.Localisation is { } loc
+                ? new List<string> { Combine(projectDir, loc.Directory) }
+                : [];
             var layerAssets = file.Directories.Art.Select(d => Combine(projectDir, d))
                 .Concat(file.Directories.Audio.Select(d => Combine(projectDir, d))).ToList();
 
@@ -57,13 +59,13 @@ public sealed class ModProjectResolver
             assets.AddRange(layerAssets);
 
             // Root project is last in the ordered list so its value overwrites dependencies.
-            if (file.Directories.TextResourceType is not null)
-                textResourceType = file.Directories.TextResourceType;
+            if (file.Localisation is not null)
+                textResourceType = file.Localisation.Type;
 
             // Per-layer TextResourceType is preserved so each project's localisation loads with its
             // own format (a dependency's .csv must not be skipped because the root uses another type).
             layers.Add(new ProjectLayer(rank, file.Name, layerXml, layerScripts, layerText, layerAssets,
-                file.Directories.TextResourceType, path));
+                file.Localisation?.Type, path));
         }
 
         return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType) { Layers = layers };

@@ -311,6 +311,7 @@ public sealed class XmlDefinitionHandlerTest
     {
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

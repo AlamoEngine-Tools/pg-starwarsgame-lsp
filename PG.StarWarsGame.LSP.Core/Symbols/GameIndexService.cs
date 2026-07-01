@@ -36,6 +36,7 @@ public sealed class GameIndexService : IGameIndexService
     public GameIndex Current => Volatile.Read(ref _current);
 
     public event Action<GameIndex>? IndexChanged;
+    public event Action<ILocalisationIndex>? LocalisationChanged;
 
     public IDisposable BeginBulkUpdate()
     {
@@ -191,6 +192,7 @@ public sealed class GameIndexService : IGameIndexService
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         RaiseIndexChanged(Volatile.Read(ref _current));
+        LocalisationChanged?.Invoke(index);
     }
 
     public void ApplyAssetFiles(IAssetFileIndex index)

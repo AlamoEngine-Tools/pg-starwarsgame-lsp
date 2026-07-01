@@ -40,4 +40,11 @@ public interface IGameIndexService
     // Fires on the thread that completes a CAS write. Subscribers must not do heavy work
     // inline; queue a background diagnostics publish instead.
     event Action<GameIndex>? IndexChanged;
+
+    // Fires only on ApplyLocalisation — never on document/asset/enum/baseline updates. Lets
+    // subscribers that only care about localisation (e.g. the client-facing
+    // aet/localisationIndexUpdated notification) avoid reacting to unrelated workspace churn.
+    // Not suppressed by BeginBulkUpdate: localisation applies are coarse-grained (once per
+    // reload), so the O(N²) concern that suppression exists for doesn't apply here.
+    event Action<ILocalisationIndex>? LocalisationChanged;
 }

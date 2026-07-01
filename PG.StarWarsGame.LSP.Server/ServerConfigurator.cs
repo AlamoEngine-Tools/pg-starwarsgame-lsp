@@ -81,11 +81,17 @@ public static class ServerConfigurator
             .WithHandler<ReloadProjectCommandHandler>()
             .WithHandler<NewModProjectCommandHandler>()
             .WithHandler<InitLocalisationProjectCommandHandler>()
+            .WithHandler<ImportLocalisationProjectCommandHandler>()
             .WithHandler<CreateLocalisationKeyCommandHandler>()
             .WithHandler<GetLocalisationProjectsHandler>()
+            .WithHandler<GetRootLocalisationConfigHandler>()
             .WithHandler<GetBaselineEntriesHandler>()
             .WithHandler<GetLanguagesHandler>()
             .WithHandler<ExportLocalisationToDatHandler>()
+            .WithHandler<GetLocalisationEntriesHandler>()
+            .WithHandler<SetLocalisationEntryHandler>()
+            .WithHandler<DeleteLocalisationEntryHandler>()
+            .WithHandler<AddLocalisationLanguageHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
             .WithServices(services =>
             {
@@ -124,6 +130,9 @@ public static class ServerConfigurator
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
                 services.AddSingleton<IProjectConfigurationResolver, ProjectConfigurationResolver>();
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
+                services.AddSingleton<IModProjectFileWriter, ModProjectFileWriter>();
+                services.AddSingleton<ILocalisationSeedFileWriter, LocalisationSeedFileWriter>();
+                services.AddSingleton<ILocalisationEntryWriter, LocalisationEntryWriter>();
 
                 // Linear startup pipeline and its stage collaborators.
                 services.AddSingleton<ISchemaBootstrapper, SchemaBootstrapper>();
@@ -149,6 +158,9 @@ public static class ServerConfigurator
                 services.AddSingleton<LocalisationProjectRegistry>();
                 services.AddSingleton<ILocalisationProjectRegistry>(sp =>
                     sp.GetRequiredService<LocalisationProjectRegistry>());
+                services.AddSingleton<LocalisationLayerRegistry>();
+                services.AddSingleton<ILocalisationLayerRegistry>(sp =>
+                    sp.GetRequiredService<LocalisationLayerRegistry>());
                 services.AddSingleton<ILocalisationLoader, LocalisationLoader>();
                 services.AddSingleton<LocalisationIndexChangedNotifier>(sp =>
                     new LocalisationIndexChangedNotifier(

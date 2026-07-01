@@ -93,6 +93,34 @@ public sealed class LocalisationIndexOnGameIndexTest
         Assert.False(service.Current.Localisation.ContainsKey("OLD_KEY"));
     }
 
+    // ── LocalisationChanged (scoped event, decoupled from the general IndexChanged) ──────────
+
+    [Fact]
+    public void ApplyLocalisation_FiresLocalisationChanged()
+    {
+        var service = BuildService();
+        ILocalisationIndex? received = null;
+        service.LocalisationChanged += idx => received = idx;
+
+        var loc = new StubLocalisationIndex(["TEXT_TEST"]);
+        service.ApplyLocalisation(loc);
+
+        Assert.NotNull(received);
+        Assert.True(received!.ContainsKey("TEXT_TEST"));
+    }
+
+    [Fact]
+    public void ApplyBaseline_DoesNotFireLocalisationChanged()
+    {
+        var service = BuildService();
+        var fired = false;
+        service.LocalisationChanged += _ => fired = true;
+
+        service.ApplyBaseline(BaselineIndex.Empty);
+
+        Assert.False(fired);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static IGameIndexService BuildService()

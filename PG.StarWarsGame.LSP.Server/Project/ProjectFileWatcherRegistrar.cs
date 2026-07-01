@@ -9,9 +9,10 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 
 public static class ProjectFileWatcherRegistrar
 {
-    // Builds watched-file registration options from a workspace configuration. For Chunk 3 this
-    // intentionally produces flat blanket globs (no RelativePattern); per-role scoped watchers are
-    // a follow-up. *.pgproj is always registered so project-file changes trigger a reload.
+    // Builds watched-file registration options from a workspace configuration. This intentionally
+    // produces flat blanket globs (no RelativePattern); per-role scoped watchers are a follow-up.
+    // *.pgproj is always registered so project-file changes trigger a reload; *.csv/*.properties
+    // (plus *.xml, shared with game XML) cover localisation text-root changes.
     public static DidChangeWatchedFilesRegistrationOptions Build(WorkspaceConfiguration config)
     {
         _ = config;
@@ -20,7 +21,9 @@ public static class ProjectFileWatcherRegistrar
             Watchers = new Container<LspFileSystemWatcher>(
                 new LspFileSystemWatcher { GlobPattern = "**/*.xml" },
                 new LspFileSystemWatcher { GlobPattern = "**/*.lua" },
-                new LspFileSystemWatcher { GlobPattern = "**/*.pgproj" })
+                new LspFileSystemWatcher { GlobPattern = "**/*.pgproj" },
+                new LspFileSystemWatcher { GlobPattern = "**/*.csv" },
+                new LspFileSystemWatcher { GlobPattern = "**/*.properties" })
         };
     }
 }

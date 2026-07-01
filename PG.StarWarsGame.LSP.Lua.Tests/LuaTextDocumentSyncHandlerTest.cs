@@ -258,6 +258,12 @@ public sealed class LuaTextDocumentSyncHandlerTest
             remove { }
         }
 
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             UpdateCalls.Add(new UpdateCall(uri, text, version));

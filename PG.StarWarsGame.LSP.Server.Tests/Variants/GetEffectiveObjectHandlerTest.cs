@@ -187,6 +187,12 @@ public sealed class GetEffectiveObjectHandlerTest
             remove { }
         }
 
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
         private sealed class NoopScope : IDisposable
         {
             public void Dispose()

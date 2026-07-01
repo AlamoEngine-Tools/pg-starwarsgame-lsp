@@ -303,38 +303,119 @@ public sealed class ModProjectLoaderTest
     }
 
     [Fact]
-    public void Load_ParsesTextResourceType()
+    public void Load_ParsesLocalisationNode()
     {
         const string json = """
                             {
                               "modinfo": { "name": "Mod" },
-                              "directories": {
-                                "text": ["data/text"],
-                                "textResourceType": "dat"
-                              }
+                              "localisation": { "type": "DAT", "directory": "data/text" }
                             }
                             """;
         var loader = Build(json, out _);
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal("dat", model.Directories.TextResourceType);
+        Assert.Equal("DAT", model.Localisation!.Type);
+        Assert.Equal("data/text", model.Localisation.Directory);
     }
 
     [Fact]
-    public void Load_AbsentTextResourceType_IsNull()
+    public void Load_LocalisationNode_TypeIsCaseInsensitive_NormalizedToUppercase()
     {
         const string json = """
                             {
                               "modinfo": { "name": "Mod" },
-                              "directories": { "text": ["data/text"] }
+                              "localisation": { "type": "csv", "directory": "data/text" }
                             }
                             """;
         var loader = Build(json, out _);
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Null(model.Directories.TextResourceType);
+        Assert.Equal("CSV", model.Localisation!.Type);
+    }
+
+    [Fact]
+    public void Load_LocalisationNode_DirectoryNormalizedToLowercaseForwardSlashes()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": { "type": "CSV", "directory": "Data\\Text" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal("data/text", model.Localisation!.Directory);
+    }
+
+    [Fact]
+    public void Load_AbsentLocalisationNode_IsNull()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "directories": { "xml": ["data/xml"] }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Null(model.Localisation);
+    }
+
+    [Fact]
+    public void Load_LocalisationNode_UnrecognisedType_ThrowsClearException()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": { "type": "TXT", "directory": "data/text" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("localisation.type", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("CSV", ex.Message);
+    }
+
+    [Fact]
+    public void Load_LocalisationNode_MissingDirectory_ThrowsClearException()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": { "type": "CSV" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("localisation.directory", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_OldDirectoriesTextShape_IgnoredNotError()
+    {
+        // Clean break: the old directories.text/textResourceType shape was removed in favour of
+        // the top-level "localisation" node. Old-shape files must not crash the server — they
+        // just silently stop configuring a text directory (System.Text.Json ignores unknown
+        // properties by default).
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "directories": { "text": ["data/text"], "textResourceType": "csv" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Null(model.Localisation);
     }
 
     [Fact]

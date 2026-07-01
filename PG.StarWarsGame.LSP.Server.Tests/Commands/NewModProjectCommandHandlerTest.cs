@@ -52,6 +52,8 @@ public sealed class NewModProjectCommandHandlerTest
         var model = loader.Load(pgprojPath);
         Assert.Equal("My Mod", model.Modinfo.Name);
         Assert.Equal(new[] { "data/xml" }, model.Directories.Xml);
+        Assert.Equal("CSV", model.Localisation!.Type);
+        Assert.Equal("data/text", model.Localisation.Directory);
     }
 
     [Fact]

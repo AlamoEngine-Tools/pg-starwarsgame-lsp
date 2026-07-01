@@ -220,6 +220,12 @@ public sealed class XmlInlayHintHandlerTest
             remove { }
         }
 
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;

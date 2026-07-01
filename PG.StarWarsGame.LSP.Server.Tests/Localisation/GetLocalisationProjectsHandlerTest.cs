@@ -23,8 +23,8 @@ public sealed class GetLocalisationProjectsHandlerTest
     {
         var registry = new LocalisationProjectRegistry();
         registry.Set([
-            new LocProjectInfo("a.csv", "/mod/a.csv", "Csv"),
-            new LocProjectInfo("b.csv", "/mod/b.csv", "Csv")
+            new LocProjectInfo("a.csv", "/mod/a.csv", "Csv", "Root", 0),
+            new LocProjectInfo("b.csv", "/mod/b.csv", "Csv", "Root", 0)
         ]);
         var handler = new GetLocalisationProjectsHandler(registry);
 
@@ -39,13 +39,13 @@ public sealed class GetLocalisationProjectsHandlerTest
     public async Task Handle_RegistryUpdated_ReturnsLatestProjects()
     {
         var registry = new LocalisationProjectRegistry();
-        registry.Set([new LocProjectInfo("first.csv", "/mod/first.csv", "Csv")]);
+        registry.Set([new LocProjectInfo("first.csv", "/mod/first.csv", "Csv", "Root", 0)]);
         var handler = new GetLocalisationProjectsHandler(registry);
 
         // Update registry after handler is created
         registry.Set([
-            new LocProjectInfo("second.csv", "/mod/second.csv", "Nls"),
-            new LocProjectInfo("third.csv", "/mod/third.csv", "Nls")
+            new LocProjectInfo("second.csv", "/mod/second.csv", "Nls", "Root", 0),
+            new LocProjectInfo("third.csv", "/mod/third.csv", "Nls", "Root", 0)
         ]);
 
         var result = await handler.Handle(new GetLocalisationProjectsParams(), CancellationToken.None);

@@ -3,9 +3,11 @@
 
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
+using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
@@ -22,12 +24,15 @@ public sealed class LocalisationLoader : ILocalisationLoader
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ILspConfigurationProvider _configProvider;
     private readonly ICsvTranslationImporter _csvImporter;
+    private readonly IDatFileService _datFileService;
+    private readonly IDatTranslationImporter _datImporter;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILanguageService _langService;
     private readonly ILogger<LocalisationLoader> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
+    private readonly LocalisationLayerRegistry _layerRegistry;
     private readonly LocalisationProjectRegistry _registry;
     private readonly IXmlTranslationImporter _xmlImporter;
 
@@ -37,11 +42,14 @@ public sealed class LocalisationLoader : ILocalisationLoader
         ICsvTranslationImporter csvImporter,
         IXmlTranslationImporter xmlImporter,
         IPropertiesTranslationImporter nlsImporter,
+        IDatTranslationImporter datImporter,
+        IDatFileService datFileService,
         ILanguageService langService,
         ILspConfigurationProvider configProvider,
         IFileHelper fileHelper,
         IGameIndexService indexService,
         LocalisationProjectRegistry registry,
+        LocalisationLayerRegistry layerRegistry,
         ILogger<LocalisationLoader> logger)
     {
         _baselineProvider = baselineProvider;
@@ -49,11 +57,14 @@ public sealed class LocalisationLoader : ILocalisationLoader
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
         _nlsImporter = nlsImporter;
+        _datImporter = datImporter;
+        _datFileService = datFileService;
         _langService = langService;
         _configProvider = configProvider;
         _fileHelper = fileHelper;
         _indexService = indexService;
         _registry = registry;
+        _layerRegistry = layerRegistry;
         _logger = logger;
     }
 
@@ -70,6 +81,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
 
         var registryEntries = new List<LocProjectInfo>();
         var layerDbs = new List<IKeyedTranslationDatabase>();
+        var layerEntries = new List<LocalisationLayerEntry>();
 
         // pgproj mode is driven by the resolved project layers (or flat TextRoots as a single
         // synthetic layer). Each layer is loaded with its OWN resource type so a dependency's CSV is
@@ -88,10 +100,12 @@ public sealed class LocalisationLoader : ILocalisationLoader
                 foreach (var path in paths)
                 {
                     await TryImportFileAsync(path, layerType, language!, db, ct);
-                    registryEntries.Add(new LocProjectInfo(Path.GetFileName(path), path, layerType));
+                    registryEntries.Add(
+                        new LocProjectInfo(Path.GetFileName(path), path, layerType, layer.Name, layer.Rank));
                 }
 
                 layerDbs.Add(db);
+                layerEntries.Add(new LocalisationLayerEntry(layer, db));
             }
         }
         else
@@ -106,7 +120,8 @@ public sealed class LocalisationLoader : ILocalisationLoader
                 foreach (var path in sourcePaths)
                 {
                     await TryImportFileAsync(path, resourceType, language!, db, ct);
-                    registryEntries.Add(new LocProjectInfo(Path.GetFileName(path), path, resourceType));
+                    registryEntries.Add(
+                        new LocProjectInfo(Path.GetFileName(path), path, resourceType, "workspace", 0));
                 }
 
                 layerDbs.Add(db);
@@ -114,6 +129,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         }
 
         _registry.Set(registryEntries);
+        _layerRegistry.Set(layerEntries);
 
         // Workspace layers (highest precedence first) shadow the shipped baseline.
         var databases = new List<IKeyedTranslationDatabase>(layerDbs) { eawDb, focDb };
@@ -156,6 +172,32 @@ public sealed class LocalisationLoader : ILocalisationLoader
         string path, string resourceType, IAlamoLanguageDefinition language,
         IKeyedTranslationDatabase db, CancellationToken ct)
     {
+        // DAT is binary — never goes through the text-read path below. It's also one file per
+        // language with no self-describing language tag, so the language comes from the file
+        // name, not the workspace default passed in above (used by CSV/XML/NLS only).
+        if (string.Equals(resourceType, "dat", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!DatFileNameLanguageResolver.TryResolve(path, _langService, out var datLanguage))
+            {
+                _logger.LogWarning(
+                    "Could not determine a language from DAT file name {Path} " +
+                    "(expected '..._<LANGUAGE>.dat'); skipping.", path);
+                return;
+            }
+
+            try
+            {
+                using var datFile = _datFileService.Load(path);
+                _datImporter.Import(datFile.Content, datLanguage!, db);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to import DAT localisation file {Path}", path);
+            }
+
+            return;
+        }
+
         string content;
         try
         {
@@ -188,10 +230,6 @@ public sealed class LocalisationLoader : ILocalisationLoader
                         _nlsImporter.Import(reader, language, db);
                     }
 
-                    break;
-                case "dat":
-                    _logger.LogWarning(
-                        "DAT localisation workspace files are not yet supported; skipping {Path}", path);
                     break;
                 default:
                     _logger.LogWarning("Unknown localisation ResourceType '{Type}'; skipping {Path}",

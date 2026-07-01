@@ -329,6 +329,7 @@ file sealed class StubIndexService : IGameIndexService
 {
     public GameIndex Current => GameIndex.Empty;
     public event Action<GameIndex>? IndexChanged;
+    public event Action<ILocalisationIndex>? LocalisationChanged;
 
     public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
     {

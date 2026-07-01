@@ -1294,6 +1294,7 @@ public sealed class XmlCompletionHandlerTest
 
         public GameIndex Current { get; }
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
