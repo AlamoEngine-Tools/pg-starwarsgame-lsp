@@ -51,12 +51,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
             {
                 // Baseline members carry a non-openable game-relative path — skip them.
                 if (m.MemberOrigin is not FileOrigin { IsNavigable: true } fo) continue;
-                var col = fo.Column ?? 0;
-                locations.Add(new Location
-                {
-                    Uri = fo.Uri,
-                    Range = new LspRange(new Position(fo.Line, col), new Position(fo.Line, col))
-                });
+                locations.Add(fo.ToLspLocation());
             }
 
             _logger.LogDebug("Find-refs (group): {Id} → {Count} member(s)", id, locations.Count);
@@ -77,11 +72,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
             foreach (var s in defs)
             {
                 if (s.Origin is not FileOrigin { IsNavigable: true } fo) continue;
-                locations.Add(new Location
-                {
-                    Uri = fo.Uri,
-                    Range = new LspRange(new Position(fo.Line, fo.Column ?? 0), new Position(fo.Line, fo.Column ?? 0))
-                });
+                locations.Add(fo.ToLspLocation());
             }
 
         _logger.LogDebug("Find-refs: {Id} → {Count} location(s)", id, locations.Count);

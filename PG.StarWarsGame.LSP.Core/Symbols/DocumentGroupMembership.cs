@@ -5,8 +5,8 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 
 /// <summary>
 ///     Runtime-only (not serialized) pairing of a <see cref="GroupMembership" /> with the source-text span
-///     of the group-key tag value. The tag span is used by <c>XmlPositionResolver</c> to detect when the
-///     cursor is positioned on a group-key value; <see cref="Membership" /> supplies the navigation target.
+///     of the group-key tag value. The tag span is used by <see cref="DocumentPositionResolver" /> to detect
+///     when the cursor is positioned on a group-key value; <see cref="Membership" /> supplies the navigation target.
 /// </summary>
 public sealed record DocumentGroupMembership(
     GroupMembership Membership,

@@ -8,7 +8,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -59,15 +58,9 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
             return Task.FromResult<LocationOrLocationLinks?>(null);
         }
 
-        var location = new Location
-        {
-            Uri = fo.Uri,
-            Range = new LspRange(new Position(fo.Line, fo.Column ?? 0), new Position(fo.Line, fo.Column ?? 0))
-        };
-
         _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
         return Task.FromResult<LocationOrLocationLinks?>(
-            new LocationOrLocationLinks(new LocationOrLocationLink(location)));
+            new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocation())));
     }
 
     private LocationOrLocationLinks? ResolveEnumDefinition(string id, GameIndex index)
@@ -84,15 +77,8 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         if (!valueMap.TryGetValue(valueName, out var origin) || !origin.IsNavigable)
             return null;
 
-        var location = new Location
-        {
-            Uri = origin.Uri,
-            Range = new LspRange(new Position(origin.Line, origin.Column ?? 0),
-                new Position(origin.Line, origin.Column ?? 0))
-        };
-
         _logger.LogDebug("Go-to-def (enum): {Id} → {Uri}:{Line}", id, origin.Uri, origin.Line);
-        return new LocationOrLocationLinks(new LocationOrLocationLink(location));
+        return new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocation()));
     }
 
     protected override DefinitionRegistrationOptions CreateRegistrationOptions(

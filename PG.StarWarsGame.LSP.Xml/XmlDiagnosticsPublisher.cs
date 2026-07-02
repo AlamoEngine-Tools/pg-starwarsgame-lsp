@@ -283,7 +283,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var length = result.OverrideLength ?? fact.Length;
         return new Diagnostic
         {
-            Severity = MapSeverity(result.Severity),
+            Severity = result.Severity.ToLsp(),
             Message = result.Message,
             Range = SafeRange(line, col, length),
             Source = AppProperties.LspServerId,
@@ -331,17 +331,5 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (result.RemoveRedundantOverride)
             obj["removeRedundantOverride"] = true;
         return obj;
-    }
-
-    private static DiagnosticSeverity? MapSeverity(XmlDiagnosticSeverity severity)
-    {
-        return severity switch
-        {
-            XmlDiagnosticSeverity.Error => DiagnosticSeverity.Error,
-            XmlDiagnosticSeverity.Warning => DiagnosticSeverity.Warning,
-            XmlDiagnosticSeverity.Information => DiagnosticSeverity.Information,
-            XmlDiagnosticSeverity.Hint => DiagnosticSeverity.Hint,
-            _ => throw new ArgumentOutOfRangeException(nameof(severity), severity, null)
-        };
     }
 }

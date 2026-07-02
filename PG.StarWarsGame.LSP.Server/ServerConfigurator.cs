@@ -58,6 +58,24 @@ public static class ServerConfigurator
                 .AddSerilog(dispose: true)
 #endif
                 )
+            // ── Two wiring conventions coexist below, deliberately ──────────────────
+            // Most capabilities (Sync, Completion, Definition, CodeAction, CodeLens,
+            // InlayHint) are "dual-registered": the Xml* and Lua* handler for a capability
+            // are both passed to .WithHandler<>(), and OmniSharp picks the right one per
+            // request using each handler's own DocumentSelector (ForLanguage("xml"/"lua")).
+            //
+            // Hover and Rename instead go through a single Game*Handler "router" (below)
+            // that holds both language providers and dispatches by file extension; the
+            // providers are registered as interfaces only (see WithServices) so DryIoc never
+            // sees two competing IHoverHandler/IRenameHandler registrations.
+            //
+            // These are not meant to converge. The router shape exists only because hover
+            // registration specifically produced a DryIoc conflict historically. An E2E test
+            // (DualRegistrationRoutingSmokeTest, added 2026-07-02) opens an XML and a Lua
+            // document in the same live server and proves Completion/Definition route to the
+            // correct language handler with no crosstalk under dual-registration — so that
+            // convention is equally safe for the capabilities that use it. If either
+            // convention needs to change, extend that test first as the regression gate.
             .WithHandler<LuaTextDocumentSyncHandler>()
             .WithHandler<LuaCompletionHandler>()
             .WithHandler<LuaCodeActionHandler>()
@@ -168,13 +186,14 @@ public static class ServerConfigurator
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<LocalisationIndexChangedNotifier>>()));
 
-                // GameHoverHandler routes by extension to one of these providers.
-                // Registered as interfaces only so DryIoc does not see them as competing IHoverHandler registrations.
+                // GameHoverHandler routes by extension to one of these providers. Registered as
+                // interfaces only so DryIoc does not see them as competing IHoverHandler
+                // registrations — see the router-vs-dual-registration note above .WithHandler<>().
                 services.AddSingleton<IXmlHoverProvider, XmlHoverHandler>();
                 services.AddSingleton<ILuaHoverProvider, LuaHoverHandler>();
 
-                // GameRenameHandler and GamePrepareRenameHandler route by extension to these providers.
-                // Registered as interfaces only — same pattern as hover to avoid competing OmniSharp registrations.
+                // GameRenameHandler and GamePrepareRenameHandler route by extension to these
+                // providers. Same router pattern as hover, for the same reason.
                 services.AddSingleton<IXmlRenameProvider, XmlRenameHandler>();
                 services.AddSingleton<ILuaRenameProvider, LuaRenameHandler>();
             })
