@@ -8,12 +8,10 @@ public sealed record DirectoryMap(
     IReadOnlyList<string> Scripts,
     IReadOnlyList<string> Art,
     IReadOnlyList<string> Audio,
-    IReadOnlyList<string> Text,
-    IReadOnlyList<string> Ai,
-    string? TextResourceType)
+    IReadOnlyList<string> Ai)
 {
     public DirectoryMap()
-        : this([], [], [], [], [], [], null)
+        : this([], [], [], [], [])
     {
     }
 }

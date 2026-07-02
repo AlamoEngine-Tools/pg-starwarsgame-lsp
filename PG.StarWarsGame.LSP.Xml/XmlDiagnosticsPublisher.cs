@@ -2,8 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
-using System.Xml;
-using System.Xml.Linq;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -79,7 +77,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         int debounceMs = 0,
         IXmlVariantFactProducer? variantProducer = null,
         IXmlLayerShadowFactProducer? shadowProducer = null)
-        : base(publish, indexService, workspaceHost, debounceMs)
+        : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
@@ -147,12 +145,16 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(text, uri));
 
+        var lines = text.Split('\n');
         var allDiags = new List<Diagnostic>();
         foreach (var fact in facts)
-        foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
-            allDiags.Add(ToLspDiagnostic(fact, result));
+        {
+            if (fact is XmlSymbolFact symbolFact && IsDuplicateSymbolSuppressed(lines, symbolFact.Line))
+                continue;
+            foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
+                allDiags.Add(ToLspDiagnostic(fact, result));
+        }
 
-        allDiags.AddRange(CollectEnumBoundaryDiagnostics(uri, text, index));
         allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, text, index));
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
@@ -173,97 +175,20 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         });
     }
 
-    internal IReadOnlyList<Diagnostic> CollectEnumBoundaryDiagnostics(
-        string documentUri, string text, GameIndex index)
-    {
-        var hardcoded = index.Baseline.HardcodedEnumValues;
-        if (hardcoded.IsEmpty) return [];
-        var uriPath = _fileHelper.NormalizeUri(documentUri);
-        if (!Path.GetFileName(uriPath).Equals("gameconstants.xml", StringComparison.OrdinalIgnoreCase)) return [];
-
-        XDocument doc;
-        try
-        {
-            doc = XDocument.Parse(text, LoadOptions.SetLineInfo);
-        }
-        catch
-        {
-            return [];
-        }
-
-        var diagnostics = new List<Diagnostic>();
-
-        foreach (var (enumName, tagName) in
-                 (IEnumerable<(string, string)>)[("DamageType", "Damage_Types"), ("ArmorType", "Armor_Types")])
-        {
-            if (!hardcoded.TryGetValue(enumName, out var knownHardcoded)) continue;
-            var knownSet = new HashSet<string>(knownHardcoded, StringComparer.OrdinalIgnoreCase);
-
-            var el = doc.Descendants(tagName).FirstOrDefault();
-            if (el is null) continue;
-
-            var pastBoundary = false;
-            foreach (var node in el.Nodes())
-            {
-                if (node is XComment c && IsBoundaryComment(c.Value))
-                {
-                    pastBoundary = true;
-                    continue;
-                }
-
-                if (!pastBoundary || node is not XText textNode) continue;
-
-                var li = (IXmlLineInfo)textNode;
-                EmitTokenDiagnostics(textNode.Value, li.LineNumber, li.LinePosition,
-                    knownSet, diagnostics);
-            }
-        }
-
-        return diagnostics;
-    }
-
-    private void EmitTokenDiagnostics(
-        string raw, int startLine, int startCol,
-        HashSet<string> knownSet, List<Diagnostic> diagnostics)
-    {
-        var lines = raw.Split('\n');
-        for (var li = 0; li < lines.Length; li++)
-        {
-            var line = lines[li].TrimEnd('\r');
-            var lineNumber = startLine + li;
-            var col = 0;
-
-            while (col < line.Length)
-            {
-                while (col < line.Length && char.IsWhiteSpace(line[col])) col++;
-                if (col >= line.Length) break;
-
-                var tokenStart = col;
-                while (col < line.Length && !char.IsWhiteSpace(line[col])) col++;
-                var token = line[tokenStart..col];
-
-                if (knownSet.Contains(token)) continue;
-
-                // 0-based column: first line of text node starts at startCol-1, subsequent at 0
-                var tokenCol0 = (li == 0 ? startCol - 1 : 0) + tokenStart;
-                var tokenLine0 = lineNumber - 1;
-                diagnostics.Add(new Diagnostic
-                {
-                    Severity = DiagnosticSeverity.Warning,
-                    Message =
-                        $"'{token}' is below the hard-coded section boundary. Add new damage/armor types above the boundary comment.",
-                    Range = SafeRange(tokenLine0, tokenCol0, token.Length),
-                    Source = AppProperties.LspServerId
-                });
-            }
-        }
-    }
-
     internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
         string documentUri, string text, GameIndex index)
     {
         var hardcodedSets = _schema.AllHardcodedSets;
         if (hardcodedSets.Count == 0) return [];
+
+        // Skip the expensive HAP re-parse for file types whose schema has no hardcoded-ref tags.
+        // Files with unknown/unregistered types fall through to the full walk (defensive).
+        var normalizedUri = _fileHelper.NormalizeUri(documentUri);
+        var fileTypes = _fileTypeRegistry.GetTypesForFile(normalizedUri);
+        if (!fileTypes.IsDefaultOrEmpty &&
+            !fileTypes.Any(t => _schema.GetTagsForType(t)
+                                       .Any(tag => tag.ReferenceKind == ReferenceKind.HardcodedSet)))
+            return [];
 
         var diagnostics = new List<Diagnostic>();
         var doc = new HtmlDocument();
@@ -291,14 +216,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         string text, List<Diagnostic> diagnostics)
     {
         var groups = tagDef.ValueGroups;
-        var validNames = new HashSet<string>(
-            groups.Count == 0
-                ? set.Values.Select(v => v.Name)
-                : set.Values
-                    .Where(v => v.Groups.Count == 0 ||
-                                v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)))
-                    .Select(v => v.Name),
-            StringComparer.OrdinalIgnoreCase);
+        var applicableValues = groups.Count == 0
+            ? set.Values
+            : set.Values
+                .Where(v => v.Groups.Count == 0 ||
+                            v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)));
+        var validNames = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in applicableValues)
+            validNames[value.Name] = value.Deprecated;
 
         var innerText = child.InnerText;
         char[] separators = [',', ' ', '\t', '\r', '\n'];
@@ -315,25 +240,50 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 i++;
 
             var token = innerText[tokenStart..i];
-            if (token.Length == 0 || validNames.Contains(token)) continue;
-
-            var absPos = child.InnerStartIndex + tokenStart;
-            var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
-
-            diagnostics.Add(new Diagnostic
+            if (token.Length == 0) continue;
+            if (!validNames.TryGetValue(token, out var deprecated))
             {
-                Severity = DiagnosticSeverity.Error,
-                Message =
-                    $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
-                Range = SafeRange(line0, col0, token.Length),
-                Source = AppProperties.LspServerId
-            });
+                var absPos = child.InnerStartIndex + tokenStart;
+                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message =
+                        $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
+                    Range = SafeRange(line0, col0, token.Length),
+                    Source = AppProperties.LspServerId
+                });
+            }
+            else if (deprecated)
+            {
+                var absPos = child.InnerStartIndex + tokenStart;
+                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Message = $"'{token}' is deprecated.",
+                    Range = SafeRange(line0, col0, token.Length),
+                    Source = AppProperties.LspServerId
+                });
+            }
         }
     }
 
-    private static bool IsBoundaryComment(string commentText)
+    // Scans up to 5 lines before the symbol's line for a `<!-- lsp:suppress duplicate-symbol -->`
+    // annotation. Returns true when found, indicating the duplicate diagnostic should be suppressed.
+    private static bool IsDuplicateSymbolSuppressed(string[] lines, int symbolLine0)
     {
-        return commentText.Contains("ABOVE this point", StringComparison.OrdinalIgnoreCase);
+        var start = Math.Max(0, symbolLine0 - 5);
+        var end = Math.Min(symbolLine0, lines.Length - 1);
+        for (var i = start; i <= end; i++)
+        {
+            if (lines[i].Contains("lsp:suppress duplicate-symbol", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsStoryParserDocument(string documentUri)
@@ -348,7 +298,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var length = result.OverrideLength ?? fact.Length;
         return new Diagnostic
         {
-            Severity = MapSeverity(result.Severity),
+            Severity = result.Severity.ToLsp(),
             Message = result.Message,
             Range = SafeRange(line, col, length),
             Source = AppProperties.LspServerId,
@@ -396,17 +346,5 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (result.RemoveRedundantOverride)
             obj["removeRedundantOverride"] = true;
         return obj;
-    }
-
-    private static DiagnosticSeverity? MapSeverity(XmlDiagnosticSeverity severity)
-    {
-        return severity switch
-        {
-            XmlDiagnosticSeverity.Error => DiagnosticSeverity.Error,
-            XmlDiagnosticSeverity.Warning => DiagnosticSeverity.Warning,
-            XmlDiagnosticSeverity.Information => DiagnosticSeverity.Information,
-            XmlDiagnosticSeverity.Hint => DiagnosticSeverity.Hint,
-            _ => throw new ArgumentOutOfRangeException(nameof(severity), severity, null)
-        };
     }
 }

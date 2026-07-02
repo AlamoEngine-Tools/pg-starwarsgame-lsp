@@ -27,4 +27,14 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"'{sfxEventName}' could not be resolved as an SFX event for <{tagName}>.");
     }
+
+    protected static XmlDiagnosticResult? TryValidateGameObjectName(string name, string tagName, GameIndex index)
+    {
+        if (index.Baseline.Symbols.Count == 0 && index.WorkspaceDefinitions.Count == 0)
+            return null;
+        if (index.Resolve(name) is not null)
+            return null;
+        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+            $"'{name}' could not be resolved as a game object for <{tagName}>.");
+    }
 }

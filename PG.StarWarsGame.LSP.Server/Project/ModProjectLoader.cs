@@ -76,9 +76,9 @@ public sealed class ModProjectLoader
             Normalize(dto.Directories?.Scripts),
             Normalize(dto.Directories?.Art),
             Normalize(dto.Directories?.Audio),
-            Normalize(dto.Directories?.Text),
-            Normalize(dto.Directories?.Ai),
-            dto.Directories?.TextResourceType);
+            Normalize(dto.Directories?.Ai));
+
+        var localisation = ParseLocalisation(dto.Localisation, fileName);
 
         var references = new List<ProjectReference>();
         foreach (var reference in dto.ProjectReferences ?? [])
@@ -93,7 +93,27 @@ public sealed class ModProjectLoader
             references.Add(new ProjectReference(NormalizePath(raw)));
         }
 
-        return new ModProjectFile(name, modinfo, directories, references);
+        return new ModProjectFile(name, modinfo, directories, references, localisation);
+    }
+
+    private static readonly HashSet<string> ValidLocalisationTypes =
+        new(StringComparer.OrdinalIgnoreCase) { "CSV", "DAT", "XML", "NLS" };
+
+    private LocalisationProjectSettings? ParseLocalisation(LocalisationDto? dto, string fileName)
+    {
+        if (dto is null) return null;
+
+        if (string.IsNullOrWhiteSpace(dto.Type) || !ValidLocalisationTypes.Contains(dto.Type))
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': 'localisation.type' must be one of " +
+                $"CSV, DAT, XML, NLS (got '{dto.Type}').");
+
+        if (string.IsNullOrWhiteSpace(dto.Directory))
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': 'localisation.directory' is required " +
+                "when 'localisation' is present.");
+
+        return new LocalisationProjectSettings(dto.Type.ToUpperInvariant(), NormalizePath(dto.Directory));
     }
 
     private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? paths)
@@ -130,6 +150,7 @@ public sealed class ModProjectLoader
         public JsonElement? Modinfo { get; init; }
         public DirectoryMapDto? Directories { get; init; }
         public List<ProjectReferenceDto>? ProjectReferences { get; init; }
+        public LocalisationDto? Localisation { get; init; }
     }
 
     private sealed class DirectoryMapDto
@@ -138,13 +159,17 @@ public sealed class ModProjectLoader
         public List<string>? Scripts { get; init; }
         public List<string>? Art { get; init; }
         public List<string>? Audio { get; init; }
-        public List<string>? Text { get; init; }
         public List<string>? Ai { get; init; }
-        public string? TextResourceType { get; init; }
     }
 
     private sealed class ProjectReferenceDto
     {
         public string? Path { get; init; }
+    }
+
+    private sealed class LocalisationDto
+    {
+        public string? Type { get; init; }
+        public string? Directory { get; init; }
     }
 }

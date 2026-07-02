@@ -3,12 +3,20 @@
 
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 
 public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
 {
     private static readonly char[] FlagSeparators = ['|', ','];
+
+    private readonly IGameIndexService _indexService;
+
+    public DynamicEnumValueProposalProvider(IGameIndexService indexService)
+    {
+        _indexService = indexService;
+    }
 
     public XmlValueType ValueType => XmlValueType.DynamicEnumValue;
 
@@ -38,6 +46,9 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
             currentPartial = partialValue.Trim();
         }
 
+        if (enumDef.Kind == EnumKind.DynamicXml)
+            return GetDynamicProposals(enumDef.Name, currentPartial, alreadySelected);
+
         return enumDef.Values
             .Where(v => !alreadySelected.Contains(v.Name))
             .Where(v => v.Name.StartsWith(currentPartial, StringComparison.OrdinalIgnoreCase))
@@ -47,5 +58,29 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
                 Detail = v.Description.GetValueOrDefault("en")
             })
             .ToList();
+    }
+
+    private IReadOnlyList<ValueProposal> GetDynamicProposals(
+        string enumName, string currentPartial, HashSet<string> alreadySelected)
+    {
+        var index = _indexService.Current;
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<ValueProposal>();
+
+        void Add(string name)
+        {
+            if (!seen.Add(name)) return;
+            if (alreadySelected.Contains(name)) return;
+            if (!name.StartsWith(currentPartial, StringComparison.OrdinalIgnoreCase)) return;
+            result.Add(new ValueProposal { Label = name });
+        }
+
+        if (index.Baseline.DynamicEnumValues.TryGetValue(enumName, out var baselineVals))
+            foreach (var v in baselineVals) Add(v);
+
+        if (index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspaceVals))
+            foreach (var v in workspaceVals) Add(v);
+
+        return result;
     }
 }

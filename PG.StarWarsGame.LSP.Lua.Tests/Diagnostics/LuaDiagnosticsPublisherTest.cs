@@ -339,9 +339,9 @@ public sealed class LuaDiagnosticsPublisherTest
             _docs.Remove(uri);
         }
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs[uri] = new TrackedDocument(uri, text, version);
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         }
 
         public bool TryGet(string uri, out TrackedDocument doc)
@@ -365,6 +365,12 @@ public sealed class LuaDiagnosticsPublisherTest
         {
             add => _indexChanged += value;
             remove => _indexChanged -= value;
+        }
+
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
         }
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
@@ -394,6 +400,15 @@ public sealed class LuaDiagnosticsPublisherTest
 
         public void ApplyModelBones(
             ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public void ApplyWorkspaceDynamicEnumValues(
+            ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 

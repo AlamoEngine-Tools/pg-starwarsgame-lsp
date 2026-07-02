@@ -56,7 +56,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger,
         int debounceMs = 0)
-        : base(publish, indexService, workspaceHost, debounceMs)
+        : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
@@ -130,13 +130,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 
             diagnostics.Add(new LspDiagnostic
             {
-                Severity = eval.Value.Severity switch
-                {
-                    XmlDiagnosticSeverity.Error => LspDiagnosticSeverity.Error,
-                    XmlDiagnosticSeverity.Warning => LspDiagnosticSeverity.Warning,
-                    XmlDiagnosticSeverity.Information => LspDiagnosticSeverity.Information,
-                    _ => LspDiagnosticSeverity.Hint
-                },
+                Severity = eval.Value.Severity.ToLsp(),
                 Message = eval.Value.Message,
                 Range = range,
                 Source = AppProperties.LspServerId

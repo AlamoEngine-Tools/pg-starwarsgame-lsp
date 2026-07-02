@@ -62,6 +62,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new EaWXmlContext(fileHelper),
             new NullProjectIndexCache(),
             new LuaAnnotationRepository(),
+            host ?? new FakeWorkspaceHost(),
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
@@ -215,14 +216,166 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Empty(spy.Updates);
     }
 
+    // ── localisation text-root changes ───────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CsvUnderTextRoot_TriggersLocalisationReload_NotDocumentIndex()
+    {
+        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\mastertextfile.csv"] = new("key,ENGLISH\r\nTEXT_A,Hello\r\n")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(csvUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+        Assert.Empty(spy.Updates);
+    }
+
+    [Fact]
+    public async Task Handle_PropertiesUnderTextRoot_TriggersLocalisationReload()
+    {
+        const string propsUri = "file:///c:/mods/mymod/data/text/mastertextfile.properties";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\mastertextfile.properties"] = new("TEXT_A=Hello")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "nls")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(propsUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+    }
+
+    [Fact]
+    public async Task Handle_XmlUnderTextRoot_RoutesToLocalisationReload_NotDocumentParser()
+    {
+        // A localisation XML file matches the blanket **/*.xml watcher too — it must be routed to
+        // the localisation reload, not the game-XML document parser (no parser understands it).
+        const string xmlUri = "file:///c:/mods/mymod/data/text/mastertextfile.xml";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\mastertextfile.xml"] = new("<LocalisationData/>")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "xml")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(xmlUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+        Assert.Empty(spy.Updates);
+    }
+
+    [Fact]
+    public async Task Handle_DeletedCsvUnderTextRoot_TriggersLocalisationReload_NotRemoveDocument()
+    {
+        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+
+        var handler = BuildHandler(spy, reload: reload);
+        await handler.Handle(Deleted(csvUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+        Assert.Empty(spy.Removals);
+    }
+
+    [Fact]
+    public async Task Handle_MultipleTextRootChanges_TriggersExactlyOneLocalisationReload()
+    {
+        const string csvUri = "file:///c:/mods/mymod/data/text/a.csv";
+        const string propsUri = "file:///c:/mods/mymod/data/text/b.properties";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\a.csv"] = new("key,ENGLISH"),
+            [@"c:\mods\mymod\data\text\b.properties"] = new("")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+
+        var request = new DidChangeWatchedFilesParams
+        {
+            Changes = new Container<FileEvent>(
+                new FileEvent { Uri = DocumentUri.From(csvUri), Type = FileChangeType.Changed },
+                new FileEvent { Uri = DocumentUri.From(propsUri), Type = FileChangeType.Changed })
+        };
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(request, CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+    }
+
+    [Fact]
+    public async Task Handle_CsvOutsideAnyTextRoot_NotRoutedToLocalisationReload()
+    {
+        const string csvUri = "file:///c:/mods/mymod/notes/scratch.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\notes\scratch.csv"] = new("a,b")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(csvUri), CancellationToken.None);
+
+        Assert.Equal(0, reload.LocalisationReloadCount);
+    }
+
+    [Fact]
+    public async Task Handle_CsvChanged_NoWorkspaceConfigYet_NotRoutedToLocalisationReload()
+    {
+        // LastWorkspaceConfig is null before the first successful LoadAsync — the handler must not
+        // throw, and the change is simply ignored as an unrecognised document.
+        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\mastertextfile.csv"] = new("key,ENGLISH")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService();
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        var ex = await Record.ExceptionAsync(() => handler.Handle(Changed(csvUri), CancellationToken.None));
+
+        Assert.Null(ex);
+        Assert.Equal(0, reload.LocalisationReloadCount);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class FakeReloadService : IModProjectReloadService
     {
         public int ReloadCount { get; private set; }
+        public int LocalisationReloadCount { get; private set; }
 
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => null;
+        public WorkspaceConfiguration? LastWorkspaceConfig { get; init; }
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -233,6 +386,12 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         public Task ReloadAsync(CancellationToken ct)
         {
             ReloadCount++;
+            return Task.CompletedTask;
+        }
+
+        public Task ReloadLocalisationAsync(CancellationToken ct)
+        {
+            LocalisationReloadCount++;
             return Task.CompletedTask;
         }
     }
@@ -292,6 +451,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         public readonly List<(string Uri, string Text)> Updates = [];
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -325,6 +485,14 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
         }
 
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             return NullDisposable.Instance;
@@ -344,9 +512,9 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs[uri] = new TrackedDocument(uri, text, version);
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         }
 
         public void Remove(string uri)

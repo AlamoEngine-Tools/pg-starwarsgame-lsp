@@ -36,6 +36,15 @@ public sealed class FloatVector3HandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
 
+    [Theory]
+    [InlineData("1.0, 2.0, 3.0,")]
+    [InlineData("1.0 2.0 3.0 ")]
+    public void Trailing_separator_is_tolerated(string value)
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
     [Fact]
     public void Non_float3_tag_returns_no_diagnostics()
     {

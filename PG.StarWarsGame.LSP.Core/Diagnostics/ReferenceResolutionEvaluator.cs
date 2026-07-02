@@ -18,9 +18,12 @@ public static class ReferenceResolutionEvaluator
     public static (XmlDiagnosticSeverity Severity, string Message)? Evaluate(
         string targetId, string? expectedTypeName, GameSymbol? resolved)
     {
+        // Scoped ability IDs are stored as "OWNER$name"; show only the bare name to the user.
+        var displayId = StripOwnerPrefix(targetId);
+
         if (resolved is null)
             return (XmlDiagnosticSeverity.Error,
-                $"Cannot resolve reference '{targetId}': no object with this name exists in the workspace.");
+                $"Cannot resolve reference '{displayId}': no object with this name exists in the workspace.");
 
         if (expectedTypeName is null)
             return null;
@@ -32,6 +35,17 @@ public static class ReferenceResolutionEvaluator
             return null;
 
         return (XmlDiagnosticSeverity.Error,
-            $"Type mismatch for '{targetId}': expected '{expectedTypeName}' but found '{resolved.TypeName}'.");
+            $"Type mismatch for '{displayId}': expected '{expectedTypeName}' but found '{resolved.TypeName}'.");
+    }
+
+    /// <summary>
+    ///     Returns the user-visible portion of a symbol ID, stripping an owner prefix separated by
+    ///     <c>$</c> (e.g. <c>"MY_UNIT$Medic_Healing"</c> → <c>"Medic_Healing"</c>).
+    ///     IDs without a <c>$</c> are returned as-is.
+    /// </summary>
+    public static string StripOwnerPrefix(string id)
+    {
+        var idx = id.IndexOf('$');
+        return idx >= 0 ? id[(idx + 1)..] : id;
     }
 }

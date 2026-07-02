@@ -48,6 +48,7 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<EawLspServerFixture>
     public async Task UnitAbility_TypeTag_HoverDoesNotShowGameObjectType()
     {
         RequireEawWorkspace();
+        await WaitForScanAsync();
 
         var filePath = Path.Combine(LspTestEnvironment.EawWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
@@ -90,6 +91,13 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<EawLspServerFixture>
     {
         if (LspTestEnvironment.EawWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception("$XunitDynamicSkip$eaw/ workspace not found; cannot run ability type smoke tests.");
+    }
+
+    private async Task WaitForScanAsync()
+    {
+        var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(60)));
+        if (completed != _fixture.ScanCompleted)
+            throw new Exception("$XunitDynamicSkip$EAW workspace scan did not complete within 60 s.");
     }
 
     private static (int line, int col) FindLineContaining(string[] lines, string needle)

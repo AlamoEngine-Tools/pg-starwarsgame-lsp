@@ -60,18 +60,6 @@ public sealed class XmlDiagnosticsPublisherTest
                 .Add(targetId, ImmutableArray.Create(reference)));
     }
 
-    private static GameIndex IndexWithHardcodedEnums(
-        ImmutableDictionary<string, ImmutableArray<string>> hardcoded)
-    {
-        var baseline = new BaselineIndex(
-            ImmutableDictionary<string, GameSymbol>.Empty,
-            DateTimeOffset.UtcNow, "hash",
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty,
-            hardcoded,
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
-        return GameIndex.Empty with { Baseline = baseline };
-    }
-
     private static (XmlDiagnosticsPublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
@@ -251,141 +239,6 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Equal("file:///a.xml", pub.Uri.ToString());
     }
 
-    // ── enum boundary diagnostics ────────────────────────────────────────────
-
-    [Fact]
-    public void CollectEnumBoundaryDiagnostics_NonGameConstantsFile_NoWarning()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("DamageType", ["EXPLOSIVE"]);
-        var index = IndexWithHardcodedEnums(hardcoded);
-
-        const string xml = """
-                           <GameConstants>
-                             <Damage_Types>NEW_TYPE
-                           <!-- PLEASE add your new damage types ABOVE this point. -->
-                           EXPLOSIVE
-                             </Damage_Types>
-                           </GameConstants>
-                           """;
-
-        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///units.xml", xml, index);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectEnumBoundaryDiagnostics_EmptyHardcodedBaseline_NoWarning()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var index = IndexWithHardcodedEnums(
-            ImmutableDictionary<string, ImmutableArray<string>>.Empty);
-
-        const string xml = """
-                           <GameConstants>
-                             <Damage_Types>CUSTOM
-                           <!-- PLEASE add your new damage types ABOVE this point. -->
-                           MYSTERY_TYPE
-                             </Damage_Types>
-                           </GameConstants>
-                           """;
-
-        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectEnumBoundaryDiagnostics_NoBoundaryComment_NoWarning()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("DamageType", ["EXPLOSIVE"]);
-        var index = IndexWithHardcodedEnums(hardcoded);
-
-        const string xml = "<GameConstants><Damage_Types>EXPLOSIVE ENERGY CUSTOM</Damage_Types></GameConstants>";
-
-        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectEnumBoundaryDiagnostics_KnownHardcodedToken_NoWarning()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("DamageType", ["EXPLOSIVE", "ENERGY"]);
-        var index = IndexWithHardcodedEnums(hardcoded);
-
-        const string xml = """
-                           <GameConstants>
-                             <Damage_Types>CUSTOM_TYPE
-                           <!-- PLEASE add your new damage types ABOVE this point. -->
-                           EXPLOSIVE ENERGY
-                             </Damage_Types>
-                           </GameConstants>
-                           """;
-
-        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
-
-        Assert.Empty(diags);
-    }
-
-    [Fact]
-    public void CollectEnumBoundaryDiagnostics_MisplacedToken_EmitsWarning()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("DamageType", ["EXPLOSIVE", "ENERGY"]);
-        var index = IndexWithHardcodedEnums(hardcoded);
-
-        const string xml = """
-                           <GameConstants>
-                             <Damage_Types>CUSTOM_TYPE
-                           <!-- PLEASE add your new damage types ABOVE this point. -->
-                           EXPLOSIVE SABER_SLASH ENERGY
-                             </Damage_Types>
-                           </GameConstants>
-                           """;
-
-        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
-
-        Assert.Single(diags);
-        Assert.Contains("SABER_SLASH", diags[0].Message);
-        Assert.Equal(DiagnosticSeverity.Warning, diags[0].Severity);
-    }
-
-    [Fact]
-    public void CollectEnumBoundaryDiagnostics_MultipleEnums_BothChecked()
-    {
-        var (publisher, _, _, _) = BuildSubscribed();
-        var hardcoded = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-            .Add("DamageType", ["EXPLOSIVE"])
-            .Add("ArmorType", ["ARMOR_INFANTRY"]);
-        var index = IndexWithHardcodedEnums(hardcoded);
-
-        const string xml = """
-                           <GameConstants>
-                             <Damage_Types>CUSTOM
-                           <!-- PLEASE add your new damage types ABOVE this point. -->
-                           EXPLOSIVE MOD_DAMAGE_BELOW
-                             </Damage_Types>
-                             <Armor_Types>MY_ARMOR
-                           <!-- PLEASE add your new armor types ABOVE this point. -->
-                           ARMOR_INFANTRY MOD_ARMOR_BELOW
-                             </Armor_Types>
-                           </GameConstants>
-                           """;
-
-        var diags = publisher.CollectEnumBoundaryDiagnostics("file:///data/xml/gameconstants.xml", xml, index);
-
-        Assert.Equal(2, diags.Count);
-        Assert.Contains(diags, d => d.Message.Contains("MOD_DAMAGE_BELOW"));
-        Assert.Contains(diags, d => d.Message.Contains("MOD_ARMOR_BELOW"));
-    }
-
     // ── story parser guard ───────────────────────────────────────────────────
 
     [Fact]
@@ -532,6 +385,56 @@ public sealed class XmlDiagnosticsPublisherTest
         var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///A.xml");
         Assert.NotNull(pub);
         Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
+    }
+
+    // ── lsp:suppress annotation ──────────────────────────────────────────────
+
+    private static GameIndex IndexWithDuplicateAtLine(string id, string uri1, string uri2, int line)
+    {
+        var sym1 = new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri1, line, null), null);
+        var sym2 = new GameSymbol(id, GameSymbolKind.XmlObject, "Unit", new FileOrigin(uri2, 0, null), null);
+        var doc1 = new DocumentIndex(uri1, 1, [sym1], []);
+        var doc2 = new DocumentIndex(uri2, 1, [sym2], []);
+        return new GameIndex(
+            BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(uri1, doc1).Add(uri2, doc2),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add(id, ImmutableArray.Create(sym1, sym2)),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+    }
+
+    [Fact]
+    public void OnIndexChanged_SuppressAnnotation_Before_Duplicate_Symbol_Suppresses_Diagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        // Symbol is at line 1; suppression comment is at line 0.
+        const string xml = "<!-- lsp:suppress duplicate-symbol -->\n<Unit Name=\"Default\"/>";
+        workspaceHost.Set("file:///a.xml", xml);
+        workspaceHost.Set("file:///b.xml", "<Unit Name=\"Default\"/>");
+        var index = IndexWithDuplicateAtLine("Default", "file:///a.xml", "file:///b.xml", 1);
+
+        indexService.Fire(index);
+
+        var pub = published.FirstOrDefault(p => p.Uri.ToString() == "file:///a.xml");
+        Assert.NotNull(pub);
+        Assert.DoesNotContain(pub.Diagnostics!, d => d.Message.Contains("Duplicate"));
+    }
+
+    [Fact]
+    public void OnIndexChanged_SuppressAnnotation_Only_Suppresses_That_File()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed();
+        const string xmlA = "<!-- lsp:suppress duplicate-symbol -->\n<Unit Name=\"Default\"/>";
+        const string xmlB = "<Unit Name=\"Default\"/>";
+        workspaceHost.Set("file:///a.xml", xmlA);
+        workspaceHost.Set("file:///b.xml", xmlB);
+        var index = IndexWithDuplicateAtLine("Default", "file:///a.xml", "file:///b.xml", 1);
+
+        indexService.Fire(index);
+
+        var pubB = published.FirstOrDefault(p => p.Uri.ToString() == "file:///b.xml");
+        Assert.NotNull(pubB);
+        Assert.Contains(pubB.Diagnostics!, d => d.Message.Contains("Duplicate"));
     }
 
     // ── closed-file suppression ──────────────────────────────────────────────
@@ -889,6 +792,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -917,6 +821,13 @@ public sealed class XmlDiagnosticsPublisherTest
 
         public void ApplyModelBones(
             ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 
@@ -972,7 +883,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
             Set(uri, text, version);
         }

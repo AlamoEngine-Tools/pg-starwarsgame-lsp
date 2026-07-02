@@ -36,6 +36,7 @@ public sealed class GameIndexService : IGameIndexService
     public GameIndex Current => Volatile.Read(ref _current);
 
     public event Action<GameIndex>? IndexChanged;
+    public event Action<ILocalisationIndex>? LocalisationChanged;
 
     public IDisposable BeginBulkUpdate()
     {
@@ -191,6 +192,7 @@ public sealed class GameIndexService : IGameIndexService
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         RaiseIndexChanged(Volatile.Read(ref _current));
+        LocalisationChanged?.Invoke(index);
     }
 
     public void ApplyAssetFiles(IAssetFileIndex index)
@@ -212,6 +214,31 @@ public sealed class GameIndexService : IGameIndexService
         {
             snapshot = Volatile.Read(ref _current);
             updated = snapshot with { ModelBones = bones };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { WorkspaceDynamicEnumValues = values };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    public void ApplyWorkspaceEnumValueDefinitions(
+        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            updated = snapshot with { WorkspaceEnumValueDefinitions = definitions };
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
         RaiseIndexChanged(Volatile.Read(ref _current));

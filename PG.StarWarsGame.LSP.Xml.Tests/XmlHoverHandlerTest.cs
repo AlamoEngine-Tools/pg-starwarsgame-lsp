@@ -615,9 +615,9 @@ public sealed class XmlHoverHandlerTest
     {
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
-        public void AddOrUpdate(string uri, string text, int version)
+        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
         {
-            _docs[uri] = new TrackedDocument(uri, text, version);
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
         }
 
         public void Remove(string uri)
@@ -751,6 +751,7 @@ public sealed class XmlHoverHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
 
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -779,6 +780,13 @@ public sealed class XmlHoverHandlerTest
 
         public void ApplyModelBones(
             ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 

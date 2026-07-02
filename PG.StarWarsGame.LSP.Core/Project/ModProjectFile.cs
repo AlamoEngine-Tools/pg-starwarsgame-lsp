@@ -7,4 +7,5 @@ public sealed record ModProjectFile(
     string Name,
     ModinfoData? Modinfo,
     DirectoryMap Directories,
-    IReadOnlyList<ProjectReference> ProjectReferences);
+    IReadOnlyList<ProjectReference> ProjectReferences,
+    LocalisationProjectSettings? Localisation = null);

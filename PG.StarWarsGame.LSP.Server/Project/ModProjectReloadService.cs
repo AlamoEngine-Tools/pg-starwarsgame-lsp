@@ -59,6 +59,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _layerMap.SetLayers(config.Layers);
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);
+        _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);
         _indexer.ApplyAssetCatalog(config.AssetRoots);
         _indexer.ApplyModelBoneCatalog(config.AssetRoots);
         LastAssetRoots = config.AssetRoots;
@@ -89,6 +90,25 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Mod project reload failed.");
+        }
+    }
+
+    public async Task ReloadLocalisationAsync(CancellationToken ct)
+    {
+        var config = LastWorkspaceConfig;
+        if (config is null)
+        {
+            _logger.LogWarning("ReloadLocalisationAsync called before LoadAsync; ignoring reload request.");
+            return;
+        }
+
+        try
+        {
+            await _localisation.LoadAsync(config, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Localisation-only reload failed.");
         }
     }
 }

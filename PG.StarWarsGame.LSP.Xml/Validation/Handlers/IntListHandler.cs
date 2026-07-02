@@ -21,7 +21,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
                     $"'' is not a valid integer list for <{fact.Tag.Tag}>.")
             ];
 
-        var parts = Separator().Split(trimmed);
+        var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
 
         // Any token that is not a valid float at all → error
         if (parts.Any(p => !LenientFloatParser.TryParse(p, out _)))

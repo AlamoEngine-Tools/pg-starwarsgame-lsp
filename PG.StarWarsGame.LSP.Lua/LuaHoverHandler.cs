@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.Text;
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
@@ -84,6 +85,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 
         foreach (var reference in docIndex.References)
         {
+            if (reference.ExpectedKind != GameSymbolKind.XmlObject) continue;
             if (reference.Line != line) continue;
             if (character < reference.Column || character > reference.Column + reference.Length) continue;
 
@@ -96,9 +98,8 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             string markdown;
             if (sym?.Origin is MegArchiveOrigin meg)
             {
-                var archiveName = Path.GetFileName(meg.ArchivePath);
                 markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*\n\n" +
-                           $"*Packaged in* `{archiveName}` — this object is read-only and cannot be renamed or navigated to.";
+                           MegArchiveOriginHoverText.Describe(meg);
             }
             else
             {
@@ -122,78 +123,37 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     private static Hover? TryBuildRequireHover(SyntaxNode root, int line, int character,
         IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper, string callerUri)
     {
-        foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
+        var found = LuaRequireCallLocator.TryFindAt(root, line, character);
+        if (found is null) return null;
+
+        var (requireArg, startLine, startChar, endLine, endChar) = found.Value;
+        var range = new LspRange(
+            new Position(startLine, startChar),
+            new Position(endLine, endChar));
+
+        var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper, callerUri);
+        string markdown;
+        if (resolved is not null)
         {
-            if (call.Expression is not IdentifierNameSyntax { Name: "require" }) continue;
-
-            string? requireArg = null;
-            if (call.Argument is StringFunctionArgumentSyntax strArg)
-                requireArg = strArg.Expression.Token.ValueText;
-            else if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
-                     exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
-                requireArg = lit.Token.ValueText;
-
-            if (requireArg is null) continue;
-
-            var tokenSpan = GetRequireArgSpan(call);
-            if (tokenSpan is null) continue;
-
-            var (startLine, startChar, endLine, endChar) = tokenSpan.Value;
-            if (line < startLine || line > endLine) continue;
-            if (line == startLine && character < startChar) continue;
-            if (line == endLine && character > endChar) continue;
-
-            var range = new LspRange(
-                new Position(startLine, startChar),
-                new Position(endLine, endChar));
-
-            var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper, callerUri);
-            string markdown;
-            if (resolved is not null)
-            {
-                var normalized = resolved.Replace('\\', '/');
-                var slashIdx = normalized.LastIndexOf('/');
-                var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
-                markdown = $"**require** `{requireArg}`\n→ `{filename}`";
-            }
-            else
-            {
-                markdown = $"**require** `{requireArg}`\n*Module not found in workspace*";
-            }
-
-            return new Hover
-            {
-                Contents = new MarkedStringsOrMarkupContent(new MarkupContent
-                {
-                    Kind = MarkupKind.Markdown,
-                    Value = markdown
-                }),
-                Range = range
-            };
+            var normalized = resolved.Replace('\\', '/');
+            var slashIdx = normalized.LastIndexOf('/');
+            var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
+            markdown = $"**require** `{requireArg}`\n→ `{filename}`";
+        }
+        else
+        {
+            markdown = $"**require** `{requireArg}`\n*Module not found in workspace*";
         }
 
-        return null;
-    }
-
-    private static (int StartLine, int StartChar, int EndLine, int EndChar)? GetRequireArgSpan(
-        FunctionCallExpressionSyntax call)
-    {
-        if (call.Argument is StringFunctionArgumentSyntax strArg)
+        return new Hover
         {
-            var s = strArg.Expression.Token.GetLocation().GetLineSpan();
-            return (s.StartLinePosition.Line, s.StartLinePosition.Character,
-                s.EndLinePosition.Line, s.EndLinePosition.Character);
-        }
-
-        if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
-            exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
-        {
-            var s = lit.Token.GetLocation().GetLineSpan();
-            return (s.StartLinePosition.Line, s.StartLinePosition.Character,
-                s.EndLinePosition.Line, s.EndLinePosition.Character);
-        }
-
-        return null;
+            Contents = new MarkedStringsOrMarkupContent(new MarkupContent
+            {
+                Kind = MarkupKind.Markdown,
+                Value = markdown
+            }),
+            Range = range
+        };
     }
 
     private static Hover? TryBuildIdentifierHover(
@@ -221,47 +181,26 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 var luaGlobal = defs.FirstOrDefault(s => s.Kind == GameSymbolKind.LuaGlobal);
                 if (luaGlobal is not null)
                 {
-                    var sb = new StringBuilder();
-                    sb.Append($"**function** `{id.Name}`");
-                    if (luaGlobal.Description is not null)
-                    {
-                        sb.AppendLine();
-                        sb.Append(luaGlobal.Description);
-                    }
-
-                    return new Hover
-                    {
-                        Contents = new MarkedStringsOrMarkupContent(new MarkupContent
-                        {
-                            Kind = MarkupKind.Markdown,
-                            Value = sb.ToString()
-                        }),
-                        Range = range
-                    };
+                    var ann = repository.GetFunctionAnnotation(id.Name);
+                    // If no annotation is indexed yet, synthesise one from the symbol description.
+                    if (ann is null && luaGlobal.Description is not null)
+                        ann = EmmyLuaAnnotations.Empty with { Description = luaGlobal.Description };
+                    return BuildHover(BuildFunctionHoverMarkdown(id.Name, ann), range);
                 }
             }
 
-            // Engine global function: show name and description from schema.
+            // Engine global function: show name, params, and return type from schema.
             if (schema.AllFunctionNames.Contains(id.Name))
             {
-                var sb = new StringBuilder();
-                sb.Append($"**function** `{id.Name}`");
-                var desc = schema.GetFunctionDescription(id.Name);
-                if (desc is not null)
+                var ann = EmmyLuaAnnotations.Empty with
                 {
-                    sb.AppendLine();
-                    sb.Append(desc);
-                }
-
-                return new Hover
-                {
-                    Contents = new MarkedStringsOrMarkupContent(new MarkupContent
-                    {
-                        Kind = MarkupKind.Markdown,
-                        Value = sb.ToString()
-                    }),
-                    Range = range
+                    Description = schema.GetFunctionDescription(id.Name),
+                    Params = schema.GetFunctionParams(id.Name).ToImmutableArray(),
+                    Returns = schema.GetReturnTypeName(id.Name) is { } ret
+                        ? [new LuaReturnAnnotation(new LuaTypeRef(ret), null, null)]
+                        : ImmutableArray<LuaReturnAnnotation>.Empty
                 };
+                return BuildHover(BuildFunctionHoverMarkdown(id.Name, ann), range);
             }
 
             // Workspace type (class, alias, enum) from the annotation repository.
@@ -320,6 +259,79 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         }
 
         return BuildHover(sb.ToString().TrimEnd(), range);
+    }
+
+    private static string BuildFunctionHoverMarkdown(string name, EmmyLuaAnnotations? ann)
+    {
+        var sb = new StringBuilder();
+
+        // Signature line with param names if available.
+        if (ann is not null && !ann.Params.IsDefaultOrEmpty)
+        {
+            var paramList = string.Join(", ", ann.Params.Select(p => p.IsOptional ? p.Name + "?" : p.Name));
+            sb.Append($"**function** `{name}({paramList})`");
+        }
+        else
+        {
+            sb.Append($"**function** `{name}`");
+        }
+
+        if (ann is null)
+            return sb.ToString();
+
+        if (ann.IsDeprecated)
+        {
+            sb.AppendLine();
+            sb.Append("*⚠ Deprecated*");
+        }
+
+        if (ann.Description is not null)
+        {
+            sb.AppendLine();
+            sb.Append(ann.Description);
+        }
+
+        if (!ann.Params.IsDefaultOrEmpty)
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            sb.Append("**Parameters:**");
+            foreach (var p in ann.Params)
+            {
+                sb.AppendLine();
+                var pName = p.IsOptional ? $"`{p.Name}?`" : $"`{p.Name}`";
+                if (p.Description is not null)
+                    sb.Append($"- {pName} `{p.Type.Raw}` — {p.Description}");
+                else
+                    sb.Append($"- {pName} `{p.Type.Raw}`");
+            }
+        }
+
+        if (!ann.Returns.IsDefaultOrEmpty)
+        {
+            sb.AppendLine();
+            sb.AppendLine();
+            if (ann.Returns.Length == 1)
+            {
+                var r = ann.Returns[0];
+                sb.Append($"**Returns:** `{r.Type.Raw}`");
+                if (r.Description is not null)
+                    sb.Append($" — {r.Description}");
+            }
+            else
+            {
+                sb.Append("**Returns:**");
+                foreach (var r in ann.Returns)
+                {
+                    sb.AppendLine();
+                    var line = $"- `{r.Type.Raw}`";
+                    if (r.Description is not null) line += $" — {r.Description}";
+                    sb.Append(line);
+                }
+            }
+        }
+
+        return sb.ToString().TrimEnd();
     }
 
     private static Hover BuildHover(string markdown, LspRange range) =>

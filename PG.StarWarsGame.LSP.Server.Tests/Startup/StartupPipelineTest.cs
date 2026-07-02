@@ -169,6 +169,11 @@ public sealed class StartupPipelineTest
         {
             return Task.CompletedTask;
         }
+
+        public Task ReloadLocalisationAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
     }
 
     private sealed class ThrowingReloadService : IModProjectReloadService
@@ -183,6 +188,11 @@ public sealed class StartupPipelineTest
         }
 
         public Task ReloadAsync(CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public Task ReloadLocalisationAsync(CancellationToken ct)
         {
             return Task.CompletedTask;
         }

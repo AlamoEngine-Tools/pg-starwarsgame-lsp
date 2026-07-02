@@ -27,8 +27,10 @@ public sealed class ExportLocalisationToDatHandler
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
+    private readonly ILocalisationLayerRegistry _layerRegistry;
     private readonly ILogger<ExportLocalisationToDatHandler> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
+    private readonly ILocalisationProjectRegistry _projectRegistry;
     private readonly IXmlTranslationImporter _xmlImporter;
 
     public ExportLocalisationToDatHandler(
@@ -41,6 +43,8 @@ public sealed class ExportLocalisationToDatHandler
         IDatTranslationExporter datExporter,
         IDatFileService datFileService,
         IFileHelper fileHelper,
+        ILocalisationProjectRegistry projectRegistry,
+        ILocalisationLayerRegistry layerRegistry,
         ILogger<ExportLocalisationToDatHandler> logger)
     {
         _csvImporter = csvImporter;
@@ -52,6 +56,8 @@ public sealed class ExportLocalisationToDatHandler
         _datExporter = datExporter;
         _datFileService = datFileService;
         _fileHelper = fileHelper;
+        _projectRegistry = projectRegistry;
+        _layerRegistry = layerRegistry;
         _logger = logger;
     }
 
@@ -69,13 +75,12 @@ public sealed class ExportLocalisationToDatHandler
         var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
         var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
 
+        // Seed with baseline + every dependency layer below the exported file's own layer, so a
+        // patch mod's export includes translations it inherits from a base-translation dependency,
+        // not just the shipped game text — then the selected file is imported on top below.
         var merged = _factory.CreateKeyed(languages);
-        foreach (var entry in eawDb)
-        foreach (var kv in entry.Translations)
-            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
-        foreach (var entry in focDb)
-        foreach (var kv in entry.Translations)
-            merged.SetTranslation(entry.Key, kv.Key, kv.Value);
+        LocalisationLayerMerge.MergeBaselineAndLowerLayers(
+            merged, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
 
         var ext = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         try
@@ -129,5 +134,15 @@ public sealed class ExportLocalisationToDatHandler
 
         _logger.LogInformation("Exported {Count} DAT files from '{Path}'.", written.Count, request.ProjectFilePath);
         return Task.FromResult(new ExportLocalisationToDatResult(written, null));
+    }
+
+    // The rank of the layer that owns projectFilePath — everything strictly below it (dependency
+    // layers) is merged in as "inherited" before the file itself is imported on top.
+    private int? ResolveBelowRank(string? projectFilePath)
+    {
+        if (string.IsNullOrEmpty(projectFilePath)) return null;
+        var project = _projectRegistry.Projects.FirstOrDefault(
+            p => string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
+        return project?.Rank;
     }
 }

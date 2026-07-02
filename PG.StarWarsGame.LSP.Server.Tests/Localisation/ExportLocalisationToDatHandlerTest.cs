@@ -14,6 +14,7 @@ using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
@@ -110,6 +111,39 @@ public sealed class ExportLocalisationToDatHandlerTest
         Assert.All(result.WrittenFiles, path => Assert.True(fs.File.ReadAllBytes(path).Length > 0));
     }
 
+    // ── dependency-aware export ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_ExportedFileHasLowerLayer_DatIncludesDependencyOnlyKey()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData> { [CsvPath] = new(CsvContent) });
+        var services = new ServiceCollection();
+        services.AddSingleton<IFileSystem>(mockFs);
+        services.SupportLocalisationBaseline();
+        var sp = services.BuildServiceProvider();
+        var langService = sp.GetRequiredService<ILanguageService>();
+        var factory = sp.GetRequiredService<ITranslationDatabaseFactory>();
+        var english = langService.Default;
+
+        var depDb = factory.CreateKeyed([english]);
+        depDb.SetTranslation("TEXT_DEP_ONLY_KEY", english, "Dependency Only Value");
+        var projectRegistry = new LocalisationProjectRegistry();
+        projectRegistry.Set([
+            new LocProjectInfo("MasterTextFile.csv", CsvPath, "Csv", "Root", 1),
+            new LocProjectInfo("core.csv", "/dep/text/core.csv", "Csv", "Dep", 0)
+        ]);
+        var layerRegistry = new LocalisationLayerRegistry();
+        layerRegistry.Set([
+            new LocalisationLayerEntry(new ProjectLayer(0, "Dep", [], [], ["/dep/text"], [], "Csv"), depDb)
+        ]);
+
+        var handler = BuildHandlerWithFs(mockFs, sp, projectRegistry, layerRegistry);
+        var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.Contains(result.WrittenFiles, p => p.EndsWith("_ENGLISH.dat", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static (ExportLocalisationToDatHandler handler, MockFileSystem fs, int languageCount)
         BuildHandler(bool withCsvFile = false)
     {
@@ -126,7 +160,8 @@ public sealed class ExportLocalisationToDatHandlerTest
     }
 
     private static ExportLocalisationToDatHandler BuildHandlerWithFs(
-        MockFileSystem mockFs, IServiceProvider? sp = null)
+        MockFileSystem mockFs, IServiceProvider? sp = null,
+        LocalisationProjectRegistry? projectRegistry = null, LocalisationLayerRegistry? layerRegistry = null)
     {
         if (sp is null)
         {
@@ -146,6 +181,8 @@ public sealed class ExportLocalisationToDatHandlerTest
             sp.GetRequiredService<IDatTranslationExporter>(),
             sp.GetRequiredService<IDatFileService>(),
             new FileHelper(mockFs),
+            projectRegistry ?? new LocalisationProjectRegistry(),
+            layerRegistry ?? new LocalisationLayerRegistry(),
             NullLogger<ExportLocalisationToDatHandler>.Instance);
     }
 }

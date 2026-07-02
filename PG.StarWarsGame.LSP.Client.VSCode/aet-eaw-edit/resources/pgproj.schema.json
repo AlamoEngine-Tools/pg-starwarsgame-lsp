@@ -84,22 +84,35 @@
             "type": "string"
           }
         },
-        "text": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
         "ai": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "description": "Reserved — currently excluded from XML parsing."
-        },
-        "textResourceType": {
+        }
+      }
+    },
+    "localisation": {
+      "description": "The project's single localisation source: which directory (relative to this .pgproj) holds the translation files, and what format they're stored in.",
+      "type": "object",
+      "required": [
+        "type",
+        "directory"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
           "type": "string",
-          "description": "Localisation resource type for the text directories (Csv, Xml, Nls, or Dat). Selects how the localisation loader reads translation files for this project."
+          "enum": [
+            "CSV",
+            "DAT",
+            "XML",
+            "NLS"
+          ]
+        },
+        "directory": {
+          "type": "string"
         }
       }
     },

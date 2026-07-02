@@ -168,12 +168,26 @@ public sealed class GetEffectiveObjectHandlerTest
         {
         }
 
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             return new NoopScope();
         }
 
         public event Action<GameIndex>? IndexChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<ILocalisationIndex>? LocalisationChanged
         {
             add { }
             remove { }

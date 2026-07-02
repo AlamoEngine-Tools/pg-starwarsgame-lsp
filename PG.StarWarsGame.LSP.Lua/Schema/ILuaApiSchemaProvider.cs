@@ -35,6 +35,12 @@ public interface ILuaApiSchemaProvider
     string? GetReturnTypeName(string functionName);
 
     /// <summary>
+    ///     Returns the documented parameters for a function (from <c>---@param</c> annotations),
+    ///     or an empty list if none. Lookup is case-insensitive.
+    /// </summary>
+    IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName);
+
+    /// <summary>
     ///     Returns all documented members of the given engine type (from <c>function TypeName.X</c>
     ///     / <c>function TypeName:X</c> declarations). Empty when the type is unknown.
     /// </summary>

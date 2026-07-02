@@ -7,4 +7,5 @@ using OmniSharp.Extensions.JsonRpc;
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 [Method("aet/getBaselineEntries", Direction.ClientToServer)]
-public sealed record GetBaselineEntriesParams : IRequest<GetBaselineEntriesResult>;
+public sealed record GetBaselineEntriesParams(string? ProjectFilePath = null)
+    : IRequest<GetBaselineEntriesResult>;

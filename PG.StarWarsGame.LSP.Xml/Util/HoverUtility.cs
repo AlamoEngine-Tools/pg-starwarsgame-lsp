@@ -188,11 +188,10 @@ internal static class HoverUtility
 
     private static void AppendPackedOrigin(StringBuilder sb, MegArchiveOrigin meg)
     {
-        var archiveName = Path.GetFileName(meg.ArchivePath);
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append($"📦 Packed in `{archiveName}` → `{meg.InternalPath}`");
+        sb.Append(MegArchiveOriginHoverText.Describe(meg));
     }
 
     // A baseline symbol projected from shipped game data carries a game-relative path (not a file://

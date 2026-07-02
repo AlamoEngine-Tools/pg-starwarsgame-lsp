@@ -107,8 +107,12 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
                 xml = new[] { "data/xml" },
                 scripts = new[] { "data/scripts" },
                 art = new[] { "data/art" },
-                audio = new[] { "data/audio" },
-                text = new[] { "data/text" }
+                audio = new[] { "data/audio" }
+            },
+            localisation = new
+            {
+                type = "CSV",
+                directory = "data/text"
             },
             projectReferences = Array.Empty<object>()
         };

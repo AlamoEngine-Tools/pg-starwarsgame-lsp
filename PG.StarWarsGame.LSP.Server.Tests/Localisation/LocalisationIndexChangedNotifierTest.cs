@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 public sealed class LocalisationIndexChangedNotifierTest
 {
     [Fact]
-    public void IndexChanged_Fires_SendsLocalisationIndexUpdatedNotification()
+    public void LocalisationChanged_Fires_SendsLocalisationIndexUpdatedNotification()
     {
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
@@ -22,13 +22,13 @@ public sealed class LocalisationIndexChangedNotifierTest
             m => sent.Add(m),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 
-        indexService.Raise(GameIndex.Empty);
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
 
         Assert.Contains("aet/localisationIndexUpdated", sent);
     }
 
     [Fact]
-    public void IndexChanged_FiresMultipleTimes_NotificationSentEachTime()
+    public void LocalisationChanged_FiresMultipleTimes_NotificationSentEachTime()
     {
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
@@ -37,15 +37,15 @@ public sealed class LocalisationIndexChangedNotifierTest
             m => sent.Add(m),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 
-        indexService.Raise(GameIndex.Empty);
-        indexService.Raise(GameIndex.Empty);
-        indexService.Raise(GameIndex.Empty);
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
 
         Assert.Equal(3, sent.Count);
     }
 
     [Fact]
-    public void IndexChanged_SenderThrows_ExceptionDoesNotPropagate()
+    public void LocalisationChanged_SenderThrows_ExceptionDoesNotPropagate()
     {
         var indexService = new RaisableIndexService();
         _ = new LocalisationIndexChangedNotifier(
@@ -53,18 +53,35 @@ public sealed class LocalisationIndexChangedNotifierTest
             _ => throw new InvalidOperationException("boom"),
             NullLogger<LocalisationIndexChangedNotifier>.Instance);
 
-        var ex = Record.Exception(() => indexService.Raise(GameIndex.Empty));
+        var ex = Record.Exception(() => indexService.RaiseLocalisation(GameIndex.Empty.Localisation));
 
         Assert.Null(ex);
     }
 
     [Fact]
-    public void NoNotifierConstructed_IndexChangedFires_NothingSent()
+    public void NoNotifierConstructed_LocalisationChangedFires_NothingSent()
     {
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
 
         // No notifier ever constructed — raising the event must not call our spy
+        indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
+
+        Assert.Empty(sent);
+    }
+
+    [Fact]
+    public void GenericIndexChanged_Fires_NoLocalisationNotificationSent()
+    {
+        // The notifier must be decoupled from the general IndexChanged event (which also fires
+        // for unrelated XML/Lua/asset changes) — only LocalisationChanged should trigger it.
+        var sent = new List<string>();
+        var indexService = new RaisableIndexService();
+        _ = new LocalisationIndexChangedNotifier(
+            indexService,
+            m => sent.Add(m),
+            NullLogger<LocalisationIndexChangedNotifier>.Instance);
+
         indexService.Raise(GameIndex.Empty);
 
         Assert.Empty(sent);
@@ -77,6 +94,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         public GameIndex Current => GameIndex.Empty;
 
         public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -107,6 +125,14 @@ public sealed class LocalisationIndexChangedNotifierTest
         {
         }
 
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
+
         public IDisposable BeginBulkUpdate()
         {
             return NullDisposable.Instance;
@@ -115,6 +141,11 @@ public sealed class LocalisationIndexChangedNotifierTest
         public void Raise(GameIndex index)
         {
             IndexChanged?.Invoke(index);
+        }
+
+        public void RaiseLocalisation(ILocalisationIndex index)
+        {
+            LocalisationChanged?.Invoke(index);
         }
 
         private sealed class NullDisposable : IDisposable

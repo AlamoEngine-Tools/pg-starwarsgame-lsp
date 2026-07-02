@@ -78,7 +78,9 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 	}
 }
 
-interface LocProjectInfo { label: string; filePath: string; resourceType: string; }
+interface LocProjectInfo {
+	label: string; filePath: string; resourceType: string; projectName: string; rank: number;
+}
 interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; }
 
 interface GetEffectiveObjectResult {
@@ -301,7 +303,10 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 				}
 
 				const picked = await vscode.window.showQuickPick(
-					projects.map(p => ({ label: p.label, description: p.filePath, detail: p.resourceType, filePath: p.filePath })),
+					projects.map(p => ({
+						label: p.label, description: p.filePath,
+						detail: `${p.projectName} · ${p.resourceType}`, filePath: p.filePath
+					})),
 					{ title: `Create localisation key '${keyName}'`, placeHolder: 'Select localisation project' }
 				);
 				if (!picked) { return; }
@@ -522,20 +527,152 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.initLocalisationProject', async () => {
 			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
-			const formatItem = await vscode.window.showQuickPick(
-				[
-					{ label: 'CSV', description: 'Comma-separated values (.csv)' },
-					{ label: 'XML', description: 'eaw-translation v1 XML (.xml)' },
-					{ label: 'NLS', description: 'Java-style properties (.properties)' },
-				],
-				{ title: 'Initialise Localisation Project from Baseline', placeHolder: 'Select output format' }
-			);
+
+			let rootConfig: { configured: boolean; type: string | null; directory: string | null };
+			try {
+				rootConfig = await lspClient.sendRequest('aet/getRootLocalisationConfig', {});
+			} catch {
+				vscode.window.showWarningMessage('EaWEdit LSP: could not query the project\'s localisation config.');
+				return;
+			}
+
+			// The .pgproj already declares a localisation node — it wins outright, no picker.
+			if (rootConfig.configured) {
+				const confirmed = await vscode.window.showInformationMessage(
+					`Initialise the localisation project (${rootConfig.type} in "${rootConfig.directory}")?`,
+					{ modal: true }, 'Initialise'
+				);
+				if (confirmed !== 'Initialise') { return; }
+				await lspClient.sendRequest(ExecuteCommandRequest.type, {
+					command: 'aet-eaw-edit.lsp.initLocalisationProject',
+					arguments: [{}],
+				});
+				vscode.window.showInformationMessage('Localisation project initialised.');
+				return;
+			}
+
+			// Not configured — the VS Code setting only pre-fills the picker here, as a last resort.
+			const formatOptions = [
+				{ label: 'CSV', description: 'Comma-separated values (.csv)' },
+				{ label: 'XML', description: 'eaw-translation v1 XML (.xml)' },
+				{ label: 'NLS', description: 'Java-style properties (.properties)' },
+			];
+			const defaultFormat = cfg('localisation').get<string>('format', 'format-dat')
+				.replace(/^format-/, '').toUpperCase();
+			const defaultIdx = formatOptions.findIndex(o => o.label === defaultFormat);
+			if (defaultIdx > 0) { formatOptions.unshift(formatOptions.splice(defaultIdx, 1)[0]); }
+
+			const formatItem = await vscode.window.showQuickPick(formatOptions, {
+				title: 'Initialise Localisation Project from Baseline', placeHolder: 'Select output format'
+			});
 			if (!formatItem) { return; }
+
+			const directory = await vscode.window.showInputBox({
+				title: 'Localisation directory (relative to the .pgproj)',
+				value: 'data/text',
+				prompt: 'Where the localisation project files will live',
+				validateInput: v => (v?.trim() ? null : 'A directory is required'),
+			});
+			if (!directory) { return; }
+
 			await lspClient.sendRequest(ExecuteCommandRequest.type, {
 				command: 'aet-eaw-edit.lsp.initLocalisationProject',
-				arguments: [{ format: formatItem.label }],
+				arguments: [{ format: formatItem.label, directory: directory.trim() }],
 			});
 			vscode.window.showInformationMessage(`Localisation project initialised (${formatItem.label}).`);
+		}),
+	);
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.importLocalisationProject', async () => {
+			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+
+			const convertibleFormats = [
+				{ label: 'CSV', description: 'Comma-separated values (.csv)' },
+				{ label: 'XML', description: 'eaw-translation v1 XML (.xml)' },
+				{ label: 'NLS', description: 'Java-style properties (.properties)' },
+			];
+			const datFormat = { label: 'DAT', description: 'The game\'s proprietary binary format (.dat)' };
+			const sourceFormatChoices = [...convertibleFormats, datFormat];
+
+			const sourceFormatItem = await vscode.window.showQuickPick(sourceFormatChoices, {
+				title: 'Import Existing Localisation Files', placeHolder: 'What format are your existing files in?'
+			});
+			if (!sourceFormatItem) { return; }
+			const isDatSource = sourceFormatItem.label === 'DAT';
+
+			// DAT is one binary file per language (MasterTextFile_<LANGUAGE>.dat) — the user picks
+			// one file, the server discovers its siblings in the same folder. Every other format
+			// stores all languages in one file, so the user picks the containing folder directly.
+			let sourceDirectory: string;
+			const defaultUri = vscode.workspace.workspaceFolders?.[0]?.uri;
+			if (isDatSource) {
+				const sourceFiles = await vscode.window.showOpenDialog({
+					canSelectFolders: false, canSelectFiles: true, canSelectMany: false,
+					defaultUri,
+					filters: { 'DAT files': ['dat'] },
+					openLabel: 'Select a MasterTextFile_<LANGUAGE>.dat file',
+					title: 'Select one DAT file — its siblings in the same folder are imported too',
+				});
+				if (!sourceFiles?.length) { return; }
+				sourceDirectory = vscode.Uri.joinPath(sourceFiles[0], '..').fsPath;
+			} else {
+				const sourceFolders = await vscode.window.showOpenDialog({
+					canSelectFolders: true, canSelectFiles: false, canSelectMany: false,
+					defaultUri,
+					openLabel: 'Select folder with existing files',
+					title: `Folder containing your ${sourceFormatItem.label} files`,
+				});
+				if (!sourceFolders?.length) { return; }
+				sourceDirectory = sourceFolders[0].fsPath;
+			}
+
+			// Pre-fill the target format to match the source — the common case is "just register
+			// what I already have," not a conversion. DAT is never a conversion target (no DAT
+			// generator wired into this wizard — use the existing "Export DAT" action for that), so
+			// it only appears as a target choice when the source is DAT itself, with no pre-selection
+			// (DAT is never git-friendly for collaborative editing — force an explicit choice).
+			let targetFormatItem: { label: string; description: string } | undefined;
+			if (isDatSource) {
+				targetFormatItem = await vscode.window.showQuickPick([...convertibleFormats, datFormat], {
+					title: 'Target Format', placeHolder: 'Format to use going forward'
+				});
+			} else {
+				const targetChoices = convertibleFormats.map(o => ({ ...o }));
+				const sourceIdx = targetChoices.findIndex(o => o.label === sourceFormatItem.label);
+				if (sourceIdx > 0) { targetChoices.unshift(targetChoices.splice(sourceIdx, 1)[0]); }
+				targetFormatItem = await vscode.window.showQuickPick(targetChoices, {
+					title: 'Target Format',
+					placeHolder: `Format to use going forward (defaults to ${sourceFormatItem.label})`
+				});
+			}
+			if (!targetFormatItem) { return; }
+
+			let targetDirectory: string | undefined;
+			if (targetFormatItem.label !== sourceFormatItem.label) {
+				targetDirectory = await vscode.window.showInputBox({
+					title: 'Target directory (relative to the .pgproj)',
+					value: 'data/text',
+					prompt: `Converting ${sourceFormatItem.label} → ${targetFormatItem.label} — where should the new file go?`,
+					validateInput: v => (v?.trim() ? null : 'A directory is required'),
+				});
+				if (!targetDirectory) { return; }
+			}
+
+			await lspClient.sendRequest(ExecuteCommandRequest.type, {
+				command: 'aet-eaw-edit.lsp.importLocalisationProject',
+				arguments: [{
+					sourceFormat: sourceFormatItem.label,
+					sourceDirectory,
+					targetFormat: targetFormatItem.label,
+					...(targetDirectory ? { targetDirectory: targetDirectory.trim() } : {}),
+				}],
+			});
+			vscode.window.showInformationMessage(
+				targetDirectory
+					? `Localisation project imported and converted to ${targetFormatItem.label}.`
+					: 'Localisation project imported.'
+			);
 		}),
 	);
 

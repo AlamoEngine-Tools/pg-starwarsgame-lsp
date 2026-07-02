@@ -62,14 +62,9 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
                     return Task.FromResult<LocationOrLocationLinks?>(null);
                 }
 
-                var location = new Location
-                {
-                    Uri = fo.Uri,
-                    Range = new LspRange(new Position(fo.Line, fo.Column ?? 0), new Position(fo.Line, fo.Column ?? 0))
-                };
                 _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
                 return Task.FromResult<LocationOrLocationLinks?>(
-                    new LocationOrLocationLinks(new LocationOrLocationLink(location)));
+                    new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocation())));
             }
         }
 
@@ -96,52 +91,10 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         SyntaxNode root, int line, int character,
         IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper, string callerUri)
     {
-        foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())
-        {
-            if (call.Expression is not IdentifierNameSyntax { Name: "require" }) continue;
-
-            string? requireArg = null;
-            if (call.Argument is StringFunctionArgumentSyntax strArg)
-                requireArg = strArg.Expression.Token.ValueText;
-            else if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
-                     exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
-                requireArg = lit.Token.ValueText;
-
-            if (requireArg is null) continue;
-
-            var span = GetArgSpan(call);
-            if (span is null) continue;
-
-            var (startLine, startChar, endLine, endChar) = span.Value;
-            if (line < startLine || line > endLine) continue;
-            if (line == startLine && character < startChar) continue;
-            if (line == endLine && character > endChar) continue;
-
-            return LuaRequireResolver.Resolve(requireArg, documents, fileHelper, callerUri);
-        }
-
-        return null;
-    }
-
-    private static (int StartLine, int StartChar, int EndLine, int EndChar)? GetArgSpan(
-        FunctionCallExpressionSyntax call)
-    {
-        if (call.Argument is StringFunctionArgumentSyntax strArg)
-        {
-            var s = strArg.Expression.Token.GetLocation().GetLineSpan();
-            return (s.StartLinePosition.Line, s.StartLinePosition.Character,
-                s.EndLinePosition.Line, s.EndLinePosition.Character);
-        }
-
-        if (call.Argument is ExpressionListFunctionArgumentSyntax exprList &&
-            exprList.Expressions.FirstOrDefault() is LiteralExpressionSyntax lit)
-        {
-            var s = lit.Token.GetLocation().GetLineSpan();
-            return (s.StartLinePosition.Line, s.StartLinePosition.Character,
-                s.EndLinePosition.Line, s.EndLinePosition.Character);
-        }
-
-        return null;
+        var found = LuaRequireCallLocator.TryFindAt(root, line, character);
+        return found is null
+            ? null
+            : LuaRequireResolver.Resolve(found.Value.ArgText, documents, fileHelper, callerUri);
     }
 
     protected override DefinitionRegistrationOptions CreateRegistrationOptions(

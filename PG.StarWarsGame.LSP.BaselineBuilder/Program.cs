@@ -230,7 +230,9 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     {
         if (path.Contains("gameconstants", StringComparison.OrdinalIgnoreCase))
             return gameConstantsXml;
-        using var enumStream = engine.GameRepository.TryOpenFile(path.ToUpperInvariant().Replace('/', '\\'));
+        // Bare filenames (no directory component) live in data/xml/enum/ in the game archive.
+        var fullPath = path.Contains('/') ? path : $"data/xml/enum/{path}";
+        using var enumStream = engine.GameRepository.TryOpenFile(fullPath.ToUpperInvariant().Replace('/', '\\'));
         return enumStream is null ? null : new StreamReader(enumStream).ReadToEnd();
     };
 

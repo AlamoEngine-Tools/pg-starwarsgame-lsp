@@ -4,14 +4,22 @@
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
-interface LocProjectInfo { label: string; filePath: string; resourceType: string; }
+interface LocProjectInfo {
+    label: string; filePath: string; resourceType: string; projectName: string; rank: number;
+}
 interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; }
+interface LocalisationEntryDto { key: string; translations: Record<string, string>; }
+interface GetLocalisationEntriesResult {
+    entries: LocalisationEntryDto[]; languages: string[]; contentHash: string; error?: string | null;
+}
+interface LocalisationWriteResult { success: boolean; error?: string | null; newContentHash?: string | null; }
 
 export class LocalisationEditorViewProvider implements vscode.WebviewViewProvider {
     public static readonly viewId = 'aet-eaw-edit.lsp.localisationEditor';
 
     private _view?: vscode.WebviewView;
     private _currentFilePath?: string;
+    private _currentContentHash?: string;
     private _officialLanguages: string[] = [];
 
     constructor(
@@ -40,14 +48,40 @@ export class LocalisationEditorViewProvider implements vscode.WebviewViewProvide
             switch (msg.type) {
                 case 'ready':         await this._handleReady();                                 break;
                 case 'selectProject': await this._handleSelectProject(msg.filePath as string);  break;
-                case 'setFileText':   await this._handleSetFileText(msg.text as string);         break;
+                case 'setEntry':
+                    await this._handleSetEntry(
+                        msg.key as string, msg.translations as Record<string, string>);
+                    break;
+                case 'deleteEntry':  await this._handleDeleteEntry(msg.key as string);            break;
+                case 'resetEntry':
+                    await this._handleResetEntry(
+                        msg.key as string, msg.translations as Record<string, string>);
+                    break;
+                case 'addLanguage':  await this._handleAddLanguage(msg.language as string);       break;
                 case 'requestBaseline':  await this._handleRequestBaseline();                    break;
                 case 'requestLanguages': await this._handleRequestLanguages();                   break;
-                case 'initProject':
-                    await vscode.commands.executeCommand('aet-eaw-edit.lsp.initLocalisationProject');
+                case 'initProject': {
+                    const choice = await vscode.window.showQuickPick(
+                        [
+                            {
+                                label: 'Initialise from Baseline',
+                                description: 'Create a fresh file seeded with the shipped game text',
+                                command: 'aet-eaw-edit.lsp.initLocalisationProject',
+                            },
+                            {
+                                label: 'Import Existing Files',
+                                description: 'Adopt a directory of translation files you already have',
+                                command: 'aet-eaw-edit.lsp.importLocalisationProject',
+                            },
+                        ],
+                        { title: 'New Localisation Project', placeHolder: 'How do you want to set this up?' }
+                    );
+                    if (!choice) { break; }
+                    await vscode.commands.executeCommand(choice.command);
                     this._currentFilePath = undefined;
                     await this._handleReady();
                     break;
+                }
                 case 'exportToDat': {
                     const client = this._getLspClient();
                     if (!client) {
@@ -118,25 +152,89 @@ export class LocalisationEditorViewProvider implements vscode.WebviewViewProvide
 
     private async _loadAndSendFile(filePath: string): Promise<void> {
         this._currentFilePath = filePath;
+        this._currentContentHash = undefined;
+        const client = this._getLspClient();
+        if (!client) {
+            this._post({ type: 'error', message: 'LSP server is not running.' });
+            return;
+        }
         try {
-            const bytes = await vscode.workspace.fs.readFile(vscode.Uri.file(filePath));
-            const text = Buffer.from(bytes).toString('utf8');
-            this._post({ type: 'fileText', filePath, text });
+            const result = await client.sendRequest<GetLocalisationEntriesResult>(
+                'aet/getLocalisationEntries', { projectFilePath: filePath });
+            if (result.error) {
+                this._post({ type: 'error', message: result.error });
+                return;
+            }
+            this._currentContentHash = result.contentHash;
+            this._post({
+                type: 'fileEntries',
+                filePath,
+                entries: result.entries ?? [],
+                languages: result.languages ?? [],
+            });
         } catch (e) {
-            this._post({ type: 'error', message: `Cannot read file: ${e}` });
+            this._post({ type: 'error', message: `Cannot load file: ${e}` });
         }
     }
 
-    private async _handleSetFileText(text: string): Promise<void> {
-        if (!this._currentFilePath) { return; }
-        try {
-            await vscode.workspace.fs.writeFile(
-                vscode.Uri.file(this._currentFilePath),
-                Buffer.from(text, 'utf8')
-            );
-        } catch (e) {
-            this._post({ type: 'error', message: `Cannot write file: ${e}` });
+    /**
+     * Sends a structured write request. On failure, shows an error and resyncs from the server
+     * (self-healing after e.g. a stale-content-hash rejection). Returns whether it succeeded.
+     */
+    private async _runWrite(method: string, extraParams: Record<string, unknown>): Promise<boolean> {
+        if (!this._currentFilePath) { return false; }
+        const filePath = this._currentFilePath;
+        const client = this._getLspClient();
+        if (!client) {
+            this._post({ type: 'error', message: 'LSP server is not running.' });
+            return false;
         }
+        try {
+            const result = await client.sendRequest<LocalisationWriteResult>(method, {
+                projectFilePath: filePath,
+                expectedContentHash: this._currentContentHash,
+                ...extraParams,
+            });
+            if (!result.success) {
+                void vscode.window.showErrorMessage(result.error ?? 'Localisation write failed.');
+                this._post({ type: 'error', message: result.error ?? 'Write failed.' });
+                await this._loadAndSendFile(filePath);
+                return false;
+            }
+            this._currentContentHash = result.newContentHash ?? this._currentContentHash;
+            return true;
+        } catch (e) {
+            void vscode.window.showErrorMessage(`Localisation write failed: ${e}`);
+            this._post({ type: 'error', message: `Write failed: ${e}` });
+            await this._loadAndSendFile(filePath);
+            return false;
+        }
+    }
+
+    private async _handleSetEntry(key: string, translations: Record<string, string>): Promise<void> {
+        await this._runWrite('aet/setLocalisationEntry', { key, translations });
+    }
+
+    private async _handleDeleteEntry(key: string): Promise<void> {
+        const choice = await vscode.window.showWarningMessage(
+            `Delete "${key}"?`, { modal: true }, 'Delete');
+        if (choice !== 'Delete') { return; }
+        const filePath = this._currentFilePath;
+        const ok = await this._runWrite('aet/deleteLocalisationEntry', { key });
+        if (ok && filePath) { await this._loadAndSendFile(filePath); }
+    }
+
+    private async _handleResetEntry(key: string, translations: Record<string, string>): Promise<void> {
+        const choice = await vscode.window.showWarningMessage(
+            `Reset "${key}" to inherited value?`, { modal: true }, 'Reset');
+        if (choice !== 'Reset') { return; }
+        const filePath = this._currentFilePath;
+        const ok = await this._runWrite('aet/setLocalisationEntry', { key, translations });
+        if (ok && filePath) { await this._loadAndSendFile(filePath); }
+    }
+
+    private async _handleAddLanguage(language: string): Promise<void> {
+        await this._runWrite('aet/addLocalisationLanguage', { language });
     }
 
     private async _handleRequestBaseline(): Promise<void> {
@@ -147,7 +245,7 @@ export class LocalisationEditorViewProvider implements vscode.WebviewViewProvide
             if (client) {
                 try {
                     const result = await client.sendRequest<{ entries: { key: string; translations: Record<string, string> }[] }>(
-                        'aet/getBaselineEntries', {});
+                        'aet/getBaselineEntries', { projectFilePath: this._currentFilePath });
                     const rows = (result.entries ?? []).map(e => ({
                         key: e.key,
                         translations: e.translations ?? {},
@@ -445,7 +543,7 @@ langPicker.addEventListener('change', () => {
     if (!lang || languages.includes(lang)) return;
     languages.push(lang);
     renderRows();
-    vscode.postMessage({ type: 'setFileText', text: serializeFile(currentExt, allRows, languages) });
+    vscode.postMessage({ type: 'addLanguage', language: lang });
 });
 
 function debounce(fn, ms) { let t; return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); }; }
@@ -489,13 +587,14 @@ function confirmNewEntry() {
     const key = (newKeyInput.value || '').trim();
     newEntryBar.style.display = 'none';
     if (!key) return;
-    allRows.unshift({ key, translations: Object.fromEntries(languages.map(l => [l, ''])) });
+    const translations = Object.fromEntries(languages.map(l => [l, '']));
+    allRows.unshift({ key, translations });
     currentFilter = '';
     searchInput.value = '';
     searchInput.classList.remove('filter-error');
     computeInheritedKeys();
     renderRows();
-    vscode.postMessage({ type: 'setFileText', text: serializeFile(currentExt, allRows, languages) });
+    vscode.postMessage({ type: 'setEntry', key, translations });
 }
 
 btnConfirmEntry.addEventListener('click', confirmNewEntry);
@@ -542,7 +641,7 @@ gridBody.addEventListener('focusout', e => {
             }
         }
     }
-    vscode.postMessage({ type: 'setFileText', text: serializeFile(currentExt, allRows, languages) });
+    vscode.postMessage({ type: 'setEntry', key: row.key, translations: row.translations });
 });
 
 gridBody.addEventListener('keydown', e => {
@@ -558,33 +657,18 @@ gridBody.addEventListener('keydown', e => {
 gridBody.addEventListener('click', e => {
     const delBtn = e.target.closest('.del-btn[data-delete-key]');
     if (delBtn) {
-        const key = delBtn.dataset.deleteKey;
-        if (!confirm(\`Delete "\${key}"?\`)) return;
-        const idx = allRows.findIndex(r => r.key === key);
-        if (idx >= 0) {
-            allRows.splice(idx, 1);
-            inheritedKeys.delete(key);
-            filteredSortedRows = filteredSortedRows.filter(r => r.key !== key);
-            rowByKey.delete(key);
-            renderViewport();
-            vscode.postMessage({ type: 'setFileText', text: serializeFile(currentExt, allRows, languages) });
-        }
+        // Confirmation and the actual row removal both happen extension-side (VS Code-native
+        // modal); on success the extension resends 'fileEntries', which re-renders the grid.
+        vscode.postMessage({ type: 'deleteEntry', key: delBtn.dataset.deleteKey });
         return;
     }
 
     const gutterIcon = e.target.closest('.gutter-icon[data-reset-key]');
     if (gutterIcon) {
         const key = gutterIcon.dataset.resetKey;
-        if (!confirm(\`Reset "\${key}" to inherited value?\`)) return;
-        const idx = allRows.findIndex(r => r.key === key);
-        if (idx >= 0) {
-            const baseline = baselineRows.find(r => r.key === key);
-            if (baseline) {
-                allRows[idx].translations = { ...baseline.translations };
-                computeInheritedKeys();
-                renderRows();
-                vscode.postMessage({ type: 'setFileText', text: serializeFile(currentExt, allRows, languages) });
-            }
+        const baseline = baselineRows.find(r => r.key === key);
+        if (baseline) {
+            vscode.postMessage({ type: 'resetEntry', key, translations: { ...baseline.translations } });
         }
         return;
     }
@@ -605,13 +689,19 @@ window.addEventListener('message', event => {
             renderProjects(msg.projects);
             if (!msg.projects || !msg.projects.length) btnExportDat.disabled = true;
             break;
-        case 'fileText': {
+        case 'fileEntries': {
             currentFilePath = msg.filePath;
             btnExportDat.disabled = false;
             currentExt = currentFilePath.split('.').pop().toLowerCase();
-            const parsed = parseFile(currentExt, msg.text);
-            allRows = parsed.rows;
-            languages = parsed.languages;
+            // Dictionary string keys (e.g. "ENGLISH") get camelCased by OmniSharp's JSON
+            // serializer (see the 'baselineRows' handler below) — normalise the same way here.
+            allRows = (msg.entries || []).map(e => {
+                const translations = {};
+                for (const [k, v] of Object.entries(e.translations ?? {}))
+                    translations[k.toUpperCase()] = v;
+                return { key: e.key, translations };
+            });
+            languages = msg.languages || [];
             baselineRows = [];
             baselineKeySet = new Set();
             inheritedKeys = new Set();
@@ -656,150 +746,6 @@ window.addEventListener('message', event => {
     }
 });
 
-// ── File parsing ─────────────────────────────────────────────────────────────
-
-function parseFile(ext, text) {
-    if (ext === 'csv')        return parseCsv(text);
-    if (ext === 'properties') return parseNls(text);
-    if (ext === 'xml')        return parseXml(text);
-    return { rows: [], languages: [] };
-}
-
-function parseCsvRfc4180(text) {
-    // Returns string[][] — one inner array per row, one string per field.
-    const result = [];
-    let pos = 0;
-    const len = text.length;
-    while (pos < len) {
-        const row = [];
-        while (pos < len) {
-            if (text[pos] === '"') {
-                pos++;
-                let field = '';
-                while (pos < len) {
-                    if (text[pos] === '"') {
-                        if (pos + 1 < len && text[pos + 1] === '"') { field += '"'; pos += 2; }
-                        else { pos++; break; }
-                    } else { field += text[pos++]; }
-                }
-                row.push(field);
-            } else {
-                let field = '';
-                while (pos < len && text[pos] !== ',' && text[pos] !== '\\n' && text[pos] !== '\\r')
-                    field += text[pos++];
-                row.push(field);
-            }
-            if (pos < len && text[pos] === ',') pos++;
-            else break;
-        }
-        if (pos < len && text[pos] === '\\r') pos++;
-        if (pos < len && text[pos] === '\\n') pos++;
-        if (row.some(f => f !== '')) result.push(row);
-    }
-    return result;
-}
-
-function parseCsv(text) {
-    const rows = parseCsvRfc4180(text);
-    if (!rows.length) return { rows: [], languages: [] };
-    const header = rows[0];
-    const langs = header.slice(1);
-    const parsed = [];
-    for (let i = 1; i < rows.length; i++) {
-        const parts = rows[i];
-        const key = parts[0];
-        if (!key) continue;
-        const translations = {};
-        for (let j = 0; j < langs.length; j++)
-            translations[langs[j]] = parts[j + 1] !== undefined ? parts[j + 1] : '';
-        parsed.push({ key, translations });
-    }
-    const activeLangs = langs.filter(lang => parsed.some(r => r.translations[lang]));
-    return { rows: parsed, languages: activeLangs };
-}
-
-function parseNls(text) {
-    const rows = [];
-    for (const line of text.split('\\n')) {
-        const t = line.replace(/\\r$/, '').trim();
-        if (!t || t.startsWith('#')) continue;
-        const eq = t.indexOf('=');
-        if (eq < 0) continue;
-        rows.push({ key: t.slice(0, eq), translations: { ENGLISH: t.slice(eq + 1) } });
-    }
-    return { rows, languages: ['ENGLISH'] };
-}
-
-function parseXml(text) {
-    const ns = 'http://www.example.org/eaw-translation/';
-    let doc;
-    try { doc = new DOMParser().parseFromString(text, 'text/xml'); }
-    catch { return { rows: [], languages: [] }; }
-    const langSet = new Set();
-    const rows = [];
-    for (const loc of doc.getElementsByTagNameNS(ns, 'Localisation')) {
-        const key = loc.getAttribute('key');
-        if (!key) continue;
-        const translations = {};
-        for (const t of loc.getElementsByTagNameNS(ns, 'Translation')) {
-            const lang = t.getAttribute('Language');
-            if (lang) { translations[lang] = t.textContent || ''; langSet.add(lang); }
-        }
-        rows.push({ key, translations });
-    }
-    const activeLangs = [...langSet].filter(lang => rows.some(r => r.translations[lang]));
-    return { rows, languages: activeLangs };
-}
-
-// ── File serialization ────────────────────────────────────────────────────────
-
-function serializeFile(ext, rows, langs) {
-    if (ext === 'csv')        return serializeCsv(rows, langs);
-    if (ext === 'properties') return serializeNls(rows);
-    if (ext === 'xml')        return serializeXml(rows, langs);
-    return '';
-}
-
-function escapeCsvField(v) {
-    if (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\\n') >= 0 || v.indexOf('\\r') >= 0)
-        return '"' + v.replace(/"/g, '""') + '"';
-    return v;
-}
-
-function serializeCsv(rows, langs) {
-    const lines = [['key', ...langs].map(escapeCsvField).join(',')];
-    for (const row of rows) {
-        const fields = [row.key, ...langs.map(l => row.translations[l] !== undefined ? row.translations[l] : '')];
-        lines.push(fields.map(escapeCsvField).join(','));
-    }
-    return lines.join('\\n') + '\\n';
-}
-
-function serializeNls(rows) {
-    return rows.map(r => r.key + '=' + (r.translations['ENGLISH'] || '')).join('\\n') + '\\n';
-}
-
-function serializeXml(rows, langs) {
-    const ns = 'http://www.example.org/eaw-translation/';
-    const doc = document.implementation.createDocument(ns, null, null);
-    const root = doc.createElementNS(ns, 'LocalisationData');
-    for (const row of rows) {
-        const loc = doc.createElementNS(ns, 'Localisation');
-        loc.setAttribute('key', row.key);
-        const td = doc.createElementNS(ns, 'TranslationData');
-        for (const lang of langs) {
-            const t = doc.createElementNS(ns, 'Translation');
-            t.setAttribute('Language', lang);
-            t.textContent = row.translations[lang] !== undefined ? row.translations[lang] : '';
-            td.appendChild(t);
-        }
-        loc.appendChild(td);
-        root.appendChild(loc);
-    }
-    doc.appendChild(root);
-    return new XMLSerializer().serializeToString(doc);
-}
-
 // ── Rendering ─────────────────────────────────────────────────────────────────
 
 function renderProjects(projects) {
@@ -812,10 +758,16 @@ function renderProjects(projects) {
         projectPicker.appendChild(opt);
         return;
     }
+    // Same-named files from different .pgproj layers (root vs. a dependency) are otherwise
+    // indistinguishable — append the owning project's name when a label collides.
+    const labelCounts = new Map();
+    for (const p of projects) labelCounts.set(p.label, (labelCounts.get(p.label) || 0) + 1);
     for (const p of projects) {
         const opt = document.createElement('option');
         opt.value = p.filePath;
-        opt.textContent = p.label;
+        opt.textContent = (labelCounts.get(p.label) > 1 && p.projectName)
+            ? \`\${p.label} — \${p.projectName}\`
+            : p.label;
         projectPicker.appendChild(opt);
     }
     if (prevValue && [...projectPicker.options].some(o => o.value === prevValue)) {

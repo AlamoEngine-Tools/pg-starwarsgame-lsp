@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -66,6 +67,113 @@ public sealed class DynamicEnumExtractorTest
         var result = DynamicEnumExtractor.ParseEnumDefinitionFile("<not valid xml <<<<");
 
         Assert.Empty(result);
+    }
+
+    // ── ParseElementTextWithLocations ────────────────────────────────────────
+
+    [Fact]
+    public void ParseElementTextWithLocations_ReturnsTokenAndPosition()
+    {
+        const string xml = "<GameConstants><Damage_Types>EXPLOSIVE ENERGY GRENADE</Damage_Types></GameConstants>";
+
+        var result = DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
+
+        Assert.Equal(3, result.Count);
+        Assert.Equal("EXPLOSIVE", result[0].Name);
+        Assert.Equal("ENERGY", result[1].Name);
+        Assert.Equal("GRENADE", result[2].Name);
+        Assert.All(result, r => Assert.Equal("file:///gameconstants.xml", r.Origin.Uri));
+        // All on line 0; ENERGY starts after "EXPLOSIVE " (10 chars after EXPLOSIVE start)
+        Assert.True(result[1].Origin.Column > result[0].Origin.Column);
+        Assert.True(result[2].Origin.Column > result[1].Origin.Column);
+    }
+
+    [Fact]
+    public void ParseElementTextWithLocations_MultiLine_TracksLineBreaks()
+    {
+        const string xml = """
+                           <GameConstants>
+                               <Damage_Types>
+                                   EXPLOSIVE
+                                   ENERGY
+                               </Damage_Types>
+                           </GameConstants>
+                           """;
+
+        var result = DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
+
+        Assert.Equal(2, result.Count);
+        Assert.Equal("EXPLOSIVE", result[0].Name);
+        Assert.Equal("ENERGY", result[1].Name);
+        // ENERGY is on a different line than EXPLOSIVE
+        Assert.True(result[1].Origin.Line > result[0].Origin.Line);
+    }
+
+    [Fact]
+    public void ParseElementTextWithLocations_StopsAtBoundaryComment()
+    {
+        const string xml = """
+                           <GameConstants>
+                             <Damage_Types>MOD_DMG
+                           <!-- PLEASE add your new damage types ABOVE this point. -->
+                           EXPLOSIVE ENERGY
+                             </Damage_Types>
+                           </GameConstants>
+                           """;
+
+        var result = DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
+
+        // Only MOD_DMG is before the boundary; EXPLOSIVE and ENERGY are hardcoded
+        Assert.Equal("MOD_DMG", Assert.Single(result).Name);
+    }
+
+    [Fact]
+    public void ParseElementTextWithLocations_MissingElement_ReturnsEmpty()
+    {
+        const string xml = "<GameConstants><Other_Types>SOMETHING</Other_Types></GameConstants>";
+
+        Assert.Empty(DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///x.xml"));
+    }
+
+    [Fact]
+    public void ParseElementTextWithLocations_NullOrEmpty_ReturnsEmpty()
+    {
+        Assert.Empty(DynamicEnumExtractor.ParseElementTextWithLocations(null, "Damage_Types", "file:///x.xml"));
+        Assert.Empty(DynamicEnumExtractor.ParseElementTextWithLocations("", "Damage_Types", "file:///x.xml"));
+    }
+
+    // ── ParseEnumDefinitionFileWithLocations ─────────────────────────────────
+
+    [Fact]
+    public void ParseEnumDefinitionFileWithLocations_ReturnsNameAndLineForEachElement()
+    {
+        const string xml = """
+                           <EnumDefinition>
+                               <GENERIC_TRACK>0</GENERIC_TRACK>
+                               <INFANTRY_TERRAIN_MODIFIER>1</INFANTRY_TERRAIN_MODIFIER>
+                           </EnumDefinition>
+                           """;
+
+        var result = DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations(xml, "file:///surfacefxtriggertype.xml");
+
+        Assert.Equal(2, result.Count);
+        var first = result[0];
+        Assert.Equal("GENERIC_TRACK", first.Name);
+        Assert.Equal("file:///surfacefxtriggertype.xml", first.Origin.Uri);
+        Assert.True(first.Origin.Line > 0); // must be past line 0 (the root element)
+    }
+
+    [Fact]
+    public void ParseEnumDefinitionFileWithLocations_NullOrEmpty_ReturnsEmpty()
+    {
+        Assert.Empty(DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations(null, "file:///x.xml"));
+        Assert.Empty(DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations("", "file:///x.xml"));
+    }
+
+    [Fact]
+    public void ParseEnumDefinitionFileWithLocations_MalformedXml_ReturnsEmpty()
+    {
+        Assert.Empty(DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations("<bad xml <<", "file:///x.xml"));
     }
 
     // ── Extract — schema with no DynamicXml enums ─────────────────────────────

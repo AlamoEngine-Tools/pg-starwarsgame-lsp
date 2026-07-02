@@ -6,6 +6,7 @@ using System.Collections.Immutable;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -40,11 +41,13 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
+    private readonly IGameWorkspaceHost _workspaceHost;
 
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
-        ILuaAnnotationRepository annotationRepository, ILogger<WorkspaceIndexer> logger)
+        ILuaAnnotationRepository annotationRepository, IGameWorkspaceHost workspaceHost,
+        ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
         _parsers = parsers;
@@ -54,6 +57,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
         _annotationRepository = annotationRepository;
+        _workspaceHost = workspaceHost;
         _logger = logger;
     }
 
@@ -221,6 +225,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                 var uri = _fileHelper.PathToFileUri(file);
                 await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                 var done = Interlocked.Increment(ref indexed);
                 progress?.Invoke(done, files.Count);
             });
@@ -287,7 +292,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                         ? NormalizePath(_fileHelper.FileSystem.Path.GetRelativePath(projectDir, file))
                         : file;
 
-                    var hash = ProjectFileHasher.ComputeFileHash(file, _fileHelper.FileSystem);
+                    var (hash, text) = ProjectFileHasher.ReadAndHash(file, _fileHelper.FileSystem);
                     layerEntries.Add((relPath, uri, hash));
 
                     if (cacheHits is not null
@@ -298,10 +303,10 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                     }
                     else
                     {
-                        var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                         await _indexService.UpdateDocumentAsync(uri, text, 0, token);
                     }
 
+                    _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                     var done = Interlocked.Increment(ref indexed);
                     progress?.Invoke(done, totalFiles);
                 });
@@ -390,6 +395,100 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     {
         var idx = normalizedPath.LastIndexOf('/');
         return idx < 0 ? string.Empty : normalizedPath[..idx];
+    }
+
+    /// <summary>
+    ///     Scans the workspace XML directories for every <see cref="EnumKind.DynamicXml" /> enum file
+    ///     declared in the schema, parses it with <see cref="DynamicEnumExtractor" />, and publishes
+    ///     the merged result as <see cref="IGameIndexService.ApplyWorkspaceDynamicEnumValues" />.
+    ///     Only files that actually exist in the workspace are included; missing files are silently
+    ///     skipped so dependency-only enums degrade gracefully to baseline-only validation.
+    /// </summary>
+    public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots)
+    {
+        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
+
+        // Keyed by logical file path (anchor stripped). Caches (diskPath, content) so the file is
+        // read once even when multiple enums share the same source file (e.g. gameconstants.xml).
+        var resolvedFiles = new Dictionary<string, (string DiskPath, string Content)>(
+            StringComparer.OrdinalIgnoreCase);
+
+        string? FileReader(string sourceFile)
+        {
+            var filePath = sourceFile.Contains('$') ? sourceFile[..sourceFile.IndexOf('$')] : sourceFile;
+
+            if (resolvedFiles.TryGetValue(filePath, out var cached))
+                return cached.Content;
+
+            // Filename-only search across every xml root, recursing into subdirectories.
+            // Iterate in reverse so the highest-rank (root project) directory is checked first;
+            // config.XmlDirectories is deps-first / root-last (see ModProjectResolver.Resolve).
+            var fileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep));
+            foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
+            {
+                if (!_fileHelper.FileSystem.Directory.Exists(xmlRoot)) continue;
+                var match = _fileHelper.FileSystem.Directory
+                    .EnumerateFiles(xmlRoot, fileName, SearchOption.AllDirectories)
+                    .FirstOrDefault();
+                if (match is null) continue;
+                try
+                {
+                    var content = _fileHelper.FileSystem.File.ReadAllText(match);
+                    resolvedFiles[filePath] = (match, content);
+                    return content;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("Could not read enum file '{Path}': {Message}", match, ex.Message);
+                }
+            }
+
+            return null;
+        }
+
+        var (workspace, _) = DynamicEnumExtractor.Extract(_schema, FileReader);
+
+        // Build per-value file locations for both plain-file and $anchor format enums.
+        var defsBuilder =
+            ImmutableDictionary.CreateBuilder<string, ImmutableDictionary<string, FileOrigin>>(
+                StringComparer.OrdinalIgnoreCase);
+
+        foreach (var enumDef in _schema.AllEnums)
+        {
+            if (enumDef.Kind != EnumKind.DynamicXml || string.IsNullOrEmpty(enumDef.SourceFile))
+                continue;
+
+            var sourceFile = enumDef.SourceFile;
+            var anchorIdx = sourceFile.IndexOf('$');
+            var filePath = anchorIdx >= 0 ? sourceFile[..anchorIdx] : sourceFile;
+
+            if (!resolvedFiles.TryGetValue(filePath, out var resolved))
+                continue;
+
+            var fileUri = _fileHelper.PathToFileUri(resolved.DiskPath);
+
+            IReadOnlyList<(string Name, FileOrigin Origin)> locations = anchorIdx >= 0
+                ? DynamicEnumExtractor.ParseElementTextWithLocations(
+                    resolved.Content, sourceFile[(anchorIdx + 1)..], fileUri)
+                : DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations(
+                    resolved.Content, fileUri);
+
+            if (locations.Count == 0) continue;
+
+            var inner = ImmutableDictionary.CreateBuilder<string, FileOrigin>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, origin) in locations)
+                inner[name] = origin;
+
+            defsBuilder[enumDef.Name] = inner.ToImmutable();
+        }
+
+        var count = workspace.Values.Sum(v => v.Length);
+        _logger.LogInformation(
+            "Dynamic enum catalog: {EnumCount} enum(s) with {ValueCount} workspace value(s) applied",
+            workspace.Count, count);
+
+        _indexService.ApplyWorkspaceDynamicEnumValues(workspace);
+        _indexService.ApplyWorkspaceEnumValueDefinitions(defsBuilder.ToImmutable());
     }
 
     public static bool IsAssetFile(string path)

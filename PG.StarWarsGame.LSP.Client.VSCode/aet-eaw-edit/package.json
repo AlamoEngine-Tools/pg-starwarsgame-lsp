@@ -52,7 +52,8 @@
           "icon": "resources/icons/localisation.svg",
           "type": "webview",
           "id": "aet-eaw-edit.lsp.localisationEditor",
-          "name": "Editor"
+          "name": "Editor",
+          "when": "config.aet-eaw-edit.localisation.editorEnabled"
         }
       ]
     },
@@ -81,6 +82,10 @@
       {
         "command": "aet-eaw-edit.lsp.initLocalisationProject",
         "title": "EaWEdit: Initialise Localisation Project from Baseline"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.importLocalisationProject",
+        "title": "EaWEdit: Import Existing Localisation Files"
       },
       {
         "command": "aet-eaw-edit.lsp.showEffectiveObject",
@@ -199,21 +204,24 @@
           "order": 1200,
           "type": "string",
           "default": "format-dat",
-          "markdownDescription": "Only applies when `#aet-eaw-edit.localisation.editorEnabled#` is set to `true`.",
+          "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node — an existing project's own declared format always wins.",
           "enum": [
             "format-dat",
             "format-csv",
-            "format-xml"
+            "format-xml",
+            "format-nls"
           ],
           "enumItemLabels": [
             "DAT",
             "CSV",
-            "XML"
+            "XML",
+            "NLS"
           ],
           "markdownEnumDescriptions": [
             "The game's proprietary *.DAT format.\n\n*Not recommended if the project is being worked on by multiple people.*",
             "A comma-separated file per language. Recommended.",
-            "An XML file used by the [Empire at War Text Editor](https://www.nexusmods.com/starwarsempireatwar/mods/1859)"
+            "An XML file used by the [Empire at War Text Editor](https://www.nexusmods.com/starwarsempireatwar/mods/1859)",
+            "Java-style `key=value` properties file (single language)."
           ]
         },
         "aet-eaw-edit.modVerify.enabled": {

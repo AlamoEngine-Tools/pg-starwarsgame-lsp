@@ -85,6 +85,35 @@ public sealed class ModProjectReloadServiceTest
     }
 
     [Fact]
+    public async Task ReloadLocalisationAsync_BeforeLoadAsync_NoOpWithWarning()
+    {
+        var (service, _, logger) = Build(SampleConfig);
+
+        await service.ReloadLocalisationAsync(CancellationToken.None);
+
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning);
+    }
+
+    [Fact]
+    public async Task ReloadLocalisationAsync_AfterLoad_ReloadsLocalisationOnly()
+    {
+        var localisation = new RecordingLocalisationLoader();
+        var indexer = new RecordingIndexer();
+        var service = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), new ListLogger());
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+        var indexCallsAfterLoad = indexer.IndexCallCount;
+        var localisationCallsAfterLoad = localisation.LoadCallCount;
+
+        await service.ReloadLocalisationAsync(CancellationToken.None);
+
+        // Only the localisation loader ran again — the full XML/Lua/asset/bone/enum indexer did not.
+        Assert.Equal(indexCallsAfterLoad, indexer.IndexCallCount);
+        Assert.Equal(localisationCallsAfterLoad + 1, localisation.LoadCallCount);
+        Assert.Same(SampleConfig, localisation.LastConfig);
+    }
+
+    [Fact]
     public async Task LoadAsync_PublishesConfigLayersToLayerMapBeforeIndexing()
     {
         var layerMap = new RecordingLayerMap();
@@ -148,6 +177,7 @@ public sealed class ModProjectReloadServiceTest
         public int IndexCallCount { get; private set; }
         public bool AssetCatalogApplied { get; private set; }
         public bool BonesApplied { get; private set; }
+        public bool DynamicEnumCatalogApplied { get; private set; }
 
         public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
         {
@@ -160,6 +190,11 @@ public sealed class ModProjectReloadServiceTest
         {
             IndexCallCount++;
             return Task.FromResult(0);
+        }
+
+        public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots)
+        {
+            DynamicEnumCatalogApplied = true;
         }
 
         public void ApplyAssetCatalog(IReadOnlyList<string> roots)
@@ -177,6 +212,19 @@ public sealed class ModProjectReloadServiceTest
     {
         public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct)
         {
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class RecordingLocalisationLoader : ILocalisationLoader
+    {
+        public int LoadCallCount { get; private set; }
+        public WorkspaceConfiguration? LastConfig { get; private set; }
+
+        public Task LoadAsync(WorkspaceConfiguration workspaceConfig, CancellationToken ct)
+        {
+            LoadCallCount++;
+            LastConfig = workspaceConfig;
             return Task.CompletedTask;
         }
     }

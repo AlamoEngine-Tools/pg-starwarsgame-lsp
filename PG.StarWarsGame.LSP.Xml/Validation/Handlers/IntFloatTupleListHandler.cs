@@ -17,7 +17,7 @@ public sealed partial class IntFloatTupleListHandler : SingleValueTypeHandlerBas
         if (trimmed.Length == 0)
             return [Error(fact, trimmed)];
 
-        var parts = Separator().Split(trimmed);
+        var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
         if (parts.Length % 2 != 0)
             return [Error(fact, trimmed)];
 

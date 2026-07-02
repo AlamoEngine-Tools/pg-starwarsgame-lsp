@@ -195,6 +195,82 @@ public sealed class DynamicEnumValueHandlerTest
         Assert.Empty(results);
     }
 
+    // ── Workspace dynamic enum values ────────────────────────────────────────
+
+    [Fact]
+    public void DynamicXml_workspace_only_value_is_accepted()
+    {
+        var enumDef = DynXml("SurfaceFXTriggerType");
+        var tag = XmlHandlerTestFixtures.MakeTag("SurfaceFX_Name", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+
+        // Baseline knows GENERIC_TRACK; workspace adds MY_CUSTOM_TRACK.
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                DynamicEnumValues = ImmutableDictionary.CreateRange(
+                    StringComparer.OrdinalIgnoreCase,
+                    [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("GENERIC_TRACK"))])
+            },
+            WorkspaceDynamicEnumValues = ImmutableDictionary.CreateRange(
+                StringComparer.OrdinalIgnoreCase,
+                [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("MY_CUSTOM_TRACK"))])
+        };
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "MY_CUSTOM_TRACK"), ctx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void DynamicXml_baseline_value_still_accepted_when_workspace_also_present()
+    {
+        var enumDef = DynXml("SurfaceFXTriggerType");
+        var tag = XmlHandlerTestFixtures.MakeTag("SurfaceFX_Name", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                DynamicEnumValues = ImmutableDictionary.CreateRange(
+                    StringComparer.OrdinalIgnoreCase,
+                    [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("GENERIC_TRACK"))])
+            },
+            WorkspaceDynamicEnumValues = ImmutableDictionary.CreateRange(
+                StringComparer.OrdinalIgnoreCase,
+                [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("MY_CUSTOM_TRACK"))])
+        };
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "GENERIC_TRACK"), ctx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void DynamicXml_value_absent_from_both_baseline_and_workspace_warns()
+    {
+        var enumDef = DynXml("SurfaceFXTriggerType");
+        var tag = XmlHandlerTestFixtures.MakeTag("SurfaceFX_Name", XmlValueType.DynamicEnumValue, enumDef: enumDef);
+
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                DynamicEnumValues = ImmutableDictionary.CreateRange(
+                    StringComparer.OrdinalIgnoreCase,
+                    [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("GENERIC_TRACK"))])
+            },
+            WorkspaceDynamicEnumValues = ImmutableDictionary.CreateRange(
+                StringComparer.OrdinalIgnoreCase,
+                [KeyValuePair.Create("SurfaceFXTriggerType", ImmutableArray.Create("MY_CUSTOM_TRACK"))])
+        };
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "TOTALLY_UNKNOWN"), ctx).ToList();
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static EnumDefinition DynXml(string name)

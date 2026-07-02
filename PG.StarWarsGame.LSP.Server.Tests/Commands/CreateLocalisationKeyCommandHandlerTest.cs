@@ -9,6 +9,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
+using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Commands;
@@ -17,7 +18,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
 {
     // ── XML ──────────────────────────────────────────────────────────────────
 
-    private const string XmlNs = "http://www.example.org/eaw-translation/";
+    private const string XmlNs = "urn:alamoenginetools:localisation:v1";
     // ── CSV ──────────────────────────────────────────────────────────────────
 
     [Fact]
@@ -242,9 +243,12 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
             files[filePath] = new MockFileData(initialContent);
 
         var mockFs = new MockFileSystem(files);
+        var fileHelper = new FileHelper(mockFs);
         var reload = new SpyReloadService2();
+        var entryWriter = new LocalisationEntryWriter(fileHelper, NullLogger<LocalisationEntryWriter>.Instance);
         var handler = new CreateLocalisationKeyCommandHandler(
-            new FileHelper(mockFs),
+            entryWriter,
+            fileHelper,
             reload,
             NullLogger<CreateLocalisationKeyCommandHandler>.Instance);
         return (handler, mockFs, reload);
@@ -263,6 +267,12 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         }
 
         public Task ReloadAsync(CancellationToken ct)
+        {
+            WasReloaded = true;
+            return Task.CompletedTask;
+        }
+
+        public Task ReloadLocalisationAsync(CancellationToken ct)
         {
             WasReloaded = true;
             return Task.CompletedTask;

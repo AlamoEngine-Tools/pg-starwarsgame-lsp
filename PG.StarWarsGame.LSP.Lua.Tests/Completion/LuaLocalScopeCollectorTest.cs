@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Completion;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
@@ -266,7 +267,7 @@ public sealed class LuaLocalScopeCollectorTest
         }
 
         public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) => [];
-
         public PG.StarWarsGame.LSP.Lua.Analysis.Annotations.LuaClassDefinition? GetClassDefinition(string typeName) => null;
+        public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName) => [];
     }
 }

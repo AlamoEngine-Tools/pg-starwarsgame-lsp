@@ -7,12 +7,12 @@ using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 
-public sealed class MusicEventWeightedListHandlerTest
+public sealed class TupleListHandlerTest
 {
-    private static readonly MusicEventWeightedListHandler Sut = new();
+    private static readonly TupleListHandler Sut = new();
 
     private static readonly XmlTagDefinition Tag =
-        XmlHandlerTestFixtures.MakeTag("Music_Events", XmlValueType.MusicEventWeightedList);
+        XmlHandlerTestFixtures.MakeTag("Music_Events", XmlValueType.TupleList);
 
     [Theory]
     [InlineData("Music_Battle_01, 3")]

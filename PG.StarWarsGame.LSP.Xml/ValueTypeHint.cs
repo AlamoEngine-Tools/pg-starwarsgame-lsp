@@ -124,7 +124,7 @@ internal static class ValueTypeHint
             XmlValueType.UnitSpawnProbabilityTable =>
                 "**Format:** `UnitType, probability` pairs",
 
-            XmlValueType.MusicEventWeightedList =>
+            XmlValueType.TupleList =>
                 "**Format:** `MusicEventName, weight` pairs",
 
             XmlValueType.DeathCloneSpec =>

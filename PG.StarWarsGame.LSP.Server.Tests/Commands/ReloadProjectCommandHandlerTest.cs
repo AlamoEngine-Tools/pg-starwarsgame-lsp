@@ -39,5 +39,11 @@ public sealed class ReloadProjectCommandHandlerTest
             ReloadCallCount++;
             return Task.CompletedTask;
         }
+
+        public Task ReloadLocalisationAsync(CancellationToken ct)
+        {
+            ReloadCallCount++;
+            return Task.CompletedTask;
+        }
     }
 }
