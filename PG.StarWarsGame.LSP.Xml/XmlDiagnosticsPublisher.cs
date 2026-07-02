@@ -216,14 +216,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         string text, List<Diagnostic> diagnostics)
     {
         var groups = tagDef.ValueGroups;
-        var validNames = new HashSet<string>(
-            groups.Count == 0
-                ? set.Values.Select(v => v.Name)
-                : set.Values
-                    .Where(v => v.Groups.Count == 0 ||
-                                v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)))
-                    .Select(v => v.Name),
-            StringComparer.OrdinalIgnoreCase);
+        var applicableValues = groups.Count == 0
+            ? set.Values
+            : set.Values
+                .Where(v => v.Groups.Count == 0 ||
+                            v.Groups.Any(g => groups.Contains(g, StringComparer.OrdinalIgnoreCase)));
+        var validNames = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in applicableValues)
+            validNames[value.Name] = value.Deprecated;
 
         var innerText = child.InnerText;
         char[] separators = [',', ' ', '\t', '\r', '\n'];
@@ -240,19 +240,34 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 i++;
 
             var token = innerText[tokenStart..i];
-            if (token.Length == 0 || validNames.Contains(token)) continue;
-
-            var absPos = child.InnerStartIndex + tokenStart;
-            var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
-
-            diagnostics.Add(new Diagnostic
+            if (token.Length == 0) continue;
+            if (!validNames.TryGetValue(token, out var deprecated))
             {
-                Severity = DiagnosticSeverity.Error,
-                Message =
-                    $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
-                Range = SafeRange(line0, col0, token.Length),
-                Source = AppProperties.LspServerId
-            });
+                var absPos = child.InnerStartIndex + tokenStart;
+                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message =
+                        $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
+                    Range = SafeRange(line0, col0, token.Length),
+                    Source = AppProperties.LspServerId
+                });
+            }
+            else if (deprecated)
+            {
+                var absPos = child.InnerStartIndex + tokenStart;
+                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+
+                diagnostics.Add(new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Warning,
+                    Message = $"'{token}' is deprecated.",
+                    Range = SafeRange(line0, col0, token.Length),
+                    Source = AppProperties.LspServerId
+                });
+            }
         }
     }
 

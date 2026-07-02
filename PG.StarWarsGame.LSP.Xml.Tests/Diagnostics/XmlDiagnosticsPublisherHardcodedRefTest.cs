@@ -48,6 +48,11 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         return new HardcodedReferenceSetValue { Name = name, Groups = groups };
     }
 
+    private static HardcodedReferenceSetValue DeprecatedValue(string name, params string[] groups)
+    {
+        return new HardcodedReferenceSetValue { Name = name, Groups = groups, Deprecated = true };
+    }
+
     private static XmlTagDefinition BehaviorTag(string tagName, params string[] valueGroups)
     {
         return new XmlTagDefinition
@@ -110,6 +115,42 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
         var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
 
         Assert.Empty(diags);
+    }
+
+    [Fact]
+    public void Deprecated_token_produces_warning_diagnostic()
+    {
+        var schema = new StubHardcodedSchemaProvider(
+            BehaviorTag("Behavior"),
+            BehaviorModuleSet(Value("GenericTransport"), DeprecatedValue("OLD_MODULE")));
+        var publisher = BuildPublisher(schema);
+
+        const string xml =
+            "<GameObjectFiles><GameObject><Behavior>OLD_MODULE</Behavior></GameObject></GameObjectFiles>";
+
+        var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
+
+        var diag = Assert.Single(diags);
+        Assert.Contains("OLD_MODULE", diag.Message);
+        Assert.Contains("deprecated", diag.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
+    }
+
+    [Fact]
+    public void Deprecated_token_alongside_valid_token_produces_only_warning()
+    {
+        var schema = new StubHardcodedSchemaProvider(
+            BehaviorTag("Behavior"),
+            BehaviorModuleSet(Value("GenericTransport"), DeprecatedValue("OLD_MODULE")));
+        var publisher = BuildPublisher(schema);
+
+        const string xml =
+            "<GameObjectFiles><GameObject><Behavior>GenericTransport, OLD_MODULE</Behavior></GameObject></GameObjectFiles>";
+
+        var diags = publisher.CollectHardcodedRefDiagnostics("file:///units.xml", xml, GameIndex.Empty);
+
+        var diag = Assert.Single(diags);
+        Assert.Equal(DiagnosticSeverity.Warning, diag.Severity);
     }
 
     // ── group filtering ──────────────────────────────────────────────────────
