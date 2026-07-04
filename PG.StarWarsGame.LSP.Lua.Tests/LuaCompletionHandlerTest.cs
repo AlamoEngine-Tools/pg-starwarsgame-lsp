@@ -37,7 +37,7 @@ public sealed class LuaCompletionHandlerTest
         var svc = new FakeIndexService { Current = index };
         return new LuaCompletionHandler(
             svc,
-            host ?? new FakeWorkspaceHost(),
+            TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
             new LuaAnnotationRepository(),
@@ -362,7 +362,7 @@ public sealed class LuaCompletionHandlerTest
 
         var handler = new LuaCompletionHandler(
             new FakeIndexService { Current = index },
-            new FakeWorkspaceHost(), // empty — no document tracked
+            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
             fileHelper,
             schema,
             new LuaAnnotationRepository(),

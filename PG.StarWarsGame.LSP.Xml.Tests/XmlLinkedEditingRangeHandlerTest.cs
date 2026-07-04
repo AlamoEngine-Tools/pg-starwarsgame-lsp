@@ -26,7 +26,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     private static XmlLinkedEditingRangeHandler Build(string text)
     {
         var host = new FakeHost(TestUri, text);
-        return new XmlLinkedEditingRangeHandler(host, new AllowAllEaWContext(),
+        return new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()));
     }
 
@@ -119,7 +119,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
         var host = new FakeHost(TestUri, "<Foo>\nbar\n</Foo>");
-        var handler = new XmlLinkedEditingRangeHandler(host, new DenyAllEaWContext(),
+        var handler = new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()));
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
 

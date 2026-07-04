@@ -13,6 +13,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -615,7 +616,7 @@ public sealed class XmlDiagnosticsPublisherTest
 
     private sealed class SpanFactStubDocumentProducer : IXmlDocumentFactProducer
     {
-        public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
+        public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
         {
             return [new SpanFact(documentUri, 2, 4, 3, 6, 9)];
         }

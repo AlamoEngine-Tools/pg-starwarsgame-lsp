@@ -28,7 +28,7 @@ public sealed class WorkspaceIndexerTest
         IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, cache, repo, parsers);
     }
 
     // Overload kept for callers that pass parsers without a cache
@@ -36,19 +36,18 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, null, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, null, null, parsers);
     }
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
-        IProjectIndexCache? cache, ILuaAnnotationRepository? repo, IGameWorkspaceHost? workspaceHost,
+        IProjectIndexCache? cache, ILuaAnnotationRepository? repo,
         params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
         var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
             cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
-            workspaceHost ?? new NullWorkspaceHost(),
             NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
     }
@@ -679,6 +678,108 @@ public sealed class WorkspaceIndexerTest
         Assert.Single(saved.Files);
     }
 
+    [Fact]
+    public async Task IndexDocumentsAsync_DependencyHashChanged_DiscardsLayerSnapshot()
+    {
+        // The mod layer's cached parses were produced against the OLD dependency state — symbol
+        // extraction depends on cross-layer inputs (file-type registrations from dependency
+        // metafiles), so a dependency change must invalidate the whole layer snapshot even when
+        // the layer's own file contents are unchanged.
+        var depRoot = Root("dep");
+        var modRoot = Root("mod");
+        var depXml = Path.Combine(depRoot, "data", "xml");
+        var modXml = Path.Combine(modRoot, "data", "xml");
+        var depPgproj = Path.Combine(depRoot, "dep.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var modPgproj = Path.Combine(modRoot, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(depXml, "dep.xml")] = new("<Root/>"),
+            [Path.Combine(modXml, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        // Mod snapshot: own file hash MATCHES, but the recorded dependency hash is outdated.
+        var fh = new FileHelper(fs);
+        var unitsHash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(modXml, "units.xml"), fh.FileSystem);
+        var modSnapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [new SerializedDependencyHash { ProjectPath = depPgproj, OverallHash = "outdated" }],
+            Files =
+            [
+                new ProjectFileEntry
+                {
+                    RelativePath = "data/xml/units.xml", ContentHash = unitsHash,
+                    Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+                }
+            ]
+        };
+        var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
+        var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
+        {
+            Layers =
+            [
+                new ProjectLayer(0, "Dep", [depXml], [], [], [], null, depPgproj),
+                new ProjectLayer(1, "Mod", [modXml], [], [], [], null, modPgproj)
+            ]
+        };
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [depRoot, modRoot]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        // Both files re-parsed; nothing injected from the stale mod snapshot.
+        Assert.Equal(2, svc.Calls.Count);
+        Assert.Empty(svc.InjectedDocuments);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_UnchangedSnapshot_SkipsSave()
+    {
+        // Nothing changed since the snapshot was written — re-serializing it every startup is
+        // wasted work for large dependency layers.
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        const string relPath = "data/xml/units.xml";
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = ProjectFileHasher.ComputeProjectHash([(relPath, hash)]),
+            DependencyHashes = [],
+            Files =
+            [
+                new ProjectFileEntry
+                {
+                    RelativePath = relPath, ContentHash = hash,
+                    Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+                }
+            ]
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(svc.InjectedDocuments); // cache hit as usual …
+        Assert.Empty(cache.SavedPaths); // … and no redundant re-save
+    }
+
     private static WorkspaceConfiguration ConfigWithLayer(string xmlDir, string pgprojPath)
     {
         var layer = new ProjectLayer(0, "TestMod", [xmlDir], [], [], [], null, pgprojPath);
@@ -941,11 +1042,13 @@ public sealed class WorkspaceIndexerTest
         }
     }
 
-    // ── WorkspaceHost population ──────────────────────────────────────────────
+    // ── WorkspaceHost stays open-documents-only ───────────────────────────────
 
     [Fact]
-    public async Task IndexDocumentsAsync_FlatScan_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    public async Task IndexDocumentsAsync_FlatScan_DoesNotAddFilesToWorkspaceHost()
     {
+        // The host tracks only open editor documents; indexing must not pin the whole workspace
+        // corpus text in memory. Closed-file consumers read from disk on demand.
         var root = Root("ws");
         var xmlDir = Path.Combine(root, "data", "xml");
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -954,21 +1057,18 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "b.xml")] = new("<Root/>")
         });
         var svc = new FakeIndexService();
-        var host = new SpyWorkspaceHost();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null, null,
-            host, new FakeParser());
+            new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Equal(2, host.Calls.Count);
-        Assert.All(host.Calls, c => Assert.False(c.PublishDiagnostics));
-        Assert.All(host.Calls, c => Assert.Equal(0, c.Version));
+        Assert.Equal(2, svc.Calls.Count);
     }
 
     [Fact]
-    public async Task IndexDocumentsAsync_LayeredScan_CacheMiss_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    public async Task IndexDocumentsAsync_LayeredScan_CacheMiss_DoesNotAddFilesToWorkspaceHost()
     {
         var root = Root("ws");
         var xmlDir = Path.Combine(root, "data", "xml");
@@ -978,21 +1078,18 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "units.xml")] = new("<Root/>")
         });
         var svc = new FakeIndexService();
-        var host = new SpyWorkspaceHost();
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            null, null, host, new FakeParser());
+            null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(host.Calls);
-        Assert.False(host.Calls[0].PublishDiagnostics);
-        Assert.Equal(0, host.Calls[0].Version);
+        Assert.Single(svc.Calls);
     }
 
     [Fact]
-    public async Task IndexDocumentsAsync_LayeredScan_CacheHit_AddsFilesToWorkspaceHost_WithPublishDiagnosticsFalse()
+    public async Task IndexDocumentsAsync_LayeredScan_CacheHit_InjectsIntoIndexWithoutHost()
     {
         var root = Root("ws");
         var xmlDir = Path.Combine(root, "data", "xml");
@@ -1003,7 +1100,6 @@ public sealed class WorkspaceIndexerTest
             [Path.Combine(xmlDir, "units.xml")] = new(fileContent)
         });
         var svc = new FakeIndexService();
-        var host = new SpyWorkspaceHost();
 
         var fh = new FileHelper(fs);
         var hash = ProjectFileHasher.ComputeFileHash(
@@ -1021,15 +1117,12 @@ public sealed class WorkspaceIndexerTest
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            cache, null, host, new FakeParser());
+            cache, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
 
-        Assert.Single(host.Calls); // even cache-hit adds to host
-        Assert.False(host.Calls[0].PublishDiagnostics);
-        Assert.Equal(0, host.Calls[0].Version);
-        Assert.Equal("<Root/>", host.Calls[0].Text);
+        Assert.Single(svc.InjectedDocuments); // cache hit lands in the index; no text is pinned anywhere
     }
 
     private sealed class SpyAnnotationRepository : ILuaAnnotationRepository
@@ -1046,23 +1139,4 @@ public sealed class WorkspaceIndexerTest
         public EmmyLuaAnnotations? GetFunctionAnnotation(string name) => null;
     }
 
-    private sealed class NullWorkspaceHost : IGameWorkspaceHost
-    {
-        public IEnumerable<TrackedDocument> All => [];
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true) { }
-        public void Remove(string uri) { }
-        public bool TryGet(string uri, out TrackedDocument doc) { doc = null!; return false; }
-    }
-
-    private sealed class SpyWorkspaceHost : IGameWorkspaceHost
-    {
-        public List<(string Uri, string Text, int Version, bool PublishDiagnostics)> Calls { get; } = [];
-        public IEnumerable<TrackedDocument> All => [];
-        public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-        {
-            lock (Calls) Calls.Add((uri, text, version, publishDiagnostics));
-        }
-        public void Remove(string uri) { }
-        public bool TryGet(string uri, out TrackedDocument doc) { doc = null!; return false; }
-    }
 }

@@ -43,7 +43,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, new FakeWorkspaceHost(), new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(new FakeWorkspaceHost()), NullLogger.Instance);
 
         Assert.Null(result);
     }
@@ -57,7 +57,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, new FakeWorkspaceHost(), new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(new FakeWorkspaceHost()), NullLogger.Instance);
 
         Assert.Null(result);
     }
@@ -75,7 +75,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, host, new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
         var edit = Assert.Single(result!.Changes![DocumentUri.From(DefUri)]);
@@ -99,7 +99,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs);
 
         var result = DynamicEnumValueRenameBuilder.Build("GameObjectCategoryType", "Structure", "Building",
-            index, host, new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
         var edits = result!.Changes![DocumentUri.From(EnumFileUri)].OrderBy(e => e.Range.Start.Character).ToList();
@@ -124,7 +124,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs);
 
         var result = DynamicEnumValueRenameBuilder.Build("GameObjectCategoryType", "Structure", "Building",
-            index, host, new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(host), NullLogger.Instance);
 
         Assert.Null(result);
     }
@@ -143,7 +143,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs, refs);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, host, new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
         Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(RefUri)));
@@ -172,7 +172,7 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs, docs: docs);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, host, new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(host), NullLogger.Instance);
 
         Assert.Null(result);
     }
@@ -193,12 +193,18 @@ public sealed class DynamicEnumValueRenameBuilderTest
         var index = IndexWith(defs, docs: docs);
 
         var result = DynamicEnumValueRenameBuilder.Build("ArmorType", "Armor_Structure", "Armor_Renamed",
-            index, host, new FileHelper(new MockFileSystem()), NullLogger.Instance);
+            index, Source(host), NullLogger.Instance);
 
         Assert.NotNull(result);
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
+
+    private static DocumentTextSource Source(IGameWorkspaceHost host)
+    {
+        return new DocumentTextSource(host, new FileHelper(new MockFileSystem()),
+            NullLogger<DocumentTextSource>.Instance);
+    }
 
     private sealed class FakeWorkspaceHost : IGameWorkspaceHost
     {

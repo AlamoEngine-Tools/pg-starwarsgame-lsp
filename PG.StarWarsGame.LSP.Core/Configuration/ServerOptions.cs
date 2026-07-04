@@ -24,6 +24,12 @@ public sealed record ServerOptions
     public TimeSpan DiagnosticsDebounce { get; init; } = TimeSpan.FromMilliseconds(100);
 
     /// <summary>
+    ///     Maximum number of documents whose parse artifacts (XML DOM / Lua syntax tree) are kept
+    ///     in the per-language parse caches. 0 disables parse caching entirely.
+    /// </summary>
+    public int ParseCacheCapacity { get; init; } = 16;
+
+    /// <summary>
     ///     Returns a copy with all wait timeouts set to infinite and the debounce set to zero.
     ///     Call this when launching with <c>--wait-for-debugger</c> so breakpoints and slow attach
     ///     do not trigger premature cancellation.
@@ -62,6 +68,10 @@ public sealed record ServerOptions
         if (server.TryGetProperty("diagnosticsDebounceMs", out var ddb) &&
             ddb.TryGetDouble(out var ddbs))
             result = result with { DiagnosticsDebounce = TimeSpan.FromMilliseconds(ddbs) };
+
+        if (server.TryGetProperty("parseCacheCapacity", out var pcc) &&
+            pcc.TryGetInt32(out var pccValue))
+            result = result with { ParseCacheCapacity = pccValue };
 
         return result;
     }

@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Util;
 using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
@@ -25,16 +26,16 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaDefinitionHandler> _logger;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILuaParseCache _parseCache;
 
     public LuaDefinitionHandler(
         IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
+        ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILogger<LuaDefinitionHandler> logger)
     {
         _indexService = indexService;
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
         _logger = logger;
     }
@@ -68,12 +69,13 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             }
         }
 
-        // Path B: require() argument — parse AST and resolve.
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        // Path B: require() argument — resolve via the shared parse.
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
-        var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);
-        var resolved = TryResolveRequireAtPosition(tree.GetRoot(), line, character, index.Documents, _fileHelper, uri);
+        var resolved = TryResolveRequireAtPosition(parsed.Tree.GetRoot(), line, character, index.Documents, _fileHelper,
+            uri);
         if (resolved is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 

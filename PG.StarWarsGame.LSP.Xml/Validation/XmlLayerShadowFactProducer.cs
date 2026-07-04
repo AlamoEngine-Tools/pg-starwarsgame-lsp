@@ -11,13 +11,12 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string documentUri, string text, GameIndex index)
+    public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         if (!index.Documents.TryGetValue(documentUri, out var doc))
             return [];
 
-        var hapDoc = XmlUtility.CreateHtmlDocument(text);
-        var suppressed = ParseSuppressionComments(hapDoc);
+        var suppressed = ParseSuppressionComments(document.Html);
         var facts = new List<XmlFact>();
 
         var leafLayerRank = index.LeafLayerRank;

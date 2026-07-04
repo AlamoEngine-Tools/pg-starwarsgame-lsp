@@ -21,12 +21,12 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlInlayHintHandler> _logger;
+    private readonly IXmlParseCache _parseCache;
     private readonly IXmlInlayHintRegistry _registry;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlInlayHintHandler(
-        IGameWorkspaceHost workspaceHost,
+        IXmlParseCache parseCache,
         IGameIndexService indexService,
         ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext,
@@ -34,7 +34,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         ILogger<XmlInlayHintHandler> logger,
         IXmlInlayHintRegistry registry)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _indexService = indexService;
         _schema = schema;
         _eaWXmlContext = eaWXmlContext;
@@ -49,12 +49,13 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<InlayHintContainer?>(null);
 
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<InlayHintContainer?>(null);
 
         var index = _indexService.Current;
         var range = request.Range;
-        var hapDoc = XmlUtility.CreateHtmlDocument(doc.Text);
+        var hapDoc = parsed.Html;
         var hints = new List<InlayHint>();
 
         foreach (var node in hapDoc.DocumentNode.Descendants()

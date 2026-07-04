@@ -76,11 +76,14 @@ public sealed class XmlRenameHandlerTest
         IEaWXmlContext? ctx = null,
         IFileHelper? fileHelper = null)
     {
+        var textSource = new DocumentTextSource(
+            host ?? new FakeWorkspaceHost(),
+            fileHelper ?? new FileHelper(new MockFileSystem()),
+            NullLogger<DocumentTextSource>.Instance);
         return new XmlRenameHandler(
             ctx ?? new AllowAllContext(),
-            host ?? new FakeWorkspaceHost(),
+            textSource,
             schema ?? new FakeSchemaProvider(),
-            fileHelper ?? new FileHelper(new MockFileSystem()),
             NullLogger<XmlRenameHandler>.Instance);
     }
 

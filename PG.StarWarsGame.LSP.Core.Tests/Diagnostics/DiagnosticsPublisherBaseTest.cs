@@ -140,6 +140,81 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Empty(published);
     }
 
+    // ── scoped re-publish (content-only edits touch only the edited doc) ──────
+
+    [Fact]
+    public void IndexChanged_OnlyOneDocumentEntryChanged_RepublishesOnlyThatDocument()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.Add("file:///b.xml", "content");
+
+        var docA = new DocumentIndex("file:///a.xml", 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty);
+        var docB = new DocumentIndex("file:///b.xml", 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty);
+        var index1 = GameIndex.Empty with
+        {
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///a.xml", docA).Add("file:///b.xml", docB)
+        };
+        indexService.Fire(index1);
+        published.Clear();
+
+        // Content-only edit of a.xml: only its Documents entry is replaced; the workspace symbol
+        // dictionaries (and all other index fields) keep their references.
+        var index2 = index1 with
+        {
+            Documents = index1.Documents.SetItem("file:///a.xml", docA with { Version = 2 })
+        };
+        indexService.Fire(index2);
+
+        Assert.Single(published);
+        Assert.Equal("file:///a.xml", published[0].Uri.ToString());
+    }
+
+    [Fact]
+    public void IndexChanged_WorkspaceDefinitionsChanged_RepublishesAllOpenDocuments()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Add("file:///a.xml", "content");
+        workspaceHost.Add("file:///b.xml", "content");
+
+        var index1 = IndexWithDoc("file:///a.xml");
+        indexService.Fire(index1);
+        published.Clear();
+
+        // A symbol-shape change can invalidate cross-document diagnostics everywhere.
+        var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
+            new FileOrigin("file:///a.xml", 1, null), null);
+        var index2 = index1 with
+        {
+            WorkspaceDefinitions = index1.WorkspaceDefinitions.Add("UNIT_A", [sym])
+        };
+        indexService.Fire(index2);
+
+        Assert.Equal(2, published.Count);
+    }
+
+    [Fact]
+    public void IndexChanged_NewlyOpenedDocument_PublishedEvenWhenIndexIsIdentical()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Add("file:///a.xml", "content");
+
+        var index = IndexWithDoc("file:///a.xml");
+        indexService.Fire(index);
+        published.Clear();
+
+        // didOpen of an unedited, already-indexed file re-fires IndexChanged with the same index
+        // (the unchanged-content fast path) — the newly opened doc still needs its diagnostics.
+        workspaceHost.Add("file:///b.xml", "content");
+        indexService.Fire(index);
+
+        Assert.Single(published);
+        Assert.Equal("file:///b.xml", published[0].Uri.ToString());
+    }
+
     // ── error isolation ───────────────────────────────────────────────────────
 
     [Fact]

@@ -3,10 +3,11 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 public interface IXmlLayerShadowFactProducer
 {
-    IReadOnlyList<XmlFact> Produce(string documentUri, string text, GameIndex index);
+    IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index);
 }

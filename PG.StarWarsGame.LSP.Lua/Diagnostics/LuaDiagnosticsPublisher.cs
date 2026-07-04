@@ -23,15 +23,16 @@ using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Model
 using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspPublishParams = OmniSharp.Extensions.LanguageServer.Protocol.Models.PublishDiagnosticsParams;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua.Diagnostics;
 
 public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 {
-    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
-
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
+    private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
     public LuaDiagnosticsPublisher(
@@ -41,10 +42,12 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger,
+        ILuaParseCache parseCache,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p),
             indexService, workspaceHost, fileHelper, schemaProvider, logger,
-            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds)
+            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
+            parseCache)
     {
     }
 
@@ -55,12 +58,16 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger,
-        int debounceMs = 0)
+        int debounceMs = 0,
+        ILuaParseCache? parseCache = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _logger = logger;
+        _parseCache = parseCache ?? new LuaParseCache(
+            new DocumentTextSource(workspaceHost, fileHelper, NullLogger<DocumentTextSource>.Instance),
+            ServerOptions.Default.ParseCacheCapacity);
     }
 
     protected override string FileExtension => ".lua";
@@ -69,11 +76,16 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
     {
         var diagnostics = new List<LspDiagnostic>();
 
-        CollectSyntaxErrors(text, diagnostics);
+        // One parse shared by the syntax-error pass and all three analyzers (previously four
+        // separate parses of the same text) — and via the cache, with indexing and every request
+        // handler touching the same content.
+        var parsed = _parseCache.GetOrParse(_fileHelper.NormalizeUri(uri), text);
+
+        CollectSyntaxErrors(parsed.Tree, diagnostics);
         CollectReferenceErrors(uri, index, diagnostics);
-        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, text, index.Documents, _fileHelper));
-        diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, text, index, _schemaProvider, _fileHelper));
-        diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(text, uri));
+        diagnostics.AddRange(LuaImportAnalyzer.Analyze(uri, parsed.Tree, index.Documents, _fileHelper));
+        diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper));
+        diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri));
 
         Publish(new LspPublishParams
         {
@@ -82,9 +94,8 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         });
     }
 
-    private static void CollectSyntaxErrors(string text, List<LspDiagnostic> diagnostics)
+    private static void CollectSyntaxErrors(SyntaxTree tree, List<LspDiagnostic> diagnostics)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         foreach (var diag in tree.GetDiagnostics())
         {
             if (diag.Severity == DiagnosticSeverity.Hidden) continue;

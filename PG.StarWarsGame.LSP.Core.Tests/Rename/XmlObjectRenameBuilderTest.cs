@@ -45,7 +45,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
-            SchemaWithUnit(), new FakeWorkspaceHost(), new FileHelper(new MockFileSystem()),
+            SchemaWithUnit(), Source(new FakeWorkspaceHost()),
             NullLogger.Instance);
 
         Assert.Null(result);
@@ -55,7 +55,7 @@ public sealed class XmlObjectRenameBuilderTest
     public void Build_NoDefinitionsNoRefs_ReturnsNull()
     {
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", GameIndex.Empty,
-            SchemaWithUnit(), new FakeWorkspaceHost(), new FileHelper(new MockFileSystem()),
+            SchemaWithUnit(), Source(new FakeWorkspaceHost()),
             NullLogger.Instance);
 
         Assert.Null(result);
@@ -72,7 +72,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
-            SchemaWithUnit(), host, new FileHelper(new MockFileSystem()),
+            SchemaWithUnit(), Source(host),
             NullLogger.Instance);
 
         Assert.NotNull(result);
@@ -98,7 +98,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [r]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
-            SchemaWithUnit(), host, new FileHelper(new MockFileSystem()),
+            SchemaWithUnit(), Source(host),
             NullLogger.Instance);
 
         Assert.NotNull(result);
@@ -123,7 +123,7 @@ public sealed class XmlObjectRenameBuilderTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add("UNIT_A", [luaRef]));
 
         var result = XmlObjectRenameBuilder.Build("UNIT_A", "UNIT_B", index,
-            SchemaWithUnit(), host, new FileHelper(new MockFileSystem()),
+            SchemaWithUnit(), Source(host),
             NullLogger.Instance);
 
         Assert.NotNull(result);
@@ -131,6 +131,12 @@ public sealed class XmlObjectRenameBuilderTest
     }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
+
+    private static DocumentTextSource Source(IGameWorkspaceHost host)
+    {
+        return new DocumentTextSource(host, new FileHelper(new MockFileSystem()),
+            NullLogger<DocumentTextSource>.Instance);
+    }
 
     private sealed class FakeWorkspaceHost : IGameWorkspaceHost
     {

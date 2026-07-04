@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
@@ -151,7 +152,7 @@ file sealed class StubSchemaProvider2 : ISchemaProvider
 
 file sealed class StubDocumentFactProducer2 : IXmlDocumentFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri) => [];
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri) => [];
 }
 
 file sealed class StubIndexFactProducer2 : IXmlIndexFactProducer
@@ -161,7 +162,7 @@ file sealed class StubIndexFactProducer2 : IXmlIndexFactProducer
 
 file sealed class StubStoryFactProducer2 : IStoryFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri) => [];
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri) => [];
 }
 
 file sealed class StubIndexService2 : IGameIndexService

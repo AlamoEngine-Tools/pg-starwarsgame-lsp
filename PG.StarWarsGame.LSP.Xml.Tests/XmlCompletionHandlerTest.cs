@@ -60,7 +60,7 @@ public sealed class XmlCompletionHandlerTest
             new TupleValueCompletionStrategy(schema, proposals, resolvedCompletionReg)
         ]);
 
-        return (new XmlCompletionHandler(host, schema, indexService, fileTypeReg,
+        return (new XmlCompletionHandler(TestParseCache.For(host), schema, indexService, fileTypeReg,
             new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
             tagNameRegistry, tagValueRegistry), host, schema, proposals);
     }

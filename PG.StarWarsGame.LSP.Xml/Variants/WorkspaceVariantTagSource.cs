@@ -3,68 +3,88 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Variants;
 
 /// <summary>
-///     <see cref="IVariantTagSource" /> backed by the open workspace documents. Resolves an object's direct
-///     child tags by locating the element whose <c>Name</c> attribute matches the id (every named GameObject
-///     type uses <c>Name</c> as its name tag). Tags read here shadow shipped-game baseline tags.
+///     <see cref="IVariantTagSource" /> backed by the game index. Resolves an object's direct child
+///     tags by locating its winning workspace definition (highest project layer, same precedence as
+///     <see cref="GameIndex.Resolve(string)" />), loading that single document's text — the open
+///     editor buffer when available, the file on disk otherwise — and parsing just that document.
+///     Tags read here shadow shipped-game baseline tags.
 /// </summary>
 /// <remarks>
-///     Results are cached and rebuilt only when the set of open documents or their versions changes, so the
-///     resolver can walk multi-level chains without re-parsing every document on each lookup.
+///     Parses are cached per document and reused while the indexed document's (Version,
+///     ContentHash) pair is unchanged, so the resolver can walk multi-level chains without
+///     re-parsing, and an edit to one file never re-parses the rest of the workspace.
 /// </remarks>
 public sealed class WorkspaceVariantTagSource : IVariantTagSource
 {
     private const string NameAttribute = "Name";
+
+    // Per-document tag maps keyed by canonical URI. Guarded by _gate.
+    private readonly Dictionary<string, CacheEntry> _cache = new(StringComparer.Ordinal);
     private readonly object _gate = new();
+    private readonly IGameIndexService _indexService;
+    private readonly IXmlParseCache _parseCache;
 
-    private readonly IGameWorkspaceHost _host;
-
-    private Dictionary<string, IReadOnlyList<VariantTag>> _byId = new(StringComparer.OrdinalIgnoreCase);
-    private string? _signature;
-
-    public WorkspaceVariantTagSource(IGameWorkspaceHost host)
+    public WorkspaceVariantTagSource(IXmlParseCache parseCache, IGameIndexService indexService)
     {
-        _host = host;
+        _parseCache = parseCache;
+        _indexService = indexService;
     }
 
     public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
     {
+        var index = _indexService.Current;
+        if (!index.WorkspaceDefinitions.TryGetValue(objectId, out var defs) || defs.Length == 0)
+            return null;
+
+        // Highest project layer wins — the same precedence GameIndex.Resolve applies.
+        var winner = defs.Length == 1 ? defs[0] : defs.OrderByDescending(index.LayerRankOf).First();
+        if (winner.Origin is not FileOrigin origin)
+            return null;
+
+        var map = GetOrBuildDocumentMap(origin.Uri, index);
+        return map?.GetValueOrDefault(objectId);
+    }
+
+    private Dictionary<string, IReadOnlyList<VariantTag>>? GetOrBuildDocumentMap(string uri, GameIndex index)
+    {
+        var indexed = index.Documents.GetValueOrDefault(uri);
+        var version = indexed?.Version ?? -1;
+        var contentHash = indexed?.ContentHash ?? 0;
+
         lock (_gate)
         {
-            EnsureCurrent();
-            return _byId.GetValueOrDefault(objectId);
+            if (_cache.TryGetValue(uri, out var entry)
+                && entry.Version == version
+                && entry.ContentHash == contentHash)
+                return entry.TagsById;
+
+            var parsed = _parseCache.GetOrParse(uri);
+            if (parsed is null) return null;
+
+            var map = new Dictionary<string, IReadOnlyList<VariantTag>>(StringComparer.OrdinalIgnoreCase);
+            IndexDocument(uri, parsed, map);
+            _cache[uri] = new CacheEntry(version, contentHash, map);
+            return map;
         }
     }
 
-    private void EnsureCurrent()
+    private static void IndexDocument(string uri, ParsedXmlDocument parsed,
+        Dictionary<string, IReadOnlyList<VariantTag>> map)
     {
-        var docs = _host.All.ToList();
-        var signature = string.Join("", docs.Select(d => $"{d.Uri}{d.Version}"));
-        if (signature == _signature) return;
-
-        var map = new Dictionary<string, IReadOnlyList<VariantTag>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var doc in docs)
-            IndexDocument(doc.Uri, doc.Text, map);
-
-        _byId = map;
-        _signature = signature;
-    }
-
-    private static void IndexDocument(string uri, string text, Dictionary<string, IReadOnlyList<VariantTag>> map)
-    {
-        var hapDoc = XmlUtility.CreateHtmlDocument(text);
-        foreach (var node in hapDoc.DocumentNode.Descendants()
+        foreach (var node in parsed.Html.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
         {
             var id = GetNameAttribute(node);
             if (id is null) continue;
             // First definition wins; duplicate ids are a workspace error handled elsewhere.
-            map.TryAdd(id, CollectChildTags(node, uri, text));
+            map.TryAdd(id, CollectChildTags(node, uri, parsed.Text));
         }
     }
 
@@ -120,4 +140,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
         endOffset = Math.Min(endOffset, text.Length);
         return endOffset > start ? text[start..endOffset] : node.OuterHtml;
     }
+
+    private sealed record CacheEntry(
+        int Version, long ContentHash, Dictionary<string, IReadOnlyList<VariantTag>> TagsById);
 }

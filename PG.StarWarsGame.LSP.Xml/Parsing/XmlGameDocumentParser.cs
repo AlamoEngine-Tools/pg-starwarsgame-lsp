@@ -16,15 +16,21 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
+    private readonly IXmlParseCache? _parseCache;
     private readonly ISchemaProvider _schema;
 
+    // parseCache is optional so minimal test setups can omit it; production wires the shared
+    // cache so the indexing parse seeds it — the diagnostics publish and the first hover/inlay
+    // request after an edit then reuse this parse instead of re-parsing.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
-        IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger)
+        IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
+        IXmlParseCache? parseCache = null)
     {
         _fileHelper = fileHelper;
         _schema = schema;
         _fileTypeRegistry = fileTypeRegistry;
         _logger = logger;
+        _parseCache = parseCache;
     }
 
     public bool CanParse(string fileExtension)
@@ -36,18 +42,19 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         string documentUri, string text, int version, CancellationToken ct)
     {
         var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
+        var parsed = _parseCache?.GetOrParse(canonicalUri, text) ?? ParsedXmlDocument.Parse(text);
+        var doc = parsed.Html;
 
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
+        var lineIndex = parsed.LineIndex;
 
         // References are collected first so the symbol passes can append the typed variant-base
         // reference for each object they index (the enclosing object's type is only known here).
-        var references = CollectReferences(doc, canonicalUri, text, ct);
-        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, text, registeredTypes, references, ct);
-        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, text, references, ct));
+        var references = CollectReferences(doc, canonicalUri, lineIndex, ct);
+        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, lineIndex, registeredTypes, references, ct);
+        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
 
-        var groupMemberships = CollectGroupMemberships(doc, canonicalUri, text, ct);
+        var groupMemberships = CollectGroupMemberships(doc, canonicalUri, lineIndex, ct);
 
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,
@@ -57,7 +64,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,
-        string text, ImmutableArray<string> registeredTypes, List<GameReference> references, CancellationToken ct)
+        LineOffsetIndex lineIndex, ImmutableArray<string> registeredTypes, List<GameReference> references,
+        CancellationToken ct)
     {
         var typeDef = registeredTypes
             .Select(t => _schema.GetObjectType(t))
@@ -81,8 +89,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             }
             else
             {
-                var col = FindNameAttributeValueColumn(node, typeDef.NameTag, text);
-                var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, text);
+                var col = FindNameAttributeValueColumn(node, typeDef.NameTag, lineIndex);
+                var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, lineIndex);
                 if (variantRef is not null) references.Add(variantRef);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
                     new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId));
@@ -100,7 +108,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     ///     unresolved-reference and type-mismatch handlers validate the inheritance link for free.
     /// </summary>
     private (string? BaseId, GameReference? Reference) ResolveVariant(
-        HtmlNode objectNode, string enclosingTypeName, string documentUri, string text, string? ownerPrefix = null)
+        HtmlNode objectNode, string enclosingTypeName, string documentUri, LineOffsetIndex lineIndex,
+        string? ownerPrefix = null)
     {
         foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
@@ -113,7 +122,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
             var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
             var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+            var (line, column) = lineIndex.GetPosition(absPos);
 
             // The base id/reference must live in the same id-space as objectNode's own id — for
             // top-level objects that's the bare name (ownerPrefix is null); for abilities it's
@@ -128,15 +137,15 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return (null, null);
     }
 
-    private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, string text)
+    private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, LineOffsetIndex lineIndex)
     {
         var attr = node.Attributes.FirstOrDefault(a =>
             a.Name.Equals(nameTag, StringComparison.OrdinalIgnoreCase));
         if (attr is null) return null;
-        return XmlUtility.OffsetToPosition(text, attr.ValueStartIndex).Col;
+        return lineIndex.GetPosition(attr.ValueStartIndex).Col;
     }
 
-    private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, string text,
+    private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, LineOffsetIndex lineIndex,
         CancellationToken ct)
     {
         var references = new List<GameReference>();
@@ -153,7 +162,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     tagDef.Enum?.Kind == EnumKind.DynamicXml)
                 {
                     if (HasChildElement(child)) continue;
-                    CollectEnumReferences(child, tagDef.Enum.Name, text, documentUri, references);
+                    CollectEnumReferences(child, tagDef.Enum.Name, lineIndex, documentUri, references);
                     continue;
                 }
 
@@ -176,7 +185,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
                     var absPos = child.InnerStartIndex + tokenOffset;
-                    var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+                    var (line, column) = lineIndex.GetPosition(absPos);
                     var targetId = ownerPrefix is not null ? $"{ownerPrefix}${name}" : name;
 
                     references.Add(new GameReference(
@@ -195,13 +204,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private static void CollectEnumReferences(HtmlNode child, string enumName,
-        string text, string documentUri, List<GameReference> references)
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {
         var innerText = child.InnerText;
         foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
         {
             var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+            var (line, column) = lineIndex.GetPosition(absPos);
             references.Add(new GameReference(
                 $"enum:{enumName}/{token}",
                 null,
@@ -214,7 +223,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<DocumentGroupMembership> CollectGroupMemberships(HtmlDocument doc, string documentUri,
-        string text, CancellationToken ct)
+        LineOffsetIndex lineIndex, CancellationToken ct)
     {
         var memberships = new List<DocumentGroupMembership>();
 
@@ -237,7 +246,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 // Tag-value cursor position
                 var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
                 var absPos = child.InnerStartIndex + tokenOffset;
-                var (tagLine, tagColumn) = XmlUtility.OffsetToPosition(text, absPos);
+                var (tagLine, tagColumn) = lineIndex.GetPosition(absPos);
 
                 // Parent-name navigation target
                 var memberTypeName = tagDef.ObjectType?.TypeName;
@@ -251,7 +260,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     var parentId = GetNameAttribute(node, nameTag);
                     if (parentId.Length > 0)
-                        memberColumn = FindNameAttributeValueColumn(node, nameTag, text);
+                        memberColumn = FindNameAttributeValueColumn(node, nameTag, lineIndex);
                 }
 
                 memberships.Add(new DocumentGroupMembership(
@@ -321,7 +330,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSubObjectListSymbols(
-        HtmlDocument doc, string documentUri, string text, List<GameReference> references, CancellationToken ct)
+        HtmlDocument doc, string documentUri, LineOffsetIndex lineIndex, List<GameReference> references,
+        CancellationToken ct)
     {
         var symbols = new List<GameSymbol>();
 
@@ -353,9 +363,9 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
                     var ownerPrefix = string.IsNullOrEmpty(ownerId) ? null : ownerId;
                     var id = ownerPrefix is null ? abilityName : $"{ownerPrefix}${abilityName}";
-                    var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, text);
+                    var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, lineIndex);
                     var (variantBaseId, variantRef) =
-                        ResolveVariant(abilityNode, typeName, documentUri, text, ownerPrefix);
+                        ResolveVariant(abilityNode, typeName, documentUri, lineIndex, ownerPrefix);
                     if (variantRef is not null) references.Add(variantRef);
                     symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
                         new FileOrigin(documentUri, abilityNode.Line - 1, col), null, variantBaseId));

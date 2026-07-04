@@ -24,6 +24,11 @@ public abstract class DiagnosticsPublisherBase
     private readonly object _publishLock = new();
     private readonly IGameWorkspaceHost _workspaceHost;
     private HashSet<string> _lastPublishedUris = [];
+
+    // The index the last publish run was based on, for scoping the next run: documents whose
+    // entry (and every cross-document input) is reference-identical to the last run cannot have
+    // different diagnostics and are skipped. Guarded by _publishLock.
+    private GameIndex? _lastRunIndex;
     private int _pendingVersion;
 
     protected DiagnosticsPublisherBase(
@@ -69,7 +74,11 @@ public abstract class DiagnosticsPublisherBase
     {
         if (_debounceMs <= 0)
         {
-            RunPublish(newIndex);
+            lock (_publishLock)
+            {
+                RunPublish(newIndex);
+            }
+
             return;
         }
 
@@ -96,8 +105,31 @@ public abstract class DiagnosticsPublisherBase
             .ToList();
         var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
 
+        // Reference-diff against the last run: a document's diagnostics can only change when its
+        // own Documents entry changed or when any cross-document input (symbols, references,
+        // groups, baseline, localisation, assets, bones, enums) changed. GameIndex is an immutable
+        // record, so unchanged fields keep their references across updates; a content-only edit
+        // replaces just the edited document's entry.
+        var last = _lastRunIndex;
+        var crossDocInputsChanged = last is null
+                                    || !ReferenceEquals(last.WorkspaceDefinitions, index.WorkspaceDefinitions)
+                                    || !ReferenceEquals(last.WorkspaceReferences, index.WorkspaceReferences)
+                                    || !ReferenceEquals(last.WorkspaceGroupMemberships, index.WorkspaceGroupMemberships)
+                                    || !ReferenceEquals(last.Baseline, index.Baseline)
+                                    || !ReferenceEquals(last.Localisation, index.Localisation)
+                                    || !ReferenceEquals(last.AssetFiles, index.AssetFiles)
+                                    || !ReferenceEquals(last.ModelBones, index.ModelBones)
+                                    || !ReferenceEquals(last.WorkspaceDynamicEnumValues, index.WorkspaceDynamicEnumValues)
+                                    || !ReferenceEquals(last.WorkspaceEnumValueDefinitions,
+                                        index.WorkspaceEnumValueDefinitions);
+
         foreach (var doc in openDocs)
         {
+            if (!crossDocInputsChanged
+                && _lastPublishedUris.Contains(doc.Uri)
+                && ReferenceEquals(last!.Documents.GetValueOrDefault(doc.Uri), index.Documents.GetValueOrDefault(doc.Uri)))
+                continue;
+
             try
             {
                 PublishForDocument(doc.Uri, doc.Text, index);
@@ -114,5 +146,6 @@ public abstract class DiagnosticsPublisherBase
                 _publish(EmptyParams(uri));
 
         _lastPublishedUris = openUris;
+        _lastRunIndex = index;
     }
 }

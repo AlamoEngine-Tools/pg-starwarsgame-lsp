@@ -73,10 +73,11 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
             if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
                 using (_indexService.BeginBulkUpdate())
                 {
+                    // Restore the saved state in the index only; the host tracks open documents,
+                    // closed-file consumers read from disk on demand.
                     _indexService.RemoveDocument(uri);
                     var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
                     await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                    _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                 }
             else
                 _indexService.RemoveDocument(uri);

@@ -56,7 +56,7 @@ public sealed class SquadronSyncCodeActionProviderTest
     {
         var host = new FakeWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
-        return new SquadronSyncCodeActionProvider(host, fileHelper);
+        return new SquadronSyncCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
 
     private static XmlCodeActionContext MakeCtx(int diagnosticLine, int expectedOffsets)

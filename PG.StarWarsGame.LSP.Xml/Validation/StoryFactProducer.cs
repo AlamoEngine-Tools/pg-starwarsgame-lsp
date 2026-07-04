@@ -4,6 +4,7 @@
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -12,11 +13,10 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
     private const int MaxEventParamSlots = 7;
     private const int MaxRewardParamSlots = 14;
 
-    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
     {
         var facts = new List<XmlFact>();
-        var doc = new HtmlDocument();
-        doc.LoadHtml(xmlText);
+        var doc = document.Html;
 
         foreach (var eventNode in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&

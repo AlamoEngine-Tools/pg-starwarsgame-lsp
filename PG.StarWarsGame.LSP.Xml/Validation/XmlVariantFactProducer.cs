@@ -14,7 +14,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
 {
     private const string NameAttribute = "Name";
 
-    public IReadOnlyList<XmlFact> Produce(string documentUri, string text, GameIndex index)
+    public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         if (!index.Documents.TryGetValue(documentUri, out var docIndex))
             return [];
@@ -23,7 +23,8 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
         if (variants.Count == 0)
             return [];
 
-        var hapDoc = XmlUtility.CreateHtmlDocument(text);
+        var text = document.Text;
+        var hapDoc = document.Html;
         var resolver = new EffectiveObjectResolver(index, schema, tagSource);
         var facts = new List<XmlFact>();
 

@@ -77,8 +77,10 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
             var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
             if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
             {
-                // File still on disk — restore the saved state so workspace-wide references
-                // (cross-file go-to-def, unresolved-ref diagnostics) keep working after close.
+                // File still on disk — restore the saved state in the INDEX so workspace-wide
+                // references (cross-file go-to-def, unresolved-ref diagnostics) keep working after
+                // close; the text itself is not re-added to the host, which tracks only open
+                // documents (closed-file consumers read from disk on demand).
                 // UpdateDocumentAsync skips the re-parse when the buffer already matched disk (the
                 // common case for a viewed-but-unedited file), avoiding an expensive re-index and the
                 // symbol-removal flicker that briefly drops resolution back to the baseline. Pass the
@@ -86,7 +88,6 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
                 var version = _indexService.Current.Documents.GetValueOrDefault(uri)?.Version ?? 0;
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
                 await _indexService.UpdateDocumentAsync(uri, text, version, token);
-                _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
             }
             else
             {

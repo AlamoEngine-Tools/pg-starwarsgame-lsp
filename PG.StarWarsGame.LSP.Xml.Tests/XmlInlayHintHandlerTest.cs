@@ -37,7 +37,7 @@ public sealed class XmlInlayHintHandlerTest
 
         var registry = new XmlInlayHintRegistry([new LocalisationKeySingleValueInlayHintProvider()]);
         return (new XmlInlayHintHandler(
-            host,
+            TestParseCache.For(host),
             index,
             schema ?? new EmptySchemaProvider(),
             new AllowAllEaWContext(),
@@ -164,7 +164,7 @@ public sealed class XmlInlayHintHandlerTest
         host.Set(Uri, xml);
         var index = new FakeIndexService();
         var handler = new XmlInlayHintHandler(
-            host, index, new EmptySchemaProvider(),
+            TestParseCache.For(host), index, new EmptySchemaProvider(),
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
@@ -172,6 +172,30 @@ public sealed class XmlInlayHintHandlerTest
 
         var result = await handler.Handle(Params(), CancellationToken.None);
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_SameContentTwice_ReusesOneParse()
+    {
+        // Inlay hints are re-requested by clients on every scroll — with unchanged content the
+        // second request must be a cache hit, not a re-parse.
+        const string xml = "<GameObjectType><Text_ID>TEXT_NAME</Text_ID></GameObjectType>";
+        var host = new FakeWorkspaceHost();
+        host.Set(Uri, xml);
+        var cache = TestParseCache.For(host);
+        var handler = new XmlInlayHintHandler(
+            cache, new FakeIndexService(), new EmptySchemaProvider(),
+            new AllowAllEaWContext(),
+            new FileHelper(new MockFileSystem()),
+            NullLogger<XmlInlayHintHandler>.Instance,
+            new XmlInlayHintRegistry([]));
+
+        _ = await handler.Handle(Params(), CancellationToken.None);
+        _ = await handler.Handle(Params(), CancellationToken.None);
+
+        var (hits, misses, _) = cache.Statistics;
+        Assert.Equal(1, misses);
+        Assert.Equal(1, hits);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

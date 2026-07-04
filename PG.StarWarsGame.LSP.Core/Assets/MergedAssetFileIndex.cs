@@ -11,6 +11,10 @@ namespace PG.StarWarsGame.LSP.Core.Assets;
 /// </summary>
 public sealed class MergedAssetFileIndex : IAssetFileIndex
 {
+    // Paths pre-bucketed by extension: completion providers enumerate one extension per request,
+    // and a linear EndsWith scan over the full catalog (all packed game assets) per keystroke is
+    // needlessly expensive.
+    private readonly ImmutableDictionary<string, ImmutableArray<string>> _byExtension;
     private readonly ImmutableHashSet<string> _packedPaths;
     private readonly ImmutableHashSet<string> _paths;
 
@@ -18,12 +22,14 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
     {
         _paths = paths.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         _packedPaths = ImmutableHashSet<string>.Empty;
+        _byExtension = BucketByExtension(_paths);
     }
 
     private MergedAssetFileIndex(ImmutableHashSet<string> all, ImmutableHashSet<string> packed)
     {
         _paths = all;
         _packedPaths = packed;
+        _byExtension = BucketByExtension(all);
     }
 
     public bool Contains(string normalisedPath)
@@ -33,7 +39,24 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
 
     public IEnumerable<string> GetByExtension(string ext)
     {
-        return _paths.Where(p => p.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+        return _byExtension.GetValueOrDefault(ext, ImmutableArray<string>.Empty);
+    }
+
+    private static ImmutableDictionary<string, ImmutableArray<string>> BucketByExtension(
+        ImmutableHashSet<string> paths)
+    {
+        var buckets = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            var ext = Path.GetExtension(path);
+            if (ext.Length == 0) continue;
+            if (!buckets.TryGetValue(ext, out var list))
+                buckets[ext] = list = [];
+            list.Add(path);
+        }
+
+        return buckets.ToImmutableDictionary(
+            kv => kv.Key, kv => kv.Value.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
     }
 
     public bool IsPackedAsset(string normalisedPath)

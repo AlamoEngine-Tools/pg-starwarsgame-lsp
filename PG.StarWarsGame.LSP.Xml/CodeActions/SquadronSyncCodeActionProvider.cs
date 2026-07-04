@@ -15,11 +15,11 @@ namespace PG.StarWarsGame.LSP.Xml.CodeActions;
 internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
 {
     private readonly IFileHelper _fileHelper;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlParseCache _parseCache;
 
-    public SquadronSyncCodeActionProvider(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
+    public SquadronSyncCodeActionProvider(IXmlParseCache parseCache, IFileHelper fileHelper)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
     }
 
@@ -32,10 +32,11 @@ internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
         var expectedOffsets = syncData.Value<int?>("expectedOffsets") ?? 0;
 
         var uri = _fileHelper.NormalizeUri(ctx.DocumentUri.ToString());
-        if (!_workspaceHost.TryGet(uri, out var trackedDoc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return [];
 
-        var hapDoc = XmlUtility.CreateHtmlDocument(trackedDoc.Text);
+        var hapDoc = parsed.Html;
         var diagnosticLine = ctx.Diagnostic.Range.Start.Line;
 
         var objectNode = XmlUtility.FindEnclosingElement(hapDoc, diagnosticLine);
@@ -53,7 +54,7 @@ internal sealed class SquadronSyncCodeActionProvider : IXmlCodeActionProvider
             .ToList();
 
         var actualOffsets = offsetNodes.Count;
-        var indent = GetIndent(trackedDoc.Text, unitNodes.FirstOrDefault() ?? offsetNodes.FirstOrDefault());
+        var indent = GetIndent(parsed.Text, unitNodes.FirstOrDefault() ?? offsetNodes.FirstOrDefault());
 
         var actions = new List<CommandOrCodeAction>();
 

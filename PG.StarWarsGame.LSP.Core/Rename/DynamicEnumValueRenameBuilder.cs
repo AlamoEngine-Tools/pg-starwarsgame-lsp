@@ -23,7 +23,7 @@ public static class DynamicEnumValueRenameBuilder
 {
     public static WorkspaceEdit? Build(
         string enumName, string valueName, string newName, GameIndex index,
-        IGameWorkspaceHost workspaceHost, IFileHelper fileHelper, ILogger logger)
+        IDocumentTextSource textSource, ILogger logger)
     {
         if (!index.WorkspaceEnumValueDefinitions.TryGetValue(enumName, out var valueMap) ||
             !valueMap.TryGetValue(valueName, out var origin) || !origin.IsNavigable)
@@ -60,7 +60,7 @@ public static class DynamicEnumValueRenameBuilder
             // recorded for this format (see DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations),
             // so the tag name is located by text search, same approach as
             // XmlObjectRenameBuilder.FindNameAttributeRange.
-            var edits = FindElementNameEdits(origin.Uri, origin.Line, valueName, newName, workspaceHost, fileHelper);
+            var edits = FindElementNameEdits(origin.Uri, origin.Line, valueName, newName, textSource);
             if (edits.Count == 0)
             {
                 logger.LogDebug("Rename blocked: could not locate element name '{Value}' at {Uri}:{Line}",
@@ -95,27 +95,10 @@ public static class DynamicEnumValueRenameBuilder
     }
 
     private static List<TextEdit> FindElementNameEdits(
-        string uri, int line, string valueName, string newName,
-        IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
+        string uri, int line, string valueName, string newName, IDocumentTextSource textSource)
     {
-        string text;
-        if (workspaceHost.TryGet(uri, out var doc))
-        {
-            text = doc.Text;
-        }
-        else
-        {
-            var path = fileHelper.FileUriToPath(uri);
-            if (path is null) return [];
-            try
-            {
-                text = fileHelper.FileSystem.File.ReadAllText(path);
-            }
-            catch
-            {
-                return [];
-            }
-        }
+        var text = textSource.GetText(uri)?.Text;
+        if (text is null) return [];
 
         var lines = text.Split('\n');
         if (line >= lines.Length) return [];

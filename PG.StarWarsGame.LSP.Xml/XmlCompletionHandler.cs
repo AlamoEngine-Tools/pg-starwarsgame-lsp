@@ -37,10 +37,10 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private readonly ISchemaProvider _schema;
     private readonly IXmlTagNameCompletionStrategyRegistry _tagNameRegistry;
     private readonly IXmlTagValueCompletionStrategyRegistry _tagValueRegistry;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlParseCache _parseCache;
 
     public XmlCompletionHandler(
-        IGameWorkspaceHost workspaceHost,
+        IXmlParseCache parseCache,
         ISchemaProvider schema,
         IGameIndexService indexService,
         IFileTypeRegistry fileTypeRegistry,
@@ -49,7 +49,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IXmlTagNameCompletionStrategyRegistry tagNameRegistry,
         IXmlTagValueCompletionStrategyRegistry tagValueRegistry)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _schema = schema;
         _indexService = indexService;
         _fileTypeRegistry = fileTypeRegistry;
@@ -64,11 +64,12 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult(new CompletionList());
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult(new CompletionList());
-        var text = doc.Text;
+        var text = parsed.Text;
 
-        var lines = text.Split('\n');
+        var lines = parsed.Lines;
         var lineIndex = request.Position.Line;
         if (lineIndex >= lines.Length)
             return Task.FromResult(new CompletionList());
@@ -102,7 +103,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             return Task.FromResult(new CompletionList());
 
         // Value completion: cursor is inside an element body
-        var valueDoc = XmlUtility.CreateHtmlDocument(text);
+        var valueDoc = parsed.Html;
         var enclosingValueNode = XmlUtility.FindEnclosingElement(valueDoc, lineIndex);
         var enclosingTag = enclosingValueNode?.Name;
         var enclosingDepth = enclosingValueNode is null ? 0 : XmlUtility.GetDepth(enclosingValueNode);

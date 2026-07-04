@@ -622,6 +622,195 @@ public sealed class GameIndexServiceTest
         Assert.True(captured!.WorkspaceDefinitions.ContainsKey("UNIT_A"));
     }
 
+    // ── Bulk merge semantics (builder-based bulk construction) ──────────────
+
+    [Fact]
+    public async Task BulkUpdate_DefersDocumentVisibility_UntilScopeEnds()
+    {
+        var svc = Build(new FakeParser(Doc("", 0)));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
+            Assert.False(svc.Current.Documents.ContainsKey("file:///a.xml"));
+        }
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///a.xml"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_MergedIndex_MatchesSequentialUpdates()
+    {
+        DocumentIndex DocFor(string uri, int version)
+        {
+            return Doc(uri, version,
+                [Symbol($"UNIT_{uri[^5]}", uri)],
+                [Reference("SHARED_TARGET", uri)],
+                [GroupMembership("SHARED_GROUP", uri)]);
+        }
+
+        var bulkSvc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(DocFor(uri, v))));
+        var seqSvc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(DocFor(uri, v))));
+
+        using (bulkSvc.BeginBulkUpdate())
+        {
+            await bulkSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, default);
+            await bulkSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, default);
+        }
+
+        await seqSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, default);
+        await seqSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, default);
+
+        Assert.Equal(seqSvc.Current.Documents.Keys.Order(), bulkSvc.Current.Documents.Keys.Order());
+        Assert.Equal(2, bulkSvc.Current.WorkspaceReferences["SHARED_TARGET"].Length);
+        Assert.Equal(2, bulkSvc.Current.WorkspaceGroupMemberships["SHARED_GROUP"].Length);
+        Assert.True(bulkSvc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+        Assert.True(bulkSvc.Current.WorkspaceDefinitions.ContainsKey("UNIT_B"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ReindexOfExistingDocument_StripsOldEntries()
+    {
+        var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol(text.Contains("v2") ? "UNIT_NEW" : "UNIT_OLD", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, default);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, default);
+        }
+
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_NEW"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_RemoveThenReaddSameContentInsideScope_KeepsDocument()
+    {
+        // Mirrors LuaTextDocumentSyncHandler.didClose: RemoveDocument + UpdateDocumentAsync with
+        // the on-disk (identical) text inside one bulk scope. The unchanged-content fast path must
+        // not swallow the re-add while the removal is still pending.
+        var svc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol("UNIT_A", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 3, default);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.RemoveDocument("file:///f.xml");
+            await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 0, default);
+        }
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_UpdateThenRemoveInsideScope_RemovesDocument()
+    {
+        var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_A")])));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+            svc.RemoveDocument("file:///f.xml");
+        }
+
+        Assert.False(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_StaleVersionInsideScope_IsDropped()
+    {
+        var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol(text.Contains("new") ? "UNIT_NEW" : "UNIT_OLD", uri)]))));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///f.xml", "<new/>", 2, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<old/>", 1, default);
+        }
+
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
+    }
+
+    [Fact]
+    public async Task RemoveDocument_DuringBulk_DefersRemovalUntilScopeEnds()
+    {
+        var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_A")])));
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.RemoveDocument("file:///f.xml");
+            Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        }
+
+        Assert.False(svc.Current.Documents.ContainsKey("file:///f.xml"));
+    }
+
+    [Fact]
+    public void InjectDocument_DuringBulk_DefersAndMerges()
+    {
+        var svc = Build();
+        var doc = Doc("file:///cached.xml", 0, [Symbol("UNIT_CACHED", "file:///cached.xml")]);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.InjectDocument(doc);
+            Assert.False(svc.Current.Documents.ContainsKey("file:///cached.xml"));
+        }
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///cached.xml"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_CACHED"));
+    }
+
+    // ── Content-only re-parse keeps workspace dictionaries reference-identical ──
+
+    [Fact]
+    public async Task UpdateDocumentAsync_SameSymbolsRefsGroups_KeepsWorkspaceDictionariesReferenceIdentical()
+    {
+        // A re-parse whose symbols/references/group memberships are value-identical (e.g. an edit
+        // in a comment or non-indexed value) must not rebuild the workspace dictionaries — the
+        // diagnostics publisher relies on their reference identity to scope re-publishing.
+        var svc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol("UNIT_A", uri)], [Reference("TARGET", uri)],
+                [GroupMembership("GROUP", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        var before = svc.Current;
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X edited/>", 2, default);
+        var after = svc.Current;
+
+        Assert.Equal(2, after.Documents["file:///f.xml"].Version);
+        Assert.True(ReferenceEquals(before.WorkspaceDefinitions, after.WorkspaceDefinitions));
+        Assert.True(ReferenceEquals(before.WorkspaceReferences, after.WorkspaceReferences));
+        Assert.True(ReferenceEquals(before.WorkspaceGroupMemberships, after.WorkspaceGroupMemberships));
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_ChangedSymbols_RebuildsWorkspaceDefinitions()
+    {
+        var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol(text.Contains("v2") ? "UNIT_B" : "UNIT_A", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, default);
+        var before = svc.Current;
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, default);
+        var after = svc.Current;
+
+        Assert.False(ReferenceEquals(before.WorkspaceDefinitions, after.WorkspaceDefinitions));
+        Assert.True(after.WorkspaceDefinitions.ContainsKey("UNIT_B"));
+        Assert.False(after.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
     // ── Cancellation ─────────────────────────────────────────────────────────
 
     [Fact]

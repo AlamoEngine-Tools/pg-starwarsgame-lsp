@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -24,18 +25,18 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaInlayHintHandler> _logger;
     private readonly ILuaApiSchemaProvider _schemaProvider;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILuaParseCache _parseCache;
 
     public LuaInlayHintHandler(
         IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
+        ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
         ILogger<LuaInlayHintHandler> logger)
     {
         _indexService = indexService;
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _annotationRepository = annotationRepository;
@@ -48,13 +49,13 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<InlayHintContainer?>(null);
 
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<InlayHintContainer?>(null);
 
         var range = request.Range;
         var index = _indexService.Current;
-        var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);
-        var root = tree.GetRoot();
+        var root = parsed.Tree.GetRoot();
         var hints = new List<InlayHint>();
 
         foreach (var call in root.DescendantNodes().OfType<FunctionCallExpressionSyntax>())

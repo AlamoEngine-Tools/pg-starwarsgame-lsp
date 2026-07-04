@@ -173,8 +173,10 @@ public sealed class LuaTextDocumentSyncHandlerTest
     }
 
     [Fact]
-    public async Task DidClose_WhenFileExistsOnDisk_RestoresHostEntry_WithPublishDiagnosticsFalse()
+    public async Task DidClose_WhenFileExistsOnDisk_DoesNotRetainHostEntry()
     {
+        // The host tracks only open documents — after close the text lives on disk and every
+        // closed-file consumer reads it from there on demand.
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [DiskPath] = new(DiskContent) });
         var (handler, host, _) = Build(fs);
@@ -184,10 +186,8 @@ public sealed class LuaTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Single(host.AddOrUpdateCalls);
-        Assert.Equal(DiskUri, host.AddOrUpdateCalls[0].Uri);
-        Assert.Equal(DiskContent, host.AddOrUpdateCalls[0].Text);
-        Assert.False(host.AddOrUpdateCalls[0].PublishDiagnostics);
+        Assert.Single(host.RemoveCalls);
+        Assert.Empty(host.AddOrUpdateCalls);
     }
 
     // ── DidSave ──────────────────────────────────────────────────────────────

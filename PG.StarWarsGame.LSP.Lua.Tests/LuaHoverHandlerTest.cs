@@ -39,7 +39,7 @@ public sealed class LuaHoverHandlerTest
         var svc = new FakeIndexService { Current = index };
         return new LuaHoverHandler(
             svc,
-            host ?? new FakeWorkspaceHost(),
+            TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             schema,
             repo ?? new LuaAnnotationRepository(),
@@ -429,7 +429,7 @@ public sealed class LuaHoverHandlerTest
 
         var handler = new LuaHoverHandler(
             new FakeIndexService { Current = GameIndex.Empty },
-            new FakeWorkspaceHost(), // empty — no document tracked
+            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
             fileHelper,
             new LuaApiSchemaProvider([]),
             new LuaAnnotationRepository(),

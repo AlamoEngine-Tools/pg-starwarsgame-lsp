@@ -64,7 +64,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             new EaWXmlContext(fileHelper),
             new NullProjectIndexCache(),
             new LuaAnnotationRepository(),
-            host ?? new FakeWorkspaceHost(),
             NullLogger<WorkspaceIndexer>.Instance);
         return new GameDidChangeWatchedFilesHandler(
             idx,
@@ -421,6 +420,125 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Equal(0, reload.LocalisationReloadCount);
     }
 
+    // ── batching: expensive reactions run once per notification ────────────────
+
+    [Fact]
+    public async Task Handle_MultipleAssetChanges_ReglobsAssetCatalogOnce()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\data\art\textures\a.tga"] = new(""),
+            [@"c:\data\art\textures\b.dds"] = new(""),
+            [@"c:\data\art\models\c.alo"] = new("")
+        });
+        var spy = new SpyIndexService();
+
+        var handler = BuildHandler(spy, fs: fs);
+        await handler.Handle(Changed(
+            "file:///c:/data/art/textures/a.tga",
+            "file:///c:/data/art/textures/b.dds",
+            "file:///c:/data/art/models/c.alo"), CancellationToken.None);
+
+        Assert.Equal(1, spy.AssetApplications);
+    }
+
+    [Fact]
+    public async Task Handle_MultipleDynamicEnumChanges_RescansEnumCatalogOnce()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\xml\gameconstants.xml"] =
+                new("<GameConstants><Armor_Types>Armor_Structure</Armor_Types></GameConstants>"),
+            [@"c:\mods\mymod\data\xml\surfacefxtriggertype.xml"] =
+                new("<Enum><Entry>Dirt</Entry></Enum>")
+        });
+        var spy = new SpyIndexService();
+        var schema = new FakeSchemaProvider(
+            new EnumDefinition
+            {
+                Name = "ArmorType", Kind = EnumKind.DynamicXml,
+                SourceFile = "data/xml/gameconstants.xml$Armor_Types", Values = []
+            },
+            new EnumDefinition
+            {
+                Name = "SurfaceFXTriggerType", Kind = EnumKind.DynamicXml,
+                SourceFile = "data/xml/surfacefxtriggertype.xml", Values = []
+            });
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration(["c:/mods/mymod/data/xml"], [], [], [], "csv")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload, schema: schema);
+        await handler.Handle(Changed(
+            "file:///c:/mods/mymod/data/xml/gameconstants.xml",
+            "file:///c:/mods/mymod/data/xml/surfacefxtriggertype.xml"), CancellationToken.None);
+
+        Assert.Single(spy.DynamicEnumApplications);
+    }
+
+    [Fact]
+    public async Task Handle_MultiplePgprojChanges_ReloadsOnce()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\mymod.pgproj"] = new("{}"),
+            [@"c:\mods\dep\dep.pgproj"] = new("{}")
+        });
+        var reload = new FakeReloadService();
+
+        var handler = BuildHandler(fs: fs, reload: reload);
+        await handler.Handle(Changed(
+            "file:///c:/mods/mymod/mymod.pgproj",
+            "file:///c:/mods/dep/dep.pgproj"), CancellationToken.None);
+
+        Assert.Equal(1, reload.ReloadCount);
+    }
+
+    [Fact]
+    public async Task Handle_PgprojAndAssetChanged_ReloadSubsumesAssetReglob()
+    {
+        // The full project reload re-runs every catalog itself — a separate asset re-glob in the
+        // same notification would be redundant work on the old configuration.
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\mymod.pgproj"] = new("{}"),
+            [@"c:\data\art\textures\a.tga"] = new("")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService();
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(
+            "file:///c:/mods/mymod/mymod.pgproj",
+            "file:///c:/data/art/textures/a.tga"), CancellationToken.None);
+
+        Assert.Equal(1, reload.ReloadCount);
+        Assert.Equal(0, spy.AssetApplications);
+    }
+
+    [Fact]
+    public async Task Handle_PgprojAndCsvChanged_ReloadSubsumesLocalisationReload()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\mymod.pgproj"] = new("{}"),
+            [@"c:\mods\mymod\data\text\mastertextfile.csv"] = new("key,ENGLISH")
+        });
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+
+        var handler = BuildHandler(fs: fs, reload: reload);
+        await handler.Handle(Changed(
+            "file:///c:/mods/mymod/mymod.pgproj",
+            "file:///c:/mods/mymod/data/text/mastertextfile.csv"), CancellationToken.None);
+
+        Assert.Equal(1, reload.ReloadCount);
+        Assert.Equal(0, reload.LocalisationReloadCount);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class FakeReloadService : IModProjectReloadService
@@ -531,8 +649,11 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
         }
 
+        public int AssetApplications { get; private set; }
+
         public void ApplyAssetFiles(IAssetFileIndex index)
         {
+            AssetApplications++;
         }
 
         public void ApplyModelBones(

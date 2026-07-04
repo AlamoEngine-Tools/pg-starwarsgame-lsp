@@ -14,6 +14,32 @@ public sealed record GameIndex(
     ImmutableDictionary<string, ImmutableArray<GameReference>> WorkspaceReferences
 )
 {
+    // Memoization fields for the computed members below. The custom copy constructor deliberately
+    // does NOT copy them: a `with` mutation produces a copy that must recompute against its own
+    // (possibly changed) dictionaries. -1 marks LeafLayerRank as not-yet-computed (ranks are >= 0).
+    private ImmutableDictionary<string, ImmutableArray<GroupMembership>>? _allGroupMemberships;
+    private int _leafLayerRank = -1;
+
+    // Replaces the compiler-synthesised copy constructor used by `with` expressions. Every
+    // property must be copied here — add new properties to this list when extending the record.
+    // NOTE: field initializers do NOT run in a user-defined record copy constructor, so the
+    // LeafLayerRank sentinel must be reset explicitly (the group-memberships cache defaults to
+    // null, which is already "not computed").
+    private GameIndex(GameIndex original)
+    {
+        _leafLayerRank = -1;
+        Baseline = original.Baseline;
+        Documents = original.Documents;
+        WorkspaceDefinitions = original.WorkspaceDefinitions;
+        WorkspaceReferences = original.WorkspaceReferences;
+        WorkspaceGroupMemberships = original.WorkspaceGroupMemberships;
+        Localisation = original.Localisation;
+        AssetFiles = original.AssetFiles;
+        ModelBones = original.ModelBones;
+        WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
+        WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
+    }
+
     // WorkspaceDefinitions and WorkspaceReferences are keyed by game object Name, which
     // the engine resolves case-insensitively. Use OrdinalIgnoreCase so "X-wing" and
     // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI
@@ -77,25 +103,33 @@ public sealed record GameIndex(
     ///     <see cref="WorkspaceGroupMemberships" /> in LSP handlers so shipped-game members are included
     ///     alongside mod-workspace members when resolving group keys.
     /// </summary>
-    public ImmutableDictionary<string, ImmutableArray<GroupMembership>> AllGroupMemberships
+    public ImmutableDictionary<string, ImmutableArray<GroupMembership>> AllGroupMemberships =>
+        _allGroupMemberships ??= ComputeAllGroupMemberships();
+
+    // The highest LayerRank among all indexed documents; 0 when no documents exist. Memoized —
+    // callers use it per symbol in loops (IsLeafOwned, shadow facts) and the record is immutable.
+    public int LeafLayerRank
     {
         get
         {
-            if (Baseline.GroupMemberships.IsEmpty) return WorkspaceGroupMemberships;
-            if (WorkspaceGroupMemberships.IsEmpty) return Baseline.GroupMemberships;
-
-            var result = WorkspaceGroupMemberships;
-            foreach (var (key, baselineMembers) in Baseline.GroupMemberships)
-                result = result.TryGetValue(key, out var ws)
-                    ? result.SetItem(key, ws.AddRange(baselineMembers))
-                    : result.Add(key, baselineMembers);
-            return result;
+            var rank = _leafLayerRank;
+            if (rank >= 0) return rank;
+            return _leafLayerRank = Documents.Count == 0 ? 0 : Documents.Values.Max(d => d.LayerRank);
         }
     }
 
-    // The highest LayerRank among all indexed documents; 0 when no documents exist.
-    public int LeafLayerRank =>
-        Documents.Count == 0 ? 0 : Documents.Values.Max(d => d.LayerRank);
+    private ImmutableDictionary<string, ImmutableArray<GroupMembership>> ComputeAllGroupMemberships()
+    {
+        if (Baseline.GroupMemberships.IsEmpty) return WorkspaceGroupMemberships;
+        if (WorkspaceGroupMemberships.IsEmpty) return Baseline.GroupMemberships;
+
+        var result = WorkspaceGroupMemberships;
+        foreach (var (key, baselineMembers) in Baseline.GroupMemberships)
+            result = result.TryGetValue(key, out var ws)
+                ? result.SetItem(key, ws.AddRange(baselineMembers))
+                : result.Add(key, baselineMembers);
+        return result;
+    }
 
     public GameSymbol? Resolve(string id)
     {

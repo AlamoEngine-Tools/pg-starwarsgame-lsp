@@ -3,6 +3,7 @@
 
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
+using Loretta.CodeAnalysis;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -20,7 +21,13 @@ internal static class LuaImportAnalyzer
     public static IReadOnlyList<LspDiagnostic> Analyze(
         string documentUri, string text, IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
+        return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), documents, fileHelper);
+    }
+
+    public static IReadOnlyList<LspDiagnostic> Analyze(
+        string documentUri, SyntaxTree tree, IReadOnlyDictionary<string, DocumentIndex> documents,
+        IFileHelper fileHelper)
+    {
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 

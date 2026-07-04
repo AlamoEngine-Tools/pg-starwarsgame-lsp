@@ -16,12 +16,12 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
 {
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlParseCache _parseCache;
 
-    public XmlLinkedEditingRangeHandler(IGameWorkspaceHost workspaceHost, IEaWXmlContext eaWXmlContext,
+    public XmlLinkedEditingRangeHandler(IXmlParseCache parseCache, IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
     }
@@ -32,14 +32,14 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<LinkedEditingRanges>(null!);
 
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<LinkedEditingRanges>(null!);
 
         var line = request.Position.Line;
         var character = request.Position.Character;
 
-        var htmlDoc = new HtmlDocument();
-        htmlDoc.LoadHtml(doc.Text);
+        var htmlDoc = parsed.Html;
 
         var node = FindNodeAtPosition(htmlDoc, line, character);
         if (node is null)

@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
@@ -85,10 +86,14 @@ public sealed class LuaRenameHandlerTest
 
     private static LuaRenameHandler MakeHandler(FakeWorkspaceHost? host = null, FakeSchemaProvider? schema = null)
     {
-        return new LuaRenameHandler(
+        var textSource = new DocumentTextSource(
             host ?? new FakeWorkspaceHost(),
-            schema ?? new FakeSchemaProvider(),
             new FileHelper(new MockFileSystem()),
+            NullLogger<DocumentTextSource>.Instance);
+        return new LuaRenameHandler(
+            new LuaParseCache(textSource, 16),
+            textSource,
+            schema ?? new FakeSchemaProvider(),
             NullLogger<LuaRenameHandler>.Instance);
     }
 

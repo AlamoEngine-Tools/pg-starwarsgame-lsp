@@ -14,22 +14,19 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlRenameHandler : IXmlRenameProvider
 {
     private readonly IEaWXmlContext _eaWXmlContext;
-    private readonly IFileHelper _fileHelper;
     private readonly ILogger<XmlRenameHandler> _logger;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IDocumentTextSource _textSource;
 
     public XmlRenameHandler(
         IEaWXmlContext eaWXmlContext,
-        IGameWorkspaceHost workspaceHost,
+        IDocumentTextSource textSource,
         ISchemaProvider schema,
-        IFileHelper fileHelper,
         ILogger<XmlRenameHandler> logger)
     {
         _eaWXmlContext = eaWXmlContext;
-        _workspaceHost = workspaceHost;
+        _textSource = textSource;
         _schema = schema;
-        _fileHelper = fileHelper;
         _logger = logger;
     }
 
@@ -42,11 +39,10 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         if (hit is null) return null;
 
         if (TryParseEnumValueId(hit.Value.Id, out var enumName, out var valueName))
-            return DynamicEnumValueRenameBuilder.Build(enumName, valueName, request.NewName, index, _workspaceHost,
-                _fileHelper, _logger);
+            return DynamicEnumValueRenameBuilder.Build(enumName, valueName, request.NewName, index, _textSource,
+                _logger);
 
-        return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _workspaceHost, _fileHelper,
-            _logger);
+        return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _textSource, _logger);
     }
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)

@@ -410,12 +410,76 @@ public sealed class GameIndexTest
         Assert.Equal(2, all["Unit_AT_AT"].Length);
     }
 
+    [Fact]
+    public void AllGroupMemberships_RepeatedAccess_ReturnsSameInstance()
+    {
+        // The merge is memoized — handlers call this property on hot request paths (go-to-def,
+        // find-references) and must not pay a full baseline∪workspace merge per access.
+        var baselineMember =
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///shipped.xml", 0, null));
+        var workspaceMember =
+            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///mod.xml", 1, null));
+
+        var index = GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                GroupMemberships = ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(
+                        StringComparer.OrdinalIgnoreCase)
+                    .Add("Unit_AT_AT", ImmutableArray.Create(baselineMember))
+            },
+            WorkspaceGroupMemberships =
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Unit_AT_AT", ImmutableArray.Create(workspaceMember))
+        };
+
+        Assert.Same(index.AllGroupMemberships, index.AllGroupMemberships);
+    }
+
+    [Fact]
+    public void AllGroupMemberships_WithMutatedCopy_ReflectsNewGroups()
+    {
+        // `with` copies must NOT inherit the memoized merge of the original.
+        var member = new GroupMembership("Unit_TIE", "SFXEvent", new FileOrigin("file:///sfx.xml", 1, null));
+        var index = GameIndex.Empty with
+        {
+            WorkspaceGroupMemberships =
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Unit_TIE", ImmutableArray.Create(member))
+        };
+        _ = index.AllGroupMemberships; // memoize on the original
+
+        var added = new GroupMembership("Unit_X", "SFXEvent", new FileOrigin("file:///x.xml", 1, null));
+        var mutated = index with
+        {
+            WorkspaceGroupMemberships = index.WorkspaceGroupMemberships.Add("Unit_X", ImmutableArray.Create(added))
+        };
+
+        Assert.True(mutated.AllGroupMemberships.ContainsKey("Unit_X"));
+    }
+
     // ── LeafLayerRank ─────────────────────────────────────────────────────────
 
     [Fact]
     public void LeafLayerRank_NoDocuments_ReturnsZero()
     {
         Assert.Equal(0, GameIndex.Empty.LeafLayerRank);
+    }
+
+    [Fact]
+    public void LeafLayerRank_WithMutatedCopy_ReflectsNewDocuments()
+    {
+        // `with` copies must NOT inherit the memoized rank of the original.
+        var a = At("A", "file:///dep/a.xml");
+        var index = WithLayers((a, 0));
+        Assert.Equal(0, index.LeafLayerRank); // memoize on the original
+
+        var b = At("B", "file:///leaf/b.xml");
+        var docB = new DocumentIndex("file:///leaf/b.xml", 1,
+            ImmutableArray.Create(b), ImmutableArray<GameReference>.Empty) with { LayerRank = 2 };
+        var mutated = index with { Documents = index.Documents.SetItem("file:///leaf/b.xml", docB) };
+
+        Assert.Equal(2, mutated.LeafLayerRank);
     }
 
     [Fact]

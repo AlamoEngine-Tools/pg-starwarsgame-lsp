@@ -22,7 +22,11 @@ internal static class LuaUpvalueAnalyzer
 
     public static IReadOnlyList<LspDiagnostic> Analyze(string text, string? documentUri = null)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
+        return Analyze(LuaSyntaxTree.ParseText(text, s_parseOptions), documentUri);
+    }
+
+    public static IReadOnlyList<LspDiagnostic> Analyze(SyntaxTree tree, string? documentUri = null)
+    {
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 

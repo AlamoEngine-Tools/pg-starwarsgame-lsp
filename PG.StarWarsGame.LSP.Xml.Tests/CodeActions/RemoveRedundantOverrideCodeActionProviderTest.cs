@@ -39,7 +39,7 @@ public sealed class RemoveRedundantOverrideCodeActionProviderTest
     {
         var host = new FakeRemoveOverrideWorkspaceHost(Uri, xml);
         var fileHelper = new FileHelper(new MockFileSystem());
-        return new RemoveRedundantOverrideCodeActionProvider(host, fileHelper);
+        return new RemoveRedundantOverrideCodeActionProvider(TestParseCache.For(host, fileHelper), fileHelper);
     }
 
     private static XmlCodeActionContext MakeCtx(int diagnosticLine, bool withMarker)

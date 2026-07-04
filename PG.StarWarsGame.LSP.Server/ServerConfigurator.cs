@@ -130,6 +130,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IProjectLayerMap, ProjectLayerMap>();
 
                 services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
+                services.AddSingleton<IDocumentTextSource, DocumentTextSource>();
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();

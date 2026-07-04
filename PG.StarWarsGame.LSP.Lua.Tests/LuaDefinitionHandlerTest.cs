@@ -32,7 +32,7 @@ public sealed class LuaDefinitionHandlerTest
     {
         return new LuaDefinitionHandler(
             new FakeIndexService { Current = index },
-            host ?? new FakeWorkspaceHost(),
+            TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
             NullLogger<LuaDefinitionHandler>.Instance);
     }
@@ -243,7 +243,7 @@ public sealed class LuaDefinitionHandlerTest
         // No document in workspace host — simulates not-yet-synced state
         var handler = new LuaDefinitionHandler(
             new FakeIndexService { Current = index },
-            new FakeWorkspaceHost(),
+            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
             fileHelper,
             NullLogger<LuaDefinitionHandler>.Instance);
 

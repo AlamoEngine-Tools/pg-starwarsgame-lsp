@@ -47,7 +47,8 @@ public sealed class XmlHoverHandlerTest
             new AssetHoverStrategy(),
             new TagNameHoverStrategy(fileTypeRegistry)
         ]);
-        return (new XmlHoverHandler(host, indexService ?? new FakeIndexService(), schema, config,
+        return (new XmlHoverHandler(TestParseCache.For(host), indexService ?? new FakeIndexService(), schema,
+                config,
                 NullLogger<XmlHoverHandler>.Instance,
                 new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
                 strategyRegistry),

@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -35,7 +36,9 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
+    private readonly IXmlParseCache _parseCache;
     private readonly IStoryFactProducer _storyProducer;
+    private readonly IDocumentTextSource _textSource;
     private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
 
@@ -53,12 +56,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileHelper fileHelper,
         IXmlVariantFactProducer variantProducer,
         IXmlLayerShadowFactProducer shadowProducer,
+        IDocumentTextSource textSource,
+        IXmlParseCache parseCache,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            variantProducer, shadowProducer)
+            variantProducer, shadowProducer, textSource, parseCache)
     {
     }
 
@@ -76,11 +81,16 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileHelper fileHelper,
         int debounceMs = 0,
         IXmlVariantFactProducer? variantProducer = null,
-        IXmlLayerShadowFactProducer? shadowProducer = null)
+        IXmlLayerShadowFactProducer? shadowProducer = null,
+        IDocumentTextSource? textSource = null,
+        IXmlParseCache? parseCache = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _indexService = indexService;
         _workspaceHost = workspaceHost;
+        _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
+            NullLogger<DocumentTextSource>.Instance);
+        _parseCache = parseCache ?? new XmlParseCache(_textSource, ServerOptions.Default.ParseCacheCapacity);
         _schema = schema;
         _handlerRegistry = handlerRegistry;
         _documentProducer = documentProducer;
@@ -103,22 +113,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             await RevalidateDocumentAsync(uri, ct);
     }
 
-    public async Task RevalidateDocumentAsync(string uri, CancellationToken ct)
+    public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
     {
         var index = _indexService.Current;
-        string text;
-        if (_workspaceHost.TryGet(uri, out var doc))
-        {
-            text = doc.Text;
-        }
-        else
-        {
-            var path = _fileHelper.FileUriToPath(uri);
-            if (path is null) return;
-            text = await _fileHelper.FileSystem.File.ReadAllTextAsync(path, ct);
-        }
+        var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
+        if (text is null) return Task.CompletedTask;
 
         PublishForDocument(uri, text, index);
+        return Task.CompletedTask;
     }
 
     public string? GetSuggestedFix(string uri, int startLine, int startChar)
@@ -135,17 +137,21 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
 
+        // One parse shared by every producer — and via the parse cache, shared with the indexing
+        // parse and every request handler touching the same content.
+        var parsed = _parseCache.GetOrParse(canonicalUri, text);
+
         var facts = new List<XmlFact>();
-        facts.AddRange(_documentProducer.Produce(text, uri));
+        facts.AddRange(_documentProducer.Produce(parsed, uri));
         facts.AddRange(_indexProducer.Produce(canonicalUri, index));
         if (_variantProducer is not null)
-            facts.AddRange(_variantProducer.Produce(canonicalUri, text, index));
+            facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index));
         if (_shadowProducer is not null)
-            facts.AddRange(_shadowProducer.Produce(canonicalUri, text, index));
+            facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
         if (IsStoryParserDocument(uri))
-            facts.AddRange(_storyProducer.Produce(text, uri));
+            facts.AddRange(_storyProducer.Produce(parsed, uri));
 
-        var lines = text.Split('\n');
+        var lines = parsed.Lines;
         var allDiags = new List<Diagnostic>();
         foreach (var fact in facts)
         {
@@ -155,8 +161,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 allDiags.Add(ToLspDiagnostic(fact, result));
         }
 
-        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, text, index));
-        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, text));
+        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index));
+        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();
@@ -176,13 +182,20 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         });
     }
 
+    // Test convenience: parses the text itself; the publish path shares one ParsedXmlDocument.
     internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
         string documentUri, string text, GameIndex index)
+    {
+        return CollectHardcodedRefDiagnostics(documentUri, ParsedXmlDocument.Parse(text), index);
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
+        string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         var hardcodedSets = _schema.AllHardcodedSets;
         if (hardcodedSets.Count == 0) return [];
 
-        // Skip the expensive HAP re-parse for file types whose schema has no hardcoded-ref tags.
+        // Skip the tree walk for file types whose schema has no hardcoded-ref tags.
         // Files with unknown/unregistered types fall through to the full walk (defensive).
         var normalizedUri = _fileHelper.NormalizeUri(documentUri);
         var fileTypes = _fileTypeRegistry.GetTypesForFile(normalizedUri);
@@ -192,9 +205,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             return [];
 
         var diagnostics = new List<Diagnostic>();
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-        WalkForHardcodedRefs(doc.DocumentNode, text, diagnostics);
+        WalkForHardcodedRefs(document.Html.DocumentNode, document.LineIndex, diagnostics);
         return diagnostics;
     }
 
@@ -212,15 +223,22 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
 
+    // Test convenience: parses the text itself; the publish path shares one ParsedXmlDocument.
     internal IReadOnlyList<Diagnostic> CollectDamageTypeOrderDiagnostics(string documentUri, string text)
     {
-        // Cheap pre-check before parsing — almost no documents declare this element.
+        return CollectDamageTypeOrderDiagnostics(documentUri, ParsedXmlDocument.Parse(text));
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectDamageTypeOrderDiagnostics(
+        string documentUri, ParsedXmlDocument document)
+    {
+        var text = document.Text;
+
+        // Cheap pre-check before walking the tree — almost no documents declare this element.
         if (!text.Contains("Damage_Types", StringComparison.OrdinalIgnoreCase))
             return [];
 
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-        var element = doc.DocumentNode.Descendants().FirstOrDefault(n =>
+        var element = document.Html.DocumentNode.Descendants().FirstOrDefault(n =>
             n.NodeType == HtmlNodeType.Element && n.Name.Equals("Damage_Types", StringComparison.OrdinalIgnoreCase));
         if (element is null)
             return [];
@@ -235,11 +253,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 tokens.Add((token, nodeStart + offset));
         }
 
+        var lineIndex = document.LineIndex;
         if (tokens.Count < RequiredDamageTypeTail.Length)
         {
             var (line, col) = tokens.Count > 0
-                ? XmlUtility.OffsetToPosition(text, tokens[^1].AbsPos)
-                : XmlUtility.OffsetToPosition(text, element.InnerStartIndex);
+                ? lineIndex.GetPosition(tokens[^1].AbsPos)
+                : lineIndex.GetPosition(element.InnerStartIndex);
             var len = tokens.Count > 0 ? tokens[^1].Token.Length : 0;
             return
             [
@@ -262,7 +281,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             if (string.Equals(tail[i].Token, RequiredDamageTypeTail[i], StringComparison.Ordinal))
                 continue;
 
-            var (line, col) = XmlUtility.OffsetToPosition(text, tail[i].AbsPos);
+            var (line, col) = lineIndex.GetPosition(tail[i].AbsPos);
             diagnostics.Add(new Diagnostic
             {
                 Severity = DiagnosticSeverity.Error,
@@ -291,7 +310,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         }
     }
 
-    private void WalkForHardcodedRefs(HtmlNode node, string text, List<Diagnostic> diagnostics)
+    private void WalkForHardcodedRefs(HtmlNode node, LineOffsetIndex lineIndex, List<Diagnostic> diagnostics)
     {
         foreach (var child in node.ChildNodes)
         {
@@ -299,15 +318,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
             var tagDef = _schema.GetTag(child.Name);
             if (tagDef is { ReferenceKind: ReferenceKind.HardcodedSet, HardcodedSet: not null })
-                EmitHardcodedRefDiagnostics(child, tagDef, tagDef.HardcodedSet, text, diagnostics);
+                EmitHardcodedRefDiagnostics(child, tagDef, tagDef.HardcodedSet, lineIndex, diagnostics);
 
-            WalkForHardcodedRefs(child, text, diagnostics);
+            WalkForHardcodedRefs(child, lineIndex, diagnostics);
         }
     }
 
     private static void EmitHardcodedRefDiagnostics(
         HtmlNode child, XmlTagDefinition tagDef, HardcodedReferenceSet set,
-        string text, List<Diagnostic> diagnostics)
+        LineOffsetIndex lineIndex, List<Diagnostic> diagnostics)
     {
         var groups = tagDef.ValueGroups;
         var applicableValues = groups.Count == 0
@@ -338,7 +357,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             if (!validNames.TryGetValue(token, out var deprecated))
             {
                 var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+                var (line0, col0) = lineIndex.GetPosition(absPos);
 
                 diagnostics.Add(new Diagnostic
                 {
@@ -352,7 +371,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             else if (deprecated)
             {
                 var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+                var (line0, col0) = lineIndex.GetPosition(absPos);
 
                 diagnostics.Add(new Diagnostic
                 {

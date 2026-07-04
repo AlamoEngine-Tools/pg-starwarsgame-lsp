@@ -61,6 +61,37 @@ public sealed class LuaDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
 
+    // ── shared parse (cache) ──────────────────────────────────────────────────
+
+    [Fact]
+    public void PublishForDocument_SameContentTwice_ParsesOnce()
+    {
+        // One publish = one parse shared by the syntax-error pass and all three analyzers
+        // (previously four separate parses); a second publish of unchanged content is a cache hit.
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
+        var fileHelper = new FileHelper(new MockFileSystem());
+        var cache = TestLuaParseCache.For(workspaceHost, fileHelper);
+        var publisher = new LuaDiagnosticsPublisher(
+            p => published.Add(p),
+            indexService,
+            workspaceHost,
+            fileHelper,
+            new LuaApiSchemaProvider([]),
+            NullLogger<LuaDiagnosticsPublisher>.Instance,
+            parseCache: cache);
+        workspaceHost.Set(LuaUri, "function Foo() end");
+
+        indexService.Fire(GameIndex.Empty);
+        indexService.Fire(IndexWithLuaRef(LuaUri, "UNIT_A")); // different index, same text
+
+        Assert.Equal(2, published.Count);
+        var (hits, misses, _) = cache.Statistics;
+        Assert.Equal(1, misses);
+        Assert.Equal(1, hits);
+    }
+
     // ── file-type filtering ───────────────────────────────────────────────────
 
     [Fact]

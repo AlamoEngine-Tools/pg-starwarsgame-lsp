@@ -42,7 +42,7 @@ public sealed class LuaInlayHintHandlerTest
         var svc = new FakeIndexService { Current = index ?? GameIndex.Empty };
         return new LuaInlayHintHandler(
             svc,
-            host,
+            TestLuaParseCache.For(host),
             new FileHelper(new MockFileSystem()),
             schema ?? new LuaApiSchemaProvider([]),
             repo ?? new LuaAnnotationRepository(),
