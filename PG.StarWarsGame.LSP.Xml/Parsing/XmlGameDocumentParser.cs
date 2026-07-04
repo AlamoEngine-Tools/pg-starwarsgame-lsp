@@ -100,7 +100,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     ///     unresolved-reference and type-mismatch handlers validate the inheritance link for free.
     /// </summary>
     private (string? BaseId, GameReference? Reference) ResolveVariant(
-        HtmlNode objectNode, string enclosingTypeName, string documentUri, string text)
+        HtmlNode objectNode, string enclosingTypeName, string documentUri, string text, string? ownerPrefix = null)
     {
         foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
@@ -115,9 +115,14 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             var absPos = child.InnerStartIndex + tokenOffset;
             var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
 
-            var reference = new GameReference(trimmed, GameSymbolKind.XmlObject,
+            // The base id/reference must live in the same id-space as objectNode's own id — for
+            // top-level objects that's the bare name (ownerPrefix is null); for abilities it's
+            // owner-scoped ("{ownerId}$Name", see CollectSubObjectListSymbols) to avoid coincidentally
+            // resolving to an unrelated object's same-named ability.
+            var baseId = ownerPrefix is not null ? $"{ownerPrefix}${trimmed}" : trimmed;
+            var reference = new GameReference(baseId, GameSymbolKind.XmlObject,
                 enclosingTypeName, documentUri, line, column, trimmed.Length);
-            return (trimmed, reference);
+            return (baseId, reference);
         }
 
         return (null, null);
@@ -346,9 +351,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     var abilityName = GetNameAttribute(abilityNode, objectType.NameTag);
                     if (string.IsNullOrEmpty(abilityName)) continue;
 
-                    var id = string.IsNullOrEmpty(ownerId) ? abilityName : $"{ownerId}${abilityName}";
+                    var ownerPrefix = string.IsNullOrEmpty(ownerId) ? null : ownerId;
+                    var id = ownerPrefix is null ? abilityName : $"{ownerPrefix}${abilityName}";
                     var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, text);
-                    var (variantBaseId, variantRef) = ResolveVariant(abilityNode, typeName, documentUri, text);
+                    var (variantBaseId, variantRef) =
+                        ResolveVariant(abilityNode, typeName, documentUri, text, ownerPrefix);
                     if (variantRef is not null) references.Add(variantRef);
                     symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
                         new FileOrigin(documentUri, abilityNode.Line - 1, col), null, variantBaseId));

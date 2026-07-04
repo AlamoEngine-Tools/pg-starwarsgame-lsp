@@ -193,6 +193,12 @@ public sealed class GetEffectiveObjectHandlerTest
             remove { }
         }
 
+        public event Action<GameIndex>? DynamicEnumChanged
+        {
+            add { }
+            remove { }
+        }
+
         private sealed class NoopScope : IDisposable
         {
             public void Dispose()

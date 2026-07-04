@@ -44,13 +44,17 @@ public sealed class BaselineLoader
         try
         {
             var bytes = await _fileHelper.FileSystem.File.ReadAllBytesAsync(path, ct);
-            return BaselineSerializer.Deserialize(bytes);
+            var baseline = BaselineSerializer.Deserialize(bytes);
+            if (baseline is not null)
+                return baseline;
+            _logger.LogWarning("Baseline at '{Path}' is stale or incompatible; using empty baseline", path);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to load local baseline from '{Path}'", path);
-            return BaselineIndex.Empty;
         }
+
+        return BaselineIndex.Empty;
     }
 
     private async Task<BaselineIndex> LoadHttpAsync(string url, CancellationToken ct)
@@ -60,9 +64,17 @@ public sealed class BaselineLoader
         try
         {
             var bytes = await _httpClient.GetByteArrayAsync(url, ct);
-            _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
-            await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
-            return BaselineSerializer.Deserialize(bytes);
+            var baseline = BaselineSerializer.Deserialize(bytes);
+            if (baseline is not null)
+            {
+                // Only persist to cache once confirmed loadable — a stale/incompatible download must
+                // never overwrite a previously-good cached copy that the fallback below could still use.
+                _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
+                await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);
+                return baseline;
+            }
+
+            _logger.LogWarning("Downloaded baseline from '{Url}' is stale or incompatible; trying cache", url);
         }
         catch (Exception ex)
         {
@@ -73,7 +85,10 @@ public sealed class BaselineLoader
             try
             {
                 var cached = await _fileHelper.FileSystem.File.ReadAllBytesAsync(cacheFile, ct);
-                return BaselineSerializer.Deserialize(cached);
+                var baseline = BaselineSerializer.Deserialize(cached);
+                if (baseline is not null)
+                    return baseline;
+                _logger.LogWarning("Cached baseline at '{Path}' is stale or incompatible", cacheFile);
             }
             catch (Exception ex)
             {

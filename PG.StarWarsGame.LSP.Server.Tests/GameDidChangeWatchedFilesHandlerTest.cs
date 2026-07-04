@@ -48,17 +48,19 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         SpyIndexService? index = null,
         FakeWorkspaceHost? host = null,
         MockFileSystem? fs = null,
-        FakeReloadService? reload = null)
+        FakeReloadService? reload = null,
+        ISchemaProvider? schema = null)
     {
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
         var idx = index ?? new SpyIndexService();
+        var schemaProvider = schema ?? new FakeSchemaProvider();
         var indexer = new WorkspaceIndexer(
             fileHelper,
             [],
             idx,
             new FileTypeRegistry(),
-            new FakeSchemaProvider(),
+            schemaProvider,
             new EaWXmlContext(fileHelper),
             new NullProjectIndexCache(),
             new LuaAnnotationRepository(),
@@ -70,6 +72,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             fileHelper,
             indexer,
             reload ?? new FakeReloadService(),
+            schemaProvider,
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
     }
 
@@ -214,6 +217,57 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         await handler.Handle(Changed(assetUri), CancellationToken.None);
 
         Assert.Empty(spy.Updates);
+    }
+
+    // ── dynamic enum source file changes ─────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_DynamicEnumSourceFileChanged_RefreshesEnumCatalog_NotDocumentIndex()
+    {
+        const string xmlUri = "file:///c:/mods/mymod/data/xml/gameconstants.xml";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\xml\gameconstants.xml"] =
+                new("<GameConstants><Armor_Types>Armor_Structure ArmourG_Structure</Armor_Types></GameConstants>")
+        });
+        var spy = new SpyIndexService();
+        var schema = new FakeSchemaProvider(new EnumDefinition
+        {
+            Name = "ArmorType", Kind = EnumKind.DynamicXml,
+            SourceFile = "data/xml/gameconstants.xml$Armor_Types", Values = []
+        });
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration(["c:/mods/mymod/data/xml"], [], [], [], "csv")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload, schema: schema);
+        await handler.Handle(Changed(xmlUri), CancellationToken.None);
+
+        Assert.Single(spy.DynamicEnumApplications);
+        Assert.Contains("ArmourG_Structure", spy.DynamicEnumApplications[0]["ArmorType"]);
+        Assert.Empty(spy.Updates);
+    }
+
+    [Fact]
+    public async Task Handle_DynamicEnumSourceFileChanged_NoWorkspaceConfigYet_DoesNotThrow()
+    {
+        const string xmlUri = "file:///c:/mods/mymod/data/xml/gameconstants.xml";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\xml\gameconstants.xml"] = new("<GameConstants/>")
+        });
+        var spy = new SpyIndexService();
+        var schema = new FakeSchemaProvider(new EnumDefinition
+        {
+            Name = "ArmorType", Kind = EnumKind.DynamicXml,
+            SourceFile = "data/xml/gameconstants.xml$Armor_Types", Values = []
+        });
+
+        var handler = BuildHandler(spy, fs: fs, reload: new FakeReloadService(), schema: schema);
+        var ex = await Record.ExceptionAsync(() => handler.Handle(Changed(xmlUri), CancellationToken.None));
+
+        Assert.Null(ex);
     }
 
     // ── localisation text-root changes ───────────────────────────────────────────
@@ -396,12 +450,12 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         }
     }
 
-    private sealed class FakeSchemaProvider : ISchemaProvider
+    private sealed class FakeSchemaProvider(params EnumDefinition[] enums) : ISchemaProvider
     {
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
+        public IReadOnlyList<EnumDefinition> AllEnums => enums;
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
 
         public event EventHandler? SchemaRefreshed
@@ -432,7 +486,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
 
         public EnumDefinition? GetEnum(string enumName)
         {
-            return null;
+            return enums.FirstOrDefault(e => e.Name.Equals(enumName, StringComparison.OrdinalIgnoreCase));
         }
     }
 
@@ -452,6 +506,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -485,8 +540,11 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
         }
 
+        public readonly List<ImmutableDictionary<string, ImmutableArray<string>>> DynamicEnumApplications = [];
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
+            DynamicEnumApplications.Add(values);
         }
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)

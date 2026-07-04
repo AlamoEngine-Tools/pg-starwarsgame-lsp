@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -14,7 +15,9 @@ public sealed class AudioFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFa
             return [];
 
         var results = new List<XmlDiagnosticResult>();
-        foreach (var token in fact.RawValue.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        var tokens = ListValueConstants.PrepareValueForSplit(fact.RawValue)
+            .Split(ListValueConstants.GetListSeparators(), StringSplitOptions.RemoveEmptyEntries);
+        foreach (var token in tokens)
             if (!token.EndsWith(".wav", StringComparison.OrdinalIgnoreCase) &&
                 !token.EndsWith(".mp3", StringComparison.OrdinalIgnoreCase))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

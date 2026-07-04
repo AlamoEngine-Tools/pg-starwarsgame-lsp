@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Compression;
+using MessagePack;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -25,7 +27,7 @@ public sealed class BaselineSerializerTest
     public void RoundTrip_EmptyBaseline()
     {
         var data = BaselineSerializer.Serialize(BaselineIndex.Empty);
-        var result = BaselineSerializer.Deserialize(data);
+        var result = Deserialize(data);
 
         Assert.Empty(result.Symbols);
         Assert.Equal(string.Empty, result.SourceManifestHash);
@@ -40,7 +42,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_A", new FileOrigin("file:///data/unit.xml", 10, 5));
         var data = BaselineSerializer.Serialize(Baseline(sym));
-        var result = BaselineSerializer.Deserialize(data).Symbols["UNIT_A"];
+        var result = Deserialize(data).Symbols["UNIT_A"];
 
         var origin = Assert.IsType<FileOrigin>(result.Origin);
         Assert.Equal("file:///data/unit.xml", origin.Uri);
@@ -53,7 +55,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_B", new MegArchiveOrigin("DATA.MEG", "DATA/UNITS/B.XML", 3, null));
         var data = BaselineSerializer.Serialize(Baseline(sym));
-        var result = BaselineSerializer.Deserialize(data).Symbols["UNIT_B"];
+        var result = Deserialize(data).Symbols["UNIT_B"];
 
         var origin = Assert.IsType<MegArchiveOrigin>(result.Origin);
         Assert.Equal("DATA.MEG", origin.ArchivePath);
@@ -67,7 +69,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = Symbol("UNIT_C", new UnknownOrigin("CRC collision survivor"));
         var data = BaselineSerializer.Serialize(Baseline(sym));
-        var result = BaselineSerializer.Deserialize(data).Symbols["UNIT_C"];
+        var result = Deserialize(data).Symbols["UNIT_C"];
 
         var origin = Assert.IsType<UnknownOrigin>(result.Origin);
         Assert.Equal("CRC collision survivor", origin.Hint);
@@ -80,7 +82,7 @@ public sealed class BaselineSerializerTest
     {
         var sym = new GameSymbol("UNIT_D", GameSymbolKind.XmlObject, "Infantry",
             new FileOrigin("file:///f.xml", 1, null), "A description");
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(Baseline(sym)))
+        var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym)))
             .Symbols["UNIT_D"];
 
         Assert.Equal("UNIT_D", result.Id);
@@ -93,7 +95,7 @@ public sealed class BaselineSerializerTest
     public void RoundTrip_NullableFields_WhenNull()
     {
         var sym = Symbol("UNIT_E", new FileOrigin("file:///f.xml", 1, null), null);
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(Baseline(sym)))
+        var result = Deserialize(BaselineSerializer.Serialize(Baseline(sym)))
             .Symbols["UNIT_E"];
 
         Assert.Null(result.TypeName);
@@ -113,7 +115,7 @@ public sealed class BaselineSerializerTest
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Equal(TestDate, result.BuiltAt);
         Assert.Equal("abc123hash", result.SourceManifestHash);
@@ -124,7 +126,7 @@ public sealed class BaselineSerializerTest
     {
         var a = Symbol("ALPHA", new FileOrigin("file:///a.xml", 1, null));
         var b = Symbol("BETA", new FileOrigin("file:///b.xml", 2, null));
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(Baseline(a, b)));
+        var result = Deserialize(BaselineSerializer.Serialize(Baseline(a, b)));
 
         Assert.Equal(2, result.Symbols.Count);
         Assert.True(result.Symbols.ContainsKey("ALPHA"));
@@ -145,7 +147,7 @@ public sealed class BaselineSerializerTest
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Equal(2, result.DynamicEnumValues.Count);
         Assert.Collection(result.DynamicEnumValues["DamageType"],
@@ -160,7 +162,7 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_EmptyDynamicEnumValues()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
         Assert.Empty(result.DynamicEnumValues);
     }
 
@@ -178,7 +180,7 @@ public sealed class BaselineSerializerTest
                 .Add("ArmorType", ["ARMOR_INFANTRY"]),
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Equal(2, result.HardcodedEnumValues.Count);
         Assert.Collection(result.HardcodedEnumValues["DamageType"],
@@ -191,7 +193,7 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_EmptyHardcodedEnumValues()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
         Assert.Empty(result.HardcodedEnumValues);
     }
 
@@ -209,7 +211,7 @@ public sealed class BaselineSerializerTest
                 .Add("data/xml/hardpoints.xml", ["GameObjectType"])
                 .Add("data/xml/movies.xml", ["BinkMovie"]));
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Equal(2, result.FileTypeMap.Count);
         Assert.Equal(["GameObjectType"], result.FileTypeMap["data/xml/hardpoints.xml"].ToArray());
@@ -219,7 +221,7 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_EmptyFileTypeMap()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
 
         Assert.Empty(result.FileTypeMap);
     }
@@ -229,7 +231,7 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_GroupMemberships_Empty()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
         Assert.Empty(result.GroupMemberships);
     }
 
@@ -245,7 +247,7 @@ public sealed class BaselineSerializerTest
                 .Add("Unit_AT_AT", [membership])
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Single(result.GroupMemberships);
         var members = result.GroupMemberships["Unit_AT_AT"];
@@ -270,7 +272,7 @@ public sealed class BaselineSerializerTest
                 .Add("Laser_Group", [membership])
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         var members = result.GroupMemberships["Laser_Group"];
         Assert.Single(members);
@@ -295,7 +297,7 @@ public sealed class BaselineSerializerTest
                 .Add("GRP_B", [g2m1])
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Equal(2, result.GroupMemberships.Count);
         Assert.Equal(2, result.GroupMemberships["GRP_A"].Length);
@@ -308,7 +310,7 @@ public sealed class BaselineSerializerTest
         // Verify backwards compatibility: a baseline serialized before GroupMemberships existed
         // deserializes without error and yields an empty GroupMemberships dict.
         // We simulate this by checking BaselineIndex.Empty round-trips cleanly.
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
         Assert.Empty(result.GroupMemberships);
     }
 
@@ -317,7 +319,7 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_AssetFiles_Empty()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
         Assert.Empty(result.AssetFiles);
     }
 
@@ -332,7 +334,7 @@ public sealed class BaselineSerializerTest
                 "data/audio/baz.wav")
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Equal(3, result.AssetFiles.Count);
         Assert.Contains("data/art/textures/foo.tga", result.AssetFiles);
@@ -345,7 +347,7 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_ModelBones_Empty()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
         Assert.Empty(result.ModelBones);
     }
 
@@ -358,7 +360,7 @@ public sealed class BaselineSerializerTest
                 .Add("data/art/models/unit.alo", ["root", "turret_bone"])
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Single(result.ModelBones);
         Assert.Collection(result.ModelBones["data/art/models/unit.alo"],
@@ -377,7 +379,7 @@ public sealed class BaselineSerializerTest
                 .Add("UNIT_A", [new BaselineTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 3)])
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.Single(result.ObjectTags);
         var tag = Assert.Single(result.ObjectTags["UNIT_A"]);
@@ -396,7 +398,7 @@ public sealed class BaselineSerializerTest
                 .Add("Unit_A", [new BaselineTag("Mass", "5", "<Mass>5</Mass>", 0)])
         };
 
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(baseline));
+        var result = Deserialize(BaselineSerializer.Serialize(baseline));
 
         Assert.True(result.ObjectTags.ContainsKey("UNIT_A"));
     }
@@ -404,9 +406,52 @@ public sealed class BaselineSerializerTest
     [Fact]
     public void RoundTrip_EmptyBaseline_ObjectTagsEmpty()
     {
-        var result = BaselineSerializer.Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
+        var result = Deserialize(BaselineSerializer.Serialize(BaselineIndex.Empty));
 
         Assert.Empty(result.ObjectTags);
+    }
+
+    // ── SchemaVersion ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Deserialize_WrongSchemaVersion_ReturnsNull()
+    {
+        var dto = new SerializedBaseline { SchemaVersion = SerializedBaseline.CurrentSchemaVersion + 99 };
+        var bytes = SerializeRawDto(dto);
+
+        var result = BaselineSerializer.Deserialize(bytes);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Deserialize_DefaultSchemaVersion_TreatedAsPreVersioningFormat_ReturnsNull()
+    {
+        // A dto built without ever touching SchemaVersion simulates a baseline written by code that
+        // predates the field's existence — MessagePack defaults an unset trailing key to 0 on read,
+        // which must never equal CurrentSchemaVersion (bumped to a nonzero value for exactly this).
+        var dto = new SerializedBaseline();
+        var bytes = SerializeRawDto(dto);
+
+        var result = BaselineSerializer.Deserialize(bytes);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Deserialize_CorruptData_ReturnsNull()
+    {
+        var result = BaselineSerializer.Deserialize([0x00, 0x01, 0x02, 0x03]);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Deserialize_EmptyArray_ReturnsNull()
+    {
+        var result = BaselineSerializer.Deserialize([]);
+
+        Assert.Null(result);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
@@ -417,5 +462,21 @@ public sealed class BaselineSerializerTest
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty,
             ImmutableDictionary<string, ImmutableArray<string>>.Empty);
+    }
+
+    private static BaselineIndex Deserialize(byte[] data)
+    {
+        var result = BaselineSerializer.Deserialize(data);
+        Assert.NotNull(result);
+        return result;
+    }
+
+    private static byte[] SerializeRawDto(SerializedBaseline dto)
+    {
+        var msgpack = MessagePackSerializer.Serialize(dto);
+        using var ms = new MemoryStream();
+        using (var gz = new GZipStream(ms, CompressionLevel.Optimal))
+            gz.Write(msgpack);
+        return ms.ToArray();
     }
 }

@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.CommandLine;
 using System.IO.Abstractions;
 using System.Security.Cryptography;
+using System.Xml;
 using System.Xml.Linq;
 using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,9 +167,57 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
             gameConstantsXml = await new StreamReader(stream).ReadToEndAsync();
     }
 
+    // ── Music events ────────────────────────────────────────────────────────
+    //
+    // !!! STOPGAP — DO NOT TREAT AS THE PERMANENT SHAPE OF THIS FEATURE !!!
+    //
+    // PG.StarWarsGame.Engine has NO MusicEvent support at all today: no game manager, no entity
+    // type — unlike SFXEvent, which has a real ISfxEventGameManager (see engine.SfxGameManager
+    // above). This block reads and parses MusicEvents.xml directly against the engine's virtual
+    // file system, entirely bypassing the engine's game-manager abstraction, purely so the LSP
+    // baseline can carry MusicEvent symbols for go-to-definition/rename/find-references parity
+    // with SFXEvent. It intentionally does NOT replicate anything else ISfxEventGameManager does
+    // (locale-aware MEG loading, engine-level validation/error reporting) — those aren't needed
+    // for symbol-level baseline projection, and adding them here would be reimplementing engine
+    // internals in the wrong layer.
+    //
+    // MusicEvents.xml is a single direct-content file (schema/eaw/meta/metafiles.yaml declares it
+    // as `metaFileType: directContent`), not a MEG-packed file-list registry like SFXEventFiles.XML
+    // — so a flat `<MusicEvents><MusicEvent Name="...">...</MusicEvent></MusicEvents>` parse is
+    // sufficient; there is no per-language variation to resolve.
+    //
+    // TODO(music-events): delete this entire block and switch to `engine.MusicEventGameManager`
+    // (mirroring SfxEventGameManager exactly) once PG.StarWarsGame.Engine adds first-class
+    // MusicEvent support upstream.
+    var musicEvents = new List<ProjectableEntry>();
+    using (var stream = engine.GameRepository.TryOpenFile("Data\\XML\\MusicEvents.xml"))
+    {
+        if (stream is not null)
+        {
+            var musicEventsXml = await new StreamReader(stream).ReadToEndAsync();
+            try
+            {
+                var musicDoc = XDocument.Parse(musicEventsXml, LoadOptions.SetLineInfo);
+                foreach (var element in musicDoc.Root?.Elements("MusicEvent") ?? [])
+                {
+                    var name = element.Attribute("Name")?.Value;
+                    if (string.IsNullOrEmpty(name)) continue;
+                    var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber : (int?)null;
+                    musicEvents.Add(new ProjectableEntry(name, "MUSIC_EVENT",
+                        new XmlLocationInfo("Data\\XML\\MusicEvents.xml", line)));
+                }
+            }
+            catch (XmlException ex)
+            {
+                Console.Error.WriteLine($"Warning: Failed to parse MusicEvents.xml: {ex.Message}");
+            }
+        }
+    }
+    Console.WriteLine($"Music events: {musicEvents.Count} (direct-parsed stopgap — see TODO(music-events))");
+
     var schemaProvider = sp.GetService<ISchemaProvider>();
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
-    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash);
+    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash, musicEvents);
     Console.WriteLine($"Projected {baseline.Symbols.Count} symbol(s)");
 
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────

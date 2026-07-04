@@ -47,4 +47,12 @@ public interface IGameIndexService
     // Not suppressed by BeginBulkUpdate: localisation applies are coarse-grained (once per
     // reload), so the O(N²) concern that suppression exists for doesn't apply here.
     event Action<ILocalisationIndex>? LocalisationChanged;
+
+    // Fires only on ApplyBaseline and ApplyWorkspaceDynamicEnumValues — the two calls that can
+    // change the merged dynamic-enum value set. Lets subscribers that cache dynamic-enum
+    // completion candidates (see DynamicEnumValueProposalProvider) invalidate precisely instead
+    // of on every unrelated document edit via IndexChanged. Not suppressed by BeginBulkUpdate:
+    // both applies are coarse-grained (once per project load/reload or per changed enum source
+    // file), not per-document.
+    event Action<GameIndex>? DynamicEnumChanged;
 }

@@ -63,6 +63,35 @@ public sealed class GameSymbolProjectorTest
         Assert.Equal(GameSymbolKind.XmlObject, result.Symbols["EXPLOSION_01"].Kind);
     }
 
+    [Fact]
+    public void Project_MusicEvent_TypeNameIsMusicEvent()
+    {
+        var entry = Entry("MAIN_THEME", "MUSIC_EVENT");
+        var result = Build().Project([], [], "hash", [entry]);
+
+        Assert.Equal("MusicEvent", result.Symbols["MAIN_THEME"].TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, result.Symbols["MAIN_THEME"].Kind);
+    }
+
+    [Fact]
+    public void Project_NoMusicEventsArgument_DoesNotThrow_AndProjectsNoMusicEventSymbols()
+    {
+        var result = Build().Project([], [], "hash");
+
+        Assert.Empty(result.Symbols);
+    }
+
+    [Fact]
+    public void Project_MusicEventWithTags_PopulatesObjectTags()
+    {
+        var entry = new ProjectableEntry("MAIN_THEME", "MUSIC_EVENT",
+            new XmlLocationInfo("DATA\\XML\\MUSICEVENTS.XML", 5), [Tag("Volume_Percent", "70")]);
+        var result = Build().Project([], [], "hash", [entry]);
+
+        Assert.True(result.ObjectTags.ContainsKey("MAIN_THEME"));
+        Assert.Contains(result.ObjectTags["MAIN_THEME"], t => t.TagName == "Volume_Percent" && t.Value == "70");
+    }
+
     // ── Symbol fields ──────────────────────────────────────────────────────────
 
     [Fact]

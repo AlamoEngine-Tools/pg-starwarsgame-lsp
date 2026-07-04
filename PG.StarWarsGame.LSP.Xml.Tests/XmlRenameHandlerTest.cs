@@ -262,6 +262,115 @@ public sealed class XmlRenameHandlerTest
         Assert.True(result.Changes.ContainsKey(DocumentUri.From(OtherXmlUri)));
     }
 
+    // ── Dynamic enum value rename ────────────────────────────────────────────
+
+    [Fact]
+    public void HandleRename_CursorOnEnumValueReference_RoutesToDynamicEnumValueRenameBuilder()
+    {
+        const string defUri = "file:///gameconstants.xml";
+        var enumRef = new GameReference("enum:ArmorType/Armor_Structure", null, null, XmlUri, 0, 10, 15);
+        var doc = XmlDoc(XmlUri, r: enumRef);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(XmlUri, "<Armor_Type>Armor_Structure</Armor_Type>", 1);
+        host.AddOrUpdate(defUri, "<GameConstants><Armor_Types>Armor_Structure</Armor_Types></GameConstants>", 1);
+
+        var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
+            .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
+                .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
+            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("enum:ArmorType/Armor_Structure", [enumRef])
+        ) with { WorkspaceEnumValueDefinitions = defs };
+
+        var result = MakeHandler(host).HandleRename(XmlUri, RenameAt(0, 12, "Armor_Renamed"), index);
+
+        Assert.NotNull(result);
+        Assert.True(result!.Changes!.ContainsKey(DocumentUri.From(defUri)));
+        Assert.True(result.Changes.ContainsKey(DocumentUri.From(XmlUri)));
+    }
+
+    [Fact]
+    public void HandlePrepare_CursorOnEnumValueReference_NavigableDefinition_ReturnsRange()
+    {
+        const string defUri = "file:///gameconstants.xml";
+        var enumRef = new GameReference("enum:ArmorType/Armor_Structure", null, null, XmlUri, 0, 10, 15);
+        var doc = XmlDoc(XmlUri, r: enumRef);
+
+        var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
+            .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
+                .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
+        var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc))
+            with { WorkspaceEnumValueDefinitions = defs };
+
+        var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
+
+        Assert.NotNull(result);
+        Assert.NotNull(result!.Range);
+    }
+
+    [Fact]
+    public void HandlePrepare_CursorOnEnumValueReference_BaselineOnlyValue_ReturnsNull()
+    {
+        // No WorkspaceEnumValueDefinitions entry — the value is baseline-only (vanilla), not
+        // renameable.
+        var enumRef = new GameReference("enum:ArmorType/Armor_Normal", null, null, XmlUri, 0, 10, 12);
+        var doc = XmlDoc(XmlUri, r: enumRef);
+        var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc));
+
+        var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void HandlePrepare_CursorOnEnumValueReference_DefinedInDependencyLayer_ReturnsNull()
+    {
+        const string defUri = "file:///dep/gameconstants.xml";
+        var enumRef = new GameReference("enum:ArmorType/Armor_Structure", null, null, XmlUri, 0, 10, 15);
+        var leafDoc = new DocumentIndex(XmlUri, 1, ImmutableArray<GameSymbol>.Empty, [enumRef], LayerRank: 1);
+        var depDoc = new DocumentIndex(defUri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+
+        var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
+            .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
+                .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, leafDoc).Add(defUri, depDoc))
+            with { WorkspaceEnumValueDefinitions = defs };
+
+        var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void HandleRename_CursorOnEnumValueReference_DefinedInDependencyLayer_ReturnsNull()
+    {
+        const string defUri = "file:///dep/gameconstants.xml";
+        var enumRef = new GameReference("enum:ArmorType/Armor_Structure", null, null, XmlUri, 0, 10, 15);
+        var leafDoc = new DocumentIndex(XmlUri, 1, ImmutableArray<GameSymbol>.Empty, [enumRef], LayerRank: 1);
+        var depDoc = new DocumentIndex(defUri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty, LayerRank: 0);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(defUri, "<GameConstants><Armor_Types>Armor_Structure</Armor_Types></GameConstants>", 1);
+
+        var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
+            .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
+                .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
+        var index = BuildIndex(
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, leafDoc).Add(defUri, depDoc),
+            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("enum:ArmorType/Armor_Structure", [enumRef]))
+            with { WorkspaceEnumValueDefinitions = defs };
+
+        var result = MakeHandler(host).HandleRename(XmlUri, RenameAt(0, 12, "Armor_Renamed"), index);
+
+        Assert.Null(result);
+    }
+
     // ── HandlePrepare ─────────────────────────────────────────────────────────
 
     [Fact]

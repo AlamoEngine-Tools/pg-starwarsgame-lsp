@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -102,6 +103,59 @@ public sealed class GameIndexServiceTest
             ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase));
 
         Assert.NotNull(fired);
+    }
+
+    // ── DynamicEnumChanged (scoped event for dynamic-enum caches) ───────────────
+
+    [Fact]
+    public void ApplyBaseline_Fires_DynamicEnumChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.DynamicEnumChanged += idx => fired = idx;
+
+        svc.ApplyBaseline(BaselineIndex.Empty);
+
+        Assert.NotNull(fired);
+    }
+
+    [Fact]
+    public void ApplyWorkspaceDynamicEnumValues_Fires_DynamicEnumChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.DynamicEnumChanged += idx => fired = idx;
+        var values = ImmutableDictionary<string, ImmutableArray<string>>.Empty.Add("DamageType", ["MOD_DMG"]);
+
+        svc.ApplyWorkspaceDynamicEnumValues(values);
+
+        Assert.NotNull(fired);
+        Assert.Equal(values, fired!.WorkspaceDynamicEnumValues);
+    }
+
+    [Fact]
+    public void ApplyModelBones_DoesNotFire_DynamicEnumChanged()
+    {
+        var svc = Build();
+        var fired = false;
+        svc.DynamicEnumChanged += _ => fired = true;
+
+        svc.ApplyModelBones(
+            ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void ApplyLocalisation_DoesNotFire_DynamicEnumChanged()
+    {
+        var svc = Build();
+        var fired = false;
+        svc.DynamicEnumChanged += _ => fired = true;
+
+        svc.ApplyLocalisation(new StubLocalisationIndex());
+
+        Assert.False(fired);
     }
 
     // ── URI normalization — canonical form at the index boundary ────────────
@@ -812,5 +866,12 @@ public sealed class GameIndexServiceTest
         {
             return _fn(uri, text, version, ct);
         }
+    }
+
+    private sealed class StubLocalisationIndex : ILocalisationIndex
+    {
+        public bool ContainsKey(string key) => false;
+        public IEnumerable<string> Keys => [];
+        public string? GetValue(string key) => null;
     }
 }

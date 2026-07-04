@@ -37,6 +37,7 @@ public sealed class GameIndexService : IGameIndexService
 
     public event Action<GameIndex>? IndexChanged;
     public event Action<ILocalisationIndex>? LocalisationChanged;
+    public event Action<GameIndex>? DynamicEnumChanged;
 
     public IDisposable BeginBulkUpdate()
     {
@@ -179,7 +180,9 @@ public sealed class GameIndexService : IGameIndexService
 
         _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count,
             baseline.BuiltAt);
-        RaiseIndexChanged(Volatile.Read(ref _current));
+        var afterBaseline = Volatile.Read(ref _current);
+        RaiseIndexChanged(afterBaseline);
+        DynamicEnumChanged?.Invoke(afterBaseline);
     }
 
     public void ApplyLocalisation(ILocalisationIndex index)
@@ -228,7 +231,9 @@ public sealed class GameIndexService : IGameIndexService
             updated = snapshot with { WorkspaceDynamicEnumValues = values };
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
-        RaiseIndexChanged(Volatile.Read(ref _current));
+        var afterUpdate = Volatile.Read(ref _current);
+        RaiseIndexChanged(afterUpdate);
+        DynamicEnumChanged?.Invoke(afterUpdate);
     }
 
     public void ApplyWorkspaceEnumValueDefinitions(

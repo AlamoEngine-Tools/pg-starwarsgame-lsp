@@ -49,7 +49,7 @@ public sealed class XmlTagValueCompletionStrategyRegistrationTest
     [Fact]
     public void Registered_strategy_count_is_locked()
     {
-        const int expectedCount = 3;
+        const int expectedCount = 4;
         Assert.Equal(expectedCount, RegisteredStrategyTypes().Count);
     }
 

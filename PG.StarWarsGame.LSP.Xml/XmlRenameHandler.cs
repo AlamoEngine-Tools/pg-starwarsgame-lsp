@@ -41,6 +41,10 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         var hit = XmlPositionResolver.FindAtPosition(docIndex, request.Position.Line, request.Position.Character);
         if (hit is null) return null;
 
+        if (TryParseEnumValueId(hit.Value.Id, out var enumName, out var valueName))
+            return DynamicEnumValueRenameBuilder.Build(enumName, valueName, request.NewName, index, _workspaceHost,
+                _fileHelper, _logger);
+
         return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _workspaceHost, _fileHelper,
             _logger);
     }
@@ -53,8 +57,33 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         var hit = XmlPositionResolver.FindAtPosition(docIndex, line, character);
         if (hit is null) return null;
 
+        if (TryParseEnumValueId(hit.Value.Id, out var enumName, out var valueName))
+        {
+            if (!index.WorkspaceEnumValueDefinitions.TryGetValue(enumName, out var valueMap) ||
+                !valueMap.TryGetValue(valueName, out var origin) || !origin.IsNavigable)
+                return null;
+            if (index.LayerRankOfUri(origin.Uri) != index.LeafLayerRank)
+                return null;
+            return new RangeOrPlaceholderRange(hit.Value.Range);
+        }
+
         if (!index.IsLeafOwned(hit.Value.Id)) return null;
 
         return new RangeOrPlaceholderRange(hit.Value.Range);
+    }
+
+    // id format: "enum:{EnumName}/{ValueName}" — see XmlGameDocumentParser.CollectEnumReferences.
+    private static bool TryParseEnumValueId(string id, out string enumName, out string valueName)
+    {
+        enumName = "";
+        valueName = "";
+        if (!id.StartsWith("enum:", StringComparison.Ordinal)) return false;
+
+        var slash = id.IndexOf('/', "enum:".Length);
+        if (slash < 0) return false;
+
+        enumName = id["enum:".Length..slash];
+        valueName = id[(slash + 1)..];
+        return true;
     }
 }

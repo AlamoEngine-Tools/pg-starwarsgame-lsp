@@ -509,6 +509,42 @@ public sealed class XmlHoverHandlerTest
     }
 
     [Fact]
+    public async Task Handle_CrossTypePlaceholderId_ResolvesUsingExpectedTypeName()
+    {
+        // Two symbols share the id "Null" — an SFXEvent placeholder and an unrelated TradeRouteLine
+        // placeholder (the engine allows distinct types to share an id, e.g. "Null"/"Default"). The
+        // reference's ExpectedTypeName ("SFXEvent") must disambiguate which one hover resolves to.
+        var uri = TestUri.ToString();
+        var sfxNull = new GameSymbol("Null", GameSymbolKind.XmlObject, "SFXEvent",
+            new FileOrigin("file:///sfx.xml", 0, null), null);
+        var otherNull = new GameSymbol("Null", GameSymbolKind.XmlObject, "TradeRouteLine",
+            new FileOrigin("file:///routes.xml", 0, null), null);
+        var reference = new GameReference("Null", GameSymbolKind.XmlObject, "SFXEvent", uri, 1, 18, 4);
+        var doc = new DocumentIndex(uri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(reference));
+        // otherNull inserted first so untyped Resolve's stable-order tie-break would pick the WRONG
+        // symbol if ExpectedTypeName weren't consulted — proves the fix, not just insertion luck.
+        var defs = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+            .Add("Null", ImmutableArray.Create(otherNull, sfxNull));
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(uri, doc),
+            defs,
+            ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
+        var indexService = new FakeIndexService { Current = index };
+        var (handler, host, schema, _) = Build(indexService: indexService);
+        schema.AddType(new GameObjectTypeDefinition
+            { TypeName = "SFXEvent", Description = new Dictionary<string, string>() });
+        schema.AddType(new GameObjectTypeDefinition
+            { TypeName = "TradeRouteLine", Description = new Dictionary<string, string>() });
+        host.AddOrUpdate(uri, "<Root>\n<SFXEvent_Select>Null</SFXEvent_Select>\n</Root>", 1);
+
+        var result = await handler.Handle(At(1, 19), CancellationToken.None);
+
+        Assert.NotNull(result);
+        Assert.Contains("SFXEvent", result!.Contents.MarkupContent!.Value);
+        Assert.DoesNotContain("TradeRouteLine", result.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
     public async Task Handle_CursorOnUnresolvedReference_ReturnsNull()
     {
         var index = IndexWith(DocWithRef("MISSING_UNIT", 1, 13, 12));
@@ -752,6 +788,7 @@ public sealed class XmlHoverHandlerTest
 
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

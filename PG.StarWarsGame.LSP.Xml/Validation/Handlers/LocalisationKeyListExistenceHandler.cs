@@ -9,14 +9,21 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class LocalisationKeyListExistenceHandler : LocalisationKeyHandlerBase
 {
-    protected override XmlValueType TargetType => XmlValueType.NameReferenceList;
+    // Encyclopedia_Text/MP_Encyclopedia_Text are declared as TypeReferenceList in schema even
+    // though they're semantically a localisation-key list like any NameReferenceList tag — the
+    // inlay-hint provider already treats both as equivalent (LocalisationKeyMultiValueInlayHintProvider).
+    protected override IReadOnlyList<XmlValueType> TargetTypes =>
+        [XmlValueType.NameReferenceList, XmlValueType.TypeReferenceList];
 
     protected override IEnumerable<XmlDiagnosticResult> HandleLocalisationKey(
         XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        return ListValueConstants.PrepareValueForSplit(fact.RawValue)
-            .Split(ListValueConstants.GetListSeparators(), StringSplitOptions.RemoveEmptyEntries)
-            .Select(key => CheckKey(key, ctx))
+        // SplitListWithOffsets preserves each token's offset within the original RawValue (unlike
+        // PrepareValueForSplit's whitespace-collapsing), so a missing key inside a multi-line list
+        // is highlighted at its own line, not the whole list value's start.
+        return XmlUtility.SplitListWithOffsets(fact.RawValue)
+            .Select(t => CheckKey(t.Token, ctx,
+                XmlUtility.AdvancePosition(fact.Line, fact.Column, fact.RawValue, t.Offset)))
             .OfType<XmlDiagnosticResult>();
     }
 }

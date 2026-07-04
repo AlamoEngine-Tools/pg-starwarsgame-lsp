@@ -72,7 +72,12 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
 
             if (baseValues.TryGetValue(child.Name, out var baseVal) &&
                 string.Equals(baseVal, child.InnerText.Trim(), StringComparison.Ordinal))
-                facts.Add(new VariantRedundantOverrideFact(documentUri, line, col, len, name));
+            {
+                // Grey out the whole node (opening tag through closing tag), not just the opening
+                // tag name — the value may span multiple lines.
+                var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
+                facts.Add(new VariantRedundantOverrideFact(documentUri, line, col, len, name, endLine, endCol));
+            }
         }
     }
 

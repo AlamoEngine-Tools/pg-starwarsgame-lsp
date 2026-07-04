@@ -175,6 +175,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlTagValueCompletionStrategy, StoryParamValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, BoneNameValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, StandardValueCompletionStrategy>();
+        services.AddSingleton<IXmlTagValueCompletionStrategy, TupleValueCompletionStrategy>();
 
         // Code action providers — add IXmlCodeActionProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();

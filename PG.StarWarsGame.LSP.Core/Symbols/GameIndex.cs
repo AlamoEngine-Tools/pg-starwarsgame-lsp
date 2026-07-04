@@ -147,6 +147,15 @@ public sealed record GameIndex(
             : 0;
     }
 
+    // Same lookup as LayerRankOf, but keyed directly by URI — for origins that don't carry a
+    // GameSymbol (e.g. WorkspaceEnumValueDefinitions' FileOrigin). Every workspace .xml file is
+    // indexed as a Document regardless of whether it defines any symbols (XmlGameDocumentParser
+    // accepts any .xml), so dynamic-enum source files land here with a correctly stamped rank too.
+    public int LayerRankOfUri(string uri)
+    {
+        return Documents.TryGetValue(uri, out var doc) ? doc.LayerRank : 0;
+    }
+
     // True iff every workspace definition of <id> is a FileOrigin symbol in the leaf layer.
     // Returns false when the id is absent, any definition has a non-FileOrigin origin, or any
     // definition lives in a dependency layer (rank < LeafLayerRank).

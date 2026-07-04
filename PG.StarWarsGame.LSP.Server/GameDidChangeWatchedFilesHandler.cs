@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -22,6 +23,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     private readonly IGameIndexService _indexService;
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
+    private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public GameDidChangeWatchedFilesHandler(
@@ -30,6 +32,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         IFileHelper fileHelper,
         IWorkspaceIndexer indexer,
         IModProjectReloadService reloadService,
+        ISchemaProvider schema,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
         _indexService = indexService;
@@ -37,6 +40,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         _fileHelper = fileHelper;
         _indexer = indexer;
         _reloadService = reloadService;
+        _schema = schema;
         _logger = logger;
     }
 
@@ -82,6 +86,16 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 continue;
             }
 
+            // A changed dynamic-enum source file (e.g. gameconstants.xml, surfacefxtriggertype.xml)
+            // re-scans the enum catalog so referencing tags re-validate against the new value set —
+            // no IGameDocumentParser understands these files, so routing them through the generic
+            // path below is always a silent no-op.
+            if (IsDynamicEnumSourceFile(path))
+            {
+                _indexer.ApplyDynamicEnumCatalog(_reloadService.LastWorkspaceConfig?.XmlDirectories ?? []);
+                continue;
+            }
+
             // Opened documents are kept in sync by didOpen/didChange — skip them.
             if (_workspaceHost.TryGet(uri, out _)) continue;
 
@@ -102,6 +116,28 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             await _reloadService.ReloadLocalisationAsync(ct);
 
         return Unit.Value;
+    }
+
+    // Matches by filename only, same as WorkspaceIndexer.ApplyDynamicEnumCatalog's file search —
+    // the schema's SourceFile carries an optional "$Element" anchor that isn't part of the path.
+    private bool IsDynamicEnumSourceFile(string path)
+    {
+        var fileName = _fileHelper.FileSystem.Path.GetFileName(path);
+        foreach (var enumDef in _schema.AllEnums)
+        {
+            if (enumDef.Kind != EnumKind.DynamicXml || string.IsNullOrEmpty(enumDef.SourceFile))
+                continue;
+
+            var sourceFile = enumDef.SourceFile;
+            var anchorIdx = sourceFile.IndexOf('$');
+            var filePath = anchorIdx >= 0 ? sourceFile[..anchorIdx] : sourceFile;
+            var sourceFileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', '\\'));
+
+            if (string.Equals(fileName, sourceFileName, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private bool IsUnderTextRoot(string path)

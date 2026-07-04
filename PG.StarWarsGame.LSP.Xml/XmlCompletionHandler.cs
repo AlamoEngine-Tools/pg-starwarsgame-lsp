@@ -21,6 +21,15 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Every validator for these types splits on the FIRST comma only — completions therefore only
+    // ever need to distinguish "before the first comma" (slot 0) from "after it" (slot 1), regardless
+    // of how many further commas appear within slot 1's own value.
+    private static readonly HashSet<XmlValueType> TupleValueTypes =
+    [
+        XmlValueType.HardPointSfxMap, XmlValueType.AbilitySfxMap, XmlValueType.ConditionalSfxEvent,
+        XmlValueType.UnitSpawnTable, XmlValueType.AbilityModMultiplier, XmlValueType.TupleList
+    ];
+
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -165,9 +174,13 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
         var partialValue = ExtractPartialValue(line, character);
         var valueIndex = _indexService.Current;
+        var tupleSlotIndex = tagDef is not null && TupleValueTypes.Contains(tagDef.ValueType)
+            ? ComputeTupleSlotIndex(text, enclosingValueNode!, lineIndex, character)
+            : 0;
         var valueCtx = new TagValueCompletionContext(
             uri, valueIndex, _schema, valueDoc, enclosingValueNode!, enclosingTag, enclosingDepth,
-            tagDef, partialValue, lineIndex, character, isStoryParserForValue, storyParamSide, storyParamPosition);
+            tagDef, partialValue, lineIndex, character, isStoryParserForValue, storyParamSide,
+            storyParamPosition, tupleSlotIndex);
         var valueItems = _tagValueRegistry.GetCompletions(valueCtx);
         return Task.FromResult(new CompletionList(valueItems));
     }
@@ -215,7 +228,26 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet
                    or ReferenceKind.LocalisationKey or ReferenceKind.TextureFile or ReferenceKind.ModelFile
                    or ReferenceKind.AudioFile or ReferenceKind.MapFile or ReferenceKind.BoneName ||
-               tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
+               tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue ||
+               TupleValueTypes.Contains(tagDef.ValueType);
+    }
+
+    /// <summary>
+    ///     Counts commas between the enclosing element's content start and the cursor, clamped to 1 —
+    ///     see <see cref="TupleValueTypes" /> for why only "before/after the first comma" matters.
+    /// </summary>
+    private static int ComputeTupleSlotIndex(string text, HtmlNode enclosingNode, int lineIndex, int character)
+    {
+        var innerStart = enclosingNode.InnerStartIndex;
+        var cursorOffset = XmlUtility.PositionToOffset(text, lineIndex, character);
+        if (innerStart < 0 || cursorOffset <= innerStart) return 0;
+
+        var span = text[innerStart..Math.Min(cursorOffset, text.Length)];
+        var commaCount = 0;
+        foreach (var c in span)
+            if (c == ',')
+                commaCount++;
+        return Math.Min(1, commaCount);
     }
 
     /// <summary>

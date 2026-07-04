@@ -52,10 +52,12 @@ public sealed class XmlCompletionHandlerTest
             new StoryEventTagNameStrategy(),
             new StandardTagNameStrategy(fileTypeReg)
         ]);
+        var resolvedCompletionReg = completionReg ?? new FakeCompletionRegistry();
         var tagValueRegistry = new XmlTagValueCompletionStrategyRegistry([
             new StoryParamValueCompletionStrategy(storyProposals),
             new BoneNameValueCompletionStrategy(boneHelper),
-            new StandardValueCompletionStrategy(proposals, completionReg ?? new FakeCompletionRegistry())
+            new StandardValueCompletionStrategy(proposals, resolvedCompletionReg),
+            new TupleValueCompletionStrategy(schema, proposals, resolvedCompletionReg)
         ]);
 
         return (new XmlCompletionHandler(host, schema, indexService, fileTypeReg,
@@ -1090,6 +1092,159 @@ public sealed class XmlCompletionHandlerTest
         Assert.Equal(ReferenceKind.Enum, capturing.LastTagDef?.ReferenceKind);
     }
 
+    // ── tuple-slot completions (#13) ──────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_HardPointSfxMap_CursorBeforeAnyComma_OffersHardPointTypeEnum()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, proposals) = Build(registry);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "HardPoint_SFX", ValueType = XmlValueType.HardPointSfxMap
+        });
+        schema.AddEnum(new EnumDefinition
+        {
+            Name = "HardPointType", Kind = EnumKind.SchemaFixed,
+            Values = [new EnumValueDefinition { Name = "HARD_POINT_WEAPON_LASER" }]
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<HardPoint_SFX></HardPoint_SFX>\n</SpaceUnit>\n</Root>", 1);
+
+        // "<HardPoint_SFX>" is 15 chars — cursor right after the opening tag, before any comma.
+        await handler.Handle(At(2, 15), CancellationToken.None);
+
+        Assert.Equal("HardPointType", proposals.LastTag?.Enum?.Name);
+    }
+
+    [Fact]
+    public async Task Handle_HardPointSfxMap_CursorAfterFirstComma_OffersSfxEventReference()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var capturing = new CapturingCompletionRegistry();
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "HardPoint_SFX", ValueType = XmlValueType.HardPointSfxMap
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<HardPoint_SFX>HARD_POINT_WEAPON_LASER, </HardPoint_SFX>\n</SpaceUnit>\n</Root>",
+            1);
+
+        // "<HardPoint_SFX>HARD_POINT_WEAPON_LASER, " is 40 chars — cursor right after the comma+space.
+        await handler.Handle(At(2, 40), CancellationToken.None);
+
+        Assert.Equal(ReferenceKind.XmlObject, capturing.LastTagDef?.ReferenceKind);
+        Assert.Equal("SFXEvent", capturing.LastTagDef?.ObjectType?.TypeName);
+    }
+
+    [Fact]
+    public async Task Handle_HardPointSfxMap_CursorBeforeComma_WithTrailingNullAfterIt_StillOffersSlot0()
+    {
+        // Regression guard for the reported bug: "<Tag> |, null</Tag>" — a later comma/value must
+        // not be counted; only commas strictly BEFORE the cursor matter.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
+        var (handler, host, schema, proposals) = Build(registry);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
+        schema.AddTagForType("SpaceUnit", new XmlTagDefinition
+        {
+            Tag = "HardPoint_SFX", ValueType = XmlValueType.HardPointSfxMap
+        });
+        schema.AddEnum(new EnumDefinition
+        {
+            Name = "HardPointType", Kind = EnumKind.SchemaFixed, Values = []
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<SpaceUnit Name=\"X\">\n<HardPoint_SFX> , null</HardPoint_SFX>\n</SpaceUnit>\n</Root>", 1);
+
+        // "<HardPoint_SFX>" is 15 chars — cursor right after the opening tag, before the space/comma/null.
+        await handler.Handle(At(2, 15), CancellationToken.None);
+
+        Assert.Equal("HardPointType", proposals.LastTag?.Enum?.Name);
+    }
+
+    [Fact]
+    public async Task Handle_AbilitySfxMap_Slot0_OffersAbilityTypeHardcodedSet()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("Faction"));
+        var capturing = new CapturingCompletionRegistry();
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
+        schema.AddTagForType("Faction", new XmlTagDefinition
+        {
+            Tag = "Ability_SFX", ValueType = XmlValueType.AbilitySfxMap
+        });
+        schema.AddHardcodedSet(new HardcodedReferenceSet { Name = "AbilityType" });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<Faction Name=\"X\">\n<Ability_SFX></Ability_SFX>\n</Faction>\n</Root>", 1);
+
+        await handler.Handle(At(2, 13), CancellationToken.None);
+
+        Assert.Equal(ReferenceKind.HardcodedSet, capturing.LastTagDef?.ReferenceKind);
+        Assert.Equal("AbilityType", capturing.LastTagDef?.HardcodedSet?.Name);
+    }
+
+    [Fact]
+    public async Task Handle_UnitSpawnTable_Slot0_OffersGameObjectTypeWildcardReference()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("GameObjectType"));
+        var capturing = new CapturingCompletionRegistry();
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddTagForType("GameObjectType", new XmlTagDefinition
+        {
+            Tag = "Spawn_Unit", ValueType = XmlValueType.UnitSpawnTable, MultipleAllowed = true
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<GameObjectType Name=\"X\">\n<Spawn_Unit></Spawn_Unit>\n</GameObjectType>\n</Root>", 1);
+
+        await handler.Handle(At(2, 12), CancellationToken.None);
+
+        Assert.Equal("GameObjectType", capturing.LastTagDef?.ObjectType?.TypeName);
+    }
+
+    [Fact]
+    public async Task Handle_TupleList_ContextNamePair_Slot1_OffersMusicEventReference()
+    {
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("Faction"));
+        var capturing = new CapturingCompletionRegistry();
+        var (handler, host, schema, _) = Build(registry, completionReg: capturing);
+
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "Faction", NameTag = "Name" });
+        schema.AddTagForType("Faction", new XmlTagDefinition
+        {
+            Tag = "Music_Event_List_Ambient", ValueType = XmlValueType.TupleList, MultipleAllowed = true,
+            ValidationOverride = new TagValidationOverride { ValidationId = "context-name-pair" }
+        });
+
+        host.AddOrUpdate(TestUri.ToString(),
+            "<Root>\n<Faction Name=\"X\">\n<Music_Event_List_Ambient>Space, </Music_Event_List_Ambient>\n</Faction>\n</Root>",
+            1);
+
+        // "<Music_Event_List_Ambient>Space, " is 33 chars — cursor right after the comma+space.
+        await handler.Handle(At(2, 33), CancellationToken.None);
+
+        Assert.Equal("MusicEvent", capturing.LastTagDef?.ObjectType?.TypeName);
+    }
+
     // ── boneName completions ──────────────────────────────────────────────────
 
     [Fact]
@@ -1191,6 +1346,7 @@ public sealed class XmlCompletionHandlerTest
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
         private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, HardcodedReferenceSet> _hardcodedSets = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
@@ -1226,7 +1382,7 @@ public sealed class XmlCompletionHandlerTest
 
         public IReadOnlyList<EnumDefinition> AllEnums => [.. _enums.Values];
 
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [.. _hardcodedSets.Values];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
         public event EventHandler? SchemaRefreshed
@@ -1252,14 +1408,23 @@ public sealed class XmlCompletionHandlerTest
         {
             _enums[enumDef.Name] = enumDef;
         }
+
+        public void AddHardcodedSet(HardcodedReferenceSet set)
+        {
+            _hardcodedSets[set.Name] = set;
+        }
     }
 
     private sealed class FakeProposalRegistry : IXmlValueProposalRegistry
     {
         public IReadOnlyList<ValueProposal> ProposalsToReturn { get; set; } = [];
+        public XmlTagDefinition? LastTag { get; private set; }
+        public string? LastPartialValue { get; private set; }
 
-        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition __, string ___)
+        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition tag, string partialValue)
         {
+            LastTag = tag;
+            LastPartialValue = partialValue;
             return ProposalsToReturn;
         }
     }
@@ -1295,6 +1460,7 @@ public sealed class XmlCompletionHandlerTest
         public GameIndex Current { get; }
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

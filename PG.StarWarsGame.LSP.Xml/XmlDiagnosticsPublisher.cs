@@ -156,6 +156,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         }
 
         allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, text, index));
+        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, text));
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();
@@ -195,6 +196,99 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         doc.LoadHtml(text);
         WalkForHardcodedRefs(doc.DocumentNode, text, diagnostics);
         return diagnostics;
+    }
+
+    // The engine hardcodes these 20 damage types at fixed positions relative to the end of
+    // GameConstants.xml's <Damage_Types> list. If they aren't present as the exact tail, in this
+    // exact order, the game crashes at runtime.
+    private static readonly string[] RequiredDamageTypeTail =
+    [
+        "Damage_Normal", "Damage_Force_Whirlwind", "Damage_Force_Telekinesis", "Damage_Force_Lightning",
+        "Damage_Force_Corruption", "Damage_Hard_Point_Self_Destruct", "Damage_Fire", "Damage_Cable_Attack",
+        "Damage_Explosion", "Damage_Asteroid", "Damage_Cable_Attack_Deployed", "Damage_Normal_Deployed",
+        "Damage_Vehicle_Thief", "Damage_Crush", "Damage_Eat", "Damage_Redirected", "Damage_Wampa",
+        "Damage_Infection", "Damage_Remote_Bomb", "Damage_Drain_Life"
+    ];
+
+    private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
+
+    internal IReadOnlyList<Diagnostic> CollectDamageTypeOrderDiagnostics(string documentUri, string text)
+    {
+        // Cheap pre-check before parsing — almost no documents declare this element.
+        if (!text.Contains("Damage_Types", StringComparison.OrdinalIgnoreCase))
+            return [];
+
+        var doc = new HtmlDocument();
+        doc.LoadHtml(text);
+        var element = doc.DocumentNode.Descendants().FirstOrDefault(n =>
+            n.NodeType == HtmlNodeType.Element && n.Name.Equals("Damage_Types", StringComparison.OrdinalIgnoreCase));
+        if (element is null)
+            return [];
+
+        var tokens = new List<(string Token, int AbsPos)>();
+        foreach (var node in element.ChildNodes)
+        {
+            if (node.NodeType != HtmlNodeType.Text) continue;
+            var nodeText = node.InnerText;
+            var nodeStart = node.StreamPosition;
+            foreach (var (token, offset) in SplitDamageTypeTokens(nodeText))
+                tokens.Add((token, nodeStart + offset));
+        }
+
+        if (tokens.Count < RequiredDamageTypeTail.Length)
+        {
+            var (line, col) = tokens.Count > 0
+                ? XmlUtility.OffsetToPosition(text, tokens[^1].AbsPos)
+                : XmlUtility.OffsetToPosition(text, element.InnerStartIndex);
+            var len = tokens.Count > 0 ? tokens[^1].Token.Length : 0;
+            return
+            [
+                new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message =
+                        $"<Damage_Types> has only {tokens.Count} value(s); it must end with the engine's " +
+                        $"{RequiredDamageTypeTail.Length} hardcoded damage types, in order, or the game will crash.",
+                    Range = SafeRange(line, col, len),
+                    Source = AppProperties.LspServerId
+                }
+            ];
+        }
+
+        var tail = tokens.GetRange(tokens.Count - RequiredDamageTypeTail.Length, RequiredDamageTypeTail.Length);
+        var diagnostics = new List<Diagnostic>();
+        for (var i = 0; i < RequiredDamageTypeTail.Length; i++)
+        {
+            if (string.Equals(tail[i].Token, RequiredDamageTypeTail[i], StringComparison.Ordinal))
+                continue;
+
+            var (line, col) = XmlUtility.OffsetToPosition(text, tail[i].AbsPos);
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Error,
+                Message =
+                    $"'{tail[i].Token}' must be '{RequiredDamageTypeTail[i]}' — the last " +
+                    $"{RequiredDamageTypeTail.Length} entries of <Damage_Types> must exactly match the " +
+                    "engine's hardcoded order or the game will crash.",
+                Range = SafeRange(line, col, tail[i].Token.Length),
+                Source = AppProperties.LspServerId
+            });
+        }
+
+        return diagnostics;
+    }
+
+    private static IEnumerable<(string Token, int Offset)> SplitDamageTypeTokens(string text)
+    {
+        var i = 0;
+        while (i < text.Length)
+        {
+            while (i < text.Length && Array.IndexOf(DamageTypeTokenSeparators, text[i]) >= 0) i++;
+            if (i >= text.Length) break;
+            var start = i;
+            while (i < text.Length && Array.IndexOf(DamageTypeTokenSeparators, text[i]) < 0) i++;
+            yield return (text[start..i], start);
+        }
     }
 
     private void WalkForHardcodedRefs(HtmlNode node, string text, List<Diagnostic> diagnostics)
@@ -295,12 +389,19 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         var line = result.OverrideLine ?? fact.Line;
         var col = result.OverrideColumn ?? fact.Column;
-        var length = result.OverrideLength ?? fact.Length;
+        var endLine = result.OverrideEndLine ?? fact.EndLine;
+
+        // A cross-line span (fact or result carries an explicit end line) wins over the default
+        // same-line col+length range — used e.g. to grey out a whole multi-line element.
+        var range = endLine is { } el
+            ? SafeRange(line, col, el, result.OverrideEndColumn ?? fact.EndColumn ?? 0)
+            : SafeRange(line, col, result.OverrideLength ?? fact.Length);
+
         return new Diagnostic
         {
             Severity = result.Severity.ToLsp(),
             Message = result.Message,
-            Range = SafeRange(line, col, length),
+            Range = range,
             Source = AppProperties.LspServerId,
             Tags = MapTags(result.Tags),
             Data = BuildDiagnosticData(result)
@@ -328,6 +429,18 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         col = Math.Max(0, col);
         var end = Math.Max(col, col + length);
         return new Range(new Position(line, col), new Position(line, end));
+    }
+
+    // Cross-line variant: the end position may legitimately be on a later line (e.g. a whole
+    // multi-line element) — clamp endLine to at least startLine so a malformed/negative value can't
+    // produce an inverted range.
+    private static Range SafeRange(int startLine, int startCol, int endLine, int endCol)
+    {
+        startLine = Math.Max(0, startLine);
+        startCol = Math.Max(0, startCol);
+        endLine = Math.Max(startLine, endLine);
+        endCol = Math.Max(0, endCol);
+        return new Range(new Position(startLine, startCol), new Position(endLine, endCol));
     }
 
     private static JToken? BuildDiagnosticData(XmlDiagnosticResult result)

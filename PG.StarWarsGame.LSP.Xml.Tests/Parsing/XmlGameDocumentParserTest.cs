@@ -959,6 +959,33 @@ public sealed class XmlGameDocumentParserTest
     }
 
     [Fact]
+    public async Task ParseAsync_AbilityVariantBase_Scoped_To_Same_Owner_As_Ability_Id()
+    {
+        // The ability's own id is owner-scoped ("MY_UNIT$My_Ability") specifically to prevent
+        // cross-object collisions when two units share an ability name. Its Variant_Of_Existing_Type
+        // base must be scoped the same way — otherwise a bare "Base_Ability" base id can coincidentally
+        // resolve to some unrelated object's same-named ability elsewhere in the workspace.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddTag(VariantTag());
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<GameObjectType Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"><Variant_Of_Existing_Type>Base_Ability</Variant_Of_Existing_Type></Lucky_Shot_Attack_Ability></Abilities></GameObjectType>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("MY_UNIT$My_Ability", sym.Id);
+        Assert.Equal("MY_UNIT$Base_Ability", sym.VariantBaseId);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("MY_UNIT$Base_Ability", reference.TargetId);
+        Assert.Equal("LuckyShotAttackAbility", reference.ExpectedTypeName);
+    }
+
+    [Fact]
     public async Task ParseAsync_OwnerScopedReference_Prefixes_With_Enclosing_Object_Name()
     {
         var schema = new FakeSchemaProvider();

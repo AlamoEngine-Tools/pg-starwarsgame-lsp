@@ -3,7 +3,9 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using System.IO.Compression;
 using System.Net;
+using MessagePack;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -35,6 +37,15 @@ public sealed class BaselineLoaderTest
     private static byte[] Serialize(BaselineIndex b)
     {
         return BaselineSerializer.Serialize(b);
+    }
+
+    private static byte[] SerializeRawDto(SerializedBaseline dto)
+    {
+        var msgpack = MessagePackSerializer.Serialize(dto);
+        using var ms = new MemoryStream();
+        using (var gz = new GZipStream(ms, CompressionLevel.Optimal))
+            gz.Write(msgpack);
+        return ms.ToArray();
     }
 
     // ── None ────────────────────────────────────────────────────────────────
@@ -104,6 +115,22 @@ public sealed class BaselineLoaderTest
         var path = "/baselines/corrupt.bin";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [path] = new(new byte[] { 0x00, 0x01, 0x02 }) });
+        var loader = Build(fs, new FakeHttpHandler(_ =>
+            throw new InvalidOperationException("should not be called")));
+        var config = new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = path };
+
+        var result = await loader.LoadAsync(config, CancellationToken.None);
+
+        Assert.Same(BaselineIndex.Empty, result);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Local_WrongSchemaVersion_ReturnsEmpty()
+    {
+        var path = "/baselines/stale.bin";
+        var bytes = SerializeRawDto(new SerializedBaseline
+            { SchemaVersion = SerializedBaseline.CurrentSchemaVersion + 99 });
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(bytes) });
         var loader = Build(fs, new FakeHttpHandler(_ =>
             throw new InvalidOperationException("should not be called")));
         var config = new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = path };
@@ -191,6 +218,49 @@ public sealed class BaselineLoaderTest
         var result = await loader.LoadAsync(config, CancellationToken.None);
 
         Assert.Same(BaselineIndex.Empty, result);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Http_WrongSchemaVersion_NoCacheExists_ReturnsEmpty()
+    {
+        var bytes = SerializeRawDto(new SerializedBaseline
+            { SchemaVersion = SerializedBaseline.CurrentSchemaVersion + 99 });
+        var fs = new MockFileSystem();
+        var handler = new FakeHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(bytes) });
+        var loader = Build(fs, handler);
+        var config = new BaselineSourceConfig
+        {
+            Type = BaselineSourceType.Http,
+            Url = "https://example.com/foc-baseline.bin"
+        };
+
+        var result = await loader.LoadAsync(config, CancellationToken.None);
+
+        Assert.Same(BaselineIndex.Empty, result);
+    }
+
+    [Fact]
+    public async Task LoadAsync_Http_WrongSchemaVersion_CacheExists_FallsBackToCache()
+    {
+        var staleBytes = SerializeRawDto(new SerializedBaseline
+            { SchemaVersion = SerializedBaseline.CurrentSchemaVersion + 99 });
+        var cachedBaseline = MakeBaseline();
+        var cachedBytes = Serialize(cachedBaseline);
+        var cacheFile = Path.Combine(CacheDir, "foc-baseline.bin");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [cacheFile] = new(cachedBytes) });
+        var handler = new FakeHttpHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(staleBytes) });
+        var loader = Build(fs, handler);
+        var config = new BaselineSourceConfig
+        {
+            Type = BaselineSourceType.Http,
+            Url = "https://example.com/foc-baseline.bin"
+        };
+
+        var result = await loader.LoadAsync(config, CancellationToken.None);
+
+        Assert.True(result.Symbols.ContainsKey("UNIT_A"));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

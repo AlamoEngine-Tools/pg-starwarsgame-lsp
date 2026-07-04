@@ -373,6 +373,12 @@ public sealed class LuaDiagnosticsPublisherTest
             remove { }
         }
 
+        public event Action<GameIndex>? DynamicEnumChanged
+        {
+            add { }
+            remove { }
+        }
+
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;

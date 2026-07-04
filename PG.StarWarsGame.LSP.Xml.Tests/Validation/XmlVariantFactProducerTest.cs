@@ -74,6 +74,41 @@ public sealed class XmlVariantFactProducerTest
     }
 
     [Fact]
+    public void Produce_RedundantOverride_FactCarriesElementEndPosition()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Max_Health>100</Max_Health></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source =
+            new FakeTagSource().With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        var fact = Assert.Single(facts.OfType<VariantRedundantOverrideFact>());
+        Assert.Equal(0, fact.EndLine);
+        var expectedEndCol = text.IndexOf("</Max_Health>", StringComparison.Ordinal) + "</Max_Health>".Length;
+        Assert.Equal(expectedEndCol, fact.EndColumn);
+    }
+
+    [Fact]
+    public void Produce_RedundantOverride_MultilineElement_EndLineDiffersFromStartLine()
+    {
+        const string text =
+            "<X>\n<SpaceUnit Name=\"V\">\n<Variant_Of_Existing_Type>B</Variant_Of_Existing_Type>\n" +
+            "<Max_Health>\n100\n</Max_Health>\n</SpaceUnit>\n</X>";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source =
+            new FakeTagSource().With("B",
+                new VariantTag("Max_Health", "100", "<Max_Health>\n100\n</Max_Health>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        var fact = Assert.Single(facts.OfType<VariantRedundantOverrideFact>());
+        Assert.Equal(3, fact.Line); // "<Max_Health>" opens on line 3 (0-based)
+        Assert.Equal(5, fact.EndLine); // "</Max_Health>" closes on line 5
+    }
+
+    [Fact]
     public void Produce_DifferentValueOverride_NoRedundantFact()
     {
         const string text =
