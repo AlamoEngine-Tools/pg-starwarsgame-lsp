@@ -37,6 +37,14 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
 
         foreach (var reference in doc.References)
         {
+            // "enum:{EnumName}/{Value}" ids are synthetic markers recorded by
+            // XmlGameDocumentParser.CollectEnumReferences for go-to-definition/rename. They can
+            // never resolve against the object index, so producing a fact would make
+            // UnresolvedReferenceHandler flag every dynamic-enum tag value regardless of
+            // validity. Enum membership is validated by NamedEnumValueHandlerBase instead.
+            if (reference.TargetId.StartsWith("enum:", StringComparison.Ordinal))
+                continue;
+
             var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
             facts.Add(new XmlReferenceFact(
                 documentUri,

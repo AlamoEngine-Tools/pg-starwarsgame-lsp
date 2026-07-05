@@ -18,6 +18,8 @@ public sealed class LuaTextDocumentSyncHandlerTest
     private const string DiskUri = "file:///c:/scripts/test.lua";
     private const string DiskPath = @"c:\scripts\test.lua";
     private const string DiskContent = "function Definitions() end";
+    private const string XmlDiskUri = "file:///c:/data/xml/units.xml";
+    private const string XmlDiskPath = @"c:\data\xml\units.xml";
     private static DocumentUri TestUri => DocumentUri.From("file:///test.lua");
 
     private static (LuaTextDocumentSyncHandler handler,
@@ -53,8 +55,11 @@ public sealed class LuaTextDocumentSyncHandlerTest
     }
 
     [Fact]
-    public async Task DidOpen_Triggers_Index_Update()
+    public async Task DidOpen_Triggers_Index_Open()
     {
+        // didOpen must route through OpenDocumentAsync (version-epoch reset), not
+        // UpdateDocumentAsync — a fresh session's client versions restart at 1 and would
+        // otherwise be dropped as stale against the previous session's committed version.
         var (handler, _, index) = Build();
 
         await handler.Handle(new DidOpenTextDocumentParams
@@ -63,10 +68,11 @@ public sealed class LuaTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "function Foo() end", LanguageId = "lua", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Single(index.UpdateCalls);
-        Assert.Equal(TestUri.ToString(), index.UpdateCalls[0].Uri);
-        Assert.Equal("function Foo() end", index.UpdateCalls[0].Text);
-        Assert.Equal(1, index.UpdateCalls[0].Version);
+        Assert.Empty(index.UpdateCalls);
+        Assert.Single(index.OpenCalls);
+        Assert.Equal(TestUri.ToString(), index.OpenCalls[0].Uri);
+        Assert.Equal("function Foo() end", index.OpenCalls[0].Text);
+        Assert.Equal(1, index.OpenCalls[0].Version);
     }
 
     // ── DidChange ────────────────────────────────────────────────────────────
@@ -140,8 +146,11 @@ public sealed class LuaTextDocumentSyncHandlerTest
     }
 
     [Fact]
-    public async Task DidClose_WhenFileExistsOnDisk_ReindexesAtVersionZero()
+    public async Task DidClose_WhenFileExistsOnDisk_ReindexesWithoutRemoval()
     {
+        // Mirrors XmlTextDocumentSyncHandler: the index entry must never be removed for a file
+        // that still exists — a queued removal racing the async re-add can otherwise strip the
+        // document's symbols permanently (the 2026-07-05 go-to-definition bug).
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [DiskPath] = new(DiskContent) });
         var (handler, _, index) = Build(fs);
@@ -151,11 +160,11 @@ public sealed class LuaTextDocumentSyncHandlerTest
             TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(DiskUri) }
         }, CancellationToken.None);
 
-        Assert.Single(index.RemoveCalls);
+        Assert.Empty(index.RemoveCalls);
         Assert.Single(index.UpdateCalls);
         Assert.Equal(DiskContent, index.UpdateCalls[0].Text);
-        Assert.Equal(0, index.UpdateCalls[0].Version);
-        Assert.Equal(1, index.BulkUpdateCount);
+        Assert.Equal(0, index.UpdateCalls[0].Version); // Current is empty → falls back to 0
+        Assert.Equal(0, index.BulkUpdateCount);
     }
 
     [Fact]
@@ -188,6 +197,62 @@ public sealed class LuaTextDocumentSyncHandlerTest
 
         Assert.Single(host.RemoveCalls);
         Assert.Empty(host.AddOrUpdateCalls);
+    }
+
+    // ── Non-Lua documents (dual-registration crosstalk guard) ────────────────
+    // OmniSharp routes didClose/didChange by tracked attributes, not language id, so this
+    // handler also receives notifications for XML documents. It must ignore them entirely:
+    // a Lua-side removal racing the XML handler's own re-add silently deleted XML documents
+    // from the index (the 2026-07-05 "go-to resolves to base game after closing a tab" bug).
+
+    [Fact]
+    public async Task DidOpen_NonLuaDocument_IsIgnored()
+    {
+        var (handler, host, index) = Build();
+
+        await handler.Handle(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+                { Uri = DocumentUri.From(XmlDiskUri), Text = "<Foo/>", LanguageId = "xml", Version = 1 }
+        }, CancellationToken.None);
+
+        Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Empty(index.UpdateCalls);
+        Assert.Empty(index.OpenCalls);
+    }
+
+    [Fact]
+    public async Task DidChange_NonLuaDocument_IsIgnored()
+    {
+        var (handler, host, index) = Build();
+
+        await handler.Handle(new DidChangeTextDocumentParams
+        {
+            TextDocument = new OptionalVersionedTextDocumentIdentifier
+                { Uri = DocumentUri.From(XmlDiskUri), Version = 2 },
+            ContentChanges = new Container<TextDocumentContentChangeEvent>(
+                new TextDocumentContentChangeEvent { Text = "<Bar/>" })
+        }, CancellationToken.None);
+
+        Assert.Empty(host.AddOrUpdateCalls);
+        Assert.Empty(index.UpdateCalls);
+    }
+
+    [Fact]
+    public async Task DidClose_NonLuaDocument_IsIgnored()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+            { [XmlDiskPath] = new("<Foo/>") });
+        var (handler, host, index) = Build(fs);
+
+        await handler.Handle(new DidCloseTextDocumentParams
+        {
+            TextDocument = new TextDocumentIdentifier { Uri = DocumentUri.From(XmlDiskUri) }
+        }, CancellationToken.None);
+
+        Assert.Empty(host.RemoveCalls);
+        Assert.Empty(index.RemoveCalls);
+        Assert.Empty(index.UpdateCalls);
     }
 
     // ── DidSave ──────────────────────────────────────────────────────────────
@@ -247,6 +312,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
     internal sealed class FakeGameIndexService : IGameIndexService
     {
         public List<UpdateCall> UpdateCalls { get; } = [];
+        public List<UpdateCall> OpenCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
         public int BulkUpdateCount { get; private set; }
 
@@ -273,6 +339,12 @@ public sealed class LuaTextDocumentSyncHandlerTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             UpdateCalls.Add(new UpdateCall(uri, text, version));
+            return Task.CompletedTask;
+        }
+
+        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            OpenCalls.Add(new UpdateCall(uri, text, version));
             return Task.CompletedTask;
         }
 

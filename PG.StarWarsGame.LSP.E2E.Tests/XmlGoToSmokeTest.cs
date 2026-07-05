@@ -64,6 +64,41 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
     }
 
+    [Fact]
+    public async Task XmlGoTo_AfterOpenCloseCyclesOfTargetFile_StillResolvesWorkspaceDefinition()
+    {
+        // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML
+        // didClose notifications and queued an index REMOVAL that raced the XML handler's
+        // async re-add — when the removal landed last, the closed file's symbols were silently
+        // deleted and every reference into it fell back to the non-navigable baseline. VS Code
+        // preview tabs make open+close cycles constant, so navigating files progressively
+        // destroyed the index. Cycle the target file a few times, then go-to must still work.
+        RequireEawWorkspace();
+        await WaitForFullScanAsync();
+
+        var workspace = LspTestEnvironment.EawWorkspacePath!;
+        var frigatesPath = Path.Combine(workspace, "Data/Xml/Spaceunitsfrigates.xml");
+        var frigatesUri = DocumentUri.FromFileSystemPath(frigatesPath);
+        var frigatesText = await File.ReadAllTextAsync(frigatesPath);
+
+        for (var i = 0; i < 3; i++)
+        {
+            _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+            {
+                TextDocument = new TextDocumentItem
+                    { Uri = frigatesUri, LanguageId = "xml", Version = 1, Text = frigatesText }
+            });
+            await Task.Delay(100);
+            _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = frigatesUri }
+            });
+            await Task.Delay(150);
+        }
+
+        await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
+    }
+
     private async Task RunGoToAsync(string? tagName, string value, string expectedDefinitionFile,
         string sourceFileRel = CorvettesXmlRel)
     {

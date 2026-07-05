@@ -44,7 +44,9 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         {
             if (!_eaWXmlContext.IsEaWXmlFile(uri)) return;
             _workspaceHost.AddOrUpdate(uri, text, version);
-            await _indexService.UpdateDocumentAsync(uri, text, version, token);
+            // Open (not Update): client versions restart at 1 per open session, while the didClose
+            // re-index below preserves the committed version — the open starts a new version epoch.
+            await _indexService.OpenDocumentAsync(uri, text, version, token);
         }, ct);
         return Unit.Value;
     }

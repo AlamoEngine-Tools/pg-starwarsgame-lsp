@@ -14,9 +14,26 @@ public interface IGameIndexService
     Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct);
 
     /// <summary>
+    ///     Indexes a freshly opened document (didOpen). Unlike <see cref="UpdateDocumentAsync" />,
+    ///     the committed version never suppresses this update: LSP client versions restart at 1 for
+    ///     every open session, while the committed version deliberately survives a didClose
+    ///     re-index — so a didOpen starts a new version epoch. An unchanged-content open skips the
+    ///     re-parse but still re-stamps the stored version, so the new session's subsequent
+    ///     didChanges are not dropped as stale.
+    ///     Default implementation delegates to <see cref="UpdateDocumentAsync" /> so existing test
+    ///     fakes keep working without changes.
+    /// </summary>
+    Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return UpdateDocumentAsync(uri, text, version, ct);
+    }
+
+    /// <summary>
     ///     Applies a pre-built <see cref="DocumentIndex" /> (e.g. from a project index cache) without
-    ///     re-parsing. The document's <see cref="DocumentIndex.LayerRank" />, <see cref="DocumentIndex.LayerName" />,
-    ///     and all symbol/reference data are preserved as-is.
+    ///     re-parsing. All symbol/reference data is preserved as-is;
+    ///     <see cref="DocumentIndex.LayerRank" /> and <see cref="DocumentIndex.LayerName" /> are
+    ///     re-stamped from the live layer map when one is registered (snapshot ranks go stale when
+    ///     the dependency graph changes between sessions) and preserved only in map-less setups.
     /// </summary>
     void InjectDocument(DocumentIndex document);
 

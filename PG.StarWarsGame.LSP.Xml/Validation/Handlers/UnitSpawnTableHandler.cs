@@ -22,6 +22,6 @@ public sealed class UnitSpawnTableHandler : CommaSeparatedPairHandlerBase
             ];
 
         var d = TryValidateGameObjectName(parts[0].Trim(), fact.Tag.Tag, ctx.Index);
-        return d is not null ? [d] : [];
+        return d is not null ? [AtPairSlot(d, fact, 0)] : [];
     }
 }

@@ -329,6 +329,85 @@ public sealed class GameIndexServiceTest
         Assert.True(fired);
     }
 
+    // ── OpenDocumentAsync — didOpen version-epoch reset ──────────────────────
+    // LSP client versions restart at 1 for every open session, but the committed version
+    // survives a didClose re-index (deliberately, so an unsaved-edit revert is not dropped).
+    // Without an epoch reset the NEXT session's didOpen/didChange at v1/v2 lose against the
+    // previous session's v3 and are silently dropped as stale.
+
+    [Fact]
+    public async Task OpenDocumentAsync_LowerVersionChangedContent_AppliesNewContent()
+    {
+        var svc = Build(new TextSymbolParser());
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+
+        await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, default);
+
+        Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("OLD"));
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_UnchangedContentLowerVersion_ResetsVersionWithoutReparse()
+    {
+        var counting = new CountingParser(Doc("", 0, [Symbol("A")]));
+        var svc = Build(counting);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 3, default);
+
+        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.Equal(1, counting.ParseCount);
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_EpochReset_ThenChangeAtLowerClientVersion_Applies()
+    {
+        // The full reported sequence: session 1 leaves v3 committed; session 2 opens at v1
+        // (unchanged content) and edits at v2 — the edit must not be dropped as stale.
+        var svc = Build(new TextSymbolParser());
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+
+        await svc.OpenDocumentAsync("file:///f.xml", "OLD", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "NEW", 2, default);
+
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("OLD"));
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_InBulk_AppliesOverHigherCommittedVersion()
+    {
+        var svc = Build(new TextSymbolParser());
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, default);
+        }
+
+        Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("OLD"));
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_SameVersionUnchangedContent_FiresIndexChanged()
+    {
+        // Mirrors UpdateDocumentAsync_Same_Version_Fires_IndexChanged for the open path:
+        // diagnostics must re-publish on re-open even when nothing changed.
+        var svc = Build(new FakeParser(Doc("", 0)));
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        var fired = false;
+        svc.IndexChanged += _ => fired = true;
+        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.True(fired);
+    }
+
     // ── UpdateDocumentAsync — document replacement ───────────────────────────
 
     [Fact]
@@ -553,6 +632,51 @@ public sealed class GameIndexServiceTest
 
         var winner = svc.Current.Resolve("UNIT_A");
         Assert.Equal("file:///rev/u.xml", ((FileOrigin)winner!.Origin).Uri);
+    }
+
+    [Fact]
+    public void InjectDocument_WithLiveLayerMap_RestampsLayerRankAndName()
+    {
+        // Snapshots persist the LayerRank at WRITE time; when the dependency graph changes
+        // between sessions the ranks renumber, and a stale injected rank silently breaks the
+        // leaf-ownership gates (IsLeafOwned, LayerRankOfUri == LeafLayerRank). The live layer
+        // map is authoritative.
+        var layerMap = new StubLayerMap(_ => 3, _ => "Leaf");
+        var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap);
+
+        svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 1, LayerName = "Stale" });
+
+        Assert.Equal(3, svc.Current.Documents["file:///f.xml"].LayerRank);
+        Assert.Equal("Leaf", svc.Current.Documents["file:///f.xml"].LayerName);
+    }
+
+    [Fact]
+    public void InjectDocument_InBulk_WithLiveLayerMap_RestampsLayerRank()
+    {
+        var layerMap = new StubLayerMap(_ => 3, _ => "Leaf");
+        var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 1, LayerName = "Stale" });
+        }
+
+        Assert.Equal(3, svc.Current.Documents["file:///f.xml"].LayerRank);
+        Assert.Equal("Leaf", svc.Current.Documents["file:///f.xml"].LayerName);
+    }
+
+    [Fact]
+    public void InjectDocument_WithoutLayerMap_PreservesSerializedRank()
+    {
+        // Minimal setups (tests) have no layer map — the snapshot's own stamp stays authoritative.
+        var svc = Build(new FakeParser(Doc("", 0)));
+
+        svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 2, LayerName = "FromSnapshot" });
+
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].LayerRank);
+        Assert.Equal("FromSnapshot", svc.Current.Documents["file:///f.xml"].LayerName);
     }
 
     // ── BeginBulkUpdate ──────────────────────────────────────────────────────
@@ -929,11 +1053,13 @@ public sealed class GameIndexServiceTest
 
     private sealed class StubLayerMap : IProjectLayerMap
     {
+        private readonly Func<int, string?>? _name;
         private readonly Func<string, int> _rank;
 
-        public StubLayerMap(Func<string, int> rank)
+        public StubLayerMap(Func<string, int> rank, Func<int, string?>? name = null)
         {
             _rank = rank;
+            _name = name;
         }
 
         public void SetLayers(IReadOnlyList<ProjectLayer> layers)
@@ -947,7 +1073,7 @@ public sealed class GameIndexServiceTest
 
         public string? GetLayerName(int rank)
         {
-            return null;
+            return _name?.Invoke(rank);
         }
     }
 
@@ -973,6 +1099,25 @@ public sealed class GameIndexServiceTest
         {
             ParseCount++;
             return ValueTask.FromResult(_result with { DocumentUri = uri, Version = version });
+        }
+    }
+
+    // Derives the symbol id from the document text, so tests can assert which CONTENT won a
+    // version race (FakeParser always returns the same symbols regardless of text).
+    private sealed class TextSymbolParser : IGameDocumentParser
+    {
+        public bool CanParse(string ext)
+        {
+            return ext == ".xml";
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
+            CancellationToken ct)
+        {
+            var symbol = new GameSymbol(text, GameSymbolKind.XmlObject, "Unit",
+                new FileOrigin(uri, 1, null), null);
+            return ValueTask.FromResult(new DocumentIndex(uri, version,
+                ImmutableArray.Create(symbol), ImmutableArray<GameReference>.Empty));
         }
     }
 

@@ -86,6 +86,34 @@ public sealed class HardPointSfxMapHandlerTest
         Assert.Empty(results);
     }
 
+    [Fact]
+    public void HardPointType_UnknownValue_HighlightsOnlyTheTypeToken()
+    {
+        // A broken token must highlight only itself, not the whole tuple value
+        // (fact position is line 0, column 0 via MakeFact).
+        var ctx = CtxWithHardPointTypeEnum("HARD_POINT_WEAPON_LASER");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "INVALID_TYPE, SFX_Fire"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(0, d.OverrideLine);
+        Assert.Equal(0, d.OverrideColumn);
+        Assert.Equal("INVALID_TYPE".Length, d.OverrideLength);
+    }
+
+    [Fact]
+    public void SfxEvent_UnresolvedSymbol_HighlightsOnlyTheSfxToken()
+    {
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithSfxEvent("Other_SFX"),
+            "file:///test.xml", "en");
+        var results = Sut.Handle(
+            XmlHandlerTestFixtures.MakeFact(Tag, "HARDPOINT_WEAPON, Missing_SFX"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(0, d.OverrideLine);
+        Assert.Equal(18, d.OverrideColumn); // offset of "Missing_SFX" in the raw value
+        Assert.Equal("Missing_SFX".Length, d.OverrideLength);
+    }
+
     // ── SFX event second-field validation ────────────────────────────────────
 
     private static GameIndex IndexWithSfxEvent(string sfxEventId)

@@ -120,6 +120,48 @@ public sealed class AbilitySfxMapHandlerTest
         Assert.Contains("Missing_SFX", d.Message);
     }
 
+    // ── per-slot diagnostic ranges ───────────────────────────────────────────
+    // A broken token must highlight only itself, not the whole tuple value
+    // (fact position is line 0, column 0 via MakeFact).
+
+    [Fact]
+    public void SfxEvent_UnresolvedSymbol_HighlightsOnlyTheSfxToken()
+    {
+        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"),
+            "file:///test.xml", "en");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT, Missing_SFX"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(0, d.OverrideLine);
+        Assert.Equal(6, d.OverrideColumn); // offset of "Missing_SFX" in the raw value
+        Assert.Equal("Missing_SFX".Length, d.OverrideLength);
+    }
+
+    [Fact]
+    public void AbilityCode_UnknownValue_HighlightsOnlyTheCodeToken()
+    {
+        var ctx = CtxWithAbilityTypeSet("HUNT", "DEFEND");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "UNKNOWN_CODE, SFX_Event"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(0, d.OverrideLine);
+        Assert.Equal(0, d.OverrideColumn);
+        Assert.Equal("UNKNOWN_CODE".Length, d.OverrideLength);
+    }
+
+    [Fact]
+    public void SfxEvent_UnresolvedSymbol_MultiLineValue_HighlightsTokenOnItsOwnLine()
+    {
+        var ctx = new DiagnosticsContext(new StubSchemaProvider([]), IndexWithSfxEvent("Other_SFX"),
+            "file:///test.xml", "en");
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "HUNT,\n  Missing_SFX"), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(1, d.OverrideLine); // second line of the value
+        Assert.Equal(2, d.OverrideColumn); // after the two-space indent
+        Assert.Equal("Missing_SFX".Length, d.OverrideLength);
+    }
+
     [Fact]
     public void SfxEvent_UnresolvedSymbol_WithEmptyIndex_ReturnsNoDiagnostics()
     {

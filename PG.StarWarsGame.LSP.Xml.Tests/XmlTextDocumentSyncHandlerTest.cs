@@ -63,8 +63,11 @@ public sealed class XmlTextDocumentSyncHandlerTest
     }
 
     [Fact]
-    public async Task DidOpen_Triggers_Index_Update()
+    public async Task DidOpen_Triggers_Index_Open()
     {
+        // didOpen must route through OpenDocumentAsync (version-epoch reset), not
+        // UpdateDocumentAsync — a fresh session's client versions restart at 1 and would
+        // otherwise be dropped as stale against the previous session's committed version.
         var (handler, _, index) = Build();
 
         await handler.Handle(new DidOpenTextDocumentParams
@@ -73,10 +76,11 @@ public sealed class XmlTextDocumentSyncHandlerTest
                 { Uri = TestUri, Text = "<Foo/>", LanguageId = "xml", Version = 1 }
         }, CancellationToken.None);
 
-        Assert.Single(index.UpdateCalls);
-        Assert.Equal(TestUri.ToString(), index.UpdateCalls[0].Uri);
-        Assert.Equal("<Foo/>", index.UpdateCalls[0].Text);
-        Assert.Equal(1, index.UpdateCalls[0].Version);
+        Assert.Empty(index.UpdateCalls);
+        Assert.Single(index.OpenCalls);
+        Assert.Equal(TestUri.ToString(), index.OpenCalls[0].Uri);
+        Assert.Equal("<Foo/>", index.OpenCalls[0].Text);
+        Assert.Equal(1, index.OpenCalls[0].Version);
     }
 
     [Fact]
@@ -94,13 +98,13 @@ public sealed class XmlTextDocumentSyncHandlerTest
         }, CancellationToken.None);
 
         Assert.Empty(host.AddOrUpdateCalls);
-        Assert.Empty(index.UpdateCalls);
+        Assert.Empty(index.OpenCalls);
 
         await gate.OpenAsync();
 
         Assert.Single(host.AddOrUpdateCalls);
-        Assert.Single(index.UpdateCalls);
-        Assert.Equal("<Foo/>", index.UpdateCalls[0].Text);
+        Assert.Single(index.OpenCalls);
+        Assert.Equal("<Foo/>", index.OpenCalls[0].Text);
     }
 
     // ── DidChange ────────────────────────────────────────────────────────────
@@ -259,6 +263,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
 
         Assert.Empty(host.AddOrUpdateCalls);
         Assert.Empty(index.UpdateCalls);
+        Assert.Empty(index.OpenCalls);
     }
 
     [Fact]
@@ -333,6 +338,7 @@ public sealed class XmlTextDocumentSyncHandlerTest
     internal sealed class FakeGameIndexService : IGameIndexService
     {
         public List<UpdateCall> UpdateCalls { get; } = [];
+        public List<UpdateCall> OpenCalls { get; } = [];
         public List<string> RemoveCalls { get; } = [];
         public int BulkUpdateCount { get; private set; }
 
@@ -359,6 +365,12 @@ public sealed class XmlTextDocumentSyncHandlerTest
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             UpdateCalls.Add(new UpdateCall(uri, text, version));
+            return Task.CompletedTask;
+        }
+
+        public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            OpenCalls.Add(new UpdateCall(uri, text, version));
             return Task.CompletedTask;
         }
 

@@ -57,7 +57,21 @@ public sealed class GameIndexService : IGameIndexService
         return new BulkUpdateScope(this);
     }
 
-    public async Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return IndexDocumentAsync(uri, text, version, false, ct);
+    }
+
+    public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return IndexDocumentAsync(uri, text, version, true, ct);
+    }
+
+    // force = didOpen semantics: LSP client versions restart at 1 for every open session while the
+    // committed version deliberately survives a didClose re-index, so an open starts a new version
+    // epoch — the committed version must never suppress it.
+    private async Task IndexDocumentAsync(string uri, string text, int version, bool force,
+        CancellationToken ct)
     {
         uri = NormalizeUri(uri);
         var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
@@ -72,9 +86,24 @@ public sealed class GameIndexService : IGameIndexService
             && Volatile.Read(ref _current).Documents.GetValueOrDefault(uri) is { } indexed
             && indexed.ContentHash == contentHash)
         {
-            _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
-            RaiseIndexChanged(Volatile.Read(ref _current));
-            return;
+            if (!force || indexed.Version == version)
+            {
+                _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
+                RaiseIndexChanged(Volatile.Read(ref _current));
+                return;
+            }
+
+            // Unchanged-content open: no re-parse needed, but the stored version must still be
+            // re-stamped to the new session's client version — otherwise its subsequent
+            // didChanges (v2, v3, …) are dropped as stale against the previous session's version.
+            if (TryRestampVersion(uri, contentHash, version))
+            {
+                _logger.LogDebug("Re-opened {Uri} unchanged; version epoch reset to v{Version}",
+                    uri, version);
+                RaiseIndexChanged(Volatile.Read(ref _current));
+                return;
+            }
+            // The document changed concurrently — fall through to the full parse.
         }
 
         // Cancel any in-flight parse for this URI and register the new one.
@@ -118,7 +147,7 @@ public sealed class GameIndexService : IGameIndexService
             ContentHash = contentHash
         };
 
-        if (TryDeferToBulk(new PendingOp(newDoc, null)))
+        if (TryDeferToBulk(new PendingOp(newDoc, null, force)))
         {
             _logger.LogDebug("Queued {Uri} v{Version} for bulk merge", uri, newDoc.Version);
             return;
@@ -132,9 +161,10 @@ public sealed class GameIndexService : IGameIndexService
             // Drop stale parses: a strictly newer version has already been committed.
             // Using strict > (not >=) so that re-opening the same file at the same version
             // (e.g. DidOpen after a workspace scan at v0, then again at v1) still fires
-            // IndexChanged and re-publishes diagnostics.
+            // IndexChanged and re-publishes diagnostics. A didOpen (force) is exempt — it
+            // starts a new version epoch.
             var existing = snapshot.Documents.GetValueOrDefault(uri);
-            if (existing is not null && existing.Version > newDoc.Version)
+            if (!force && existing is not null && existing.Version > newDoc.Version)
             {
                 _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri,
                     newDoc.Version, existing.Version);
@@ -149,11 +179,43 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    // CAS-replaces only the stored version of an unchanged document (didOpen epoch reset).
+    // Returns false when the document disappeared or its content changed concurrently, in which
+    // case the caller falls back to a full parse.
+    private bool TryRestampVersion(string uri, long contentHash, int version)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            if (snapshot.Documents.GetValueOrDefault(uri) is not { } current
+                || current.ContentHash != contentHash)
+                return false;
+            if (current.Version == version) return true;
+            updated = snapshot with
+            {
+                Documents = snapshot.Documents.SetItem(uri, current with { Version = version })
+            };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        return true;
+    }
+
     public void InjectDocument(DocumentIndex document)
     {
         var uri = NormalizeUri(document.DocumentUri);
         if (document.DocumentUri != uri)
             document = document with { DocumentUri = uri };
+
+        // Snapshots persist the LayerRank at write time; if the dependency graph changed between
+        // sessions the ranks renumber, and a stale rank silently breaks the leaf-ownership gates
+        // (IsLeafOwned, LayerRankOfUri == LeafLayerRank). Re-stamp from the live layer map when
+        // one is registered; minimal setups without a map keep the serialized stamp.
+        if (_layerMap is not null)
+        {
+            var layerRank = _layerMap.GetRank(uri);
+            document = document with { LayerRank = layerRank, LayerName = _layerMap.GetLayerName(layerRank) };
+        }
 
         if (TryDeferToBulk(new PendingOp(document, null)))
         {
@@ -371,7 +433,9 @@ public sealed class GameIndexService : IGameIndexService
             var prior = finalDocs.TryGetValue(doc.DocumentUri, out var queued)
                 ? queued
                 : index.Documents.GetValueOrDefault(doc.DocumentUri);
-            if (prior is not null && prior.Version > doc.Version)
+            // Force = didOpen epoch reset: a freshly opened document's client version restarts
+            // at 1 and must never lose against the previous session's committed version.
+            if (!op.Force && prior is not null && prior.Version > doc.Version)
             {
                 _logger.LogDebug("Dropping stale bulk parse for {Uri} v{Incoming} (committed v{Current})",
                     doc.DocumentUri, doc.Version, prior.Version);
@@ -447,7 +511,7 @@ public sealed class GameIndexService : IGameIndexService
         return builder.ToImmutable();
     }
 
-    private sealed record PendingOp(DocumentIndex? Document, string? RemoveUri);
+    private sealed record PendingOp(DocumentIndex? Document, string? RemoveUri, bool Force = false);
 
     private sealed class Delta<T>
     {
