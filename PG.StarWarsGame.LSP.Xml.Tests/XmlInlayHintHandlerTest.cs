@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -26,7 +27,8 @@ public sealed class XmlInlayHintHandlerTest
     private static (XmlInlayHintHandler handler, FakeIndexService index) Build(
         string docText,
         ISchemaProvider? schema = null,
-        ILocalisationIndex? localisation = null)
+        ILocalisationIndex? localisation = null,
+        ILspConfigurationProvider? config = null)
     {
         var host = new FakeWorkspaceHost();
         host.Set(Uri, docText);
@@ -43,7 +45,25 @@ public sealed class XmlInlayHintHandlerTest
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            registry), index);
+            registry, config ?? new FakeLspConfigurationProvider()), index);
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_InlayHintsFlagOff_ReturnsNull()
+    {
+        // Same arrange as LocKeyTag_WithKnownTranslation — only the flag differs.
+        const string xml = "<GameObjectType>\n  <Text_ID>TEXT_UNIT_NAME</Text_ID>\n</GameObjectType>";
+        var schema = new LocKeySchemaProvider("Text_ID");
+        var loc = new ValueLocalisationIndex("TEXT_UNIT_NAME", "X-Wing Fighter");
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { InlayHints = false } });
+
+        var (handler, _) = Build(xml, schema, loc, config);
+        var result = await handler.Handle(Params(), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     private static LspRange FullRange()
@@ -168,7 +188,7 @@ public sealed class XmlInlayHintHandlerTest
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]));
+            new XmlInlayHintRegistry([]), new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(Params(), CancellationToken.None);
         Assert.Null(result);
@@ -188,7 +208,7 @@ public sealed class XmlInlayHintHandlerTest
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]));
+            new XmlInlayHintRegistry([]), new FakeLspConfigurationProvider());
 
         _ = await handler.Handle(Params(), CancellationToken.None);
         _ = await handler.Handle(Params(), CancellationToken.None);

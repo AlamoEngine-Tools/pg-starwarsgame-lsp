@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -34,13 +35,71 @@ public sealed class GameRenameHandlerTest
 
     private static GameRenameHandler BuildHandler(
         IXmlRenameProvider? xmlProvider = null,
-        ILuaRenameProvider? luaProvider = null)
+        ILuaRenameProvider? luaProvider = null,
+        ILspConfigurationProvider? config = null)
     {
         return new GameRenameHandler(
             new FakeIndexService(),
             xmlProvider ?? new NullXmlProvider(),
             luaProvider ?? new NullLuaProvider(),
-            new FileHelper(new MockFileSystem()));
+            new FileHelper(new MockFileSystem()),
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flags ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_XmlRenameFlagOff_ReturnsNullWithoutInvokingXmlProvider()
+    {
+        var stub = new StubProvider(new WorkspaceEdit());
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(stub, config: config)
+            .Handle(RenameAt(XmlUri), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(stub.RenameCalled);
+    }
+
+    [Fact]
+    public async Task Handle_XmlRenameFlagOff_LuaStillRouted()
+    {
+        var luaEdit = new WorkspaceEdit();
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(luaProvider: new StubProvider(luaEdit), config: config)
+            .Handle(RenameAt(LuaUri), CancellationToken.None);
+
+        Assert.Same(luaEdit, result);
+    }
+
+    [Fact]
+    public async Task Handle_LuaRenameFlagOff_ReturnsNullWithoutInvokingLuaProvider()
+    {
+        var stub = new StubProvider(new WorkspaceEdit());
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(luaProvider: stub, config: config)
+            .Handle(RenameAt(LuaUri), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(stub.RenameCalled);
+    }
+
+    [Fact]
+    public async Task Handle_LuaRenameFlagOff_XmlStillRouted()
+    {
+        var xmlEdit = new WorkspaceEdit();
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(new StubProvider(xmlEdit), config: config)
+            .Handle(RenameAt(XmlUri), CancellationToken.None);
+
+        Assert.Same(xmlEdit, result);
     }
 
     // ── routing ────────────────────────────────────────────────────────────────
@@ -174,8 +233,11 @@ public sealed class GameRenameHandlerTest
             _edit = edit;
         }
 
+        public bool RenameCalled { get; private set; }
+
         public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
         {
+            RenameCalled = true;
             return _edit;
         }
 

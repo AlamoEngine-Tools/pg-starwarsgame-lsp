@@ -18,6 +18,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
 {
     private const string CorvettesXmlRel = "Data/Xml/Spaceunitscorvettes.xml";
     private const string FightersXmlRel = "Data/Xml/Spaceunitsfighters.xml";
+    private const string FactionsXmlRel = "Data/Xml/Factions.xml";
 
     private readonly EawLspServerFixture _fixture;
 
@@ -62,6 +63,16 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         // (space-separated list) must navigate to Spaceunitsfrigates.xml even though that file
         // was never opened in the editor — its symbols come purely from the workspace scan.
         await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_ShadowBlobMaterialReference_ReturnsShadowblobmaterialsDefinition()
+    {
+        // ShadowBlobMaterial is a first-class object type (2026-07-05):
+        // <Reinforcements_Shadow_Blob_Material_Name> Reinforcement_Overlay_Empire </…> in
+        // Factions.xml must navigate to the <Material name="…"> entry in Shadowblobmaterials.xml
+        // (directContent-registered, lowercase `name` attribute).
+        await RunGoToAsync(null, "Reinforcement_Overlay_Empire", "Shadowblobmaterials", FactionsXmlRel);
     }
 
     [Fact]

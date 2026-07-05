@@ -7,6 +7,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -21,21 +22,30 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<CreateLocalisationKeyCommandHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
+    private readonly ILspConfigurationProvider _config;
 
     public CreateLocalisationKeyCommandHandler(
         ILocalisationEntryWriter entryWriter,
         IFileHelper fileHelper,
         IModProjectReloadService reloadService,
-        ILogger<CreateLocalisationKeyCommandHandler> logger)
+        ILogger<CreateLocalisationKeyCommandHandler> logger,
+        ILspConfigurationProvider config)
     {
         _entryWriter = entryWriter;
         _fileHelper = fileHelper;
         _reloadService = reloadService;
         _logger = logger;
+        _config = config;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+        {
+            _logger.LogWarning("{Cmd}: {Reason}", CommandName, LocalisationFeatureDisabled.Message);
+            return Unit.Value;
+        }
+
         if (request.Arguments is null || request.Arguments.Count < 2)
         {
             _logger.LogWarning("{Cmd}: missing arguments.", CommandName);

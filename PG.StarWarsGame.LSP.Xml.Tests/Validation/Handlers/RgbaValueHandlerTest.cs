@@ -45,4 +45,26 @@ public sealed class RgbaValueHandlerTest
             .ToList();
         Assert.Empty(results);
     }
+
+    [Fact]
+    public void FloatComponents_ReturnWarningWithCorrectedColor()
+    {
+        // All number types accept a float where an integer is expected, with a Warning.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "255.0, 128, 0, 255"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal("255 128 0 255", d.SuggestedFix);
+    }
+
+    [Fact]
+    public void FloatComponentOutOfRange_StillError()
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "300.0, 128, 0"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
 }

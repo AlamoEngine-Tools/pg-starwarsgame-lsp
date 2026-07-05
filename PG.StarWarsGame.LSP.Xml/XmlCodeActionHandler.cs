@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -11,14 +12,19 @@ namespace PG.StarWarsGame.LSP.Xml;
 public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 {
     private readonly IXmlCodeActionRegistry _registry;
+    private readonly ILspConfigurationProvider _config;
 
-    public XmlCodeActionHandler(IXmlCodeActionRegistry registry)
+    public XmlCodeActionHandler(IXmlCodeActionRegistry registry, ILspConfigurationProvider config)
     {
         _registry = registry;
+        _config = config;
     }
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.CodeActions)
+            return Task.FromResult<CommandOrCodeActionContainer?>(new CommandOrCodeActionContainer());
+
         var uri = request.TextDocument.Uri;
         var actions = request.Context.Diagnostics
             .SelectMany(d => _registry.Dispatch(new XmlCodeActionContext(uri, d)))

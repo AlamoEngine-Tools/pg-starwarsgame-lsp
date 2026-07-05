@@ -215,9 +215,48 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     }
     Console.WriteLine($"Music events: {musicEvents.Count} (direct-parsed stopgap — see TODO(music-events))");
 
+    // ── Shadow blob materials ───────────────────────────────────────────────
+    //
+    // Same stopgap as music events above (see that comment for the full rationale):
+    // PG.StarWarsGame.Engine has no shadow-blob-material support, and Shadowblobmaterials.xml is
+    // another single direct-content file — a flat <Shadow_Blob_Materials><Material name="…">
+    // list, so a direct parse is sufficient. Note the LOWERCASE `name` attribute (unlike every
+    // other object type's `Name`); matched case-insensitively for robustness.
+    //
+    // TODO(music-events): fold into the same engine-level solution when it lands.
+    var shadowBlobMaterials = new List<ProjectableEntry>();
+    using (var stream = engine.GameRepository.TryOpenFile("Data\\XML\\ShadowBlobMaterials.xml"))
+    {
+        if (stream is not null)
+        {
+            var shadowBlobXml = await new StreamReader(stream).ReadToEndAsync();
+            try
+            {
+                var blobDoc = XDocument.Parse(shadowBlobXml, LoadOptions.SetLineInfo);
+                foreach (var element in blobDoc.Root?.Elements() ?? [])
+                {
+                    if (!element.Name.LocalName.Equals("Material", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var name = element.Attributes()
+                        .FirstOrDefault(a => a.Name.LocalName.Equals("name", StringComparison.OrdinalIgnoreCase))
+                        ?.Value;
+                    if (string.IsNullOrEmpty(name)) continue;
+                    var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber : (int?)null;
+                    shadowBlobMaterials.Add(new ProjectableEntry(name, "SHADOW_BLOB_MATERIAL",
+                        new XmlLocationInfo("Data\\XML\\ShadowBlobMaterials.xml", line)));
+                }
+            }
+            catch (XmlException ex)
+            {
+                Console.Error.WriteLine($"Warning: Failed to parse ShadowBlobMaterials.xml: {ex.Message}");
+            }
+        }
+    }
+    Console.WriteLine($"Shadow blob materials: {shadowBlobMaterials.Count} (direct-parsed stopgap)");
+
     var schemaProvider = sp.GetService<ISchemaProvider>();
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
-    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash, musicEvents);
+    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials);
     Console.WriteLine($"Projected {baseline.Symbols.Count} symbol(s)");
 
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────

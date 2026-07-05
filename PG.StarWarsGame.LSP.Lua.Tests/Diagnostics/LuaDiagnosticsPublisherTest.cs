@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -26,7 +27,8 @@ public sealed class LuaDiagnosticsPublisherTest
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) Build(
-            ILuaApiSchemaProvider? schema = null)
+            ILuaApiSchemaProvider? schema = null,
+            ILspConfigurationProvider? config = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -38,8 +40,24 @@ public sealed class LuaDiagnosticsPublisherTest
             workspaceHost,
             fileHelper,
             schema ?? new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance);
+            NullLogger<LuaDiagnosticsPublisher>.Instance,
+            configProvider: config);
         return (publisher, published, indexService, workspaceHost);
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_LuaDiagnosticsFlagOff_PublishesNothing()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Diagnostics = false } });
+        var (_, published, indexService, workspaceHost) = Build(config: config);
+        workspaceHost.Set(LuaUri, "function Foo() end");
+
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.Empty(published);
     }
 
     private static GameIndex IndexWithLuaRef(string documentUri, string targetId,

@@ -92,6 +92,28 @@ public sealed class GameSymbolProjectorTest
         Assert.Contains(result.ObjectTags["MAIN_THEME"], t => t.TagName == "Volume_Percent" && t.Value == "70");
     }
 
+    [Fact]
+    public void Project_ShadowBlobMaterial_TypeNameIsShadowBlobMaterial()
+    {
+        var entry = Entry("Generic_Shadow", "SHADOW_BLOB_MATERIAL",
+            "DATA\\XML\\SHADOWBLOBMATERIALS.XML");
+        var result = Build().Project([], [], "hash", shadowBlobMaterials: [entry]);
+
+        Assert.Equal("ShadowBlobMaterial", result.Symbols["Generic_Shadow"].TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, result.Symbols["Generic_Shadow"].Kind);
+    }
+
+    [Fact]
+    public void Project_ShadowBlobMaterial_CarriesLocation()
+    {
+        var entry = new ProjectableEntry("Generic_Shadow", "SHADOW_BLOB_MATERIAL",
+            new XmlLocationInfo("DATA\\XML\\SHADOWBLOBMATERIALS.XML", 27));
+        var result = Build().Project([], [], "hash", shadowBlobMaterials: [entry]);
+
+        var origin = Assert.IsType<FileOrigin>(result.Symbols["Generic_Shadow"].Origin);
+        Assert.Contains("SHADOWBLOBMATERIALS", origin.Uri, StringComparison.OrdinalIgnoreCase);
+    }
+
     // ── Symbol fields ──────────────────────────────────────────────────────────
 
     [Fact]

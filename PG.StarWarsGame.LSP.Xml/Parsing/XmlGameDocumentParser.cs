@@ -166,6 +166,27 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // Presence_Induced_Animations: "AnimationStateId, ObjectName, ..." — the first
+                // token is an engine animation state (not indexable), the rest are game objects
+                // whose presence triggers it. Record those as object references so
+                // go-to-definition and unresolved-reference validation cover them.
+                if (tagDef.ValidationOverride?.ValidationId == "presence-induced-animations")
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectPresenceInducedObjectReferences(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
+                // (GameObjectCategoryType, float) tuples: record slot 0 as an enum: reference
+                // so go-to-definition/rename work on the category token. Membership is validated
+                // by InaccuracyMapHandler; XmlIndexFactProducer skips enum: ids.
+                if (tagDef.ValueType == XmlValueType.InaccuracyMap)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectInaccuracyCategoryReference(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
                 // Variant base references are emitted by the symbol passes with the enclosing
@@ -201,6 +222,58 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         }
 
         return references;
+    }
+
+    // Every token AFTER the leading animation-state id of a Presence_Induced_Animations value,
+    // as wildcard-typed object references.
+    private static void CollectPresenceInducedObjectReferences(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var first = true;
+        foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
+        {
+            if (first)
+            {
+                first = false; // the animation state id — not a game object
+                continue;
+            }
+
+            var absPos = child.InnerStartIndex + tokenOffset;
+            var (line, column) = lineIndex.GetPosition(absPos);
+            references.Add(new GameReference(
+                token,
+                GameSymbolKind.XmlObject,
+                null,
+                documentUri,
+                line,
+                column,
+                token.Length));
+        }
+    }
+
+    // Slot 0 of an InaccuracyMap tuple ("Bomber, 15.0") as an enum: reference, mirroring
+    // CollectEnumReferences' id format for plain dynamic-enum tags.
+    private static void CollectInaccuracyCategoryReference(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var comma = innerText.IndexOf(',');
+        var slot = comma < 0 ? innerText : innerText[..comma];
+        var token = slot.Trim();
+        if (token.Length == 0) return;
+
+        var tokenOffset = slot.IndexOf(token, StringComparison.Ordinal);
+        var absPos = child.InnerStartIndex + tokenOffset;
+        var (line, column) = lineIndex.GetPosition(absPos);
+        references.Add(new GameReference(
+            $"enum:GameObjectCategoryType/{token}",
+            null,
+            null,
+            documentUri,
+            line,
+            column,
+            token.Length));
     }
 
     private static void CollectEnumReferences(HtmlNode child, string enumName,
@@ -273,10 +346,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return memberships;
     }
 
-    // True when the element contains a nested child element, marking it as a container/object
-    // definition rather than a leaf reference value.
-    // Walks up from node to find the nearest ancestor that is a registered game object type,
-    // then returns that ancestor's name-attribute value. Used for OwnerScopedReference tags.
+    // Walks up from node to find the nearest ancestor that identifies a game object, then returns
+    // that ancestor's name-attribute value. Used for owner-scoped ability symbols and
+    // OwnerScopedReference tags. An ancestor qualifies when its element name is a registered
+    // object type (whose NameTag then applies) OR when it simply carries a Name attribute — real
+    // game files use concrete element names (<SpaceUnit>, <SpecialStructure>, …) that are NOT
+    // schema object types (the schema models one umbrella GameObjectType), so without the
+    // Name-attribute fallback every owner lookup fails and ability ids collide across objects.
     private string? FindEnclosingObjectId(HtmlNode node)
     {
         var current = node.ParentNode;
@@ -288,6 +364,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var id = GetNameAttribute(current, typeDef.NameTag);
                 return string.IsNullOrEmpty(id) ? null : id;
             }
+
+            var nameAttr = GetNameAttribute(current, "Name");
+            if (!string.IsNullOrEmpty(nameAttr))
+                return nameAttr;
 
             current = current.ParentNode;
         }
@@ -346,10 +426,9 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
                 // Find the enclosing game object's ID so abilities can be scoped to their owner,
                 // preventing false duplicate-symbol errors when two units share an ability name.
-                var ownerTypeDef = _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name));
-                var ownerId = ownerTypeDef?.NameTag is not null
-                    ? GetNameAttribute(node, ownerTypeDef.NameTag)
-                    : null;
+                // Same resolution as OwnerScopedReference tags (incl. the Name-attribute fallback
+                // for concrete element names that are not schema object types).
+                var ownerId = FindEnclosingObjectId(child);
 
                 foreach (var abilityNode in child.ChildNodes
                              .Where(n => n.NodeType == HtmlNodeType.Element))

@@ -14,6 +14,7 @@ using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -25,6 +26,23 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Commands;
 public sealed class InitLocalisationProjectCommandHandlerTest
 {
     private const string PgprojPath = "/mod/mymod.pgproj";
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_NoSeedFileNoReload()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, fs, reload, writer) = BuildHandler(
+            ConfiguredLayer("Csv", "/mod/data/text"), lspConfig: config);
+
+        await handler.Handle(NoArgsRequest(), CancellationToken.None);
+
+        Assert.False(fs.File.Exists("/mod/data/text/MasterTextFile.csv"));
+        Assert.False(reload.LocalisationOnlyReloaded);
+        Assert.Null(writer.LastCall);
+    }
 
     // ── already-configured root layer: format/directory come from the project, not the client ──
 
@@ -305,7 +323,8 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
     private static (InitLocalisationProjectCommandHandler handler, MockFileSystem fs,
         SpyReloadService reload, SpyFileWriter writer) BuildHandler(
-            ProjectLayer? rootLayer, MockFileSystem? initialFs = null)
+            ProjectLayer? rootLayer, MockFileSystem? initialFs = null,
+            ILspConfigurationProvider? lspConfig = null)
     {
         var mockFs = initialFs ?? new MockFileSystem();
 
@@ -335,7 +354,8 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             reload,
             writer,
             seedWriter,
-            NullLogger<InitLocalisationProjectCommandHandler>.Instance);
+            NullLogger<InitLocalisationProjectCommandHandler>.Instance,
+            lspConfig ?? new FakeLspConfigurationProvider());
 
         return (handler, mockFs, reload, writer);
     }

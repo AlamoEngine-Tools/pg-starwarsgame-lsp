@@ -7,12 +7,14 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -65,7 +67,8 @@ public sealed class XmlDiagnosticsPublisherTest
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
-            FakeFileTypeRegistry? registry = null)
+            FakeFileTypeRegistry? registry = null,
+            ILspConfigurationProvider? config = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -102,7 +105,8 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryFactProducer(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             effectiveRegistry,
-            fileHelper);
+            fileHelper,
+            configProvider: config);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -144,6 +148,48 @@ public sealed class XmlDiagnosticsPublisherTest
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    private static FakeLspConfigurationProvider XmlDiagnosticsOff()
+    {
+        return FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Diagnostics = false } });
+    }
+
+    [Fact]
+    public void IndexChanged_XmlDiagnosticsFlagOff_PublishesNothing()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_XmlDiagnosticsFlagOff_PublishesNothing()
+    {
+        var (publisher, published, _, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+
+        await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
+    public async Task RevalidateWorkspace_XmlDiagnosticsFlagOff_PublishesNothing()
+    {
+        var (publisher, published, indexService, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+        indexService.Current = IndexWithDoc("file:///a.xml");
+
+        await publisher.RevalidateWorkspaceAsync(CancellationToken.None);
+
+        Assert.Empty(published);
     }
 
     [Fact]

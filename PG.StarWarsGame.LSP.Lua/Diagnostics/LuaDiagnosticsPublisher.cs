@@ -34,6 +34,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
+    private readonly ILspConfigurationProvider? _configProvider;
 
     public LuaDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -43,11 +44,12 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger,
         ILuaParseCache parseCache,
+        ILspConfigurationProvider configProvider,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p),
             indexService, workspaceHost, fileHelper, schemaProvider, logger,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            parseCache)
+            parseCache, configProvider)
     {
     }
 
@@ -59,18 +61,24 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILuaApiSchemaProvider schemaProvider,
         ILogger<LuaDiagnosticsPublisher> logger,
         int debounceMs = 0,
-        ILuaParseCache? parseCache = null)
+        ILuaParseCache? parseCache = null,
+        ILspConfigurationProvider? configProvider = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _logger = logger;
+        _configProvider = configProvider;
         _parseCache = parseCache ?? new LuaParseCache(
             new DocumentTextSource(workspaceHost, fileHelper, NullLogger<DocumentTextSource>.Instance),
             ServerOptions.Default.ParseCacheCapacity);
     }
 
     protected override string FileExtension => ".lua";
+
+    // Feature-flag gate: a null provider (test convenience ctor) means always enabled.
+    protected override bool DiagnosticsEnabled =>
+        _configProvider?.Current.Features.Lua.Diagnostics ?? true;
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)
     {

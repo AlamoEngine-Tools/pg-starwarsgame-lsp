@@ -3,13 +3,26 @@
 
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Xml.CodeActions;
 
 internal sealed class CreateLocKeyCodeActionProvider : IXmlCodeActionProvider
 {
+    private readonly ILspConfigurationProvider _config;
+
+    public CreateLocKeyCodeActionProvider(ILspConfigurationProvider config)
+    {
+        _config = config;
+    }
+
     public IEnumerable<CommandOrCodeAction> Handle(XmlCodeActionContext ctx)
     {
+        // Gated on features.tools.localisation (not xml.codeActions): the quick-fix drives the
+        // createLocalisationKey command, which is localisation tooling.
+        if (!_config.Current.Features.Tools.Localisation)
+            return [];
+
         var locKey = ctx.Diagnostic.Data?["createLocKey"]?.Value<string>();
         if (locKey is null)
             return [];

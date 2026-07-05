@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.HoverStrategies;
@@ -30,7 +31,16 @@ internal sealed class ReferenceHoverStrategy : IXmlHoverStrategy
         if (typeDef is null)
             return null;
 
+        // A navigable definition owned by a lower-ranked (dependency) layer gets an explicit
+        // origin note; empty string = dependency layer without a display name.
+        string? dependencyLayerName = null;
+        if (symbol.Origin is FileOrigin { IsNavigable: true } fo
+            && ctx.Index.Documents.TryGetValue(fo.Uri, out var originDoc)
+            && originDoc.LayerRank != ctx.Index.LeafLayerRank)
+            dependencyLayerName = originDoc.LayerName ?? string.Empty;
+
         var displayId = ReferenceResolutionEvaluator.StripOwnerPrefix(symbol.Id);
-        return HoverUtility.BuildReferenceHover(typeDef, displayId, reference, ctx.Locale, symbol.Origin);
+        return HoverUtility.BuildReferenceHover(typeDef, displayId, reference, ctx.Locale, symbol.Origin,
+            dependencyLayerName);
     }
 }

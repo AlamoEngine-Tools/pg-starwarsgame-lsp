@@ -6,6 +6,7 @@ using System.Xml.Linq;
 using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -145,6 +146,23 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
         Assert.Single(matches);
     }
 
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_NoWriteNoReload()
+    {
+        const string path = "/mod/a.csv";
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, fs, reload) = BuildHandler(path, "key,ENGLISH\n", config);
+
+        await handler.Handle(Request("TEXT_NEW", path, new Dictionary<string, string> { ["ENGLISH"] = "v" }),
+            CancellationToken.None);
+
+        Assert.Equal("key,ENGLISH\n", fs.File.ReadAllText(path));
+        Assert.False(reload.WasReloaded);
+    }
+
     // ── guard cases ──────────────────────────────────────────────────────────
 
     [Fact]
@@ -236,7 +254,7 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
     }
 
     private static (CreateLocalisationKeyCommandHandler handler, MockFileSystem fs, SpyReloadService2 reload)
-        BuildHandler(string? filePath, string? initialContent)
+        BuildHandler(string? filePath, string? initialContent, ILspConfigurationProvider? config = null)
     {
         var files = new Dictionary<string, MockFileData>();
         if (filePath is not null && initialContent is not null)
@@ -250,7 +268,8 @@ public sealed class CreateLocalisationKeyCommandHandlerTest
             entryWriter,
             fileHelper,
             reload,
-            NullLogger<CreateLocalisationKeyCommandHandler>.Instance);
+            NullLogger<CreateLocalisationKeyCommandHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
         return (handler, mockFs, reload);
     }
 

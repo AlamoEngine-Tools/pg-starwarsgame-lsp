@@ -15,8 +15,11 @@ public sealed class ProjectIndexSnapshot
     // be edited — so any change to what XmlGameDocumentParser/LuaGameDocumentParser emit MUST
     // come with a bump here.
     // History: 1 = initial; 2 = discard pre-2026-07 snapshots lacking enum:-prefixed references
-    // and owner-scoped ability ids (parser changes of 2026-07-02/04 shipped without a bump).
-    public const int CurrentSchemaVersion = 2;
+    // and owner-scoped ability ids (parser changes of 2026-07-02/04 shipped without a bump);
+    // 3 = owner-id resolution gained the Name-attribute fallback (2026-07-05) — ability
+    // symbol/reference ids changed from bare to owner-scoped for real game files;
+    // 4 = Presence_Induced_Animations object references added (2026-07-05).
+    public const int CurrentSchemaVersion = 4;
 
     [Key(0)] public int SchemaVersion { get; set; }
 
@@ -25,4 +28,10 @@ public sealed class ProjectIndexSnapshot
     // Keyed by normalised pgproj path; value = that dependency's OverallHash at snapshot build time.
     [Key(2)] public SerializedDependencyHash[] DependencyHashes { get; set; } = [];
     [Key(3)] public ProjectFileEntry[] Files { get; set; } = [];
+
+    // SchemaFingerprint.Compute of the schema the snapshot was built under (append-only Key).
+    // The schema drives what the parser emits, so a snapshot from a different schema is stale
+    // even when every file's content hash matches; empty (pre-fingerprint snapshots) never
+    // matches a computed value and is discarded.
+    [Key(4)] public string SchemaFingerprint { get; set; } = string.Empty;
 }

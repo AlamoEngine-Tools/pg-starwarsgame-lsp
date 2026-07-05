@@ -41,17 +41,25 @@ public sealed class ReferenceHoverStrategyTest
         return new GameSymbol("EMPIRE", GameSymbolKind.XmlObject, typeName, new FileOrigin(OtherUri, 0, null), null);
     }
 
-    private static GameIndex IndexWith(GameReference? reference, GameSymbol? symbol)
+    private static GameIndex IndexWith(GameReference? reference, GameSymbol? symbol,
+        int referencingDocRank = 0, int? originDocRank = null, string? originLayerName = null)
     {
         var refs = reference is null
             ? ImmutableArray<GameReference>.Empty
             : ImmutableArray.Create(reference);
-        var doc = new DocumentIndex(DocUri, 1, ImmutableArray<GameSymbol>.Empty, refs);
+        var doc = new DocumentIndex(DocUri, 1, ImmutableArray<GameSymbol>.Empty, refs,
+            LayerRank: referencingDocRank);
         var defs = symbol is null
             ? ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             : ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add(symbol.Id, [symbol]);
+        var docs = ImmutableDictionary<string, DocumentIndex>.Empty.Add(DocUri, doc);
+        if (originDocRank is not null)
+            docs = docs.Add(OtherUri, new DocumentIndex(OtherUri, 1,
+                symbol is null ? ImmutableArray<GameSymbol>.Empty : [symbol],
+                ImmutableArray<GameReference>.Empty,
+                LayerRank: originDocRank.Value, LayerName: originLayerName));
         return new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(DocUri, doc),
+            docs,
             defs,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
     }
@@ -106,6 +114,62 @@ public sealed class ReferenceHoverStrategyTest
         var md = hover!.Contents.MarkupContent!.Value;
         Assert.Contains("EMPIRE", md);
         Assert.Contains("Faction", md);
+    }
+
+    // ── dependency-layer indicator ────────────────────────────────────────────
+    // A workspace definition living in a DEPENDENCY project's layer must say so — without the
+    // note it is indistinguishable from a leaf-project definition, and users read a
+    // non-navigating experience as "broken" (2026-07-05 smoketest report).
+
+    [Fact]
+    public void Handle_SymbolInDependencyLayer_HoverNamesTheDependency()
+    {
+        var strategy = new ReferenceHoverStrategy();
+        var schema = SchemaWithType("Faction");
+        // Referencing doc is the leaf (rank 1); the definition lives in a rank-0 dependency.
+        var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"),
+            referencingDocRank: 1, originDocRank: 0, originLayerName: "Base EaW");
+        var ctx = MakeCtx(index, schema, line: 1, character: 14);
+
+        var hover = strategy.Handle(ctx);
+
+        Assert.NotNull(hover);
+        var md = hover!.Contents.MarkupContent!.Value;
+        Assert.Contains("dependency", md, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Base EaW", md);
+    }
+
+    [Fact]
+    public void Handle_SymbolInDependencyLayerWithoutName_HoverShowsGenericDependencyNote()
+    {
+        var strategy = new ReferenceHoverStrategy();
+        var schema = SchemaWithType("Faction");
+        var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"),
+            referencingDocRank: 1, originDocRank: 0);
+        var ctx = MakeCtx(index, schema, line: 1, character: 14);
+
+        var hover = strategy.Handle(ctx);
+
+        Assert.NotNull(hover);
+        Assert.Contains("dependency", hover!.Contents.MarkupContent!.Value,
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Handle_SymbolInLeafLayer_NoDependencyNote()
+    {
+        var strategy = new ReferenceHoverStrategy();
+        var schema = SchemaWithType("Faction");
+        // Definition doc is at the same (leaf) rank as the referencing doc.
+        var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"),
+            referencingDocRank: 1, originDocRank: 1, originLayerName: "My Mod");
+        var ctx = MakeCtx(index, schema, line: 1, character: 14);
+
+        var hover = strategy.Handle(ctx);
+
+        Assert.NotNull(hover);
+        Assert.DoesNotContain("dependency", hover!.Contents.MarkupContent!.Value,
+            StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

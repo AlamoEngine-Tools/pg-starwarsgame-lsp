@@ -55,4 +55,32 @@ public sealed class IntFloatTupleListHandlerTest
             .ToList();
         Assert.Empty(results);
     }
+
+    // ── float-in-int-slot policy: accept with Warning (the game truncates) ──
+
+    [Fact]
+    public void FloatInIntSlot_ReturnsWarningAtThatToken_WithSuggestedFix()
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "10.5, 0.8, 20, 0.9"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("10.5", d.Message);
+        Assert.Equal("10", d.SuggestedFix);
+        Assert.Equal(0, d.OverrideColumn);
+        Assert.Equal(4, d.OverrideLength);
+    }
+
+    [Fact]
+    public void NonNumericIntSlot_ReturnsErrorAtThatToken()
+    {
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "10, 0.8, abc, 0.9"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+        Assert.Contains("abc", d.Message);
+        Assert.Equal(9, d.OverrideColumn);
+    }
 }

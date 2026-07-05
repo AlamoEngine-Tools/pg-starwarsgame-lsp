@@ -47,7 +47,7 @@ public sealed class XmlDocumentFactProducer(
         foreach (var root in doc.DocumentNode.ChildNodes)
         {
             if (root.NodeType != HtmlNodeType.Element) continue;
-            WalkNodes(root, facts, lineIndex, isTypeContainerLevel, documentUri, initialContext);
+            WalkNodes(root, facts, lineIndex, isTypeContainerLevel, documentUri, initialContext, document.Text);
         }
 
         // Collect notes hints for every element in the document
@@ -70,7 +70,7 @@ public sealed class XmlDocumentFactProducer(
 
     private void WalkNodes(
         HtmlNode node, List<XmlFact> facts, LineOffsetIndex lineIndex, bool isTypeContainerLevel,
-        string documentUri, TagResolutionContext? context = null)
+        string documentUri, TagResolutionContext? context, string text)
     {
         if (isTypeContainerLevel)
         {
@@ -81,7 +81,7 @@ public sealed class XmlDocumentFactProducer(
                 var childContext = typeName is not null
                     ? new TagResolutionContext(typeName, XmlUtility.GetDepth(child), child, context)
                     : context;
-                WalkNodes(child, facts, lineIndex, false, documentUri, childContext);
+                WalkNodes(child, facts, lineIndex, false, documentUri, childContext, text);
             }
 
             return;
@@ -123,7 +123,7 @@ public sealed class XmlDocumentFactProducer(
                     var abilityTypeName = XmlUtility.ToPascalCase(abilityNode.Name);
                     var abilityContext = new TagResolutionContext(
                         abilityTypeName, XmlUtility.GetDepth(abilityNode), abilityNode, context);
-                    WalkNodes(abilityNode, facts, lineIndex, false, documentUri, abilityContext);
+                    WalkNodes(abilityNode, facts, lineIndex, false, documentUri, abilityContext, text);
                 }
 
                 continue;
@@ -131,7 +131,7 @@ public sealed class XmlDocumentFactProducer(
 
             if (tagDef is null)
             {
-                WalkNodes(child, facts, lineIndex, false, documentUri, context);
+                WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
                 continue;
             }
 
@@ -140,13 +140,17 @@ public sealed class XmlDocumentFactProducer(
 
             if (duplicatedSingletons.Contains(name))
             {
-                var otherLines = childGroups[name]
+                var group = childGroups[name];
+                var otherLines = group
                     .Where(n => !ReferenceEquals(n, child))
                     .Select(n => n.Line)
                     .ToList();
                 var openLen = XmlUtility.GetOpeningTagLength(child);
-                facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines));
-                WalkNodes(child, facts, lineIndex, false, documentUri, context);
+                // Whole-element span so the Unnecessary grey-out covers the entire dead node.
+                var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
+                facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines,
+                    ReferenceEquals(child, group[^1]), endLine, endCol));
+                WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
                 continue;
             }
 
@@ -159,7 +163,7 @@ public sealed class XmlDocumentFactProducer(
                 facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, rawValue.Length, tagDef, rawValue));
             }
 
-            WalkNodes(child, facts, lineIndex, false, documentUri, context);
+            WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
         }
 
         // Pass 3: cross-tag rules evaluated on the current object's full child set

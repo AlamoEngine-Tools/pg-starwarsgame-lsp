@@ -7,6 +7,7 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -27,7 +28,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly HashSet<XmlValueType> TupleValueTypes =
     [
         XmlValueType.HardPointSfxMap, XmlValueType.AbilitySfxMap, XmlValueType.ConditionalSfxEvent,
-        XmlValueType.UnitSpawnTable, XmlValueType.AbilityModMultiplier, XmlValueType.TupleList
+        XmlValueType.UnitSpawnTable, XmlValueType.AbilityModMultiplier, XmlValueType.TupleList,
+        XmlValueType.InaccuracyMap
     ];
 
     private readonly IEaWXmlContext _eaWXmlContext;
@@ -38,6 +40,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private readonly IXmlTagNameCompletionStrategyRegistry _tagNameRegistry;
     private readonly IXmlTagValueCompletionStrategyRegistry _tagValueRegistry;
     private readonly IXmlParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public XmlCompletionHandler(
         IXmlParseCache parseCache,
@@ -47,7 +50,8 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
         IXmlTagNameCompletionStrategyRegistry tagNameRegistry,
-        IXmlTagValueCompletionStrategyRegistry tagValueRegistry)
+        IXmlTagValueCompletionStrategyRegistry tagValueRegistry,
+        ILspConfigurationProvider config)
     {
         _parseCache = parseCache;
         _schema = schema;
@@ -57,10 +61,14 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _eaWXmlContext = eaWXmlContext;
         _tagNameRegistry = tagNameRegistry;
         _tagValueRegistry = tagValueRegistry;
+        _config = config;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.Completion)
+            return Task.FromResult(new CompletionList());
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult(new CompletionList());

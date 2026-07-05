@@ -45,6 +45,11 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             if (reference.TargetId.StartsWith("enum:", StringComparison.Ordinal))
                 continue;
 
+            // Engine placeholders ("null"/"Default"/"None") are a valid "no object" value in any
+            // reference position — never unresolved, never a type mismatch.
+            if (EnginePlaceholders.IsPlaceholder(reference.TargetId))
+                continue;
+
             var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
             facts.Add(new XmlReferenceFact(
                 documentUri,

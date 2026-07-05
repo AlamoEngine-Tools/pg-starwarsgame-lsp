@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -15,21 +16,27 @@ public sealed class DeleteLocalisationEntryHandler
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<DeleteLocalisationEntryHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
+    private readonly ILspConfigurationProvider _config;
 
     public DeleteLocalisationEntryHandler(
         ILocalisationEntryWriter entryWriter,
         IFileHelper fileHelper,
         IModProjectReloadService reloadService,
-        ILogger<DeleteLocalisationEntryHandler> logger)
+        ILogger<DeleteLocalisationEntryHandler> logger,
+        ILspConfigurationProvider config)
     {
         _entryWriter = entryWriter;
         _fileHelper = fileHelper;
         _reloadService = reloadService;
         _logger = logger;
+        _config = config;
     }
 
     public async Task<LocalisationWriteResult> Handle(DeleteLocalisationEntryParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+            return LocalisationWriteResult.Fail(LocalisationFeatureDisabled.Message);
+
         var fs = _fileHelper.FileSystem;
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath) || !fs.File.Exists(request.ProjectFilePath))
             return LocalisationWriteResult.Fail($"File not found: {request.ProjectFilePath}");

@@ -53,14 +53,51 @@ Place a `.pgproj` file at the root of your mod workspace so the extension knows 
     "xml":     ["data/xml"],
     "scripts": ["data/scripts"],
     "art":     ["data/art"],
-    "audio":   ["data/audio"],
-    "text":    ["data/text"]
+    "audio":   ["data/audio"]
+  },
+  "localisation": {
+    "type": "CSV",
+    "directory": "data/text"
   },
   "projectReferences": []
 }
 ```
 
-All paths are relative to the `.pgproj` file. The `projectReferences` field can list other `.pgproj` files whose symbols your mod inherits - for example, a base game `.pgproj` placed alongside your mod.
+All paths are relative to the `.pgproj` file. The `projectReferences` field can list other `.pgproj` files whose symbols your mod inherits - for example, a base game `.pgproj` placed alongside your mod. `localisation.type` is one of `CSV`, `DAT`, `XML`, `NLS`.
+
+---
+
+## Upgrading from 0.1.x
+
+**`.pgproj` files must be migrated.** 0.2.0 moves localisation configuration out of `directories` into its own top-level node:
+
+```diff
+   "directories": {
+     "xml": ["data/xml"],
+     "scripts": ["data/scripts"],
+     "art": ["data/art"],
+-    "audio": ["data/audio"],
+-    "text": ["data/text"],
+-    "textResourceType": "Csv"
++    "audio": ["data/audio"]
+   },
++  "localisation": {
++    "type": "CSV",
++    "directory": "data/text"
++  },
+   "projectReferences": []
+```
+
+`type` is the uppercased resource type (`CSV`, `DAT`, `XML`, `NLS`). **This edit is required** - a `.pgproj` left in the old shape now fails to load, with an error notification pointing at exactly this fix, so the server refuses to start rather than silently indexing your mod without localisation.
+
+**Only one `.pgproj` per workspace.** If your opened folder contains more than one `.pgproj` file (for example a leftover backup copy), the server now fails to start with a notification listing every one found, instead of silently picking one at random as it used to. Remove or relocate the extras, or open the specific subfolder that contains the one you want to use.
+
+**Then clear cached indexes.** This release bundles a large number of accumulated parser and schema fixes. To be sure you are not looking at stale cached data, delete:
+
+1. The `.aetswg` folder next to every `.pgproj` in your workspace (per-project index cache)
+2. `%USERPROFILE%\.aetswg\` (downloaded baseline and schema cache)
+
+Both are safe to delete - everything in them is rebuilt or re-downloaded automatically. After deleting, run **EaWEdit: Restart LSP Server** (or reload the window).
 
 ---
 
@@ -110,8 +147,9 @@ Available from the Command Palette (`Ctrl+Shift+P`):
 | EaWEdit: Reload Mod Project | Re-reads the `.pgproj` and re-indexes the workspace |
 | EaWEdit: Re-validate Workspace | Re-runs all diagnostics across indexed files |
 | EaWEdit: Restart LSP Server | Stops and restarts the language server |
-| EaWEdit: Initialise Localisation Project from Baseline | Creates a starter localisation file from the game baseline |
-| EaWEdit: Show Effective Object (Variant Inheritance) | Opens a read-only view of the fully resolved XML for a variant object |
+| EaWEdit: Initialise Localisation Project from Baseline | Creates a starter localisation file from the game baseline. Requires `aet-eaw-edit.features.tools.localisation` |
+| EaWEdit: Import Existing Localisation Files | Adopts existing CSV, XML, Properties, or DAT translation files into the `.pgproj`. Requires `aet-eaw-edit.features.tools.localisation` |
+| EaWEdit: Show Effective Object (Variant Inheritance) | Opens a read-only view of the fully resolved XML for a variant object. Requires `aet-eaw-edit.features.tools.variants` |
 
 ---
 
@@ -150,6 +188,47 @@ The baseline is a pre-built snapshot of all vanilla EaW and FoC game objects and
 | `aet-eaw-edit.localisation.editorEnabled` | `false` | Show the localisation editor panel in the activity bar |
 | `aet-eaw-edit.localisation.format` | `format-dat` | Default format for new localisation projects (`format-dat`, `format-csv`, `format-xml`) |
 
+### Feature flags
+
+Every language feature can be independently enabled or disabled. All flags default to `true` except the three still-in-development capabilities noted below. **Changing any feature-flag setting automatically restarts the language server.**
+
+XML:
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.features.xml.completion` | `true` | Code completion |
+| `aet-eaw-edit.features.xml.hover` | `true` | Hover tooltips |
+| `aet-eaw-edit.features.xml.diagnostics` | `true` | Diagnostics (error and warning squiggles) |
+| `aet-eaw-edit.features.xml.goToDefinition` | `true` | Go to definition |
+| `aet-eaw-edit.features.xml.findReferences` | `true` | Find all references |
+| `aet-eaw-edit.features.xml.rename` | `true` | Symbol rename |
+| `aet-eaw-edit.features.xml.codeLens` | `true` | Code lenses (reference counts, variant links) |
+| `aet-eaw-edit.features.xml.inlayHints` | `true` | Inlay hints |
+| `aet-eaw-edit.features.xml.codeActions` | `true` | Code actions (quick fixes) |
+| `aet-eaw-edit.features.xml.linkedEditing` | `true` | Linked editing of matching tag pairs |
+
+Lua:
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.features.lua.completion` | `true` | Code completion |
+| `aet-eaw-edit.features.lua.hover` | `false` | Hover tooltips _(work in progress)_ |
+| `aet-eaw-edit.features.lua.diagnostics` | `false` | Diagnostics _(work in progress)_ |
+| `aet-eaw-edit.features.lua.goToDefinition` | `true` | Go to definition |
+| `aet-eaw-edit.features.lua.rename` | `true` | Symbol rename, including global rename of XML objects referenced from Lua |
+| `aet-eaw-edit.features.lua.codeLens` | `true` | Code lenses |
+| `aet-eaw-edit.features.lua.inlayHints` | `true` | Inlay hints |
+| `aet-eaw-edit.features.lua.codeActions` | `true` | Code actions (quick fixes) |
+
+Cross-language tools:
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.features.tools.localisation` | `false` | Localisation tooling: the localisation editor's data source, the initialise/import commands, and the create-key code action _(work in progress)_ |
+| `aet-eaw-edit.features.tools.variants` | `true` | Variant-inheritance tooling: the Show Effective Object command and its code lens |
+
+> The localisation panel needs both `aet-eaw-edit.localisation.editorEnabled` and `aet-eaw-edit.features.tools.localisation` set to `true` - the first shows the panel, the second makes it functional.
+
 ---
 
 ## What this extension downloads
@@ -179,8 +258,17 @@ The server binary and extension must be the same version. Download the matching 
 **Features only work in some files**
 Only files inside directories listed in your `.pgproj` are indexed. Add the relevant paths to `directories.xml` or `directories.scripts`.
 
+**Notification: "Found multiple .pgproj files under ..."**
+Only one `.pgproj` is supported per opened workspace root. Remove or relocate the extra file(s) named in the notification, or open the specific subfolder that contains the one you want to use, then run EaWEdit: Restart LSP Server.
+
+**Notification: "'directories.text'/'directories.textResourceType' were removed"**
+Your `.pgproj` still uses the pre-0.2.0 localisation format. See [Upgrading from 0.1.x](#upgrading-from-01x) for the exact fields to change.
+
 **The localisation panel is not visible**
-Set `aet-eaw-edit.localisation.editorEnabled` to `true`, then reload the window (`Ctrl+Shift+P` > Developer: Reload Window).
+Set both `aet-eaw-edit.localisation.editorEnabled` and `aet-eaw-edit.features.tools.localisation` to `true`, then reload the window (`Ctrl+Shift+P` > Developer: Reload Window). The localisation tooling is disabled by default while still in development.
+
+**A command or code action doesn't appear ("Show Effective Object", "Initialise/Import Localisation Project", localisation quick-fixes)**
+These are gated behind feature flags. Confirm `aet-eaw-edit.features.tools.variants` (for variant inheritance) or `aet-eaw-edit.features.tools.localisation` (for localisation tooling) is `true`. Changing either setting restarts the language server automatically.
 
 **Viewing raw server output**
 Set `aet-eaw-edit.lsp.debug.traceServer` to `messages` and open the **EaWEdit** output channel in the Output panel.

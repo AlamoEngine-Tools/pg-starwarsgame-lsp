@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -64,14 +65,32 @@ public sealed class XmlCodeLensHandlerTest
     }
 
     private static XmlCodeLensHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
-        IFileHelper? fileHelper = null)
+        IFileHelper? fileHelper = null, ILspConfigurationProvider? config = null)
     {
         var svc = new FakeIndexService { Current = index };
         var registry = new XmlCodeLensRegistry([new ReferencesCodeLensProvider()]);
         return new XmlCodeLensHandler(svc, NullLogger<XmlCodeLensHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
             fileHelper ?? new FileHelper(new MockFileSystem()),
-            registry);
+            registry, config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CodeLensFlagOff_ReturnsNull()
+    {
+        // Same arrange as Handle_DocumentWithSymbolAndZeroRefs — only the flag differs.
+        var sym = SymbolAt("UNIT_A", TestUri, 3);
+        var doc = new DocumentIndex(TestUri, 1,
+            ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { CodeLens = false } });
+        var handler = BuildHandler(BuildIndex(doc), config: config);
+
+        var result = await handler.Handle(ForDoc(), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────

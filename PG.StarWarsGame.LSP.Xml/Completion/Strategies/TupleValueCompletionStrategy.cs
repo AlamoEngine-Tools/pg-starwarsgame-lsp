@@ -62,6 +62,11 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
                 0 => EnumValues(ctx, "AbilityMultiplierType"),
                 _ => []
             },
+            XmlValueType.InaccuracyMap => ctx.TupleSlotIndex switch
+            {
+                0 => EnumValues(ctx, "GameObjectCategoryType"),
+                _ => [] // plain float distance
+            },
             XmlValueType.TupleList => TupleListProposals(ctx),
             _ => []
         };

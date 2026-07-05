@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
@@ -13,6 +14,25 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 public sealed class DeleteLocalisationEntryHandlerTest
 {
     private const string Path = "/mod/f.csv";
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_FailsWithDisabledMessageWithoutWriting()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, fs, reload) = Build("key,ENGLISH\nTEXT_A,Hello\n", config);
+        var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(Path));
+
+        var result = await handler.Handle(
+            new DeleteLocalisationEntryParams(Path, "TEXT_A", hash), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(LocalisationFeatureDisabled.Message, result.Error);
+        Assert.Contains("TEXT_A", fs.File.ReadAllText(Path));
+        Assert.False(reload.LocalisationOnlyReloaded);
+    }
 
     [Fact]
     public async Task Handle_ExistingKey_RemovesEntry_ReturnsSuccess()
@@ -85,7 +105,7 @@ public sealed class DeleteLocalisationEntryHandlerTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (DeleteLocalisationEntryHandler handler, MockFileSystem fs, SpyReloadService reload) Build(
-        string? initialContent)
+        string? initialContent, ILspConfigurationProvider? config = null)
     {
         var files = initialContent is null
             ? new Dictionary<string, MockFileData>()
@@ -95,7 +115,8 @@ public sealed class DeleteLocalisationEntryHandlerTest
         var entryWriter = new LocalisationEntryWriter(fileHelper, NullLogger<LocalisationEntryWriter>.Instance);
         var reload = new SpyReloadService();
         var handler = new DeleteLocalisationEntryHandler(
-            entryWriter, fileHelper, reload, NullLogger<DeleteLocalisationEntryHandler>.Instance);
+            entryWriter, fileHelper, reload, NullLogger<DeleteLocalisationEntryHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
         return (handler, fs, reload);
     }
 

@@ -113,4 +113,19 @@ public sealed class UnitSpawnTableHandlerTest
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "x_wing, 3"), ctx).ToList();
         Assert.Empty(results);
     }
+
+    [Fact]
+    public void FloatCount_ReturnsWarningAtCountToken_WithSuggestedFix()
+    {
+        // All number types accept a float where an integer is expected, with a Warning —
+        // the game truncates it.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "X_Wing, 3.0"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal("3", d.SuggestedFix);
+        Assert.Equal(8, d.OverrideColumn);
+        Assert.Equal(3, d.OverrideLength);
+    }
 }

@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -13,6 +14,20 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class GetBaselineEntriesHandlerTest
 {
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_ReturnsEmptyEntries()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var handler = BuildHandler(config);
+
+        var result = await handler.Handle(new GetBaselineEntriesParams(), CancellationToken.None);
+
+        Assert.Empty(result.Entries);
+    }
+
     [Fact]
     public async Task Handle_Always_ReturnsNonEmptyEntries()
     {
@@ -157,15 +172,15 @@ public sealed class GetBaselineEntriesHandlerTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static GetBaselineEntriesHandler BuildHandler()
+    private static GetBaselineEntriesHandler BuildHandler(ILspConfigurationProvider? config = null)
     {
-        var (handler, _, _, _, _) = BuildHandlerWithRegistries();
+        var (handler, _, _, _, _) = BuildHandlerWithRegistries(config);
         return handler;
     }
 
     private static (GetBaselineEntriesHandler Handler, LocalisationProjectRegistry ProjectRegistry,
         LocalisationLayerRegistry LayerRegistry, ITranslationDatabaseFactory Factory,
-        ILanguageService LangService) BuildHandlerWithRegistries()
+        ILanguageService LangService) BuildHandlerWithRegistries(ILspConfigurationProvider? config = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(new FileSystem());
@@ -182,7 +197,8 @@ public sealed class GetBaselineEntriesHandlerTest
             langService,
             factory,
             projectRegistry,
-            layerRegistry);
+            layerRegistry,
+            config ?? new FakeLspConfigurationProvider());
 
         return (handler, projectRegistry, layerRegistry, factory, langService);
     }

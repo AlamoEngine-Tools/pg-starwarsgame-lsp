@@ -4,6 +4,7 @@
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua;
@@ -17,17 +18,20 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILuaRenameProvider _luaProvider;
     private readonly IXmlRenameProvider _xmlProvider;
+    private readonly ILspConfigurationProvider _config;
 
     public GamePrepareRenameHandler(
         IGameIndexService indexService,
         IXmlRenameProvider xmlProvider,
         ILuaRenameProvider luaProvider,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _xmlProvider = xmlProvider;
         _luaProvider = luaProvider;
         _fileHelper = fileHelper;
+        _config = config;
     }
 
     public override Task<RangeOrPlaceholderRange?> Handle(PrepareRenameParams request, CancellationToken ct)
@@ -36,11 +40,13 @@ public sealed class GamePrepareRenameHandler : PrepareRenameHandlerBase
         var index = _indexService.Current;
 
         if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(_xmlProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character,
-                index));
+            return Task.FromResult(_config.Current.Features.Xml.Rename
+                ? _xmlProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character, index)
+                : null);
         if (uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
-            return Task.FromResult(_luaProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character,
-                index));
+            return Task.FromResult(_config.Current.Features.Lua.Rename
+                ? _luaProvider.HandlePrepare(uri, request.Position.Line, request.Position.Character, index)
+                : null);
 
         return Task.FromResult<RangeOrPlaceholderRange?>(null);
     }

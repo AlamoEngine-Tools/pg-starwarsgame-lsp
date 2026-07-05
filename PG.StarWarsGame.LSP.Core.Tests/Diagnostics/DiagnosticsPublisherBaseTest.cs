@@ -30,13 +30,13 @@ public sealed class DiagnosticsPublisherBaseTest
     private static (ConcretePublisher publisher,
         List<PublishDiagnosticsParams> published,
         FakeIndexService indexService,
-        FakeWorkspaceHost workspaceHost) Build(string extension = ".xml", int debounceMs = 0)
+        FakeWorkspaceHost workspaceHost) Build(string extension = ".xml", int debounceMs = 0, bool enabled = true)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeIndexService();
         var workspaceHost = new FakeWorkspaceHost();
         var publisher = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, extension,
-            debounceMs);
+            debounceMs, enabled);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -127,6 +127,17 @@ public sealed class DiagnosticsPublisherBaseTest
         await Task.Delay(250);
 
         Assert.Single(published); // published after debounce
+    }
+
+    [Fact]
+    public void OnIndexChanged_DiagnosticsDisabled_PublishesNothing()
+    {
+        var (_, published, indexService, workspaceHost) = Build(enabled: false);
+        workspaceHost.Add("file:///a.xml", "content");
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.Empty(published);
     }
 
     [Fact]
@@ -261,13 +272,17 @@ public sealed class DiagnosticsPublisherBaseTest
             IGameIndexService indexService,
             IGameWorkspaceHost workspaceHost,
             string extension,
-            int debounceMs = 0)
+            int debounceMs = 0,
+            bool enabled = true)
             : base(publish, indexService, workspaceHost, debounceMs)
         {
             FileExtension = extension;
+            DiagnosticsEnabled = enabled;
         }
 
         protected override string FileExtension { get; }
+
+        protected override bool DiagnosticsEnabled { get; }
 
         protected override void PublishForDocument(string uri, string text, GameIndex index)
         {

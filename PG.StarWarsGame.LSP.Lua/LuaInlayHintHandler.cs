@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -26,6 +27,7 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
     private readonly ILogger<LuaInlayHintHandler> _logger;
     private readonly ILuaApiSchemaProvider _schemaProvider;
     private readonly ILuaParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public LuaInlayHintHandler(
         IGameIndexService indexService,
@@ -33,7 +35,8 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
-        ILogger<LuaInlayHintHandler> logger)
+        ILogger<LuaInlayHintHandler> logger,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -41,10 +44,14 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
         _schemaProvider = schemaProvider;
         _annotationRepository = annotationRepository;
         _logger = logger;
+        _config = config;
     }
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.InlayHints)
+            return Task.FromResult<InlayHintContainer?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<InlayHintContainer?>(null);

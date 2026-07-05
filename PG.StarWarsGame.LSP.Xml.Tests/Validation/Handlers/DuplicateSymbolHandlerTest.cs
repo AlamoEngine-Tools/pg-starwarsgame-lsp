@@ -60,6 +60,41 @@ public sealed class DuplicateSymbolHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
     }
 
+    // ── navigable related locations ──────────────────────────────────────────
+
+    [Fact]
+    public void Duplicate_emits_related_location_for_other_definition()
+    {
+        // The other definition's exact position must ride along as a related location so the
+        // editor renders it as a clickable link — "also defined in <file>" alone forces the user
+        // to hunt for the line manually.
+        var sym1 = MakeSymbol("X1", "file:///a.xml", 2);
+        var sym2 = MakeSymbol("X1", "file:///b.xml", 5);
+        var fact = new XmlSymbolFact("file:///a.xml", 2, 0, 0, "X1", [sym1, sym2]);
+
+        var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.NotNull(d.RelatedLocations);
+        var loc = Assert.Single(d.RelatedLocations!);
+        Assert.Equal("file:///b.xml", loc.Uri);
+        Assert.Equal(5, loc.Line);
+        Assert.Contains("X1", loc.Message);
+    }
+
+    [Fact]
+    public void NonNavigableOtherDefinition_ProducesNoRelatedLocation()
+    {
+        // Baseline symbols carry game-relative paths the editor cannot open — a related location
+        // would render as a dead link.
+        var sym1 = MakeSymbol("X1", "file:///a.xml", 2);
+        var sym2 = MakeSymbol("X1", "DATA\\XML\\UNITS.XML", 5);
+        var fact = new XmlSymbolFact("file:///a.xml", 2, 0, 0, "X1", [sym1, sym2]);
+
+        var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.True(d.RelatedLocations is null || d.RelatedLocations.Count == 0);
+    }
+
     [Fact]
     public void Multiple_other_definitions_all_listed()
     {

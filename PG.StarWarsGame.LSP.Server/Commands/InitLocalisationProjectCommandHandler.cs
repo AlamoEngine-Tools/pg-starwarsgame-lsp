@@ -11,6 +11,7 @@ using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -29,6 +30,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     private readonly ILogger<InitLocalisationProjectCommandHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
     private readonly ILocalisationSeedFileWriter _seedWriter;
+    private readonly ILspConfigurationProvider _config;
 
     public InitLocalisationProjectCommandHandler(
         IBaselineTranslationProvider baselineProvider,
@@ -38,7 +40,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         IModProjectReloadService reloadService,
         IModProjectFileWriter fileWriter,
         ILocalisationSeedFileWriter seedWriter,
-        ILogger<InitLocalisationProjectCommandHandler> logger)
+        ILogger<InitLocalisationProjectCommandHandler> logger,
+        ILspConfigurationProvider config)
     {
         _baselineProvider = baselineProvider;
         _factory = factory;
@@ -48,10 +51,17 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         _fileWriter = fileWriter;
         _seedWriter = seedWriter;
         _logger = logger;
+        _config = config;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+        {
+            _logger.LogWarning("{Cmd}: {Reason}", CommandName, LocalisationFeatureDisabled.Message);
+            return Unit.Value;
+        }
+
         var fs = _fileHelper.FileSystem;
         var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
             .OrderByDescending(l => l.Rank).FirstOrDefault();

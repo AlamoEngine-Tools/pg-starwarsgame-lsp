@@ -83,6 +83,23 @@ public sealed class ProjectConfigurationResolverTest
     }
 
     [Fact]
+    public void Resolve_MultiplePgprojFiles_ReturnsNullAndShowsUserErrorNotification()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(WorkspaceRoot, "a.pgproj")] = new("{}"),
+            [Path.Combine(WorkspaceRoot, "b.pgproj")] = new("{}")
+        });
+
+        var config = Build(fs, out var notifier).Resolve([WorkspaceRoot]);
+
+        Assert.Null(config);
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains("a.pgproj", message);
+        Assert.Contains("b.pgproj", message);
+    }
+
+    [Fact]
     public void Resolve_MalformedProjectFile_ShowsUserErrorNotification()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>

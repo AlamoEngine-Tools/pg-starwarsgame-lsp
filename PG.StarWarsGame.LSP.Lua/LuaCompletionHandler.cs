@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -24,6 +25,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     private readonly ILogger<LuaCompletionHandler> _logger;
     private readonly ILuaApiSchemaProvider _schemaProvider;
     private readonly ILuaParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public LuaCompletionHandler(
         IGameIndexService indexService,
@@ -31,7 +33,8 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
-        ILogger<LuaCompletionHandler> logger)
+        ILogger<LuaCompletionHandler> logger,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _parseCache = parseCache;
@@ -39,10 +42,14 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
         _schemaProvider = schemaProvider;
         _annotationRepository = annotationRepository;
         _logger = logger;
+        _config = config;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.Completion)
+            return Task.FromResult(new CompletionList());
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(new CompletionList());

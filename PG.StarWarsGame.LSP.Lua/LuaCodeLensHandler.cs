@@ -6,6 +6,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -17,19 +18,25 @@ public sealed class LuaCodeLensHandler : CodeLensHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCodeLensHandler> _logger;
+    private readonly ILspConfigurationProvider _config;
 
     public LuaCodeLensHandler(
         IGameIndexService indexService,
         IFileHelper fileHelper,
-        ILogger<LuaCodeLensHandler> logger)
+        ILogger<LuaCodeLensHandler> logger,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _fileHelper = fileHelper;
         _logger = logger;
+        _config = config;
     }
 
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.CodeLens)
+            return Task.FromResult<CodeLensContainer?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<CodeLensContainer?>(null);

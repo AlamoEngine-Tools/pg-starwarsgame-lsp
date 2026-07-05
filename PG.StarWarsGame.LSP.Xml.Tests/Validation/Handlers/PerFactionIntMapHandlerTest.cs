@@ -29,7 +29,6 @@ public sealed class PerFactionIntMapHandlerTest
     [InlineData("REBEL")]
     [InlineData(",100")]
     [InlineData("REBEL, not_an_int")]
-    [InlineData("REBEL, 1.5")]
     [InlineData("REBEL,")]
     public void Invalid_values_return_error(string value)
     {
@@ -45,5 +44,18 @@ public sealed class PerFactionIntMapHandlerTest
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(floatTag, ""), XmlHandlerTestFixtures.EmptyCtx)
             .ToList();
         Assert.Empty(results);
+    }
+
+    [Fact]
+    public void FloatValue_ReturnsWarningAtValueToken_WithSuggestedFix()
+    {
+        // All number types accept a float where an integer is expected, with a Warning.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Empire, 5.0"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal("5", d.SuggestedFix);
+        Assert.Equal(8, d.OverrideColumn);
     }
 }

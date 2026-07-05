@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -28,13 +29,36 @@ public sealed class LuaDefinitionHandlerTest
         };
     }
 
-    private static LuaDefinitionHandler BuildHandler(GameIndex index, FakeWorkspaceHost? host = null)
+    private static LuaDefinitionHandler BuildHandler(GameIndex index, FakeWorkspaceHost? host = null,
+        ILspConfigurationProvider? config = null)
     {
         return new LuaDefinitionHandler(
             new FakeIndexService { Current = index },
             TestLuaParseCache.For(host ?? new FakeWorkspaceHost()),
             new FileHelper(new MockFileSystem()),
-            NullLogger<LuaDefinitionHandler>.Instance);
+            NullLogger<LuaDefinitionHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LuaGoToDefinitionFlagOff_ReturnsNull()
+    {
+        // Same arrange as Handle_CursorOnGlobalReference — only the flag differs.
+        var reference = new GameReference("Foo", GameSymbolKind.LuaGlobal, null, LuaUri, 0, 0, 3);
+        var docIndex = new DocumentIndex(LuaUri, 1, [], [reference]);
+        var symbol = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null, new FileOrigin(LibUri, 5, 9), null);
+        var libDocIndex = new DocumentIndex(LibUri, 1, [symbol], []);
+        var index = MakeIndex(
+            [("Foo", ImmutableArray.Create(symbol))], (LuaUri, docIndex), (LibUri, libDocIndex));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { GoToDefinition = false } });
+
+        var result = await BuildHandler(index, config: config)
+            .Handle(RequestAt(0, 1), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     // ── gating ────────────────────────────────────────────────────────────────
@@ -245,7 +269,8 @@ public sealed class LuaDefinitionHandlerTest
             new FakeIndexService { Current = index },
             TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
             fileHelper,
-            NullLogger<LuaDefinitionHandler>.Instance);
+            NullLogger<LuaDefinitionHandler>.Instance,
+            new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(
             new DefinitionParams

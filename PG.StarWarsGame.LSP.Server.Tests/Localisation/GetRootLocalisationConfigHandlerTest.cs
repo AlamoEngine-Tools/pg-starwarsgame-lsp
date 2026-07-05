@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -9,6 +10,25 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class GetRootLocalisationConfigHandlerTest
 {
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_ReturnsNotConfiguredDespiteConfiguredRootLayer()
+    {
+        var rootLayer = new ProjectLayer(0, "Root", [], [], ["/mod/data/text"], [], "Csv", "/mod/mymod.pgproj");
+        var reload = new StubReloadService
+        {
+            LastWorkspaceConfig = WorkspaceConfiguration.Empty with { Layers = [rootLayer] }
+        };
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var handler = new GetRootLocalisationConfigHandler(reload, config);
+
+        var result = await handler.Handle(new GetRootLocalisationConfigParams(), CancellationToken.None);
+
+        Assert.False(result.Configured);
+    }
+
     [Fact]
     public async Task Handle_RootLayerConfigured_ReturnsConfiguredTrueWithTypeAndDirectory()
     {
@@ -17,7 +37,7 @@ public sealed class GetRootLocalisationConfigHandlerTest
         {
             LastWorkspaceConfig = WorkspaceConfiguration.Empty with { Layers = [rootLayer] }
         };
-        var handler = new GetRootLocalisationConfigHandler(reload);
+        var handler = new GetRootLocalisationConfigHandler(reload, new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(new GetRootLocalisationConfigParams(), CancellationToken.None);
 
@@ -34,7 +54,7 @@ public sealed class GetRootLocalisationConfigHandlerTest
         {
             LastWorkspaceConfig = WorkspaceConfiguration.Empty with { Layers = [rootLayer] }
         };
-        var handler = new GetRootLocalisationConfigHandler(reload);
+        var handler = new GetRootLocalisationConfigHandler(reload, new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(new GetRootLocalisationConfigParams(), CancellationToken.None);
 
@@ -47,7 +67,7 @@ public sealed class GetRootLocalisationConfigHandlerTest
     public async Task Handle_NoWorkspaceConfigYet_ReturnsNotConfigured()
     {
         var reload = new StubReloadService { LastWorkspaceConfig = null };
-        var handler = new GetRootLocalisationConfigHandler(reload);
+        var handler = new GetRootLocalisationConfigHandler(reload, new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(new GetRootLocalisationConfigParams(), CancellationToken.None);
 
@@ -63,7 +83,7 @@ public sealed class GetRootLocalisationConfigHandlerTest
         {
             LastWorkspaceConfig = WorkspaceConfiguration.Empty with { Layers = [depLayer, rootLayer] }
         };
-        var handler = new GetRootLocalisationConfigHandler(reload);
+        var handler = new GetRootLocalisationConfigHandler(reload, new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(new GetRootLocalisationConfigParams(), CancellationToken.None);
 

@@ -602,7 +602,8 @@ public sealed class WorkspaceIndexerTest
             SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
             OverallHash = "anything",
             DependencyHashes = [],
-            Files = [entry]
+            Files = [entry],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
@@ -614,6 +615,74 @@ public sealed class WorkspaceIndexerTest
 
         Assert.Empty(svc.Calls); // no re-parse
         Assert.Single(svc.InjectedDocuments); // injected from cache
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_SchemaFingerprintChanged_DiscardsLayerSnapshot()
+    {
+        // The schema drives what the parser emits (which tags become references, which files
+        // carry types), so a snapshot built under a different schema must be discarded even
+        // when every file's content hash matches — e.g. after flipping a tag from
+        // referenceKind: unknown to a typed reference.
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "units.xml"), fh.FileSystem);
+        var entry = new ProjectFileEntry
+        {
+            RelativePath = "data/xml/units.xml", ContentHash = hash,
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files = [entry],
+            SchemaFingerprint = "fingerprint-of-an-older-schema"
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Single(svc.Calls); // re-parsed
+        Assert.Empty(svc.InjectedDocuments);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_WritesSnapshotWithCurrentSchemaFingerprint()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/').ToLowerInvariant();
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "data", "xml", "units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var cache = new FakeProjectIndexCache();
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var schema = new FakeSchemaProvider();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema, cache, null, new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        var saved = cache.Saved[pgproj];
+        Assert.Equal(SchemaFingerprint.Compute(schema), saved.SchemaFingerprint);
+        Assert.NotEqual(string.Empty, saved.SchemaFingerprint);
     }
 
     [Fact]
@@ -639,7 +708,8 @@ public sealed class WorkspaceIndexerTest
             SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
             OverallHash = "old",
             DependencyHashes = [],
-            Files = [entry]
+            Files = [entry],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
@@ -714,7 +784,8 @@ public sealed class WorkspaceIndexerTest
                     RelativePath = "data/xml/units.xml", ContentHash = unitsHash,
                     Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
                 }
-            ]
+            ],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
         };
         var cache = new FakeProjectIndexCache { [modPgproj] = modSnapshot };
         var config = new WorkspaceConfiguration([depXml, modXml], [], [], [], null)
@@ -766,7 +837,8 @@ public sealed class WorkspaceIndexerTest
                     RelativePath = relPath, ContentHash = hash,
                     Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
                 }
-            ]
+            ],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
@@ -1112,7 +1184,8 @@ public sealed class WorkspaceIndexerTest
         var snapshot = new ProjectIndexSnapshot
         {
             SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
-            OverallHash = "anything", DependencyHashes = [], Files = [entry]
+            OverallHash = "anything", DependencyHashes = [], Files = [entry],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
         };
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);

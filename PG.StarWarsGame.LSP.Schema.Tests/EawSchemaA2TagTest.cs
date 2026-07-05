@@ -233,16 +233,55 @@ public sealed class EawSchemaA2TagTest
         Assert.Equal("BinkMovie", tag.ObjectType?.TypeName);
     }
 
-    // ── HardPoint:Special_Ability_Name → SpecialAbility ──────────────────────
+    // ── engine enum wiring (2026-07-05: enumNames pointed at nonexistent enums) ─
 
     [Fact]
-    public void HardPoint_SpecialAbilityName_ReferenceTypeIsSpecialAbility()
+    public void GameObjectType_MovementClass_ResolvesMovementClassTypeEnum()
     {
+        var tag = Schema.GetTagsForType("GameObjectType")
+            .First(t => string.Equals(t.Tag, "MovementClass", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("MovementClassType", tag.Enum?.Name);
+        Assert.Equal(EnumKind.DynamicXml, tag.Enum?.Kind);
+    }
+
+    [Fact]
+    public void GameObjectType_SpaceLayer_ResolvesSchemaFixedSpaceLayerTypeEnum()
+    {
+        var tag = Schema.GetTagsForType("GameObjectType")
+            .First(t => string.Equals(t.Tag, "Space_Layer", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("SpaceLayerType", tag.Enum?.Name);
+        Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
+        Assert.Contains(tag.Enum!.Values, v => v.Name == "SuperCapital");
+    }
+
+    [Fact]
+    public void GameObjectType_UnitCollisionClass_ResolvesSchemaFixedCollisionClassTypeEnum()
+    {
+        var tag = Schema.GetTagsForType("GameObjectType")
+            .First(t => string.Equals(t.Tag, "UnitCollisionClass", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal("CollisionClassType", tag.Enum?.Name);
+        Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
+        // Engine collision classes contain spaces — must survive schema loading intact.
+        Assert.Contains(tag.Enum!.Values, v => v.Name == "Landing Transport");
+    }
+
+    // ── HardPoint:Special_Ability_Name → deliberately UNVALIDATED ────────────
+
+    [Fact]
+    public void HardPoint_SpecialAbilityName_IsUnknownKind_NoFalseMissingObjectDiagnostics()
+    {
+        // The referenced ability lives on the object the hardpoint is ATTACHED to; validating it
+        // needs an owner-object ability lookup (which unit mounts this hardpoint?) that is not
+        // supported yet. Until then the tag stays referenceKind: unknown so no false "missing
+        // object" diagnostics are emitted (2026-07-05 smoketest decision).
         var tag = Schema.GetTagsForType("HardPoint")
             .First(t => string.Equals(t.Tag, "Special_Ability_Name", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
-        Assert.Equal("SpecialAbility", tag.ObjectType?.TypeName);
+        Assert.Equal(ReferenceKind.Unknown, tag.ReferenceKind);
+        Assert.Null(tag.ObjectType);
     }
 
     // ── RadioactiveContaminateAbility:Contamination_Object_Name → GameObjectType

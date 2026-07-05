@@ -250,6 +250,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         var options = new ParallelOptions
             { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
 
+        // The schema drives what the parser emits (which tags produce references, which files
+        // carry types), so snapshots built under a different schema are stale even when every
+        // file's content hash matches. Computed once per scan.
+        var schemaFingerprint = SchemaFingerprint.Compute(_schema);
+
         // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
         var layerOverallHashes = new Dictionary<string, string>(StringComparer.Ordinal);
 
@@ -269,6 +274,15 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
 
                 var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath) : null;
+
+                // Snapshot built under a different (or pre-fingerprint) schema — discard it.
+                if (snapshot is not null && snapshot.SchemaFingerprint != schemaFingerprint)
+                {
+                    _logger.LogInformation(
+                        "Schema changed since layer '{Layer}' was cached; discarding its snapshot",
+                        layer.Name);
+                    snapshot = null;
+                }
 
                 // A dependency changed since this snapshot was built. Cached parses are not
                 // content-pure — symbol extraction depends on cross-layer inputs (file-type
@@ -372,7 +386,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
                 OverallHash = overallHash,
                 DependencyHashes = depHashes,
-                Files = snapshotFiles
+                Files = snapshotFiles,
+                SchemaFingerprint = schemaFingerprint
             };
             _cache.Save(pgprojPath, newSnapshot);
             _cache.EnsureGitHygiene(pgprojPath);

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -27,21 +28,27 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaDefinitionHandler> _logger;
     private readonly ILuaParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public LuaDefinitionHandler(
         IGameIndexService indexService,
         ILuaParseCache parseCache,
         IFileHelper fileHelper,
-        ILogger<LuaDefinitionHandler> logger)
+        ILogger<LuaDefinitionHandler> logger,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _parseCache = parseCache;
         _fileHelper = fileHelper;
         _logger = logger;
+        _config = config;
     }
 
     public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.GoToDefinition)
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<LocationOrLocationLinks?>(null);

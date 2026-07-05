@@ -27,10 +27,13 @@ public sealed class ModProjectDetector : IModProjectDetector
             var matches = _fileHelper.FileSystem.Directory
                 .GetFiles(root, "*.pgproj", SearchOption.AllDirectories);
             if (matches.Length == 0) continue;
+
             if (matches.Length > 1)
-                _logger.LogWarning(
-                    "Multiple .pgproj files found under '{Root}'; using '{First}'. Consider opening the directory that contains your project file directly.",
-                    root, matches[0]);
+                throw new ModProjectLoadException(
+                    $"Found multiple .pgproj files under '{root}': {string.Join(", ", matches)}. " +
+                    "Only one .pgproj is supported per workspace — remove or relocate the extras, " +
+                    "or open the specific directory that contains the one you want to use.");
+
             projectFilePath = matches[0];
             _logger.LogInformation("Detected mod project file '{Path}'.", projectFilePath);
             return true;

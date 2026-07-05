@@ -41,6 +41,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IDocumentTextSource _textSource;
     private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILspConfigurationProvider? _configProvider;
 
     public XmlDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -58,12 +59,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IXmlLayerShadowFactProducer shadowProducer,
         IDocumentTextSource textSource,
         IXmlParseCache parseCache,
+        ILspConfigurationProvider configProvider,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            variantProducer, shadowProducer, textSource, parseCache)
+            variantProducer, shadowProducer, textSource, parseCache, configProvider)
     {
     }
 
@@ -83,9 +85,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IXmlVariantFactProducer? variantProducer = null,
         IXmlLayerShadowFactProducer? shadowProducer = null,
         IDocumentTextSource? textSource = null,
-        IXmlParseCache? parseCache = null)
+        IXmlParseCache? parseCache = null,
+        ILspConfigurationProvider? configProvider = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
+        _configProvider = configProvider;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
@@ -105,8 +109,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     protected override string FileExtension => ".xml";
 
+    // Feature-flag gate: a null provider (test convenience ctors) means always enabled.
+    protected override bool DiagnosticsEnabled =>
+        _configProvider?.Current.Features.Xml.Diagnostics ?? true;
+
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
+        if (!DiagnosticsEnabled) return;
+
         ClearAllPublished();
         var index = _indexService.Current;
         foreach (var uri in index.Documents.Keys)
@@ -115,6 +125,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
     {
+        if (!DiagnosticsEnabled) return Task.CompletedTask;
+
         var index = _indexService.Current;
         var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
         if (text is null) return Task.CompletedTask;
@@ -423,8 +435,27 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Range = range,
             Source = AppProperties.LspServerId,
             Tags = MapTags(result.Tags),
-            Data = BuildDiagnosticData(result)
+            Data = BuildDiagnosticData(result),
+            RelatedInformation = MapRelatedInformation(result.RelatedLocations)
         };
+    }
+
+    private static Container<DiagnosticRelatedInformation>? MapRelatedInformation(
+        IReadOnlyList<XmlRelatedLocation>? locations)
+    {
+        if (locations is null || locations.Count == 0)
+            return null;
+
+        return new Container<DiagnosticRelatedInformation>(locations.Select(l =>
+            new DiagnosticRelatedInformation
+            {
+                Message = l.Message,
+                Location = new Location
+                {
+                    Uri = l.Uri,
+                    Range = SafeRange(l.Line, l.Column ?? 0, 0)
+                }
+            }));
     }
 
     private static Container<DiagnosticTag>? MapTags(IReadOnlyList<XmlDiagnosticTag>? tags)
@@ -465,7 +496,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private static JToken? BuildDiagnosticData(XmlDiagnosticResult result)
     {
         if (result.SuggestedFix is null && result.CreateLocalisationKey is null &&
-            result.SquadronSyncJson is null && !result.RemoveRedundantOverride)
+            result.SquadronSyncJson is null && !result.RemoveRedundantOverride &&
+            !result.OfferRemoveEarlierDuplicates)
             return null;
 
         var obj = new JObject();
@@ -477,6 +509,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             obj["squadronSync"] = JToken.Parse(result.SquadronSyncJson);
         if (result.RemoveRedundantOverride)
             obj["removeRedundantOverride"] = true;
+        if (result.OfferRemoveEarlierDuplicates)
+            obj["removeEarlierDuplicates"] = true;
         return obj;
     }
 }

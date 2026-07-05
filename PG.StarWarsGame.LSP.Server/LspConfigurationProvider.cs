@@ -37,8 +37,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
 
         var workspaceRoot = ResolveWorkspaceRoot(initializationOptions);
         var fromFile = LoadConfigFile(workspaceRoot);
-        var overlay = ParseInitOptions(initializationOptions);
-        Current = Merge(fromFile, overlay);
+        var overlay = ParseInitOptions(initializationOptions, out var overlayFeatures);
+        Current = Merge(fromFile, overlay, overlayFeatures);
 
         _logger.LogInformation("LSP configuration loaded (locale={Locale}, gamePath={GamePath})",
             Current.Locale, Current.GamePath ?? "<none>");
@@ -73,8 +73,9 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         }
     }
 
-    private LspConfiguration ParseInitOptions(object? initOptions)
+    private LspConfiguration ParseInitOptions(object? initOptions, out FeatureFlags? features)
     {
+        features = null;
         if (initOptions is null) return new LspConfiguration();
 
         JsonElement elem;
@@ -100,6 +101,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
                 return new LspConfiguration();
             }
         }
+
+        features = ParseFeatures(elem);
 
         var workspaceRoot = TryGetString(elem, "workspaceRoot");
         var baseGamePath = TryGetString(elem, "baseGamePath");
@@ -136,10 +139,34 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         };
     }
 
-    private static LspConfiguration Merge(LspConfiguration file, LspConfiguration overlay)
+    /// <summary>
+    ///     Extracts the optional <c>features</c> node from initializationOptions. Returns
+    ///     <c>null</c> when the node is absent or malformed, so the .pg-lsp.json value (or the
+    ///     all-true defaults) applies. Client keys are camelCase; parsing is case-insensitive.
+    /// </summary>
+    private FeatureFlags? ParseFeatures(JsonElement elem)
+    {
+        if (!elem.TryGetProperty("features", out var node)) return null;
+        try
+        {
+            return node.Deserialize<FeatureFlags>(FeatureJsonOptions);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogWarning(ex, "Malformed 'features' node in InitializationOptions; ignoring it");
+            return null;
+        }
+    }
+
+    private static readonly JsonSerializerOptions FeatureJsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+    private static LspConfiguration Merge(LspConfiguration file, LspConfiguration overlay, FeatureFlags? overlayFeatures)
     {
         return new LspConfiguration
         {
+            // A features node sent by the client wins wholesale over the file's Features:
+            // the client always sends the complete resolved object, so no per-leaf merge.
+            Features = overlayFeatures ?? file.Features,
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,

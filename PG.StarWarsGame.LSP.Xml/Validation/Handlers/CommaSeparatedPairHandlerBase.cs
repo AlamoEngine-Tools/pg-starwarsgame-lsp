@@ -33,6 +33,18 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
         return result with { OverrideLine = line, OverrideColumn = column, OverrideLength = span.Length };
     }
 
+    /// <summary>
+    ///     Returns <paramref name="result" /> positioned at an arbitrary token of the fact's raw
+    ///     value, given the token's offset within <see cref="XmlTagValueFact.RawValue" /> — for
+    ///     handlers that tokenize beyond the first-comma pair (e.g. alternating tuple lists).
+    /// </summary>
+    protected static XmlDiagnosticResult AtToken(
+        XmlDiagnosticResult result, XmlTagValueFact fact, int offset, int length)
+    {
+        var (line, column) = XmlUtility.AdvancePosition(fact.Line, fact.Column, fact.RawValue, offset);
+        return result with { OverrideLine = line, OverrideColumn = column, OverrideLength = length };
+    }
+
     // Span of one side of the first-comma pair within the UNTRIMMED raw value, with each slot's
     // surrounding whitespace excluded — offsets stay valid against the fact's own position even
     // when the value spans multiple lines.

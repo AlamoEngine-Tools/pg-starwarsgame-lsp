@@ -3,6 +3,7 @@
 
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -10,14 +11,19 @@ public sealed class GetLanguagesHandler
     : IJsonRpcRequestHandler<GetLanguagesParams, GetLanguagesResult>
 {
     private readonly ILanguageService _langService;
+    private readonly ILspConfigurationProvider _config;
 
-    public GetLanguagesHandler(ILanguageService langService)
+    public GetLanguagesHandler(ILanguageService langService, ILspConfigurationProvider config)
     {
         _langService = langService;
+        _config = config;
     }
 
     public Task<GetLanguagesResult> Handle(GetLanguagesParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+            return Task.FromResult(new GetLanguagesResult([]));
+
         var languages = _langService.OfficiallySupported()
             .Select(l => l.LanguageIdentifier)
             .ToList();

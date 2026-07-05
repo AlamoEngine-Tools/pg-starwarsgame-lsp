@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -63,12 +64,33 @@ public sealed class XmlReferencesHandlerTest
     }
 
     private static XmlReferencesHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
-        IFileHelper? fileHelper = null)
+        IFileHelper? fileHelper = null, ILspConfigurationProvider? config = null)
     {
         var svc = new FakeIndexService { Current = index };
         return new XmlReferencesHandler(svc, NullLogger<XmlReferencesHandler>.Instance,
             ctx ?? new AllowAllEaWContext(),
-            fileHelper ?? new FileHelper(new MockFileSystem()));
+            fileHelper ?? new FileHelper(new MockFileSystem()),
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_FindReferencesFlagOff_ReturnsNull()
+    {
+        // Same arrange as Handle_CursorOnReference_ReturnsAllRefs — only the flag differs.
+        var callerDoc = DocWithRef(TestUri, "UNIT_A", 0, 4, 6);
+        var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
+            "UNIT_A", ImmutableArray.Create(
+                MakeRef("UNIT_A", TestUri, 0, 4, 6),
+                MakeRef("UNIT_A", OtherUri, 2, 8, 6)));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { FindReferences = false } });
+        var handler = BuildHandler(BuildIndex(callerDoc, refs), config: config);
+
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────

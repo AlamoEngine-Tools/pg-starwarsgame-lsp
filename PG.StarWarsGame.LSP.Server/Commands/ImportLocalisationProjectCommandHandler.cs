@@ -15,6 +15,7 @@ using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -42,6 +43,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     private readonly IModProjectReloadService _reloadService;
     private readonly ILocalisationSeedFileWriter _seedWriter;
     private readonly IXmlTranslationImporter _xmlImporter;
+    private readonly ILspConfigurationProvider _config;
 
     public ImportLocalisationProjectCommandHandler(
         ICsvTranslationImporter csvImporter,
@@ -55,7 +57,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         IFileHelper fileHelper,
         IModProjectReloadService reloadService,
         IModProjectFileWriter fileWriter,
-        ILogger<ImportLocalisationProjectCommandHandler> logger)
+        ILogger<ImportLocalisationProjectCommandHandler> logger,
+        ILspConfigurationProvider config)
     {
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
@@ -69,10 +72,17 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         _reloadService = reloadService;
         _fileWriter = fileWriter;
         _logger = logger;
+        _config = config;
     }
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+        {
+            _logger.LogWarning("{Cmd}: {Reason}", CommandName, LocalisationFeatureDisabled.Message);
+            return Unit.Value;
+        }
+
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
             _logger.LogWarning("aet-eaw-edit.lsp.importLocalisationProject invoked without arguments.");

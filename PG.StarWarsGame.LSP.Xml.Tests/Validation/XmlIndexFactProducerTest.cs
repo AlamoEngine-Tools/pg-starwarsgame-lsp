@@ -208,6 +208,25 @@ public sealed class XmlIndexFactProducerTest
         Assert.Equal("Missing", f.TargetId);
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("Null")]
+    [InlineData("NULL")]
+    [InlineData("Default")]
+    [InlineData("None")]
+    public void EnginePlaceholderReference_ProducesNoReferenceFact(string placeholder)
+    {
+        // The game accepts "null"/"Default"/"None" as a valid "no object" value in any reference
+        // position (e.g. <Land_Damage_SFX>null,SFX_A,…) — flagging them as unresolved or
+        // type-mismatched is always a false positive.
+        var reference = new GameReference(placeholder, GameSymbolKind.XmlObject, "SFXEvent",
+            "file:///a.xml", 3, 0, placeholder.Length);
+
+        var index = BuildIndex([], [reference]);
+
+        Assert.DoesNotContain(Sut.Produce("file:///a.xml", index), f => f is XmlReferenceFact);
+    }
+
     [Fact]
     public void Unresolved_reference_emits_reference_fact_with_null_resolved()
     {

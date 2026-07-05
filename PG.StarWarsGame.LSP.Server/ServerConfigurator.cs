@@ -228,9 +228,23 @@ public static class ServerConfigurator
 
                 var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
 
-                // Log whether a .pgproj was found under the scan roots — useful startup breadcrumb.
+                // Log whether a .pgproj was found under the scan roots — useful startup breadcrumb only.
+                // Not authoritative: the real resolution (with a user-facing notification on failure,
+                // e.g. multiple .pgproj files found) happens moments later via
+                // ProjectConfigurationResolver inside the Task.Run below, so any exception here
+                // (detector.TryFind can throw) must not crash this handler before that ever runs.
                 var detector = server.Services.GetRequiredService<IModProjectDetector>();
-                var hasPgproj = detector.TryFind(scanRoots, out var pgprojPath);
+                var hasPgproj = false;
+                string? pgprojPath = null;
+                try
+                {
+                    hasPgproj = detector.TryFind(scanRoots, out pgprojPath);
+                }
+                catch (Exception ex)
+                {
+                    initLogger.LogWarning(ex, "Could not determine .pgproj presence for the startup breadcrumb log.");
+                }
+
                 initLogger.LogInformation(
                     "[initialized] scanRoots={Roots} | .pgproj present={Found} path={Path}",
                     string.Join(", ", scanRoots), hasPgproj, pgprojPath ?? "<none>");

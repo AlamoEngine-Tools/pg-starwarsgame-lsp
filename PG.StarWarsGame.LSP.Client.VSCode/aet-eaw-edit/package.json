@@ -53,7 +53,7 @@
           "type": "webview",
           "id": "aet-eaw-edit.lsp.localisationEditor",
           "name": "Editor",
-          "when": "config.aet-eaw-edit.localisation.editorEnabled"
+          "when": "config.aet-eaw-edit.localisation.editorEnabled && config.aet-eaw-edit.features.tools.localisation"
         }
       ]
     },
@@ -81,220 +81,351 @@
       },
       {
         "command": "aet-eaw-edit.lsp.initLocalisationProject",
-        "title": "EaWEdit: Initialise Localisation Project from Baseline"
+        "title": "EaWEdit: Initialise Localisation Project from Baseline",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
       },
       {
         "command": "aet-eaw-edit.lsp.importLocalisationProject",
-        "title": "EaWEdit: Import Existing Localisation Files"
+        "title": "EaWEdit: Import Existing Localisation Files",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
       },
       {
         "command": "aet-eaw-edit.lsp.showEffectiveObject",
-        "title": "EaWEdit: Show Effective Object (Variant Inheritance)"
+        "title": "EaWEdit: Show Effective Object (Variant Inheritance)",
+        "enablement": "config.aet-eaw-edit.features.tools.variants"
       }
     ],
-    "configuration": {
-      "title": "Alamo Engine Tools - Empire at War Edit",
-      "type": "object",
-      "properties": {
-        "aet-eaw-edit.lsp.enabled": {
-          "order": 100,
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Enables the Empire at War specific LSP server."
-        },
-        "aet-eaw-edit.lsp.executable": {
-          "order": 200,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "Path to `PG.StarWarsGame.LSP.Server.exe`. Download the server archive from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases), extract it, and point this setting at the `.exe`.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
-          "scope": "machine-overridable"
-        },
-        "aet-eaw-edit.lsp.locale": {
-          "order": 400,
-          "type": "string",
-          "default": "en",
-          "markdownDescription": "Language locale used for hover text and diagnostics.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": [
-            "en",
-            "de",
-            "fr",
-            "es",
-            "it",
-            "pl",
-            "ru"
-          ],
-          "enumItemLabels": [
-            "English",
-            "German",
-            "French",
-            "Spanish",
-            "Italian",
-            "Polish",
-            "Russian"
-          ]
-        },  
-        "aet-eaw-edit.lsp.source.baseline.type": {
-          "order": 600,
-          "type": "string",
-          "default": "http",
-          "markdownDescription": "Where to load the EaW baseline index from. Use `http` to download automatically; `local` to point at a file; `none` to disable baseline loading.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": [
-            "http",
-            "local",
-            "none"
-          ],
-          "enumItemLabels": [
-            "Download automatically (recommended)",
-            "Local file",
-            "Disabled"
-          ]
-        },
-        "aet-eaw-edit.lsp.source.baseline.localPath": {
-          "order": 700,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "Path to a local baseline `.aet` file.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
-          "scope": "machine-overridable"
-        },
-        "aet-eaw-edit.lsp.source.baseline.url": {
-          "order": 750,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "Custom HTTP URL for the baseline `.aet` file. Leave empty to use the default source.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `http`."
-        },
-        "aet-eaw-edit.lsp.schema.source": {
-          "order": 800,
-          "type": "string",
-          "default": "http",
-          "markdownDescription": "Where to load the EaW XML schema from. Use `http` to fetch from GitHub (default); use `local` to point at a local copy.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": [
-            "http",
-            "local"
-          ],
-          "enumItemLabels": [
-            "GitHub (recommended)",
-            "Local directory"
-          ]
-        },
-        "aet-eaw-edit.lsp.schema.url": {
-          "order": 900,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the default GitHub source.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
-        },
-        "aet-eaw-edit.lsp.schema.localPath": {
-          "order": 1000,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "Path to the local EaW XML schema directory (`schema/eaw/`).\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
-          "scope": "machine-overridable"
-        },
-        "aet-eaw-edit.localisation.editorEnabled": {
-          "order": 1100,
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Enables the built-in localisation editor."
-        },
-        "aet-eaw-edit.localisation.format": {
-          "order": 1200,
-          "type": "string",
-          "default": "format-dat",
-          "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node — an existing project's own declared format always wins.",
-          "enum": [
-            "format-dat",
-            "format-csv",
-            "format-xml",
-            "format-nls"
-          ],
-          "enumItemLabels": [
-            "DAT",
-            "CSV",
-            "XML",
-            "NLS"
-          ],
-          "markdownEnumDescriptions": [
-            "The game's proprietary *.DAT format.\n\n*Not recommended if the project is being worked on by multiple people.*",
-            "A comma-separated file per language. Recommended.",
-            "An XML file used by the [Empire at War Text Editor](https://www.nexusmods.com/starwarsempireatwar/mods/1859)",
-            "Java-style `key=value` properties file (single language)."
-          ]
-        },
-        "aet-eaw-edit.modVerify.enabled": {
-          "order": 1300,
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Enables the ModVerify integration."
-        },
-        "aet-eaw-edit.modVerify.executable": {
-          "order": 1400,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "The path to the [ModVerify](https://github.com/AlamoEngine-Tools/ModVerify/releases) executable.\n\nOnly applies when `#aet-eaw-edit.modVerify.enabled#` is set to `true`.",
-          "scope": "machine-overridable",
-          "when": "aet-eaw-edit.modVerify.enabled"
-        },
-        "aet-eaw-edit.modVerify.baseGameDirectory": {
-          "order": 1500,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "The path to the base game **Star Wars: Empire at War**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
-          "scope": "machine-overridable",
-          "when": "aet-eaw-edit.modVerify.enabled"
-        },
-        "aet-eaw-edit.modVerify.expansionDirectory": {
-          "order": 1600,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "The path to the expansion pack **Star Wars: Empire at War: Forces of Corruption**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
-          "scope": "machine-overridable",
-          "when": "aet-eaw-edit.modVerify.enabled"
-        },
-        "aet-eaw-edit.lsp.devMode.enabled": {
-          "order": 1700,
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Start the LSP server from source using `dotnet run --project` instead of a pre-built executable. Requires `#aet-eaw-edit.lsp.devMode.projectPath#` to be set.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
-        },
-        "aet-eaw-edit.lsp.devMode.projectPath": {
-          "order": 1800,
-          "type": "string",
-          "default": "",
-          "format": "uri-reference",
-          "markdownDescription": "Path to the `PG.StarWarsGame.LSP.Server.csproj` file used when `#aet-eaw-edit.lsp.devMode#` is enabled.",
-          "scope": "machine-overridable"
-        },
-        "aet-eaw-edit.lsp.debug.traceServer": {
-          "order": 1900,
-          "type": "string",
-          "default": "off",
-          "markdownDescription": "LSP wire-protocol trace level. Set to `messages` or `verbose` to log traffic in the output panel for debugging.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
-          "enum": [
-            "off",
-            "messages",
-            "verbose"
-          ],
-          "enumItemLabels": [
-            "Off",
-            "Messages",
-            "Verbose"
-          ]
-        },
-        "aet-eaw-edit.lsp.debug.waitForDebugger": {
-          "order": 2000,
-          "type": "boolean",
-          "default": false,
-          "markdownDescription": "Pass `--wait-for-debugger` to the LSP server process on startup, causing it to pause until a .NET debugger attaches.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+    "configuration": [
+      {
+        "title": "General",
+        "type": "object",
+        "properties": {
+          "aet-eaw-edit.lsp.enabled": {
+            "order": 100,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the Empire at War specific LSP server."
+          },
+          "aet-eaw-edit.lsp.executable": {
+            "order": 200,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Path to `PG.StarWarsGame.LSP.Server.exe`. Download the server archive from the [releases page](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases), extract it, and point this setting at the `.exe`.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true` and `#aet-eaw-edit.lsp.devMode.enabled#` is `false`.",
+            "scope": "machine-overridable"
+          },
+          "aet-eaw-edit.lsp.locale": {
+            "order": 400,
+            "type": "string",
+            "default": "en",
+            "markdownDescription": "Language locale used for hover text and diagnostics.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "en",
+              "de",
+              "fr",
+              "es",
+              "it",
+              "pl",
+              "ru"
+            ],
+            "enumItemLabels": [
+              "English",
+              "German",
+              "French",
+              "Spanish",
+              "Italian",
+              "Polish",
+              "Russian"
+            ]
+          },
+          "aet-eaw-edit.lsp.source.baseline.type": {
+            "order": 600,
+            "type": "string",
+            "default": "http",
+            "markdownDescription": "Where to load the EaW baseline index from. Use `http` to download automatically; `local` to point at a file; `none` to disable baseline loading.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "http",
+              "local",
+              "none"
+            ],
+            "enumItemLabels": [
+              "Download automatically (recommended)",
+              "Local file",
+              "Disabled"
+            ]
+          },
+          "aet-eaw-edit.lsp.source.baseline.localPath": {
+            "order": 700,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Path to a local baseline `.aet` file.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `local`.",
+            "scope": "machine-overridable"
+          },
+          "aet-eaw-edit.lsp.source.baseline.url": {
+            "order": 750,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Custom HTTP URL for the baseline `.aet` file. Leave empty to use the default source.\n\nOnly applies when `#aet-eaw-edit.lsp.source.baseline.type#` is `http`."
+          },
+          "aet-eaw-edit.lsp.schema.source": {
+            "order": 800,
+            "type": "string",
+            "default": "http",
+            "markdownDescription": "Where to load the EaW XML schema from. Use `http` to fetch from GitHub (default); use `local` to point at a local copy.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "http",
+              "local"
+            ],
+            "enumItemLabels": [
+              "GitHub (recommended)",
+              "Local directory"
+            ]
+          },
+          "aet-eaw-edit.lsp.schema.url": {
+            "order": 900,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Custom HTTP URL for the EaW XML schema index. Leave empty to use the default GitHub source.\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `http`."
+          },
+          "aet-eaw-edit.lsp.schema.localPath": {
+            "order": 1000,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Path to the local EaW XML schema directory (`schema/eaw/`).\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
+            "scope": "machine-overridable"
+          },
+          "aet-eaw-edit.localisation.editorEnabled": {
+            "order": 1100,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the built-in localisation editor.\n\nThe editor panel also requires `#aet-eaw-edit.features.tools.localisation#` to be enabled."
+          },
+          "aet-eaw-edit.localisation.format": {
+            "order": 1200,
+            "type": "string",
+            "default": "format-dat",
+            "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node — an existing project's own declared format always wins.",
+            "enum": [
+              "format-dat",
+              "format-csv",
+              "format-xml",
+              "format-nls"
+            ],
+            "enumItemLabels": [
+              "DAT",
+              "CSV",
+              "XML",
+              "NLS"
+            ],
+            "markdownEnumDescriptions": [
+              "The game's proprietary *.DAT format.\n\n*Not recommended if the project is being worked on by multiple people.*",
+              "A comma-separated file per language. Recommended.",
+              "An XML file used by the [Empire at War Text Editor](https://www.nexusmods.com/starwarsempireatwar/mods/1859)",
+              "Java-style `key=value` properties file (single language)."
+            ]
+          },
+          "aet-eaw-edit.modVerify.enabled": {
+            "order": 1300,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the ModVerify integration."
+          },
+          "aet-eaw-edit.modVerify.executable": {
+            "order": 1400,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "The path to the [ModVerify](https://github.com/AlamoEngine-Tools/ModVerify/releases) executable.\n\nOnly applies when `#aet-eaw-edit.modVerify.enabled#` is set to `true`.",
+            "scope": "machine-overridable",
+            "when": "aet-eaw-edit.modVerify.enabled"
+          },
+          "aet-eaw-edit.modVerify.baseGameDirectory": {
+            "order": 1500,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "The path to the base game **Star Wars: Empire at War**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
+            "scope": "machine-overridable",
+            "when": "aet-eaw-edit.modVerify.enabled"
+          },
+          "aet-eaw-edit.modVerify.expansionDirectory": {
+            "order": 1600,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "The path to the expansion pack **Star Wars: Empire at War: Forces of Corruption**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
+            "scope": "machine-overridable",
+            "when": "aet-eaw-edit.modVerify.enabled"
+          },
+          "aet-eaw-edit.lsp.devMode.enabled": {
+            "order": 1700,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Start the LSP server from source using `dotnet run --project` instead of a pre-built executable. Requires `#aet-eaw-edit.lsp.devMode.projectPath#` to be set.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+          },
+          "aet-eaw-edit.lsp.devMode.projectPath": {
+            "order": 1800,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "markdownDescription": "Path to the `PG.StarWarsGame.LSP.Server.csproj` file used when `#aet-eaw-edit.lsp.devMode#` is enabled.",
+            "scope": "machine-overridable"
+          },
+          "aet-eaw-edit.lsp.debug.traceServer": {
+            "order": 1900,
+            "type": "string",
+            "default": "off",
+            "markdownDescription": "LSP wire-protocol trace level. Set to `messages` or `verbose` to log traffic in the output panel for debugging.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "off",
+              "messages",
+              "verbose"
+            ],
+            "enumItemLabels": [
+              "Off",
+              "Messages",
+              "Verbose"
+            ]
+          },
+          "aet-eaw-edit.lsp.debug.waitForDebugger": {
+            "order": 2000,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Pass `--wait-for-debugger` to the LSP server process on startup, causing it to pause until a .NET debugger attaches.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+          }
+        }
+      },
+      {
+        "title": "Features",
+        "type": "object",
+        "properties": { 
+          "aet-eaw-edit.features.xml.completion": {
+            "order": 100,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables code completion in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.hover": {
+            "order": 200,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables hover tooltips in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.diagnostics": {
+            "order": 300,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables diagnostics (error and warning squiggles) in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.goToDefinition": {
+            "order": 400,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables go-to-definition in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.findReferences": {
+            "order": 500,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables find-all-references in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.rename": {
+            "order": 600,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables symbol rename in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.codeLens": {
+            "order": 700,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables code lenses (reference counts, variant links) in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.inlayHints": {
+            "order": 800,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables inlay hints in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.codeActions": {
+            "order": 900,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables code actions (quick fixes) in EaW XML files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.linkedEditing": {
+            "order": 1000,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables linked editing of matching XML tag pairs.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.completion": {
+            "order": 1100,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables code completion in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.hover": {
+            "order": 1200,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables hover tooltips in Lua script files.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.diagnostics": {
+            "order": 1300,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables diagnostics (error and warning squiggles) in Lua script files.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.goToDefinition": {
+            "order": 1400,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables go-to-definition in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.rename": {
+            "order": 1500,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables symbol rename in Lua script files. Also required for global rename of XML objects that are referenced from Lua scripts.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.codeLens": {
+            "order": 1600,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables code lenses in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.inlayHints": {
+            "order": 1700,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables inlay hints in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.lua.codeActions": {
+            "order": 1800,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables code actions (quick fixes) in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.tools.localisation": {
+            "order": 1900,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the localisation tooling: the localisation editor panel's data source, the initialise/import commands, and the create-key code action.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.tools.variants": {
+            "order": 2000,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables the variant-inheritance tooling: the *Show Effective Object* command and its code lens.\n\nChanging this setting automatically restarts the LSP server."
+          }
         }
       }
-    }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run check-types && npm run bundle -- --production",

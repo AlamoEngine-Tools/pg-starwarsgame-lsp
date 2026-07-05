@@ -38,25 +38,32 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
     public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
     {
         _logger.LogDebug("Resolving project configuration under [{Roots}]", string.Join(", ", roots));
-        if (_detector.TryFind(roots, out var pgprojPath) && pgprojPath is not null)
-            try
+
+        // Detection (e.g. multiple .pgproj files under one root) and loading both need to surface
+        // as a user-facing notification rather than failing silently or crashing startup, so both
+        // are covered by the same catch — ModProjectDetector.TryFind can throw just like the loader.
+        try
+        {
+            if (_detector.TryFind(roots, out var pgprojPath) && pgprojPath is not null)
             {
                 var file = _loader.Load(pgprojPath);
                 return _resolver.Resolve(pgprojPath, file);
             }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex,
-                    "Failed to load mod project '{Path}'; no directories will be indexed.", pgprojPath);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to resolve mod project configuration under [{Roots}]; no directories will be indexed.",
+                string.Join(", ", roots));
 
-                // Surface a clear, actionable message to the user as an editor notification rather than
-                // failing silently. ModProjectLoadException already carries a user-facing message.
-                var message = ex is ModProjectLoadException
-                    ? ex.Message
-                    : $"Could not load mod project '{pgprojPath}': {ex.Message}";
-                _notifier.ShowError(message);
-                return null;
-            }
+            // Surface a clear, actionable message to the user as an editor notification rather than
+            // failing silently. ModProjectLoadException already carries a user-facing message.
+            var message = ex is ModProjectLoadException
+                ? ex.Message
+                : $"Could not load mod project configuration: {ex.Message}";
+            _notifier.ShowError(message);
+            return null;
+        }
 
         _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
         return null;

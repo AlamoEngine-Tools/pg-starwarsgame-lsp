@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -24,6 +25,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     private readonly IXmlParseCache _parseCache;
     private readonly IXmlInlayHintRegistry _registry;
     private readonly ISchemaProvider _schema;
+    private readonly ILspConfigurationProvider _config;
 
     public XmlInlayHintHandler(
         IXmlParseCache parseCache,
@@ -32,7 +34,8 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
         ILogger<XmlInlayHintHandler> logger,
-        IXmlInlayHintRegistry registry)
+        IXmlInlayHintRegistry registry,
+        ILspConfigurationProvider config)
     {
         _parseCache = parseCache;
         _indexService = indexService;
@@ -41,10 +44,14 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         _fileHelper = fileHelper;
         _logger = logger;
         _registry = registry;
+        _config = config;
     }
 
     public override Task<InlayHintContainer?> Handle(InlayHintParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.InlayHints)
+            return Task.FromResult<InlayHintContainer?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<InlayHintContainer?>(null);

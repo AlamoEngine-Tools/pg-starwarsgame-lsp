@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -18,18 +19,23 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlReferencesHandler> _logger;
+    private readonly ILspConfigurationProvider _config;
 
     public XmlReferencesHandler(IGameIndexService indexService, ILogger<XmlReferencesHandler> logger,
-        IEaWXmlContext eaWXmlContext, IFileHelper fileHelper)
+        IEaWXmlContext eaWXmlContext, IFileHelper fileHelper, ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _logger = logger;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
+        _config = config;
     }
 
     public override Task<LocationContainer?> Handle(ReferenceParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.FindReferences)
+            return Task.FromResult<LocationContainer?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<LocationContainer?>(null);

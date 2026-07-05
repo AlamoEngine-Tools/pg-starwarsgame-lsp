@@ -177,6 +177,31 @@ public sealed class HoverUtilityTest
     }
 
     [Fact]
+    public void BuildAssetReferenceHover_TgaReferenced_OnlyDdsPresent_ResolvesToDds()
+    {
+        // The engine treats TGA and DDS interchangeably — hover must resolve the reference the
+        // same way instead of showing nothing.
+        var hover = HoverUtility.BuildAssetReferenceHover(
+            AssetTag(ReferenceKind.TextureFile), "foo.tga",
+            Loose("data/art/textures/foo.dds"), 0, 0, 7);
+
+        Assert.NotNull(hover);
+        var md = hover!.Contents.MarkupContent!.Value;
+        Assert.Contains("data/art/textures/foo.dds", md);
+    }
+
+    [Fact]
+    public void BuildAssetReferenceHover_DdsReferenced_OnlyTgaPresent_ResolvesToTga()
+    {
+        var hover = HoverUtility.BuildAssetReferenceHover(
+            AssetTag(ReferenceKind.TextureFile), "foo.dds",
+            Loose("data/art/textures/foo.tga"), 0, 0, 7);
+
+        Assert.NotNull(hover);
+        Assert.Contains("data/art/textures/foo.tga", hover!.Contents.MarkupContent!.Value);
+    }
+
+    [Fact]
     public void BuildAssetReferenceHover_PackedAsset_ContainsPathAndPackedMarker()
     {
         var hover = HoverUtility.BuildAssetReferenceHover(

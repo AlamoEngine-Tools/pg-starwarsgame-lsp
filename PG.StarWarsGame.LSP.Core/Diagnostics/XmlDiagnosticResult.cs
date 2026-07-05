@@ -24,4 +24,14 @@ public record XmlDiagnosticResult(
     IReadOnlyList<XmlDiagnosticTag>? Tags = null,
     bool RemoveRedundantOverride = false,
     int? OverrideEndLine = null,
-    int? OverrideEndColumn = null);
+    int? OverrideEndColumn = null,
+    // Navigable companion positions rendered as LSP DiagnosticRelatedInformation (clickable in
+    // the editor) - e.g. the OTHER definitions of a duplicate symbol. Only editor-openable
+    // file:// URIs belong here.
+    IReadOnlyList<XmlRelatedLocation>? RelatedLocations = null,
+    // Marks the diagnostic as eligible for the "remove earlier duplicate occurrences" quick fix
+    // (duplicate singleton tags within one object; the game keeps the last occurrence).
+    bool OfferRemoveEarlierDuplicates = false);
+
+/// <summary>A navigable location referenced by a diagnostic (LSP related information).</summary>
+public sealed record XmlRelatedLocation(string Uri, int Line, int? Column, string Message);

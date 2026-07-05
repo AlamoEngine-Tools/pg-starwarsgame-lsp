@@ -3,13 +3,26 @@
 
 using System.Collections.Immutable;
 using Newtonsoft.Json.Linq;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeLens;
 
 public sealed class VariantCodeLensProviderTest
 {
+    private static VariantCodeLensProvider Provider(ILspConfigurationProvider? config = null)
+    {
+        return new VariantCodeLensProvider(config ?? new FakeLspConfigurationProvider());
+    }
+
+    private static FakeLspConfigurationProvider VariantsOff()
+    {
+        return FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Variants = false } });
+    }
+
     private static GameSymbol Sym(string id, string? baseId = null)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit",
@@ -28,11 +41,37 @@ public sealed class VariantCodeLensProviderTest
         return new CodeLensSymbolContext(symbol, (FileOrigin)symbol.Origin, index);
     }
 
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Handle_VariantsFlagOff_SuppressesShowEffectiveLens()
+    {
+        var v = Sym("V", "B");
+
+        var lens = Provider(VariantsOff()).Handle(Ctx(v, IndexWith(v, Sym("B"))));
+
+        Assert.Null(lens);
+    }
+
+    [Fact]
+    public void Handle_VariantsFlagOff_KeepsVariantsPeekLensOnBaseSymbol()
+    {
+        // Only the showEffectiveObject lens is variant tooling — the "N variants" references peek
+        // stays available with the flag off.
+        var b = Sym("B");
+        var index = IndexWith(b, Sym("V1", "B"), Sym("V2", "B"));
+
+        var lens = Provider(VariantsOff()).Handle(Ctx(b, index));
+
+        Assert.NotNull(lens);
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens!.Command!.Name);
+    }
+
     [Fact]
     public void Handle_VariantSymbol_EmitsShowEffectiveLens()
     {
         var v = Sym("V", "B");
-        var lens = new VariantCodeLensProvider().Handle(Ctx(v, IndexWith(v, Sym("B"))));
+        var lens = Provider().Handle(Ctx(v, IndexWith(v, Sym("B"))));
 
         Assert.NotNull(lens);
         Assert.Equal(VariantCodeLensProvider.ShowEffectiveCommand, lens!.Command!.Name);
@@ -46,7 +85,7 @@ public sealed class VariantCodeLensProviderTest
         var b = Sym("B");
         var index = IndexWith(b, Sym("V1", "B"), Sym("V2", "B"));
 
-        var lens = new VariantCodeLensProvider().Handle(Ctx(b, index));
+        var lens = Provider().Handle(Ctx(b, index));
 
         Assert.NotNull(lens);
         Assert.Equal("2 variants", lens!.Command!.Title);
@@ -60,6 +99,6 @@ public sealed class VariantCodeLensProviderTest
     public void Handle_PlainSymbol_ReturnsNull()
     {
         var p = Sym("P");
-        Assert.Null(new VariantCodeLensProvider().Handle(Ctx(p, IndexWith(p))));
+        Assert.Null(Provider().Handle(Ctx(p, IndexWith(p))));
     }
 }

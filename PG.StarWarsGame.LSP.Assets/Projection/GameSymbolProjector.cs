@@ -21,7 +21,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         IEnumerable<ProjectableEntry> gameObjects,
         IEnumerable<ProjectableEntry> sfxEvents,
         string sourceManifestHash,
-        IEnumerable<ProjectableEntry>? musicEvents = null)
+        IEnumerable<ProjectableEntry>? musicEvents = null,
+        IEnumerable<ProjectableEntry>? shadowBlobMaterials = null)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
         var objectTags = ImmutableDictionary.CreateBuilder<string, ImmutableArray<BaselineTag>>(
@@ -60,6 +61,15 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             builder[sym.Id] = sym;
             if (tags.Count > 0)
                 objectTags[entry.Name] = [.. tags];
+        }
+
+        // Same stopgap as music events: no engine-level manager exists for shadow blob
+        // materials — entries come from BaselineBuilder parsing Shadowblobmaterials.xml directly.
+        foreach (var entry in shadowBlobMaterials ?? [])
+        {
+            var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "ShadowBlobMaterial",
+                ResolveOrigin(entry.Location), null);
+            builder[sym.Id] = sym;
         }
 
         return new BaselineIndex(builder.ToImmutable(), DateTimeOffset.UtcNow,

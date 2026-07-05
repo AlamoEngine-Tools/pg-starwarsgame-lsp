@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Completion;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -38,7 +39,8 @@ public sealed class XmlCompletionHandlerTest
             FakeFileTypeRegistry? registry = null,
             IEaWXmlContext? ctx = null,
             IXmlCompletionRegistry? completionReg = null,
-            GameIndex? index = null)
+            GameIndex? index = null,
+            ILspConfigurationProvider? config = null)
     {
         var host = new FakeGameWorkspaceHost();
         var schema = new FakeSchemaProvider();
@@ -62,7 +64,8 @@ public sealed class XmlCompletionHandlerTest
 
         return (new XmlCompletionHandler(TestParseCache.For(host), schema, indexService, fileTypeReg,
             new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
-            tagNameRegistry, tagValueRegistry), host, schema, proposals);
+            tagNameRegistry, tagValueRegistry, config ?? new FakeLspConfigurationProvider()), host, schema,
+            proposals);
     }
 
     private static CompletionParams At(int line, int character, string? triggerChar = null)
@@ -583,6 +586,26 @@ public sealed class XmlCompletionHandlerTest
         var labels = result.Items.Select(i => i.Label).ToList();
         Assert.Contains("0", labels);
         Assert.Contains("1", labels);
+    }
+
+    [Fact]
+    public async Task Handle_XmlCompletionFlagOff_ReturnsEmptyList()
+    {
+        // Same arrange as StoryParser_ValueOnEventParam_BooleanInt — only the flag differs.
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Completion = false } });
+        var (handler, host, schema, _) = Build(registry, config: config);
+        schema.AddType(MakeType("StoryParser"));
+        schema.AddEnum(StoryRewardTypeWith(StoryReward("LOCK_CONTROLS", Param(0, XmlValueType.Boolean))));
+        var xml =
+            "<StoryParser>\n<Event>\n<Event_Type>STORY_MOVIE_DONE</Event_Type>\n<Reward_Type>LOCK_CONTROLS</Reward_Type>\n<Reward_Param1>\n</Event>\n</StoryParser>";
+        host.AddOrUpdate(TestUri.ToString(), xml, 1);
+
+        var result = await handler.Handle(At(4, 15), CancellationToken.None);
+
+        Assert.Empty(result.Items);
     }
 
     // ── StoryParser registry-based detection ─────────────────────────────────

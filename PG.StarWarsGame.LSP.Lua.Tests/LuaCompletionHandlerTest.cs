@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -32,7 +33,8 @@ public sealed class LuaCompletionHandlerTest
     private static LuaCompletionHandler BuildHandler(
         GameIndex index,
         ILuaApiSchemaProvider schema,
-        FakeWorkspaceHost? host = null)
+        FakeWorkspaceHost? host = null,
+        ILspConfigurationProvider? config = null)
     {
         var svc = new FakeIndexService { Current = index };
         return new LuaCompletionHandler(
@@ -41,7 +43,41 @@ public sealed class LuaCompletionHandlerTest
             new FileHelper(new MockFileSystem()),
             schema,
             new LuaAnnotationRepository(),
-            NullLogger<LuaCompletionHandler>.Instance);
+            NullLogger<LuaCompletionHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LuaCompletionFlagOff_ReturnsEmpty()
+    {
+        // Same arrange as Handle_InsideApiStringArg_ReturnsMatchingTypeSymbols — only the flag differs.
+        var schema = new LuaApiSchemaProvider([
+            """
+            ---@param objectName string
+            ---@xmlref XmlObject:Unit
+            function Find_First_Object(objectName) end
+            """
+        ]);
+
+        var sym = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
+            new FileOrigin("file:///units.xml", 0, null), null);
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(LuaUri, new DocumentIndex(LuaUri, 1, [], [])),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty.Add("UNIT_A", [sym]),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Completion = false } });
+
+        var handler = BuildHandler(index, schema, host, config);
+        var result = await handler.Handle(CompletionAt(0, 21), CancellationToken.None);
+
+        Assert.Empty(result.Items);
     }
 
     // ── gating ────────────────────────────────────────────────────────────────
@@ -366,7 +402,8 @@ public sealed class LuaCompletionHandlerTest
             fileHelper,
             schema,
             new LuaAnnotationRepository(),
-            NullLogger<LuaCompletionHandler>.Instance);
+            NullLogger<LuaCompletionHandler>.Instance,
+            new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(
             new CompletionParams

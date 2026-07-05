@@ -27,6 +27,38 @@ public sealed class TupleValueCompletionStrategyTest
         return new XmlTagDefinition { Tag = name, ValueType = valueType, ValidationOverride = over };
     }
 
+    // ── InaccuracyMap ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public void InaccuracyMap_Slot0_QueriesGameObjectCategoryTypeEnum()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddEnum(new EnumDefinition
+        {
+            Name = "GameObjectCategoryType", Kind = EnumKind.DynamicXml,
+            Values = [new EnumValueDefinition { Name = "Bomber" }]
+        });
+        var proposals = new CapturingProposalRegistry();
+        var strategy = new TupleValueCompletionStrategy(schema, proposals, new CapturingCompletionRegistry());
+
+        var result = strategy.Handle(Ctx(Tag("X", XmlValueType.InaccuracyMap), 0, "Bom", schema)).ToList();
+
+        Assert.Equal(XmlValueType.DynamicEnumValue, proposals.LastValueType);
+        Assert.Equal("GameObjectCategoryType", proposals.LastTag?.Enum?.Name);
+        Assert.Single(result);
+        Assert.Equal("Bomber", result[0].Label);
+    }
+
+    [Fact]
+    public void InaccuracyMap_Slot1_HasNoCompletionSource()
+    {
+        var schema = new FakeSchemaProvider();
+        var strategy = new TupleValueCompletionStrategy(
+            schema, new CapturingProposalRegistry(), new CapturingCompletionRegistry());
+
+        Assert.Empty(strategy.Handle(Ctx(Tag("X", XmlValueType.InaccuracyMap), 1, "", schema)));
+    }
+
     // ── HardPointSfxMap ────────────────────────────────────────────────────────
 
     [Fact]

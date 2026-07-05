@@ -193,6 +193,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
+        services.AddSingleton<IXmlCodeActionProvider, RemoveEarlierDuplicatesCodeActionProvider>();
 
         // Hover strategies — add IXmlHoverStrategy implementations here to register new strategies
         services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();
