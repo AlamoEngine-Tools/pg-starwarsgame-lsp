@@ -13,10 +13,16 @@ public sealed class XmlDuplicateTagHandler : XmlDiagnosticsHandler<XmlDuplicateT
             ? $" Also at line {fact.OtherLines[0]}."
             : $" Also at lines {string.Join(", ", fact.OtherLines)}.";
 
+        // Warning, not Error: the game loads the object top to bottom and the LAST occurrence
+        // wins, so duplicates technically work - they are just misleading style. Earlier
+        // occurrences are dead values and get greyed out (Unnecessary); every occurrence offers
+        // the "remove earlier duplicates" quick fix.
         return
         [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"Duplicate tag '{fact.Tag.Tag}': only one occurrence is allowed per object.{othersText}")
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"Duplicate tag '{fact.Tag.Tag}': only one occurrence is used per object - the game keeps the LAST one.{othersText}",
+                Tags: fact.IsLastOccurrence ? null : [XmlDiagnosticTag.Unnecessary],
+                OfferRemoveEarlierDuplicates: true)
         ];
     }
 }

@@ -4,7 +4,9 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.CodeActions;
@@ -19,6 +21,29 @@ public sealed class CreateLocKeyCodeActionProviderTest
         return new XmlCodeActionContext(TestUri, d);
     }
 
+    private static CreateLocKeyCodeActionProvider Provider(ILspConfigurationProvider? config = null)
+    {
+        return new CreateLocKeyCodeActionProvider(config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void LocalisationFlagOff_ReturnsEmptyDespiteCreateLocKeyData()
+    {
+        var d = new Diagnostic
+        {
+            Range = TestRange,
+            Data = JToken.FromObject(new { createLocKey = "TEXT_NEW_KEY" })
+        };
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+
+        var results = Provider(config).Handle(Ctx(d)).ToList();
+
+        Assert.Empty(results);
+    }
+
     [Fact]
     public void DiagnosticWithCreateLocKey_ReturnsCreateAction()
     {
@@ -27,7 +52,7 @@ public sealed class CreateLocKeyCodeActionProviderTest
             Range = TestRange,
             Data = JToken.FromObject(new { createLocKey = "TEXT_NEW_KEY" })
         };
-        var provider = new CreateLocKeyCodeActionProvider();
+        var provider = Provider();
 
         var results = provider.Handle(Ctx(d)).ToList();
 
@@ -42,7 +67,7 @@ public sealed class CreateLocKeyCodeActionProviderTest
     public void DiagnosticWithoutCreateLocKey_ReturnsEmpty()
     {
         var d = new Diagnostic { Range = TestRange, Data = null };
-        var provider = new CreateLocKeyCodeActionProvider();
+        var provider = Provider();
 
         var results = provider.Handle(Ctx(d)).ToList();
 
@@ -57,7 +82,7 @@ public sealed class CreateLocKeyCodeActionProviderTest
             Range = TestRange,
             Data = JToken.FromObject(new { fix = "something_else" })
         };
-        var provider = new CreateLocKeyCodeActionProvider();
+        var provider = Provider();
 
         var results = provider.Handle(Ctx(d)).ToList();
 

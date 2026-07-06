@@ -11,11 +11,40 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
 {
     private static readonly char[] FlagSeparators = ['|', ','];
 
-    private readonly IGameIndexService _indexService;
+    // Rebuilt only on DynamicEnumChanged (baseline/workspace enum-value applies) instead of
+    // recomputing the baseline+workspace union from scratch on every completion keystroke.
+    private IReadOnlyDictionary<string, string[]> _mergedValuesByEnum;
 
     public DynamicEnumValueProposalProvider(IGameIndexService indexService)
     {
-        _indexService = indexService;
+        _mergedValuesByEnum = BuildCache(indexService.Current);
+        indexService.DynamicEnumChanged += index => _mergedValuesByEnum = BuildCache(index);
+    }
+
+    private static IReadOnlyDictionary<string, string[]> BuildCache(GameIndex index)
+    {
+        var enumNames = index.Baseline.DynamicEnumValues.Keys
+            .Concat(index.WorkspaceDynamicEnumValues.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        var cache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var enumName in enumNames)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var merged = new List<string>();
+
+            if (index.Baseline.DynamicEnumValues.TryGetValue(enumName, out var baselineVals))
+                foreach (var v in baselineVals)
+                    if (seen.Add(v)) merged.Add(v);
+
+            if (index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspaceVals))
+                foreach (var v in workspaceVals)
+                    if (seen.Add(v)) merged.Add(v);
+
+            cache[enumName] = [.. merged];
+        }
+
+        return cache;
     }
 
     public XmlValueType ValueType => XmlValueType.DynamicEnumValue;
@@ -63,24 +92,13 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
     private IReadOnlyList<ValueProposal> GetDynamicProposals(
         string enumName, string currentPartial, HashSet<string> alreadySelected)
     {
-        var index = _indexService.Current;
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var result = new List<ValueProposal>();
+        if (!_mergedValuesByEnum.TryGetValue(enumName, out var values))
+            return [];
 
-        void Add(string name)
-        {
-            if (!seen.Add(name)) return;
-            if (alreadySelected.Contains(name)) return;
-            if (!name.StartsWith(currentPartial, StringComparison.OrdinalIgnoreCase)) return;
-            result.Add(new ValueProposal { Label = name });
-        }
-
-        if (index.Baseline.DynamicEnumValues.TryGetValue(enumName, out var baselineVals))
-            foreach (var v in baselineVals) Add(v);
-
-        if (index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspaceVals))
-            foreach (var v in workspaceVals) Add(v);
-
-        return result;
+        return values
+            .Where(v => !alreadySelected.Contains(v))
+            .Where(v => v.StartsWith(currentPartial, StringComparison.OrdinalIgnoreCase))
+            .Select(v => new ValueProposal { Label = v })
+            .ToList();
     }
 }

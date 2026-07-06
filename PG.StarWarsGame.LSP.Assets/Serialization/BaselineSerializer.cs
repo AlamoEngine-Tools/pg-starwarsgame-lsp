@@ -23,7 +23,8 @@ public static class BaselineSerializer
             GroupMemberships = ToSerializedGroupMemberships(baseline.GroupMemberships),
             AssetFiles = baseline.AssetFiles.ToArray(),
             ModelBones = ToSerializedArray(baseline.ModelBones),
-            ObjectTags = ToSerializedObjectTags(baseline.ObjectTags)
+            ObjectTags = ToSerializedObjectTags(baseline.ObjectTags),
+            SchemaVersion = SerializedBaseline.CurrentSchemaVersion
         };
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
@@ -35,13 +36,25 @@ public static class BaselineSerializer
         return ms.ToArray();
     }
 
-    public static BaselineIndex Deserialize(byte[] data)
+    public static BaselineIndex? Deserialize(byte[] data)
     {
-        using var ms = new MemoryStream(data);
-        using var gz = new GZipStream(ms, CompressionMode.Decompress);
-        using var decompressed = new MemoryStream();
-        gz.CopyTo(decompressed);
-        var dto = MessagePackSerializer.Deserialize<SerializedBaseline>(decompressed.ToArray());
+        try
+        {
+            using var ms = new MemoryStream(data);
+            using var gz = new GZipStream(ms, CompressionMode.Decompress);
+            using var decompressed = new MemoryStream();
+            gz.CopyTo(decompressed);
+            var dto = MessagePackSerializer.Deserialize<SerializedBaseline>(decompressed.ToArray());
+            return dto.SchemaVersion != SerializedBaseline.CurrentSchemaVersion ? null : FromDto(dto);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static BaselineIndex FromDto(SerializedBaseline dto)
+    {
         var builtAt = DateTimeOffset.FromUnixTimeMilliseconds(dto.BuiltAtMs);
         var symbols = dto.Symbols.ToImmutableDictionary(s => s.Id);
         var enums = FromSerializedArray(dto.DynamicEnumValues);

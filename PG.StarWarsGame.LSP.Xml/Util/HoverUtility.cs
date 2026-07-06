@@ -107,7 +107,7 @@ internal static class HoverUtility
 
     public static Hover BuildReferenceHover(
         GameObjectTypeDefinition type, string symbolId, GameReference reference, string locale,
-        SymbolOrigin? origin = null)
+        SymbolOrigin? origin = null, string? dependencyLayerName = null)
     {
         var sb = new StringBuilder();
         sb.Append($"### `{type.TypeName}`");
@@ -118,6 +118,8 @@ internal static class HoverUtility
             AppendPackedOrigin(sb, meg);
         else if (origin is FileOrigin { IsNavigable: false } shipped)
             AppendShippedOrigin(sb, shipped);
+        else if (dependencyLayerName is not null)
+            AppendDependencyOrigin(sb, dependencyLayerName);
         return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
@@ -138,12 +140,18 @@ internal static class HoverUtility
         var ext = Path.GetExtension(value);
         if (string.IsNullOrEmpty(ext)) return null;
 
-        var matches = assetFiles.GetByExtension(ext)
-            .Where(p =>
-                p.Equals(value, StringComparison.OrdinalIgnoreCase) ||
-                p.EndsWith("/" + value, StringComparison.OrdinalIgnoreCase) ||
-                Path.GetFileName(p).Equals(value, StringComparison.OrdinalIgnoreCase))
-            .ToList();
+        var matches = FindMatches(assetFiles, value, ext);
+
+        // The engine treats TGA and DDS as one texture (TGA wins when both exist, otherwise it
+        // silently falls back to the other format) — resolve the hover the same way.
+        if (matches.Count == 0 && tag.ReferenceKind == ReferenceKind.TextureFile)
+        {
+            var altExt = ext.Equals(".tga", StringComparison.OrdinalIgnoreCase) ? ".dds"
+                : ext.Equals(".dds", StringComparison.OrdinalIgnoreCase) ? ".tga"
+                : null;
+            if (altExt is not null)
+                matches = FindMatches(assetFiles, value[..^ext.Length] + altExt, altExt);
+        }
 
         if (matches.Count == 0) return null;
 
@@ -186,6 +194,16 @@ internal static class HoverUtility
         };
     }
 
+    private static List<string> FindMatches(IAssetFileIndex assetFiles, string value, string ext)
+    {
+        return assetFiles.GetByExtension(ext)
+            .Where(p =>
+                p.Equals(value, StringComparison.OrdinalIgnoreCase) ||
+                p.EndsWith("/" + value, StringComparison.OrdinalIgnoreCase) ||
+                Path.GetFileName(p).Equals(value, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+    }
+
     private static void AppendPackedOrigin(StringBuilder sb, MegArchiveOrigin meg)
     {
         sb.AppendLine();
@@ -203,6 +221,19 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine("---");
         sb.Append($"📦 Packed in the base game — `{shipped.Uri.Replace('\\', '/')}`");
+    }
+
+    // A navigable workspace definition that lives in a DEPENDENCY project's layer (rank below the
+    // leaf). Without the note it is indistinguishable from a leaf-project definition, and users
+    // read the non-editable experience as "broken". Empty name = the layer has no display name.
+    private static void AppendDependencyOrigin(StringBuilder sb, string layerName)
+    {
+        sb.AppendLine();
+        sb.AppendLine();
+        sb.AppendLine("---");
+        sb.Append(layerName.Length > 0
+            ? $"📚 Defined in dependency **{layerName}**"
+            : "📚 Defined in a dependency project");
     }
 
     private static void AppendNotes(StringBuilder sb, IReadOnlyDictionary<string, string> notes, string locale)

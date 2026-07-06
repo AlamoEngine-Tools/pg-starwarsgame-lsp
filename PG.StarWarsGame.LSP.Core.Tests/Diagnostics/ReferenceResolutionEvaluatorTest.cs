@@ -86,6 +86,54 @@ public sealed class ReferenceResolutionEvaluatorTest
         Assert.Null(result);
     }
 
+    // ── SpecialAbility family allowlist ──────────────────────────────────────
+
+    [Fact]
+    public void Evaluate_SpecialAbilityExpected_ConcreteAbilitySubtype_ReturnsNull()
+    {
+        // ProximityMinesAbility is a concrete SpecialAbility subtype — GUI_Activated_Ability_Name
+        // (referenceType: SpecialAbility) must accept it, not just literal "SpecialAbility".
+        var result = ReferenceResolutionEvaluator.Evaluate(
+            "Bacara_Proximity_Mines_AV", "SpecialAbility", Symbol("Bacara_Proximity_Mines_AV", "ProximityMinesAbility"));
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Evaluate_SpecialAbilityExpected_ConcreteAbilitySubtype_CaseInsensitive_ReturnsNull()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate(
+            "X", "specialability", Symbol("X", "proximityminesability"));
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Evaluate_SpecialAbilityExpected_LiteralSpecialAbility_ReturnsNull()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate(
+            "X", "SpecialAbility", Symbol("X", "SpecialAbility"));
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void Evaluate_SpecialAbilityExpected_UnrelatedType_ReturnsError()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate(
+            "X", "SpecialAbility", Symbol("X", "Unit"));
+        Assert.NotNull(result);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+    }
+
+    [Fact]
+    public void Evaluate_NonSpecialAbilityExpected_AbilitySubtype_StillEnforcesExactMatch()
+    {
+        // The allowlist relaxation is scoped to expectedTypeName == SpecialAbility only — an
+        // unrelated expected type must still require an exact match.
+        var result = ReferenceResolutionEvaluator.Evaluate(
+            "X", "UnitAbility", Symbol("X", "ProximityMinesAbility"));
+        Assert.NotNull(result);
+        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+    }
+
     // ── type mismatch ─────────────────────────────────────────────────────────
 
     [Fact]

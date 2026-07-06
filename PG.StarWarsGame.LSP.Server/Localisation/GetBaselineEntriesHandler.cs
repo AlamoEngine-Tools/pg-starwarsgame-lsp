@@ -6,6 +6,7 @@ using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -17,24 +18,30 @@ public sealed class GetBaselineEntriesHandler
     private readonly ILanguageService _langService;
     private readonly ILocalisationLayerRegistry _layerRegistry;
     private readonly ILocalisationProjectRegistry _projectRegistry;
+    private readonly ILspConfigurationProvider _config;
 
     public GetBaselineEntriesHandler(
         IBaselineTranslationProvider baselineProvider,
         ILanguageService langService,
         ITranslationDatabaseFactory factory,
         ILocalisationProjectRegistry projectRegistry,
-        ILocalisationLayerRegistry layerRegistry)
+        ILocalisationLayerRegistry layerRegistry,
+        ILspConfigurationProvider config)
     {
         _baselineProvider = baselineProvider;
         _langService = langService;
         _factory = factory;
         _projectRegistry = projectRegistry;
         _layerRegistry = layerRegistry;
+        _config = config;
     }
 
     public Task<GetBaselineEntriesResult> Handle(
         GetBaselineEntriesParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+            return Task.FromResult(GetBaselineEntriesResult.Empty);
+
         var languages = _langService.OfficiallySupported();
         var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
         var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);

@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
@@ -344,7 +345,7 @@ file sealed class StubHardcodedSchemaProvider : ISchemaProvider
 
 file sealed class StubDocumentFactProducer : IXmlDocumentFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
     {
         return [];
     }
@@ -360,7 +361,7 @@ file sealed class StubIndexFactProducer : IXmlIndexFactProducer
 
 file sealed class StubStoryFactProducer : IStoryFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string xmlText, string documentUri)
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
     {
         return [];
     }
@@ -371,6 +372,7 @@ file sealed class StubIndexService : IGameIndexService
     public GameIndex Current => GameIndex.Empty;
     public event Action<GameIndex>? IndexChanged;
     public event Action<ILocalisationIndex>? LocalisationChanged;
+    public event Action<GameIndex>? DynamicEnumChanged;
 
     public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
     {

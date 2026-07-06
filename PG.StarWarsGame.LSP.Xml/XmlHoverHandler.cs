@@ -21,11 +21,11 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlHoverHandler> _logger;
     private readonly IXmlHoverStrategyRegistry _registry;
+    private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlHoverHandler(
-        IGameWorkspaceHost workspaceHost,
+        IXmlParseCache parseCache,
         IGameIndexService indexService,
         ISchemaProvider schema,
         ILspConfigurationProvider config,
@@ -34,7 +34,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         IEaWXmlContext eaWXmlContext,
         IXmlHoverStrategyRegistry registry)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _indexService = indexService;
         _schema = schema;
         _config = config;
@@ -52,9 +52,10 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<Hover?>(null);
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<Hover?>(null);
-        var hapDoc = XmlUtility.CreateHtmlDocument(doc.Text);
+        var hapDoc = parsed.Html;
 
         if (!XmlUtility.TryGetRootNode(hapDoc, out var rootNode) ||
             XmlUtility.GetLine(rootNode) == request.Position.Line)

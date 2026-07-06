@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -17,18 +18,24 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDefinitionHandler> _logger;
+    private readonly ILspConfigurationProvider _config;
 
     public XmlDefinitionHandler(IGameIndexService indexService, IFileHelper fileHelper,
-        ILogger<XmlDefinitionHandler> logger, IEaWXmlContext eaWXmlContext)
+        ILogger<XmlDefinitionHandler> logger, IEaWXmlContext eaWXmlContext,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _fileHelper = fileHelper;
         _logger = logger;
         _eaWXmlContext = eaWXmlContext;
+        _config = config;
     }
 
     public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.GoToDefinition)
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<LocationOrLocationLinks?>(null);

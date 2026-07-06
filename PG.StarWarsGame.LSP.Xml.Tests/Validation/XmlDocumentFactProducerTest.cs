@@ -100,6 +100,38 @@ public sealed class XmlDocumentFactProducerTest
     }
 
     [Fact]
+    public void XmlDuplicateTagFact_spans_the_whole_element_including_closing_tag()
+    {
+        // Greying out (Unnecessary) must cover the whole dead element, not just its opening tag.
+        //  line 0: <Root>
+        //  line 1: <Max_Speed>1.0</Max_Speed>
+        //  line 2: <Max_Speed>2.0</Max_Speed>
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+        var dups = facts.OfType<XmlDuplicateTagFact>().OrderBy(d => d.Line).ToList();
+
+        Assert.Equal(2, dups.Count);
+        Assert.Equal(1, dups[0].EndLine);
+        Assert.Equal("<Max_Speed>1.0</Max_Speed>".Length, dups[0].EndColumn);
+        Assert.Equal(2, dups[1].EndLine);
+    }
+
+    [Fact]
+    public void XmlDuplicateTagFact_marks_only_the_last_occurrence_as_last()
+    {
+        // The game keeps the LAST occurrence — the facts must say which one that is so earlier
+        // ones can be greyed out.
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n<Max_Speed>3.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+        var dups = facts.OfType<XmlDuplicateTagFact>().OrderBy(d => d.Line).ToList();
+
+        Assert.Equal(3, dups.Count);
+        Assert.False(dups[0].IsLastOccurrence);
+        Assert.False(dups[1].IsLastOccurrence);
+        Assert.True(dups[2].IsLastOccurrence);
+    }
+
+    [Fact]
     public void MultipleAllowed_tag_appearing_twice_does_not_emit_XmlDuplicateTagFact()
     {
         const string xml = "<Root><Multi_Tag>a</Multi_Tag><Multi_Tag>b</Multi_Tag></Root>";

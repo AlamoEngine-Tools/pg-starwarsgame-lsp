@@ -13,6 +13,7 @@ using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
@@ -32,6 +33,7 @@ public sealed class ExportLocalisationToDatHandler
     private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly ILocalisationProjectRegistry _projectRegistry;
     private readonly IXmlTranslationImporter _xmlImporter;
+    private readonly ILspConfigurationProvider _config;
 
     public ExportLocalisationToDatHandler(
         ICsvTranslationImporter csvImporter,
@@ -45,7 +47,8 @@ public sealed class ExportLocalisationToDatHandler
         IFileHelper fileHelper,
         ILocalisationProjectRegistry projectRegistry,
         ILocalisationLayerRegistry layerRegistry,
-        ILogger<ExportLocalisationToDatHandler> logger)
+        ILogger<ExportLocalisationToDatHandler> logger,
+        ILspConfigurationProvider config)
     {
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
@@ -59,11 +62,15 @@ public sealed class ExportLocalisationToDatHandler
         _projectRegistry = projectRegistry;
         _layerRegistry = layerRegistry;
         _logger = logger;
+        _config = config;
     }
 
     public Task<ExportLocalisationToDatResult> Handle(
         ExportLocalisationToDatParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Tools.Localisation)
+            return Task.FromResult(new ExportLocalisationToDatResult([], LocalisationFeatureDisabled.Message));
+
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Task.FromResult(new ExportLocalisationToDatResult([], "No project file path provided."));
 

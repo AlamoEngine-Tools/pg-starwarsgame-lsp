@@ -85,6 +85,60 @@ public sealed class AssetFileExistenceHandlerTest
         Assert.Empty(TextureSut.Handle(fact, ctx));
     }
 
+    // ── TGA/DDS interchangeability ───────────────────────────────────────────
+    // The engine treats TGA and DDS as one texture: a .tga reference is satisfied by the .dds
+    // (and vice versa); TGA wins when both exist. Only both-missing is a real problem.
+
+    [Fact]
+    public void Texture_TgaReferenced_OnlyDdsPresent_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
+        var ctx = CtxWith("data/art/textures/foo.dds");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_DdsReferenced_OnlyTgaPresent_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.dds");
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_TgaReferencedFullPath_OnlyDdsPresent_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile),
+            "data/art/textures/foo.tga");
+        var ctx = CtxWith("data/art/textures/foo.dds");
+
+        Assert.Empty(TextureSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Texture_NeitherFormatPresent_WarnsAndMentionsTheAlternate()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "missing.tga");
+        var ctx = CtxWith("data/art/textures/foo.tga");
+
+        var d = Assert.Single(TextureSut.Handle(fact, ctx));
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("missing.tga", d.Message);
+        Assert.Contains("missing.dds", d.Message);
+    }
+
+    [Fact]
+    public void Model_Absent_NoCrossExtensionFallback()
+    {
+        // Interchangeability is a TEXTURE rule; other asset types keep exact-extension matching.
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.ModelFile), "missing.alo");
+        var ctx = CtxWith("data/art/models/missing.dds");
+
+        Assert.Single(ModelSut.Handle(fact, ctx));
+    }
+
     // ── model / audio / map gating ───────────────────────────────────────────
 
     [Fact]

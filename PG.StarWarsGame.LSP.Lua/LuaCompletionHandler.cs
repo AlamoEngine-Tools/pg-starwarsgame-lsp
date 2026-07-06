@@ -5,12 +5,14 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Completion;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -22,39 +24,46 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCompletionHandler> _logger;
     private readonly ILuaApiSchemaProvider _schemaProvider;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILuaParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public LuaCompletionHandler(
         IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
+        ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
-        ILogger<LuaCompletionHandler> logger)
+        ILogger<LuaCompletionHandler> logger,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _annotationRepository = annotationRepository;
         _logger = logger;
+        _config = config;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.Completion)
+            return Task.FromResult(new CompletionList());
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(new CompletionList());
 
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult(new CompletionList());
 
         var line = request.Position.Line;
         var character = request.Position.Character;
         var index = _indexService.Current;
 
-        var ctx = LuaCompletionContextClassifier.Classify(doc.Text, line, character);
-        return Task.FromResult(BuildCompletions(ctx, uri, doc.Text, line, character, index));
+        var ctx = LuaCompletionContextClassifier.Classify(parsed.Text, line, character);
+        return Task.FromResult(BuildCompletions(ctx, uri, parsed, line, character, index));
     }
 
     public override Task<CompletionItem> Handle(CompletionItem request, CancellationToken ct)
@@ -75,7 +84,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
     private CompletionList BuildCompletions(
         LuaCompletionContext? ctx,
-        string uri, string text, int line, int character,
+        string uri, ParsedLuaDocument parsed, int line, int character,
         GameIndex index)
     {
         switch (ctx)
@@ -108,7 +117,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             case IdentifierContext { AtStatementStart: var atStart }:
             {
                 var scope = LuaLocalScopeCollector.CollectAt(
-                    text, line, character, uri, index, _schemaProvider, _fileHelper);
+                    parsed.Tree, parsed.Text, line, character, uri, index, _schemaProvider, _fileHelper);
                 var items = LuaIdentifierCompletionProvider.Provide(scope).ToList();
                 if (atStart)
                     items.AddRange(LuaSnippetCompletionProvider.Snippets);
@@ -118,7 +127,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             case MemberAccessContext memberCtx:
             {
                 var scope = LuaLocalScopeCollector.CollectAt(
-                    text, line, character, uri, index, _schemaProvider, _fileHelper);
+                    parsed.Tree, parsed.Text, line, character, uri, index, _schemaProvider, _fileHelper);
                 return new CompletionList(LuaMemberCompletionProvider.Provide(
                     memberCtx, scope, _schemaProvider, _annotationRepository.Current));
             }

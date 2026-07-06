@@ -71,6 +71,24 @@ public sealed class AudioFileFormatHandlerTest
     }
 
     [Fact]
+    public void Comma_separated_tokens_return_no_diagnostics()
+    {
+        var results = Sut.Handle(
+            XmlHandlerTestFixtures.MakeFact(AudioTag, "hit.wav, boom.wav, swoosh.mp3"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void Comma_and_newline_mixed_separators_return_no_diagnostics()
+    {
+        var results = Sut.Handle(
+            XmlHandlerTestFixtures.MakeFact(AudioTag, "hit.wav,\nboom.wav,\nswoosh.mp3"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
     public void Non_audio_tag_returns_no_diagnostics()
     {
         var otherTag = XmlHandlerTestFixtures.MakeTag("Speed", XmlValueType.Float);

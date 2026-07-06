@@ -41,12 +41,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
 
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
-        ILuaAnnotationRepository annotationRepository, IGameWorkspaceHost workspaceHost,
+        ILuaAnnotationRepository annotationRepository,
         ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
@@ -57,7 +56,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
         _annotationRepository = annotationRepository;
-        _workspaceHost = workspaceHost;
         _logger = logger;
     }
 
@@ -217,7 +215,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (flat scan)", files.Count);
 
         var indexed = 0;
-        var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
+        var options = new ParallelOptions
+            { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
         using (_indexService.BeginBulkUpdate())
         {
             await Parallel.ForEachAsync(files, options, async (file, token) =>
@@ -225,7 +224,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
                 var uri = _fileHelper.PathToFileUri(file);
                 await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                 var done = Interlocked.Increment(ref indexed);
                 progress?.Invoke(done, files.Count);
             });
@@ -249,10 +247,20 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
 
         var indexed = 0;
-        var options = new ParallelOptions { MaxDegreeOfParallelism = 4, CancellationToken = ct };
+        var options = new ParallelOptions
+            { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
+
+        // The schema drives what the parser emits (which tags produce references, which files
+        // carry types), so snapshots built under a different schema are stale even when every
+        // file's content hash matches. Computed once per scan.
+        var schemaFingerprint = SchemaFingerprint.Compute(_schema);
 
         // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
         var layerOverallHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // (pgprojPath → OverallHash) of snapshots that survived dependency validation — when the
+        // recomputed hash matches, the snapshot on disk is already current and is not re-saved.
+        var validSnapshotHashes = new Dictionary<string, string>(StringComparer.Ordinal);
 
         // Collect per-layer results for snapshot writing after the bulk update.
         var layerResults = new List<(ProjectLayer Layer, List<(string RelPath, string AbsUri, string Hash)> Entries)>();
@@ -267,17 +275,34 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
                 var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath) : null;
 
-                // Check if any dependency's hash has changed since the snapshot was built.
-                if (snapshot is not null && pgprojPath is not null)
+                // Snapshot built under a different (or pre-fingerprint) schema — discard it.
+                if (snapshot is not null && snapshot.SchemaFingerprint != schemaFingerprint)
+                {
+                    _logger.LogInformation(
+                        "Schema changed since layer '{Layer}' was cached; discarding its snapshot",
+                        layer.Name);
+                    snapshot = null;
+                }
+
+                // A dependency changed since this snapshot was built. Cached parses are not
+                // content-pure — symbol extraction depends on cross-layer inputs (file-type
+                // registrations from dependency metafiles) — so the layer's own file hashes cannot
+                // catch this; discard the whole snapshot and re-parse the layer.
+                if (snapshot is not null)
                     foreach (var dep in snapshot.DependencyHashes)
                         if (!layerOverallHashes.TryGetValue(dep.ProjectPath, out var currentHash)
                             || currentHash != dep.OverallHash)
                         {
-                            _logger.LogDebug(
-                                "Dependency hash changed for '{Dep}' in layer '{Layer}'; snapshot dep-hashes may be stale",
+                            _logger.LogInformation(
+                                "Dependency '{Dep}' changed since layer '{Layer}' was cached; discarding its snapshot",
                                 dep.ProjectPath, layer.Name);
+                            snapshot = null;
                             break;
                         }
+
+                // Overall hash of the validated snapshot, for skipping the redundant re-save below.
+                if (snapshot is not null && pgprojPath is not null)
+                    validSnapshotHashes[pgprojPath] = snapshot.OverallHash;
 
                 // Build lookup from relPath → cached entry.
                 var projectDir = pgprojPath is not null ? GetDirectory(pgprojPath) : null;
@@ -306,7 +331,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                         await _indexService.UpdateDocumentAsync(uri, text, 0, token);
                     }
 
-                    _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
                     var done = Interlocked.Increment(ref indexed);
                     progress?.Invoke(done, totalFiles);
                 });
@@ -330,6 +354,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             if (pgprojPath is null) continue;
 
             var overallHash = layerOverallHashes.GetValueOrDefault(pgprojPath, string.Empty);
+
+            // Nothing changed since the snapshot on disk was written — skip the re-serialization.
+            if (validSnapshotHashes.TryGetValue(pgprojPath, out var priorHash) && priorHash == overallHash)
+            {
+                _logger.LogDebug("Layer snapshot '{Pgproj}' unchanged; skipping save", pgprojPath);
+                continue;
+            }
+
             var depHashes = config.Layers
                 .Select(l => (NormalizedPath: l.ProjectPath?.Replace('\\', '/'), Layer: l))
                 .Where(t => t.Layer.Rank < layer.Rank && t.NormalizedPath is not null
@@ -354,7 +386,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
                 OverallHash = overallHash,
                 DependencyHashes = depHashes,
-                Files = snapshotFiles
+                Files = snapshotFiles,
+                SchemaFingerprint = schemaFingerprint
             };
             _cache.Save(pgprojPath, newSnapshot);
             _cache.EnsureGitHygiene(pgprojPath);
@@ -408,6 +441,35 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     {
         var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
 
+        // Filename-only search across every xml root, recursing into subdirectories. Collect the
+        // wanted filenames up front and walk each root ONCE, instead of one recursive directory
+        // walk per enum source file per root. Roots are iterated in reverse so the highest-rank
+        // (root project) directory wins; config.XmlDirectories is deps-first / root-last (see
+        // ModProjectResolver.Resolve).
+        var wantedFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var enumDef in _schema.AllEnums)
+        {
+            if (enumDef.Kind != EnumKind.DynamicXml || string.IsNullOrEmpty(enumDef.SourceFile))
+                continue;
+            var anchorIdx = enumDef.SourceFile.IndexOf('$');
+            var filePath = anchorIdx >= 0 ? enumDef.SourceFile[..anchorIdx] : enumDef.SourceFile;
+            wantedFileNames.Add(_fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep)));
+        }
+
+        var diskPathByFileName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (wantedFileNames.Count > 0)
+            foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
+            {
+                if (!_fileHelper.FileSystem.Directory.Exists(xmlRoot)) continue;
+                foreach (var file in _fileHelper.FileSystem.Directory
+                             .EnumerateFiles(xmlRoot, "*", SearchOption.AllDirectories))
+                {
+                    var name = _fileHelper.FileSystem.Path.GetFileName(file);
+                    if (wantedFileNames.Contains(name) && !diskPathByFileName.ContainsKey(name))
+                        diskPathByFileName[name] = file;
+                }
+            }
+
         // Keyed by logical file path (anchor stripped). Caches (diskPath, content) so the file is
         // read once even when multiple enums share the same source file (e.g. gameconstants.xml).
         var resolvedFiles = new Dictionary<string, (string DiskPath, string Content)>(
@@ -420,30 +482,21 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             if (resolvedFiles.TryGetValue(filePath, out var cached))
                 return cached.Content;
 
-            // Filename-only search across every xml root, recursing into subdirectories.
-            // Iterate in reverse so the highest-rank (root project) directory is checked first;
-            // config.XmlDirectories is deps-first / root-last (see ModProjectResolver.Resolve).
             var fileName = _fileHelper.FileSystem.Path.GetFileName(filePath.Replace('/', sep));
-            foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
-            {
-                if (!_fileHelper.FileSystem.Directory.Exists(xmlRoot)) continue;
-                var match = _fileHelper.FileSystem.Directory
-                    .EnumerateFiles(xmlRoot, fileName, SearchOption.AllDirectories)
-                    .FirstOrDefault();
-                if (match is null) continue;
-                try
-                {
-                    var content = _fileHelper.FileSystem.File.ReadAllText(match);
-                    resolvedFiles[filePath] = (match, content);
-                    return content;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning("Could not read enum file '{Path}': {Message}", match, ex.Message);
-                }
-            }
+            if (!diskPathByFileName.TryGetValue(fileName, out var match))
+                return null;
 
-            return null;
+            try
+            {
+                var content = _fileHelper.FileSystem.File.ReadAllText(match);
+                resolvedFiles[filePath] = (match, content);
+                return content;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not read enum file '{Path}': {Message}", match, ex.Message);
+                return null;
+            }
         }
 
         var (workspace, _) = DynamicEnumExtractor.Extract(_schema, FileReader);

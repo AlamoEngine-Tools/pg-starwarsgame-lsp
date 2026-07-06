@@ -21,6 +21,18 @@ public sealed class InaccuracyMapHandler : CommaSeparatedPairHandlerBase
                     $"'{fact.RawValue.Trim()}' is not a valid inaccuracy map entry for <{fact.Tag.Tag}>. Expected: Category, Float.")
             ];
 
+        // Slot 0 is a GameObjectCategoryType member (Fighter, Bomber, ...) - validate it against
+        // the merged baseline+workspace value set, precisely positioned at the category token.
+        var category = parts[0].Trim();
+        var valid = EnumValueSets.GetValidValues(ctx.Schema.GetEnum("GameObjectCategoryType"), ctx);
+        if (valid is not null && !valid.Contains(category))
+            return
+            [
+                AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
+                        $"'{category}' is not a known GameObjectCategoryType value for <{fact.Tag.Tag}>."),
+                    fact, 0)
+            ];
+
         return [];
     }
 }

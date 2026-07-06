@@ -399,12 +399,13 @@ public sealed class ModProjectLoaderTest
     }
 
     [Fact]
-    public void Load_OldDirectoriesTextShape_IgnoredNotError()
+    public void Load_OldDirectoriesTextAndTypeShape_ThrowsClearException()
     {
         // Clean break: the old directories.text/textResourceType shape was removed in favour of
-        // the top-level "localisation" node. Old-shape files must not crash the server — they
-        // just silently stop configuring a text directory (System.Text.Json ignores unknown
-        // properties by default).
+        // the top-level "localisation" node. Silently ignoring it (System.Text.Json's default
+        // behaviour for unknown properties) would leave the mod's localisation quietly
+        // unconfigured with no indication why — so this must hard-fail with a migration hint
+        // instead of loading successfully.
         const string json = """
                             {
                               "modinfo": { "name": "Mod" },
@@ -413,9 +414,27 @@ public sealed class ModProjectLoaderTest
                             """;
         var loader = Build(json, out _);
 
-        var model = loader.Load(ProjectPath);
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("directories.text", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("localisation", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("mymod.pgproj", ex.Message);
+    }
 
-        Assert.Null(model.Localisation);
+    [Fact]
+    public void Load_OldDirectoriesTextResourceTypeOnly_ThrowsClearException()
+    {
+        // The two legacy fields could theoretically appear independently; either one alone must
+        // still be caught.
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "directories": { "xml": ["data/xml"], "textResourceType": "csv" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("directories.text", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

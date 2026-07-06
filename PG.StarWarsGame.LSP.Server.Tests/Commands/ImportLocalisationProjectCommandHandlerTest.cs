@@ -17,6 +17,7 @@ using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Commands;
@@ -28,6 +29,25 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Commands;
 public sealed class ImportLocalisationProjectCommandHandlerTest
 {
     private const string PgprojPath = "/mod/mymod.pgproj";
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_NoOp()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+        });
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, reload, writer) = BuildHandler(mockFs, lspConfig: config);
+
+        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
+
+        Assert.False(reload.FullyReloaded);
+        Assert.Null(writer.LastCall);
+    }
 
     // ── validation / guard clauses ───────────────────────────────────────────
 
@@ -376,7 +396,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     }
 
     private static (ImportLocalisationProjectCommandHandler handler, SpyReloadService reload, SpyFileWriter writer)
-        BuildHandler(MockFileSystem? fs = null, bool noPgproj = false)
+        BuildHandler(MockFileSystem? fs = null, bool noPgproj = false, ILspConfigurationProvider? lspConfig = null)
     {
         var mockFs = fs ?? new MockFileSystem();
 
@@ -409,7 +429,8 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             new FileHelper(mockFs),
             reload,
             writer,
-            NullLogger<ImportLocalisationProjectCommandHandler>.Instance);
+            NullLogger<ImportLocalisationProjectCommandHandler>.Instance,
+            lspConfig ?? new FakeLspConfigurationProvider());
 
         return (handler, reload, writer);
     }

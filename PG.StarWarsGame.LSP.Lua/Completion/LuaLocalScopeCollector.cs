@@ -36,10 +36,23 @@ internal static class LuaLocalScopeCollector
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper)
     {
+        return CollectAt(LuaSyntaxTree.ParseText(text, s_parseOptions), text, line, character,
+            documentUri, index, schemaProvider, fileHelper);
+    }
+
+    public static IReadOnlyList<ScopeEntry> CollectAt(
+        SyntaxTree tree,
+        string text,
+        int line,
+        int character,
+        string documentUri,
+        GameIndex index,
+        ILuaApiSchemaProvider schemaProvider,
+        IFileHelper fileHelper)
+    {
         var entries = new List<ScopeEntry>();
 
         // 1. AST-based: locals and parameters visible at cursor
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
         var cursorOffset = ComputeOffset(text, line, character);
 

@@ -7,12 +7,15 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
+using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -64,7 +67,8 @@ public sealed class XmlDiagnosticsPublisherTest
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
-            FakeFileTypeRegistry? registry = null)
+            FakeFileTypeRegistry? registry = null,
+            ILspConfigurationProvider? config = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -101,7 +105,8 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryFactProducer(effectiveSchema),
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             effectiveRegistry,
-            fileHelper);
+            fileHelper,
+            configProvider: config);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -143,6 +148,48 @@ public sealed class XmlDiagnosticsPublisherTest
 
         Assert.Single(published);
         Assert.Equal("file:///a.xml", published[0].Uri.ToString());
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    private static FakeLspConfigurationProvider XmlDiagnosticsOff()
+    {
+        return FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Diagnostics = false } });
+    }
+
+    [Fact]
+    public void IndexChanged_XmlDiagnosticsFlagOff_PublishesNothing()
+    {
+        var (_, published, indexService, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_XmlDiagnosticsFlagOff_PublishesNothing()
+    {
+        var (publisher, published, _, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+
+        await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
+
+        Assert.Empty(published);
+    }
+
+    [Fact]
+    public async Task RevalidateWorkspace_XmlDiagnosticsFlagOff_PublishesNothing()
+    {
+        var (publisher, published, indexService, workspaceHost) = BuildSubscribed(config: XmlDiagnosticsOff());
+        workspaceHost.Set("file:///a.xml", "<Root/>");
+        indexService.Current = IndexWithDoc("file:///a.xml");
+
+        await publisher.RevalidateWorkspaceAsync(CancellationToken.None);
+
+        Assert.Empty(published);
     }
 
     [Fact]
@@ -557,6 +604,98 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Equal("TEXT_FOO", diag.Data?["createLocKey"]?.Value<string>());
     }
 
+    // ── cross-line ranges (result override) ──────────────────────────────────
+
+    [Fact]
+    public void ToLspDiagnostic_WhenResultOverridesEndPosition_ProducesCrossLineRange()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition { Tag = "Priority", ValueType = XmlValueType.Int });
+        var (_, published, indexService, workspaceHost) =
+            BuildSubscribedWithHandlers(schema, [new EndPositionOverrideStubHandler()]);
+
+        workspaceHost.Set("file:///test.xml", "<Root>\n<Priority>1.5</Priority>\n</Root>");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diag = Assert.Single(published.Single().Diagnostics!);
+        Assert.Equal(1, diag.Range.Start.Line);
+        Assert.Equal(3, diag.Range.End.Line);
+        Assert.Equal(7, diag.Range.End.Character);
+    }
+
+    [Fact]
+    public void ToLspDiagnostic_WhenFactCarriesEndPosition_HandlerNeedNotOverride_ProducesCrossLineRange()
+    {
+        // Proves the fact-level fallthrough path used by VariantRedundantOverrideFact: a producer
+        // that knows a node's full span sets EndLine/EndColumn once on the fact, and a handler that
+        // never touches position at all (returns a plain XmlDiagnosticResult) still gets a correct
+        // cross-line Range.
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
+        var fileHelper = new FileHelper(new MockFileSystem());
+        var publisher = new XmlDiagnosticsPublisher(
+            p => published.Add(p),
+            indexService,
+            workspaceHost,
+            new FakeSchemaProvider(),
+            new XmlDiagnosticsHandlerRegistry([new PlainResultForSpanFactHandler()]),
+            new SpanFactStubDocumentProducer(),
+            new StubIndexFactProducerForSpan(),
+            new StoryFactProducer(new FakeSchemaProvider()),
+            NullLogger<XmlDiagnosticsPublisher>.Instance,
+            new FakeFileTypeRegistry(),
+            fileHelper);
+
+        workspaceHost.Set("file:///test.xml", "irrelevant text");
+        indexService.Fire(IndexWithDoc("file:///test.xml"));
+
+        var diag = Assert.Single(published.Single().Diagnostics!);
+        Assert.Equal(2, diag.Range.Start.Line);
+        Assert.Equal(4, diag.Range.Start.Character);
+        Assert.Equal(6, diag.Range.End.Line);
+        Assert.Equal(9, diag.Range.End.Character);
+    }
+
+    private sealed record SpanFact(string DocumentUri, int Line, int Column, int Length, int? EndLine,
+        int? EndColumn) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);
+
+    private sealed class SpanFactStubDocumentProducer : IXmlDocumentFactProducer
+    {
+        public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+        {
+            return [new SpanFact(documentUri, 2, 4, 3, 6, 9)];
+        }
+    }
+
+    private sealed class StubIndexFactProducerForSpan : IXmlIndexFactProducer
+    {
+        public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+        {
+            return [];
+        }
+    }
+
+    private sealed class PlainResultForSpanFactHandler : XmlDiagnosticsHandler<SpanFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(SpanFact fact, DiagnosticsContext ctx)
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "whole-node span")];
+        }
+    }
+
+    private sealed class EndPositionOverrideStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+        {
+            return
+            [
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "spans multiple lines",
+                    OverrideEndLine: 3, OverrideEndColumn: 7)
+            ];
+        }
+    }
+
     // ── revalidation ────────────────────────────────────────────────────────────
 
     private static (XmlDiagnosticsPublisher publisher,
@@ -793,6 +932,7 @@ public sealed class XmlDiagnosticsPublisherTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

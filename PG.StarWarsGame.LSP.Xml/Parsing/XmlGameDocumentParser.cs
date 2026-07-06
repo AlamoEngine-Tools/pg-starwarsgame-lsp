@@ -16,15 +16,21 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
+    private readonly IXmlParseCache? _parseCache;
     private readonly ISchemaProvider _schema;
 
+    // parseCache is optional so minimal test setups can omit it; production wires the shared
+    // cache so the indexing parse seeds it — the diagnostics publish and the first hover/inlay
+    // request after an edit then reuse this parse instead of re-parsing.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
-        IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger)
+        IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
+        IXmlParseCache? parseCache = null)
     {
         _fileHelper = fileHelper;
         _schema = schema;
         _fileTypeRegistry = fileTypeRegistry;
         _logger = logger;
+        _parseCache = parseCache;
     }
 
     public bool CanParse(string fileExtension)
@@ -36,18 +42,19 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         string documentUri, string text, int version, CancellationToken ct)
     {
         var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
+        var parsed = _parseCache?.GetOrParse(canonicalUri, text) ?? ParsedXmlDocument.Parse(text);
+        var doc = parsed.Html;
 
         var registeredTypes = _fileTypeRegistry.GetTypesForFile(canonicalUri);
+        var lineIndex = parsed.LineIndex;
 
         // References are collected first so the symbol passes can append the typed variant-base
         // reference for each object they index (the enclosing object's type is only known here).
-        var references = CollectReferences(doc, canonicalUri, text, ct);
-        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, text, registeredTypes, references, ct);
-        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, text, references, ct));
+        var references = CollectReferences(doc, canonicalUri, lineIndex, ct);
+        var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, lineIndex, registeredTypes, references, ct);
+        symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
 
-        var groupMemberships = CollectGroupMemberships(doc, canonicalUri, text, ct);
+        var groupMemberships = CollectGroupMemberships(doc, canonicalUri, lineIndex, ct);
 
         return ValueTask.FromResult(new DocumentIndex(
             canonicalUri, version,
@@ -57,7 +64,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,
-        string text, ImmutableArray<string> registeredTypes, List<GameReference> references, CancellationToken ct)
+        LineOffsetIndex lineIndex, ImmutableArray<string> registeredTypes, List<GameReference> references,
+        CancellationToken ct)
     {
         var typeDef = registeredTypes
             .Select(t => _schema.GetObjectType(t))
@@ -81,8 +89,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             }
             else
             {
-                var col = FindNameAttributeValueColumn(node, typeDef.NameTag, text);
-                var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, text);
+                var col = FindNameAttributeValueColumn(node, typeDef.NameTag, lineIndex);
+                var (variantBaseId, variantRef) = ResolveVariant(node, typeDef.TypeName, documentUri, lineIndex);
                 if (variantRef is not null) references.Add(variantRef);
                 symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeDef.TypeName,
                     new FileOrigin(documentUri, node.Line - 1, col), null, variantBaseId));
@@ -100,7 +108,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     ///     unresolved-reference and type-mismatch handlers validate the inheritance link for free.
     /// </summary>
     private (string? BaseId, GameReference? Reference) ResolveVariant(
-        HtmlNode objectNode, string enclosingTypeName, string documentUri, string text)
+        HtmlNode objectNode, string enclosingTypeName, string documentUri, LineOffsetIndex lineIndex,
+        string? ownerPrefix = null)
     {
         foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
@@ -113,25 +122,30 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
             var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
             var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+            var (line, column) = lineIndex.GetPosition(absPos);
 
-            var reference = new GameReference(trimmed, GameSymbolKind.XmlObject,
+            // The base id/reference must live in the same id-space as objectNode's own id — for
+            // top-level objects that's the bare name (ownerPrefix is null); for abilities it's
+            // owner-scoped ("{ownerId}$Name", see CollectSubObjectListSymbols) to avoid coincidentally
+            // resolving to an unrelated object's same-named ability.
+            var baseId = ownerPrefix is not null ? $"{ownerPrefix}${trimmed}" : trimmed;
+            var reference = new GameReference(baseId, GameSymbolKind.XmlObject,
                 enclosingTypeName, documentUri, line, column, trimmed.Length);
-            return (trimmed, reference);
+            return (baseId, reference);
         }
 
         return (null, null);
     }
 
-    private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, string text)
+    private static int? FindNameAttributeValueColumn(HtmlNode node, string nameTag, LineOffsetIndex lineIndex)
     {
         var attr = node.Attributes.FirstOrDefault(a =>
             a.Name.Equals(nameTag, StringComparison.OrdinalIgnoreCase));
         if (attr is null) return null;
-        return XmlUtility.OffsetToPosition(text, attr.ValueStartIndex).Col;
+        return lineIndex.GetPosition(attr.ValueStartIndex).Col;
     }
 
-    private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, string text,
+    private List<GameReference> CollectReferences(HtmlDocument doc, string documentUri, LineOffsetIndex lineIndex,
         CancellationToken ct)
     {
         var references = new List<GameReference>();
@@ -148,7 +162,28 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     tagDef.Enum?.Kind == EnumKind.DynamicXml)
                 {
                     if (HasChildElement(child)) continue;
-                    CollectEnumReferences(child, tagDef.Enum.Name, text, documentUri, references);
+                    CollectEnumReferences(child, tagDef.Enum.Name, lineIndex, documentUri, references);
+                    continue;
+                }
+
+                // Presence_Induced_Animations: "AnimationStateId, ObjectName, ..." — the first
+                // token is an engine animation state (not indexable), the rest are game objects
+                // whose presence triggers it. Record those as object references so
+                // go-to-definition and unresolved-reference validation cover them.
+                if (tagDef.ValidationOverride?.ValidationId == "presence-induced-animations")
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectPresenceInducedObjectReferences(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
+                // (GameObjectCategoryType, float) tuples: record slot 0 as an enum: reference
+                // so go-to-definition/rename work on the category token. Membership is validated
+                // by InaccuracyMapHandler; XmlIndexFactProducer skips enum: ids.
+                if (tagDef.ValueType == XmlValueType.InaccuracyMap)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectInaccuracyCategoryReference(child, lineIndex, documentUri, references);
                     continue;
                 }
 
@@ -171,7 +206,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
                     var absPos = child.InnerStartIndex + tokenOffset;
-                    var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+                    var (line, column) = lineIndex.GetPosition(absPos);
                     var targetId = ownerPrefix is not null ? $"{ownerPrefix}${name}" : name;
 
                     references.Add(new GameReference(
@@ -189,14 +224,66 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return references;
     }
 
+    // Every token AFTER the leading animation-state id of a Presence_Induced_Animations value,
+    // as wildcard-typed object references.
+    private static void CollectPresenceInducedObjectReferences(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var first = true;
+        foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
+        {
+            if (first)
+            {
+                first = false; // the animation state id — not a game object
+                continue;
+            }
+
+            var absPos = child.InnerStartIndex + tokenOffset;
+            var (line, column) = lineIndex.GetPosition(absPos);
+            references.Add(new GameReference(
+                token,
+                GameSymbolKind.XmlObject,
+                null,
+                documentUri,
+                line,
+                column,
+                token.Length));
+        }
+    }
+
+    // Slot 0 of an InaccuracyMap tuple ("Bomber, 15.0") as an enum: reference, mirroring
+    // CollectEnumReferences' id format for plain dynamic-enum tags.
+    private static void CollectInaccuracyCategoryReference(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var comma = innerText.IndexOf(',');
+        var slot = comma < 0 ? innerText : innerText[..comma];
+        var token = slot.Trim();
+        if (token.Length == 0) return;
+
+        var tokenOffset = slot.IndexOf(token, StringComparison.Ordinal);
+        var absPos = child.InnerStartIndex + tokenOffset;
+        var (line, column) = lineIndex.GetPosition(absPos);
+        references.Add(new GameReference(
+            $"enum:GameObjectCategoryType/{token}",
+            null,
+            null,
+            documentUri,
+            line,
+            column,
+            token.Length));
+    }
+
     private static void CollectEnumReferences(HtmlNode child, string enumName,
-        string text, string documentUri, List<GameReference> references)
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {
         var innerText = child.InnerText;
         foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
         {
             var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = XmlUtility.OffsetToPosition(text, absPos);
+            var (line, column) = lineIndex.GetPosition(absPos);
             references.Add(new GameReference(
                 $"enum:{enumName}/{token}",
                 null,
@@ -209,7 +296,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<DocumentGroupMembership> CollectGroupMemberships(HtmlDocument doc, string documentUri,
-        string text, CancellationToken ct)
+        LineOffsetIndex lineIndex, CancellationToken ct)
     {
         var memberships = new List<DocumentGroupMembership>();
 
@@ -232,7 +319,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 // Tag-value cursor position
                 var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
                 var absPos = child.InnerStartIndex + tokenOffset;
-                var (tagLine, tagColumn) = XmlUtility.OffsetToPosition(text, absPos);
+                var (tagLine, tagColumn) = lineIndex.GetPosition(absPos);
 
                 // Parent-name navigation target
                 var memberTypeName = tagDef.ObjectType?.TypeName;
@@ -246,7 +333,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 {
                     var parentId = GetNameAttribute(node, nameTag);
                     if (parentId.Length > 0)
-                        memberColumn = FindNameAttributeValueColumn(node, nameTag, text);
+                        memberColumn = FindNameAttributeValueColumn(node, nameTag, lineIndex);
                 }
 
                 memberships.Add(new DocumentGroupMembership(
@@ -259,10 +346,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         return memberships;
     }
 
-    // True when the element contains a nested child element, marking it as a container/object
-    // definition rather than a leaf reference value.
-    // Walks up from node to find the nearest ancestor that is a registered game object type,
-    // then returns that ancestor's name-attribute value. Used for OwnerScopedReference tags.
+    // Walks up from node to find the nearest ancestor that identifies a game object, then returns
+    // that ancestor's name-attribute value. Used for owner-scoped ability symbols and
+    // OwnerScopedReference tags. An ancestor qualifies when its element name is a registered
+    // object type (whose NameTag then applies) OR when it simply carries a Name attribute — real
+    // game files use concrete element names (<SpaceUnit>, <SpecialStructure>, …) that are NOT
+    // schema object types (the schema models one umbrella GameObjectType), so without the
+    // Name-attribute fallback every owner lookup fails and ability ids collide across objects.
     private string? FindEnclosingObjectId(HtmlNode node)
     {
         var current = node.ParentNode;
@@ -274,6 +364,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 var id = GetNameAttribute(current, typeDef.NameTag);
                 return string.IsNullOrEmpty(id) ? null : id;
             }
+
+            var nameAttr = GetNameAttribute(current, "Name");
+            if (!string.IsNullOrEmpty(nameAttr))
+                return nameAttr;
 
             current = current.ParentNode;
         }
@@ -316,7 +410,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     }
 
     private List<GameSymbol> CollectSubObjectListSymbols(
-        HtmlDocument doc, string documentUri, string text, List<GameReference> references, CancellationToken ct)
+        HtmlDocument doc, string documentUri, LineOffsetIndex lineIndex, List<GameReference> references,
+        CancellationToken ct)
     {
         var symbols = new List<GameSymbol>();
 
@@ -331,10 +426,9 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
                 // Find the enclosing game object's ID so abilities can be scoped to their owner,
                 // preventing false duplicate-symbol errors when two units share an ability name.
-                var ownerTypeDef = _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name));
-                var ownerId = ownerTypeDef?.NameTag is not null
-                    ? GetNameAttribute(node, ownerTypeDef.NameTag)
-                    : null;
+                // Same resolution as OwnerScopedReference tags (incl. the Name-attribute fallback
+                // for concrete element names that are not schema object types).
+                var ownerId = FindEnclosingObjectId(child);
 
                 foreach (var abilityNode in child.ChildNodes
                              .Where(n => n.NodeType == HtmlNodeType.Element))
@@ -346,9 +440,11 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     var abilityName = GetNameAttribute(abilityNode, objectType.NameTag);
                     if (string.IsNullOrEmpty(abilityName)) continue;
 
-                    var id = string.IsNullOrEmpty(ownerId) ? abilityName : $"{ownerId}${abilityName}";
-                    var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, text);
-                    var (variantBaseId, variantRef) = ResolveVariant(abilityNode, typeName, documentUri, text);
+                    var ownerPrefix = string.IsNullOrEmpty(ownerId) ? null : ownerId;
+                    var id = ownerPrefix is null ? abilityName : $"{ownerPrefix}${abilityName}";
+                    var col = FindNameAttributeValueColumn(abilityNode, objectType.NameTag, lineIndex);
+                    var (variantBaseId, variantRef) =
+                        ResolveVariant(abilityNode, typeName, documentUri, lineIndex, ownerPrefix);
                     if (variantRef is not null) references.Add(variantRef);
                     symbols.Add(new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
                         new FileOrigin(documentUri, abilityNode.Line - 1, col), null, variantBaseId));

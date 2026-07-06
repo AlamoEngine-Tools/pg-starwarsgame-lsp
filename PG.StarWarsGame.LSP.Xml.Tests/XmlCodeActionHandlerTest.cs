@@ -4,20 +4,41 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
+using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
 public sealed class XmlCodeActionHandlerTest
 {
-    private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null)
+    private static XmlCodeActionHandler MakeSut(IXmlFixCache? cache = null,
+        ILspConfigurationProvider? config = null)
     {
+        var resolvedConfig = config ?? new FakeLspConfigurationProvider();
         var registry = new XmlCodeActionRegistry([
             new FixSuggestionCodeActionProvider(cache ?? new EmptyFixCache()),
-            new CreateLocKeyCodeActionProvider()
+            new CreateLocKeyCodeActionProvider(resolvedConfig)
         ]);
-        return new XmlCodeActionHandler(registry);
+        return new XmlCodeActionHandler(registry, resolvedConfig);
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_CodeActionsFlagOff_ReturnsEmpty()
+    {
+        // Same arrange as DiagnosticWithFix_ReturnsSingleCodeActionWithEdit — only the flag differs.
+        const string uri = "file:///test.xml";
+        var range = new LspRange(new Position(0, 10), new Position(0, 13));
+        var request = ParamsWithDiagnostics(uri, DiagWithFix(range, "42"));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { CodeActions = false } });
+
+        var result = await MakeSut(config: config).Handle(request, CancellationToken.None);
+
+        Assert.Empty(result!);
     }
 
     private static CodeActionParams ParamsWithDiagnostics(string uri, params Diagnostic[] diagnostics)

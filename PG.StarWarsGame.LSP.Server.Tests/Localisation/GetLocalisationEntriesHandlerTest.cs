@@ -11,6 +11,7 @@ using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -18,6 +19,25 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class GetLocalisationEntriesHandlerTest
 {
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_ReturnsDisabledErrorWithoutReadingFile()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/f.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+        });
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var handler = BuildHandler(fs, config);
+
+        var result = await handler.Handle(new GetLocalisationEntriesParams("/mod/f.csv"), CancellationToken.None);
+
+        Assert.Empty(result.Entries);
+        Assert.Equal(LocalisationFeatureDisabled.Message, result.Error);
+    }
+
     [Fact]
     public async Task Handle_MissingPath_ReturnsError()
     {
@@ -161,7 +181,8 @@ public sealed class GetLocalisationEntriesHandlerTest
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static GetLocalisationEntriesHandler BuildHandler(MockFileSystem fs)
+    private static GetLocalisationEntriesHandler BuildHandler(
+        MockFileSystem fs, ILspConfigurationProvider? config = null)
     {
         var services = new ServiceCollection();
         services.AddSingleton<IFileSystem>(fs);
@@ -175,6 +196,7 @@ public sealed class GetLocalisationEntriesHandlerTest
             sp.GetRequiredService<ITranslationDatabaseFactory>(),
             sp.GetRequiredService<ILanguageService>(),
             new FileHelper(fs),
-            NullLogger<GetLocalisationEntriesHandler>.Instance);
+            NullLogger<GetLocalisationEntriesHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
     }
 }

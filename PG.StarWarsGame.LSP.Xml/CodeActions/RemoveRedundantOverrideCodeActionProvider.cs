@@ -20,11 +20,11 @@ namespace PG.StarWarsGame.LSP.Xml.CodeActions;
 internal sealed class RemoveRedundantOverrideCodeActionProvider : IXmlCodeActionProvider
 {
     private readonly IFileHelper _fileHelper;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlParseCache _parseCache;
 
-    public RemoveRedundantOverrideCodeActionProvider(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
+    public RemoveRedundantOverrideCodeActionProvider(IXmlParseCache parseCache, IFileHelper fileHelper)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
     }
 
@@ -34,17 +34,18 @@ internal sealed class RemoveRedundantOverrideCodeActionProvider : IXmlCodeAction
             return [];
 
         var uri = _fileHelper.NormalizeUri(ctx.DocumentUri.ToString());
-        if (!_workspaceHost.TryGet(uri, out var trackedDoc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return [];
 
-        var hapDoc = XmlUtility.CreateHtmlDocument(trackedDoc.Text);
+        var hapDoc = parsed.Html;
         var diagnosticLine = ctx.Diagnostic.Range.Start.Line;
         if (!XmlUtility.TryFindNode(hapDoc, diagnosticLine, out var node) || node is null)
             return [];
 
         var removeStart = new Position(node.Line - 1, 0);
         var removeEnd = new Position(EndHapLine(node), 0);
-        var tagName = XmlUtility.GetOriginalTagName(node, trackedDoc.Text);
+        var tagName = XmlUtility.GetOriginalTagName(node, parsed.Text);
 
         return
         [

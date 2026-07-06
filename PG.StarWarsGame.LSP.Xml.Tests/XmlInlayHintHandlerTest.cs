@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -26,7 +27,8 @@ public sealed class XmlInlayHintHandlerTest
     private static (XmlInlayHintHandler handler, FakeIndexService index) Build(
         string docText,
         ISchemaProvider? schema = null,
-        ILocalisationIndex? localisation = null)
+        ILocalisationIndex? localisation = null,
+        ILspConfigurationProvider? config = null)
     {
         var host = new FakeWorkspaceHost();
         host.Set(Uri, docText);
@@ -37,13 +39,31 @@ public sealed class XmlInlayHintHandlerTest
 
         var registry = new XmlInlayHintRegistry([new LocalisationKeySingleValueInlayHintProvider()]);
         return (new XmlInlayHintHandler(
-            host,
+            TestParseCache.For(host),
             index,
             schema ?? new EmptySchemaProvider(),
             new AllowAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            registry), index);
+            registry, config ?? new FakeLspConfigurationProvider()), index);
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_InlayHintsFlagOff_ReturnsNull()
+    {
+        // Same arrange as LocKeyTag_WithKnownTranslation — only the flag differs.
+        const string xml = "<GameObjectType>\n  <Text_ID>TEXT_UNIT_NAME</Text_ID>\n</GameObjectType>";
+        var schema = new LocKeySchemaProvider("Text_ID");
+        var loc = new ValueLocalisationIndex("TEXT_UNIT_NAME", "X-Wing Fighter");
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { InlayHints = false } });
+
+        var (handler, _) = Build(xml, schema, loc, config);
+        var result = await handler.Handle(Params(), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     private static LspRange FullRange()
@@ -164,14 +184,38 @@ public sealed class XmlInlayHintHandlerTest
         host.Set(Uri, xml);
         var index = new FakeIndexService();
         var handler = new XmlInlayHintHandler(
-            host, index, new EmptySchemaProvider(),
+            TestParseCache.For(host), index, new EmptySchemaProvider(),
             new DenyAllEaWContext(),
             new FileHelper(new MockFileSystem()),
             NullLogger<XmlInlayHintHandler>.Instance,
-            new XmlInlayHintRegistry([]));
+            new XmlInlayHintRegistry([]), new FakeLspConfigurationProvider());
 
         var result = await handler.Handle(Params(), CancellationToken.None);
         Assert.Null(result);
+    }
+
+    [Fact]
+    public async Task Handle_SameContentTwice_ReusesOneParse()
+    {
+        // Inlay hints are re-requested by clients on every scroll — with unchanged content the
+        // second request must be a cache hit, not a re-parse.
+        const string xml = "<GameObjectType><Text_ID>TEXT_NAME</Text_ID></GameObjectType>";
+        var host = new FakeWorkspaceHost();
+        host.Set(Uri, xml);
+        var cache = TestParseCache.For(host);
+        var handler = new XmlInlayHintHandler(
+            cache, new FakeIndexService(), new EmptySchemaProvider(),
+            new AllowAllEaWContext(),
+            new FileHelper(new MockFileSystem()),
+            NullLogger<XmlInlayHintHandler>.Instance,
+            new XmlInlayHintRegistry([]), new FakeLspConfigurationProvider());
+
+        _ = await handler.Handle(Params(), CancellationToken.None);
+        _ = await handler.Handle(Params(), CancellationToken.None);
+
+        var (hits, misses, _) = cache.Statistics;
+        Assert.Equal(1, misses);
+        Assert.Equal(1, hits);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -221,6 +265,12 @@ public sealed class XmlInlayHintHandlerTest
         }
 
         public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<GameIndex>? DynamicEnumChanged
         {
             add { }
             remove { }

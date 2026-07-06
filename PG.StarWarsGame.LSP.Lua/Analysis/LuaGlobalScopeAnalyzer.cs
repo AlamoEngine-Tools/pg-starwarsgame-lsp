@@ -34,7 +34,14 @@ internal static class LuaGlobalScopeAnalyzer
         string documentUri, string text, GameIndex index, ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
+        return Analyze(documentUri, LuaSyntaxTree.ParseText(text, s_parseOptions), index, schemaProvider,
+            fileHelper);
+    }
+
+    public static IReadOnlyList<LspDiagnostic> Analyze(
+        string documentUri, SyntaxTree tree, GameIndex index, ILuaApiSchemaProvider schemaProvider,
+        IFileHelper fileHelper)
+    {
         var root = tree.GetRoot();
         var diagnostics = new List<LspDiagnostic>();
 

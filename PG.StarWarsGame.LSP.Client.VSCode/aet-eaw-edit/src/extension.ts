@@ -166,6 +166,46 @@ function cfg(section: string) {
 	return vscode.workspace.getConfiguration(`aet-eaw-edit.${section}`);
 }
 
+/**
+ * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
+ * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
+ * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation) live in
+ * package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the
+ * config listener in activate() restarts the server when any `aet-eaw-edit.features` value changes.
+ */
+function resolveFeatureFlags() {
+	const features = cfg('features');
+	const flag = (key: string, fallback: boolean) => features.get<boolean>(key, fallback);
+	return {
+		xml: {
+			completion:     flag('xml.completion', true),
+			hover:          flag('xml.hover', true),
+			diagnostics:    flag('xml.diagnostics', true),
+			goToDefinition: flag('xml.goToDefinition', true),
+			findReferences: flag('xml.findReferences', true),
+			rename:         flag('xml.rename', true),
+			codeLens:       flag('xml.codeLens', true),
+			inlayHints:     flag('xml.inlayHints', true),
+			codeActions:    flag('xml.codeActions', true),
+			linkedEditing:  flag('xml.linkedEditing', true),
+		},
+		lua: {
+			completion:     flag('lua.completion', true),
+			hover:          flag('lua.hover', false),
+			diagnostics:    flag('lua.diagnostics', false),
+			goToDefinition: flag('lua.goToDefinition', true),
+			rename:         flag('lua.rename', true),
+			codeLens:       flag('lua.codeLens', true),
+			inlayHints:     flag('lua.inlayHints', true),
+			codeActions:    flag('lua.codeActions', true),
+		},
+		tools: {
+			localisation: flag('tools.localisation', false),
+			variants:     flag('tools.variants', true),
+		},
+	};
+}
+
 function validateConfiguration(): boolean {
 	if (!cfg('lsp').get<boolean>('enabled')) {
 		return true;
@@ -272,7 +312,8 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			baselineUrl:       cfg('lsp.source.baseline').get<string>('type', 'http') === 'http'
 			                       ? (cfg('lsp.source.baseline').get<string>('url') || undefined)
 			                       : undefined,
-			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined
+			baselineLocalPath: cfg('lsp.source.baseline').get<string>('localPath') || undefined,
+			features:          resolveFeatureFlags()
 		},
 		middleware: {
 			executeCommand: async (command, args, next) => {
@@ -439,6 +480,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	logLine(`  lsp.executable   = ${cfg('lsp').get<string>('executable') ?? '(not set)'}`);
 	logLine(`  lsp.projectPath  = ${cfg('lsp.devMode').get<string>('projectPath') ?? '(not set)'}`);
 
+	const restartServer = async () => {
+		await stopLspClient();
+		if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration()) {
+			await startLspClient(context);
+		}
+	};
+
 	context.subscriptions.push(
 		vscode.workspace.onDidChangeConfiguration(async e => {
 			if (!e.affectsConfiguration('aet-eaw-edit')) { return; }
@@ -451,18 +499,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			} else if (enabled && !lspClient && validateConfiguration()) {
 				logLine('Starting LSP server after configuration change.');
 				await startLspClient(context);
+			} else if (lspClient && e.affectsConfiguration('aet-eaw-edit.features')) {
+				// Feature flags travel once via initializationOptions — restart to apply them.
+				logLine('Feature flags changed — restarting LSP server.');
+				await restartServer();
 			} else {
 				validateConfiguration();
 			}
 		})
 	);
-
-	const restartServer = async () => {
-		await stopLspClient();
-		if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration()) {
-			await startLspClient(context);
-		}
-	};
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.debug.forceStartup', async () => {

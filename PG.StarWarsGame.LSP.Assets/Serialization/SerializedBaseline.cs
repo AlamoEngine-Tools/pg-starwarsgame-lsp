@@ -9,6 +9,13 @@ namespace PG.StarWarsGame.LSP.Assets.Serialization;
 [MessagePackObject]
 public sealed class SerializedBaseline
 {
+    // Bumped whenever the DTO layout changes; a mismatched (or absent — see Deserialize) baseline is
+    // discarded cleanly instead of being interpreted against the wrong layout. Key(10) is appended
+    // after the original 10 fields rather than inserted at Key(0), so pre-versioning baselines (which
+    // never wrote this key) deserialize it as the CLR default 0 — itself a natural version mismatch,
+    // with no separate migration path needed.
+    public const int CurrentSchemaVersion = 1;
+
     [Key(0)] public GameSymbol[] Symbols { get; set; } = [];
     [Key(1)] public long BuiltAtMs { get; set; }
     [Key(2)] public string SourceManifestHash { get; set; } = string.Empty;
@@ -19,4 +26,5 @@ public sealed class SerializedBaseline
     [Key(7)] public string[] AssetFiles { get; set; } = [];
     [Key(8)] public SerializedEnumValues[] ModelBones { get; set; } = [];
     [Key(9)] public SerializedObjectTags[] ObjectTags { get; set; } = [];
+    [Key(10)] public int SchemaVersion { get; set; }
 }

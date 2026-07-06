@@ -46,4 +46,17 @@ public sealed class MovieFrameTriggerHandlerTest
             .ToList();
         Assert.Empty(results);
     }
+
+    [Fact]
+    public void FloatFrame_ReturnsWarningAtFrameToken_WithSuggestedFix()
+    {
+        // All number types accept a float where an integer is expected, with a Warning.
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Key_A, 20.0"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal("20", d.SuggestedFix);
+        Assert.Equal(7, d.OverrideColumn);
+    }
 }

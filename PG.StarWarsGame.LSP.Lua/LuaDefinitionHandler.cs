@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -15,6 +16,7 @@ using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Util;
 using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
@@ -25,22 +27,28 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaDefinitionHandler> _logger;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILuaParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public LuaDefinitionHandler(
         IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
+        ILuaParseCache parseCache,
         IFileHelper fileHelper,
-        ILogger<LuaDefinitionHandler> logger)
+        ILogger<LuaDefinitionHandler> logger,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
         _logger = logger;
+        _config = config;
     }
 
     public override Task<LocationOrLocationLinks?> Handle(DefinitionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.GoToDefinition)
+            return Task.FromResult<LocationOrLocationLinks?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<LocationOrLocationLinks?>(null);
@@ -68,12 +76,13 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             }
         }
 
-        // Path B: require() argument — parse AST and resolve.
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        // Path B: require() argument — resolve via the shared parse.
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
-        var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);
-        var resolved = TryResolveRequireAtPosition(tree.GetRoot(), line, character, index.Documents, _fileHelper, uri);
+        var resolved = TryResolveRequireAtPosition(parsed.Tree.GetRoot(), line, character, index.Documents, _fileHelper,
+            uri);
         if (resolved is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 

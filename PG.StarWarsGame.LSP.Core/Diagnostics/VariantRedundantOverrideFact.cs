@@ -9,5 +9,7 @@ public sealed record VariantRedundantOverrideFact(
     int Line,
     int Column,
     int Length,
-    string TagName
-) : XmlFact(DocumentUri, Line, Column, Length);
+    string TagName,
+    int? EndLine = null,
+    int? EndColumn = null
+) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);

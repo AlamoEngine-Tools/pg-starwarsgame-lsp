@@ -13,6 +13,7 @@ using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
@@ -25,6 +26,23 @@ public sealed class ExportLocalisationToDatHandlerTest
 
     private const string CsvPath = "/mod/Data/Text/MasterTextFile.csv";
     private const string CsvContent = "key,ENGLISH\nMY_TEST_KEY,Hello World\n";
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_ReturnsDisabledErrorWithoutWritingFiles()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData> { [CsvPath] = new(CsvContent) });
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var handler = BuildHandlerWithFs(mockFs, config: config);
+
+        var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
+
+        Assert.Equal(LocalisationFeatureDisabled.Message, result.Error);
+        Assert.Empty(result.WrittenFiles);
+        Assert.DoesNotContain(mockFs.AllFiles, f => f.EndsWith(".dat", StringComparison.OrdinalIgnoreCase));
+    }
 
     [Fact]
     public async Task Handle_WhenProjectFilePathIsNull_ReturnsErrorResult()
@@ -161,7 +179,8 @@ public sealed class ExportLocalisationToDatHandlerTest
 
     private static ExportLocalisationToDatHandler BuildHandlerWithFs(
         MockFileSystem mockFs, IServiceProvider? sp = null,
-        LocalisationProjectRegistry? projectRegistry = null, LocalisationLayerRegistry? layerRegistry = null)
+        LocalisationProjectRegistry? projectRegistry = null, LocalisationLayerRegistry? layerRegistry = null,
+        ILspConfigurationProvider? config = null)
     {
         if (sp is null)
         {
@@ -183,6 +202,7 @@ public sealed class ExportLocalisationToDatHandlerTest
             new FileHelper(mockFs),
             projectRegistry ?? new LocalisationProjectRegistry(),
             layerRegistry ?? new LocalisationLayerRegistry(),
-            NullLogger<ExportLocalisationToDatHandler>.Instance);
+            NullLogger<ExportLocalisationToDatHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
     }
 }

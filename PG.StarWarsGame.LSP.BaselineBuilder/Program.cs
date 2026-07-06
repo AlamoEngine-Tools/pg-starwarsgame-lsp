@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.CommandLine;
 using System.IO.Abstractions;
 using System.Security.Cryptography;
+using System.Xml;
 using System.Xml.Linq;
 using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
@@ -166,9 +167,96 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
             gameConstantsXml = await new StreamReader(stream).ReadToEndAsync();
     }
 
+    // ── Music events ────────────────────────────────────────────────────────
+    //
+    // !!! STOPGAP — DO NOT TREAT AS THE PERMANENT SHAPE OF THIS FEATURE !!!
+    //
+    // PG.StarWarsGame.Engine has NO MusicEvent support at all today: no game manager, no entity
+    // type — unlike SFXEvent, which has a real ISfxEventGameManager (see engine.SfxGameManager
+    // above). This block reads and parses MusicEvents.xml directly against the engine's virtual
+    // file system, entirely bypassing the engine's game-manager abstraction, purely so the LSP
+    // baseline can carry MusicEvent symbols for go-to-definition/rename/find-references parity
+    // with SFXEvent. It intentionally does NOT replicate anything else ISfxEventGameManager does
+    // (locale-aware MEG loading, engine-level validation/error reporting) — those aren't needed
+    // for symbol-level baseline projection, and adding them here would be reimplementing engine
+    // internals in the wrong layer.
+    //
+    // MusicEvents.xml is a single direct-content file (schema/eaw/meta/metafiles.yaml declares it
+    // as `metaFileType: directContent`), not a MEG-packed file-list registry like SFXEventFiles.XML
+    // — so a flat `<MusicEvents><MusicEvent Name="...">...</MusicEvent></MusicEvents>` parse is
+    // sufficient; there is no per-language variation to resolve.
+    //
+    // TODO(music-events): delete this entire block and switch to `engine.MusicEventGameManager`
+    // (mirroring SfxEventGameManager exactly) once PG.StarWarsGame.Engine adds first-class
+    // MusicEvent support upstream.
+    var musicEvents = new List<ProjectableEntry>();
+    using (var stream = engine.GameRepository.TryOpenFile("Data\\XML\\MusicEvents.xml"))
+    {
+        if (stream is not null)
+        {
+            var musicEventsXml = await new StreamReader(stream).ReadToEndAsync();
+            try
+            {
+                var musicDoc = XDocument.Parse(musicEventsXml, LoadOptions.SetLineInfo);
+                foreach (var element in musicDoc.Root?.Elements("MusicEvent") ?? [])
+                {
+                    var name = element.Attribute("Name")?.Value;
+                    if (string.IsNullOrEmpty(name)) continue;
+                    var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber : (int?)null;
+                    musicEvents.Add(new ProjectableEntry(name, "MUSIC_EVENT",
+                        new XmlLocationInfo("Data\\XML\\MusicEvents.xml", line)));
+                }
+            }
+            catch (XmlException ex)
+            {
+                Console.Error.WriteLine($"Warning: Failed to parse MusicEvents.xml: {ex.Message}");
+            }
+        }
+    }
+    Console.WriteLine($"Music events: {musicEvents.Count} (direct-parsed stopgap — see TODO(music-events))");
+
+    // ── Shadow blob materials ───────────────────────────────────────────────
+    //
+    // Same stopgap as music events above (see that comment for the full rationale):
+    // PG.StarWarsGame.Engine has no shadow-blob-material support, and Shadowblobmaterials.xml is
+    // another single direct-content file — a flat <Shadow_Blob_Materials><Material name="…">
+    // list, so a direct parse is sufficient. Note the LOWERCASE `name` attribute (unlike every
+    // other object type's `Name`); matched case-insensitively for robustness.
+    //
+    // TODO(music-events): fold into the same engine-level solution when it lands.
+    var shadowBlobMaterials = new List<ProjectableEntry>();
+    using (var stream = engine.GameRepository.TryOpenFile("Data\\XML\\ShadowBlobMaterials.xml"))
+    {
+        if (stream is not null)
+        {
+            var shadowBlobXml = await new StreamReader(stream).ReadToEndAsync();
+            try
+            {
+                var blobDoc = XDocument.Parse(shadowBlobXml, LoadOptions.SetLineInfo);
+                foreach (var element in blobDoc.Root?.Elements() ?? [])
+                {
+                    if (!element.Name.LocalName.Equals("Material", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var name = element.Attributes()
+                        .FirstOrDefault(a => a.Name.LocalName.Equals("name", StringComparison.OrdinalIgnoreCase))
+                        ?.Value;
+                    if (string.IsNullOrEmpty(name)) continue;
+                    var line = element is IXmlLineInfo li && li.HasLineInfo() ? li.LineNumber : (int?)null;
+                    shadowBlobMaterials.Add(new ProjectableEntry(name, "SHADOW_BLOB_MATERIAL",
+                        new XmlLocationInfo("Data\\XML\\ShadowBlobMaterials.xml", line)));
+                }
+            }
+            catch (XmlException ex)
+            {
+                Console.Error.WriteLine($"Warning: Failed to parse ShadowBlobMaterials.xml: {ex.Message}");
+            }
+        }
+    }
+    Console.WriteLine($"Shadow blob materials: {shadowBlobMaterials.Count} (direct-parsed stopgap)");
+
     var schemaProvider = sp.GetService<ISchemaProvider>();
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
-    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash);
+    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials);
     Console.WriteLine($"Projected {baseline.Symbols.Count} symbol(s)");
 
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────

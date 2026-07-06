@@ -223,6 +223,47 @@ public sealed class DynamicEnumValueProposalProviderTest
 
         Assert.Empty(proposals);
     }
+
+    // ── DynamicEnumChanged cache invalidation ──────────────────────────────────
+
+    [Fact]
+    public void DynamicEnumChanged_Fired_RebuildsCacheFromNewIndex()
+    {
+        var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
+        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var service = new FakeIndexService();
+        var sut = new DynamicEnumValueProposalProvider(service);
+
+        Assert.Empty(sut.GetProposals(tag, ""));
+
+        var updatedValues = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("DamageType", ["MOD_DMG"]);
+        service.RaiseDynamicEnumChanged(GameIndex.Empty with { WorkspaceDynamicEnumValues = updatedValues });
+
+        var proposals = sut.GetProposals(tag, "");
+        Assert.Single(proposals);
+        Assert.Equal("MOD_DMG", proposals[0].Label);
+    }
+
+    [Fact]
+    public void DynamicEnumChanged_NotFired_DoesNotSeeIndexMutation()
+    {
+        // GetDynamicProposals reads a cache built once at construction, not _indexService.Current
+        // live — this is the point of caching, and confirms the cache genuinely isn't recomputed
+        // per request.
+        var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
+        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDynamicEnumValues = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+                .Add("DamageType", ["INITIAL"])
+        };
+
+        var proposals = Sut(index).GetProposals(tag, "");
+
+        Assert.Single(proposals);
+        Assert.Equal("INITIAL", proposals[0].Label);
+    }
 }
 
 file sealed class FakeIndexService(GameIndex? current = null) : IGameIndexService
@@ -240,6 +281,10 @@ file sealed class FakeIndexService(GameIndex? current = null) : IGameIndexServic
         add { }
         remove { }
     }
+
+    public event Action<GameIndex>? DynamicEnumChanged;
+
+    public void RaiseDynamicEnumChanged(GameIndex index) => DynamicEnumChanged?.Invoke(index);
 
     public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         => Task.CompletedTask;

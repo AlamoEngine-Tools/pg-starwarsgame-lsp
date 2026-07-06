@@ -17,7 +17,19 @@ public sealed class GameIndexService : IGameIndexService
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts = new();
     private readonly IProjectLayerMap? _layerMap;
     private readonly ILogger<GameIndexService> _logger;
+    private readonly object _mergeLock = new();
     private readonly IEnumerable<IGameDocumentParser> _parsers;
+
+    // Document operations deferred while a bulk update is open. Applying documents one-by-one to
+    // the immutable index is quadratic on hot keys (every ImmutableArray.Add copies the array) and
+    // makes parallel indexers CAS-retry whole documents, so bulk scopes queue their operations and
+    // EndBulkUpdate merges them into the index in a single builder pass.
+    private readonly ConcurrentQueue<PendingOp> _pendingOps = new();
+
+    // Per-URI count of queued operations, so the unchanged-content fast path never skips a URI
+    // that has a pending removal in the same bulk (e.g. didClose's remove-then-readd sequence).
+    private readonly ConcurrentDictionary<string, int> _pendingUris = new(StringComparer.Ordinal);
+
     private GameIndex _current = GameIndex.Empty;
     private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
     private int _suppressionDepth;
@@ -37,6 +49,7 @@ public sealed class GameIndexService : IGameIndexService
 
     public event Action<GameIndex>? IndexChanged;
     public event Action<ILocalisationIndex>? LocalisationChanged;
+    public event Action<GameIndex>? DynamicEnumChanged;
 
     public IDisposable BeginBulkUpdate()
     {
@@ -44,7 +57,21 @@ public sealed class GameIndexService : IGameIndexService
         return new BulkUpdateScope(this);
     }
 
-    public async Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return IndexDocumentAsync(uri, text, version, false, ct);
+    }
+
+    public Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return IndexDocumentAsync(uri, text, version, true, ct);
+    }
+
+    // force = didOpen semantics: LSP client versions restart at 1 for every open session while the
+    // committed version deliberately survives a didClose re-index, so an open starts a new version
+    // epoch — the committed version must never suppress it.
+    private async Task IndexDocumentAsync(string uri, string text, int version, bool force,
+        CancellationToken ct)
     {
         uri = NormalizeUri(uri);
         var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
@@ -52,13 +79,31 @@ public sealed class GameIndexService : IGameIndexService
 
         // Fast path: identical content is already indexed (re-opening or closing an unedited file).
         // Skip the expensive re-parse, but still notify so diagnostics re-publish for the document.
-        var contentHash = ComputeContentHash(text);
-        if (Volatile.Read(ref _current).Documents.GetValueOrDefault(uri) is { } indexed
+        // Not taken while an operation for this URI is queued in a bulk scope: a pending removal
+        // followed by this re-add would otherwise merge to "removed" and drop the document.
+        var contentHash = ContentHasher.Hash(text);
+        if (!_pendingUris.ContainsKey(uri)
+            && Volatile.Read(ref _current).Documents.GetValueOrDefault(uri) is { } indexed
             && indexed.ContentHash == contentHash)
         {
-            _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
-            RaiseIndexChanged(Volatile.Read(ref _current));
-            return;
+            if (!force || indexed.Version == version)
+            {
+                _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
+                RaiseIndexChanged(Volatile.Read(ref _current));
+                return;
+            }
+
+            // Unchanged-content open: no re-parse needed, but the stored version must still be
+            // re-stamped to the new session's client version — otherwise its subsequent
+            // didChanges (v2, v3, …) are dropped as stale against the previous session's version.
+            if (TryRestampVersion(uri, contentHash, version))
+            {
+                _logger.LogDebug("Re-opened {Uri} unchanged; version epoch reset to v{Version}",
+                    uri, version);
+                RaiseIndexChanged(Volatile.Read(ref _current));
+                return;
+            }
+            // The document changed concurrently — fall through to the full parse.
         }
 
         // Cancel any in-flight parse for this URI and register the new one.
@@ -102,6 +147,12 @@ public sealed class GameIndexService : IGameIndexService
             ContentHash = contentHash
         };
 
+        if (TryDeferToBulk(new PendingOp(newDoc, null, force)))
+        {
+            _logger.LogDebug("Queued {Uri} v{Version} for bulk merge", uri, newDoc.Version);
+            return;
+        }
+
         GameIndex snapshot, updated;
         do
         {
@@ -110,9 +161,10 @@ public sealed class GameIndexService : IGameIndexService
             // Drop stale parses: a strictly newer version has already been committed.
             // Using strict > (not >=) so that re-opening the same file at the same version
             // (e.g. DidOpen after a workspace scan at v0, then again at v1) still fires
-            // IndexChanged and re-publishes diagnostics.
+            // IndexChanged and re-publishes diagnostics. A didOpen (force) is exempt — it
+            // starts a new version epoch.
             var existing = snapshot.Documents.GetValueOrDefault(uri);
-            if (existing is not null && existing.Version > newDoc.Version)
+            if (!force && existing is not null && existing.Version > newDoc.Version)
             {
                 _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri,
                     newDoc.Version, existing.Version);
@@ -127,11 +179,49 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    // CAS-replaces only the stored version of an unchanged document (didOpen epoch reset).
+    // Returns false when the document disappeared or its content changed concurrently, in which
+    // case the caller falls back to a full parse.
+    private bool TryRestampVersion(string uri, long contentHash, int version)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            if (snapshot.Documents.GetValueOrDefault(uri) is not { } current
+                || current.ContentHash != contentHash)
+                return false;
+            if (current.Version == version) return true;
+            updated = snapshot with
+            {
+                Documents = snapshot.Documents.SetItem(uri, current with { Version = version })
+            };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        return true;
+    }
+
     public void InjectDocument(DocumentIndex document)
     {
         var uri = NormalizeUri(document.DocumentUri);
         if (document.DocumentUri != uri)
             document = document with { DocumentUri = uri };
+
+        // Snapshots persist the LayerRank at write time; if the dependency graph changed between
+        // sessions the ranks renumber, and a stale rank silently breaks the leaf-ownership gates
+        // (IsLeafOwned, LayerRankOfUri == LeafLayerRank). Re-stamp from the live layer map when
+        // one is registered; minimal setups without a map keep the serialized stamp.
+        if (_layerMap is not null)
+        {
+            var layerRank = _layerMap.GetRank(uri);
+            document = document with { LayerRank = layerRank, LayerName = _layerMap.GetLayerName(layerRank) };
+        }
+
+        if (TryDeferToBulk(new PendingOp(document, null)))
+        {
+            _logger.LogDebug("Queued injected {Uri} for bulk merge", uri);
+            return;
+        }
 
         GameIndex snapshot, updated;
         do
@@ -156,6 +246,14 @@ public sealed class GameIndexService : IGameIndexService
     public void RemoveDocument(string uri)
     {
         uri = NormalizeUri(uri);
+
+        // Deferred before the exists-check: the document may only exist as a queued upsert.
+        if (TryDeferToBulk(new PendingOp(null, uri)))
+        {
+            _logger.LogDebug("Queued removal of {Uri} for bulk merge", uri);
+            return;
+        }
+
         GameIndex snapshot, updated;
         do
         {
@@ -179,7 +277,9 @@ public sealed class GameIndexService : IGameIndexService
 
         _logger.LogInformation("Applied baseline: {Count} symbols, built {BuiltAt}", baseline.Symbols.Count,
             baseline.BuiltAt);
-        RaiseIndexChanged(Volatile.Read(ref _current));
+        var afterBaseline = Volatile.Read(ref _current);
+        RaiseIndexChanged(afterBaseline);
+        DynamicEnumChanged?.Invoke(afterBaseline);
     }
 
     public void ApplyLocalisation(ILocalisationIndex index)
@@ -228,7 +328,9 @@ public sealed class GameIndexService : IGameIndexService
             updated = snapshot with { WorkspaceDynamicEnumValues = values };
         } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
 
-        RaiseIndexChanged(Volatile.Read(ref _current));
+        var afterUpdate = Volatile.Read(ref _current);
+        RaiseIndexChanged(afterUpdate);
+        DynamicEnumChanged?.Invoke(afterUpdate);
     }
 
     public void ApplyWorkspaceEnumValueDefinitions(
@@ -248,8 +350,173 @@ public sealed class GameIndexService : IGameIndexService
     {
         if (Interlocked.Decrement(ref _suppressionDepth) > 0)
             return;
+        DrainPendingOps();
         if (Interlocked.Exchange(ref _hasPendingEvent, 0) != 0)
             RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    // Queues the operation when a bulk scope is open. Returns false outside bulk so callers fall
+    // through to the direct CAS path.
+    private bool TryDeferToBulk(PendingOp op)
+    {
+        if (Volatile.Read(ref _suppressionDepth) <= 0) return false;
+
+        var uri = op.Document?.DocumentUri ?? op.RemoveUri!;
+        _pendingUris.AddOrUpdate(uri, 1, (_, count) => count + 1);
+        _pendingOps.Enqueue(op);
+
+        // The bulk may have ended between the depth check and the enqueue — drain so the
+        // operation is not stranded until the next bulk opens.
+        if (Volatile.Read(ref _suppressionDepth) == 0)
+            DrainPendingOps();
+
+        RaiseIndexChanged(Volatile.Read(ref _current));
+        return true;
+    }
+
+    private void DrainPendingOps()
+    {
+        lock (_mergeLock)
+        {
+            if (_pendingOps.IsEmpty) return;
+
+            var ops = new List<PendingOp>();
+            while (_pendingOps.TryDequeue(out var op))
+                ops.Add(op);
+
+            GameIndex snapshot, updated;
+            do
+            {
+                snapshot = Volatile.Read(ref _current);
+                updated = MergePendingOps(snapshot, ops);
+            } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+            foreach (var op in ops)
+                ReleasePendingUri(op.Document?.DocumentUri ?? op.RemoveUri!);
+
+            _logger.LogDebug("Bulk merge applied {Count} pending document operation(s)", ops.Count);
+        }
+    }
+
+    private void ReleasePendingUri(string uri)
+    {
+        while (_pendingUris.TryGetValue(uri, out var count))
+        {
+            if (count <= 1)
+            {
+                if (_pendingUris.TryRemove(KeyValuePair.Create(uri, count))) return;
+            }
+            else if (_pendingUris.TryUpdate(uri, count - 1, count))
+            {
+                return;
+            }
+        }
+    }
+
+    // Applies all queued operations to the index in one builder pass: O(ops + size of the touched
+    // keys), instead of one immutable-dictionary rewrite per symbol/reference per document.
+    private GameIndex MergePendingOps(GameIndex index, List<PendingOp> ops)
+    {
+        // Resolve the final operation per URI in arrival order (null = remove). The version rule
+        // matches the non-bulk CAS path: a strictly newer already-committed version wins; after a
+        // queued removal any version applies, exactly as it would sequentially.
+        var finalDocs = new Dictionary<string, DocumentIndex?>(StringComparer.Ordinal);
+        foreach (var op in ops)
+        {
+            if (op.Document is null)
+            {
+                finalDocs[op.RemoveUri!] = null;
+                continue;
+            }
+
+            var doc = op.Document;
+            var prior = finalDocs.TryGetValue(doc.DocumentUri, out var queued)
+                ? queued
+                : index.Documents.GetValueOrDefault(doc.DocumentUri);
+            // Force = didOpen epoch reset: a freshly opened document's client version restarts
+            // at 1 and must never lose against the previous session's committed version.
+            if (!op.Force && prior is not null && prior.Version > doc.Version)
+            {
+                _logger.LogDebug("Dropping stale bulk parse for {Uri} v{Incoming} (committed v{Current})",
+                    doc.DocumentUri, doc.Version, prior.Version);
+                continue;
+            }
+
+            finalDocs[doc.DocumentUri] = doc;
+        }
+
+        var docs = index.Documents.ToBuilder();
+        var defDeltas = new Dictionary<string, Delta<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
+        var refDeltas = new Dictionary<string, Delta<GameReference>>(StringComparer.OrdinalIgnoreCase);
+        var groupDeltas = new Dictionary<string, Delta<GroupMembership>>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (uri, newDoc) in finalDocs)
+        {
+            if (docs.TryGetValue(uri, out var old))
+            {
+                foreach (var sym in old.Symbols) DeltaFor(defDeltas, sym.Id).Removed.Add(sym);
+                foreach (var reference in old.References) DeltaFor(refDeltas, reference.TargetId).Removed.Add(reference);
+                if (!old.GroupMemberships.IsDefault)
+                    foreach (var dgm in old.GroupMemberships)
+                        DeltaFor(groupDeltas, dgm.Membership.GroupKey).Removed.Add(dgm.Membership);
+            }
+
+            if (newDoc is null)
+            {
+                docs.Remove(uri);
+                continue;
+            }
+
+            docs[uri] = newDoc;
+            foreach (var sym in newDoc.Symbols) DeltaFor(defDeltas, sym.Id).Added.Add(sym);
+            foreach (var reference in newDoc.References) DeltaFor(refDeltas, reference.TargetId).Added.Add(reference);
+            if (!newDoc.GroupMemberships.IsDefault)
+                foreach (var dgm in newDoc.GroupMemberships)
+                    DeltaFor(groupDeltas, dgm.Membership.GroupKey).Added.Add(dgm.Membership);
+        }
+
+        return index with
+        {
+            Documents = docs.ToImmutable(),
+            WorkspaceDefinitions = ApplyDeltas(index.WorkspaceDefinitions, defDeltas),
+            WorkspaceReferences = ApplyDeltas(index.WorkspaceReferences, refDeltas),
+            WorkspaceGroupMemberships = ApplyDeltas(index.WorkspaceGroupMemberships, groupDeltas)
+        };
+    }
+
+    private static Delta<T> DeltaFor<T>(Dictionary<string, Delta<T>> deltas, string key)
+    {
+        if (!deltas.TryGetValue(key, out var delta))
+            deltas[key] = delta = new Delta<T>();
+        return delta;
+    }
+
+    private static ImmutableDictionary<string, ImmutableArray<T>> ApplyDeltas<T>(
+        ImmutableDictionary<string, ImmutableArray<T>> dict, Dictionary<string, Delta<T>> deltas)
+    {
+        if (deltas.Count == 0) return dict;
+
+        var builder = dict.ToBuilder();
+        foreach (var (key, delta) in deltas)
+        {
+            List<T> items = builder.TryGetValue(key, out var existing) ? [.. existing] : [];
+            foreach (var removed in delta.Removed)
+                items.Remove(removed); // first value-equal occurrence, same as ImmutableArray.Remove
+            items.AddRange(delta.Added);
+
+            if (items.Count == 0) builder.Remove(key);
+            else builder[key] = items.ToImmutableArray();
+        }
+
+        return builder.ToImmutable();
+    }
+
+    private sealed record PendingOp(DocumentIndex? Document, string? RemoveUri, bool Force = false);
+
+    private sealed class Delta<T>
+    {
+        public List<T> Removed { get; } = [];
+        public List<T> Added { get; } = [];
     }
 
     private void RaiseIndexChanged(GameIndex index)
@@ -265,6 +532,16 @@ public sealed class GameIndexService : IGameIndexService
 
     private static GameIndex ApplyDocumentIndex(GameIndex index, DocumentIndex doc)
     {
+        // Content-only re-parse (an edit in a comment or non-indexed value): the symbol,
+        // reference, and group sets are value-identical, so skip the strip/re-add and replace only
+        // the Documents entry. This keeps the workspace dictionaries reference-identical, which
+        // the diagnostics publisher uses to re-publish only the edited document.
+        if (index.Documents.TryGetValue(doc.DocumentUri, out var previous)
+            && previous.Symbols.SequenceEqual(doc.Symbols)
+            && previous.References.SequenceEqual(doc.References)
+            && NormalizedGroups(previous).SequenceEqual(NormalizedGroups(doc)))
+            return index with { Documents = index.Documents.SetItem(doc.DocumentUri, doc) };
+
         // Strip the previous version of this document before applying the new one.
         var base_ = index.Documents.ContainsKey(doc.DocumentUri)
             ? StripDocumentFromIndex(index, doc.DocumentUri)
@@ -341,25 +618,16 @@ public sealed class GameIndexService : IGameIndexService
         };
     }
 
+    private static ImmutableArray<DocumentGroupMembership> NormalizedGroups(DocumentIndex doc)
+    {
+        return doc.GroupMemberships.IsDefault
+            ? ImmutableArray<DocumentGroupMembership>.Empty
+            : doc.GroupMemberships;
+    }
+
     private string NormalizeUri(string uri)
     {
         return _fileHelper.NormalizeUri(uri);
-    }
-
-    // FNV-1a 64-bit over the UTF-16 code units — stable within a session, allocation-free, and with
-    // ample collision resistance to gate the unchanged-content re-parse skip.
-    private static long ComputeContentHash(string text)
-    {
-        const ulong offset = 14695981039346656037;
-        const ulong prime = 1099511628211;
-        var hash = offset;
-        foreach (var c in text)
-        {
-            hash ^= c;
-            hash *= prime;
-        }
-
-        return unchecked((long)hash);
     }
 
     private sealed class BulkUpdateScope : IDisposable

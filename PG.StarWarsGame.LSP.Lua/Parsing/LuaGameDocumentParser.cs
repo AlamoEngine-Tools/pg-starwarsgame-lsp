@@ -16,23 +16,27 @@ namespace PG.StarWarsGame.LSP.Lua.Parsing;
 
 public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
-    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
-
     private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaGameDocumentParser> _logger;
+    private readonly ILuaParseCache? _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
+    // parseCache is optional so minimal test setups can omit it; production wires the shared
+    // cache so the indexing parse seeds it — the diagnostics publish and the first request after
+    // an edit then reuse this parse instead of re-parsing.
     public LuaGameDocumentParser(
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper,
         ILogger<LuaGameDocumentParser> logger,
-        ILuaAnnotationRepository annotationRepository)
+        ILuaAnnotationRepository annotationRepository,
+        ILuaParseCache? parseCache = null)
     {
         _schemaProvider = schemaProvider;
         _fileHelper = fileHelper;
         _logger = logger;
         _annotationRepository = annotationRepository;
+        _parseCache = parseCache;
     }
 
     public bool CanParse(string fileExtension)
@@ -44,7 +48,8 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         string documentUri, string text, int version, CancellationToken ct)
     {
         var canonicalUri = _fileHelper.NormalizeUri(documentUri);
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions, canonicalUri);
+        var parsed = _parseCache?.GetOrParse(canonicalUri, text) ?? ParsedLuaDocument.Parse(text, canonicalUri);
+        var tree = parsed.Tree;
         var root = tree.GetRoot(ct);
 
         var (symbols, annotations, functionAnnotations) = CollectSymbols(root, canonicalUri);

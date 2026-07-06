@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -25,9 +26,31 @@ public sealed class GetEffectiveObjectHandlerTest
         return GameIndex.Empty with { WorkspaceDefinitions = defs };
     }
 
-    private static GetEffectiveObjectHandler Handler(GameIndex index, FakeTagSource source)
+    private static GetEffectiveObjectHandler Handler(
+        GameIndex index, FakeTagSource source, ILspConfigurationProvider? config = null)
     {
-        return new GetEffectiveObjectHandler(new FakeIndexService(index), new NullSchema(), source);
+        return new GetEffectiveObjectHandler(new FakeIndexService(index), new NullSchema(), source,
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_VariantsFlagOff_NotFoundDespiteResolvableObject()
+    {
+        // Same arrange as Handle_Variant_RendersMergedEffectiveXml — only the flag differs.
+        var index = IndexWith(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0))
+            .With("V", new VariantTag("Mass", "5", "<Mass>5</Mass>", 0));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Variants = false } });
+
+        var result = await Handler(index, source, config)
+            .Handle(new GetEffectiveObjectParams { ObjectId = "V" }, CancellationToken.None);
+
+        Assert.False(result.Found);
+        Assert.Equal(string.Empty, result.Xml);
     }
 
     [Fact]
@@ -188,6 +211,12 @@ public sealed class GetEffectiveObjectHandlerTest
         }
 
         public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<GameIndex>? DynamicEnumChanged
         {
             add { }
             remove { }

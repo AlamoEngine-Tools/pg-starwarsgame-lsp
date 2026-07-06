@@ -15,6 +15,18 @@ public sealed class ServerOptionsTest
         Assert.Equal(TimeSpan.FromSeconds(30), opts.SchemaWaitTimeout);
         Assert.Equal(TimeSpan.FromSeconds(2), opts.ProgressReporterTimeout);
         Assert.Equal(TimeSpan.FromMilliseconds(100), opts.DiagnosticsDebounce);
+        Assert.Equal(16, opts.ParseCacheCapacity);
+    }
+
+    [Fact]
+    public void FromJson_ParsesParseCacheCapacity()
+    {
+        const string json = """{ "server": { "parseCacheCapacity": 4 } }""";
+
+        var opts = ServerOptions.FromJson(json);
+
+        Assert.Equal(4, opts.ParseCacheCapacity);
+        Assert.Equal(TimeSpan.FromSeconds(30), opts.SchemaWaitTimeout); // unrelated defaults kept
     }
 
     [Fact]

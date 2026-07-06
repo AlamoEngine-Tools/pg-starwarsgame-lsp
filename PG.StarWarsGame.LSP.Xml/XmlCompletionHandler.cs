@@ -7,6 +7,7 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -21,6 +22,16 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    // Every validator for these types splits on the FIRST comma only — completions therefore only
+    // ever need to distinguish "before the first comma" (slot 0) from "after it" (slot 1), regardless
+    // of how many further commas appear within slot 1's own value.
+    private static readonly HashSet<XmlValueType> TupleValueTypes =
+    [
+        XmlValueType.HardPointSfxMap, XmlValueType.AbilitySfxMap, XmlValueType.ConditionalSfxEvent,
+        XmlValueType.UnitSpawnTable, XmlValueType.AbilityModMultiplier, XmlValueType.TupleList,
+        XmlValueType.InaccuracyMap
+    ];
+
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -28,19 +39,21 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private readonly ISchemaProvider _schema;
     private readonly IXmlTagNameCompletionStrategyRegistry _tagNameRegistry;
     private readonly IXmlTagValueCompletionStrategyRegistry _tagValueRegistry;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
     public XmlCompletionHandler(
-        IGameWorkspaceHost workspaceHost,
+        IXmlParseCache parseCache,
         ISchemaProvider schema,
         IGameIndexService indexService,
         IFileTypeRegistry fileTypeRegistry,
         IFileHelper fileHelper,
         IEaWXmlContext eaWXmlContext,
         IXmlTagNameCompletionStrategyRegistry tagNameRegistry,
-        IXmlTagValueCompletionStrategyRegistry tagValueRegistry)
+        IXmlTagValueCompletionStrategyRegistry tagValueRegistry,
+        ILspConfigurationProvider config)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _schema = schema;
         _indexService = indexService;
         _fileTypeRegistry = fileTypeRegistry;
@@ -48,18 +61,23 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         _eaWXmlContext = eaWXmlContext;
         _tagNameRegistry = tagNameRegistry;
         _tagValueRegistry = tagValueRegistry;
+        _config = config;
     }
 
     public override Task<CompletionList> Handle(CompletionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.Completion)
+            return Task.FromResult(new CompletionList());
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult(new CompletionList());
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult(new CompletionList());
-        var text = doc.Text;
+        var text = parsed.Text;
 
-        var lines = text.Split('\n');
+        var lines = parsed.Lines;
         var lineIndex = request.Position.Line;
         if (lineIndex >= lines.Length)
             return Task.FromResult(new CompletionList());
@@ -93,7 +111,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
             return Task.FromResult(new CompletionList());
 
         // Value completion: cursor is inside an element body
-        var valueDoc = XmlUtility.CreateHtmlDocument(text);
+        var valueDoc = parsed.Html;
         var enclosingValueNode = XmlUtility.FindEnclosingElement(valueDoc, lineIndex);
         var enclosingTag = enclosingValueNode?.Name;
         var enclosingDepth = enclosingValueNode is null ? 0 : XmlUtility.GetDepth(enclosingValueNode);
@@ -165,9 +183,13 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
 
         var partialValue = ExtractPartialValue(line, character);
         var valueIndex = _indexService.Current;
+        var tupleSlotIndex = tagDef is not null && TupleValueTypes.Contains(tagDef.ValueType)
+            ? ComputeTupleSlotIndex(text, enclosingValueNode!, lineIndex, character)
+            : 0;
         var valueCtx = new TagValueCompletionContext(
             uri, valueIndex, _schema, valueDoc, enclosingValueNode!, enclosingTag, enclosingDepth,
-            tagDef, partialValue, lineIndex, character, isStoryParserForValue, storyParamSide, storyParamPosition);
+            tagDef, partialValue, lineIndex, character, isStoryParserForValue, storyParamSide,
+            storyParamPosition, tupleSlotIndex);
         var valueItems = _tagValueRegistry.GetCompletions(valueCtx);
         return Task.FromResult(new CompletionList(valueItems));
     }
@@ -215,7 +237,26 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         return tagDef.ReferenceKind is ReferenceKind.XmlObject or ReferenceKind.HardcodedSet
                    or ReferenceKind.LocalisationKey or ReferenceKind.TextureFile or ReferenceKind.ModelFile
                    or ReferenceKind.AudioFile or ReferenceKind.MapFile or ReferenceKind.BoneName ||
-               tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue;
+               tagDef.ValueType is XmlValueType.Boolean or XmlValueType.DynamicEnumValue ||
+               TupleValueTypes.Contains(tagDef.ValueType);
+    }
+
+    /// <summary>
+    ///     Counts commas between the enclosing element's content start and the cursor, clamped to 1 —
+    ///     see <see cref="TupleValueTypes" /> for why only "before/after the first comma" matters.
+    /// </summary>
+    private static int ComputeTupleSlotIndex(string text, HtmlNode enclosingNode, int lineIndex, int character)
+    {
+        var innerStart = enclosingNode.InnerStartIndex;
+        var cursorOffset = XmlUtility.PositionToOffset(text, lineIndex, character);
+        if (innerStart < 0 || cursorOffset <= innerStart) return 0;
+
+        var span = text[innerStart..Math.Min(cursorOffset, text.Length)];
+        var commaCount = 0;
+        foreach (var c in span)
+            if (c == ',')
+                commaCount++;
+        return Math.Min(1, commaCount);
     }
 
     /// <summary>

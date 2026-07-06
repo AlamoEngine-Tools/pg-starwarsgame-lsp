@@ -5,6 +5,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua;
 using PG.StarWarsGame.LSP.Xml;
@@ -13,10 +14,75 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 
 public class GameHoverHandlerTest
 {
-    private static GameHoverHandler Build(IXmlHoverProvider xml, ILuaHoverProvider lua)
+    private static GameHoverHandler Build(IXmlHoverProvider xml, ILuaHoverProvider lua,
+        ILspConfigurationProvider? config = null)
     {
         return new GameHoverHandler(xml, lua, new FileHelper(new MockFileSystem()),
-            new NullLogger<GameHoverHandler>());
+            new NullLogger<GameHoverHandler>(), config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flags ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_XmlHoverFlagOff_ReturnsNullWithoutInvokingXmlProvider()
+    {
+        var lua = new FakeLuaProvider(null);
+        var xml = new FakeXmlProvider(new Hover());
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Hover = false } });
+        var handler = Build(xml, lua, config);
+
+        var result = await handler.Handle(RequestFor("file:///data.xml"), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(xml.WasCalled);
+        Assert.False(lua.WasCalled);
+    }
+
+    [Fact]
+    public async Task Handle_XmlHoverFlagOff_LuaStillRouted()
+    {
+        var lua = new FakeLuaProvider(new Hover());
+        var xml = new FakeXmlProvider(null);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Hover = false } });
+        var handler = Build(xml, lua, config);
+
+        await handler.Handle(RequestFor("file:///script.lua"), CancellationToken.None);
+
+        Assert.True(lua.WasCalled);
+        Assert.False(xml.WasCalled);
+    }
+
+    [Fact]
+    public async Task Handle_LuaHoverFlagOff_ReturnsNullWithoutInvokingLuaProvider()
+    {
+        var lua = new FakeLuaProvider(new Hover());
+        var xml = new FakeXmlProvider(null);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Hover = false } });
+        var handler = Build(xml, lua, config);
+
+        var result = await handler.Handle(RequestFor("file:///script.lua"), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(lua.WasCalled);
+        Assert.False(xml.WasCalled);
+    }
+
+    [Fact]
+    public async Task Handle_LuaHoverFlagOff_XmlStillRouted()
+    {
+        var lua = new FakeLuaProvider(null);
+        var xml = new FakeXmlProvider(new Hover());
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Hover = false } });
+        var handler = Build(xml, lua, config);
+
+        await handler.Handle(RequestFor("file:///data.xml"), CancellationToken.None);
+
+        Assert.True(xml.WasCalled);
+        Assert.False(lua.WasCalled);
     }
 
     [Fact]

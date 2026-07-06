@@ -36,6 +36,57 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
         Assert.Empty(results);
     }
 
+    // ── newline-separated tuple lists (vanilla Destruction_Survivors format) ─
+
+    [Fact]
+    public void MultiLine_NewlineSeparatedTuples_ReturnNoDiagnostics()
+    {
+        // The vanilla format separates pairs by NEWLINES, not commas:
+        //   <Destruction_Survivors>
+        //       Rebel_Survivors_Small, 1.0
+        //       Rebel_Survivors_Medium, 1.0
+        //   </Destruction_Survivors>
+        const string value = "\n\t\t\tRebel_Survivors_Small, 1.0\n\t\t\tRebel_Survivors_Medium, 1.0\n\t\t\tRebel_Survivors_Large, 1.0 \n\t\t";
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        Assert.Empty(results);
+    }
+
+    [Fact]
+    public void MultiLine_UnknownName_ErrorPositionedAtThatToken()
+    {
+        var known = new GameSymbol("Rebel_Survivors_Small", GameSymbolKind.XmlObject, "GameObjectType",
+            new UnknownOrigin("test"), null);
+        var defs = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+            .Add(known.Id, ImmutableArray.Create(known));
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty, defs,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
+
+        // fact position (0,0); the bogus name sits on the SECOND line of the value.
+        const string value = "\n  Rebel_Survivors_Small, 1.0\n  Missing_Unit, 1.0\n";
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Contains("Missing_Unit", d.Message);
+        Assert.Equal(2, d.OverrideLine);
+        Assert.Equal(2, d.OverrideColumn);
+        Assert.Equal("Missing_Unit".Length, d.OverrideLength);
+    }
+
+    [Fact]
+    public void MultiLine_OutOfRangeProbability_ErrorPositionedAtFloatToken()
+    {
+        const string value = "\n  Unit_A, 1.0\n  Unit_B, 1.5\n";
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+        Assert.Equal(2, d.OverrideLine);
+        Assert.Equal(10, d.OverrideColumn); // "  Unit_B, " → "1.5" starts at col 10
+        Assert.Equal(3, d.OverrideLength);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("X_Wing")]

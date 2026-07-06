@@ -4,6 +4,7 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
@@ -14,6 +15,26 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 public sealed class SetLocalisationEntryHandlerTest
 {
     private const string Path = "/mod/f.csv";
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_FailsWithDisabledMessageWithoutWriting()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, fs, reload) = Build("key,ENGLISH\nTEXT_A,Hello\n", config);
+        var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(Path));
+
+        var result = await handler.Handle(
+            new SetLocalisationEntryParams(Path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" }, hash),
+            CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(LocalisationFeatureDisabled.Message, result.Error);
+        Assert.DoesNotContain("TEXT_B", fs.File.ReadAllText(Path));
+        Assert.False(reload.LocalisationOnlyReloaded);
+    }
 
     [Fact]
     public async Task Handle_NewKey_WritesEntry_ReturnsSuccessWithNewHash()
@@ -120,7 +141,7 @@ public sealed class SetLocalisationEntryHandlerTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (SetLocalisationEntryHandler handler, MockFileSystem fs, SpyReloadService reload) Build(
-        string? initialContent)
+        string? initialContent, ILspConfigurationProvider? config = null)
     {
         var files = initialContent is null
             ? new Dictionary<string, MockFileData>()
@@ -130,7 +151,8 @@ public sealed class SetLocalisationEntryHandlerTest
         var entryWriter = new LocalisationEntryWriter(fileHelper, NullLogger<LocalisationEntryWriter>.Instance);
         var reload = new SpyReloadService();
         var handler = new SetLocalisationEntryHandler(
-            entryWriter, fileHelper, reload, NullLogger<SetLocalisationEntryHandler>.Instance);
+            entryWriter, fileHelper, reload, NullLogger<SetLocalisationEntryHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
         return (handler, fs, reload);
     }
 

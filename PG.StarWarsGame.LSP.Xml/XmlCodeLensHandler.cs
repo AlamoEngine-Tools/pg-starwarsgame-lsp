@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -20,23 +21,29 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlCodeLensHandler> _logger;
     private readonly IXmlCodeLensRegistry _registry;
+    private readonly ILspConfigurationProvider _config;
 
     public XmlCodeLensHandler(
         IGameIndexService indexService,
         ILogger<XmlCodeLensHandler> logger,
         IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper,
-        IXmlCodeLensRegistry registry)
+        IXmlCodeLensRegistry registry,
+        ILspConfigurationProvider config)
     {
         _indexService = indexService;
         _logger = logger;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
         _registry = registry;
+        _config = config;
     }
 
     public override Task<CodeLensContainer?> Handle(CodeLensParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.CodeLens)
+            return Task.FromResult<CodeLensContainer?>(null);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<CodeLensContainer?>(null);

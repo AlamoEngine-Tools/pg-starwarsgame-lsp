@@ -14,9 +14,26 @@ public interface IGameIndexService
     Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct);
 
     /// <summary>
+    ///     Indexes a freshly opened document (didOpen). Unlike <see cref="UpdateDocumentAsync" />,
+    ///     the committed version never suppresses this update: LSP client versions restart at 1 for
+    ///     every open session, while the committed version deliberately survives a didClose
+    ///     re-index — so a didOpen starts a new version epoch. An unchanged-content open skips the
+    ///     re-parse but still re-stamps the stored version, so the new session's subsequent
+    ///     didChanges are not dropped as stale.
+    ///     Default implementation delegates to <see cref="UpdateDocumentAsync" /> so existing test
+    ///     fakes keep working without changes.
+    /// </summary>
+    Task OpenDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return UpdateDocumentAsync(uri, text, version, ct);
+    }
+
+    /// <summary>
     ///     Applies a pre-built <see cref="DocumentIndex" /> (e.g. from a project index cache) without
-    ///     re-parsing. The document's <see cref="DocumentIndex.LayerRank" />, <see cref="DocumentIndex.LayerName" />,
-    ///     and all symbol/reference data are preserved as-is.
+    ///     re-parsing. All symbol/reference data is preserved as-is;
+    ///     <see cref="DocumentIndex.LayerRank" /> and <see cref="DocumentIndex.LayerName" /> are
+    ///     re-stamped from the live layer map when one is registered (snapshot ranks go stale when
+    ///     the dependency graph changes between sessions) and preserved only in map-less setups.
     /// </summary>
     void InjectDocument(DocumentIndex document);
 
@@ -47,4 +64,12 @@ public interface IGameIndexService
     // Not suppressed by BeginBulkUpdate: localisation applies are coarse-grained (once per
     // reload), so the O(N²) concern that suppression exists for doesn't apply here.
     event Action<ILocalisationIndex>? LocalisationChanged;
+
+    // Fires only on ApplyBaseline and ApplyWorkspaceDynamicEnumValues — the two calls that can
+    // change the merged dynamic-enum value set. Lets subscribers that cache dynamic-enum
+    // completion candidates (see DynamicEnumValueProposalProvider) invalidate precisely instead
+    // of on every unrelated document edit via IndexChanged. Not suppressed by BeginBulkUpdate:
+    // both applies are coarse-grained (once per project load/reload or per changed enum source
+    // file), not per-document.
+    event Action<GameIndex>? DynamicEnumChanged;
 }

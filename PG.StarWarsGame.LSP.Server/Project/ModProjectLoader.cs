@@ -20,6 +20,12 @@ public sealed class ModProjectLoader
         PropertyNameCaseInsensitive = true
     };
 
+    private static readonly JsonDocumentOptions DocumentOptions = new()
+    {
+        CommentHandling = JsonCommentHandling.Skip,
+        AllowTrailingCommas = true
+    };
+
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ModProjectLoader> _logger;
 
@@ -46,6 +52,8 @@ public sealed class ModProjectLoader
 
         if (dto is null)
             throw new ModProjectLoadException($"Could not load mod project '{fileName}': the file is empty.");
+
+        ThrowIfLegacyLocalisationShape(text, fileName);
 
         IModinfo? parsed = null;
         if (dto.Modinfo is { } modinfoElement)
@@ -114,6 +122,42 @@ public sealed class ModProjectLoader
                 "when 'localisation' is present.");
 
         return new LocalisationProjectSettings(dto.Type.ToUpperInvariant(), NormalizePath(dto.Directory));
+    }
+
+    // Clean break: directories.text/textResourceType were removed in 0.2.0 in favour of the
+    // top-level "localisation" node. System.Text.Json silently ignores unknown properties, so
+    // without this check an un-migrated .pgproj would load "successfully" with its localisation
+    // quietly unconfigured — no error, no hint why. Hard-fail instead, per feedback_strict_validation_clear_errors.
+    private static void ThrowIfLegacyLocalisationShape(string text, string fileName)
+    {
+        using var document = JsonDocument.Parse(text, DocumentOptions);
+        var root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) return;
+        if (!TryGetPropertyCaseInsensitive(root, "directories", out var directories)) return;
+        if (directories.ValueKind != JsonValueKind.Object) return;
+
+        var hasLegacyText = TryGetPropertyCaseInsensitive(directories, "text", out _);
+        var hasLegacyType = TryGetPropertyCaseInsensitive(directories, "textResourceType", out _);
+        if (!hasLegacyText && !hasLegacyType) return;
+
+        throw new ModProjectLoadException(
+            $"Could not load mod project '{fileName}': 'directories.text' and 'directories.textResourceType' " +
+            "were removed in 0.2.0. Move your localisation directory into a top-level 'localisation' node " +
+            "instead, e.g. \"localisation\": { \"type\": \"CSV\", \"directory\": \"data/text\" }. " +
+            "See the extension's 'Upgrading from 0.1.x' README section for the full migration steps.");
+    }
+
+    private static bool TryGetPropertyCaseInsensitive(JsonElement element, string name, out JsonElement value)
+    {
+        foreach (var property in element.EnumerateObject())
+            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                value = property.Value;
+                return true;
+            }
+
+        value = default;
+        return false;
     }
 
     private static IReadOnlyList<string> Normalize(IReadOnlyList<string>? paths)

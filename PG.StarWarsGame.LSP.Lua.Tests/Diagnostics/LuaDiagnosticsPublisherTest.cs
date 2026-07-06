@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -26,7 +27,8 @@ public sealed class LuaDiagnosticsPublisherTest
         List<PublishDiagnosticsParams> published,
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) Build(
-            ILuaApiSchemaProvider? schema = null)
+            ILuaApiSchemaProvider? schema = null,
+            ILspConfigurationProvider? config = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -38,8 +40,24 @@ public sealed class LuaDiagnosticsPublisherTest
             workspaceHost,
             fileHelper,
             schema ?? new LuaApiSchemaProvider([]),
-            NullLogger<LuaDiagnosticsPublisher>.Instance);
+            NullLogger<LuaDiagnosticsPublisher>.Instance,
+            configProvider: config);
         return (publisher, published, indexService, workspaceHost);
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_LuaDiagnosticsFlagOff_PublishesNothing()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Diagnostics = false } });
+        var (_, published, indexService, workspaceHost) = Build(config: config);
+        workspaceHost.Set(LuaUri, "function Foo() end");
+
+        indexService.Fire(GameIndex.Empty);
+
+        Assert.Empty(published);
     }
 
     private static GameIndex IndexWithLuaRef(string documentUri, string targetId,
@@ -59,6 +77,37 @@ public sealed class LuaDiagnosticsPublisherTest
             ImmutableDictionary<string, DocumentIndex>.Empty.Add(documentUri, doc),
             definitions,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+    }
+
+    // ── shared parse (cache) ──────────────────────────────────────────────────
+
+    [Fact]
+    public void PublishForDocument_SameContentTwice_ParsesOnce()
+    {
+        // One publish = one parse shared by the syntax-error pass and all three analyzers
+        // (previously four separate parses); a second publish of unchanged content is a cache hit.
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeGameIndexService();
+        var workspaceHost = new FakeGameWorkspaceHost();
+        var fileHelper = new FileHelper(new MockFileSystem());
+        var cache = TestLuaParseCache.For(workspaceHost, fileHelper);
+        var publisher = new LuaDiagnosticsPublisher(
+            p => published.Add(p),
+            indexService,
+            workspaceHost,
+            fileHelper,
+            new LuaApiSchemaProvider([]),
+            NullLogger<LuaDiagnosticsPublisher>.Instance,
+            parseCache: cache);
+        workspaceHost.Set(LuaUri, "function Foo() end");
+
+        indexService.Fire(GameIndex.Empty);
+        indexService.Fire(IndexWithLuaRef(LuaUri, "UNIT_A")); // different index, same text
+
+        Assert.Equal(2, published.Count);
+        var (hits, misses, _) = cache.Statistics;
+        Assert.Equal(1, misses);
+        Assert.Equal(1, hits);
     }
 
     // ── file-type filtering ───────────────────────────────────────────────────
@@ -368,6 +417,12 @@ public sealed class LuaDiagnosticsPublisherTest
         }
 
         public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<GameIndex>? DynamicEnumChanged
         {
             add { }
             remove { }

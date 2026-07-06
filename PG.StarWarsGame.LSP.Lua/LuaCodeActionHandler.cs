@@ -5,6 +5,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
@@ -15,15 +16,21 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 {
     private readonly IFileHelper _fileHelper;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILspConfigurationProvider _config;
 
-    public LuaCodeActionHandler(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
+    public LuaCodeActionHandler(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper,
+        ILspConfigurationProvider config)
     {
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
+        _config = config;
     }
 
     public override Task<CommandOrCodeActionContainer?> Handle(CodeActionParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Lua.CodeActions)
+            return Task.FromResult<CommandOrCodeActionContainer?>(new CommandOrCodeActionContainer());
+
         var uri = request.TextDocument.Uri;
 
         var actions = request.Context.Diagnostics

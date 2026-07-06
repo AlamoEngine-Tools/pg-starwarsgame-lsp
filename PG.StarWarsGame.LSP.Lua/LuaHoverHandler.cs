@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
@@ -26,19 +27,19 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaHoverHandler> _logger;
+    private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
-    private readonly IGameWorkspaceHost _workspaceHost;
 
     public LuaHoverHandler(
         IGameIndexService indexService,
-        IGameWorkspaceHost workspaceHost,
+        ILuaParseCache parseCache,
         IFileHelper fileHelper,
         ILuaApiSchemaProvider schemaProvider,
         ILuaAnnotationRepository annotationRepository,
         ILogger<LuaHoverHandler> logger)
     {
         _indexService = indexService;
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
         _annotationRepository = annotationRepository;
@@ -51,7 +52,8 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (!uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult<Hover?>(null);
 
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<Hover?>(null);
 
         var line = request.Position.Line;
@@ -63,9 +65,8 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (xmlRefHover is not null)
             return Task.FromResult<Hover?>(xmlRefHover);
 
-        // Parse AST once for Phases 2 and 3.
-        var tree = LuaSyntaxTree.ParseText(doc.Text, s_parseOptions);
-        var root = tree.GetRoot();
+        // AST (shared via the parse cache) for Phases 2 and 3.
+        var root = parsed.Tree.GetRoot();
 
         // Phase 2: require() module hover.
         var requireHover = TryBuildRequireHover(root, line, character, index.Documents, _fileHelper, uri);

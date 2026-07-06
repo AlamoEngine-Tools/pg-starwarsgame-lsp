@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -37,12 +38,31 @@ public sealed class LuaCodeLensHandlerTest
         return new GameReference(id, GameSymbolKind.LuaGlobal, null, docUri, line, 0, id.Length);
     }
 
-    private static LuaCodeLensHandler BuildHandler(GameIndex index)
+    private static LuaCodeLensHandler BuildHandler(GameIndex index, ILspConfigurationProvider? config = null)
     {
         return new LuaCodeLensHandler(
             new FakeIndexService { Current = index },
             new FileHelper(new MockFileSystem()),
-            NullLogger<LuaCodeLensHandler>.Instance);
+            NullLogger<LuaCodeLensHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LuaCodeLensFlagOff_ReturnsNull()
+    {
+        // Same arrange as Handle_GlobalWithZeroReferences — only the flag differs.
+        var sym = GlobalAt("MyFunc", LuaUri, 3);
+        var doc = new DocumentIndex(LuaUri, 1,
+            ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { CodeLens = false } });
+        var handler = BuildHandler(BuildIndex(doc), config);
+
+        var result = await handler.Handle(ForDoc(), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     private static GameIndex BuildIndex(
@@ -256,6 +276,7 @@ public sealed class LuaCodeLensHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

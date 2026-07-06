@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -34,13 +35,71 @@ public sealed class GamePrepareRenameHandlerTest
 
     private static GamePrepareRenameHandler BuildHandler(
         IXmlRenameProvider? xmlProvider = null,
-        ILuaRenameProvider? luaProvider = null)
+        ILuaRenameProvider? luaProvider = null,
+        ILspConfigurationProvider? config = null)
     {
         return new GamePrepareRenameHandler(
             new FakeIndexService(),
             xmlProvider ?? new NullXmlProvider(),
             luaProvider ?? new NullLuaProvider(),
-            new FileHelper(new MockFileSystem()));
+            new FileHelper(new MockFileSystem()),
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flags ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_XmlRenameFlagOff_ReturnsNullWithoutInvokingXmlProvider()
+    {
+        var stub = new StubProvider(new RangeOrPlaceholderRange(new Range()));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(stub, config: config)
+            .Handle(PrepareAt(XmlUri), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(stub.PrepareCalled);
+    }
+
+    [Fact]
+    public async Task Handle_XmlRenameFlagOff_LuaStillRouted()
+    {
+        var range = new RangeOrPlaceholderRange(new Range());
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(luaProvider: new StubProvider(range), config: config)
+            .Handle(PrepareAt(LuaUri), CancellationToken.None);
+
+        Assert.Same(range, result);
+    }
+
+    [Fact]
+    public async Task Handle_LuaRenameFlagOff_ReturnsNullWithoutInvokingLuaProvider()
+    {
+        var stub = new StubProvider(new RangeOrPlaceholderRange(new Range()));
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(luaProvider: stub, config: config)
+            .Handle(PrepareAt(LuaUri), CancellationToken.None);
+
+        Assert.Null(result);
+        Assert.False(stub.PrepareCalled);
+    }
+
+    [Fact]
+    public async Task Handle_LuaRenameFlagOff_XmlStillRouted()
+    {
+        var range = new RangeOrPlaceholderRange(new Range());
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { Rename = false } });
+
+        var result = await BuildHandler(new StubProvider(range), config: config)
+            .Handle(PrepareAt(XmlUri), CancellationToken.None);
+
+        Assert.Same(range, result);
     }
 
     // ── routing ────────────────────────────────────────────────────────────────
@@ -85,6 +144,7 @@ public sealed class GamePrepareRenameHandlerTest
         public GameIndex Current { get; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -173,6 +233,8 @@ public sealed class GamePrepareRenameHandlerTest
             _range = range;
         }
 
+        public bool PrepareCalled { get; private set; }
+
         public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
         {
             return null;
@@ -180,6 +242,7 @@ public sealed class GamePrepareRenameHandlerTest
 
         public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
         {
+            PrepareCalled = true;
             return _range;
         }
     }

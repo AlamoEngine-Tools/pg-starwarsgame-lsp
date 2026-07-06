@@ -5,6 +5,7 @@ using HtmlAgilityPack;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -16,30 +17,35 @@ public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
 {
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IXmlParseCache _parseCache;
+    private readonly ILspConfigurationProvider _config;
 
-    public XmlLinkedEditingRangeHandler(IGameWorkspaceHost workspaceHost, IEaWXmlContext eaWXmlContext,
-        IFileHelper fileHelper)
+    public XmlLinkedEditingRangeHandler(IXmlParseCache parseCache, IEaWXmlContext eaWXmlContext,
+        IFileHelper fileHelper, ILspConfigurationProvider config)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
         _eaWXmlContext = eaWXmlContext;
         _fileHelper = fileHelper;
+        _config = config;
     }
 
     public override Task<LinkedEditingRanges> Handle(LinkedEditingRangeParams request, CancellationToken ct)
     {
+        if (!_config.Current.Features.Xml.LinkedEditing)
+            return Task.FromResult<LinkedEditingRanges>(null!);
+
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<LinkedEditingRanges>(null!);
 
-        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uri, out var doc))
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null)
             return Task.FromResult<LinkedEditingRanges>(null!);
 
         var line = request.Position.Line;
         var character = request.Position.Character;
 
-        var htmlDoc = new HtmlDocument();
-        htmlDoc.LoadHtml(doc.Text);
+        var htmlDoc = parsed.Html;
 
         var node = FindNodeAtPosition(htmlDoc, line, character);
         if (node is null)

@@ -1,9 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Collections.Concurrent;
 using System.IO.Abstractions.TestingHelpers;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -47,7 +45,7 @@ public sealed class ModProjectDetectorTest
     }
 
     [Fact]
-    public void TryFind_MultiplePgproj_ReturnsOne()
+    public void TryFind_MultiplePgproj_ThrowsClearException()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -56,14 +54,11 @@ public sealed class ModProjectDetectorTest
         });
         var detector = Build(fs);
 
-        var found = detector.TryFind([Root], out var path);
+        var ex = Assert.Throws<ModProjectLoadException>(() => detector.TryFind([Root], out _));
 
-        Assert.True(found);
-        Assert.Contains(path, new[]
-        {
-            Path.Combine(Root, "a.pgproj"),
-            Path.Combine(Root, "b.pgproj")
-        });
+        Assert.Contains("a.pgproj", ex.Message);
+        Assert.Contains("b.pgproj", ex.Message);
+        Assert.Contains("multiple", ex.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -98,46 +93,22 @@ public sealed class ModProjectDetectorTest
     }
 
     [Fact]
-    public void TryFind_MultiplePgprojInSubtree_LogsWarningAndReturnsFirst()
+    public void TryFind_MultiplePgprojInSubtree_ThrowsClearException()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
             [Path.Combine(Root, "sub1", "a.pgproj")] = new("{}"),
             [Path.Combine(Root, "sub2", "b.pgproj")] = new("{}")
         });
-        var logger = new ListLogger();
-        var detector = Build(fs, logger);
+        var detector = Build(fs);
 
-        var found = detector.TryFind([Root], out var path);
+        var ex = Assert.Throws<ModProjectLoadException>(() => detector.TryFind([Root], out _));
 
-        Assert.True(found);
-        Assert.NotNull(path);
-        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Warning);
+        Assert.Contains(Root, ex.Message);
     }
 
-    private static ModProjectDetector Build(MockFileSystem fs, ILogger<ModProjectDetector>? logger = null)
+    private static ModProjectDetector Build(MockFileSystem fs)
     {
-        return new ModProjectDetector(new FileHelper(fs), logger ?? NullLogger<ModProjectDetector>.Instance);
-    }
-
-    private sealed class ListLogger : ILogger<ModProjectDetector>
-    {
-        public ConcurrentBag<(LogLevel Level, string Message)> Entries { get; } = [];
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state,
-            Exception? exception, Func<TState, Exception?, string> formatter)
-        {
-            Entries.Add((logLevel, formatter(state, exception)));
-        }
+        return new ModProjectDetector(new FileHelper(fs), NullLogger<ModProjectDetector>.Instance);
     }
 }

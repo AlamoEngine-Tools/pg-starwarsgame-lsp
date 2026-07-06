@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -102,6 +103,59 @@ public sealed class GameIndexServiceTest
             ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase));
 
         Assert.NotNull(fired);
+    }
+
+    // ── DynamicEnumChanged (scoped event for dynamic-enum caches) ───────────────
+
+    [Fact]
+    public void ApplyBaseline_Fires_DynamicEnumChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.DynamicEnumChanged += idx => fired = idx;
+
+        svc.ApplyBaseline(BaselineIndex.Empty);
+
+        Assert.NotNull(fired);
+    }
+
+    [Fact]
+    public void ApplyWorkspaceDynamicEnumValues_Fires_DynamicEnumChanged()
+    {
+        var svc = Build();
+        GameIndex? fired = null;
+        svc.DynamicEnumChanged += idx => fired = idx;
+        var values = ImmutableDictionary<string, ImmutableArray<string>>.Empty.Add("DamageType", ["MOD_DMG"]);
+
+        svc.ApplyWorkspaceDynamicEnumValues(values);
+
+        Assert.NotNull(fired);
+        Assert.Equal(values, fired!.WorkspaceDynamicEnumValues);
+    }
+
+    [Fact]
+    public void ApplyModelBones_DoesNotFire_DynamicEnumChanged()
+    {
+        var svc = Build();
+        var fired = false;
+        svc.DynamicEnumChanged += _ => fired = true;
+
+        svc.ApplyModelBones(
+            ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase));
+
+        Assert.False(fired);
+    }
+
+    [Fact]
+    public void ApplyLocalisation_DoesNotFire_DynamicEnumChanged()
+    {
+        var svc = Build();
+        var fired = false;
+        svc.DynamicEnumChanged += _ => fired = true;
+
+        svc.ApplyLocalisation(new StubLocalisationIndex());
+
+        Assert.False(fired);
     }
 
     // ── URI normalization — canonical form at the index boundary ────────────
@@ -271,6 +325,85 @@ public sealed class GameIndexServiceTest
         var fired = false;
         svc.IndexChanged += _ => fired = true;
         await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.True(fired);
+    }
+
+    // ── OpenDocumentAsync — didOpen version-epoch reset ──────────────────────
+    // LSP client versions restart at 1 for every open session, but the committed version
+    // survives a didClose re-index (deliberately, so an unsaved-edit revert is not dropped).
+    // Without an epoch reset the NEXT session's didOpen/didChange at v1/v2 lose against the
+    // previous session's v3 and are silently dropped as stale.
+
+    [Fact]
+    public async Task OpenDocumentAsync_LowerVersionChangedContent_AppliesNewContent()
+    {
+        var svc = Build(new TextSymbolParser());
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+
+        await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, default);
+
+        Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("OLD"));
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_UnchangedContentLowerVersion_ResetsVersionWithoutReparse()
+    {
+        var counting = new CountingParser(Doc("", 0, [Symbol("A")]));
+        var svc = Build(counting);
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 3, default);
+
+        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.Equal(1, counting.ParseCount);
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_EpochReset_ThenChangeAtLowerClientVersion_Applies()
+    {
+        // The full reported sequence: session 1 leaves v3 committed; session 2 opens at v1
+        // (unchanged content) and edits at v2 — the edit must not be dropped as stale.
+        var svc = Build(new TextSymbolParser());
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+
+        await svc.OpenDocumentAsync("file:///f.xml", "OLD", 1, default);
+        await svc.UpdateDocumentAsync("file:///f.xml", "NEW", 2, default);
+
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("OLD"));
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_InBulk_AppliesOverHigherCommittedVersion()
+    {
+        var svc = Build(new TextSymbolParser());
+        await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.OpenDocumentAsync("file:///f.xml", "NEW", 1, default);
+        }
+
+        Assert.Equal(1, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("OLD"));
+    }
+
+    [Fact]
+    public async Task OpenDocumentAsync_SameVersionUnchangedContent_FiresIndexChanged()
+    {
+        // Mirrors UpdateDocumentAsync_Same_Version_Fires_IndexChanged for the open path:
+        // diagnostics must re-publish on re-open even when nothing changed.
+        var svc = Build(new FakeParser(Doc("", 0)));
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        var fired = false;
+        svc.IndexChanged += _ => fired = true;
+        await svc.OpenDocumentAsync("file:///f.xml", "<X/>", 1, default);
 
         Assert.True(fired);
     }
@@ -501,6 +634,51 @@ public sealed class GameIndexServiceTest
         Assert.Equal("file:///rev/u.xml", ((FileOrigin)winner!.Origin).Uri);
     }
 
+    [Fact]
+    public void InjectDocument_WithLiveLayerMap_RestampsLayerRankAndName()
+    {
+        // Snapshots persist the LayerRank at WRITE time; when the dependency graph changes
+        // between sessions the ranks renumber, and a stale injected rank silently breaks the
+        // leaf-ownership gates (IsLeafOwned, LayerRankOfUri == LeafLayerRank). The live layer
+        // map is authoritative.
+        var layerMap = new StubLayerMap(_ => 3, _ => "Leaf");
+        var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap);
+
+        svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 1, LayerName = "Stale" });
+
+        Assert.Equal(3, svc.Current.Documents["file:///f.xml"].LayerRank);
+        Assert.Equal("Leaf", svc.Current.Documents["file:///f.xml"].LayerName);
+    }
+
+    [Fact]
+    public void InjectDocument_InBulk_WithLiveLayerMap_RestampsLayerRank()
+    {
+        var layerMap = new StubLayerMap(_ => 3, _ => "Leaf");
+        var svc = new GameIndexService(new FileHelper(new MockFileSystem()),
+            [new FakeParser(Doc("", 0))], NullLogger<GameIndexService>.Instance, layerMap);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 1, LayerName = "Stale" });
+        }
+
+        Assert.Equal(3, svc.Current.Documents["file:///f.xml"].LayerRank);
+        Assert.Equal("Leaf", svc.Current.Documents["file:///f.xml"].LayerName);
+    }
+
+    [Fact]
+    public void InjectDocument_WithoutLayerMap_PreservesSerializedRank()
+    {
+        // Minimal setups (tests) have no layer map — the snapshot's own stamp stays authoritative.
+        var svc = Build(new FakeParser(Doc("", 0)));
+
+        svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 2, LayerName = "FromSnapshot" });
+
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].LayerRank);
+        Assert.Equal("FromSnapshot", svc.Current.Documents["file:///f.xml"].LayerName);
+    }
+
     // ── BeginBulkUpdate ──────────────────────────────────────────────────────
 
     [Fact]
@@ -566,6 +744,195 @@ public sealed class GameIndexServiceTest
 
         Assert.NotNull(captured);
         Assert.True(captured!.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
+    // ── Bulk merge semantics (builder-based bulk construction) ──────────────
+
+    [Fact]
+    public async Task BulkUpdate_DefersDocumentVisibility_UntilScopeEnds()
+    {
+        var svc = Build(new FakeParser(Doc("", 0)));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///a.xml", "<X/>", 1, default);
+            Assert.False(svc.Current.Documents.ContainsKey("file:///a.xml"));
+        }
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///a.xml"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_MergedIndex_MatchesSequentialUpdates()
+    {
+        DocumentIndex DocFor(string uri, int version)
+        {
+            return Doc(uri, version,
+                [Symbol($"UNIT_{uri[^5]}", uri)],
+                [Reference("SHARED_TARGET", uri)],
+                [GroupMembership("SHARED_GROUP", uri)]);
+        }
+
+        var bulkSvc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(DocFor(uri, v))));
+        var seqSvc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(DocFor(uri, v))));
+
+        using (bulkSvc.BeginBulkUpdate())
+        {
+            await bulkSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, default);
+            await bulkSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, default);
+        }
+
+        await seqSvc.UpdateDocumentAsync("file:///a.xml", "<A/>", 1, default);
+        await seqSvc.UpdateDocumentAsync("file:///b.xml", "<B/>", 1, default);
+
+        Assert.Equal(seqSvc.Current.Documents.Keys.Order(), bulkSvc.Current.Documents.Keys.Order());
+        Assert.Equal(2, bulkSvc.Current.WorkspaceReferences["SHARED_TARGET"].Length);
+        Assert.Equal(2, bulkSvc.Current.WorkspaceGroupMemberships["SHARED_GROUP"].Length);
+        Assert.True(bulkSvc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+        Assert.True(bulkSvc.Current.WorkspaceDefinitions.ContainsKey("UNIT_B"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_ReindexOfExistingDocument_StripsOldEntries()
+    {
+        var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol(text.Contains("v2") ? "UNIT_NEW" : "UNIT_OLD", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, default);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, default);
+        }
+
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_NEW"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_RemoveThenReaddSameContentInsideScope_KeepsDocument()
+    {
+        // Mirrors LuaTextDocumentSyncHandler.didClose: RemoveDocument + UpdateDocumentAsync with
+        // the on-disk (identical) text inside one bulk scope. The unchanged-content fast path must
+        // not swallow the re-add while the removal is still pending.
+        var svc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol("UNIT_A", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 3, default);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.RemoveDocument("file:///f.xml");
+            await svc.UpdateDocumentAsync("file:///f.xml", "<same/>", 0, default);
+        }
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_UpdateThenRemoveInsideScope_RemovesDocument()
+    {
+        var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_A")])));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+            svc.RemoveDocument("file:///f.xml");
+        }
+
+        Assert.False(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
+    }
+
+    [Fact]
+    public async Task BulkUpdate_StaleVersionInsideScope_IsDropped()
+    {
+        var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol(text.Contains("new") ? "UNIT_NEW" : "UNIT_OLD", uri)]))));
+
+        using (svc.BeginBulkUpdate())
+        {
+            await svc.UpdateDocumentAsync("file:///f.xml", "<new/>", 2, default);
+            await svc.UpdateDocumentAsync("file:///f.xml", "<old/>", 1, default);
+        }
+
+        Assert.Equal(2, svc.Current.Documents["file:///f.xml"].Version);
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_NEW"));
+        Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_OLD"));
+    }
+
+    [Fact]
+    public async Task RemoveDocument_DuringBulk_DefersRemovalUntilScopeEnds()
+    {
+        var svc = Build(new FakeParser(Doc("", 0, [Symbol("UNIT_A")])));
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.RemoveDocument("file:///f.xml");
+            Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
+        }
+
+        Assert.False(svc.Current.Documents.ContainsKey("file:///f.xml"));
+    }
+
+    [Fact]
+    public void InjectDocument_DuringBulk_DefersAndMerges()
+    {
+        var svc = Build();
+        var doc = Doc("file:///cached.xml", 0, [Symbol("UNIT_CACHED", "file:///cached.xml")]);
+
+        using (svc.BeginBulkUpdate())
+        {
+            svc.InjectDocument(doc);
+            Assert.False(svc.Current.Documents.ContainsKey("file:///cached.xml"));
+        }
+
+        Assert.True(svc.Current.Documents.ContainsKey("file:///cached.xml"));
+        Assert.True(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_CACHED"));
+    }
+
+    // ── Content-only re-parse keeps workspace dictionaries reference-identical ──
+
+    [Fact]
+    public async Task UpdateDocumentAsync_SameSymbolsRefsGroups_KeepsWorkspaceDictionariesReferenceIdentical()
+    {
+        // A re-parse whose symbols/references/group memberships are value-identical (e.g. an edit
+        // in a comment or non-indexed value) must not rebuild the workspace dictionaries — the
+        // diagnostics publisher relies on their reference identity to scope re-publishing.
+        var svc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol("UNIT_A", uri)], [Reference("TARGET", uri)],
+                [GroupMembership("GROUP", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 1, default);
+        var before = svc.Current;
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X edited/>", 2, default);
+        var after = svc.Current;
+
+        Assert.Equal(2, after.Documents["file:///f.xml"].Version);
+        Assert.True(ReferenceEquals(before.WorkspaceDefinitions, after.WorkspaceDefinitions));
+        Assert.True(ReferenceEquals(before.WorkspaceReferences, after.WorkspaceReferences));
+        Assert.True(ReferenceEquals(before.WorkspaceGroupMemberships, after.WorkspaceGroupMemberships));
+    }
+
+    [Fact]
+    public async Task UpdateDocumentAsync_ChangedSymbols_RebuildsWorkspaceDefinitions()
+    {
+        var svc = Build(new DelegateParser((uri, text, v, _) => ValueTask.FromResult(
+            Doc(uri, v, [Symbol(text.Contains("v2") ? "UNIT_B" : "UNIT_A", uri)]))));
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v1/>", 1, default);
+        var before = svc.Current;
+
+        await svc.UpdateDocumentAsync("file:///f.xml", "<X v2/>", 2, default);
+        var after = svc.Current;
+
+        Assert.False(ReferenceEquals(before.WorkspaceDefinitions, after.WorkspaceDefinitions));
+        Assert.True(after.WorkspaceDefinitions.ContainsKey("UNIT_B"));
+        Assert.False(after.WorkspaceDefinitions.ContainsKey("UNIT_A"));
     }
 
     // ── Cancellation ─────────────────────────────────────────────────────────
@@ -686,11 +1053,13 @@ public sealed class GameIndexServiceTest
 
     private sealed class StubLayerMap : IProjectLayerMap
     {
+        private readonly Func<int, string?>? _name;
         private readonly Func<string, int> _rank;
 
-        public StubLayerMap(Func<string, int> rank)
+        public StubLayerMap(Func<string, int> rank, Func<int, string?>? name = null)
         {
             _rank = rank;
+            _name = name;
         }
 
         public void SetLayers(IReadOnlyList<ProjectLayer> layers)
@@ -704,7 +1073,7 @@ public sealed class GameIndexServiceTest
 
         public string? GetLayerName(int rank)
         {
-            return null;
+            return _name?.Invoke(rank);
         }
     }
 
@@ -730,6 +1099,25 @@ public sealed class GameIndexServiceTest
         {
             ParseCount++;
             return ValueTask.FromResult(_result with { DocumentUri = uri, Version = version });
+        }
+    }
+
+    // Derives the symbol id from the document text, so tests can assert which CONTENT won a
+    // version race (FakeParser always returns the same symbols regardless of text).
+    private sealed class TextSymbolParser : IGameDocumentParser
+    {
+        public bool CanParse(string ext)
+        {
+            return ext == ".xml";
+        }
+
+        public ValueTask<DocumentIndex> ParseAsync(string uri, string text, int version,
+            CancellationToken ct)
+        {
+            var symbol = new GameSymbol(text, GameSymbolKind.XmlObject, "Unit",
+                new FileOrigin(uri, 1, null), null);
+            return ValueTask.FromResult(new DocumentIndex(uri, version,
+                ImmutableArray.Create(symbol), ImmutableArray<GameReference>.Empty));
         }
     }
 
@@ -812,5 +1200,12 @@ public sealed class GameIndexServiceTest
         {
             return _fn(uri, text, version, ct);
         }
+    }
+
+    private sealed class StubLocalisationIndex : ILocalisationIndex
+    {
+        public bool ContainsKey(string key) => false;
+        public IEnumerable<string> Keys => [];
+        public string? GetValue(string key) => null;
     }
 }

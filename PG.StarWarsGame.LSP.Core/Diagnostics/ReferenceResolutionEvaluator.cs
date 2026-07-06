@@ -34,6 +34,13 @@ public static class ReferenceResolutionEvaluator
         if (string.Equals(resolved.TypeName, expectedTypeName, StringComparison.OrdinalIgnoreCase))
             return null;
 
+        // SpecialAbility has no schema-level type hierarchy (types.yaml lists concrete ability
+        // subtypes as flat siblings) — consult the hardcoded family allowlist instead of requiring
+        // an exact match, so e.g. GUI_Activated_Ability_Name accepts any concrete ability type.
+        if (string.Equals(expectedTypeName, "SpecialAbility", StringComparison.OrdinalIgnoreCase) &&
+            resolved.TypeName is not null && SpecialAbilityTypeFamily.TypeNames.Contains(resolved.TypeName))
+            return null;
+
         return (XmlDiagnosticSeverity.Error,
             $"Type mismatch for '{displayId}': expected '{expectedTypeName}' but found '{resolved.TypeName}'.");
     }

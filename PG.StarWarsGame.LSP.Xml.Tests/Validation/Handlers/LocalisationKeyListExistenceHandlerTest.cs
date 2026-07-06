@@ -21,6 +21,12 @@ public sealed class LocalisationKeyListExistenceHandlerTest
         XmlHandlerTestFixtures.MakeTag("Abilities", XmlValueType.NameReferenceList,
             referenceKind: ReferenceKind.XmlObject);
 
+    // Encyclopedia_Text/MP_Encyclopedia_Text are declared as TypeReferenceList in schema, not
+    // NameReferenceList — the handler must cover both.
+    private static readonly XmlTagDefinition EncyclopediaTextTag =
+        XmlHandlerTestFixtures.MakeTag("Encyclopedia_Text", XmlValueType.TypeReferenceList,
+            referenceKind: ReferenceKind.LocalisationKey);
+
     private static DiagnosticsContext CtxWithKeys(params string[] keys)
     {
         var index = GameIndex.Empty with { Localisation = new ValueLocIndex(keys) };
@@ -90,6 +96,78 @@ public sealed class LocalisationKeyListExistenceHandlerTest
 
         var d = Assert.Single(results);
         Assert.Contains("TEXT_ONLY", d.Message);
+    }
+
+    [Fact]
+    public void TypeReferenceList_OneKeyAbsent_EmitsOneWarning()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(EncyclopediaTextTag, "TEXT_A TEXT_MISSING");
+        var ctx = CtxWithKeys("TEXT_A");
+
+        var results = Sut.Handle(fact, ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Contains("TEXT_MISSING", d.Message);
+    }
+
+    [Fact]
+    public void TypeReferenceList_AllKeysPresent_EmitsNothing()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(EncyclopediaTextTag, "TEXT_A TEXT_B");
+        var ctx = CtxWithKeys("TEXT_A", "TEXT_B");
+
+        var results = Sut.Handle(fact, ctx).ToList();
+
+        Assert.Empty(results);
+    }
+
+    // ── precise per-token position (not the whole list value) ───────────────────
+
+    [Fact]
+    public void OneKeyAbsent_DiagnosticPointsAtSpecificToken_NotWholeListStart()
+    {
+        // Fact starts at (line 4, col 5) — "TEXT_A TEXT_MISSING TEXT_C" — TEXT_MISSING starts at
+        // relative offset 7, so its absolute column must be 5 + 7 = 12, not the fact's own col 5.
+        var fact = new XmlTagValueFact("file:///test.xml", 4, 5, 27, LocKeyListTag, "TEXT_A TEXT_MISSING TEXT_C");
+        var ctx = CtxWithKeys("TEXT_A", "TEXT_C");
+
+        var results = Sut.Handle(fact, ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(4, d.OverrideLine);
+        Assert.Equal(12, d.OverrideColumn);
+        Assert.Equal("TEXT_MISSING".Length, d.OverrideLength);
+    }
+
+    [Fact]
+    public void MultilineList_MissingKeyOnLaterLine_DiagnosticPointsAtThatLine()
+    {
+        // Fact starts at (line 2, col 0); RawValue = "TEXT_A\nTEXT_MISSING\nTEXT_C" — TEXT_MISSING
+        // is on the line right after the first newline, i.e. absolute line 3, col 0.
+        var fact = new XmlTagValueFact("file:///test.xml", 2, 0, 26, LocKeyListTag,
+            "TEXT_A\nTEXT_MISSING\nTEXT_C");
+        var ctx = CtxWithKeys("TEXT_A", "TEXT_C");
+
+        var results = Sut.Handle(fact, ctx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal(3, d.OverrideLine);
+        Assert.Equal(0, d.OverrideColumn);
+    }
+
+    [Fact]
+    public void MultilineList_TwoMissingKeysOnDifferentLines_EachDiagnosticHasOwnLine()
+    {
+        var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 0, LocKeyListTag,
+            "TEXT_BAD1\nTEXT_BAD2");
+        var ctx = CtxWithKeys();
+
+        var results = Sut.Handle(fact, ctx).ToList();
+
+        Assert.Equal(2, results.Count);
+        Assert.Contains(results, d => d.OverrideLine == 0 && d.Message.Contains("TEXT_BAD1"));
+        Assert.Contains(results, d => d.OverrideLine == 1 && d.Message.Contains("TEXT_BAD2"));
     }
 
     [Fact]

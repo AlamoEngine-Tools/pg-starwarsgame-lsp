@@ -25,29 +25,7 @@ public abstract class NamedEnumValueHandlerBase : SingleValueTypeHandlerBase
     /// </summary>
     protected static HashSet<string>? GetValidValues(EnumDefinition? enumDef, DiagnosticsContext ctx)
     {
-        if (enumDef is null)
-            return null;
-
-        if (enumDef is { Kind: EnumKind.SchemaFixed, Values.Count: > 0 })
-            return enumDef.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        if (enumDef.Kind == EnumKind.DynamicXml)
-        {
-            var hasBaseline = ctx.Index.Baseline.DynamicEnumValues.TryGetValue(enumDef.Name, out var baselineVals)
-                              && baselineVals.Length > 0;
-            var hasWorkspace = ctx.Index.WorkspaceDynamicEnumValues.TryGetValue(enumDef.Name, out var workspaceVals)
-                               && workspaceVals.Length > 0;
-
-            if (!hasBaseline && !hasWorkspace)
-                return null;
-
-            var merged = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (hasBaseline) merged.UnionWith(baselineVals);
-            if (hasWorkspace) merged.UnionWith(workspaceVals);
-            return merged;
-        }
-
-        return null;
+        return EnumValueSets.GetValidValues(enumDef, ctx);
     }
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)

@@ -8,11 +8,6 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact>
 {
-    // Engine placeholder names that are intentionally reused across files (e.g. Default SFXEvent,
-    // Default TradeRouteLine). Duplicate detection is downgraded to Information for these.
-    private static readonly HashSet<string> PlaceholderNames =
-        new(["Default", "Null", "None"], StringComparer.OrdinalIgnoreCase);
-
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlSymbolFact fact, DiagnosticsContext ctx)
     {
         var others = fact.AllDefinitions
@@ -25,13 +20,26 @@ public sealed class DuplicateSymbolHandler : XmlDiagnosticsHandler<XmlSymbolFact
             return [];
 
         var othersText = string.Join(", ", others.Select(s => ((FileOrigin)s.Origin).Uri));
-        var severity = PlaceholderNames.Contains(fact.SymbolId)
+        // Duplicate detection is downgraded to Information for engine placeholders, which are
+        // intentionally redefined across files (e.g. Default SFXEvent, Default TradeRouteLine).
+        var severity = EnginePlaceholders.IsPlaceholder(fact.SymbolId)
             ? XmlDiagnosticSeverity.Information
             : XmlDiagnosticSeverity.Error;
+
+        // Each editor-openable other definition rides along as a clickable related location;
+        // baseline (game-relative) origins stay message-only.
+        var related = others
+            .Select(s => (FileOrigin)s.Origin)
+            .Where(fo => fo.IsNavigable)
+            .Select(fo => new XmlRelatedLocation(fo.Uri, fo.Line, fo.Column,
+                $"Other definition of '{fact.SymbolId}'"))
+            .ToList();
+
         return
         [
             new XmlDiagnosticResult(severity,
-                $"Duplicate symbol '{fact.SymbolId}': also defined in {othersText}.")
+                $"Duplicate symbol '{fact.SymbolId}': also defined in {othersText}.",
+                RelatedLocations: related.Count > 0 ? related : null)
         ];
     }
 }

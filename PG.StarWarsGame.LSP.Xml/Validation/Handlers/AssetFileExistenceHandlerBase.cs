@@ -21,6 +21,13 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
     protected abstract string AssetNoun { get; }
     protected abstract IReadOnlyList<string> AllowedExtensions { get; }
 
+    /// <summary>
+    ///     Extensions the engine treats as ONE asset: a reference to any of them is satisfied by a
+    ///     file with any other (textures: a .tga reference falls back to the .dds and vice versa;
+    ///     the TGA wins at runtime when both exist). Empty = exact-extension matching only.
+    /// </summary>
+    protected virtual IReadOnlyList<string> InterchangeableExtensions => [];
+
     protected sealed override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ReferenceKind != TargetKind)
@@ -30,12 +37,38 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         if (string.IsNullOrEmpty(value))
             return [];
 
-        var normalised = Normalize(value);
-        return (from se in normalised
-                where !Exists(ctx.Index.AssetFiles, se)
-                select new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"{AssetNoun} file '{se}' was not found in the game data or workspace asset files."))
-            .ToList();
+        var results = new List<XmlDiagnosticResult>();
+        foreach (var se in Normalize(value))
+        {
+            if (Exists(ctx.Index.AssetFiles, se))
+                continue;
+
+            var alternates = AlternateNames(se).ToList();
+            if (alternates.Any(a => Exists(ctx.Index.AssetFiles, a)))
+                continue;
+
+            var alsoChecked = alternates.Count > 0
+                ? $" Also checked {string.Join(", ", alternates.Select(a => $"'{a}'"))} (the game treats these formats interchangeably)."
+                : string.Empty;
+            results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                $"{AssetNoun} file '{se}' was not found in the game data or workspace asset files.{alsoChecked}"));
+        }
+
+        return results;
+    }
+
+    // The same name with each other interchangeable extension, when the value's own extension is
+    // part of the interchangeable set.
+    private IEnumerable<string> AlternateNames(string normalised)
+    {
+        var ext = Path.GetExtension(normalised);
+        if (string.IsNullOrEmpty(ext) ||
+            !InterchangeableExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
+            yield break;
+
+        foreach (var other in InterchangeableExtensions)
+            if (!other.Equals(ext, StringComparison.OrdinalIgnoreCase))
+                yield return normalised[..^ext.Length] + other;
     }
 
     private bool Exists(IAssetFileIndex index, string normalised)

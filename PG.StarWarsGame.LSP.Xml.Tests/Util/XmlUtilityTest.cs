@@ -391,6 +391,102 @@ public sealed class XmlUtilityTest
         Assert.Equal(0, XmlUtility.GetOpeningTagLength(null));
     }
 
+    // ── AdvancePosition ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void AdvancePosition_SameLine_AddsToColumn()
+    {
+        var (line, col) = XmlUtility.AdvancePosition(3, 10, "TEXT_A TEXT_B", 7);
+        Assert.Equal(3, line);
+        Assert.Equal(17, col);
+    }
+
+    [Fact]
+    public void AdvancePosition_CrossesNewline_ResetsColumnAndAdvancesLine()
+    {
+        // "TEXT_A\nTEXT_B" — offset 7 is the 'T' right after the newline.
+        var (line, col) = XmlUtility.AdvancePosition(3, 10, "TEXT_A\nTEXT_B", 7);
+        Assert.Equal(4, line);
+        Assert.Equal(0, col);
+    }
+
+    [Fact]
+    public void AdvancePosition_ZeroOffset_ReturnsStartPosition()
+    {
+        var (line, col) = XmlUtility.AdvancePosition(3, 10, "TEXT_A TEXT_B", 0);
+        Assert.Equal(3, line);
+        Assert.Equal(10, col);
+    }
+
+    [Fact]
+    public void AdvancePosition_MultipleNewlines_AdvancesLineForEach()
+    {
+        // "A\nB\nC" — offset 4 is 'C', two newlines crossed.
+        var (line, col) = XmlUtility.AdvancePosition(0, 0, "A\nB\nC", 4);
+        Assert.Equal(2, line);
+        Assert.Equal(0, col);
+    }
+
+    // ── GetElementEndPosition ─────────────────────────────────────────────────
+
+    [Fact]
+    public void GetElementEndPosition_SingleLineElement_ReturnsPositionAfterClosingTag()
+    {
+        // "<Root>\n<Foo>bar</Foo>\n</Root>" — line 1 is "<Foo>bar</Foo>", closing '>' at col 14.
+        const string text = "<Root>\n<Foo>bar</Foo>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col) = XmlUtility.GetElementEndPosition(node!, text);
+
+        Assert.Equal(1, line);
+        Assert.Equal(14, col);
+    }
+
+    [Fact]
+    public void GetElementEndPosition_MultilineElement_ReturnsPositionOnClosingTagLine()
+    {
+        // Line 0: <Root>  Line 1: <Foo>  Line 2: bar  Line 3: </Foo>  Line 4: </Root>
+        // Line 3 "</Foo>" — closing '>' at index 5, so end position is col 6.
+        const string text = "<Root>\n<Foo>\nbar\n</Foo>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col) = XmlUtility.GetElementEndPosition(node!, text);
+
+        Assert.Equal(3, line);
+        Assert.Equal(6, col);
+    }
+
+    [Fact]
+    public void GetElementEndPosition_SelfClosingElement_ReturnsPositionAfterOpeningTag()
+    {
+        // "<Root>\n<Foo/>\n</Root>" — line 1 "<Foo/>", closing '>' at index 5, so end position is col 6.
+        const string text = "<Root>\n<Foo/>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col) = XmlUtility.GetElementEndPosition(node!, text);
+
+        Assert.Equal(1, line);
+        Assert.Equal(6, col);
+    }
+
+    [Fact]
+    public void GetElementEndPosition_ElementWithAttributes_IgnoresAttributeQuotedAngleBrackets()
+    {
+        // Attribute values can't legally contain unescaped '<'/'>' in well-formed XML, but confirm
+        // the search starts from the closing-tag node, not from the element's own start.
+        const string text = "<Root>\n<Unit Name=\"Foo\">x</Unit>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col) = XmlUtility.GetElementEndPosition(node!, text);
+
+        Assert.Equal(1, line);
+        Assert.Equal("<Unit Name=\"Foo\">x</Unit>".Length, col);
+    }
+
     // ── OffsetToPosition ──────────────────────────────────────────────────────
 
     [Fact]
@@ -438,5 +534,46 @@ public sealed class XmlUtilityTest
         var (line, col) = XmlUtility.OffsetToPosition("anything", offset);
         Assert.Equal(0, line);
         Assert.Equal(0, col);
+    }
+
+    // ── PositionToOffset ──────────────────────────────────────────────────────
+
+    [Fact]
+    public void PositionToOffset_LineZero_ReturnsCharacter()
+    {
+        var offset = XmlUtility.PositionToOffset("hello world", 0, 6);
+        Assert.Equal(6, offset);
+    }
+
+    [Fact]
+    public void PositionToOffset_SecondLine_SkipsFirstLineAndNewline()
+    {
+        // "ab\ncd" — line 1, char 1 = 'd' → offset 4
+        var offset = XmlUtility.PositionToOffset("ab\ncd", 1, 1);
+        Assert.Equal(4, offset);
+    }
+
+    [Fact]
+    public void PositionToOffset_ThirdLine_SkipsTwoNewlines()
+    {
+        // "ab\ncd\nef" — line 2, char 0 = 'e' → offset 6
+        var offset = XmlUtility.PositionToOffset("ab\ncd\nef", 2, 0);
+        Assert.Equal(6, offset);
+    }
+
+    [Fact]
+    public void PositionToOffset_RoundTripsWithOffsetToPosition()
+    {
+        const string text = "abc\ndefgh\nij";
+        const int offset = 8;
+        var (line, col) = XmlUtility.OffsetToPosition(text, offset);
+        Assert.Equal(offset, XmlUtility.PositionToOffset(text, line, col));
+    }
+
+    [Fact]
+    public void PositionToOffset_LineBeyondText_ClampsToTextLength()
+    {
+        var offset = XmlUtility.PositionToOffset("ab\ncd", 5, 0);
+        Assert.Equal(5, offset);
     }
 }

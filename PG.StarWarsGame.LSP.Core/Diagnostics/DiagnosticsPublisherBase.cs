@@ -15,6 +15,9 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     diagnostics for open documents of a given file extension, and clears stale URIs.
 ///     When debounceMs &gt; 0, rapid consecutive index changes (e.g. from a workspace-wide
 ///     rename) are batched: only the last change triggers a diagnostic run.
+///     Subclasses can gate publishing entirely via <see cref="DiagnosticsEnabled" /> (used for
+///     the per-language diagnostics feature flags): while it returns false, index changes
+///     publish nothing.
 /// </summary>
 public abstract class DiagnosticsPublisherBase
 {
@@ -24,6 +27,11 @@ public abstract class DiagnosticsPublisherBase
     private readonly object _publishLock = new();
     private readonly IGameWorkspaceHost _workspaceHost;
     private HashSet<string> _lastPublishedUris = [];
+
+    // The index the last publish run was based on, for scoping the next run: documents whose
+    // entry (and every cross-document input) is reference-identical to the last run cannot have
+    // different diagnostics and are skipped. Guarded by _publishLock.
+    private GameIndex? _lastRunIndex;
     private int _pendingVersion;
 
     protected DiagnosticsPublisherBase(
@@ -41,6 +49,9 @@ public abstract class DiagnosticsPublisherBase
     }
 
     protected abstract string FileExtension { get; }
+
+    /// <summary>Feature-flag gate: while false, index changes publish nothing.</summary>
+    protected virtual bool DiagnosticsEnabled => true;
 
     protected abstract void PublishForDocument(string uri, string text, GameIndex index);
 
@@ -69,7 +80,11 @@ public abstract class DiagnosticsPublisherBase
     {
         if (_debounceMs <= 0)
         {
-            RunPublish(newIndex);
+            lock (_publishLock)
+            {
+                RunPublish(newIndex);
+            }
+
             return;
         }
 
@@ -90,14 +105,39 @@ public abstract class DiagnosticsPublisherBase
 
     private void RunPublish(GameIndex index)
     {
+        if (!DiagnosticsEnabled) return;
+
         var openDocs = _workspaceHost.All
             .Where(d => d.PublishDiagnostics)
             .Where(d => Path.GetExtension(d.Uri).Equals(FileExtension, StringComparison.OrdinalIgnoreCase))
             .ToList();
         var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
 
+        // Reference-diff against the last run: a document's diagnostics can only change when its
+        // own Documents entry changed or when any cross-document input (symbols, references,
+        // groups, baseline, localisation, assets, bones, enums) changed. GameIndex is an immutable
+        // record, so unchanged fields keep their references across updates; a content-only edit
+        // replaces just the edited document's entry.
+        var last = _lastRunIndex;
+        var crossDocInputsChanged = last is null
+                                    || !ReferenceEquals(last.WorkspaceDefinitions, index.WorkspaceDefinitions)
+                                    || !ReferenceEquals(last.WorkspaceReferences, index.WorkspaceReferences)
+                                    || !ReferenceEquals(last.WorkspaceGroupMemberships, index.WorkspaceGroupMemberships)
+                                    || !ReferenceEquals(last.Baseline, index.Baseline)
+                                    || !ReferenceEquals(last.Localisation, index.Localisation)
+                                    || !ReferenceEquals(last.AssetFiles, index.AssetFiles)
+                                    || !ReferenceEquals(last.ModelBones, index.ModelBones)
+                                    || !ReferenceEquals(last.WorkspaceDynamicEnumValues, index.WorkspaceDynamicEnumValues)
+                                    || !ReferenceEquals(last.WorkspaceEnumValueDefinitions,
+                                        index.WorkspaceEnumValueDefinitions);
+
         foreach (var doc in openDocs)
         {
+            if (!crossDocInputsChanged
+                && _lastPublishedUris.Contains(doc.Uri)
+                && ReferenceEquals(last!.Documents.GetValueOrDefault(doc.Uri), index.Documents.GetValueOrDefault(doc.Uri)))
+                continue;
+
             try
             {
                 PublishForDocument(doc.Uri, doc.Text, index);
@@ -114,5 +154,6 @@ public abstract class DiagnosticsPublisherBase
                 _publish(EmptyParams(uri));
 
         _lastPublishedUris = openUris;
+        _lastRunIndex = index;
     }
 }

@@ -20,7 +20,9 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
     public BaselineIndex Project(
         IEnumerable<ProjectableEntry> gameObjects,
         IEnumerable<ProjectableEntry> sfxEvents,
-        string sourceManifestHash)
+        string sourceManifestHash,
+        IEnumerable<ProjectableEntry>? musicEvents = null,
+        IEnumerable<ProjectableEntry>? shadowBlobMaterials = null)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
         var objectTags = ImmutableDictionary.CreateBuilder<string, ImmutableArray<BaselineTag>>(
@@ -45,6 +47,29 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             builder[sym.Id] = sym;
             if (tags.Count > 0)
                 objectTags[entry.Name] = [.. tags];
+        }
+
+        // STOPGAP: PG.StarWarsGame.Engine has no MusicEvent game manager (unlike SFXEvent's
+        // ISfxEventGameManager) — entries come from BaselineBuilder parsing MusicEvents.xml
+        // directly. See the big comment in BaselineBuilder/Program.cs for the full rationale and
+        // the TODO to replace this once the engine adds first-class support.
+        foreach (var entry in musicEvents ?? [])
+        {
+            var tags = entry.Tags ?? [];
+            var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "MusicEvent",
+                ResolveOrigin(entry.Location), null, ResolveVariantBaseId(tags));
+            builder[sym.Id] = sym;
+            if (tags.Count > 0)
+                objectTags[entry.Name] = [.. tags];
+        }
+
+        // Same stopgap as music events: no engine-level manager exists for shadow blob
+        // materials — entries come from BaselineBuilder parsing Shadowblobmaterials.xml directly.
+        foreach (var entry in shadowBlobMaterials ?? [])
+        {
+            var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "ShadowBlobMaterial",
+                ResolveOrigin(entry.Location), null);
+            builder[sym.Id] = sym;
         }
 
         return new BaselineIndex(builder.ToImmutable(), DateTimeOffset.UtcNow,

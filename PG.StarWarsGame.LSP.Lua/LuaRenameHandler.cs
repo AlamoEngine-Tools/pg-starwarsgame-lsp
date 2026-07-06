@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Rename;
 using PG.StarWarsGame.LSP.Lua.Util;
 using LorLocation = Loretta.CodeAnalysis.Location;
@@ -20,41 +21,40 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaRenameHandler : ILuaRenameProvider
 {
-    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
-
-    private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaRenameHandler> _logger;
+    private readonly ILuaParseCache _parseCache;
     private readonly ISchemaProvider _schema;
-    private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly IDocumentTextSource _textSource;
 
+    // textSource stays alongside the parse cache: XmlObjectRenameBuilder edits XML documents,
+    // which are outside the Lua parse cache's world.
     public LuaRenameHandler(
-        IGameWorkspaceHost workspaceHost,
+        ILuaParseCache parseCache,
+        IDocumentTextSource textSource,
         ISchemaProvider schema,
-        IFileHelper fileHelper,
         ILogger<LuaRenameHandler> logger)
     {
-        _workspaceHost = workspaceHost;
+        _parseCache = parseCache;
+        _textSource = textSource;
         _schema = schema;
-        _fileHelper = fileHelper;
         _logger = logger;
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
     {
-        var text = GetText(uri);
-        if (text is null) return null;
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null) return null;
 
         // Try game-object reference first (cursor on a string literal whose value is a known XmlObject).
-        var xmlObjectId = FindXmlObjectAtCursor(text, request.Position.Line, request.Position.Character, index);
+        var xmlObjectId = FindXmlObjectAtCursor(parsed.Tree, request.Position.Line, request.Position.Character, index);
         if (xmlObjectId is not null)
-            return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _workspaceHost,
-                _fileHelper, _logger);
+            return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _textSource, _logger);
 
         // Fall back to Lua global (cursor on an identifier that is a known LuaGlobal).
-        var luaGlobalId = FindLuaGlobalAtCursor(text, request.Position.Line, request.Position.Character, index);
+        var luaGlobalId = FindLuaGlobalAtCursor(parsed.Tree, request.Position.Line, request.Position.Character,
+            index);
         if (luaGlobalId is not null)
-            return LuaGlobalRenameBuilder.Build(luaGlobalId, request.NewName, index, _workspaceHost, _fileHelper,
-                _logger);
+            return LuaGlobalRenameBuilder.Build(luaGlobalId, request.NewName, index, _parseCache, _logger);
 
         return null;
     }
@@ -79,17 +79,16 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
             }
         }
 
-        // XmlObject string literal path — requires document text.
-        var text = GetText(uri);
-        if (text is null) return null;
+        // XmlObject string literal path — requires the parsed document.
+        var parsed = _parseCache.GetOrParse(uri);
+        if (parsed is null) return null;
 
-        return FindXmlObjectStringRange(text, line, character, index);
+        return FindXmlObjectStringRange(parsed.Tree, line, character, index);
     }
 
     private RangeOrPlaceholderRange? FindXmlObjectStringRange(
-        string text, int line, int character, GameIndex index)
+        SyntaxTree tree, int line, int character, GameIndex index)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
 
         foreach (var lit in root.DescendantNodes().OfType<LiteralExpressionSyntax>())
@@ -119,9 +118,8 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         return null;
     }
 
-    private static string? FindXmlObjectAtCursor(string text, int line, int character, GameIndex index)
+    private static string? FindXmlObjectAtCursor(SyntaxTree tree, int line, int character, GameIndex index)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
 
         foreach (var lit in root.DescendantNodes().OfType<LiteralExpressionSyntax>())
@@ -136,9 +134,8 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         return null;
     }
 
-    private static string? FindLuaGlobalAtCursor(string text, int line, int character, GameIndex index)
+    private static string? FindLuaGlobalAtCursor(SyntaxTree tree, int line, int character, GameIndex index)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
 
         foreach (var id in root.DescendantNodes().OfType<IdentifierNameSyntax>())
@@ -181,19 +178,4 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         return true;
     }
 
-    private string? GetText(string uri)
-    {
-        if (_workspaceHost.TryGet(uri, out var doc))
-            return doc.Text;
-        var path = _fileHelper.FileUriToPath(uri);
-        if (path is null) return null;
-        try
-        {
-            return _fileHelper.FileSystem.File.ReadAllText(path);
-        }
-        catch
-        {
-            return null;
-        }
-    }
 }

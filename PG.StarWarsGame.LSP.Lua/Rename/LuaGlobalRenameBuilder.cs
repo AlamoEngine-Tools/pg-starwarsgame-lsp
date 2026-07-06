@@ -3,6 +3,7 @@
 
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
+using Loretta.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -10,16 +11,15 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua.Rename;
 
 public static class LuaGlobalRenameBuilder
 {
-    private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
-
     public static WorkspaceEdit? Build(
         string id, string newName, GameIndex index,
-        IGameWorkspaceHost workspaceHost, IFileHelper fileHelper, ILogger logger)
+        ILuaParseCache parseCache, ILogger logger)
     {
         if (!index.IsLeafOwned(id))
         {
@@ -35,9 +35,9 @@ public static class LuaGlobalRenameBuilder
             {
                 if (sym.Kind != GameSymbolKind.LuaGlobal) continue;
                 if (sym.Origin is not FileOrigin fo) continue;
-                var text = GetText(fo.Uri, workspaceHost, fileHelper);
-                if (text is null) continue;
-                var range = FindFunctionNameRange(text, id);
+                var parsed = parseCache.GetOrParse(fo.Uri);
+                if (parsed is null) continue;
+                var range = FindFunctionNameRange(parsed.Tree, id);
                 if (range is null) continue;
                 AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = range });
             }
@@ -66,9 +66,8 @@ public static class LuaGlobalRenameBuilder
         };
     }
 
-    internal static LspRange? FindFunctionNameRange(string text, string globalName)
+    internal static LspRange? FindFunctionNameRange(SyntaxTree tree, string globalName)
     {
-        var tree = LuaSyntaxTree.ParseText(text, s_parseOptions);
         var root = tree.GetRoot();
 
         foreach (var funcDecl in root.DescendantNodes().OfType<FunctionDeclarationStatementSyntax>())
@@ -85,22 +84,6 @@ public static class LuaGlobalRenameBuilder
         }
 
         return null;
-    }
-
-    private static string? GetText(string uri, IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
-    {
-        if (workspaceHost.TryGet(uri, out var doc))
-            return doc.Text;
-        var path = fileHelper.FileUriToPath(uri);
-        if (path is null) return null;
-        try
-        {
-            return fileHelper.FileSystem.File.ReadAllText(path);
-        }
-        catch
-        {
-            return null;
-        }
     }
 
     private static void AddEdit(

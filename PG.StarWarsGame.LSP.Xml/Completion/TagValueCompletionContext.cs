@@ -23,7 +23,8 @@ public sealed class TagValueCompletionContext
         int character,
         bool isStoryParser,
         string? storyParamSide,
-        int storyParamPosition)
+        int storyParamPosition,
+        int tupleSlotIndex = 0)
     {
         DocumentUri = documentUri;
         Index = index;
@@ -39,6 +40,7 @@ public sealed class TagValueCompletionContext
         IsStoryParser = isStoryParser;
         StoryParamSide = storyParamSide;
         StoryParamPosition = storyParamPosition;
+        TupleSlotIndex = tupleSlotIndex;
     }
 
     public string DocumentUri { get; }
@@ -55,4 +57,12 @@ public sealed class TagValueCompletionContext
     public bool IsStoryParser { get; }
     public string? StoryParamSide { get; }
     public int StoryParamPosition { get; }
+
+    /// <summary>
+    ///     0-based comma-separated slot the cursor sits in, clamped to 1, for tuple-shaped
+    ///     <see cref="XmlTagDefinition.ValueType" />s (e.g. <c>HardPointSfxMap</c>). Clamped because every
+    ///     tuple validator splits on the FIRST comma only — anything past it belongs to slot 1 regardless
+    ///     of further commas within that slot's own value. Meaningless (always 0) for non-tuple types.
+    /// </summary>
+    public int TupleSlotIndex { get; }
 }

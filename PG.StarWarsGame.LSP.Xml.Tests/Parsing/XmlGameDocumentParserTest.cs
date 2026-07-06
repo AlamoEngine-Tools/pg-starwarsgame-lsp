@@ -942,6 +942,48 @@ public sealed class XmlGameDocumentParserTest
     }
 
     [Fact]
+    public async Task ParseAsync_AbilityOwner_ElementNameNotASchemaType_ScopesViaNameAttribute()
+    {
+        // Real game files use concrete element names (<SpaceUnit>, <SpecialStructure>, …) that are
+        // NOT schema object types — the schema models one umbrella GameObjectType. Owner scoping
+        // must fall back to the nearest ancestor with a Name attribute, or every ability id stays
+        // bare and cross-object duplicates fire (SD_Tractor_Beam_Attack_Ability, 2026-07-05).
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<SpaceUnit Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"/></Abilities></SpaceUnit>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("MY_UNIT$My_Ability", sym.Id);
+    }
+
+    [Fact]
+    public async Task ParseAsync_TwoOwners_SameAbilityName_ProduceDistinctScopedIds()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("SystemSpyAbility"));
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """
+            <SpecialStructures>
+              <SpecialStructure Name="Palace_E"><Abilities SubObjectList="Yes"><System_Spy_Ability Name="Spy"/></Abilities></SpecialStructure>
+              <SpecialStructure Name="Palace_R"><Abilities SubObjectList="Yes"><System_Spy_Ability Name="Spy"/></Abilities></SpecialStructure>
+            </SpecialStructures>
+            """,
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Contains(result.Symbols, s => s.Id == "Palace_E$Spy");
+        Assert.Contains(result.Symbols, s => s.Id == "Palace_R$Spy");
+        Assert.Equal(2, result.Symbols.Count(s => s.Id.EndsWith("$Spy", StringComparison.Ordinal)));
+    }
+
+    [Fact]
     public async Task ParseAsync_AbilityDefinitionSubObjectList_No_Owner_Id_Uses_Bare_Ability_Name()
     {
         var schema = new FakeSchemaProvider();
@@ -956,6 +998,33 @@ public sealed class XmlGameDocumentParserTest
 
         var sym = Assert.Single(result.Symbols);
         Assert.Equal("My_Ability", sym.Id);
+    }
+
+    [Fact]
+    public async Task ParseAsync_AbilityVariantBase_Scoped_To_Same_Owner_As_Ability_Id()
+    {
+        // The ability's own id is owner-scoped ("MY_UNIT$My_Ability") specifically to prevent
+        // cross-object collisions when two units share an ability name. Its Variant_Of_Existing_Type
+        // base must be scoped the same way — otherwise a bare "Base_Ability" base id can coincidentally
+        // resolve to some unrelated object's same-named ability elsewhere in the workspace.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(SubObjectListTag("Abilities"));
+        schema.AddType(Type("LuckyShotAttackAbility"));
+        schema.AddType(new GameObjectTypeDefinition { TypeName = "GameObjectType", NameTag = "Name" });
+        schema.AddTag(VariantTag());
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<GameObjectType Name="MY_UNIT"><Abilities SubObjectList="Yes"><Lucky_Shot_Attack_Ability Name="My_Ability"><Variant_Of_Existing_Type>Base_Ability</Variant_Of_Existing_Type></Lucky_Shot_Attack_Ability></Abilities></GameObjectType>""",
+            1, TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("MY_UNIT$My_Ability", sym.Id);
+        Assert.Equal("MY_UNIT$Base_Ability", sym.VariantBaseId);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("MY_UNIT$Base_Ability", reference.TargetId);
+        Assert.Equal("LuckyShotAttackAbility", reference.ExpectedTypeName);
     }
 
     [Fact]
@@ -974,6 +1043,29 @@ public sealed class XmlGameDocumentParserTest
         var result = await Build(schema).ParseAsync(
             "file:///f.xml",
             """<GameObjectType Name="MY_UNIT"><Unit_Abilities_Data><Unit_Ability><GUI_Activated_Ability_Name>My_Special_Ability</GUI_Activated_Ability_Name></Unit_Ability></Unit_Abilities_Data></GameObjectType>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("MY_UNIT$My_Special_Ability", reference.TargetId);
+    }
+
+    [Fact]
+    public async Task ParseAsync_OwnerScopedReference_ElementNameNotASchemaType_ScopesViaNameAttribute()
+    {
+        // Mirrors the symbol-side fallback: <SpaceUnit> is not a schema object type, but its Name
+        // attribute still identifies the owner — the reference must match the scoped symbol id.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "GUI_Activated_Ability_Name",
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            SemanticType = TagSemanticType.OwnerScopedReference
+        });
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<SpaceUnit Name="MY_UNIT"><Unit_Ability><GUI_Activated_Ability_Name>My_Special_Ability</GUI_Activated_Ability_Name></Unit_Ability></SpaceUnit>""",
             1, TestContext.Current.CancellationToken);
 
         var reference = Assert.Single(result.References);
@@ -1000,6 +1092,61 @@ public sealed class XmlGameDocumentParserTest
 
         var reference = Assert.Single(result.References);
         Assert.Equal("My_Special_Ability", reference.TargetId);
+    }
+
+    // ── presence-induced animation object references ────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_PresenceInducedAnimations_CollectsObjectRefsSkippingTheAnimation()
+    {
+        // Format: AnimationStateId, ObjectName, ObjectName, ... — the first token is an
+        // engine animation state (not indexable); the rest are game objects whose presence
+        // triggers it, and must be navigable/validated as object references.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Presence_Induced_Animations",
+            ValueType = XmlValueType.PerFactionObjectList,
+            ValidationOverride = new TagValidationOverride
+            {
+                ValidationId = "presence-induced-animations",
+                Mode = ValidationOverrideMode.Replace
+            }
+        });
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<U><Presence_Induced_Animations>Attention, Emperor_Palpatine, Darth_Vader,</Presence_Induced_Animations></U>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(2, result.References.Length);
+        Assert.Contains(result.References, r => r.TargetId == "Emperor_Palpatine");
+        Assert.Contains(result.References, r => r.TargetId == "Darth_Vader");
+        Assert.DoesNotContain(result.References, r => r.TargetId == "Attention");
+    }
+
+    // ── tuple category enum reference extraction ────────────────────────────
+
+    [Fact]
+    public async Task ParseAsync_InaccuracyMap_CollectsCategoryEnumReferenceForSlot0()
+    {
+        // Fire_Inaccuracy_Distance is a (GameObjectCategoryType, float) tuple — slot 0 must be
+        // recorded as an enum: reference so go-to-definition lands on the category's definition
+        // (2026-07-05 smoketest report).
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Fire_Inaccuracy_Distance", ValueType = XmlValueType.InaccuracyMap
+        });
+
+        var result = await Build(schema).ParseAsync(
+            "file:///f.xml",
+            """<HardPoint Name="HP_X"><Fire_Inaccuracy_Distance> Bomber, 15.0 </Fire_Inaccuracy_Distance></HardPoint>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("enum:GameObjectCategoryType/Bomber", reference.TargetId);
+        Assert.Equal("Bomber".Length, reference.Length);
     }
 
     // ── enum reference extraction ────────────────────────────────────────────

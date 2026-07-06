@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -65,12 +66,30 @@ public sealed class XmlDefinitionHandlerTest
             null);
     }
 
-    private static XmlDefinitionHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null)
+    private static XmlDefinitionHandler BuildHandler(GameIndex index, IEaWXmlContext? ctx = null,
+        ILspConfigurationProvider? config = null)
     {
         var indexService = new FakeIndexService { Current = index };
         var fileHelper = new FileHelper(new MockFileSystem());
         return new XmlDefinitionHandler(indexService, fileHelper, NullLogger<XmlDefinitionHandler>.Instance,
-            ctx ?? new AllowAllEaWContext());
+            ctx ?? new AllowAllEaWContext(), config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_GoToDefinitionFlagOff_ReturnsNull()
+    {
+        // Same arrange as a resolvable reference — only the feature flag differs.
+        var doc = DocWithRef(TestUri, "UNIT_A", 0, 4, 6);
+        var symbol = SymbolAt("UNIT_A", TargetUri, 3);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { GoToDefinition = false } });
+        var handler = BuildHandler(IndexWith(doc, symbol), config: config);
+
+        var result = await handler.Handle(At(0, 5), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     // ── null / miss cases ─────────────────────────────────────────────────────
@@ -312,6 +331,7 @@ public sealed class XmlDefinitionHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

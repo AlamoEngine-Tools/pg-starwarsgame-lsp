@@ -3,6 +3,7 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
@@ -13,6 +14,25 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 public sealed class AddLocalisationLanguageHandlerTest
 {
     private const string Path = "/mod/f.csv";
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_FailsWithDisabledMessageWithoutWriting()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, fs, reload) = Build("key,ENGLISH\nTEXT_A,Hello\n", config);
+        var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(Path));
+
+        var result = await handler.Handle(
+            new AddLocalisationLanguageParams(Path, "GERMAN", hash), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(LocalisationFeatureDisabled.Message, result.Error);
+        Assert.DoesNotContain("GERMAN", fs.File.ReadAllText(Path));
+        Assert.False(reload.LocalisationOnlyReloaded);
+    }
 
     [Fact]
     public async Task Handle_NewLanguage_AddsColumn_ReturnsSuccess()
@@ -53,7 +73,8 @@ public sealed class AddLocalisationLanguageHandlerTest
         var writer = new LocalisationEntryWriter(fileHelper, NullLogger<LocalisationEntryWriter>.Instance);
         var reload = new SpyReloadService();
         var handler = new AddLocalisationLanguageHandler(
-            writer, fileHelper, reload, NullLogger<AddLocalisationLanguageHandler>.Instance);
+            writer, fileHelper, reload, NullLogger<AddLocalisationLanguageHandler>.Instance,
+            new FakeLspConfigurationProvider());
         var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(nlsPath));
 
         var result = await handler.Handle(
@@ -103,14 +124,15 @@ public sealed class AddLocalisationLanguageHandlerTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static (AddLocalisationLanguageHandler handler, MockFileSystem fs, SpyReloadService reload) Build(
-        string initialContent)
+        string initialContent, ILspConfigurationProvider? config = null)
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [Path] = new(initialContent) });
         var fileHelper = new FileHelper(fs);
         var entryWriter = new LocalisationEntryWriter(fileHelper, NullLogger<LocalisationEntryWriter>.Instance);
         var reload = new SpyReloadService();
         var handler = new AddLocalisationLanguageHandler(
-            entryWriter, fileHelper, reload, NullLogger<AddLocalisationLanguageHandler>.Instance);
+            entryWriter, fileHelper, reload, NullLogger<AddLocalisationLanguageHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
         return (handler, fs, reload);
     }
 

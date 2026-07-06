@@ -189,6 +189,134 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal("de", provider.Current.Locale);
     }
 
+    // ── feature flags ────────────────────────────────────────────────────────
+
+    [Fact]
+    public void LoadFrom_NoFeaturesNode_AllFeatureFlagsDefaultTrue()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { locale = "en" }));
+
+        var features = provider.Current.Features;
+        Assert.True(features.Xml.Completion);
+        Assert.True(features.Xml.Hover);
+        Assert.True(features.Xml.Diagnostics);
+        Assert.True(features.Xml.GoToDefinition);
+        Assert.True(features.Xml.FindReferences);
+        Assert.True(features.Xml.Rename);
+        Assert.True(features.Xml.CodeLens);
+        Assert.True(features.Xml.InlayHints);
+        Assert.True(features.Xml.CodeActions);
+        Assert.True(features.Xml.LinkedEditing);
+        Assert.True(features.Lua.Completion);
+        Assert.True(features.Lua.Hover);
+        Assert.True(features.Lua.Diagnostics);
+        Assert.True(features.Lua.GoToDefinition);
+        Assert.True(features.Lua.Rename);
+        Assert.True(features.Lua.CodeLens);
+        Assert.True(features.Lua.InlayHints);
+        Assert.True(features.Lua.CodeActions);
+        Assert.True(features.Tools.Localisation);
+        Assert.True(features.Tools.Variants);
+    }
+
+    [Fact]
+    public void LoadFrom_PartialFeaturesNode_DisablesLeafKeepsSiblings()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { xml = new { completion = false } } }));
+
+        Assert.False(provider.Current.Features.Xml.Completion);
+        Assert.True(provider.Current.Features.Xml.Hover);
+        Assert.True(provider.Current.Features.Lua.Completion);
+        Assert.True(provider.Current.Features.Tools.Localisation);
+    }
+
+    [Fact]
+    public void LoadFrom_FeaturesCamelCaseKeys_MapToPascalCaseProperties()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new
+        {
+            features = new
+            {
+                xml = new { goToDefinition = false, inlayHints = false, linkedEditing = false },
+                lua = new { codeLens = false, hover = false },
+                tools = new { localisation = false }
+            }
+        }));
+
+        var features = provider.Current.Features;
+        Assert.False(features.Xml.GoToDefinition);
+        Assert.False(features.Xml.InlayHints);
+        Assert.False(features.Xml.LinkedEditing);
+        Assert.False(features.Lua.CodeLens);
+        Assert.False(features.Lua.Hover);
+        Assert.False(features.Tools.Localisation);
+        // Untouched leaves keep their defaults.
+        Assert.True(features.Xml.Completion);
+        Assert.True(features.Lua.Rename);
+        Assert.True(features.Tools.Variants);
+    }
+
+    [Fact]
+    public void LoadFrom_FeaturesViaNonJsonElementToken_Parse()
+    {
+        var fakeToken = new FakeJsonToken("""{"features":{"lua":{"diagnostics":false}}}""");
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(fakeToken);
+
+        Assert.False(provider.Current.Features.Lua.Diagnostics);
+        Assert.True(provider.Current.Features.Lua.Completion);
+    }
+
+    [Fact]
+    public void LoadFrom_MalformedFeaturesNode_UsesDefaultsWithoutThrowing()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        var ex = Record.Exception(() =>
+            provider.LoadFrom(Json(new { features = new { xml = new { completion = "not-a-bool" } } })));
+
+        Assert.Null(ex);
+        Assert.True(provider.Current.Features.Xml.Completion);
+    }
+
+    [Fact]
+    public void Merge_InitOptionsFeaturesWinWholesaleOverFileFeatures()
+    {
+        // File disables Xml.Hover and Lua.CodeLens; init options send a features node that
+        // only disables Xml.Completion. The init options node replaces the file node wholesale
+        // (the client always sends the complete resolved object), so the file's flags are gone.
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".pg-lsp.json"),
+            """{"Features":{"Xml":{"Hover":false},"Lua":{"CodeLens":false}}}""");
+
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new
+        {
+            workspaceRoot = _tempDir,
+            features = new { xml = new { completion = false } }
+        }));
+
+        Assert.False(provider.Current.Features.Xml.Completion);
+        Assert.True(provider.Current.Features.Xml.Hover);
+        Assert.True(provider.Current.Features.Lua.CodeLens);
+    }
+
+    [Fact]
+    public void Merge_NoFeaturesInInitOptions_FileFeaturesApply()
+    {
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".pg-lsp.json"),
+            """{"Features":{"Xml":{"Hover":false}}}""");
+
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
+
+        Assert.False(provider.Current.Features.Xml.Hover);
+        Assert.True(provider.Current.Features.Xml.Completion);
+    }
+
     // ── MockFileSystem tests ─────────────────────────────────────────────────
 
     [Fact]

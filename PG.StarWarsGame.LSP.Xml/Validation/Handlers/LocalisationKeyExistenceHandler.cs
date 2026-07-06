@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class LocalisationKeyExistenceHandler : LocalisationKeyHandlerBase
 {
-    protected override XmlValueType TargetType => XmlValueType.NameReference;
+    protected override IReadOnlyList<XmlValueType> TargetTypes => [XmlValueType.NameReference];
 
     protected override IEnumerable<XmlDiagnosticResult> HandleLocalisationKey(
         XmlTagValueFact fact, DiagnosticsContext ctx)

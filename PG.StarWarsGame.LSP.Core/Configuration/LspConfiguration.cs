@@ -12,4 +12,5 @@ public record LspConfiguration
     public SchemaSourceConfig SchemaSource { get; init; } = new();
     public BaselineSourceConfig BaselineSource { get; init; } = new();
     public LocalisationConfig Localisation { get; init; } = new();
+    public FeatureFlags Features { get; init; } = new();
 }

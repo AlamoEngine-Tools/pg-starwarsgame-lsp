@@ -35,6 +35,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override async Task<Unit> Handle(DidOpenTextDocumentParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!IsLuaDocument(uri)) return Unit.Value;
         var text = request.TextDocument.Text;
         var version = request.TextDocument.Version ?? 0;
 
@@ -42,7 +43,9 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         await _gate.RunOrBufferAsync(async token =>
         {
             _workspaceHost.AddOrUpdate(uri, text, version);
-            await _indexService.UpdateDocumentAsync(uri, text, version, token);
+            // Open (not Update): client versions restart at 1 per open session, while the didClose
+            // re-index below preserves the committed version — the open starts a new version epoch.
+            await _indexService.OpenDocumentAsync(uri, text, version, token);
         }, ct);
         return Unit.Value;
     }
@@ -50,6 +53,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override async Task<Unit> Handle(DidChangeTextDocumentParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!IsLuaDocument(uri)) return Unit.Value;
         var text = request.ContentChanges.LastOrDefault()?.Text ?? string.Empty;
         var version = request.TextDocument.Version ?? 0;
 
@@ -64,6 +68,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     public override async Task<Unit> Handle(DidCloseTextDocumentParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
+        if (!IsLuaDocument(uri)) return Unit.Value;
 
         await _gate.RunOrBufferAsync(async token =>
         {
@@ -71,18 +76,35 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
             var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
             if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
-                using (_indexService.BeginBulkUpdate())
-                {
-                    _indexService.RemoveDocument(uri);
-                    var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
-                    await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                    _workspaceHost.AddOrUpdate(uri, text, 0, publishDiagnostics: false);
-                }
+            {
+                // File still on disk — restore the saved state in the INDEX so workspace-wide
+                // references keep working after close; the host tracks only open documents.
+                // Never remove-then-re-add here: the removal is applied by the bulk merge while
+                // the re-add's parse runs asynchronously, and whichever lands last wins — a
+                // removal landing last silently deleted the document's symbols from the index.
+                // UpdateDocumentAsync alone skips the re-parse when the buffer already matched
+                // disk. Pass the current version so an unsaved-edit revert is not dropped as stale.
+                var version = _indexService.Current.Documents.GetValueOrDefault(uri)?.Version ?? 0;
+                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
+                await _indexService.UpdateDocumentAsync(uri, text, version, token);
+            }
             else
+            {
+                // File was deleted from disk — remove it entirely from the index.
                 _indexService.RemoveDocument(uri);
+            }
         }, ct);
 
         return Unit.Value;
+    }
+
+    // OmniSharp routes didChange/didClose by tracked document attributes, not by the language id
+    // of the original didOpen, so this handler also receives notifications for XML documents.
+    // Processing them here raced the XML handler's own close flow and could strip the document
+    // from the index (a Lua-side removal landing after the XML-side re-add).
+    private static bool IsLuaDocument(string uri)
+    {
+        return uri.EndsWith(".lua", StringComparison.OrdinalIgnoreCase);
     }
 
     public override Task<Unit> Handle(DidSaveTextDocumentParams request, CancellationToken ct)

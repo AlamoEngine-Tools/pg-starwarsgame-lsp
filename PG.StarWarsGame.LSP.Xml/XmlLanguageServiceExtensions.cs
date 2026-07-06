@@ -3,8 +3,11 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.LSP.Core.Completion;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
@@ -141,6 +144,13 @@ public static class XmlLanguageServiceExtensions
         // Cross-tag validation handler
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
 
+        // Shared parse source: one HAP parse per (document, content) reused by indexing,
+        // diagnostics, and every request handler. Capacity from ServerOptions.ParseCacheCapacity.
+        services.AddSingleton<IXmlParseCache>(sp => new XmlParseCache(
+            sp.GetRequiredService<IDocumentTextSource>(),
+            sp.GetRequiredService<ServerOptions>().ParseCacheCapacity,
+            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<XmlParseCache>>()));
+
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
         services.AddSingleton<IXmlCrossTagRule, SquadronOffsetsRule>();
@@ -175,6 +185,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlTagValueCompletionStrategy, StoryParamValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, BoneNameValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, StandardValueCompletionStrategy>();
+        services.AddSingleton<IXmlTagValueCompletionStrategy, TupleValueCompletionStrategy>();
 
         // Code action providers — add IXmlCodeActionProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
@@ -182,6 +193,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
+        services.AddSingleton<IXmlCodeActionProvider, RemoveEarlierDuplicatesCodeActionProvider>();
 
         // Hover strategies — add IXmlHoverStrategy implementations here to register new strategies
         services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();

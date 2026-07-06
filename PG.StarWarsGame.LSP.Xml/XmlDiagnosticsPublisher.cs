@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -35,9 +36,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
+    private readonly IXmlParseCache _parseCache;
     private readonly IStoryFactProducer _storyProducer;
+    private readonly IDocumentTextSource _textSource;
     private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILspConfigurationProvider? _configProvider;
 
     public XmlDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -53,12 +57,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileHelper fileHelper,
         IXmlVariantFactProducer variantProducer,
         IXmlLayerShadowFactProducer shadowProducer,
+        IDocumentTextSource textSource,
+        IXmlParseCache parseCache,
+        ILspConfigurationProvider configProvider,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            variantProducer, shadowProducer)
+            variantProducer, shadowProducer, textSource, parseCache, configProvider)
     {
     }
 
@@ -76,11 +83,18 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IFileHelper fileHelper,
         int debounceMs = 0,
         IXmlVariantFactProducer? variantProducer = null,
-        IXmlLayerShadowFactProducer? shadowProducer = null)
+        IXmlLayerShadowFactProducer? shadowProducer = null,
+        IDocumentTextSource? textSource = null,
+        IXmlParseCache? parseCache = null,
+        ILspConfigurationProvider? configProvider = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
+        _configProvider = configProvider;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
+        _textSource = textSource ?? new DocumentTextSource(workspaceHost, fileHelper,
+            NullLogger<DocumentTextSource>.Instance);
+        _parseCache = parseCache ?? new XmlParseCache(_textSource, ServerOptions.Default.ParseCacheCapacity);
         _schema = schema;
         _handlerRegistry = handlerRegistry;
         _documentProducer = documentProducer;
@@ -95,30 +109,30 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     protected override string FileExtension => ".xml";
 
+    // Feature-flag gate: a null provider (test convenience ctors) means always enabled.
+    protected override bool DiagnosticsEnabled =>
+        _configProvider?.Current.Features.Xml.Diagnostics ?? true;
+
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
+        if (!DiagnosticsEnabled) return;
+
         ClearAllPublished();
         var index = _indexService.Current;
         foreach (var uri in index.Documents.Keys)
             await RevalidateDocumentAsync(uri, ct);
     }
 
-    public async Task RevalidateDocumentAsync(string uri, CancellationToken ct)
+    public Task RevalidateDocumentAsync(string uri, CancellationToken ct)
     {
+        if (!DiagnosticsEnabled) return Task.CompletedTask;
+
         var index = _indexService.Current;
-        string text;
-        if (_workspaceHost.TryGet(uri, out var doc))
-        {
-            text = doc.Text;
-        }
-        else
-        {
-            var path = _fileHelper.FileUriToPath(uri);
-            if (path is null) return;
-            text = await _fileHelper.FileSystem.File.ReadAllTextAsync(path, ct);
-        }
+        var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
+        if (text is null) return Task.CompletedTask;
 
         PublishForDocument(uri, text, index);
+        return Task.CompletedTask;
     }
 
     public string? GetSuggestedFix(string uri, int startLine, int startChar)
@@ -135,17 +149,21 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
 
+        // One parse shared by every producer — and via the parse cache, shared with the indexing
+        // parse and every request handler touching the same content.
+        var parsed = _parseCache.GetOrParse(canonicalUri, text);
+
         var facts = new List<XmlFact>();
-        facts.AddRange(_documentProducer.Produce(text, uri));
+        facts.AddRange(_documentProducer.Produce(parsed, uri));
         facts.AddRange(_indexProducer.Produce(canonicalUri, index));
         if (_variantProducer is not null)
-            facts.AddRange(_variantProducer.Produce(canonicalUri, text, index));
+            facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index));
         if (_shadowProducer is not null)
-            facts.AddRange(_shadowProducer.Produce(canonicalUri, text, index));
+            facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
         if (IsStoryParserDocument(uri))
-            facts.AddRange(_storyProducer.Produce(text, uri));
+            facts.AddRange(_storyProducer.Produce(parsed, uri));
 
-        var lines = text.Split('\n');
+        var lines = parsed.Lines;
         var allDiags = new List<Diagnostic>();
         foreach (var fact in facts)
         {
@@ -155,7 +173,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                 allDiags.Add(ToLspDiagnostic(fact, result));
         }
 
-        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, text, index));
+        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index));
+        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();
@@ -175,13 +194,20 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         });
     }
 
+    // Test convenience: parses the text itself; the publish path shares one ParsedXmlDocument.
     internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
         string documentUri, string text, GameIndex index)
+    {
+        return CollectHardcodedRefDiagnostics(documentUri, ParsedXmlDocument.Parse(text), index);
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectHardcodedRefDiagnostics(
+        string documentUri, ParsedXmlDocument document, GameIndex index)
     {
         var hardcodedSets = _schema.AllHardcodedSets;
         if (hardcodedSets.Count == 0) return [];
 
-        // Skip the expensive HAP re-parse for file types whose schema has no hardcoded-ref tags.
+        // Skip the tree walk for file types whose schema has no hardcoded-ref tags.
         // Files with unknown/unregistered types fall through to the full walk (defensive).
         var normalizedUri = _fileHelper.NormalizeUri(documentUri);
         var fileTypes = _fileTypeRegistry.GetTypesForFile(normalizedUri);
@@ -191,13 +217,112 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             return [];
 
         var diagnostics = new List<Diagnostic>();
-        var doc = new HtmlDocument();
-        doc.LoadHtml(text);
-        WalkForHardcodedRefs(doc.DocumentNode, text, diagnostics);
+        WalkForHardcodedRefs(document.Html.DocumentNode, document.LineIndex, diagnostics);
         return diagnostics;
     }
 
-    private void WalkForHardcodedRefs(HtmlNode node, string text, List<Diagnostic> diagnostics)
+    // The engine hardcodes these 20 damage types at fixed positions relative to the end of
+    // GameConstants.xml's <Damage_Types> list. If they aren't present as the exact tail, in this
+    // exact order, the game crashes at runtime.
+    private static readonly string[] RequiredDamageTypeTail =
+    [
+        "Damage_Normal", "Damage_Force_Whirlwind", "Damage_Force_Telekinesis", "Damage_Force_Lightning",
+        "Damage_Force_Corruption", "Damage_Hard_Point_Self_Destruct", "Damage_Fire", "Damage_Cable_Attack",
+        "Damage_Explosion", "Damage_Asteroid", "Damage_Cable_Attack_Deployed", "Damage_Normal_Deployed",
+        "Damage_Vehicle_Thief", "Damage_Crush", "Damage_Eat", "Damage_Redirected", "Damage_Wampa",
+        "Damage_Infection", "Damage_Remote_Bomb", "Damage_Drain_Life"
+    ];
+
+    private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
+
+    // Test convenience: parses the text itself; the publish path shares one ParsedXmlDocument.
+    internal IReadOnlyList<Diagnostic> CollectDamageTypeOrderDiagnostics(string documentUri, string text)
+    {
+        return CollectDamageTypeOrderDiagnostics(documentUri, ParsedXmlDocument.Parse(text));
+    }
+
+    internal IReadOnlyList<Diagnostic> CollectDamageTypeOrderDiagnostics(
+        string documentUri, ParsedXmlDocument document)
+    {
+        var text = document.Text;
+
+        // Cheap pre-check before walking the tree — almost no documents declare this element.
+        if (!text.Contains("Damage_Types", StringComparison.OrdinalIgnoreCase))
+            return [];
+
+        var element = document.Html.DocumentNode.Descendants().FirstOrDefault(n =>
+            n.NodeType == HtmlNodeType.Element && n.Name.Equals("Damage_Types", StringComparison.OrdinalIgnoreCase));
+        if (element is null)
+            return [];
+
+        var tokens = new List<(string Token, int AbsPos)>();
+        foreach (var node in element.ChildNodes)
+        {
+            if (node.NodeType != HtmlNodeType.Text) continue;
+            var nodeText = node.InnerText;
+            var nodeStart = node.StreamPosition;
+            foreach (var (token, offset) in SplitDamageTypeTokens(nodeText))
+                tokens.Add((token, nodeStart + offset));
+        }
+
+        var lineIndex = document.LineIndex;
+        if (tokens.Count < RequiredDamageTypeTail.Length)
+        {
+            var (line, col) = tokens.Count > 0
+                ? lineIndex.GetPosition(tokens[^1].AbsPos)
+                : lineIndex.GetPosition(element.InnerStartIndex);
+            var len = tokens.Count > 0 ? tokens[^1].Token.Length : 0;
+            return
+            [
+                new Diagnostic
+                {
+                    Severity = DiagnosticSeverity.Error,
+                    Message =
+                        $"<Damage_Types> has only {tokens.Count} value(s); it must end with the engine's " +
+                        $"{RequiredDamageTypeTail.Length} hardcoded damage types, in order, or the game will crash.",
+                    Range = SafeRange(line, col, len),
+                    Source = AppProperties.LspServerId
+                }
+            ];
+        }
+
+        var tail = tokens.GetRange(tokens.Count - RequiredDamageTypeTail.Length, RequiredDamageTypeTail.Length);
+        var diagnostics = new List<Diagnostic>();
+        for (var i = 0; i < RequiredDamageTypeTail.Length; i++)
+        {
+            if (string.Equals(tail[i].Token, RequiredDamageTypeTail[i], StringComparison.Ordinal))
+                continue;
+
+            var (line, col) = lineIndex.GetPosition(tail[i].AbsPos);
+            diagnostics.Add(new Diagnostic
+            {
+                Severity = DiagnosticSeverity.Error,
+                Message =
+                    $"'{tail[i].Token}' must be '{RequiredDamageTypeTail[i]}' — the last " +
+                    $"{RequiredDamageTypeTail.Length} entries of <Damage_Types> must exactly match the " +
+                    "engine's hardcoded order or the game will crash.",
+                Range = SafeRange(line, col, tail[i].Token.Length),
+                Source = AppProperties.LspServerId
+            });
+        }
+
+        return diagnostics;
+    }
+
+    private static IEnumerable<(string Token, int Offset)> SplitDamageTypeTokens(string text)
+    {
+        var i = 0;
+        while (i < text.Length)
+        {
+            while (i < text.Length && Array.IndexOf(DamageTypeTokenSeparators, text[i]) >= 0) i++;
+            if (i >= text.Length) break;
+            var start = i;
+            while (i < text.Length && Array.IndexOf(DamageTypeTokenSeparators, text[i]) < 0) i++;
+            yield return (text[start..i], start);
+        }
+    }
+
+    private void WalkForHardcodedRefs(HtmlNode node, LineOffsetIndex lineIndex, List<Diagnostic> diagnostics)
     {
         foreach (var child in node.ChildNodes)
         {
@@ -205,15 +330,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
             var tagDef = _schema.GetTag(child.Name);
             if (tagDef is { ReferenceKind: ReferenceKind.HardcodedSet, HardcodedSet: not null })
-                EmitHardcodedRefDiagnostics(child, tagDef, tagDef.HardcodedSet, text, diagnostics);
+                EmitHardcodedRefDiagnostics(child, tagDef, tagDef.HardcodedSet, lineIndex, diagnostics);
 
-            WalkForHardcodedRefs(child, text, diagnostics);
+            WalkForHardcodedRefs(child, lineIndex, diagnostics);
         }
     }
 
     private static void EmitHardcodedRefDiagnostics(
         HtmlNode child, XmlTagDefinition tagDef, HardcodedReferenceSet set,
-        string text, List<Diagnostic> diagnostics)
+        LineOffsetIndex lineIndex, List<Diagnostic> diagnostics)
     {
         var groups = tagDef.ValueGroups;
         var applicableValues = groups.Count == 0
@@ -244,7 +369,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             if (!validNames.TryGetValue(token, out var deprecated))
             {
                 var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+                var (line0, col0) = lineIndex.GetPosition(absPos);
 
                 diagnostics.Add(new Diagnostic
                 {
@@ -258,7 +383,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             else if (deprecated)
             {
                 var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = XmlUtility.OffsetToPosition(text, absPos);
+                var (line0, col0) = lineIndex.GetPosition(absPos);
 
                 diagnostics.Add(new Diagnostic
                 {
@@ -295,16 +420,42 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         var line = result.OverrideLine ?? fact.Line;
         var col = result.OverrideColumn ?? fact.Column;
-        var length = result.OverrideLength ?? fact.Length;
+        var endLine = result.OverrideEndLine ?? fact.EndLine;
+
+        // A cross-line span (fact or result carries an explicit end line) wins over the default
+        // same-line col+length range — used e.g. to grey out a whole multi-line element.
+        var range = endLine is { } el
+            ? SafeRange(line, col, el, result.OverrideEndColumn ?? fact.EndColumn ?? 0)
+            : SafeRange(line, col, result.OverrideLength ?? fact.Length);
+
         return new Diagnostic
         {
             Severity = result.Severity.ToLsp(),
             Message = result.Message,
-            Range = SafeRange(line, col, length),
+            Range = range,
             Source = AppProperties.LspServerId,
             Tags = MapTags(result.Tags),
-            Data = BuildDiagnosticData(result)
+            Data = BuildDiagnosticData(result),
+            RelatedInformation = MapRelatedInformation(result.RelatedLocations)
         };
+    }
+
+    private static Container<DiagnosticRelatedInformation>? MapRelatedInformation(
+        IReadOnlyList<XmlRelatedLocation>? locations)
+    {
+        if (locations is null || locations.Count == 0)
+            return null;
+
+        return new Container<DiagnosticRelatedInformation>(locations.Select(l =>
+            new DiagnosticRelatedInformation
+            {
+                Message = l.Message,
+                Location = new Location
+                {
+                    Uri = l.Uri,
+                    Range = SafeRange(l.Line, l.Column ?? 0, 0)
+                }
+            }));
     }
 
     private static Container<DiagnosticTag>? MapTags(IReadOnlyList<XmlDiagnosticTag>? tags)
@@ -330,10 +481,23 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         return new Range(new Position(line, col), new Position(line, end));
     }
 
+    // Cross-line variant: the end position may legitimately be on a later line (e.g. a whole
+    // multi-line element) — clamp endLine to at least startLine so a malformed/negative value can't
+    // produce an inverted range.
+    private static Range SafeRange(int startLine, int startCol, int endLine, int endCol)
+    {
+        startLine = Math.Max(0, startLine);
+        startCol = Math.Max(0, startCol);
+        endLine = Math.Max(startLine, endLine);
+        endCol = Math.Max(0, endCol);
+        return new Range(new Position(startLine, startCol), new Position(endLine, endCol));
+    }
+
     private static JToken? BuildDiagnosticData(XmlDiagnosticResult result)
     {
         if (result.SuggestedFix is null && result.CreateLocalisationKey is null &&
-            result.SquadronSyncJson is null && !result.RemoveRedundantOverride)
+            result.SquadronSyncJson is null && !result.RemoveRedundantOverride &&
+            !result.OfferRemoveEarlierDuplicates)
             return null;
 
         var obj = new JObject();
@@ -345,6 +509,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             obj["squadronSync"] = JToken.Parse(result.SquadronSyncJson);
         if (result.RemoveRedundantOverride)
             obj["removeRedundantOverride"] = true;
+        if (result.OfferRemoveEarlierDuplicates)
+            obj["removeEarlierDuplicates"] = true;
         return obj;
     }
 }

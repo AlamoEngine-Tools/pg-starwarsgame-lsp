@@ -179,6 +179,55 @@ public sealed class XmlIndexFactProducerTest
     }
 
     [Fact]
+    public void EnumValueReference_ProducesNoReferenceFact()
+    {
+        // "enum:{EnumName}/{Value}" is a synthetic id recorded by CollectEnumReferences for
+        // go-to-definition/rename only. The object index can never resolve it, so producing a
+        // fact here made UnresolvedReferenceHandler flag EVERY dynamic-enum tag value — valid or
+        // not. Enum membership is validated separately by NamedEnumValueHandlerBase.
+        var reference = new GameReference("enum:GameObjectCategoryType/Corvette", null, null,
+            "file:///a.xml", 3, 0, 8);
+
+        var index = BuildIndex([], [reference]);
+
+        Assert.DoesNotContain(Sut.Produce("file:///a.xml", index), f => f is XmlReferenceFact);
+    }
+
+    [Fact]
+    public void EnumValueReference_DoesNotSuppressOrdinaryReferencesInSameDocument()
+    {
+        var enumRef = new GameReference("enum:ArmorType/Armor_Tartan", null, null,
+            "file:///a.xml", 2, 0, 12);
+        var objectRef = new GameReference("Missing", GameSymbolKind.XmlObject, "SpaceUnit",
+            "file:///a.xml", 3, 0, 7);
+
+        var index = BuildIndex([], [enumRef, objectRef]);
+
+        var facts = Sut.Produce("file:///a.xml", index).OfType<XmlReferenceFact>().ToList();
+        var f = Assert.Single(facts);
+        Assert.Equal("Missing", f.TargetId);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("Null")]
+    [InlineData("NULL")]
+    [InlineData("Default")]
+    [InlineData("None")]
+    public void EnginePlaceholderReference_ProducesNoReferenceFact(string placeholder)
+    {
+        // The game accepts "null"/"Default"/"None" as a valid "no object" value in any reference
+        // position (e.g. <Land_Damage_SFX>null,SFX_A,…) — flagging them as unresolved or
+        // type-mismatched is always a false positive.
+        var reference = new GameReference(placeholder, GameSymbolKind.XmlObject, "SFXEvent",
+            "file:///a.xml", 3, 0, placeholder.Length);
+
+        var index = BuildIndex([], [reference]);
+
+        Assert.DoesNotContain(Sut.Produce("file:///a.xml", index), f => f is XmlReferenceFact);
+    }
+
+    [Fact]
     public void Unresolved_reference_emits_reference_fact_with_null_resolved()
     {
         var reference = new GameReference("Missing", GameSymbolKind.XmlObject, "SpaceUnit",

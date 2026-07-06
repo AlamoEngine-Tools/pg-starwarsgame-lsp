@@ -262,6 +262,46 @@ public static class XmlUtility
     ///     Converts an absolute byte <paramref name="offset" /> in <paramref name="text" /> to a
     ///     0-based LSP <c>(Line, Col)</c> position by counting newlines.
     /// </summary>
+    /// <summary>
+    ///     Returns the position immediately after <paramref name="node" />'s closing <c>&gt;</c> —
+    ///     the closing tag's for a normal element, or the opening tag's own for a self-closing one.
+    ///     Used to build a diagnostic <c>Range</c> that spans the whole element (opening tag through
+    ///     closing tag), not just a single line, e.g. greying out an entire redundant-override node.
+    /// </summary>
+    public static (int Line, int Col) GetElementEndPosition(HtmlNode node, string text)
+    {
+        var tagNode = node.EndNode is not null && !ReferenceEquals(node.EndNode, node) ? node.EndNode : node;
+        var searchStart = Math.Max(0, tagNode.StreamPosition);
+        var closeBracket = text.IndexOf('>', searchStart);
+        var endOffset = closeBracket >= 0 ? closeBracket + 1 : text.Length;
+        return OffsetToPosition(text, endOffset);
+    }
+
+    /// <summary>
+    ///     Walks <paramref name="text" /> from its own start up to <paramref name="offset" />,
+    ///     advancing (<paramref name="startLine" />, <paramref name="startCol" />) by each character
+    ///     crossed. Used to locate a sub-token within a fact's <c>RawValue</c> (which may itself span
+    ///     multiple lines) without needing the enclosing document's full text — the fact's own
+    ///     Line/Column is the starting point.
+    /// </summary>
+    public static (int Line, int Col) AdvancePosition(int startLine, int startCol, string text, int offset)
+    {
+        var line = startLine;
+        var col = startCol;
+        for (var i = 0; i < offset && i < text.Length; i++)
+            if (text[i] == '\n')
+            {
+                line++;
+                col = 0;
+            }
+            else if (text[i] != '\r')
+            {
+                col++;
+            }
+
+        return (line, col);
+    }
+
     public static (int Line, int Col) OffsetToPosition(string text, int offset)
     {
         var line = 0;
@@ -276,5 +316,20 @@ public static class XmlUtility
         // A negative offset (e.g. an HtmlAgilityPack InnerStartIndex of -1, or an IndexOf miss) would
         // otherwise yield a negative column, which LSP positions forbid — clamp to 0.
         return (line, Math.Max(0, offset - lineStart));
+    }
+
+    /// <summary>Inverse of <see cref="OffsetToPosition" />: converts an LSP (line, character) position back to an absolute offset into <paramref name="text" />.</summary>
+    public static int PositionToOffset(string text, int line, int character)
+    {
+        var currentLine = 0;
+        var i = 0;
+        while (currentLine < line && i < text.Length)
+        {
+            if (text[i] == '\n')
+                currentLine++;
+            i++;
+        }
+
+        return Math.Min(i + character, text.Length);
     }
 }

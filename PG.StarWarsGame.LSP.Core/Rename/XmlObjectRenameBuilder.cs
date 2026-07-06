@@ -16,7 +16,7 @@ public static class XmlObjectRenameBuilder
 {
     public static WorkspaceEdit? Build(
         string id, string newName, GameIndex index, ISchemaProvider schema,
-        IGameWorkspaceHost workspaceHost, IFileHelper fileHelper, ILogger logger)
+        IDocumentTextSource textSource, ILogger logger)
     {
         if (!index.IsLeafOwned(id))
         {
@@ -35,7 +35,7 @@ public static class XmlObjectRenameBuilder
                     ? schema.GetObjectType(sym.TypeName)?.NameTag
                     : null;
                 if (nameTag is null) continue;
-                var defRange = FindNameAttributeRange(fo.Uri, fo.Line, nameTag, id, workspaceHost, fileHelper);
+                var defRange = FindNameAttributeRange(fo.Uri, fo.Line, nameTag, id, textSource);
                 if (defRange is null) continue;
                 AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = defRange });
             }
@@ -62,27 +62,10 @@ public static class XmlObjectRenameBuilder
     }
 
     internal static LspRange? FindNameAttributeRange(
-        string uri, int line, string nameTag, string currentValue,
-        IGameWorkspaceHost workspaceHost, IFileHelper fileHelper)
+        string uri, int line, string nameTag, string currentValue, IDocumentTextSource textSource)
     {
-        string text;
-        if (workspaceHost.TryGet(uri, out var doc))
-        {
-            text = doc.Text;
-        }
-        else
-        {
-            var path = fileHelper.FileUriToPath(uri);
-            if (path is null) return null;
-            try
-            {
-                text = fileHelper.FileSystem.File.ReadAllText(path);
-            }
-            catch
-            {
-                return null;
-            }
-        }
+        var text = textSource.GetText(uri)?.Text;
+        if (text is null) return null;
 
         var lines = text.Split('\n');
         if (line >= lines.Length) return null;

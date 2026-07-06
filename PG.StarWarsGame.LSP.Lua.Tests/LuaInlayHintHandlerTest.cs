@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -35,18 +36,42 @@ public sealed class LuaInlayHintHandlerTest
         ILuaApiSchemaProvider? schema = null,
         ILuaAnnotationRepository? repo = null,
         string docText = "",
-        string docUri = LuaUri)
+        string docUri = LuaUri,
+        ILspConfigurationProvider? config = null)
     {
         var host = new FakeWorkspaceHost();
         if (docText.Length > 0) host.AddOrUpdate(docUri, docText, 1);
         var svc = new FakeIndexService { Current = index ?? GameIndex.Empty };
         return new LuaInlayHintHandler(
             svc,
-            host,
+            TestLuaParseCache.For(host),
             new FileHelper(new MockFileSystem()),
             schema ?? new LuaApiSchemaProvider([]),
             repo ?? new LuaAnnotationRepository(),
-            NullLogger<LuaInlayHintHandler>.Instance);
+            NullLogger<LuaInlayHintHandler>.Instance,
+            config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LuaInlayHintsFlagOff_ReturnsNull()
+    {
+        // Same arrange as Handle_EngineFunction_NonSpeakingArg_ShowsHint — only the flag differs.
+        const string lua = """
+            --- Plays a movie.
+            ---@param mission_name string
+            ---@param force_level integer
+            function PlayMovie(mission_name, force_level) end
+            """;
+        var schema = new LuaApiSchemaProvider([lua]);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Lua = new LuaFeatureFlags { InlayHints = false } });
+        var handler = BuildHandler(schema: schema, docText: "PlayMovie(x, y)", config: config);
+
+        var result = await handler.Handle(RequestAt(0, 0), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     private static IReadOnlyList<InlayHint> GetHints(InlayHintContainer? container)
@@ -241,6 +266,7 @@ public sealed class LuaInlayHintHandlerTest
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
         public void InjectDocument(DocumentIndex document) { }

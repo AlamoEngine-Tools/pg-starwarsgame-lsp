@@ -16,4 +16,10 @@ public sealed record XmlDuplicateTagFact(
     int Column,
     int Length,
     XmlTagDefinition Tag,
-    IReadOnlyList<int> OtherLines) : XmlFact(DocumentUri, Line, Column, Length);
+    IReadOnlyList<int> OtherLines,
+    // True for the occurrence the game engine actually uses: it reads objects top to bottom and
+    // the LAST duplicate wins. Earlier occurrences are dead weight (greyed out as Unnecessary).
+    bool IsLastOccurrence = false,
+    // Whole-element span so the grey-out covers the entire node, not just the opening tag.
+    int? EndLine = null,
+    int? EndColumn = null) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);

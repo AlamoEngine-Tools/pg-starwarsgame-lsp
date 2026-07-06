@@ -4,6 +4,7 @@
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Tests.Fakes;
@@ -23,11 +24,26 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         };
     }
 
-    private static XmlLinkedEditingRangeHandler Build(string text)
+    private static XmlLinkedEditingRangeHandler Build(string text, ILspConfigurationProvider? config = null)
     {
         var host = new FakeHost(TestUri, text);
-        return new XmlLinkedEditingRangeHandler(host, new AllowAllEaWContext(),
-            new FileHelper(new MockFileSystem()));
+        return new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new AllowAllEaWContext(),
+            new FileHelper(new MockFileSystem()), config ?? new FakeLspConfigurationProvider());
+    }
+
+    // ── feature flag ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Handle_LinkedEditingFlagOff_ReturnsNull()
+    {
+        // Same arrange as Handle_CursorOnOpeningTagName — only the flag differs.
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Xml = new XmlFeatureFlags { LinkedEditing = false } });
+        var handler = Build("<Foo>\nbar\n</Foo>", config);
+
+        var result = await handler.Handle(At(0, 1), CancellationToken.None);
+
+        Assert.Null(result);
     }
 
     // ── cursor on opening tag name ──────────────────────────────────────────
@@ -119,8 +135,8 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     public async Task Handle_NonEaWFile_ReturnsNull()
     {
         var host = new FakeHost(TestUri, "<Foo>\nbar\n</Foo>");
-        var handler = new XmlLinkedEditingRangeHandler(host, new DenyAllEaWContext(),
-            new FileHelper(new MockFileSystem()));
+        var handler = new XmlLinkedEditingRangeHandler(TestParseCache.For(host), new DenyAllEaWContext(),
+            new FileHelper(new MockFileSystem()), new FakeLspConfigurationProvider());
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
 
         Assert.Null(result);
