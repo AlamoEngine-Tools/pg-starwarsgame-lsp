@@ -67,8 +67,9 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
         if (!XmlUtility.TryFindNode(hapDoc, lineIndex, out var node) &&
             !XmlUtility.TryFindNodeByClosingLine(hapDoc, lineIndex, out node))
         {
-            _logger.LogWarning(
-                "Hover request at {Line}:{Character} produced no result, because the tag could not be found.",
+            // Expected outside element content (comments, whitespace, prolog) - not a failure worth warning about.
+            _logger.LogDebug(
+                "Hover request at {Line}:{Character} produced no result, because no tag was found at that position.",
                 lineIndex, charPos);
             return Task.FromResult<Hover?>(null);
         }
