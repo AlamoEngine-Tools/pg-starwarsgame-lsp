@@ -62,6 +62,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, NormalizedFloatHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PositionLabelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PrerequisiteExpressionHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DisallowedOrOperatorHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ProjectileCategoryHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, NameReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeReferenceHandler>();
