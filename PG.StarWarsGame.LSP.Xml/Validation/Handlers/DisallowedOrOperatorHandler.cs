@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
@@ -39,7 +40,7 @@ public sealed class DisallowedOrOperatorHandler : XmlDiagnosticsHandler<XmlTagVa
         if (!fact.RawValue.Contains('|'))
             return [];
 
-        var corrected = fact.RawValue.Replace('|', ',');
+        var corrected = string.Join(", ", XmlUtility.SplitList(fact.RawValue));
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,

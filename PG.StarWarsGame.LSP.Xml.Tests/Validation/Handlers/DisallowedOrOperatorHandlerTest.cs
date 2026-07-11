@@ -24,7 +24,18 @@ public sealed class DisallowedOrOperatorHandlerTest
 
         var d = Assert.Single(results);
         Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
-        Assert.Equal("StructA , StructB", d.SuggestedFix);
+        Assert.Equal("StructA, StructB", d.SuggestedFix);
+    }
+
+    [Fact]
+    public void Suggested_fix_normalizes_mixed_separators_and_drops_trailing_pipe()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Tactical_Build_Prerequisites", XmlValueType.GameObjectTypeReferenceList);
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "Prereq_0 Prereq_1 |"),
+            XmlHandlerTestFixtures.EmptyCtx).ToList();
+
+        var d = Assert.Single(results);
+        Assert.Equal("Prereq_0, Prereq_1", d.SuggestedFix);
     }
 
     [Theory]
