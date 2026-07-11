@@ -206,6 +206,9 @@ function resolveFeatureFlags() {
 		story: {
 			discovery: flag('story.discovery', false),
 		},
+		dialog: {
+			diagnostics: flag('dialog.diagnostics', false),
+		},
 	};
 }
 
@@ -302,6 +305,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		documentSelector: [
 			{ scheme: 'file', language: 'xml' },
 			{ scheme: 'file', language: 'lua' },
+			// Story-dialog scripts open as plaintext; the server gates all work on the
+			// pgproj storyDialog registry scope, so other .txt files stay untouched.
+			{ scheme: 'file', language: 'plaintext', pattern: '**/*.txt' },
 		],
 		traceOutputChannel: traceChannel,
 		initializationOptions: {

@@ -417,6 +417,12 @@
             "default": false,
             "markdownDescription": "Enables campaign story-chain discovery: plot manifests and story thread files are typed and validated (story event/reward parameters, chain errors like missing plot files).\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.dialog.diagnostics": {
+            "order": 1860,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the story-dialog language service: diagnostics for dialog `.txt` scripts under the `.pgproj` `directories.storyDialog` folders (unknown commands, argument errors, missing localisation keys and speech/movie/SFX references) plus the XML-side `Story_Dialog`/`Story_Chapter` cross-checks.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.tools.localisation": {
             "order": 1900,
             "type": "boolean",

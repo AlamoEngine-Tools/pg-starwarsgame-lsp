@@ -61,6 +61,29 @@ public sealed class StoryFactProducer(ISchemaProvider schema) : IStoryFactProduc
                         "Reward_Param", MaxRewardParamSlots, def.Params, documentUri, facts);
             }
         }
+
+        CollectDialogRefFact(eventNode, documentUri, facts);
+    }
+
+    private static void CollectDialogRefFact(HtmlNode eventNode, string documentUri, List<XmlFact> facts)
+    {
+        var dialogNode = FindChild(eventNode, "Story_Dialog");
+        var dialogName = dialogNode?.InnerText.Trim();
+        if (string.IsNullOrEmpty(dialogName)) return;
+
+        // A non-numeric Story_Chapter is already flagged by the Int tag validation; the
+        // cross-check only cares about chapters it can actually look up.
+        var chapterNode = FindChild(eventNode, "Story_Chapter");
+        int? chapter = null;
+        var chapterLine = -1;
+        if (chapterNode is not null && int.TryParse(chapterNode.InnerText.Trim(), out var parsed))
+        {
+            chapter = parsed;
+            chapterLine = Math.Max(0, chapterNode.Line - 1);
+        }
+
+        facts.Add(new StoryDialogRefFact(documentUri, Math.Max(0, dialogNode!.Line - 1), 0, 0,
+            dialogName, chapter, chapterLine));
     }
 
     private static void CollectParamFacts(

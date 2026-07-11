@@ -35,6 +35,7 @@ public sealed class ModProjectResolver
         var scripts = new List<string>();
         var text = new List<string>();
         var assets = new List<string>();
+        var storyDialog = new List<string>();
         string? textResourceType = null;
         var layers = new List<ProjectLayer>(ordered.Count);
 
@@ -52,11 +53,13 @@ public sealed class ModProjectResolver
                 : [];
             var layerAssets = file.Directories.Art.Select(d => Combine(projectDir, d))
                 .Concat(file.Directories.Audio.Select(d => Combine(projectDir, d))).ToList();
+            var layerStoryDialog = file.Directories.StoryDialog.Select(d => Combine(projectDir, d)).ToList();
 
             xml.AddRange(layerXml);
             scripts.AddRange(layerScripts);
             text.AddRange(layerText);
             assets.AddRange(layerAssets);
+            storyDialog.AddRange(layerStoryDialog);
 
             // Root project is last in the ordered list so its value overwrites dependencies.
             if (file.Localisation is not null)
@@ -65,10 +68,14 @@ public sealed class ModProjectResolver
             // Per-layer TextResourceType is preserved so each project's localisation loads with its
             // own format (a dependency's .csv must not be skipped because the root uses another type).
             layers.Add(new ProjectLayer(rank, file.Name, layerXml, layerScripts, layerText, layerAssets,
-                file.Localisation?.Type, path));
+                file.Localisation?.Type, path) { StoryDialogRoots = layerStoryDialog });
         }
 
-        return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType) { Layers = layers };
+        return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType)
+        {
+            Layers = layers,
+            StoryDialogRoots = storyDialog
+        };
     }
 
     private ModProjectFile? LoadReference(string absolutePath)

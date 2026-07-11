@@ -135,6 +135,7 @@ public sealed class SchemaIndex
             Description = rawVal.Description,
             Notes = rawVal.Notes,
             Deprecated = rawVal.Deprecated,
+            Untested = rawVal.Untested,
             AvailableSince = rawVal.AvailableSince,
             Groups = rawVal.Groups,
             Params = rawVal.Params?.Select(ResolveParam).ToList()

@@ -18,6 +18,7 @@ public record FeatureFlags
     public LuaFeatureFlags Lua { get; init; } = new();
     public ToolsFeatureFlags Tools { get; init; } = new();
     public StoryFeatureFlags Story { get; init; } = new();
+    public DialogFeatureFlags Dialog { get; init; } = new();
 }
 
 /// <summary>Flags for XML language capabilities.</summary>
@@ -58,6 +59,20 @@ public record StoryFeatureFlags
     ///     that activate on those file types.
     /// </summary>
     public bool Discovery { get; init; } = true;
+}
+
+/// <summary>
+///     Flags for the story-dialog (.txt) language capabilities — its own family like
+///     <see cref="LuaFeatureFlags" />, so completion/hover flags can join later.
+/// </summary>
+public record DialogFeatureFlags
+{
+    /// <summary>
+    ///     Gates the story-dialog language service: diagnostics for .txt files under the
+    ///     pgproj storyDialog directories and the XML-side Story_Dialog/Story_Chapter
+    ///     cross-checks.
+    /// </summary>
+    public bool Diagnostics { get; init; } = true;
 }
 
 /// <summary>Flags for cross-language tooling endpoints.</summary>

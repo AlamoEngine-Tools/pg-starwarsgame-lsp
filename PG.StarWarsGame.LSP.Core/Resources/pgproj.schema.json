@@ -90,6 +90,13 @@
             "type": "string"
           },
           "description": "Reserved — currently excluded from XML parsing."
+        },
+        "storyDialog": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Directories holding story-dialog .txt scripts (chaptered text/media playlists referenced from story events via Story_Dialog). Only files under these directories get the story-dialog language service."
         }
       }
     },

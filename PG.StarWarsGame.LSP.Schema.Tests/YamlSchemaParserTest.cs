@@ -478,6 +478,23 @@ public sealed class YamlSchemaParserTest
     }
 
     [Fact]
+    public void ParseEnumFile_UntestedValue_MapsUntestedFlag()
+    {
+        const string yaml = """
+                            name: StoryDialogCommand
+                            values:
+                              - name: CLEAR_TEXT
+                                untested: true
+                              - name: TEXT
+                            """;
+
+        var def = YamlSchemaParser.ParseEnumFile(yaml);
+
+        Assert.True(def.Values.Single(v => v.Name == "CLEAR_TEXT").Untested);
+        Assert.False(def.Values.Single(v => v.Name == "TEXT").Untested);
+    }
+
+    [Fact]
     public void ParseEnumFile_WithPositionedParams_ReturnsParamDefinitionsAtCorrectPositions()
     {
         const string yaml = """

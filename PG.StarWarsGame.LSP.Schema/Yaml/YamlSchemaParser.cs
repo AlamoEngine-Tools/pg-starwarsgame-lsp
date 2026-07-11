@@ -197,6 +197,7 @@ internal static class YamlSchemaParser
                 Description = v.Description,
                 Notes = v.Notes,
                 Deprecated = v.Deprecated,
+                Untested = v.Untested,
                 AvailableSince = v.AvailableSince,
                 Groups = v.Groups,
                 Params = paramDefs?.Count > 0 ? paramDefs : null

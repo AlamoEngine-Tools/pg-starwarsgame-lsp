@@ -20,4 +20,8 @@ public sealed record ProjectLayer(
     IReadOnlyList<string> AssetRoots,
     string? TextResourceType,
     // Normalised absolute path to the .pgproj file. Null when there is no pgproj (heuristic scan).
-    string? ProjectPath = null);
+    string? ProjectPath = null)
+{
+    /// <summary>This layer's resolved story-dialog directories (registry scope for dialog .txt files).</summary>
+    public IReadOnlyList<string> StoryDialogRoots { get; init; } = [];
+}
