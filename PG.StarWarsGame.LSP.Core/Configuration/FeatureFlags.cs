@@ -59,6 +59,12 @@ public record StoryFeatureFlags
     ///     that activate on those file types.
     /// </summary>
     public bool Discovery { get; init; } = true;
+
+    /// <summary>
+    ///     Gates the campaign-model graph diagnostics (dangling prereqs, prereq cycles,
+    ///     duplicate/ambiguous event names, unreachable events, tag order, flag length).
+    /// </summary>
+    public bool GraphDiagnostics { get; init; } = true;
 }
 
 /// <summary>

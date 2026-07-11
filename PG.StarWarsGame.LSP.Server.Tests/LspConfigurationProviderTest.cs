@@ -257,6 +257,16 @@ public sealed class LspConfigurationProviderTest : IDisposable
     }
 
     [Fact]
+    public void LoadFrom_StoryGraphDiagnosticsDisabled_ParsesFromCamelCaseNode()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { story = new { graphDiagnostics = false } } }));
+
+        Assert.False(provider.Current.Features.Story.GraphDiagnostics);
+        Assert.True(provider.Current.Features.Story.Discovery);
+    }
+
+    [Fact]
     public void LoadFrom_FeaturesCamelCaseKeys_MapToPascalCaseProperties()
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
