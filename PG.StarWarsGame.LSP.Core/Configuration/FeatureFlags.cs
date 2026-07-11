@@ -6,9 +6,9 @@ namespace PG.StarWarsGame.LSP.Core.Configuration;
 /// <summary>
 ///     Per-language, per-capability feature flags. Every flag defaults to <c>true</c>: a bare
 ///     server (no client-supplied <c>features</c> node) behaves exactly as before flags existed.
-///     The user-facing opt-in defaults (Lua hover, Lua diagnostics, localisation tools are off
-///     out of the box) live in the VS Code client's package.json, which always sends the complete
-///     resolved object via initializationOptions.
+///     The user-facing opt-in defaults (Lua hover, Lua diagnostics, localisation tools and story
+///     discovery are off out of the box) live in the VS Code client's package.json, which always
+///     sends the complete resolved object via initializationOptions.
 ///     In <c>.pg-lsp.json</c> the node is spelled PascalCase (<c>"Features"</c>, case-sensitive);
 ///     in initializationOptions it is camelCase (<c>"features"</c>, parsed case-insensitively).
 /// </summary>
@@ -17,6 +17,7 @@ public record FeatureFlags
     public XmlFeatureFlags Xml { get; init; } = new();
     public LuaFeatureFlags Lua { get; init; } = new();
     public ToolsFeatureFlags Tools { get; init; } = new();
+    public StoryFeatureFlags Story { get; init; } = new();
 }
 
 /// <summary>Flags for XML language capabilities.</summary>
@@ -45,6 +46,18 @@ public record LuaFeatureFlags
     public bool CodeLens { get; init; } = true;
     public bool InlayHints { get; init; } = true;
     public bool CodeActions { get; init; } = true;
+}
+
+/// <summary>Flags for story-mode capabilities.</summary>
+public record StoryFeatureFlags
+{
+    /// <summary>
+    ///     Gates the campaign story-chain scan: file typing for plot manifests
+    ///     (<c>StoryPlotManifest</c>) and story threads (<c>StoryParser</c>), the chain
+    ///     diagnostics, and thereby the story event/reward param validation and completion
+    ///     that activate on those file types.
+    /// </summary>
+    public bool Discovery { get; init; } = true;
 }
 
 /// <summary>Flags for cross-language tooling endpoints.</summary>

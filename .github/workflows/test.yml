@@ -42,3 +42,4 @@ jobs:
         dotnet test PG.StarWarsGame.LSP.Xml.Tests/PG.StarWarsGame.LSP.Xml.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
         dotnet test PG.StarWarsGame.LSP.Lua.Tests/PG.StarWarsGame.LSP.Lua.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
         dotnet test PG.StarWarsGame.LSP.Server.Tests/PG.StarWarsGame.LSP.Server.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github
+        dotnet test PG.StarWarsGame.LSP.Story.Tests/PG.StarWarsGame.LSP.Story.Tests.csproj --configuration Release --no-build --filter-not-trait "Category=E2E" --filter-not-trait "Category=FeatureCompleteness" --report-github

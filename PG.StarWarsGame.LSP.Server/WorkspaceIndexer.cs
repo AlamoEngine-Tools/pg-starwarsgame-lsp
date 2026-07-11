@@ -9,12 +9,15 @@ using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
+using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Story.Discovery;
 
 namespace PG.StarWarsGame.LSP.Server;
 
@@ -32,8 +35,12 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private static readonly HashSet<string> AssetExtensions =
         new(StringComparer.OrdinalIgnoreCase) { ".tga", ".dds", ".alo", ".wav", ".mp3", ".ted" };
 
+    private static readonly ImmutableArray<string> StoryPlotManifestTypes = ["StoryPlotManifest"];
+    private static readonly ImmutableArray<string> StoryParserTypes = ["StoryParser"];
+
     private readonly ILuaAnnotationRepository _annotationRepository;
     private readonly IProjectIndexCache _cache;
+    private readonly ILspConfigurationProvider _configProvider;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -41,11 +48,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
     private readonly ISchemaProvider _schema;
+    private readonly IStoryChainProblemStore _storyChainProblems;
 
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
         ILuaAnnotationRepository annotationRepository,
+        IStoryChainProblemStore storyChainProblems,
+        ILspConfigurationProvider configProvider,
         ILogger<WorkspaceIndexer> logger)
     {
         _fileHelper = fileHelper;
@@ -56,6 +66,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         _eaWXmlContext = eaWXmlContext;
         _cache = cache;
         _annotationRepository = annotationRepository;
+        _storyChainProblems = storyChainProblems;
+        _configProvider = configProvider;
         _logger = logger;
     }
 
@@ -78,9 +90,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
         var xmlRoots = config.XmlDirectories.ToList();
         var baseline = _indexService.Current.Baseline;
 
+        var storyProblems = new List<StoryChainProblem>();
         foreach (var def in _schema.AllMetafiles)
         {
-            if (def.MetafileType == MetafileType.Special) continue;
+            if (def.MetafileType == MetafileType.Special)
+            {
+                ScanStoryChain(def, roots, xmlRoots, baseline, storyProblems);
+                continue;
+            }
 
             // A metafile (or DirectContent file) may be shipped by any layer — the mod or a
             // dependency — so look under the workspace roots AND every declared xml root, and use
@@ -100,6 +117,74 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 else // DirectContent: the file itself carries the type
                     _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(path), def.Types.ToImmutableArray());
             }
+        }
+
+        // Replace-all also clears stale problems when a rescan (or a disabled flag) yields none.
+        _storyChainProblems.Replace(storyProblems);
+    }
+
+    /// <summary>
+    ///     Follows a <see cref="MetafileType.Special" /> definition (campaignfiles.xml) through the
+    ///     campaign → plot manifest → story thread chain and types every discovered file
+    ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) under every xml root. Chain problems are
+    ///     collected for the diagnostics pipeline. Gated by <c>features.story.discovery</c>.
+    /// </summary>
+    private void ScanStoryChain(MetafileDefinition def, IReadOnlyList<string> roots,
+        IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems)
+    {
+        if (!_configProvider.Current.Features.Story.Discovery)
+        {
+            _logger.LogInformation(
+                "Story discovery is disabled (features.story.discovery); skipping '{Path}'", def.Path);
+            return;
+        }
+
+        var copies = LocateInLayers(def.Path, roots, xmlRoots);
+        if (copies.Count == 0)
+        {
+            // No campaign registry anywhere — same degradation as file registries: the shipped
+            // baseline's typed story files are projected onto the workspace's xml roots.
+            FallbackFromBaseline(baseline, def, xmlRoots);
+            return;
+        }
+
+        var registryCopies = new List<StoryChainFile>();
+        foreach (var path in copies)
+            try
+            {
+                registryCopies.Add(new StoryChainFile(
+                    _fileHelper.FileSystem.File.ReadAllText(path), _fileHelper.NormalizeUri(path)));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not read campaign registry '{Path}': {Message}", path, ex.Message);
+            }
+
+        var resolver = new WorkspaceStoryChainFileResolver(_fileHelper, xmlRoots, baseline);
+        var result = new StoryChainScanner(resolver).Scan(registryCopies);
+
+        RegisterStoryFiles(result.ManifestFiles, StoryPlotManifestTypes, xmlRoots);
+        RegisterStoryFiles(result.ThreadFiles, StoryParserTypes, xmlRoots);
+        problems.AddRange(result.Problems);
+
+        _logger.LogInformation(
+            "Story chain: {Manifests} manifest(s), {Threads} thread file(s), {Lua} Lua script(s), {Problems} problem(s)",
+            result.ManifestFiles.Count, result.ThreadFiles.Count, result.LuaScripts.Count,
+            result.Problems.Count);
+    }
+
+    // Chain files are xml-dir-relative; like file-registry entries they are registered under
+    // EVERY xml root so a file shipped by any layer resolves to the same types.
+    private void RegisterStoryFiles(IReadOnlyList<string> relPaths, ImmutableArray<string> types,
+        IReadOnlyList<string> xmlRoots)
+    {
+        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
+        foreach (var rel in relPaths)
+        {
+            var relPath = rel.Replace('/', sep);
+            foreach (var xmlRoot in xmlRoots)
+                _fileTypeRegistry.RegisterFile(
+                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, relPath)), types);
         }
     }
 

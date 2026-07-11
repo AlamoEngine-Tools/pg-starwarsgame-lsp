@@ -433,6 +433,65 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         Assert.Equal(uri, diags.Uri);
     }
 
+    // ── Story chain: plot manifest + story thread discovered from campaignfiles.xml ──
+    // Campaigns_Underworld_Story.xml → Story_Plots_Campaign_Underworld.XML (manifest)
+    // → Story_Campaign_Underworld.xml (thread). Both files are only typed when the
+    // MetafileType.Special chain scan ran during startup.
+
+    [Fact]
+    public async Task StoryPlotManifest_TagHover_ReturnsTagMarkdown()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+        var (uri, lines) = await OpenAndWaitAsync(Path.Combine(XmlDir, "Story_plots_campaign_underworld.xml"));
+        var (line, col) = FindFirstChildElementPosition(lines);
+        var result = await HoverAsync(uri, line, col);
+
+        Assert.NotNull(result);
+        // First child in Story_plots_campaign_underworld.xml is <Lua_Script>.
+        Assert.Contains("Lua_Script", MarkdownOf(result), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task StoryPlotManifest_Diagnostics_PublishedOnOpen()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+        var filePath = Path.Combine(XmlDir, "Story_plots_campaign_underworld.xml");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
+        await OpenAndWaitAsync(filePath);
+        var diags = await received;
+        Assert.Equal(uri, diags.Uri);
+    }
+
+    [Fact]
+    public async Task StoryParser_TagHover_ReturnsTagMarkdown()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+        var (uri, lines) = await OpenAndWaitAsync(Path.Combine(XmlDir, "Story_campaign_underworld.xml"));
+        var (line, col) = FindFirstGrandchildElementPosition(lines);
+        var result = await HoverAsync(uri, line, col);
+
+        Assert.NotNull(result);
+        // First grandchild in Story_campaign_underworld.xml is <Event_Type>.
+        Assert.Contains("trigger condition type", MarkdownOf(result), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task StoryParser_Diagnostics_PublishedOnOpen()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+        var filePath = Path.Combine(XmlDir, "Story_campaign_underworld.xml");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(10));
+        await OpenAndWaitAsync(filePath);
+        var diags = await received;
+        Assert.Equal(uri, diags.Uri);
+    }
+
     // ── helpers ───────────────────────────────────────────────────────────────
 
     private async Task<(DocumentUri uri, string[] lines)> OpenAndWaitAsync(string filePath)

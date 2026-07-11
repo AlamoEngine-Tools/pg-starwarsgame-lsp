@@ -411,6 +411,12 @@
             "default": true,
             "markdownDescription": "Enables code actions (quick fixes) in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.story.discovery": {
+            "order": 1850,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables campaign story-chain discovery: plot manifests and story thread files are typed and validated (story event/reward parameters, chain errors like missing plot files).\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.tools.localisation": {
             "order": 1900,
             "type": "boolean",

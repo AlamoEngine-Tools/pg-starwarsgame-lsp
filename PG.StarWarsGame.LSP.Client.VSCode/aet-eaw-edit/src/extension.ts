@@ -169,8 +169,8 @@ function cfg(section: string) {
 /**
  * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
  * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
- * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation) live in
- * package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the
+ * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation,
+ * story.discovery) live in package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the
  * config listener in activate() restarts the server when any `aet-eaw-edit.features` value changes.
  */
 function resolveFeatureFlags() {
@@ -202,6 +202,9 @@ function resolveFeatureFlags() {
 		tools: {
 			localisation: flag('tools.localisation', false),
 			variants:     flag('tools.variants', true),
+		},
+		story: {
+			discovery: flag('story.discovery', false),
 		},
 	};
 }

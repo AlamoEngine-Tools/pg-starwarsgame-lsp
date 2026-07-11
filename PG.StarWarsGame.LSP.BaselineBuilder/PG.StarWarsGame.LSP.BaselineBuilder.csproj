@@ -15,6 +15,7 @@
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Core\PG.StarWarsGame.LSP.Core.csproj"/>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Assets\PG.StarWarsGame.LSP.Assets.csproj"/>
         <ProjectReference Include="..\PG.StarWarsGame.LSP.Schema\PG.StarWarsGame.LSP.Schema.csproj"/>
+        <ProjectReference Include="..\PG.StarWarsGame.LSP.Story\PG.StarWarsGame.LSP.Story.csproj"/>
         <ProjectReference Include="..\..\ModVerify\src\PetroglyphTools\PG.StarWarsGame.Engine\PG.StarWarsGame.Engine.csproj"/>
     </ItemGroup>
 
