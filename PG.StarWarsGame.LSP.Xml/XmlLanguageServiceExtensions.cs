@@ -141,6 +141,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamEnumHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamUnknownSlotHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, StoryDialogReferenceHandler>();
 
         // Cross-tag validation handler
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();

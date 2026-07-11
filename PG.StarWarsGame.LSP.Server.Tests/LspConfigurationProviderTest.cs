@@ -219,6 +219,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.True(features.Tools.Localisation);
         Assert.True(features.Tools.Variants);
         Assert.True(features.Story.Discovery);
+        Assert.True(features.Dialog.Diagnostics);
     }
 
     [Fact]
@@ -243,6 +244,16 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.False(provider.Current.Features.Story.Discovery);
         // Untouched leaves keep their defaults.
         Assert.True(provider.Current.Features.Xml.Completion);
+    }
+
+    [Fact]
+    public void LoadFrom_DialogDiagnosticsDisabled_ParsesFromCamelCaseNode()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { dialog = new { diagnostics = false } } }));
+
+        Assert.False(provider.Current.Features.Dialog.Diagnostics);
+        Assert.True(provider.Current.Features.Story.Discovery);
     }
 
     [Fact]

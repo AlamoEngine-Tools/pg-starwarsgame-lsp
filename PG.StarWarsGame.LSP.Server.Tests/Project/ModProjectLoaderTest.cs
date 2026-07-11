@@ -110,6 +110,39 @@ public sealed class ModProjectLoaderTest
     }
 
     [Fact]
+    public void Load_StoryDialogDirectories_ParsedAndNormalized()
+    {
+        const string json = """
+                            {
+                              "directories": {
+                                "xml": ["data/xml"],
+                                "storyDialog": ["Data\\Scripts\\Story"]
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal(["data/scripts/story"], model.Directories.StoryDialog);
+    }
+
+    [Fact]
+    public void Load_NoStoryDialogNode_YieldsEmptyList()
+    {
+        const string json = """
+                            {
+                              "directories": { "xml": ["data/xml"] }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Empty(model.Directories.StoryDialog);
+    }
+
+    [Fact]
     public void Load_MissingModinfo_NameIsFilenameAndModinfoIsNull()
     {
         const string json = """

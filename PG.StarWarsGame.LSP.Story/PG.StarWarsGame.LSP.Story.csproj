@@ -8,6 +8,7 @@
     <ItemGroup>
         <PackageReference Include="HtmlAgilityPack"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+        <PackageReference Include="OmniSharp.Extensions.LanguageServer"/>
     </ItemGroup>
 
     <ItemGroup>

@@ -18,4 +18,10 @@ public sealed record WorkspaceConfiguration(
     ///     directory lists above are retained as the union across all layers.
     /// </summary>
     public IReadOnlyList<ProjectLayer> Layers { get; init; } = [];
+
+    /// <summary>
+    ///     Union of every layer's resolved story-dialog directories (dependencies first, root
+    ///     project last) — the registry scope for the story-dialog language service.
+    /// </summary>
+    public IReadOnlyList<string> StoryDialogRoots { get; init; } = [];
 }

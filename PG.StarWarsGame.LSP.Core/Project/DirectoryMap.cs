@@ -14,4 +14,11 @@ public sealed record DirectoryMap(
         : this([], [], [], [], [])
     {
     }
+
+    /// <summary>
+    ///     Directories holding story-dialog <c>.txt</c> scripts. Only files under these
+    ///     directories get the story-dialog language service — the vanilla <c>Dialog_</c> filename
+    ///     prefix is a naming habit, not an engine requirement, so scoping is registry-based.
+    /// </summary>
+    public IReadOnlyList<string> StoryDialog { get; init; } = [];
 }

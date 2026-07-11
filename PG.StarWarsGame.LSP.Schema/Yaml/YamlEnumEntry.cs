@@ -9,6 +9,7 @@ internal sealed class YamlEnumValueEntry
     public Dictionary<string, string> Description { get; set; } = [];
     public Dictionary<string, string> Notes { get; set; } = [];
     public bool Deprecated { get; set; }
+    public bool Untested { get; set; }
     public string? AvailableSince { get; set; }
     public List<string> Groups { get; set; } = [];
     public List<YamlParamEntry>? Params { get; set; }

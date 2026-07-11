@@ -49,6 +49,42 @@ public sealed class StoryFactProducerTest
         });
     }
 
+    // ── Story dialog reference facts ─────────────────────────────────────────
+
+    [Fact]
+    public void Event_with_StoryDialog_and_chapter_emits_StoryDialogRefFact()
+    {
+        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var xml = Xml("<Story_Dialog>Dialog_Mission_One</Story_Dialog><Story_Chapter>2</Story_Chapter>");
+
+        var facts = sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>().ToList();
+
+        var f = Assert.Single(facts);
+        Assert.Equal("Dialog_Mission_One", f.DialogName);
+        Assert.Equal(2, f.Chapter);
+        Assert.True(f.ChapterLine >= 0);
+    }
+
+    [Fact]
+    public void Event_with_StoryDialog_without_chapter_emits_fact_with_null_chapter()
+    {
+        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var xml = Xml("<Story_Dialog>Dialog_Mission_One</Story_Dialog>");
+
+        var f = Assert.Single(sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>());
+        Assert.Null(f.Chapter);
+        Assert.Equal(-1, f.ChapterLine);
+    }
+
+    [Fact]
+    public void Event_without_StoryDialog_emits_no_StoryDialogRefFact()
+    {
+        var sut = new StoryFactProducer(new EmptySchemaProvider());
+        var xml = Xml("<Event_Type>UNKNOWN</Event_Type>");
+
+        Assert.Empty(sut.Produce(xml, "file:///test.xml").OfType<StoryDialogRefFact>());
+    }
+
     // ── Event type facts ─────────────────────────────────────────────────────
 
     [Fact]

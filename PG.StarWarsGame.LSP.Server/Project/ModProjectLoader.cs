@@ -84,7 +84,10 @@ public sealed class ModProjectLoader
             Normalize(dto.Directories?.Scripts),
             Normalize(dto.Directories?.Art),
             Normalize(dto.Directories?.Audio),
-            Normalize(dto.Directories?.Ai));
+            Normalize(dto.Directories?.Ai))
+        {
+            StoryDialog = Normalize(dto.Directories?.StoryDialog)
+        };
 
         var localisation = ParseLocalisation(dto.Localisation, fileName);
 
@@ -204,6 +207,7 @@ public sealed class ModProjectLoader
         public List<string>? Art { get; init; }
         public List<string>? Audio { get; init; }
         public List<string>? Ai { get; init; }
+        public List<string>? StoryDialog { get; init; }
     }
 
     private sealed class ProjectReferenceDto

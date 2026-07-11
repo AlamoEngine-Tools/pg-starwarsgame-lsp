@@ -84,6 +84,38 @@ public sealed class ModProjectResolverTest
     }
 
     [Fact]
+    public void Resolve_StoryDialogRoots_ResolvedPerLayer_AndUnionedDependencyFirst()
+    {
+        const string depJson = """
+                               {
+                                 "modinfo": { "name": "Dep" },
+                                 "directories": { "storyDialog": ["data/scripts/story"] }
+                               }
+                               """;
+        const string rootJson = """
+                                {
+                                  "modinfo": { "name": "Root" },
+                                  "directories": { "storyDialog": ["data/scripts/story"] },
+                                  "projectReferences": [ { "path": "../dep/dep.pgproj" } ]
+                                }
+                                """;
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [RootPath] = new(rootJson),
+            [DepPath] = new(depJson)
+        });
+        var (resolver, root) = Build(fs);
+
+        var config = resolver.Resolve(RootPath, root);
+
+        var depDialog = Abs(DepDir, "data/scripts/story");
+        var rootDialog = Abs(RootDir, "data/scripts/story");
+        Assert.Equal(new[] { depDialog, rootDialog }, config.StoryDialogRoots);
+        Assert.Equal([depDialog], config.Layers[0].StoryDialogRoots);
+        Assert.Equal([rootDialog], config.Layers[1].StoryDialogRoots);
+    }
+
+    [Fact]
     public void Resolve_ArtAndAudio_BothMapToAssetRoots()
     {
         const string json = """

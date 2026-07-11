@@ -28,6 +28,8 @@ using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Variants;
+using PG.StarWarsGame.LSP.Story.Dialog;
+using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.Commands;
 using PG.StarWarsGame.LSP.Xml.Parsing;
@@ -78,6 +80,7 @@ public static class ServerConfigurator
             // convention is equally safe for the capabilities that use it. If either
             // convention needs to change, extend that test first as the regression gate.
             .WithHandler<LuaTextDocumentSyncHandler>()
+            .WithHandler<DialogTextDocumentSyncHandler>()
             .WithHandler<LuaCompletionHandler>()
             .WithHandler<LuaCodeActionHandler>()
             .WithHandler<LuaDefinitionHandler>()
@@ -136,6 +139,19 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
                 services.AddSingleton<IStoryChainProblemStore, StoryChainProblemStore>();
+
+                // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
+                services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
+                services.AddSingleton<DialogFactProducer>();
+                services.AddSingleton<IDialogDiagnosticsHandler, UnknownDialogCommandHandler>();
+                services.AddSingleton<IDialogDiagnosticsHandler, DialogCommandArityHandler>();
+                services.AddSingleton<IDialogDiagnosticsHandler, DialogArgValueHandler>();
+                services.AddSingleton<IDialogDiagnosticsHandler, UntestedDialogCommandHandler>();
+                services.AddSingleton<IDialogDiagnosticsHandler, DialogArgReferenceHandler>();
+                services.AddSingleton<DialogDiagnosticsHandlerRegistry>();
+                services.AddSingleton<DialogDiagnosticsPublisher>();
+                services.AddSingleton<IDialogDiagnosticsRevalidator>(sp =>
+                    sp.GetRequiredService<DialogDiagnosticsPublisher>());
 
                 // The inbound event gate: buffers client notifications while the linear startup
                 // pipeline runs, then drains them in order. Replaces the old PreOpenBuffer race.
