@@ -12,6 +12,7 @@ using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -134,6 +135,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
+                services.AddSingleton<IStoryChainProblemStore, StoryChainProblemStore>();
 
                 // The inbound event gate: buffers client notifications while the linear startup
                 // pipeline runs, then drains them in order. Replaces the old PreOpenBuffer race.

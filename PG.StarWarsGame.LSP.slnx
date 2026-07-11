@@ -8,12 +8,14 @@
     <Project Path="PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Xml/PG.StarWarsGame.LSP.Xml.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Schema/PG.StarWarsGame.LSP.Schema.csproj"/>
+    <Project Path="PG.StarWarsGame.LSP.Story/PG.StarWarsGame.LSP.Story.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.BaselineBuilder/PG.StarWarsGame.LSP.BaselineBuilder.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Assets.Tests/PG.StarWarsGame.LSP.Assets.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Core.Tests/PG.StarWarsGame.LSP.Core.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Lua.Tests/PG.StarWarsGame.LSP.Lua.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Schema.Tests/PG.StarWarsGame.LSP.Schema.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Server.Tests/PG.StarWarsGame.LSP.Server.Tests.csproj"/>
+    <Project Path="PG.StarWarsGame.LSP.Story.Tests/PG.StarWarsGame.LSP.Story.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Xml.Tests/PG.StarWarsGame.LSP.Xml.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.E2E.Tests/PG.StarWarsGame.LSP.E2E.Tests.csproj"/>
 </Solution>

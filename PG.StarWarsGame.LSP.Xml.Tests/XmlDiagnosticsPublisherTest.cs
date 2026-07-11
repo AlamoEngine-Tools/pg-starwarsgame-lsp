@@ -68,7 +68,8 @@ public sealed class XmlDiagnosticsPublisherTest
         FakeGameIndexService indexService,
         FakeGameWorkspaceHost workspaceHost) BuildSubscribed(FakeSchemaProvider? schema = null,
             FakeFileTypeRegistry? registry = null,
-            ILspConfigurationProvider? config = null)
+            ILspConfigurationProvider? config = null,
+            IStoryChainProblemStore? storyChainProblems = null)
     {
         var published = new List<PublishDiagnosticsParams>();
         var indexService = new FakeGameIndexService();
@@ -106,7 +107,8 @@ public sealed class XmlDiagnosticsPublisherTest
             NullLogger<XmlDiagnosticsPublisher>.Instance,
             effectiveRegistry,
             fileHelper,
-            configProvider: config);
+            configProvider: config,
+            storyChainProblems: storyChainProblems);
         return (publisher, published, indexService, workspaceHost);
     }
 
@@ -134,6 +136,48 @@ public sealed class XmlDiagnosticsPublisherTest
             registry,
             fileHelper);
         return (publisher, published, indexService, workspaceHost);
+    }
+
+    // ── story-chain problems ─────────────────────────────────────────────────
+
+    [Fact]
+    public async Task RevalidateDocument_StoryChainProblem_IsPublishedAsDiagnostic()
+    {
+        var store = new StoryChainProblemStore();
+        store.Replace([
+            new StoryChainProblem("Campaigns_Test.xml", "file:///a.xml", 2, 4, 2, 24,
+                StoryChainProblemKind.UnresolvedStoryName, "Story_Plots_Gone.xml",
+                "Story plot file 'Story_Plots_Gone.xml' does not exist in any project layer or the baseline.",
+                XmlDiagnosticSeverity.Error)
+        ]);
+        var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);
+        workspaceHost.Set("file:///a.xml", "<Campaigns>\n<Campaign Name=\"T\">\n    <Rebel_Story_Name>Story_Plots_Gone.xml</Rebel_Story_Name>\n</Campaign>\n</Campaigns>");
+
+        await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
+
+        var diag = Assert.Single(Assert.Single(published).Diagnostics!);
+        Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
+        Assert.Equal(2, diag.Range.Start.Line);
+        Assert.Equal(4, diag.Range.Start.Character);
+        Assert.Equal(24, diag.Range.End.Character);
+        Assert.Contains("Story_Plots_Gone.xml", diag.Message);
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_StoryChainProblemForOtherDocument_IsNotPublished()
+    {
+        var store = new StoryChainProblemStore();
+        store.Replace([
+            new StoryChainProblem("Campaigns_Other.xml", "file:///other.xml", 0, 0, 0, 5,
+                StoryChainProblemKind.UnresolvedStoryName, "X", "message",
+                XmlDiagnosticSeverity.Error)
+        ]);
+        var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);
+        workspaceHost.Set("file:///a.xml", "<Campaigns/>");
+
+        await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
+
+        Assert.Empty(Assert.Single(published).Diagnostics!);
     }
 
     // ── subscription / routing ───────────────────────────────────────────────

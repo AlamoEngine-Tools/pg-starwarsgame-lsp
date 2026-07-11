@@ -6,6 +6,8 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
+using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -28,7 +30,7 @@ public sealed class WorkspaceIndexerTest
         IProjectIndexCache? cache = null, ILuaAnnotationRepository? repo = null,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, cache, repo, parsers);
+        return BuildWithHost(fs, svc, registry, schema, cache, repo, null, null, parsers);
     }
 
     // Overload kept for callers that pass parsers without a cache
@@ -36,18 +38,21 @@ public sealed class WorkspaceIndexerTest
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         params IGameDocumentParser[] parsers)
     {
-        return BuildWithHost(fs, svc, registry, schema, null, null, parsers);
+        return BuildWithHost(fs, svc, registry, schema, null, null, null, null, parsers);
     }
 
     private static (WorkspaceIndexer Indexer, EaWXmlContext Context) BuildWithHost(
         MockFileSystem fs, IGameIndexService svc, IFileTypeRegistry registry, ISchemaProvider schema,
         IProjectIndexCache? cache, ILuaAnnotationRepository? repo,
+        IStoryChainProblemStore? storyProblems, ILspConfigurationProvider? config,
         params IGameDocumentParser[] parsers)
     {
         var fh = new FileHelper(fs);
         var ctx = new EaWXmlContext(fh);
         var indexer = new WorkspaceIndexer(fh, parsers, svc, registry, schema, ctx,
             cache ?? new NullProjectIndexCache(), repo ?? new LuaAnnotationRepository(),
+            storyProblems ?? new StoryChainProblemStore(),
+            config ?? new FakeLspConfigurationProvider(),
             NullLogger<WorkspaceIndexer>.Instance);
         return (indexer, ctx);
     }
@@ -170,24 +175,152 @@ public sealed class WorkspaceIndexerTest
         Assert.Equal(["GameObjectType"], registry.GetTypesForFile(expectedKey).ToArray());
     }
 
+    // ── PreScanMetafiles: story chain (MetafileType.Special) ─────────────────
+
+    private static MetafileDefinition StorySpecialDef()
+    {
+        return new MetafileDefinition("data/xml/campaignfiles.xml", MetafileType.Special,
+            ["Campaign", "StoryParser", "StoryPlotManifest"]);
+    }
+
+    private static Dictionary<string, MockFileData> StoryChainFixture(string xmlDir)
+    {
+        return new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(xmlDir, "campaignfiles.xml")] =
+                new("<Campaign_Files><File>Campaigns_Test.xml</File></Campaign_Files>"),
+            [Path.Combine(xmlDir, "Campaigns_Test.xml")] = new(
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>"),
+            [Path.Combine(xmlDir, "Story_Plots_Rebel.xml")] = new(
+                "<Story_Mode_Plots><Active_Plot>Story_Rebel_Act_I.xml</Active_Plot></Story_Mode_Plots>"),
+            [Path.Combine(xmlDir, "Story_Rebel_Act_I.xml")] = new(
+                "<Story_Threads><Event Name=\"E1\"><Event_Type>STORY_TRIGGER</Event_Type></Event></Story_Threads>")
+        };
+    }
+
     [Fact]
-    public void PreScanMetafiles_SkipsSpecialMetafiles()
+    public void PreScanMetafiles_SpecialDef_TypesManifestsAndThreadsAlongTheChain()
     {
         var root = Root("ws");
         var xmlDir = Path.Combine(root, "data", "xml");
-        var campaignPath = Path.Combine(xmlDir, "CAMPAIGNS.XML");
-        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
-        {
-            [campaignPath] = new("<Campaigns/>")
-        });
+        var fs = new MockFileSystem(StoryChainFixture(xmlDir));
         var registry = new FileTypeRegistry();
-        var schema = new FakeSchemaProvider(
-            new MetafileDefinition("data/xml/campaigns.xml", MetafileType.Special, ["StoryParser"]));
-        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
+
+        var fh = new FileHelper(fs);
+        Assert.Equal(["StoryPlotManifest"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(xmlDir, "Story_Plots_Rebel.xml"))).ToArray());
+        Assert.Equal(["StoryParser"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(xmlDir, "Story_Rebel_Act_I.xml"))).ToArray());
+    }
+
+    [Fact]
+    public void PreScanMetafiles_SpecialDef_StoryDiscoveryFlagOff_RegistersNothingAndClearsProblems()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var fs = new MockFileSystem(StoryChainFixture(xmlDir));
+        var registry = new FileTypeRegistry();
+        var store = new StoryChainProblemStore();
+        store.Replace([
+            new StoryChainProblem("Campaigns_Old.xml", "file:///stale", 0, 0, 0, 1,
+                StoryChainProblemKind.UnresolvedStoryName, "X", "stale", XmlDiagnosticSeverity.Error)
+        ]);
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Story = new StoryFeatureFlags { Discovery = false } });
+        var (indexer, _) = BuildWithHost(fs, new FakeIndexService(), registry,
+            new FakeSchemaProvider(StorySpecialDef()), null, null, store, config);
 
         indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
 
         Assert.Empty(registry.All);
+        Assert.Empty(store.GetForDocument("file:///stale"));
+    }
+
+    [Fact]
+    public void PreScanMetafiles_SpecialDef_UnresolvedStoryName_LandsInProblemStore()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var files = StoryChainFixture(xmlDir);
+        files.Remove(Path.Combine(xmlDir, "Story_Plots_Rebel.xml"));
+        var fs = new MockFileSystem(files);
+        var registry = new FileTypeRegistry();
+        var store = new StoryChainProblemStore();
+        var (indexer, _) = BuildWithHost(fs, new FakeIndexService(), registry,
+            new FakeSchemaProvider(StorySpecialDef()), null, null, store, null);
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
+
+        var fh = new FileHelper(fs);
+        var campaignUri = fh.NormalizeUri(Path.Combine(xmlDir, "Campaigns_Test.xml"));
+        var problem = Assert.Single(store.GetForDocument(campaignUri));
+        Assert.Equal(StoryChainProblemKind.UnresolvedStoryName, problem.Kind);
+        Assert.Equal("Story_Plots_Rebel.xml", problem.Reference);
+    }
+
+    [Fact]
+    public void PreScanMetafiles_SpecialDef_ChainSpansXmlRoots_AndRegistersUnderEveryRoot()
+    {
+        // The campaign lives in the mod (rev); the manifest and thread ship with the dependency
+        // (core). Resolution must search every xml root, and registrations must cover both roots
+        // (mirroring how file-registry entries are registered).
+        var revXml = Path.Combine(Root("rev"), "data", "xml");
+        var coreXml = Path.Combine(Root("core"), "data", "xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(revXml, "campaignfiles.xml")] =
+                new("<Campaign_Files><File>Campaigns_Mod.xml</File></Campaign_Files>"),
+            [Path.Combine(revXml, "Campaigns_Mod.xml")] = new(
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_Core.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>"),
+            [Path.Combine(coreXml, "Story_Plots_Core.xml")] = new(
+                "<Story_Mode_Plots><Active_Plot>Story_Core_Act.xml</Active_Plot></Story_Mode_Plots>"),
+            [Path.Combine(coreXml, "Story_Core_Act.xml")] = new("<Story_Threads/>")
+        });
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [Root("rev")]);
+
+        var fh = new FileHelper(fs);
+        Assert.Equal(["StoryPlotManifest"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Plots_Core.xml"))).ToArray());
+        Assert.Equal(["StoryPlotManifest"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Story_Plots_Core.xml"))).ToArray());
+        Assert.Equal(["StoryParser"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Core_Act.xml"))).ToArray());
+    }
+
+    [Fact]
+    public void PreScanMetafiles_SpecialDef_RegistryAbsentEverywhere_FallsBackToBaselineFileTypeMap()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml");
+        var fs = new MockFileSystem();
+        fs.AddDirectory(xmlDir);
+        var fileTypeMap = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("story_plots_vanilla.xml", ImmutableArray.Create("StoryPlotManifest"))
+            .Add("story_vanilla_act.xml", ImmutableArray.Create("StoryParser"));
+        var svc = new FakeIndexService(GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with { FileTypeMap = fileTypeMap }
+        });
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, svc, registry, new FakeSchemaProvider(StorySpecialDef()));
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([xmlDir], [], [], [], null), [root]);
+
+        var fh = new FileHelper(fs);
+        Assert.Equal(["StoryPlotManifest"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(xmlDir, "story_plots_vanilla.xml"))).ToArray());
+        Assert.Equal(["StoryParser"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(xmlDir, "story_vanilla_act.xml"))).ToArray());
     }
 
     // ── IndexDocumentsAsync ──────────────────────────────────────────────────
@@ -1131,7 +1264,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var config = new WorkspaceConfiguration([xmlDir], [], [], [], null);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), null, null,
-            new FakeParser());
+            null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1152,7 +1285,7 @@ public sealed class WorkspaceIndexerTest
         var svc = new FakeIndexService();
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            null, null, new FakeParser());
+            null, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);
@@ -1190,7 +1323,7 @@ public sealed class WorkspaceIndexerTest
         var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
         var config = ConfigWithLayer(xmlDir, pgproj);
         var (indexer, _) = BuildWithHost(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(),
-            cache, null, new FakeParser());
+            cache, null, null, null, new FakeParser());
         indexer.PreScanMetafiles(config, [root]);
 
         await indexer.IndexDocumentsAsync(config, CancellationToken.None);

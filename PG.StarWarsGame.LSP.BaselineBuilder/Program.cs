@@ -24,6 +24,7 @@ using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Story.Discovery;
 
 // ── Shared options ────────────────────────────────────────────────────────────
 
@@ -354,7 +355,24 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     if (schemaProvider is not null)
         foreach (var def in schemaProvider.AllMetafiles)
         {
-            if (def.MetafileType == MetafileType.Special) continue;
+            if (def.MetafileType == MetafileType.Special)
+            {
+                // Campaign story chain: type every reachable plot manifest and story thread so
+                // workspaces without these files still validate references into vanilla data.
+                var chain = new StoryChainScanner(
+                    new GameRepositoryStoryChainFileResolver(p => engine.GameRepository.TryOpenFile(p)))
+                    .Scan(def.Path);
+                foreach (var rel in chain.ManifestFiles)
+                    fileTypeMapBuilder[NormalizeChainPath(rel)] = ["StoryPlotManifest"];
+                foreach (var rel in chain.ThreadFiles)
+                    fileTypeMapBuilder[NormalizeChainPath(rel)] = ["StoryParser"];
+                Console.WriteLine(
+                    $"Story chain: {chain.ManifestFiles.Count} manifest(s), {chain.ThreadFiles.Count} thread file(s), " +
+                    $"{chain.LuaScripts.Count} Lua script(s), {chain.Problems.Count} problem(s)");
+                foreach (var problem in chain.Problems)
+                    Console.WriteLine($"  [story-chain] {problem.SourceFile}: {problem.Message}");
+                continue;
+            }
 
             if (def.MetafileType == MetafileType.FileRegistry)
             {
@@ -477,6 +495,13 @@ static string ComputeManifestHash(string gamePath)
     return Convert.ToHexString(hash.GetHashAndReset()).ToLowerInvariant();
 }
 
+// Story-chain paths arrive xml-dir-relative with original casing; FileTypeMap keys use the same
+// normalization as file-registry entries (forward slashes, lowercase).
+static string NormalizeChainPath(string xmlRelativePath)
+{
+    return xmlRelativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+}
+
 // Walk up from the binary's directory until we find schema/eaw
 static string? FindSchemaPath()
 {
@@ -492,6 +517,25 @@ static string? FindSchemaPath()
     }
 
     return null;
+}
+
+// MEG-aware story-chain resolver over the game repository (same TryOpenFile access the group
+// membership and dynamic-enum extraction already use).
+file sealed class GameRepositoryStoryChainFileResolver(Func<string, Stream?> openFile)
+    : IStoryChainFileResolver
+{
+    public StoryChainFile? ReadFile(string xmlRelativePath)
+    {
+        var enginePath = "DATA\\XML\\" + xmlRelativePath.ToUpperInvariant().Replace('/', '\\');
+        using var stream = openFile(enginePath);
+        return stream is null ? null : new StoryChainFile(new StreamReader(stream).ReadToEnd(), null);
+    }
+
+    // The game repository IS the baseline source — there is nothing behind it to fall back to.
+    public bool IsKnownToBaseline(string xmlRelativePath)
+    {
+        return false;
+    }
 }
 
 // Minimal fallback when no schema is wired — all types become GameObjectType.

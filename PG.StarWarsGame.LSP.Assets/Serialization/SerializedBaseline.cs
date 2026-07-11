@@ -9,12 +9,14 @@ namespace PG.StarWarsGame.LSP.Assets.Serialization;
 [MessagePackObject]
 public sealed class SerializedBaseline
 {
-    // Bumped whenever the DTO layout changes; a mismatched (or absent — see Deserialize) baseline is
-    // discarded cleanly instead of being interpreted against the wrong layout. Key(10) is appended
-    // after the original 10 fields rather than inserted at Key(0), so pre-versioning baselines (which
-    // never wrote this key) deserialize it as the CLR default 0 — itself a natural version mismatch,
-    // with no separate migration path needed.
-    public const int CurrentSchemaVersion = 1;
+    // Bumped whenever the DTO layout OR the content contract changes (e.g. new required
+    // FileTypeMap entries); a mismatched (or absent — see Deserialize) baseline is discarded
+    // cleanly instead of being interpreted against the wrong layout. Key(10) is appended after
+    // the original 10 fields rather than inserted at Key(0), so pre-versioning baselines (which
+    // never wrote this key) deserialize it as the CLR default 0 — itself a natural version
+    // mismatch, with no separate migration path needed.
+    // v2: FileTypeMap now carries the story chain (StoryPlotManifest/StoryParser entries).
+    public const int CurrentSchemaVersion = 2;
 
     [Key(0)] public GameSymbol[] Symbols { get; set; } = [];
     [Key(1)] public long BuiltAtMs { get; set; }

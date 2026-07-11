@@ -218,6 +218,7 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.True(features.Lua.CodeActions);
         Assert.True(features.Tools.Localisation);
         Assert.True(features.Tools.Variants);
+        Assert.True(features.Story.Discovery);
     }
 
     [Fact]
@@ -230,6 +231,18 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.True(provider.Current.Features.Xml.Hover);
         Assert.True(provider.Current.Features.Lua.Completion);
         Assert.True(provider.Current.Features.Tools.Localisation);
+        Assert.True(provider.Current.Features.Story.Discovery);
+    }
+
+    [Fact]
+    public void LoadFrom_StoryDiscoveryDisabled_ParsesFromCamelCaseNode()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { story = new { discovery = false } } }));
+
+        Assert.False(provider.Current.Features.Story.Discovery);
+        // Untouched leaves keep their defaults.
+        Assert.True(provider.Current.Features.Xml.Completion);
     }
 
     [Fact]
