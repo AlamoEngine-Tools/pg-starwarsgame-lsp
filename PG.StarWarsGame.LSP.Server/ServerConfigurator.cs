@@ -140,6 +140,10 @@ public static class ServerConfigurator
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
                 services.AddSingleton<IStoryChainProblemStore, StoryChainProblemStore>();
 
+                // Story campaign models (per-campaign threads + graph) and their diagnostics.
+                services.AddSingleton<IStoryModelService, StoryModelService>();
+                services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();
+
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
                 services.AddSingleton<DialogFactProducer>();

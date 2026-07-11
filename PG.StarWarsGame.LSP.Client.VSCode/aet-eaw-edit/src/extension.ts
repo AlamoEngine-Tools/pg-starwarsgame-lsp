@@ -204,7 +204,8 @@ function resolveFeatureFlags() {
 			variants:     flag('tools.variants', true),
 		},
 		story: {
-			discovery: flag('story.discovery', false),
+			discovery:        flag('story.discovery', false),
+			graphDiagnostics: flag('story.graphDiagnostics', false),
 		},
 		dialog: {
 			diagnostics: flag('dialog.diagnostics', false),

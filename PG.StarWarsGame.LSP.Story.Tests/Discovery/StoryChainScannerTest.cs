@@ -367,6 +367,78 @@ public sealed class StoryChainScannerTest
         Assert.Empty(result.Problems);
     }
 
+    // ── Structured campaign associations (feed the per-campaign story models) ─
+
+    [Fact]
+    public void Scan_RecordsCampaignFactionManifestAssociations()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"GC_One\">" +
+                "<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>" +
+                "<Empire_Story_Name>Story_Plots_E.xml</Empire_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_R.xml", "<Story_Mode_Plots/>")
+            .Add("Story_Plots_E.xml", "<Story_Mode_Plots/>");
+
+        var result = Scan(resolver);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal("GC_One", campaign.Name);
+        Assert.Equal([("Rebel", "Story_Plots_R.xml"), ("Empire", "Story_Plots_E.xml")],
+            campaign.FactionManifests.Select(f => (f.Faction, f.ManifestFile)));
+    }
+
+    [Fact]
+    public void Scan_RecordsManifestContents_ThreadsAndLuaScripts()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_R.xml",
+                "<Story_Mode_Plots><Active_Plot>Story_Act_I.xml</Active_Plot>" +
+                "<Suspended_Plot>Story_Act_II.xml</Suspended_Plot>" +
+                "<Lua_Script>Story_Act_III</Lua_Script></Story_Mode_Plots>")
+            .Add("Story_Act_I.xml", "<Story_Threads/>")
+            .Add("Story_Act_II.xml", "<Story_Threads/>");
+
+        var result = Scan(resolver);
+
+        var manifest = Assert.Single(result.Manifests);
+        Assert.Equal("Story_Plots_R.xml", manifest.ManifestFile);
+        Assert.Equal(["Story_Act_I.xml"], manifest.ActiveThreads);
+        Assert.Equal(["Story_Act_II.xml"], manifest.SuspendedThreads);
+        Assert.Equal(["Story_Act_III"], manifest.LuaScripts);
+    }
+
+    [Fact]
+    public void Scan_RecordsTacticalManifestReferencesPerThread()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"T\">" +
+                "<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_R.xml",
+                "<Story_Mode_Plots><Active_Plot>Story_Galactic.xml</Active_Plot></Story_Mode_Plots>")
+            .Add("Story_Galactic.xml",
+                "<Story_Threads><Event Name=\"E\">" +
+                "<Event_Type>STORY_SPACE_TACTICAL</Event_Type>" +
+                "<Event_Param1>Story_Plots_M1.xml</Event_Param1>" +
+                "</Event></Story_Threads>")
+            .Add("Story_Plots_M1.xml", "<Story_Mode_Plots/>");
+
+        var result = Scan(resolver);
+
+        Assert.Equal([("Story_Galactic.xml", "Story_Plots_M1.xml")],
+            result.TacticalReferences.Select(t => (t.ThreadFile, t.ManifestFile)));
+    }
+
     [Fact]
     public void Scan_RegistryEntriesWithGamePathPrefix_AreNormalizedToXmlRelative()
     {

@@ -38,6 +38,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IXmlParseCache _parseCache;
     private readonly IStoryChainProblemStore? _storyChainProblems;
+    private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
     private readonly IStoryFactProducer _storyProducer;
     private readonly IDocumentTextSource _textSource;
     private readonly IXmlVariantFactProducer? _variantProducer;
@@ -62,12 +63,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IXmlParseCache parseCache,
         ILspConfigurationProvider configProvider,
         IStoryChainProblemStore storyChainProblems,
+        IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems)
+            variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
+            storyGraphDiagnostics)
     {
     }
 
@@ -89,7 +92,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IDocumentTextSource? textSource = null,
         IXmlParseCache? parseCache = null,
         ILspConfigurationProvider? configProvider = null,
-        IStoryChainProblemStore? storyChainProblems = null)
+        IStoryChainProblemStore? storyChainProblems = null,
+        IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
         _configProvider = configProvider;
@@ -109,6 +113,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _variantProducer = variantProducer;
         _shadowProducer = shadowProducer;
         _storyChainProblems = storyChainProblems;
+        _storyGraphDiagnostics = storyGraphDiagnostics;
     }
 
     protected override string FileExtension => ".xml";
@@ -181,6 +186,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
         if (_storyChainProblems is not null)
             allDiags.AddRange(_storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+        if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
+            allDiags.AddRange(_storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();
@@ -431,6 +438,18 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Range = SafeRange(problem.Line, problem.Column, problem.EndLine, problem.EndColumn),
             Source = AppProperties.LspServerId,
             Code = "story-chain"
+        };
+    }
+
+    private static Diagnostic ToLspDiagnostic(StoryGraphDiagnostic diagnostic)
+    {
+        return new Diagnostic
+        {
+            Severity = diagnostic.Severity.ToLsp(),
+            Message = diagnostic.Message,
+            Range = SafeRange(diagnostic.Line, diagnostic.Column, diagnostic.EndLine, diagnostic.EndColumn),
+            Source = AppProperties.LspServerId,
+            Code = "story-graph"
         };
     }
 

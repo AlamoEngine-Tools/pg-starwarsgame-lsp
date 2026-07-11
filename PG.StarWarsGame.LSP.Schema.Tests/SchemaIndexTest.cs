@@ -291,4 +291,26 @@ public sealed class SchemaIndexTest
         var param = enumDef.Values.Single().Params!.Single();
         Assert.Same(planetType, param.ObjectType);
     }
+
+    [Fact]
+    public void SchemaIndex_ParamReferenceTypeName_IsPreservedEvenWithoutResolution()
+    {
+        // Story edge extraction is driven by the raw referenceType string (StoryEventName,
+        // StoryFlag, StoryPlotFile) — these are not types.yaml object types, so the name must
+        // survive resolution even though ObjectType stays null.
+        var rawParam = new RawParamDefinition
+        {
+            Position = 0,
+            ValueType = XmlValueType.NameReference,
+            ReferenceType = "StoryEventName"
+        };
+        var rawEnumVal = new RawEnumValueDefinition { Name = "TRIGGER_EVENT", Params = [rawParam] };
+        var rawEnum = new RawEnumDefinition { Name = "StoryRewardType", Values = [rawEnumVal] };
+
+        var index = Build([], enums: [rawEnum]);
+
+        var param = index.GetEnum("StoryRewardType")!.Values.Single().Params!.Single();
+        Assert.Equal("StoryEventName", param.ReferenceTypeName);
+        Assert.Null(param.ObjectType);
+    }
 }

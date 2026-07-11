@@ -14,6 +14,13 @@ public sealed record ParamDefinition
     /// <summary>Non-null when ReferenceKind is XmlObject — the resolved target type.</summary>
     public GameObjectTypeDefinition? ObjectType { get; init; }
 
+    /// <summary>
+    ///     The raw <c>referenceType</c> string from the schema YAML, preserved even when it names
+    ///     no types.yaml object type (e.g. <c>StoryEventName</c>/<c>StoryFlag</c>/
+    ///     <c>StoryPlotFile</c>) — the story graph builder keys edge extraction on it.
+    /// </summary>
+    public string? ReferenceTypeName { get; init; }
+
     /// <summary>Non-null when ReferenceKind is Enum — the resolved enum definition.</summary>
     public EnumDefinition? Enum { get; init; }
 

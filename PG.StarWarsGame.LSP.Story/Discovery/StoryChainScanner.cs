@@ -69,7 +69,12 @@ public sealed class StoryChainScanner
         foreach (var campaignRel in campaignFiles)
             ScanCampaignFile(campaignRel, state);
 
-        return new StoryChainScanResult(state.Manifests, state.Threads, state.LuaScripts, state.Problems);
+        return new StoryChainScanResult(state.Manifests, state.Threads, state.LuaScripts, state.Problems)
+        {
+            Campaigns = state.Campaigns,
+            Manifests = state.ManifestContents,
+            TacticalReferences = state.TacticalReferences
+        };
     }
 
     // ── Chain stages ─────────────────────────────────────────────────────────
@@ -82,8 +87,40 @@ public sealed class StoryChainScanner
         if (file is null) return;
 
         var source = SourceDocument.Parse(campaignRel, file);
+        var processed = new HashSet<HtmlNode>();
+
+        foreach (var campaignNode in source.Doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element &&
+                                 n.Name.Equals("Campaign", StringComparison.OrdinalIgnoreCase)))
+        {
+            var campaignName = campaignNode.GetAttributeValue("Name", string.Empty).Trim();
+            var factionManifests = new List<StoryFactionManifest>();
+
+            foreach (var node in campaignNode.Descendants()
+                         .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTags.Contains(n.Name)))
+            {
+                processed.Add(node);
+                var value = node.InnerText.Trim();
+                if (value.Length == 0) continue;
+
+                AddManifest(value, source.At(node, value), StoryChainProblemKind.UnresolvedStoryName, state);
+
+                // "Rebel_Story_Name" → faction "Rebel".
+                var tagName = node.Name;
+                var faction = tagName[..tagName.IndexOf('_')];
+                faction = char.ToUpperInvariant(faction[0]) + faction[1..];
+                factionManifests.Add(new StoryFactionManifest(faction, ToXmlRelativePath(value)));
+            }
+
+            if (campaignName.Length > 0 && factionManifests.Count > 0)
+                state.Campaigns.Add(new StoryCampaignChain(campaignName, factionManifests));
+        }
+
+        // Story-name tags outside a <Campaign> element (malformed nesting) still get their
+        // manifests typed — only the campaign association is lost.
         foreach (var node in source.Doc.DocumentNode.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTags.Contains(n.Name)))
+                     .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTags.Contains(n.Name)
+                                 && !processed.Contains(n)))
         {
             var value = node.InnerText.Trim();
             if (value.Length == 0) continue;
@@ -124,18 +161,35 @@ public sealed class StoryChainScanner
             return;
         }
 
+        var activeThreads = new List<string>();
+        var suspendedThreads = new List<string>();
+        var luaScripts = new List<string>();
+
         foreach (var node in root.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
             var value = node.InnerText.Trim();
             if (value.Length == 0) continue;
 
-            if (node.Name.Equals("Active_Plot", StringComparison.OrdinalIgnoreCase) ||
-                node.Name.Equals("Suspended_Plot", StringComparison.OrdinalIgnoreCase))
+            if (node.Name.Equals("Active_Plot", StringComparison.OrdinalIgnoreCase))
+            {
+                activeThreads.Add(ToXmlRelativePath(value));
                 AddThread(value, source.At(node, value), state);
+            }
+            else if (node.Name.Equals("Suspended_Plot", StringComparison.OrdinalIgnoreCase))
+            {
+                suspendedThreads.Add(ToXmlRelativePath(value));
+                AddThread(value, source.At(node, value), state);
+            }
             else if (node.Name.Equals("Lua_Script", StringComparison.OrdinalIgnoreCase))
+            {
+                luaScripts.Add(value);
                 if (state.LuaSeen.Add(value))
                     state.LuaScripts.Add(value);
+            }
         }
+
+        state.ManifestContents.Add(
+            new StoryManifestContents(manifestRel, activeThreads, suspendedThreads, luaScripts));
     }
 
     private void AddThread(string rawReference, SourceLocation origin, ScanState state)
@@ -179,6 +233,11 @@ public sealed class StoryChainScanner
     {
         var value = paramNode?.InnerText.Trim();
         if (string.IsNullOrEmpty(value)) return; // param is optional on tactical events
+
+        var reference = new StoryTacticalReference(source.SourceFile, ToXmlRelativePath(value));
+        if (state.TacticalSeen.Add((reference.ThreadFile, reference.ManifestFile)))
+            state.TacticalReferences.Add(reference);
+
         AddManifest(value, source.At(paramNode!, value),
             StoryChainProblemKind.UnresolvedTacticalReference, state);
     }
@@ -213,6 +272,11 @@ public sealed class StoryChainScanner
         public List<string> LuaScripts { get; } = [];
         public HashSet<string> LuaSeen { get; } = new(StringComparer.OrdinalIgnoreCase);
         public List<StoryChainProblem> Problems { get; } = [];
+
+        public List<StoryCampaignChain> Campaigns { get; } = [];
+        public List<StoryManifestContents> ManifestContents { get; } = [];
+        public List<StoryTacticalReference> TacticalReferences { get; } = [];
+        public HashSet<(string, string)> TacticalSeen { get; } = [];
 
         public void AddProblem(SourceLocation origin, StoryChainProblemKind kind, string message)
         {

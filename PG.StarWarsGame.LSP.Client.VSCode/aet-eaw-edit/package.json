@@ -417,6 +417,12 @@
             "default": false,
             "markdownDescription": "Enables campaign story-chain discovery: plot manifests and story thread files are typed and validated (story event/reward parameters, chain errors like missing plot files).\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.story.graphDiagnostics": {
+            "order": 1855,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables campaign story-graph diagnostics on story thread files: dangling or cyclic prerequisites, duplicate and ambiguous event names, unreachable events, suspended plots nothing activates, event tag order, and over-long flag names.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery, story files are not typed and these diagnostics never trigger.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.dialog.diagnostics": {
             "order": 1860,
             "type": "boolean",
