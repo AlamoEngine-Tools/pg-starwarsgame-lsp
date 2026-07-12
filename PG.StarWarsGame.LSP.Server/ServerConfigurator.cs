@@ -82,6 +82,8 @@ public static class ServerConfigurator
             // convention needs to change, extend that test first as the regression gate.
             .WithHandler<LuaTextDocumentSyncHandler>()
             .WithHandler<DialogTextDocumentSyncHandler>()
+            .WithHandler<DialogInlayHintHandler>()
+            .WithHandler<DialogDefinitionHandler>()
             .WithHandler<LuaCompletionHandler>()
             .WithHandler<LuaCodeActionHandler>()
             .WithHandler<LuaDefinitionHandler>()
