@@ -106,6 +106,37 @@ public sealed class StoryCampaignAssemblerTest
     }
 
     [Fact]
+    public void Assemble_RecordsTacticalManifestThreadUris()
+    {
+        var chain = Chain(
+            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+            [
+                new StoryManifestContents("M.xml", ["T_Galactic.xml"], [], []),
+                new StoryManifestContents("M_Tac.xml", ["T_Tactical.xml"], [], [])
+            ],
+            [new StoryTacticalReference("T_Galactic.xml", "M_Tac.xml")]);
+
+        var model = Assemble(chain)!;
+
+        var entry = Assert.Single(model.TacticalManifestThreads);
+        Assert.Equal("M_Tac.xml", entry.Key);
+        var uri = Assert.Single(entry.Value);
+        Assert.Equal("file:///xml/t_tactical.xml", uri);
+    }
+
+    [Fact]
+    public void Assemble_MainCampaignManifests_AreNotRecordedAsTactical()
+    {
+        var chain = Chain(
+            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M.xml")])],
+            [new StoryManifestContents("M.xml", ["T.xml"], [], [])]);
+
+        var model = Assemble(chain)!;
+
+        Assert.Empty(model.TacticalManifestThreads);
+    }
+
+    [Fact]
     public void Assemble_ManifestOfAnotherCampaign_IsExcluded()
     {
         var chain = Chain(

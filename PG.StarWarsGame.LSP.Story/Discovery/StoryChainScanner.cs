@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Story.Discovery;
@@ -248,15 +249,12 @@ public sealed class StoryChainScanner
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     // References come in two forms: xml-dir-relative ("Story_Plots_X.xml") or game-root-relative
-    // ("DATA\XML\CAMPAIGNS_X.XML"). Collapse both to an xml-dir-relative path with '/' separators,
-    // preserving casing and subdirectories (mirrors WorkspaceIndexer.ToXmlRelativePath).
+    // ("DATA\XML\CAMPAIGNS_X.XML"). Shared with StoryGraphBuilder's tactical-node keying so a
+    // manifest reference correlates to the same node regardless of which event's raw text it
+    // came from (mirrors WorkspaceIndexer.ToXmlRelativePath).
     private static string ToXmlRelativePath(string reference)
     {
-        var normalized = reference.Replace('\\', '/').TrimStart('/');
-        const string xmlPrefix = "data/xml/";
-        return normalized.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase)
-            ? normalized[xmlPrefix.Length..]
-            : normalized;
+        return StoryReferenceTypes.NormalizeRelativePath(reference);
     }
 
     private static HtmlNode? FindChild(HtmlNode parent, string tagName)

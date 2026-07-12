@@ -29,6 +29,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<XmlDiagnosticsPublisher>();
         services.AddSingleton<IXmlDiagnosticsRevalidator>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<IXmlFixCache>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
+        services.AddSingleton<IXmlDiagnosticsCollector>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<RevalidateWorkspaceCommandHandler>();
         services.AddSingleton<RevalidateDocumentCommandHandler>();
 

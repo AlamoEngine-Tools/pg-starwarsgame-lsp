@@ -101,6 +101,39 @@ public static class StoryXmlWriter
         return MergeSamePointInserts(edits);
     }
 
+    /// <summary>
+    ///     Removes the trigger or reward block wholesale: the <c>{prefix}_Type</c> line, every
+    ///     <c>{prefix}_ParamN</c> line, and — for the trigger — the <c>Event_Filter</c> line, as
+    ///     one atomic edit set. The graph editor's immutable-type rule: changing a type means
+    ///     clearing it (params included, so nothing stale survives) and attaching a new one.
+    /// </summary>
+    public static IReadOnlyList<StoryTextEdit> ClearTypeBlock(
+        string text, StoryEvent storyEvent, string prefix)
+    {
+        var isEvent = string.Equals(prefix, "Event", StringComparison.OrdinalIgnoreCase);
+        var typeTag = prefix + "_Type";
+        var paramPrefix = prefix + "_Param";
+
+        var edits = new List<StoryTextEdit>();
+        foreach (var tag in storyEvent.Tags)
+        {
+            var remove = string.Equals(tag.Name, typeTag, StringComparison.OrdinalIgnoreCase)
+                         || IsParamTag(tag.Name, paramPrefix)
+                         || (isEvent && string.Equals(tag.Name, "Event_Filter", StringComparison.OrdinalIgnoreCase));
+            if (remove)
+                edits.Add(DeleteLines(tag.ValueRange.StartLine, tag.ValueRange.EndLine));
+        }
+
+        return edits;
+
+        static bool IsParamTag(string name, string paramPrefix)
+        {
+            return name.Length > paramPrefix.Length
+                   && name.StartsWith(paramPrefix, StringComparison.OrdinalIgnoreCase)
+                   && name[paramPrefix.Length..].All(char.IsDigit);
+        }
+    }
+
     // ── Prereqs ──────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -116,16 +149,57 @@ public static class StoryXmlWriter
             return [Insert(group.Range.EndLine, group.Range.EndColumn, " " + Escape(token))];
         }
 
+        return InsertNewPrereqLine(text, storyEvent, token);
+    }
+
+    /// <summary>
+    ///     Adds a new AND-line with every token joined in one atomic edit — the graph editor's
+    ///     "wire an AND-junction's accumulated sources to a target" gesture, which knows every
+    ///     token up front and would otherwise need one <see cref="AddPrereq" /> call per token
+    ///     while guessing at the new group's index for every call after the first.
+    /// </summary>
+    public static IReadOnlyList<StoryTextEdit> AddPrereqGroup(
+        string text, StoryEvent storyEvent, IReadOnlyList<string> tokens)
+    {
+        return InsertNewPrereqLine(text, storyEvent, string.Join(" ", tokens));
+    }
+
+    /// <summary>
+    ///     Adds one new OR-line per token in one atomic edit set — the graph editor's "wire an
+    ///     OR-junction's accumulated sources to a target" gesture. The per-token counterpart of
+    ///     <see cref="AddPrereqGroup" />: N separate <see cref="AddPrereq" /> commands would each
+    ///     be computed against the same original text and race the detached applyEdits.
+    /// </summary>
+    public static IReadOnlyList<StoryTextEdit> AddPrereqAlternatives(
+        string text, StoryEvent storyEvent, IReadOnlyList<string> tokens)
+    {
+        var edits = new List<StoryTextEdit>();
+        foreach (var token in tokens)
+            edits.AddRange(InsertNewPrereqLine(text, storyEvent, token));
+        // Every line anchors at the same insertion point (after the last existing prereq, or the
+        // canonical position) — merging turns them into a single non-overlapping insert.
+        return MergeSamePointInserts(edits);
+    }
+
+    /// <summary>
+    ///     Inserts a new <c>&lt;Prereq&gt;</c> line after the last existing one (or at the
+    ///     canonical position if there isn't one). <paramref name="rawValue" /> is escaped exactly
+    ///     once here — callers must not pre-escape, or a token containing e.g. <c>&amp;</c> would
+    ///     be double-escaped.
+    /// </summary>
+    private static IReadOnlyList<StoryTextEdit> InsertNewPrereqLine(
+        string text, StoryEvent storyEvent, string rawValue)
+    {
         var lastGroup = storyEvent.PrereqGroups.LastOrDefault();
         if (lastGroup is not null)
         {
             var eol = DetectEol(text);
             var indent = IndentAt(text, lastGroup.Range.StartLine, LineIndentLength(text, lastGroup.Range.StartLine));
             return [Insert(lastGroup.Range.EndLine + 1, 0,
-                indent + "<Prereq>" + Escape(token) + "</Prereq>" + eol)];
+                indent + "<Prereq>" + Escape(rawValue) + "</Prereq>" + eol)];
         }
 
-        return [InsertTagLine(text, storyEvent, "Prereq", token)];
+        return [InsertTagLine(text, storyEvent, "Prereq", rawValue)];
     }
 
     /// <summary>

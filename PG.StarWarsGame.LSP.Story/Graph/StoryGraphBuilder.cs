@@ -22,7 +22,14 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     private const string RefStoryPlotFile = StoryReferenceTypes.PlotFile;
     private const string RefStoryBranch = StoryReferenceTypes.Branch;
 
-    public StoryGraph Build(IReadOnlyList<StoryThread> threads)
+    /// <param name="threads">Every thread assembled into the campaign (main plots and tactical plots alike).</param>
+    /// <param name="tacticalManifestThreads">
+    ///     Manifest file (chain-scanner-canonical, e.g. <see cref="StoryReferenceTypes.NormalizeRelativePath"/>)
+    ///     → the document URIs of the threads it includes. Drives the <see cref="StoryEdgeKind.TacticalEntry"/>
+    ///     pass linking each tactical stub to its battle's own root events.
+    /// </param>
+    public StoryGraph Build(IReadOnlyList<StoryThread> threads,
+        IReadOnlyDictionary<string, IReadOnlySet<string>>? tacticalManifestThreads = null)
     {
         var state = new BuildState(
             StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryEventType")),
@@ -73,6 +80,24 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             if (!flag.Equals(writerFlag, StringComparison.OrdinalIgnoreCase) || writerId == readerId)
                 continue;
             state.AddEdge(new StoryEdge(writerId, readerId, StoryEdgeKind.Flag, display));
+        }
+
+        // Pass 4: tactical entry edges — root events (no incoming Prereq/Control) of a tactical
+        // manifest's own threads get an edge from that manifest's stub node, so "reachable from
+        // here" can jump straight into the battle's story.
+        if (tacticalManifestThreads is { Count: > 0 })
+        {
+            var hasIncoming = new HashSet<string>(
+                state.Edges.Where(e => e.Kind is StoryEdgeKind.Prereq or StoryEdgeKind.Control)
+                    .Select(e => e.ToId),
+                StringComparer.Ordinal);
+            foreach (var (manifestFile, threadUris) in tacticalManifestThreads)
+            {
+                var tactical = state.GetOrAddTacticalNode(manifestFile);
+                foreach (var (thread, node) in eventNodes)
+                    if (threadUris.Contains(thread.DocumentUri) && !hasIncoming.Contains(node.Id))
+                        state.AddEdge(new StoryEdge(tactical.Id, node.Id, StoryEdgeKind.TacticalEntry));
+            }
         }
 
         return new StoryGraph(state.Nodes, state.Edges, state.Problems);
@@ -196,7 +221,12 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         return matches;
     }
 
-    private static string EventNodeId(string documentUri, string eventName)
+    /// <summary>
+    ///     The canonical graph-node id for an event — deterministic from its thread URI and name, so
+    ///     the client and the diagnostics correlator can compute the same id for an event the model
+    ///     has not been rebuilt from yet (e.g. one just created in a staged edit-mode batch).
+    /// </summary>
+    public static string EventNodeId(string documentUri, string eventName)
     {
         return $"{documentUri}#{eventName.ToLowerInvariant()}";
     }
@@ -248,7 +278,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
         public StoryNode GetOrAddTacticalNode(string plotFileReference)
         {
-            var key = plotFileReference.Replace('\\', '/').ToLowerInvariant();
+            var key = StoryReferenceTypes.NormalizeRelativePath(plotFileReference).ToLowerInvariant();
             if (_tacticalNodes.TryGetValue(key, out var existing)) return existing;
             var node = new StoryNode($"tactical#{key}", StoryNodeKind.TacticalPlot, plotFileReference, null);
             _tacticalNodes[key] = node;

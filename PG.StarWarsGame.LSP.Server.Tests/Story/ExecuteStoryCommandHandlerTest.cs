@@ -78,7 +78,8 @@ public sealed class ExecuteStoryCommandHandlerTest
     }
 
     private static ExecuteStoryCommandHandler Handler(
-        CapturingApplier applier, bool storyEditor = true, GameIndex? index = null)
+        CapturingApplier applier, bool storyEditor = true, GameIndex? index = null,
+        IStoryModelService? modelService = null)
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -94,7 +95,7 @@ public sealed class ExecuteStoryCommandHandlerTest
             Story = new StoryFeatureFlags { Discovery = true }
         });
         return new ExecuteStoryCommandHandler(
-            new StubModelService(),
+            modelService ?? new StubModelService(),
             new StubIndexService(index ?? DefaultIndex()),
             new DocumentTextSource(new FakeHost(), fileHelper, NullLogger<DocumentTextSource>.Instance),
             new EmptySchema(),
@@ -119,10 +120,11 @@ public sealed class ExecuteStoryCommandHandlerTest
     private static ExecuteStoryCommandParams Command(string kind, string? threadUri = null,
         string? eventName = null, string? newName = null, string? value = null, bool? flag = null,
         int? groupIndex = null, string? token = null, string campaign = "GC", string? file = null,
-        string? faction = null)
+        string? faction = null, IReadOnlyList<string>? tokens = null)
     {
         return new ExecuteStoryCommandParams(campaign, kind, threadUri ?? ThreadUri, eventName, newName,
-            Value: value, Flag: flag, GroupIndex: groupIndex, Token: token, File: file, Faction: faction);
+            Value: value, Flag: flag, GroupIndex: groupIndex, Token: token, Tokens: tokens,
+            File: file, Faction: faction);
     }
 
     private static TextDocumentEdit SingleDocEdit(CapturingApplier applier)
@@ -266,6 +268,26 @@ public sealed class ExecuteStoryCommandHandlerTest
     }
 
     [Fact]
+    public async Task CreateEvent_WithInitialParams_WritesEventAndRewardParamTags()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier)
+            .Handle(Command("createEvent", newName: "Fresh") with
+            {
+                EventType = "STORY_FLAG",
+                RewardType = "SET_FLAG",
+                EventParams = [new StoryParamValueEditDto(0, "MyFlag")],
+                RewardParams = [new StoryParamValueEditDto(0, "OtherFlag")],
+            }, CancellationToken.None);
+
+        Assert.True(result.Success);
+        var newText = Assert.Single(SingleDocEdit(applier).Edits).NewText;
+        Assert.Contains("<Event_Param1>MyFlag</Event_Param1>", newText);
+        Assert.Contains("<Reward_Param1>OtherFlag</Reward_Param1>", newText);
+    }
+
+    [Fact]
     public async Task AddPrereq_NewLine_AppliesInsert()
     {
         var applier = new CapturingApplier();
@@ -275,6 +297,75 @@ public sealed class ExecuteStoryCommandHandlerTest
 
         Assert.True(result.Success);
         Assert.Contains("<Prereq>Next</Prereq>", Assert.Single(SingleDocEdit(applier).Edits).NewText);
+    }
+
+    [Fact]
+    public async Task AddPrereqGroup_MultipleTokens_AppliesOneAndLine()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier)
+            .Handle(Command("addPrereqGroup", eventName: "Start", tokens: ["Next", "Other"]),
+                CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.Contains("<Prereq>Next Other</Prereq>", Assert.Single(SingleDocEdit(applier).Edits).NewText);
+    }
+
+    [Fact]
+    public async Task AddPrereqGroup_NoTokens_ReturnsError()
+    {
+        var result = await Handler(new CapturingApplier())
+            .Handle(Command("addPrereqGroup", eventName: "Start", tokens: []), CancellationToken.None);
+
+        Assert.Contains("tokens", result.Error);
+    }
+
+    [Fact]
+    public async Task ClearEventType_RemovesTheTriggerBlock()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier)
+            .Handle(Command("clearEventType", eventName: "Start"), CancellationToken.None);
+
+        Assert.True(result.Success);
+        var edit = Assert.Single(SingleDocEdit(applier).Edits);
+        Assert.Equal("", edit.NewText); // the Event_Type line is deleted, nothing inserted
+    }
+
+    [Fact]
+    public async Task ClearRewardType_WithoutReward_ReportsNoChanges()
+    {
+        var result = await Handler(new CapturingApplier())
+            .Handle(Command("clearRewardType", eventName: "Start"), CancellationToken.None);
+
+        Assert.Contains("no changes", result.Error);
+    }
+
+    [Fact]
+    public async Task AddPrereqAlternatives_MultipleTokens_AppliesOneOrLinePerToken()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier)
+            .Handle(Command("addPrereqAlternatives", eventName: "Start", tokens: ["Next", "Other"]),
+                CancellationToken.None);
+
+        Assert.True(result.Success);
+        var newText = Assert.Single(SingleDocEdit(applier).Edits).NewText;
+        Assert.Contains("<Prereq>Next</Prereq>", newText);
+        Assert.Contains("<Prereq>Other</Prereq>", newText);
+        Assert.DoesNotContain("Next Other", newText);
+    }
+
+    [Fact]
+    public async Task AddPrereqAlternatives_NoTokens_ReturnsError()
+    {
+        var result = await Handler(new CapturingApplier())
+            .Handle(Command("addPrereqAlternatives", eventName: "Start", tokens: []), CancellationToken.None);
+
+        Assert.Contains("tokens", result.Error);
     }
 
     [Fact]
@@ -394,12 +485,81 @@ public sealed class ExecuteStoryCommandHandlerTest
     // ── renameEvent delegation ───────────────────────────────────────────────
 
     [Fact]
-    public async Task RenameEvent_NonStorySymbol_ReturnsError()
+    public async Task RenameEvent_NotIndexedButInModel_RenamesViaModel()
     {
-        var result = await Handler(new CapturingApplier())
+        // Symbol indexing off (default): the event isn't an indexed symbol, so rename falls back
+        // to the campaign model — the freshly-created-event case. "Start" is defined in the model
+        // thread and referenced by "Next"'s <Prereq>Start</Prereq>, so both spots get rewritten.
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier)
             .Handle(Command("renameEvent", eventName: "Start", newName: "Renamed"), CancellationToken.None);
 
-        Assert.Contains("not an indexed story symbol", result.Error);
+        Assert.True(result.Success);
+        // The model rename uses the `changes` map (not documentChanges) — the versioned form is
+        // rejected by the client for untracked thread files.
+        Assert.Null(applier.Edit!.DocumentChanges);
+        var edits = applier.Edit!.Changes!.Single().Value.ToList();
+        Assert.Equal(2, edits.Count); // the Name attribute + the prereq reference
+
+        // APPLYING the edits must yield valid XML — a count check alone would miss an off-by-one
+        // in the model's NameRange/token ranges that corrupts the file (and makes rename "not work").
+        var renamed = ApplyLspEdits(ThreadText, edits);
+        Assert.Contains("<Event Name=\"Renamed\">", renamed);
+        Assert.Contains("<Prereq>Renamed</Prereq>", renamed);
+        Assert.DoesNotContain("Start", renamed); // no leftover of the old name
+    }
+
+    /// <summary>Applies LSP TextEdits (0-based line/char ranges) to text, last-edit-first.</summary>
+    private static string ApplyLspEdits(string text, IReadOnlyList<TextEdit> edits)
+    {
+        var lineStarts = new List<int> { 0 };
+        for (var i = 0; i < text.Length; i++)
+            if (text[i] == '\n')
+                lineStarts.Add(i + 1);
+        int Offset(Position p) => Math.Min(lineStarts[p.Line] + p.Character, text.Length);
+
+        var result = text;
+        foreach (var edit in edits.OrderByDescending(e => Offset(e.Range.Start)))
+            result = result[..Offset(edit.Range.Start)] + edit.NewText + result[Offset(edit.Range.End)..];
+        return result;
+    }
+
+    [Fact]
+    public async Task RenameEvent_ThreadIncludedTwice_EmitsEachEditOnce()
+    {
+        // The same thread referenced by two manifests must not produce duplicate (overlapping)
+        // text edits — the client rejects the whole applyEdit if a document has overlapping edits.
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier, modelService: new StubModelService(duplicateThreads: true))
+            .Handle(Command("renameEvent", eventName: "Start", newName: "Renamed"), CancellationToken.None);
+
+        Assert.True(result.Success);
+        var edits = applier.Edit!.Changes!.Single().Value.ToList();
+        Assert.Equal(2, edits.Count); // still just the Name attribute + the one prereq reference
+        var distinctRanges = edits
+            .Select(e => (e.Range.Start.Line, e.Range.Start.Character, e.Range.End.Line, e.Range.End.Character))
+            .Distinct().Count();
+        Assert.Equal(edits.Count, distinctRanges); // no duplicate/overlapping spans
+    }
+
+    [Fact]
+    public async Task RenameEvent_UnknownEvent_ReturnsError()
+    {
+        var result = await Handler(new CapturingApplier())
+            .Handle(Command("renameEvent", eventName: "Ghost", newName: "X"), CancellationToken.None);
+
+        Assert.Contains("was not found", result.Error);
+    }
+
+    [Fact]
+    public async Task RenameEvent_ToExistingName_ReturnsError()
+    {
+        var result = await Handler(new CapturingApplier())
+            .Handle(Command("renameEvent", eventName: "Start", newName: "Next"), CancellationToken.None);
+
+        Assert.Contains("already names an event", result.Error);
     }
 
     [Fact]
@@ -424,14 +584,17 @@ public sealed class ExecuteStoryCommandHandlerTest
 
     // ── fakes ────────────────────────────────────────────────────────────────
 
-    private sealed class StubModelService : IStoryModelService
+    private sealed class StubModelService(bool duplicateThreads = false) : IStoryModelService
     {
-        private static readonly StoryCampaignModel Model = BuildModel();
+        private readonly StoryCampaignModel _model = BuildModel(duplicateThreads);
 
-        private static StoryCampaignModel BuildModel()
+        private static StoryCampaignModel BuildModel(bool duplicateThreads)
         {
+            // When duplicateThreads is set the SAME thread appears twice, mimicking a file
+            // referenced by two faction manifests — the rename must still emit each edit once.
             var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
-            return new StoryCampaignModel("GC", [thread],
+            IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
+            return new StoryCampaignModel("GC", threads,
                 new HashSet<string>(StringComparer.Ordinal),
                 new StoryGraphBuilder(new EmptySchema()).Build([thread]));
         }
@@ -443,7 +606,7 @@ public sealed class ExecuteStoryCommandHandlerTest
 
         public StoryCampaignModel? GetCampaignModel(string campaignName)
         {
-            return campaignName == "GC" ? Model : null;
+            return campaignName == "GC" ? _model : null;
         }
 
         public IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri)

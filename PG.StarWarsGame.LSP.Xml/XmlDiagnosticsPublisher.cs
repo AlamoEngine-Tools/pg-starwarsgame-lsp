@@ -23,7 +23,8 @@ using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiagnosticsRevalidator, IXmlFixCache
+public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiagnosticsRevalidator, IXmlFixCache,
+    IXmlDiagnosticsCollector
 {
     private readonly IXmlDocumentFactProducer _documentProducer;
     private readonly IFileHelper _fileHelper;
@@ -153,7 +154,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         return null;
     }
 
-    protected override void PublishForDocument(string uri, string text, GameIndex index)
+    /// <summary>
+    ///     The full pipeline for one document, publish-free (<see cref="IXmlDiagnosticsCollector" />) —
+    ///     the push path below and on-demand consumers (story graph) share this body.
+    /// </summary>
+    public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
@@ -188,6 +193,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             allDiags.AddRange(_storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
         if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
             allDiags.AddRange(_storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+
+        return allDiags;
+    }
+
+    protected override void PublishForDocument(string uri, string text, GameIndex index)
+    {
+        var allDiags = Collect(uri, text, index);
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();

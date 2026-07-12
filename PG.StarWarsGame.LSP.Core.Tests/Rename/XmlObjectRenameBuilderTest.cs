@@ -111,6 +111,34 @@ public sealed class XmlObjectRenameBuilderTest
     }
 
     [Fact]
+    public void Build_StoryEventDoubleIndexed_EmitsDefinitionEditOnce()
+    {
+        // A story event is indexed BOTH as a StoryEvent symbol (matched by the column path) and as
+        // a StoryParser object (matched by the Name= nameTag path) at the SAME span. The rename must
+        // emit that definition edit once — the client rejects the whole applyEdit if a document has
+        // overlapping/duplicate text edits (the real "rename does nothing" bug).
+        var storyEvent = new GameSymbol("Story_Ev", GameSymbolKind.XmlObject, "StoryEvent",
+            new FileOrigin(XmlUri, 0, 13), null);
+        var storyParser = new GameSymbol("Story_Ev", GameSymbolKind.XmlObject, "StoryParser",
+            new FileOrigin(XmlUri, 0, 13), null);
+        var host = new FakeWorkspaceHost();
+        host.AddOrUpdate(XmlUri, "<Event Name=\"Story_Ev\"/>", 1);
+        var schema = new FakeSchemaProvider();
+        schema.RegisterType(new GameObjectTypeDefinition { TypeName = "StoryParser", NameTag = "Name" });
+        var index = BuildIndex(ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+            .Add("Story_Ev", [storyEvent, storyParser]));
+
+        var result = XmlObjectRenameBuilder.Build("Story_Ev", "Renamed_Ev", index,
+            schema, Source(host), NullLogger.Instance);
+
+        Assert.NotNull(result);
+        var edit = Assert.Single(result!.Changes![DocumentUri.From(XmlUri)]); // deduped, not two
+        Assert.Equal("Renamed_Ev", edit.NewText);
+        Assert.Equal(13, edit.Range.Start.Character);
+        Assert.Equal(21, edit.Range.End.Character);
+    }
+
+    [Fact]
     public void Build_LuaRef_IncludedInEdits()
     {
         var luaRef = new GameReference("UNIT_A", GameSymbolKind.XmlObject, null, LuaUri, 0, 7, 6);

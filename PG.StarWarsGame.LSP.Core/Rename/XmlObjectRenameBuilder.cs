@@ -106,6 +106,18 @@ public static class XmlObjectRenameBuilder
         var key = DocumentUri.From(uri);
         if (!changes.TryGetValue(key, out var list))
             changes[key] = list = [];
+        // Skip a duplicate span. A story event is indexed BOTH as a StoryEvent symbol (matched by
+        // the column path above) AND as a StoryParser object (matched by the Name= nameTag path),
+        // so its definition would be emitted twice at the same range — and the client rejects the
+        // whole applyEdit when a document carries overlapping/duplicate text edits.
+        if (list.Any(e => SameRange(e.Range, edit.Range)))
+            return;
         list.Add(edit);
+    }
+
+    private static bool SameRange(LspRange a, LspRange b)
+    {
+        return a.Start.Line == b.Start.Line && a.Start.Character == b.Start.Character
+               && a.End.Line == b.End.Line && a.End.Character == b.End.Character;
     }
 }

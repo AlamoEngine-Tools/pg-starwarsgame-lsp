@@ -84,7 +84,12 @@ public sealed record StoryGraphNodeDto(
     string? RewardType,
     string? Branch,
     string? Lifecycle,
-    bool Reachable);
+    bool Reachable,
+    IReadOnlyList<StoryParamValueDto>? EventParams = null,
+    IReadOnlyList<StoryParamValueDto>? RewardParams = null,
+    bool Perpetual = false,
+    string? StoryDialog = null,
+    int? StoryChapter = null);
 
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
@@ -139,7 +144,59 @@ public sealed record StoryParamSchemaDto(
     string? ReferenceType,
     string? EnumName,
     bool Optional,
-    string? Description);
+    string? Description,
+    // The enum's value names, shipped inline so enum params render as dropdowns without a
+    // round trip. Null for non-enum params.
+    IReadOnlyList<string>? EnumValues = null);
+
+// ── aet/getStoryParamOptions — completion candidates for one param slot ──────
+
+/// <param name="Side"><c>event</c> or <c>reward</c>.</param>
+/// <param name="TypeName">The event/reward type whose param schema applies.</param>
+/// <param name="Position">0-based param slot.</param>
+[Method("aet/getStoryParamOptions", Direction.ClientToServer)]
+public sealed record GetStoryParamOptionsParams(
+    string Campaign,
+    string Side,
+    string TypeName,
+    int Position,
+    string? Prefix = null,
+    int? Limit = null) : IRequest<GetStoryParamOptionsResult>;
+
+public sealed record GetStoryParamOptionsResult(
+    IReadOnlyList<StoryParamOptionDto> Options, string? Error = null);
+
+public sealed record StoryParamOptionDto(string Value, string? Detail = null);
+
+// ── aet/resolveStoryReference — go-to for a reference-typed param value ──────
+
+[Method("aet/resolveStoryReference", Direction.ClientToServer)]
+public sealed record ResolveStoryReferenceParams(string Value, string? ReferenceType = null)
+    : IRequest<ResolveStoryReferenceResult>;
+
+public sealed record ResolveStoryReferenceResult(
+    string? Uri = null, int Line = 0, int Column = 0, string? Error = null);
+
+// ── aet/getStoryDiagnostics — validation results correlated to graph nodes ───
+
+[Method("aet/getStoryDiagnostics", Direction.ClientToServer)]
+public sealed record GetStoryDiagnosticsParams(string Campaign) : IRequest<GetStoryDiagnosticsResult>;
+
+public sealed record GetStoryDiagnosticsResult(
+    IReadOnlyList<StoryDiagnosticDto> Diagnostics, string? Error = null);
+
+/// <param name="NodeId">The graph node the diagnostic belongs to; null for file-level problems.</param>
+/// <param name="Side"><c>event</c>/<c>reward</c> when the range falls inside a param slot.</param>
+/// <param name="Position">0-based param slot, when <paramref name="Side" /> is set.</param>
+public sealed record StoryDiagnosticDto(
+    string? NodeId,
+    string? Side,
+    int? Position,
+    string Severity,
+    string Message,
+    string Uri,
+    int Line,
+    int Column);
 
 // ── aet/getStoryLayout / aet/setStoryLayout — node position sidecar ──────────
 

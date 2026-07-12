@@ -58,4 +58,20 @@ public static class StoryReferenceTypes
     {
         return rawValue.Split([' ', '\t', ','], StringSplitOptions.RemoveEmptyEntries);
     }
+
+    /// <summary>
+    ///     Collapses a story file reference — written either xml-dir-relative
+    ///     (<c>"Story_Plots_X.xml"</c>) or game-root-relative (<c>"DATA\XML\CAMPAIGNS_X.XML"</c>)
+    ///     — to a single xml-dir-relative shape with '/' separators, preserving casing. The
+    ///     shared normal form so a reference can be correlated wherever it's written against
+    ///     wherever it's discovered.
+    /// </summary>
+    public static string NormalizeRelativePath(string reference)
+    {
+        var normalized = reference.Replace('\\', '/').TrimStart('/');
+        const string xmlPrefix = "data/xml/";
+        return normalized.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase)
+            ? normalized[xmlPrefix.Length..]
+            : normalized;
+    }
 }

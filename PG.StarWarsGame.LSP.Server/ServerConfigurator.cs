@@ -122,7 +122,15 @@ public static class ServerConfigurator
             .WithHandler<GetStoryGraphHandler>()
             .WithHandler<GetStoryNodeDetailHandler>()
             .WithHandler<GetStorySchemaHandler>()
+            .WithHandler<GetStoryParamOptionsHandler>()
+            .WithHandler<ResolveStoryReferenceHandler>()
+            .WithHandler<GetStoryDiagnosticsHandler>()
             .WithHandler<ExecuteStoryCommandHandler>()
+            .WithHandler<ApplyStoryCommandBatchHandler>()
+            .WithHandler<ValidateStoryCommandBatchHandler>()
+            .WithHandler<PreviewStoryGraphHandler>()
+            .WithHandler<GetWorkspaceSettingsHandler>()
+            .WithHandler<SetWorkspaceSettingsHandler>()
             .WithHandler<GetStoryLayoutHandler>()
             .WithHandler<SetStoryLayoutHandler>()
             .WithHandler<StorySimStartHandler>()
@@ -174,6 +182,7 @@ public static class ServerConfigurator
                 services.AddSingleton<IWorkspaceEditApplier>(sp => new FacadeWorkspaceEditApplier(
                     () => sp.GetRequiredService<ILanguageServerFacade>()));
                 services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
+                services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
                 services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
                     sp.GetRequiredService<IStoryModelService>(),
                     sp.GetRequiredService<IGameIndexService>(),
