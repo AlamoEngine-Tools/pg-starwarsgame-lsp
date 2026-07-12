@@ -43,6 +43,11 @@
           "id": "aet-localisation",
           "title": "EaWEdit: Localisation",
           "icon": "resources/icons/alamo-engine-tools.png"
+        },
+        {
+          "id": "aet-story",
+          "title": "EaWEdit: Story",
+          "icon": "resources/icons/alamo-engine-tools.png"
         }
       ]
     },
@@ -54,6 +59,29 @@
           "id": "aet-eaw-edit.lsp.localisationEditor",
           "name": "Editor",
           "when": "config.aet-eaw-edit.localisation.editorEnabled && config.aet-eaw-edit.features.tools.localisation"
+        }
+      ],
+      "aet-story": [
+        {
+          "id": "aet-eaw-edit.lsp.storyNavigator",
+          "name": "Campaigns",
+          "when": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "aet-eaw-edit.lsp.refreshStoryNavigator",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "aet-eaw-edit.lsp.openStoryGraph",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryCampaign",
+          "group": "inline"
         }
       ]
     },
@@ -93,6 +121,18 @@
         "command": "aet-eaw-edit.lsp.showEffectiveObject",
         "title": "EaWEdit: Show Effective Object (Variant Inheritance)",
         "enablement": "config.aet-eaw-edit.features.tools.variants"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openStoryGraph",
+        "title": "EaWEdit: Open Story Graph",
+        "icon": "$(type-hierarchy)",
+        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.refreshStoryNavigator",
+        "title": "EaWEdit: Refresh Story Navigator",
+        "icon": "$(refresh)",
+        "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
       }
     ],
     "configuration": [
@@ -302,7 +342,7 @@
       {
         "title": "Features",
         "type": "object",
-        "properties": { 
+        "properties": {
           "aet-eaw-edit.features.xml.completion": {
             "order": 100,
             "type": "boolean",
@@ -467,7 +507,7 @@
     "vscode:prepublish": "npm run check-types && npm run bundle -- --production",
     "bundle": "node esbuild.js",
     "compile": "tsc -p ./",
-    "check-types": "tsc -p ./ --noEmit",
+    "check-types": "tsc -p ./ --noEmit && tsc -p ./src/webview --noEmit",
     "watch": "node esbuild.js --watch",
     "watch:tsc": "tsc -p ./ --noEmit --watch",
     "pretest": "npm run compile && npm run lint",
@@ -476,20 +516,31 @@
     "package": "vsce package --no-dependencies"
   },
   "devDependencies": {
-    "@vscode/vsce": "^3.5.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "25.9.3",
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
     "@types/vscode": "^1.107.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.5.0",
     "esbuild": "^0.28.1",
     "eslint": "^10.5.0",
     "typescript": "^6.0.0"
   },
   "dependencies": {
     "@vscode/codicons": "^0.0.45",
+    "elkjs": "^0.8.2",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "rete": "^2.0.6",
+    "rete-area-plugin": "^2.3.2",
+    "rete-auto-arrange-plugin": "^2.0.2",
+    "rete-react-plugin": "^2.1.2",
+    "rete-render-utils": "^2.0.3",
+    "styled-components": "^6.4.3",
     "vscode-languageclient": "^10.0.0"
   },
   "bugs": {

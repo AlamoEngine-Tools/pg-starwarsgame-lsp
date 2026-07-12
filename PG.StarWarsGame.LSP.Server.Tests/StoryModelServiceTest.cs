@@ -45,28 +45,35 @@ public sealed class StoryModelServiceTest
     }
 
     private static (StoryModelService Service, MockFileSystem Fs, MutableIndexService Index,
-        FakeHost Host, FileHelper FileHelper) Build(
-            Dictionary<string, MockFileData>? files = null, IReadOnlyList<string>? xmlDirs = null)
+        FakeHost Host, FileHelper FileHelper, StubReloadService Reload) Build(
+            Dictionary<string, MockFileData>? files = null, IReadOnlyList<string>? xmlDirs = null,
+            bool configured = true)
     {
         var fs = new MockFileSystem(files ?? Fixture());
         var fileHelper = new FileHelper(fs);
         var index = new MutableIndexService();
         var host = new FakeHost();
         var config = WorkspaceConfiguration.Empty with { XmlDirectories = xmlDirs ?? [XmlDir] };
+        var reload = new StubReloadService(configured ? config : null);
         var service = new StoryModelService(
-            new StubReloadService(config),
+            reload,
             index,
             new SpecialDefSchemaProvider(),
             fileHelper,
             new DocumentTextSource(host, fileHelper, NullLogger<DocumentTextSource>.Instance),
             NullLogger<StoryModelService>.Instance);
-        return (service, fs, index, host, fileHelper);
+        return (service, fs, index, host, fileHelper, reload);
+    }
+
+    private static WorkspaceConfiguration DefaultConfig()
+    {
+        return WorkspaceConfiguration.Empty with { XmlDirectories = [XmlDir] };
     }
 
     [Fact]
     public void GetCampaignNames_ComesFromTheChainScan()
     {
-        var (service, _, _, _, _) = Build();
+        var (service, _, _, _, _, _) = Build();
 
         Assert.Equal(["GC_One"], service.GetCampaignNames());
     }
@@ -74,7 +81,7 @@ public sealed class StoryModelServiceTest
     [Fact]
     public void GetCampaignModel_ParsesThreadsAndMarksSuspension()
     {
-        var (service, _, _, _, fh) = Build();
+        var (service, _, _, _, fh, _) = Build();
 
         var model = service.GetCampaignModel("GC_One")!;
 
@@ -88,7 +95,7 @@ public sealed class StoryModelServiceTest
     [Fact]
     public void GetCampaignModel_UnknownCampaign_ReturnsNull()
     {
-        var (service, _, _, _, _) = Build();
+        var (service, _, _, _, _, _) = Build();
 
         Assert.Null(service.GetCampaignModel("No_Such_Campaign"));
     }
@@ -96,7 +103,7 @@ public sealed class StoryModelServiceTest
     [Fact]
     public void GetCampaignModel_NothingChanged_ReturnsCachedInstance()
     {
-        var (service, _, _, _, _) = Build();
+        var (service, _, _, _, _, _) = Build();
 
         var first = service.GetCampaignModel("GC_One");
         var second = service.GetCampaignModel("GC_One");
@@ -107,7 +114,7 @@ public sealed class StoryModelServiceTest
     [Fact]
     public void GetCampaignModel_ThreadEdited_RebuildsWithOpenBufferText()
     {
-        var (service, _, index, host, fh) = Build();
+        var (service, _, index, host, fh, _) = Build();
         var threadUri = fh.NormalizeUri(Path.Combine(XmlDir, "Story_Act_I.xml"));
         var stale = service.GetCampaignModel("GC_One")!;
 
@@ -130,7 +137,7 @@ public sealed class StoryModelServiceTest
         // copy (last xml root = highest rank) must win.
         files[Path.Combine(DepXmlDir, "Story_Act_I.xml")] =
             new MockFileData("<Story><Event Name=\"DependencyVersion\"/></Story>");
-        var (service, _, _, _, _) = Build(files, [DepXmlDir, XmlDir]);
+        var (service, _, _, _, _, _) = Build(files, [DepXmlDir, XmlDir]);
 
         var model = service.GetCampaignModel("GC_One")!;
 
@@ -141,7 +148,7 @@ public sealed class StoryModelServiceTest
     [Fact]
     public void GetModelsContaining_FindsCampaignsUsingTheThread()
     {
-        var (service, _, _, _, fh) = Build();
+        var (service, _, _, _, fh, _) = Build();
         var threadUri = fh.NormalizeUri(Path.Combine(XmlDir, "Story_Act_I.xml"));
 
         var models = service.GetModelsContaining(threadUri);
@@ -150,12 +157,39 @@ public sealed class StoryModelServiceTest
         Assert.Empty(service.GetModelsContaining("file:///elsewhere.xml"));
     }
 
+    [Fact]
+    public void GetChainResult_ScanBeforeWorkspaceConfigLoads_IsNotCached()
+    {
+        // Startup window: a client request arrives before the pipeline has published the
+        // workspace config. The scan reads nothing — that empty result must not stick.
+        var (service, _, _, _, _, reload) = Build(configured: false);
+
+        Assert.Empty(service.GetChainResult().Campaigns);
+
+        reload.LastWorkspaceConfig = DefaultConfig();
+
+        Assert.Equal(["GC_One"], service.GetCampaignNames());
+    }
+
+    [Fact]
+    public void GetInvalidatedCampaigns_AfterStartupWindowScan_ReportsCampaignsOnceResolvable()
+    {
+        // The change notifier must be able to announce campaigns that only became resolvable
+        // after startup, so the navigator's early empty answer gets corrected.
+        var (service, _, _, _, _, reload) = Build(configured: false);
+        _ = service.GetChainResult();
+
+        reload.LastWorkspaceConfig = DefaultConfig();
+
+        Assert.Equal(["GC_One"], service.GetInvalidatedCampaigns());
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
-    private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
+    private sealed class StubReloadService(WorkspaceConfiguration? config) : IModProjectReloadService
     {
         public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
+        public WorkspaceConfiguration? LastWorkspaceConfig { get; set; } = config;
         public IReadOnlyList<string>? LastWorkspaceRoots => null;
 
         public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)

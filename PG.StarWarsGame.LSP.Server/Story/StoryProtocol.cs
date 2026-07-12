@@ -41,9 +41,23 @@ public sealed record StoryFactionDto(
     string Faction,
     string ManifestFile,
     IReadOnlyList<StoryPlotThreadDto> Threads,
-    IReadOnlyList<string> LuaScripts);
+    IReadOnlyList<StoryLuaScriptDto> LuaScripts);
 
-public sealed record StoryPlotThreadDto(string File, bool Suspended);
+/// <param name="Name">Extensionless script name exactly as written in the plot manifest.</param>
+/// <param name="Uri">
+///     Canonical URI of the indexed <c>.lua</c> document, or null when no indexed script matches.
+///     Same casing rationale as <see cref="StoryPlotThreadDto.Uri" />.
+/// </param>
+public sealed record StoryLuaScriptDto(string Name, string? Uri = null);
+
+/// <param name="File">Display name exactly as written in the plot manifest (engine casing).</param>
+/// <param name="Uri">
+///     Resolved canonical document URI, or null when the chain is broken. Manifest entries and
+///     on-disk names differ in casing throughout vanilla data (the engine resolves files
+///     case-insensitively) — clients must open this URI instead of searching for
+///     <paramref name="File" />.
+/// </param>
+public sealed record StoryPlotThreadDto(string File, bool Suspended, string? Uri = null);
 
 // ── aet/getStoryGraph — filtered campaign graph ──────────────────────────────
 

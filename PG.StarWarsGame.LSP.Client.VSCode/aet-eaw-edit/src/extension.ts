@@ -16,6 +16,8 @@ import {
 	TransportKind,
 } from 'vscode-languageclient/node';
 import { LocalisationEditorViewProvider } from './localisationEditorViewProvider';
+import { StoryGraphPanel } from './storyGraphPanel';
+import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
@@ -130,6 +132,7 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 let lspClient: LanguageClient | undefined;
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
 let localisationEditorProvider: LocalisationEditorViewProvider | undefined;
+let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
 let traceChannel: vscode.LogOutputChannel | undefined;
 let log: vscode.OutputChannel | undefined;
@@ -446,11 +449,20 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		if (statusItem) {
 			statusItem.text = '$(check) EaWEdit LSP';
 		}
+		// The navigator may have rendered before the server was up (or mid-scan) and shown an
+		// empty/error state — refetch now that the workspace is fully indexed.
+		storyNavigatorProvider?.refresh();
 	});
 
 	lspClient.onNotification('aet/localisationIndexUpdated', async () => {
 		logLine('Localisation index updated — refreshing editor panel.');
 		await localisationEditorProvider?.refresh();
+	});
+
+	lspClient.onNotification('aet/storyGraphChanged', (params: { campaigns: string[] }) => {
+		logLine(`Story graph changed: ${params.campaigns.join(', ')} — refreshing story views.`);
+		storyNavigatorProvider?.refresh();
+		StoryGraphPanel.refreshInvalidated(params.campaigns ?? []);
 	});
 }
 
@@ -475,6 +487,63 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	effectiveObjectProvider = new EffectiveObjectContentProvider();
 	context.subscriptions.push(
 		vscode.workspace.registerTextDocumentContentProvider(EFFECTIVE_SCHEME, effectiveObjectProvider)
+	);
+
+	storyNavigatorProvider = new StoryNavigatorViewProvider(() => lspClient);
+	context.subscriptions.push(
+		vscode.window.registerTreeDataProvider(StoryNavigatorViewProvider.viewId, storyNavigatorProvider),
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.refreshStoryNavigator',
+			() => storyNavigatorProvider?.refresh()),
+		// Opens the read-only story graph panel. Invoked with the campaign tree item (inline icon
+		// in the navigator) or without arguments from the command palette (quick-picks a campaign).
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryGraph', async (arg?: StoryTreeItem | string) => {
+			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+			let campaign = typeof arg === 'string' ? arg : arg?.campaignName;
+			if (!campaign) {
+				let campaigns: { name: string }[] = [];
+				try {
+					const result = await lspClient.sendRequest<{ campaigns: { name: string }[]; error?: string }>(
+						'aet/getStoryPlots', {});
+					if (result.error) { vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); return; }
+					campaigns = result.campaigns ?? [];
+				} catch (e) {
+					vscode.window.showWarningMessage(`EaWEdit: cannot load story campaigns: ${e}`);
+					return;
+				}
+				if (!campaigns.length) {
+					vscode.window.showInformationMessage('EaWEdit: no story campaigns found in this workspace.');
+					return;
+				}
+				campaign = await vscode.window.showQuickPick(campaigns.map(c => c.name), {
+					title: 'Open Story Graph', placeHolder: 'Select a campaign',
+				});
+			}
+			if (campaign) { StoryGraphPanel.show(campaign, context.extensionUri, () => lspClient); }
+		}),
+		// Prefer the server-resolved URI: manifest entries and on-disk names differ in casing
+		// throughout vanilla data (the engine is case-insensitive, findFiles is not), and the
+		// file may live outside the workspace (dependency / base game). The name-based search
+		// remains as a fallback for entries the server could not resolve (broken chain links).
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryFile', async (fileName: string, uri?: string) => {
+			if (uri) {
+				try {
+					const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(uri));
+					await vscode.window.showTextDocument(doc, { preview: true });
+					return;
+				} catch {
+					// e.g. stale URI after files changed on disk — fall through to the name search.
+				}
+			}
+			if (!fileName) { return; }
+			const matches = await vscode.workspace.findFiles(`**/${fileName}`, '**/node_modules/**', 2);
+			if (!matches.length) {
+				vscode.window.showWarningMessage(
+					`EaWEdit: '${fileName}' was not found in the workspace (it may live in a dependency or the base game).`);
+				return;
+			}
+			const doc = await vscode.workspace.openTextDocument(matches[0]);
+			await vscode.window.showTextDocument(doc, { preview: true });
+		}),
 	);
 
 	statusItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 0);
@@ -790,5 +859,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 export async function deactivate(): Promise<void> {
 	logLine('Extension deactivated.');
 	statusItem?.hide();
+	StoryGraphPanel.disposeAll();
 	await stopLspClient();
 }

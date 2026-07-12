@@ -33,14 +33,16 @@ export class LocalisationEditorViewProvider implements vscode.WebviewViewProvide
         _token: vscode.CancellationToken
     ): void {
         this._view = view;
+        // Codicons are copied into out/codicons by esbuild.js — node_modules is not part of
+        // the packaged VSIX (vsce --no-dependencies), so it must never be referenced here.
         view.webview.options = {
             enableScripts: true,
             localResourceRoots: [
-                vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist')
+                vscode.Uri.joinPath(this._extensionUri, 'out', 'codicons')
             ]
         };
         const codiconUri = view.webview.asWebviewUri(
-            vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode', 'codicons', 'dist', 'codicon.css')
+            vscode.Uri.joinPath(this._extensionUri, 'out', 'codicons', 'codicon.css')
         );
         view.webview.html = this._buildHtml(codiconUri, view.webview.cspSource);
 

@@ -199,6 +199,38 @@ public sealed class XmlLayerShadowFactProducerTest
     }
 
     [Fact]
+    public void Produce_StoryEventAndStoryParserForSameElement_EmitsNoCrossTypeShadowFact()
+    {
+        // Every story event is indexed twice by design: the generic pass emits a StoryParser
+        // object symbol, the story collector a StoryEvent symbol — same element, two passes.
+        // Warning about that collision would flag every event in every story thread.
+        var parserSym = XmlSym("Reveal_Ryloth", "StoryParser", LeafUri);
+        var eventSym = XmlSym("Reveal_Ryloth", "StoryEvent", LeafUri);
+        var doc = Doc(LeafUri, 1, "Mod", parserSym, eventSym);
+        var index = BuildIndex(null, doc);
+
+        var facts = Produce(LeafUri, @"<Story><Event Name=""Reveal_Ryloth""/></Story>", index);
+
+        Assert.Empty(facts.OfType<XmlCrossTypeShadowFact>());
+    }
+
+    [Fact]
+    public void Produce_StorySymbolCollidingWithOtherType_EmitsNoCrossTypeShadowFact()
+    {
+        // SET_FLAG names double as Lua globals and story ids may match object names — story
+        // symbols coexist with other types by design, from whichever side the fact would come.
+        var unitSym = XmlSym("Shared_Name", "Unit", LeafUri);
+        var flagSym = XmlSym("Shared_Name", "StoryFlag", DepUri, 3);
+        var leafDoc = Doc(LeafUri, 1, "Mod", unitSym);
+        var depDoc = Doc(DepUri, 0, "Core", flagSym);
+        var index = BuildIndex(null, leafDoc, depDoc);
+
+        var facts = Produce(LeafUri, @"<Units><Unit Name=""Shared_Name""/></Units>", index);
+
+        Assert.Empty(facts.OfType<XmlCrossTypeShadowFact>());
+    }
+
+    [Fact]
     public void Produce_CrossTypeShadow_EmitsOnce_PerTypeCollision()
     {
         // Two separate Faction symbols from two dep docs — both TypeName="Faction"
