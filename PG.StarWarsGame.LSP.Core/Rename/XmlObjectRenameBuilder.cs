@@ -26,7 +26,9 @@ public static class XmlObjectRenameBuilder
 
         var changes = new Dictionary<DocumentUri, List<TextEdit>>();
 
-        // XML definition edits — locate the name-attribute value in the definition file.
+        // XML definition edits — locate the name-attribute value in the definition file. Symbols
+        // whose TypeName is not a schema object type (story events/flags/notifications) carry an
+        // exact value column in their origin instead; the definition edit spans the id there.
         if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
             foreach (var sym in defs)
             {
@@ -34,10 +36,22 @@ public static class XmlObjectRenameBuilder
                 var nameTag = sym.TypeName is not null
                     ? schema.GetObjectType(sym.TypeName)?.NameTag
                     : null;
-                if (nameTag is null) continue;
-                var defRange = FindNameAttributeRange(fo.Uri, fo.Line, nameTag, id, textSource);
-                if (defRange is null) continue;
-                AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = defRange });
+                if (nameTag is not null)
+                {
+                    var defRange = FindNameAttributeRange(fo.Uri, fo.Line, nameTag, id, textSource);
+                    if (defRange is null) continue;
+                    AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = defRange });
+                }
+                else if (fo.Column is { } column && StoryReferenceTypes.IsStorySymbolType(sym.TypeName))
+                {
+                    AddEdit(changes, fo.Uri, new TextEdit
+                    {
+                        NewText = newName,
+                        Range = new LspRange(
+                            new Position(fo.Line, column),
+                            new Position(fo.Line, column + id.Length))
+                    });
+                }
             }
 
         // Reference edits — use precise positions from the index (covers both XML and Lua files).

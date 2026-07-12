@@ -27,6 +27,7 @@ using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -115,6 +116,10 @@ public static class ServerConfigurator
             .WithHandler<DeleteLocalisationEntryHandler>()
             .WithHandler<AddLocalisationLanguageHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
+            .WithHandler<GetStoryPlotsHandler>()
+            .WithHandler<GetStoryGraphHandler>()
+            .WithHandler<GetStoryNodeDetailHandler>()
+            .WithHandler<GetStorySchemaHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
@@ -143,6 +148,14 @@ public static class ServerConfigurator
                 // Story campaign models (per-campaign threads + graph) and their diagnostics.
                 services.AddSingleton<IStoryModelService, StoryModelService>();
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();
+                services.AddSingleton<StoryGraphChangeNotifier>(sp =>
+                    new StoryGraphChangeNotifier(
+                        sp.GetRequiredService<IGameIndexService>(),
+                        sp.GetRequiredService<IStoryModelService>(),
+                        sp.GetRequiredService<ILspConfigurationProvider>(),
+                        p => sp.GetRequiredService<ILanguageServerFacade>()
+                            .SendNotification("aet/storyGraphChanged", p),
+                        sp.GetRequiredService<ILogger<StoryGraphChangeNotifier>>()));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
@@ -279,6 +292,7 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
                 server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
+                server.Services.GetRequiredService<Story.StoryGraphChangeNotifier>();
                 var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
                 var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
                 var reload = server.Services.GetRequiredService<IModProjectReloadService>();

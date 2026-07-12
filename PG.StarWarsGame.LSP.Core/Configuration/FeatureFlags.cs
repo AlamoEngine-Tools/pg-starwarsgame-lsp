@@ -71,6 +71,9 @@ public record StoryFeatureFlags
     ///     AI-notification ids) and thereby hover/definition/references on them.
     /// </summary>
     public bool Symbols { get; init; } = true;
+
+    /// <summary>Gates cross-language rename of story symbols (builds on <see cref="Symbols" />).</summary>
+    public bool Rename { get; init; } = true;
 }
 
 /// <summary>
@@ -95,4 +98,10 @@ public record ToolsFeatureFlags
 
     /// <summary>Gates aet/getEffectiveObject and the "show effective object" code lens.</summary>
     public bool Variants { get; init; } = true;
+
+    /// <summary>
+    ///     Gates the story editor protocol: every <c>aet/getStory*</c> endpoint and the
+    ///     <c>aet/storyGraphChanged</c> notification (builds on <c>features.story.discovery</c>).
+    /// </summary>
+    public bool StoryEditor { get; init; } = true;
 }
