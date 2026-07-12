@@ -17,6 +17,14 @@ public sealed class StoryProtocolHandlersTest
 {
     private const string ThreadUri = "file:///ws/data/xml/story_act_i.xml";
     private const string SuspendedUri = "file:///ws/data/xml/story_act_ii.xml";
+    private const string LuaUri = "file:///ws/data/scripts/story/story_lua.lua";
+
+    private static FiringIndexService Index()
+    {
+        var documents = GameIndex.Empty.Documents.Add(
+            LuaUri, new DocumentIndex(LuaUri, 1, [], []));
+        return new FiringIndexService { Current = GameIndex.Empty with { Documents = documents } };
+    }
 
     private static ILspConfigurationProvider Config(bool storyEditor = true, bool discovery = true)
     {
@@ -37,7 +45,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryPlots_ReturnsCampaignFactionManifestTree()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Config())
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -45,15 +53,39 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal("GC", campaign.Name);
         var faction = Assert.Single(campaign.Factions);
         Assert.Equal("Rebel", faction.Faction);
-        Assert.Equal(["Story_Lua"], faction.LuaScripts);
+        Assert.Equal(["Story_Lua"], faction.LuaScripts.Select(s => s.Name));
         Assert.Equal([("Story_Act_I.xml", false), ("Story_Act_II.xml", true)],
             faction.Threads.Select(t => (t.File, t.Suspended)));
     }
 
     [Fact]
+    public async Task GetStoryPlots_ResolvesLuaScriptUrisFromTheIndex()
+    {
+        // Manifest Lua_Script entries are extensionless engine-cased names ("Story_Lua"); the
+        // indexed document is lowercase with extension. Unindexed scripts resolve to null.
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
+        Assert.Equal([LuaUri], faction.LuaScripts.Select(s => s.Uri));
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_ResolvesThreadUrisCaseInsensitively()
+    {
+        // Manifest entries carry engine casing ("Story_Act_I.xml"); canonical thread URIs are
+        // lowercase. The client must receive the resolved URI — it cannot search case-insensitively.
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        var faction = Assert.Single(Assert.Single(result.Campaigns).Factions);
+        Assert.Equal([ThreadUri, SuspendedUri], faction.Threads.Select(t => t.Uri));
+    }
+
+    [Fact]
     public async Task GetStoryPlots_StoryEditorOff_ReturnsDisabledMessage()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Config(storyEditor: false))
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config(storyEditor: false))
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
@@ -63,7 +95,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryPlots_DiscoveryOff_NamesTheMissingPrerequisite()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Config(discovery: false))
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config(discovery: false))
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DiscoveryMissingMessage, result.Error);
@@ -274,7 +306,7 @@ public sealed class StoryProtocolHandlersTest
 
     private sealed class FiringIndexService : IGameIndexService
     {
-        public GameIndex Current => GameIndex.Empty;
+        public GameIndex Current { get; init; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
 
         public event Action<ILocalisationIndex>? LocalisationChanged

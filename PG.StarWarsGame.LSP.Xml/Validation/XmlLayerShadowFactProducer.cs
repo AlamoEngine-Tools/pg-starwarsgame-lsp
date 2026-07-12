@@ -4,6 +4,7 @@
 using System.Text.RegularExpressions;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -40,8 +41,13 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
                 }
             }
 
-            // Cross-type shadow: same Id defined with a different TypeName anywhere in the workspace
+            // Cross-type shadow: same Id defined with a different TypeName anywhere in the workspace.
+            // Story symbols are exempt from both sides: every story event is indexed twice by design
+            // (generic StoryParser object symbol + StoryEvent symbol for the same element), and
+            // SET_FLAG names double as Lua globals — mirrors the duplicate/unresolved exemptions
+            // in XmlIndexFactProducer.
             if (sym.TypeName is null) continue;
+            if (StoryReferenceTypes.IsStorySymbolType(sym.TypeName)) continue;
 
             // Only emit from the highest-rank definition of each (Id, TypeName) pair to avoid
             // double-warnings when both sides of the collision are indexed workspace documents
@@ -55,7 +61,8 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
 
             var collidingTypes = allDefs
                 .Where(s => !string.Equals(s.TypeName, sym.TypeName, StringComparison.OrdinalIgnoreCase)
-                            && s.TypeName is not null)
+                            && s.TypeName is not null
+                            && !StoryReferenceTypes.IsStorySymbolType(s.TypeName))
                 .Select(s => s.TypeName!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();

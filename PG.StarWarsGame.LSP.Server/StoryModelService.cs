@@ -52,6 +52,11 @@ public sealed class StoryModelService : IStoryModelService
     private ChainCache? _chain;
     private readonly Dictionary<string, ModelCache> _models = new(StringComparer.OrdinalIgnoreCase);
 
+    // True after a request was answered from a scan that read no documents (startup window:
+    // workspace config/schema not yet published). Such an answer was served to a client, so
+    // index changes must re-trigger a scan even though no chain is cached.
+    private bool _servedIncompleteScan;
+
     public StoryModelService(
         IModProjectReloadService reloadService,
         IGameIndexService indexService,
@@ -121,20 +126,26 @@ public sealed class StoryModelService : IStoryModelService
 
     public IReadOnlyList<string> GetInvalidatedCampaigns()
     {
+        List<string> invalidated;
         lock (_gate)
         {
-            if (_chain is null) return [];
-            if (!VersionsMatch(_chain.DocumentVersions))
-                return _chain.Result.Campaigns
-                    .Select(c => c.Name)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
+            if (_chain is null && !_servedIncompleteScan) return [];
+
+            if (_chain is not null && VersionsMatch(_chain.DocumentVersions))
+                return _models
+                    .Where(kvp => !VersionsMatch(kvp.Value.DocumentVersions))
+                    .Select(kvp => kvp.Value.Model.CampaignName)
                     .ToList();
 
-            return _models
-                .Where(kvp => !VersionsMatch(kvp.Value.DocumentVersions))
-                .Select(kvp => kvp.Value.Model.CampaignName)
-                .ToList();
+            invalidated = _chain?.Result.Campaigns.Select(c => c.Name).ToList() ?? [];
         }
+
+        // The chain is stale — or a client was answered from an incomplete startup-window scan.
+        // Rescanning here is cheap (a handful of registry/manifest reads) and lets the change
+        // notification name campaigns that only became resolvable after startup finished. The
+        // old names stay included so clients holding a since-renamed campaign refresh too.
+        invalidated.AddRange(GetChain().Result.Campaigns.Select(c => c.Name));
+        return invalidated.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     // ── Chain scan (campaign → manifest → thread associations) ───────────────
@@ -158,10 +169,27 @@ public sealed class StoryModelService : IStoryModelService
         }
 
         var chain = new ChainCache(result, resolver.Versions);
+
+        // A scan that read nothing must not be cached: an empty version map matches every
+        // future index state, which would pin the empty result forever. This happens inside
+        // the startup window (workspace config / schema not yet published) and in workspaces
+        // without story data — in both cases the next access simply rescans (cheap: nothing
+        // was readable).
+        if (resolver.Versions.Count == 0)
+        {
+            lock (_gate)
+            {
+                _servedIncompleteScan = true;
+            }
+
+            return chain;
+        }
+
         lock (_gate)
         {
             _chain = chain;
             _models.Clear();
+            _servedIncompleteScan = false;
         }
 
         return chain;

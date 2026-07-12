@@ -4,13 +4,17 @@
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
-public sealed class GetStoryPlotsHandler(IStoryModelService modelService, ILspConfigurationProvider config)
+public sealed class GetStoryPlotsHandler(
+    IStoryModelService modelService,
+    IGameIndexService indexService,
+    ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetStoryPlotsParams, GetStoryPlotsResult>
 {
     public Task<GetStoryPlotsResult> Handle(GetStoryPlotsParams request, CancellationToken ct)
@@ -26,26 +30,50 @@ public sealed class GetStoryPlotsHandler(IStoryModelService modelService, ILspCo
         var campaigns = new List<StoryCampaignDto>();
         foreach (var campaign in chain.Campaigns)
         {
-            var suspended = modelService.GetCampaignModel(campaign.Name)?.SuspendedThreadUris;
+            var model = modelService.GetCampaignModel(campaign.Name);
+            // Manifest entries use engine casing; canonical thread URIs are lowercase.
+            string? ResolveUri(string thread)
+            {
+                return model?.Threads.FirstOrDefault(t => t.DocumentUri.EndsWith(
+                    "/" + thread.ToLowerInvariant(), StringComparison.Ordinal))?.DocumentUri;
+            }
+
             var factions = new List<StoryFactionDto>();
             foreach (var faction in campaign.FactionManifests)
             {
                 manifestsByFile.TryGetValue(faction.ManifestFile, out var contents);
                 var threads = new List<StoryPlotThreadDto>();
                 foreach (var thread in contents?.ActiveThreads ?? [])
-                    threads.Add(new StoryPlotThreadDto(thread, Suspended: false));
+                    threads.Add(new StoryPlotThreadDto(thread, Suspended: false, ResolveUri(thread)));
                 foreach (var thread in contents?.SuspendedThreads ?? [])
+                {
+                    var uri = ResolveUri(thread);
                     threads.Add(new StoryPlotThreadDto(thread,
-                        Suspended: suspended is null || suspended.Any(uri =>
-                            uri.EndsWith("/" + thread.ToLowerInvariant(), StringComparison.Ordinal))));
+                        Suspended: uri is null || model!.SuspendedThreadUris.Contains(uri), uri));
+                }
+
+                var luaScripts = new List<StoryLuaScriptDto>();
+                foreach (var script in contents?.LuaScripts ?? [])
+                    luaScripts.Add(new StoryLuaScriptDto(script, ResolveLuaUri(script)));
                 factions.Add(new StoryFactionDto(faction.Faction, faction.ManifestFile,
-                    threads, contents?.LuaScripts ?? []));
+                    threads, luaScripts));
             }
 
             campaigns.Add(new StoryCampaignDto(campaign.Name, factions));
         }
 
         return Task.FromResult(new GetStoryPlotsResult(campaigns));
+    }
+
+    // Manifest Lua_Script entries are extensionless engine-cased names; indexed lua documents
+    // are keyed by lowercase canonical URI.
+    private string? ResolveLuaUri(string script)
+    {
+        var fileName = script.ToLowerInvariant();
+        if (!fileName.EndsWith(".lua", StringComparison.Ordinal)) fileName += ".lua";
+        var suffix = "/" + fileName;
+        return indexService.Current.Documents.Keys
+            .FirstOrDefault(uri => uri.EndsWith(suffix, StringComparison.Ordinal));
     }
 }
 

@@ -4,6 +4,8 @@
 
 ### Features
 
+- Story navigator & graph viewer (opt-in via `aet-eaw-edit.features.tools.storyEditor` + `aet-eaw-edit.features.story.discovery`): a new *EaWEdit: Story* activity-bar view lists every campaign → faction → plot threads and attached Lua scripts (suspended threads marked; clicking opens the file). The graph icon on a campaign — or the *EaWEdit: Open Story Graph* command — opens a read-only graph panel: auto-laid-out event flow with AND/OR junctions, cross-file portals and tactical plots, node colours by lifecycle (inactive/waiting/armed/fired/disabled), dimmed unreachable events, and dashed borders on schema-untested event/reward types. A toolbar filters by name, branch and lifecycle; selecting an event shows its full property view with *Open XML* (jumps to the event block) and *Reachable from here* (trims the graph to everything downstream). The view refreshes live as story files are edited. See [#87](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/87).
+
 - Cross-language story rename (opt-in via `aet-eaw-edit.features.story.rename`, builds on story symbols): renaming a story event, flag, or AI-notification id — from XML or from Lua — updates the definition and every reference across story threads and scripts in one workspace edit. Guard rails match engine semantics: an event name defined more than once in the workspace is rejected instead of mass-renamed (disambiguate first), and story flag names are capped at the engine's 31-character limit. See [#85](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/85).
 
 - Story editor protocol surface (opt-in via `aet-eaw-edit.features.tools.storyEditor`, builds on story discovery): the server now answers `aet/getStoryPlots` (campaign → faction → plot-thread tree), `aet/getStoryGraph` (per-campaign event graph with lifecycle states and name/branch/lifecycle/reachable-from filters), `aet/getStoryNodeDetail` (full event payload), and `aet/getStorySchema` (event/reward type catalogue), and pushes a debounced `aet/storyGraphChanged` notification when edits invalidate a campaign model. This is the data backbone for the upcoming story graph editor; the requests carry a friendly error naming the exact setting to flip when disabled. See [#86](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/86).
@@ -14,6 +16,10 @@
 
 - Campaign story-chain discovery (opt-in via `aet-eaw-edit.features.story.discovery`): campaigns, story plot manifests, and story thread files are followed from `CampaignFiles.xml` and typed, activating story event/reward parameter validation and completion in story files. Broken links in the chain (a `*_Story_Name` or plot entry pointing at a missing file, tactical plot references, malformed manifests) are reported as diagnostics on the referencing line. See [#82](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/82).
 - Story-dialog language service (opt-in via `aet-eaw-edit.features.dialog.diagnostics`): dialog `.txt` scripts get diagnostics — unknown commands, wrong argument counts and types, warnings for documented-but-untested commands, and reference checks for localisation keys (`TEXT`/`TITLE`), speech events (`DIALOG`), movies (`MOVIE`/`MOVIE_ONCE`) and sound events (`SFX`). Which `.txt` files are dialog scripts is declared in the `.pgproj` via the new `directories.storyDialog` node — filename conventions play no part. Story events cross-check too: a `Story_Dialog` that doesn't resolve inside the declared scope and a `Story_Chapter` pointing at a chapter the script doesn't define are flagged. See [#89](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/89).
+
+### Bug fixes
+
+- Localisation editor icons (the search-mode toggles and the reset-to-inherited gutter arrows) now appear in the packaged extension. They were loaded from `node_modules`, which is not part of the published VSIX, so they only showed up when running the extension from source.
 
 ## 0.2.0
 

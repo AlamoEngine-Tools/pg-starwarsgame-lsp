@@ -12,4 +12,5 @@ out/localisationEditorViewProvider.js
 **/eslint.config.mjs
 **/*.map
 **/*.ts
+**/*.tsx
 **/.vscode-test.*
