@@ -201,12 +201,14 @@ function resolveFeatureFlags() {
 		},
 		tools: {
 			localisation: flag('tools.localisation', false),
+			storyEditor:  flag('tools.storyEditor', false),
 			variants:     flag('tools.variants', true),
 		},
 		story: {
 			discovery:        flag('story.discovery', false),
 			graphDiagnostics: flag('story.graphDiagnostics', false),
 			symbols:          flag('story.symbols', false),
+			rename:           flag('story.rename', false),
 		},
 		dialog: {
 			diagnostics: flag('dialog.diagnostics', false),

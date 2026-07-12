@@ -19,6 +19,16 @@ public interface IStoryModelService
 
     /// <summary>Every campaign model whose thread closure contains the given document.</summary>
     IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri);
+
+    /// <summary>The current chain scan (campaign → faction → manifest → thread associations).</summary>
+    StoryChainScanResult GetChainResult();
+
+    /// <summary>
+    ///     Campaign names whose cached model no longer matches the current index (or every
+    ///     campaign when the chain itself went stale) — without rebuilding anything. Feeds the
+    ///     <c>aet/storyGraphChanged</c> notification.
+    /// </summary>
+    IReadOnlyList<string> GetInvalidatedCampaigns();
 }
 
 /// <summary>
@@ -102,6 +112,29 @@ public sealed class StoryModelService : IStoryModelService
                 && model.Threads.Any(t => string.Equals(t.DocumentUri, canonicalUri, StringComparison.Ordinal)))
                 result.Add(model);
         return result;
+    }
+
+    public StoryChainScanResult GetChainResult()
+    {
+        return GetChain().Result;
+    }
+
+    public IReadOnlyList<string> GetInvalidatedCampaigns()
+    {
+        lock (_gate)
+        {
+            if (_chain is null) return [];
+            if (!VersionsMatch(_chain.DocumentVersions))
+                return _chain.Result.Campaigns
+                    .Select(c => c.Name)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+            return _models
+                .Where(kvp => !VersionsMatch(kvp.Value.DocumentVersions))
+                .Select(kvp => kvp.Value.Model.CampaignName)
+                .ToList();
+        }
     }
 
     // ── Chain scan (campaign → manifest → thread associations) ───────────────

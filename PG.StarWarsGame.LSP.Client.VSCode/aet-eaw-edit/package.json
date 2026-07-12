@@ -429,6 +429,12 @@
             "default": false,
             "markdownDescription": "Enables cross-language story symbol indexing: story event names, flags, and AI-notification ids become navigable symbols across XML story threads and Lua scripts (hover, go-to-definition, find references).\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery, story files are not typed and nothing is indexed.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.story.rename": {
+            "order": 1858,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables cross-language story symbol rename: renaming a story event, flag, or AI-notification id updates every XML and Lua occurrence in the workspace. Ambiguous event names (defined more than once) are rejected instead of mass-renamed.\n\nBuilds on `#aet-eaw-edit.features.story.symbols#` — without symbol indexing there is nothing to rename.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.dialog.diagnostics": {
             "order": 1860,
             "type": "boolean",
@@ -440,6 +446,12 @@
             "type": "boolean",
             "default": false,
             "markdownDescription": "Enables the localisation tooling: the localisation editor panel's data source, the initialise/import commands, and the create-key code action.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.tools.storyEditor": {
+            "order": 1950,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the story editor protocol surface: the `aet/getStoryPlots`, `aet/getStoryGraph`, `aet/getStoryNodeDetail`, and `aet/getStorySchema` requests plus the `aet/storyGraphChanged` change notification.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery there are no campaigns to serve.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.tools.variants": {
             "order": 2000,

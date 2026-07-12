@@ -48,7 +48,12 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         // Try game-object reference first (cursor on a string literal whose value is a known XmlObject).
         var xmlObjectId = FindXmlObjectAtCursor(parsed.Tree, request.Position.Line, request.Position.Character, index);
         if (xmlObjectId is not null)
+        {
+            if (StoryRenameGuard.IsStorySymbol(xmlObjectId, index) &&
+                StoryRenameGuard.Check(xmlObjectId, request.NewName, index) is { } objection)
+                throw new InvalidOperationException(objection);
             return XmlObjectRenameBuilder.Build(xmlObjectId, request.NewName, index, _schema, _textSource, _logger);
+        }
 
         // Fall back to Lua global (cursor on an identifier that is a known LuaGlobal).
         var luaGlobalId = FindLuaGlobalAtCursor(parsed.Tree, request.Position.Line, request.Position.Character,

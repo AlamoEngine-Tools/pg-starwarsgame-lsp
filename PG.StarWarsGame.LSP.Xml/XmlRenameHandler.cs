@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -13,21 +14,25 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlRenameHandler : IXmlRenameProvider
 {
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly ILogger<XmlRenameHandler> _logger;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
 
+    // A null configProvider (test convenience) means every feature flag reads as enabled.
     public XmlRenameHandler(
         IEaWXmlContext eaWXmlContext,
         IDocumentTextSource textSource,
         ISchemaProvider schema,
-        ILogger<XmlRenameHandler> logger)
+        ILogger<XmlRenameHandler> logger,
+        ILspConfigurationProvider? configProvider = null)
     {
         _eaWXmlContext = eaWXmlContext;
         _textSource = textSource;
         _schema = schema;
         _logger = logger;
+        _configProvider = configProvider;
     }
 
     public WorkspaceEdit? HandleRename(string uri, RenameParams request, GameIndex index)
@@ -42,6 +47,13 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
             return DynamicEnumValueRenameBuilder.Build(enumName, valueName, request.NewName, index, _textSource,
                 _logger);
 
+        if (StoryRenameGuard.IsStorySymbol(hit.Value.Id, index))
+        {
+            if (!(_configProvider?.Current.Features.Story.Rename ?? true)) return null;
+            if (StoryRenameGuard.Check(hit.Value.Id, request.NewName, index) is { } objection)
+                throw new InvalidOperationException(objection);
+        }
+
         return XmlObjectRenameBuilder.Build(hit.Value.Id, request.NewName, index, _schema, _textSource, _logger);
     }
 
@@ -52,6 +64,13 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
 
         var hit = XmlPositionResolver.FindAtPosition(docIndex, line, character);
         if (hit is null) return null;
+
+        if (StoryRenameGuard.IsStorySymbol(hit.Value.Id, index))
+        {
+            if (!(_configProvider?.Current.Features.Story.Rename ?? true)) return null;
+            if (StoryRenameGuard.Check(hit.Value.Id, null, index) is { } objection)
+                throw new InvalidOperationException(objection);
+        }
 
         if (TryParseEnumValueId(hit.Value.Id, out var enumName, out var valueName))
         {

@@ -3,6 +3,8 @@
 
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Story.Discovery;
+using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
@@ -55,12 +57,22 @@ public sealed class StoryGraphDiagnosticsServiceTest
                 "<Story><Event Name=\"B\"><Prereq>Ghost</Prereq></Event></Story>", ThreadUri);
             return new StoryCampaignModel(campaignName, [thread],
                 new HashSet<string>(StringComparer.Ordinal),
-                new Story.Graph.StoryGraphBuilder(new EmptySchema()).Build([thread]));
+                new StoryGraphBuilder(new EmptySchema()).Build([thread]));
         }
 
         public IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri)
         {
             return GetCampaignNames().Select(GetCampaignModel).Where(m => m is not null).ToList()!;
+        }
+
+        public StoryChainScanResult GetChainResult()
+        {
+            return StoryChainScanResult.Empty;
+        }
+
+        public IReadOnlyList<string> GetInvalidatedCampaigns()
+        {
+            return [];
         }
     }
 
