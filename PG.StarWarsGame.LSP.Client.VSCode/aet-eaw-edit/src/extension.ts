@@ -214,7 +214,9 @@ function resolveFeatureFlags() {
 			rename:           flag('story.rename', false),
 		},
 		dialog: {
-			diagnostics: flag('dialog.diagnostics', false),
+			diagnostics:    flag('dialog.diagnostics', false),
+			inlayHints:     flag('dialog.inlayHints', false),
+			goToDefinition: flag('dialog.goToDefinition', false),
 		},
 	};
 }

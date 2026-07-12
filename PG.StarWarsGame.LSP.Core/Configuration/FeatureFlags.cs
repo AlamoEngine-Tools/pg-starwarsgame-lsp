@@ -88,6 +88,12 @@ public record DialogFeatureFlags
     ///     cross-checks.
     /// </summary>
     public bool Diagnostics { get; init; } = true;
+
+    /// <summary>Gates end-of-line translated-text hints for localisation-key arguments (TEXT/TITLE).</summary>
+    public bool InlayHints { get; init; } = true;
+
+    /// <summary>Gates go-to-definition on object-reference arguments (speech events, movies, SFX events).</summary>
+    public bool GoToDefinition { get; init; } = true;
 }
 
 /// <summary>Flags for cross-language tooling endpoints.</summary>

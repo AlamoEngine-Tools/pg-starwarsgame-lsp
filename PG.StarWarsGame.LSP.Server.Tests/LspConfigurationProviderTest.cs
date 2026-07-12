@@ -277,6 +277,26 @@ public sealed class LspConfigurationProviderTest : IDisposable
     }
 
     [Fact]
+    public void LoadFrom_DialogInlayHintsDisabled_ParsesFromCamelCaseNode()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { dialog = new { inlayHints = false } } }));
+
+        Assert.False(provider.Current.Features.Dialog.InlayHints);
+        Assert.True(provider.Current.Features.Dialog.Diagnostics);
+    }
+
+    [Fact]
+    public void LoadFrom_DialogGoToDefinitionDisabled_ParsesFromCamelCaseNode()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { dialog = new { goToDefinition = false } } }));
+
+        Assert.False(provider.Current.Features.Dialog.GoToDefinition);
+        Assert.True(provider.Current.Features.Dialog.InlayHints);
+    }
+
+    [Fact]
     public void LoadFrom_StoryRenameDisabled_ParsesFromCamelCaseNode()
     {
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
