@@ -110,4 +110,10 @@ public record ToolsFeatureFlags
     ///     <c>aet/storyGraphChanged</c> notification (builds on <c>features.story.discovery</c>).
     /// </summary>
     public bool StoryEditor { get; init; } = true;
+
+    /// <summary>
+    ///     Gates the story simulator: every <c>aet/storySim*</c> endpoint and the
+    ///     <c>aet/storySimChanged</c> notification (builds on <c>features.story.discovery</c>).
+    /// </summary>
+    public bool StorySimulator { get; init; } = true;
 }

@@ -115,8 +115,40 @@ export class StoryGraphPanel {
                 case 'saveLayout':
                     await this._saveLayout(msg.entries as StoryLayoutEntryDto[]);
                     break;
+                case 'sim':
+                    await this._runSim(msg.method as string, msg.args as Record<string, unknown> | undefined);
+                    break;
             }
         });
+    }
+
+    /** Called on `aet/storySimChanged` — the panel's webview re-fetches the sim state. */
+    static simChanged(campaign: string): void {
+        StoryGraphPanel._panels.get(campaign)?._post({ type: 'simChanged' });
+    }
+
+    /**
+     * Forwards a simulation request (`start`, `stop`, `getState`, `satisfyTrigger`, `setFlag`,
+     * `advanceClock`, `luaNotify`) and posts the resulting state document back.
+     */
+    private async _runSim(method: string, args: Record<string, unknown> | undefined): Promise<void> {
+        const client = this._getLspClient();
+        if (!client) {
+            void vscode.window.showWarningMessage('EaWEdit LSP: server is not running.');
+            return;
+        }
+        const requestName = 'aet/storySim' + method.charAt(0).toUpperCase() + method.slice(1);
+        try {
+            const result = await client.sendRequest<{ state?: unknown; error?: string | null }>(
+                requestName, { campaign: this._campaign, ...(args ?? {}) });
+            if (result.error) {
+                void vscode.window.showErrorMessage(`EaWEdit: ${result.error}`);
+                return;
+            }
+            this._post({ type: 'simState', state: result.state ?? null });
+        } catch (e) {
+            void vscode.window.showErrorMessage(`EaWEdit: simulation request failed: ${e}`);
+        }
     }
 
     /**

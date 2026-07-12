@@ -505,6 +505,12 @@
             "default": false,
             "markdownDescription": "Enables the story editor protocol surface: the `aet/getStoryPlots`, `aet/getStoryGraph`, `aet/getStoryNodeDetail`, and `aet/getStorySchema` requests plus the `aet/storyGraphChanged` change notification.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery there are no campaigns to serve.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.tools.storySimulator": {
+            "order": 1960,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the story simulator inside the story graph panel: semantic simulation sessions with a virtual clock, flag inspector, and manual intervention points for Lua notifications and tactical outcomes — no game process involved.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` and pairs with `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.tools.variants": {
             "order": 2000,
             "type": "boolean",

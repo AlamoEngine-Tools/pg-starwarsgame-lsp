@@ -38,6 +38,19 @@ interface StoryNodeDetailDto {
 }
 interface StoryLayoutEntry { file: string; eventName: string; x: number; y: number; }
 interface GraphFilters { nameFilter: string; branch: string; lifecycle: string; reachableFrom: string; }
+interface SimFlag { name: string; value: number; }
+interface SimNodeState { nodeId: string; lifecycle: string; }
+interface SimIntervention {
+    kind: string; nodeId: string; eventName: string; eventType?: string | null; options: string[];
+}
+interface SimState {
+    running: boolean; clock: number; flags: SimFlag[]; nodes: SimNodeState[];
+    interventions: SimIntervention[]; luaNotifications: string[]; log: string[];
+}
+
+function sendSim(method: string, args?: Record<string, unknown>): void {
+    vscode.postMessage({ type: 'sim', method, args });
+}
 
 const EMPTY_FILTERS: GraphFilters = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
 
@@ -91,6 +104,8 @@ type AreaExtra = ReactArea2D<Schemes>;
 
 interface EditorHandle {
     setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]): Promise<void>;
+    /** Overrides node lifecycles from the simulation (null restores the static analysis view). */
+    applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void;
     fit(): void;
     destroy(): void;
 }
@@ -174,10 +189,15 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         return context;
     });
 
+    // Original (static analysis) lifecycles, so ending a simulation restores the pre-sim view.
+    const staticLifecycles = new Map<string, string | null | undefined>();
+
     return {
         async setGraph(
             nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
         ): Promise<void> {
+            staticLifecycles.clear();
+            for (const dto of nodes) { staticLifecycles.set(dto.id, dto.lifecycle); }
             applyingServerGraph = true;
             try {
                 await editor.clear();
@@ -210,6 +230,18 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 void AreaExtensions.zoomAt(area, editor.getNodes());
             } finally {
                 applyingServerGraph = false;
+            }
+        },
+        applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void {
+            for (const node of editor.getNodes()) {
+                if (node.dto.kind !== 'Event') { continue; }
+                const next = byNodeId
+                    ? byNodeId.get(node.id) ?? node.dto.lifecycle
+                    : staticLifecycles.get(node.id);
+                if (next !== node.dto.lifecycle) {
+                    node.dto.lifecycle = next ?? null;
+                    void area.update('node', node.id);
+                }
             }
         },
         fit(): void {
@@ -466,6 +498,33 @@ const Shell = styled.div`
     .detail .actions { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
     .detail p.hint { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 6px; }
 
+    .simbar {
+        display: flex;
+        gap: 12px;
+        max-height: 180px;
+        overflow: hidden;
+        padding: 6px 8px;
+        background: var(--vscode-sideBar-background);
+        border-top: 1px solid var(--vscode-panel-border);
+        flex-shrink: 0;
+        font-size: 12px;
+    }
+    .sim-section { min-width: 140px; overflow-y: auto; }
+    .sim-section.sim-log { flex: 1; font-size: 11px; color: var(--vscode-descriptionForeground); }
+    .sim-head { font-weight: bold; margin-bottom: 3px; }
+    .sim-row { display: flex; gap: 4px; align-items: center; margin: 2px 0; }
+    .sim-row input[type=text] { width: 90px; flex: none; }
+    .sim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+    .sim-kind {
+        font-size: 10px;
+        padding: 0 4px;
+        border-radius: 3px;
+        border: 1px solid var(--vscode-panel-border);
+        color: var(--vscode-descriptionForeground);
+    }
+    .sim-kind.k-lua      { border-color: var(--vscode-charts-blue, #3794ff); }
+    .sim-kind.k-tactical { border-color: var(--vscode-charts-yellow, #cca700); }
+
     .legend {
         padding: 2px 8px;
         display: flex;
@@ -516,6 +575,18 @@ function App(): JSX.Element {
     const [detail, setDetail] = useState<Detail>(null);
     const [status, setStatus] = useState<string | null>('Loading story graph…');
     const [createOpen, setCreateOpen] = useState(false);
+    const [simState, setSimState] = useState<SimState | null>(null);
+    const simRef = useRef<SimState | null>(null);
+
+    const applySimOverlay = useCallback((state: SimState | null) => {
+        simRef.current = state;
+        setSimState(state);
+        const handle = editorRef.current;
+        if (!handle) { return; }
+        handle.applyLifecycles(state?.running
+            ? new Map(state.nodes.map(n => [n.nodeId, n.lifecycle]))
+            : null);
+    }, []);
 
     const fetchGraph = useCallback((next: GraphFilters) => {
         filtersRef.current = next;
@@ -575,6 +646,14 @@ function App(): JSX.Element {
                         (msg.nodes as StoryGraphNodeDto[] | undefined) ?? [],
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
                         (msg.layout as StoryLayoutEntry[] | undefined) ?? []);
+                    // A running simulation keeps painting its lifecycles over fresh renders.
+                    if (simRef.current?.running) { applySimOverlay(simRef.current); }
+                    break;
+                case 'simState':
+                    applySimOverlay((msg.state as SimState | null) ?? null);
+                    break;
+                case 'simChanged':
+                    sendSim('getState');
                     break;
                 case 'detail': {
                     const node = msg.node as StoryNodeDetailDto | null;
@@ -594,7 +673,7 @@ function App(): JSX.Element {
         window.addEventListener('message', onMessage);
         vscode.postMessage({ type: 'ready' });
         return () => window.removeEventListener('message', onMessage);
-    }, [applyGraph]);
+    }, [applyGraph, applySimOverlay]);
 
     useEffect(() => {
         const container = containerRef.current;
@@ -650,6 +729,9 @@ function App(): JSX.Element {
                 <button className="primary" onClick={() => setCreateOpen(v => !v)} title="Create a new story event">
                     ＋ Event
                 </button>
+                {simState?.running
+                    ? <button className="danger" onClick={() => sendSim('stop')} title="End the simulation">■ Stop sim</button>
+                    : <button onClick={() => sendSim('start')} title="Simulate this campaign's story">▶ Simulate</button>}
                 <button onClick={() => editorRef.current?.fit()} title="Fit graph to view">Fit</button>
             </div>
             {createOpen ? (
@@ -672,6 +754,7 @@ function App(): JSX.Element {
                     />
                 ) : null}
             </div>
+            {simState?.running ? <SimBar state={simState} /> : null}
             <div className="legend">
                 <span><span className="swatch" style={{ borderColor: 'var(--vscode-disabledForeground, #888)' }} />Inactive</span>
                 <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-blue, #3794ff)' }} />Waiting</span>
@@ -682,6 +765,84 @@ function App(): JSX.Element {
                 <span>drag socket→socket = prereq</span>
             </div>
         </Shell>
+    );
+}
+
+/** The running simulation: clock, flag inspector, intervention queue, and the step log. */
+function SimBar(props: { state: SimState }): JSX.Element {
+    const state = props.state;
+    const [advanceBy, setAdvanceBy] = useState('10');
+    const [flagName, setFlagName] = useState('');
+
+    return (
+        <div className="simbar">
+            <div className="sim-section">
+                <div className="sim-head">⏱ {state.clock.toFixed(0)}s</div>
+                <div className="sim-row">
+                    <input type="text" value={advanceBy} onChange={e => setAdvanceBy(e.target.value)} title="Seconds" />
+                    <button onClick={() => {
+                        const seconds = Number(advanceBy);
+                        if (seconds > 0) { sendSim('advanceClock', { seconds }); }
+                    }}>Advance</button>
+                </div>
+            </div>
+            <div className="sim-section">
+                <div className="sim-head">Flags</div>
+                {state.flags.map(f => (
+                    <div className="sim-row" key={f.name}>
+                        <span className="sim-name" title={f.name}>{f.name}</span>
+                        <button onClick={() => sendSim('setFlag', { flag: f.name, value: f.value !== 0 ? 0 : 1 })}>
+                            {f.value !== 0 ? '1 → 0' : '0 → 1'}
+                        </button>
+                    </div>
+                ))}
+                <div className="sim-row">
+                    <input
+                        type="text" placeholder="Set flag…" value={flagName}
+                        onChange={e => setFlagName(e.target.value)}
+                        onKeyDown={e => {
+                            if (e.key === 'Enter' && flagName.trim()) {
+                                sendSim('setFlag', { flag: flagName.trim(), value: 1 });
+                                setFlagName('');
+                            }
+                        }}
+                    />
+                </div>
+            </div>
+            <div className="sim-section">
+                <div className="sim-head">Waiting on</div>
+                {state.interventions.length === 0 ? <div className="sim-row">nothing — story exhausted</div> : null}
+                {state.interventions.map(i => (
+                    <div className="sim-row" key={i.nodeId}>
+                        <span className={'sim-kind k-' + i.kind}>{i.kind}</span>
+                        <span className="sim-name" title={`${i.eventName} (${i.eventType ?? '?'})`}>{i.eventName}</span>
+                        {i.kind === 'lua' && i.options.length
+                            ? i.options.map(o => (
+                                <button key={o} title={`Story_Event("${o}")`}
+                                    onClick={() => sendSim('luaNotify', { id: o })}>{o}</button>
+                            ))
+                            : <button title="Fire this event's trigger"
+                                onClick={() => sendSim('satisfyTrigger', { nodeId: i.nodeId })}>Fire</button>}
+                    </div>
+                ))}
+                {state.luaNotifications.length ? (
+                    <div className="sim-row">
+                        <select
+                            value=""
+                            title="Simulate a Lua Story_Event call"
+                            onChange={e => { if (e.target.value) { sendSim('luaNotify', { id: e.target.value }); } }}
+                        >
+                            <option value="">Lua Story_Event…</option>
+                            {state.luaNotifications.map(id => <option key={id} value={id}>{id}</option>)}
+                        </select>
+                    </div>
+                ) : null}
+            </div>
+            <div className="sim-section sim-log">
+                <div className="sim-head">Log</div>
+                {state.log.slice(-30).map((line, i) => <div key={i}>{line}</div>)}
+            </div>
+        </div>
     );
 }
 

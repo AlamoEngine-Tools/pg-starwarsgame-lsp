@@ -203,9 +203,10 @@ function resolveFeatureFlags() {
 			codeActions:    flag('lua.codeActions', true),
 		},
 		tools: {
-			localisation: flag('tools.localisation', false),
-			storyEditor:  flag('tools.storyEditor', false),
-			variants:     flag('tools.variants', true),
+			localisation:   flag('tools.localisation', false),
+			storyEditor:    flag('tools.storyEditor', false),
+			storySimulator: flag('tools.storySimulator', false),
+			variants:       flag('tools.variants', true),
 		},
 		story: {
 			discovery:        flag('story.discovery', false),
@@ -465,6 +466,10 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		logLine(`Story graph changed: ${params.campaigns.join(', ')} — refreshing story views.`);
 		storyNavigatorProvider?.refresh();
 		StoryGraphPanel.refreshInvalidated(params.campaigns ?? []);
+	});
+
+	lspClient.onNotification('aet/storySimChanged', (params: { campaign: string }) => {
+		StoryGraphPanel.simChanged(params.campaign);
 	});
 }
 

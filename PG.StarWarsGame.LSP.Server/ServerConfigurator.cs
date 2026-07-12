@@ -125,6 +125,13 @@ public static class ServerConfigurator
             .WithHandler<ExecuteStoryCommandHandler>()
             .WithHandler<GetStoryLayoutHandler>()
             .WithHandler<SetStoryLayoutHandler>()
+            .WithHandler<StorySimStartHandler>()
+            .WithHandler<StorySimStopHandler>()
+            .WithHandler<StorySimGetStateHandler>()
+            .WithHandler<StorySimSatisfyTriggerHandler>()
+            .WithHandler<StorySimSetFlagHandler>()
+            .WithHandler<StorySimAdvanceClockHandler>()
+            .WithHandler<StorySimLuaNotifyHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
@@ -167,6 +174,12 @@ public static class ServerConfigurator
                 services.AddSingleton<IWorkspaceEditApplier>(sp => new FacadeWorkspaceEditApplier(
                     () => sp.GetRequiredService<ILanguageServerFacade>()));
                 services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
+                services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
+                    sp.GetRequiredService<IStoryModelService>(),
+                    sp.GetRequiredService<IGameIndexService>(),
+                    sp.GetRequiredService<ISchemaProvider>(),
+                    campaign => sp.GetRequiredService<ILanguageServerFacade>()
+                        .SendNotification("aet/storySimChanged", new StorySimChangedParams(campaign))));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
