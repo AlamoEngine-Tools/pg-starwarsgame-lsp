@@ -129,11 +129,27 @@ public static class StoryXmlWriter
     }
 
     /// <summary>
-    ///     Removes a prereq token from the given AND-line; removing the last token removes the
-    ///     whole line. Unknown tokens produce no edits (the handler validates first).
+    ///     Removes a prereq token: from the given AND-line, or — with a null
+    ///     <paramref name="groupIndex" /> — from every line containing it (the edge-removal
+    ///     gesture doesn't know line indices). Removing the last token removes the whole line.
+    ///     Unknown tokens produce no edits (the handler validates first).
     /// </summary>
     public static IReadOnlyList<StoryTextEdit> RemovePrereq(
-        string text, StoryEvent storyEvent, int groupIndex, string token)
+        string text, StoryEvent storyEvent, int? groupIndex, string token)
+    {
+        if (groupIndex is null)
+        {
+            var edits = new List<StoryTextEdit>();
+            for (var i = 0; i < storyEvent.PrereqGroups.Count; i++)
+                edits.AddRange(RemovePrereq(text, storyEvent, i, token));
+            return edits;
+        }
+
+        return RemovePrereqFromGroup(storyEvent, groupIndex.Value, token);
+    }
+
+    private static IReadOnlyList<StoryTextEdit> RemovePrereqFromGroup(
+        StoryEvent storyEvent, int groupIndex, string token)
     {
         if (groupIndex < 0 || groupIndex >= storyEvent.PrereqGroups.Count) return [];
         var group = storyEvent.PrereqGroups[groupIndex];

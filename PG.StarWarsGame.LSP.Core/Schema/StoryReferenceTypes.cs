@@ -24,6 +24,12 @@ public static class StoryReferenceTypes
     public const string FlagSymbol = "StoryFlag";
     public const string NotificationSymbol = "StoryNotification";
 
+    /// <summary>
+    ///     The story thread file type from the metafile registry. The generic symbol pass indexes
+    ///     every <c>&lt;Event&gt;</c> block as an object of this type.
+    /// </summary>
+    public const string ThreadFileTypeName = "StoryParser";
+
     /// <summary>Whether the referenceType belongs to the story domain (campaign-scoped semantics).</summary>
     public static bool IsStoryScoped(string referenceTypeName)
     {

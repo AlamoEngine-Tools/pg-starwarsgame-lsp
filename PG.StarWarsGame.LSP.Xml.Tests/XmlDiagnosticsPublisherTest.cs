@@ -90,7 +90,6 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryParamNotesHandler(),
             new StoryParamValueHandler(),
             new StoryParamEnumHandler(),
-            new StoryParamReferenceHandler(),
             new StoryParamUnknownSlotHandler()
         ];
 

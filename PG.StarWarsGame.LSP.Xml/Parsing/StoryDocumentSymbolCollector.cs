@@ -43,12 +43,12 @@ internal static class StoryDocumentSymbolCollector
                 else if (TryParamPosition(child.Name, "Event_Param", out var eventPos) && eventType is not null)
                 {
                     CollectParam(parsed, documentUri, child, eventType, eventPos, eventParamTypes,
-                        isReward: false, symbols, references);
+                        isReward: false, schema, symbols, references);
                 }
                 else if (TryParamPosition(child.Name, "Reward_Param", out var rewardPos) && rewardType is not null)
                 {
                     CollectParam(parsed, documentUri, child, rewardType, rewardPos, rewardParamTypes,
-                        isReward: true, symbols, references);
+                        isReward: true, schema, symbols, references);
                 }
         }
     }
@@ -67,7 +67,7 @@ internal static class StoryDocumentSymbolCollector
 
     private static void CollectParam(ParsedXmlDocument parsed, string documentUri, HtmlNode paramNode,
         string typeUpper, int position, Dictionary<(string, int), string> paramTypes, bool isReward,
-        List<GameSymbol> symbols, List<GameReference> references)
+        ISchemaProvider schema, List<GameSymbol> symbols, List<GameReference> references)
     {
         if (!paramTypes.TryGetValue((typeUpper, position), out var refType)) return;
 
@@ -76,9 +76,23 @@ internal static class StoryDocumentSymbolCollector
             StoryReferenceTypes.EventName => StoryReferenceTypes.EventSymbol,
             StoryReferenceTypes.Flag => StoryReferenceTypes.FlagSymbol,
             StoryReferenceTypes.Notification => StoryReferenceTypes.NotificationSymbol,
-            _ => null // plot files and branches are not symbols
+            _ => null
         };
-        if (symbolType is null) return;
+        if (symbolType is null)
+        {
+            // Plot files and branches are not index symbols — nothing to navigate to.
+            if (StoryReferenceTypes.IsStoryScoped(refType)) return;
+
+            // Object-typed params (Planet, Faction, GameObjectType, …) navigate and validate
+            // through the ordinary index pipeline: typed when the schema knows the object type
+            // (type-mismatch checks apply), untyped for umbrella names like GameObjectType where
+            // any concrete unit/structure type is a valid target.
+            var expectedTypeName = schema.GetObjectType(refType) is not null ? refType : null;
+            foreach (var (token, line, column) in Tokens(parsed, paramNode))
+                references.Add(new GameReference(token, GameSymbolKind.XmlObject, expectedTypeName,
+                    documentUri, line, column, token.Length));
+            return;
+        }
 
         // SET_FLAG creates the flag — its param is the definition; every other flag param reads.
         var defines = isReward && typeUpper == "SET_FLAG" && position == 0;

@@ -95,6 +95,33 @@ public sealed class XmlStorySymbolCollectionTest
     }
 
     [Fact]
+    public async Task ObjectTypedParam_KnownObjectType_EmitsTypedReference()
+    {
+        // A Planet-typed reward param navigates with the concrete type (mismatch checks apply).
+        var index = await ParseAsync(
+            "<Story><Event Name=\"E\"><Reward_Type>SPAWN_UNIT</Reward_Type>" +
+            "<Reward_Param1>Mon_Calamari_Cruiser</Reward_Param1>" +
+            "<Reward_Param2>Kuat</Reward_Param2></Event></Story>");
+
+        var planet = Assert.Single(index.References, r => r.TargetId == "Kuat");
+        Assert.Equal("Planet", planet.ExpectedTypeName);
+        Assert.Equal("Kuat".Length, planet.Length);
+    }
+
+    [Fact]
+    public async Task ObjectTypedParam_UmbrellaType_EmitsUntypedReference()
+    {
+        // "GameObjectType" matches no concrete symbol TypeName — the reference resolves untyped
+        // so any unit/structure/hero counts and no bogus type-mismatch fires.
+        var index = await ParseAsync(
+            "<Story><Event Name=\"E\"><Reward_Type>SPAWN_UNIT</Reward_Type>" +
+            "<Reward_Param1>Mon_Calamari_Cruiser</Reward_Param1></Event></Story>");
+
+        var unit = Assert.Single(index.References, r => r.TargetId == "Mon_Calamari_Cruiser");
+        Assert.Null(unit.ExpectedTypeName);
+    }
+
+    [Fact]
     public async Task IncrementFlagParam_IsAReference_NotADefinition()
     {
         var index = await ParseAsync(
@@ -179,7 +206,12 @@ public sealed class XmlStorySymbolCollectionTest
             [
                 new EnumValueDefinition { Name = "TRIGGER_EVENT", Params = [Param(0, "StoryEventName")] },
                 new EnumValueDefinition { Name = "SET_FLAG", Params = [Param(0, "StoryFlag")] },
-                new EnumValueDefinition { Name = "INCREMENT_FLAG", Params = [Param(0, "StoryFlag")] }
+                new EnumValueDefinition { Name = "INCREMENT_FLAG", Params = [Param(0, "StoryFlag")] },
+                new EnumValueDefinition
+                {
+                    Name = "SPAWN_UNIT",
+                    Params = [Param(0, "GameObjectType"), Param(1, "Planet")]
+                }
             ]
         };
 
@@ -219,7 +251,11 @@ public sealed class XmlStorySymbolCollectionTest
 
         public GameObjectTypeDefinition? GetObjectType(string t)
         {
-            return null;
+            // "Planet" is a real types.yaml object type; "GameObjectType" is an umbrella that
+            // no concrete symbol carries — mirrors the production schema.
+            return string.Equals(t, "Planet", StringComparison.OrdinalIgnoreCase)
+                ? new GameObjectTypeDefinition { TypeName = "Planet" }
+                : null;
         }
     }
 }

@@ -31,7 +31,7 @@ public sealed class StorySimulatorTest
         "\t\t<Event_Param1>10</Event_Param1>\n" +
         "\t</Event>\n" +
         "\t<Event Name=\"FlagWatcher\">\n" +
-        "\t\t<Event_Type>STORY_FLAGS</Event_Type>\n" +
+        "\t\t<Event_Type>STORY_FLAG</Event_Type>\n" +
         "\t\t<Event_Param1>FLAG_X</Event_Param1>\n" +
         "\t</Event>\n" +
         "\t<Event Name=\"Setter\">\n" +
@@ -57,8 +57,25 @@ public sealed class StorySimulatorTest
         "\t\t<Reward_Param1>story_b</Reward_Param1>\n" +
         "\t</Event>\n" +
         "\t<Event Name=\"PerpFlag\">\n" +
-        "\t\t<Event_Type>STORY_FLAGS</Event_Type>\n" +
+        "\t\t<Event_Type>STORY_FLAG</Event_Type>\n" +
         "\t\t<Event_Param1>FLAG_P</Event_Param1>\n" +
+        "\t\t<Perpetual>Yes</Perpetual>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"EitherWatcher\">\n" +
+        "\t\t<Event_Type>STORY_FLAG</Event_Type>\n" +
+        "\t\t<Event_Param1>FLAG_A FLAG_B</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"CounterWatcher\">\n" +
+        "\t\t<Event_Type>STORY_FLAG</Event_Type>\n" +
+        "\t\t<Event_Param1>FLAG_C</Event_Param1>\n" +
+        "\t\t<Event_Param2>3</Event_Param2>\n" +
+        "\t\t<Event_Param3>GREATER_THAN</Event_Param3>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Incrementer\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>INCREMENT_FLAG</Reward_Type>\n" +
+        "\t\t<Reward_Param1>FLAG_C</Reward_Param1>\n" +
+        "\t\t<Reward_Param2>2</Reward_Param2>\n" +
         "\t\t<Perpetual>Yes</Perpetual>\n" +
         "\t</Event>\n" +
         "</Story>\n";
@@ -129,6 +146,46 @@ public sealed class StorySimulatorTest
         snapshot = sim.SetFlag(snapshot, "FLAG_X", 1);
 
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+    }
+
+    [Fact]
+    public void StoryFlag_FlagList_IsOrSemantics()
+    {
+        // Schema: multiple values in param 0 = OR condition.
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+
+        snapshot = sim.SetFlag(snapshot, "FLAG_B", 1);
+
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "EitherWatcher"));
+    }
+
+    [Fact]
+    public void StoryFlag_GreaterComparison_UsesParams()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+
+        snapshot = sim.SetFlag(snapshot, "FLAG_C", 3);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
+
+        snapshot = sim.SetFlag(snapshot, "FLAG_C", 4);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
+    }
+
+    [Fact]
+    public void IncrementFlag_AddsToTheFlagValue()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        snapshot = sim.SetFlag(snapshot, "FLAG_C", 2);
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Incrementer"));
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Incrementer"));
+
+        // 2 + 2×2 = 6 > 3 — the greater-than watcher fires after the second increment.
+        Assert.Equal(6, snapshot.Runtime.Flags["FLAG_C"]);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
     }
 
     [Fact]
@@ -263,7 +320,7 @@ public sealed class StorySimulatorTest
                 new EnumValueDefinition { Name = "STORY_TRIGGER" },
                 new EnumValueDefinition
                 {
-                    Name = "STORY_FLAGS",
+                    Name = "STORY_FLAG",
                     Params = [new ParamDefinition
                     {
                         Position = 0, ValueType = XmlValueType.NameReference,
@@ -300,6 +357,15 @@ public sealed class StorySimulatorTest
                 new EnumValueDefinition
                 {
                     Name = "SET_FLAG",
+                    Params = [new ParamDefinition
+                    {
+                        Position = 0, ValueType = XmlValueType.NameReference,
+                        ReferenceTypeName = StoryReferenceTypes.Flag
+                    }]
+                },
+                new EnumValueDefinition
+                {
+                    Name = "INCREMENT_FLAG",
                     Params = [new ParamDefinition
                     {
                         Position = 0, ValueType = XmlValueType.NameReference,

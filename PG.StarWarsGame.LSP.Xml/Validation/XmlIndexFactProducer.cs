@@ -27,6 +27,13 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             if (StoryReferenceTypes.IsStorySymbolType(sym.TypeName))
                 continue;
 
+            // The generic pass also indexes every <Event> block as a StoryParser object. Story
+            // campaigns are sandboxed per faction, so the same event name in another campaign's
+            // thread is legal — same reasoning, same campaign-scoped diagnostics ownership.
+            if (string.Equals(sym.TypeName, StoryReferenceTypes.ThreadFileTypeName,
+                    StringComparison.OrdinalIgnoreCase))
+                continue;
+
             if (!index.WorkspaceDefinitions.TryGetValue(sym.Id, out var all) || all.Length <= 1)
                 continue;
 

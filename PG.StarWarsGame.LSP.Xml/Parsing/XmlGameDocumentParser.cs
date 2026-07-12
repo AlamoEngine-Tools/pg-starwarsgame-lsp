@@ -59,7 +59,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
 
         if ((_configProvider?.Current.Features.Story.Symbols ?? true) &&
-            registeredTypes.Contains("StoryParser", StringComparer.OrdinalIgnoreCase))
+            registeredTypes.Contains(StoryReferenceTypes.ThreadFileTypeName, StringComparer.OrdinalIgnoreCase))
             StoryDocumentSymbolCollector.Collect(parsed, canonicalUri, _schema, symbols, references);
 
         var groupMemberships = CollectGroupMemberships(doc, canonicalUri, lineIndex, ct);

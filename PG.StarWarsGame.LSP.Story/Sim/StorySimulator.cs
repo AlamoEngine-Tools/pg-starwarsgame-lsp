@@ -39,11 +39,14 @@ public sealed record StorySimIntervention(
 ///     Modelled semantics: <c>STORY_ELAPSED</c> fires from the virtual clock; control edges
 ///     (schema <c>StoryEventName</c> reward params — TRIGGER_EVENT and friends) satisfy the
 ///     target's trigger, or disable it when the edge label carries <c>DISABLE</c>;
-///     <c>STORY_FLAGS</c> fires when all its flag params are set; flag-writing rewards set
-///     (or, for <c>REMOVE_*</c>, clear) their flags; <c>STORY_ELEMENT</c> rewards activate the
-///     named suspended thread. Everything else is a manual intervention: SatisfyTrigger,
-///     LuaNotify for <c>STORY_AI_NOTIFICATION</c>, and tactical outcomes resolved by firing the
-///     armed <c>STORY_VICTORY</c>/<c>STORY_MISSION_LOST</c> events.
+///     <c>STORY_FLAG</c> fires when ANY of its listed flags (param 0, OR semantics per the
+///     schema) compares true against param 1 (operator from param 2 by name: GREATER/LESS,
+///     otherwise equality); <c>SET_FLAG</c> sets its flag to param 1 (default 1),
+///     <c>INCREMENT_FLAG</c> adds param 1 (default 1), other flag-writing rewards set 1;
+///     <c>STORY_ELEMENT</c> rewards activate the named suspended thread. Everything else is a
+///     manual intervention: SatisfyTrigger, LuaNotify for <c>STORY_AI_NOTIFICATION</c>, and
+///     tactical outcomes resolved by firing the armed
+///     <c>STORY_VICTORY</c>/<c>STORY_MISSION_LOST</c>/<c>STORY_MISSION_FAILED</c> events.
 /// </summary>
 public sealed class StorySimulator
 {
@@ -154,12 +157,12 @@ public sealed class StorySimulator
             if (_evaluator.GetLifecycle(node.Id, snapshot.Runtime) != StoryEventLifecycle.Armed) continue;
             var storyEvent = node.Event!;
             var type = storyEvent.EventType?.ToUpperInvariant();
-            if (type is "STORY_ELAPSED" or "STORY_TRIGGER" or "STORY_FLAGS") continue; // auto-firing
+            if (type is "STORY_ELAPSED" or "STORY_TRIGGER" or "STORY_FLAG") continue; // auto-firing
 
             var kind = type switch
             {
                 "STORY_AI_NOTIFICATION" => "lua",
-                "STORY_VICTORY" or "STORY_MISSION_LOST" => "tactical",
+                "STORY_VICTORY" or "STORY_MISSION_LOST" or "STORY_MISSION_FAILED" => "tactical",
                 _ => "manual"
             };
             var options = kind == "lua" ? NotificationIdsOf(storyEvent).ToList() : [];
@@ -210,10 +213,24 @@ public sealed class StorySimulator
                        && double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var at)
                        && snapshot.Clock >= at;
             }
-            case "STORY_FLAGS":
+            case "STORY_FLAG":
             {
+                // Schema: param 0 = flag name list (multiple values = OR), param 1 = comparison
+                // value, param 2 = comparison operator. Operators are matched by name; anything
+                // unrecognised (or absent) is treated as equality.
                 var flags = FlagsReadBy(storyEvent).ToList();
-                return flags.Count > 0 && flags.All(f => snapshot.Runtime.Flags.GetValueOrDefault(f) != 0);
+                if (flags.Count == 0) return false;
+                var rawTarget = storyEvent.EventParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
+                var target = int.TryParse(rawTarget, out var parsed) ? parsed : 1;
+                var op = storyEvent.EventParams.FirstOrDefault(p => p.Position == 2)?.RawValue
+                    ?.ToUpperInvariant() ?? "";
+                return flags.Any(f =>
+                {
+                    var value = snapshot.Runtime.Flags.GetValueOrDefault(f);
+                    if (op.Contains("GREATER")) return value > target;
+                    if (op.Contains("LESS")) return value < target;
+                    return value == target;
+                });
             }
             default:
                 return false;
@@ -242,18 +259,27 @@ public sealed class StorySimulator
             }
         }
 
-        // Flag-writing rewards (schema StoryFlag params on the reward side).
+        // Flag-writing rewards (schema StoryFlag params on the reward side). SET_FLAG writes
+        // param 1 (default 1), INCREMENT_FLAG adds param 1 (default 1, may be negative), other
+        // flag-writing rewards conservatively set 1.
         if (storyEvent.RewardType is { } rewardType)
         {
-            var clears = rewardType.Contains("REMOVE", StringComparison.OrdinalIgnoreCase);
+            var upperReward = rewardType.ToUpperInvariant();
+            var rawAmount = storyEvent.RewardParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
+            var amount = int.TryParse(rawAmount, out var parsedAmount) ? parsedAmount : 1;
             foreach (var slot in storyEvent.RewardParams)
             {
-                if (_rewardParamTypes.GetValueOrDefault((rewardType.ToUpperInvariant(), slot.Position))
+                if (_rewardParamTypes.GetValueOrDefault((upperReward, slot.Position))
                     != StoryReferenceTypes.Flag) continue;
                 foreach (var flag in StoryReferenceTypes.SplitList(slot.RawValue))
                 {
-                    runtime = runtime.WithFlag(flag, clears ? 0 : 1);
-                    log = log.Add($"  → flag {flag} = {(clears ? 0 : 1)}.");
+                    var value = upperReward == "INCREMENT_FLAG"
+                        ? runtime.Flags.GetValueOrDefault(flag) + amount
+                        : upperReward == "SET_FLAG"
+                            ? amount
+                            : 1;
+                    runtime = runtime.WithFlag(flag, value);
+                    log = log.Add($"  → flag {flag} = {value}.");
                 }
             }
 

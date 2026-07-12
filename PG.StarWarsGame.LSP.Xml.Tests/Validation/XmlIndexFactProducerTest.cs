@@ -90,6 +90,35 @@ public sealed class XmlIndexFactProducerTest
     }
 
     [Fact]
+    public void StoryParserSymbols_SameNameAcrossCampaignThreads_EmitsNoDuplicateFact()
+    {
+        // Story campaigns are sandboxed per faction — the same event name in the Empire and the
+        // Rebel campaign threads is legal and common in vanilla. Per-thread duplicates and
+        // campaign-wide ambiguity are the story graph diagnostics' business.
+        var empire = MakeSym("Set_Act_Counter", "file:///story_campaign_empire.xml", 3, "StoryParser");
+        var rebel = MakeSym("Set_Act_Counter", "file:///story_campaign_rebel.xml", 3, "StoryParser");
+
+        var empireDoc = new DocumentIndex("file:///story_campaign_empire.xml", 1,
+            ImmutableArray.Create(empire), ImmutableArray<GameReference>.Empty);
+        var rebelDoc = new DocumentIndex("file:///story_campaign_rebel.xml", 1,
+            ImmutableArray.Create(rebel), ImmutableArray<GameReference>.Empty);
+
+        var index = new GameIndex(
+            BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add("file:///story_campaign_empire.xml", empireDoc)
+                .Add("file:///story_campaign_rebel.xml", rebelDoc),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
+                .Add("Set_Act_Counter", ImmutableArray.Create(empire, rebel)),
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
+
+        Assert.DoesNotContain(Sut.Produce("file:///story_campaign_rebel.xml", index),
+            f => f is XmlSymbolFact);
+        Assert.DoesNotContain(Sut.Produce("file:///story_campaign_empire.xml", index),
+            f => f is XmlSymbolFact);
+    }
+
+    [Fact]
     public void CrossLayerOverride_DoesNotEmitDuplicateFact()
     {
         // A same-id definition in a different project layer is a valid override (surfaced as a code

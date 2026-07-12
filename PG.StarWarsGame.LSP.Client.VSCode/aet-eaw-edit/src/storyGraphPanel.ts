@@ -175,11 +175,15 @@ export class StoryGraphPanel {
             });
             if (!result.success) {
                 void vscode.window.showErrorMessage(`EaWEdit: ${result.error ?? 'The story command failed.'}`);
+                // A gesture may have changed the view optimistically (e.g. a picked-off
+                // connection) — have the webview re-fetch so it matches reality again.
+                this._post({ type: 'invalidate' });
                 return;
             }
             if (refreshDetail) { await this._sendDetail(refreshDetail); }
         } catch (e) {
             void vscode.window.showErrorMessage(`EaWEdit: story command failed: ${e}`);
+            this._post({ type: 'invalidate' });
         }
     }
 

@@ -139,7 +139,8 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamNotesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamEnumHandler>();
-        services.AddSingleton<IXmlDiagnosticsHandler, StoryParamReferenceHandler>();
+        // Story param object references (Planet, GameObjectType, …) are validated by the generic
+        // reference pipeline — the story symbol collector emits GameReferences for them.
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamUnknownSlotHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryDialogReferenceHandler>();
 

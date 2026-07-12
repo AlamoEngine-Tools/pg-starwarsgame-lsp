@@ -200,12 +200,39 @@ public sealed class ExecuteStoryCommandHandlerTest
     }
 
     [Fact]
-    public async Task ApplierRejection_SurfacesAsError()
+    public async Task ApplierRejection_IsLoggedAndTheCommandStillSucceeds()
     {
-        var result = await Handler(new CapturingApplier(result: false))
-            .Handle(Command("setEventType", eventName: "Start", value: "STORY_FLAGS"), CancellationToken.None);
+        // The applyEdit round-trip is detached from the request: awaiting it would let the
+        // edit's own didChange cancel this request with ContentModified. Rejections are rare
+        // and logged, not surfaced.
+        var applier = new CapturingApplier(result: false);
 
-        Assert.Contains("rejected", result.Error);
+        var result = await Handler(applier)
+            .Handle(Command("setEventType", eventName: "Start", value: "STORY_FLAG"), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(applier.Edit);
+    }
+
+    [Fact]
+    public async Task RemovePrereq_NoGroupIndex_RemovesFromAllGroups()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier)
+            .Handle(Command("removePrereq", eventName: "Next", token: "Start"), CancellationToken.None);
+
+        Assert.True(result.Success);
+        Assert.NotNull(applier.Edit);
+    }
+
+    [Fact]
+    public async Task RemovePrereq_NoGroupIndex_UnknownToken_ReturnsError()
+    {
+        var result = await Handler(new CapturingApplier())
+            .Handle(Command("removePrereq", eventName: "Next", token: "Ghost"), CancellationToken.None);
+
+        Assert.Contains("Ghost", result.Error);
     }
 
     // ── Node/edge happy paths ────────────────────────────────────────────────

@@ -73,14 +73,23 @@ function sendCommand(payload: Record<string, unknown>, confirm?: string, refresh
 const flowSocket = new ClassicPreset.Socket('flow');
 
 class StoryNode extends ClassicPreset.Node {
-    width: number;
-    height: number;
+    width = 0;
+    height = 0;
+    dto: StoryGraphNodeDto;
 
-    constructor(public readonly dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
+    constructor(dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
         super(dto.label);
+        this.dto = dto;
         // Event nodes always expose sockets so prereq edges can be drawn to/from them.
         if (hasInputs || dto.kind === 'Event') { this.addInput('in', new ClassicPreset.Input(flowSocket)); }
         if (hasOutputs || dto.kind === 'Event') { this.addOutput('out', new ClassicPreset.Output(flowSocket)); }
+        this.applyDto(dto);
+    }
+
+    /** Refreshes label/size/state from a newer server dto — the in-place update path. */
+    applyDto(dto: StoryGraphNodeDto): void {
+        this.dto = dto;
+        this.label = dto.label;
         if (dto.kind === 'AndJunction' || dto.kind === 'OrJunction') {
             this.width = 48; this.height = 48;
         } else if (dto.kind === 'Event') {
@@ -103,7 +112,12 @@ type Schemes = GetSchemes<StoryNode, StoryConnection>;
 type AreaExtra = ReactArea2D<Schemes>;
 
 interface EditorHandle {
-    setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]): Promise<void>;
+    /**
+     * Applies a server graph. `full` clears and auto-arranges (first load, filter changes);
+     * otherwise the graph is patched in place — the viewport and node positions stay put.
+     */
+    setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[],
+        full: boolean): Promise<void>;
     /** Overrides node lifecycles from the simulation (null restores the static analysis view). */
     applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void;
     fit(): void;
@@ -112,6 +126,12 @@ interface EditorHandle {
 
 /** Set by the React app before the editor exists; invoked from area/editor pipes. */
 let onNodePicked: (node: StoryNode) => void = () => { /* replaced by App */ };
+
+/** A gesture locally changed the graph without a server command — re-fetch to reconcile. */
+let onGraphDesynced: () => void = () => { /* replaced by App */ };
+
+/** AND-junction node ids embed their owner event and group index: `{eventNodeId}#g{index}`. */
+const andJunctionId = /^(.*)#g(\d+)$/;
 
 async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const editor = new NodeEditor<Schemes>();
@@ -142,9 +162,21 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
     let applyingServerGraph = false;
 
-    // Edge gesture: a user-drawn event→event connection becomes an addPrereq command (new
-    // OR-line on the target). The local connection is blocked — the real edge arrives with
-    // the server's re-render.
+    /** The event a junction belongs to (AND junctions embed their owner in the id). */
+    const junctionOwner = (junction: StoryNode): { owner: StoryNode; groupIndex: number } | null => {
+        const match = andJunctionId.exec(junction.id);
+        const owner = match ? editor.getNode(match[1]) : undefined;
+        return owner?.dto.kind === 'Event' && owner.dto.threadUri
+            ? { owner, groupIndex: Number(match![2]) }
+            : null;
+    };
+
+    // Edge gestures. Creating: event→event becomes a new OR-line prereq, event→AND-junction
+    // joins that AND-line; the local connection is blocked — the real edge arrives with the
+    // server's re-render. Removing (the connection plugin lets you pick an existing connection
+    // off a socket): prereq edges become removePrereq commands; anything else (control/flag/
+    // tactical edges are derived data, junction plumbing is structural) is not removable — the
+    // local removal is allowed to play out and a re-fetch restores it.
     editor.addPipe(context => {
         if (context.type === 'connectioncreate' && !applyingServerGraph) {
             const source = editor.getNode(context.data.source);
@@ -156,8 +188,50 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     eventName: target.dto.label,
                     token: source.dto.label,
                 });
+            } else if (source?.dto.kind === 'Event' && target?.dto.kind === 'AndJunction') {
+                const junction = junctionOwner(target);
+                if (junction) {
+                    sendCommand({
+                        kind: 'addPrereq',
+                        threadUri: junction.owner.dto.threadUri,
+                        eventName: junction.owner.dto.label,
+                        groupIndex: junction.groupIndex,
+                        token: source.dto.label,
+                    });
+                }
             }
             return undefined; // never materialise gesture connections locally
+        }
+        if (context.type === 'connectionremove' && !applyingServerGraph) {
+            const removed = context.data as StoryConnection;
+            const source = editor.getNode(removed.source);
+            const target = editor.getNode(removed.target);
+            const isPrereq = (removed.kind ?? 'Prereq') === 'Prereq';
+            if (isPrereq && source?.dto.kind === 'Event'
+                && target?.dto.kind === 'Event' && target.dto.threadUri) {
+                sendCommand({
+                    kind: 'removePrereq',
+                    threadUri: target.dto.threadUri,
+                    eventName: target.dto.label,
+                    token: source.dto.label,
+                });
+            } else if (isPrereq && source?.dto.kind === 'Event' && target?.dto.kind === 'AndJunction') {
+                const junction = junctionOwner(target);
+                if (junction) {
+                    sendCommand({
+                        kind: 'removePrereq',
+                        threadUri: junction.owner.dto.threadUri,
+                        eventName: junction.owner.dto.label,
+                        groupIndex: junction.groupIndex,
+                        token: source.dto.label,
+                    });
+                } else {
+                    onGraphDesynced();
+                }
+            } else {
+                onGraphDesynced();
+            }
+            return context; // allow the local removal; the server round-trip reconciles
         }
         return context;
     });
@@ -192,42 +266,137 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // Original (static analysis) lifecycles, so ending a simulation restores the pre-sim view.
     const staticLifecycles = new Map<string, string | null | undefined>();
 
+    const layoutKey = (dto: StoryGraphNodeDto): string =>
+        `${baseName(dto.threadUri)} ${dto.label}`.toLowerCase();
+
+    const connectionKey = (fromId: string, toId: string, kind: string): string =>
+        `${fromId}>${toId}|${kind}`;
+
+    /** A sensible spot for a node the server introduced mid-session: beside a neighbour, else view centre. */
+    const placeNewNode = (dto: StoryGraphNodeDto, edges: StoryGraphEdgeDto[]): { x: number; y: number } => {
+        for (const edge of edges) {
+            const neighbourId = edge.fromId === dto.id ? edge.toId : edge.toId === dto.id ? edge.fromId : null;
+            if (!neighbourId) { continue; }
+            const view = area.nodeViews.get(neighbourId);
+            if (view) {
+                return edge.fromId === dto.id
+                    ? { x: view.position.x - 280, y: view.position.y + 50 }
+                    : { x: view.position.x + 280, y: view.position.y + 50 };
+            }
+        }
+        const { k, x, y } = area.area.transform;
+        const rect = container.getBoundingClientRect();
+        return { x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k };
+    };
+
+    const buildFull = async (
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+    ): Promise<void> => {
+        await editor.clear();
+        const byId = new Map<string, StoryNode>();
+        const hasIn = new Set(edges.map(e => e.toId));
+        const hasOut = new Set(edges.map(e => e.fromId));
+        for (const dto of nodes) {
+            const node = new StoryNode(dto, hasIn.has(dto.id), hasOut.has(dto.id));
+            byId.set(dto.id, node);
+            await editor.addNode(node);
+        }
+        for (const edge of edges) {
+            const source = byId.get(edge.fromId);
+            const target = byId.get(edge.toId);
+            if (source && target) {
+                await editor.addConnection(new StoryConnection(source, target, edge.kind));
+            }
+        }
+        await arrange.layout({ options: { 'elk.direction': 'RIGHT' } });
+
+        // Stored positions win over auto-layout for the events that have them.
+        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        for (const node of editor.getNodes()) {
+            if (node.dto.kind !== 'Event') { continue; }
+            const entry = stored.get(layoutKey(node.dto));
+            if (entry) { await area.translate(node.id, { x: entry.x, y: entry.y }); }
+        }
+
+        void AreaExtensions.zoomAt(area, editor.getNodes());
+    };
+
+    /** Reconciles the live graph against the server's — no re-layout, viewport untouched. */
+    const patch = async (
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+    ): Promise<void> => {
+        const incoming = new Map(nodes.map(d => [d.id, d]));
+        const hasIn = new Set(edges.map(e => e.toId));
+        const hasOut = new Set(edges.map(e => e.fromId));
+        const incomingConnections = new Set(edges.map(e => connectionKey(e.fromId, e.toId, e.kind)));
+
+        // 1. Stale connections go first (their endpoints may be about to disappear).
+        for (const connection of [...editor.getConnections()]) {
+            if (!incomingConnections.has(connectionKey(connection.source, connection.target, connection.kind))) {
+                await editor.removeConnection(connection.id);
+            }
+        }
+
+        // 2. Stale nodes.
+        for (const node of [...editor.getNodes()]) {
+            if (!incoming.has(node.id)) { await editor.removeNode(node.id); }
+        }
+
+        // 3. Existing nodes update in place; nodes whose socket shape changed are rebuilt at
+        //    their current position; genuinely new nodes appear beside a neighbour.
+        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        for (const dto of nodes) {
+            const needsIn = hasIn.has(dto.id) || dto.kind === 'Event';
+            const needsOut = hasOut.has(dto.id) || dto.kind === 'Event';
+            const existing = editor.getNode(dto.id);
+            if (existing) {
+                if (existing.hasInput('in') !== needsIn || existing.hasOutput('out') !== needsOut) {
+                    const position = area.nodeViews.get(dto.id)?.position;
+                    await editor.removeNode(dto.id);
+                    const rebuilt = new StoryNode(dto, needsIn, needsOut);
+                    await editor.addNode(rebuilt);
+                    if (position) { await area.translate(rebuilt.id, position); }
+                } else {
+                    existing.applyDto(dto);
+                    await area.update('node', dto.id);
+                }
+            } else {
+                const node = new StoryNode(dto, needsIn, needsOut);
+                await editor.addNode(node);
+                const entry = dto.kind === 'Event' ? stored.get(layoutKey(dto)) : undefined;
+                await area.translate(node.id, entry
+                    ? { x: entry.x, y: entry.y }
+                    : placeNewNode(dto, edges.filter(e => e.fromId === dto.id || e.toId === dto.id)));
+            }
+        }
+
+        // 4. New connections.
+        const present = new Set(editor.getConnections()
+            .map(c => connectionKey(c.source, c.target, c.kind)));
+        for (const edge of edges) {
+            if (present.has(connectionKey(edge.fromId, edge.toId, edge.kind))) { continue; }
+            const source = editor.getNode(edge.fromId);
+            const target = editor.getNode(edge.toId);
+            if (source && target) {
+                await editor.addConnection(new StoryConnection(source, target, edge.kind));
+            }
+        }
+    };
+
     return {
         async setGraph(
-            nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+            nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[],
+            full: boolean
         ): Promise<void> {
             staticLifecycles.clear();
             for (const dto of nodes) { staticLifecycles.set(dto.id, dto.lifecycle); }
             applyingServerGraph = true;
             try {
-                await editor.clear();
-                const byId = new Map<string, StoryNode>();
-                const hasIn = new Set(edges.map(e => e.toId));
-                const hasOut = new Set(edges.map(e => e.fromId));
-                for (const dto of nodes) {
-                    const node = new StoryNode(dto, hasIn.has(dto.id), hasOut.has(dto.id));
-                    byId.set(dto.id, node);
-                    await editor.addNode(node);
+                if (full || editor.getNodes().length === 0) {
+                    await buildFull(nodes, edges, layout);
+                } else {
+                    await patch(nodes, edges, layout);
                 }
-                for (const edge of edges) {
-                    const source = byId.get(edge.fromId);
-                    const target = byId.get(edge.toId);
-                    if (source && target) {
-                        await editor.addConnection(new StoryConnection(source, target, edge.kind));
-                    }
-                }
-                await arrange.layout({ options: { 'elk.direction': 'RIGHT' } });
-
-                // Stored positions win over auto-layout for the events that have them.
-                const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
-                for (const node of editor.getNodes()) {
-                    if (node.dto.kind !== 'Event') { continue; }
-                    const key = `${baseName(node.dto.threadUri)} ${node.dto.label}`.toLowerCase();
-                    const entry = stored.get(key);
-                    if (entry) { await area.translate(node.id, { x: entry.x, y: entry.y }); }
-                }
-
-                void AreaExtensions.zoomAt(area, editor.getNodes());
             } finally {
                 applyingServerGraph = false;
             }
@@ -563,8 +732,10 @@ function App(): JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
     const filtersRef = useRef<GraphFilters>({ ...EMPTY_FILTERS });
+    // User-driven fetches (filter changes) re-layout; edit-driven refreshes patch in place.
+    const fullRenderRef = useRef(true);
     const pendingGraphRef = useRef<{
-        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntry[];
+        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntry[]; full: boolean;
     } | null>(null);
 
     const [filters, setFiltersState] = useState<GraphFilters>({ ...EMPTY_FILTERS });
@@ -591,11 +762,12 @@ function App(): JSX.Element {
     const fetchGraph = useCallback((next: GraphFilters) => {
         filtersRef.current = next;
         setFiltersState(next);
+        fullRenderRef.current = true;
         vscode.postMessage({ type: 'fetch', filters: next });
     }, []);
 
     const applyGraph = useCallback((
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[], full: boolean
     ) => {
         setBranches(() => {
             const found = [...new Set(nodes.map(n => n.branch).filter((b): b is string => !!b))].sort();
@@ -611,13 +783,17 @@ function App(): JSX.Element {
         const handle = editorRef.current;
         if (handle) {
             pendingGraphRef.current = null;
-            void handle.setGraph(nodes, edges, layout);
+            void handle.setGraph(nodes, edges, layout, full);
         } else {
-            pendingGraphRef.current = { nodes, edges, layout };
+            pendingGraphRef.current = { nodes, edges, layout, full };
         }
     }, []);
 
     useEffect(() => {
+        onGraphDesynced = () => {
+            // Re-fetch with the current filters; the incremental patch restores the view.
+            vscode.postMessage({ type: 'fetch', filters: filtersRef.current });
+        };
         onNodePicked = node => {
             if (node.dto.kind === 'Event') {
                 vscode.postMessage({ type: 'detail', nodeId: node.dto.id });
@@ -641,14 +817,18 @@ function App(): JSX.Element {
                     setRewardTypes((msg.rewardTypes as string[] | undefined) ?? []);
                     break;
                 }
-                case 'graph':
+                case 'graph': {
+                    const full = fullRenderRef.current;
+                    fullRenderRef.current = false;
                     applyGraph(
                         (msg.nodes as StoryGraphNodeDto[] | undefined) ?? [],
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
-                        (msg.layout as StoryLayoutEntry[] | undefined) ?? []);
+                        (msg.layout as StoryLayoutEntry[] | undefined) ?? [],
+                        full);
                     // A running simulation keeps painting its lifecycles over fresh renders.
                     if (simRef.current?.running) { applySimOverlay(simRef.current); }
                     break;
+                }
                 case 'simState':
                     applySimOverlay((msg.state as SimState | null) ?? null);
                     break;
@@ -687,7 +867,7 @@ function App(): JSX.Element {
             const pending = pendingGraphRef.current;
             if (pending) {
                 pendingGraphRef.current = null;
-                void created.setGraph(pending.nodes, pending.edges, pending.layout);
+                void created.setGraph(pending.nodes, pending.edges, pending.layout, pending.full);
             }
         });
         return () => {

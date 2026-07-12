@@ -40,33 +40,32 @@ public sealed class ExecuteStoryCommandHandler(
     private const string ManifestFileSkeleton =
         "<?xml version=\"1.0\" ?>\n<Story_Mode_Plots>\n</Story_Mode_Plots>\n";
 
-    public async Task<ExecuteStoryCommandResult> Handle(ExecuteStoryCommandParams request, CancellationToken ct)
+    public Task<ExecuteStoryCommandResult> Handle(ExecuteStoryCommandParams request, CancellationToken ct)
     {
         if (StoryEditorFeature.Rejection(config) is { } rejection)
-            return Error(rejection);
+            return Task.FromResult(Error(rejection));
 
         var model = modelService.GetCampaignModel(request.Campaign);
         if (model is null)
-            return Error($"Campaign '{request.Campaign}' was not found.");
+            return Task.FromResult(Error($"Campaign '{request.Campaign}' was not found."));
 
         return request.Kind switch
         {
-            "renameEvent" => await RenameEventAsync(request, ct),
+            "renameEvent" => Task.FromResult(RenameEvent(request)),
             "createEvent" or "deleteEvent" or "setEventType" or "setRewardType" or "setParams"
                 or "setPerpetual" or "setDialog" or "setBranch" or "addPrereq" or "removePrereq"
                 or "retargetControlEdge" or "createTacticalAttachment"
-                => await ThreadOpAsync(request, model, ct),
+                => Task.FromResult(ThreadOp(request, model)),
             "createThread" or "deleteThread" or "setThreadState" or "attachLuaScript"
-                => await ManifestOpAsync(request, ct),
-            "addPlotManifest" or "removePlotManifest" => await CampaignOpAsync(request, ct),
-            _ => Error($"Unknown story command '{request.Kind}'.")
+                => Task.FromResult(ManifestOp(request)),
+            "addPlotManifest" or "removePlotManifest" => Task.FromResult(CampaignOp(request)),
+            _ => Task.FromResult(Error($"Unknown story command '{request.Kind}'."))
         };
     }
 
     // ── Thread-file operations ───────────────────────────────────────────────
 
-    private async Task<ExecuteStoryCommandResult> ThreadOpAsync(
-        ExecuteStoryCommandParams request, StoryCampaignModel model, CancellationToken ct)
+    private ExecuteStoryCommandResult ThreadOp(ExecuteStoryCommandParams request, StoryCampaignModel model)
     {
         if (string.IsNullOrEmpty(request.ThreadUri))
             return Error("The command needs a threadUri.");
@@ -174,14 +173,25 @@ public sealed class ExecuteStoryCommandHandler(
                     break;
                 case "removePrereq":
                 {
-                    if (request.GroupIndex is not { } group || string.IsNullOrEmpty(request.Token))
-                        return Error("removePrereq needs groupIndex and token.");
-                    if (group < 0 || group >= storyEvent.PrereqGroups.Count)
-                        return Error($"'{storyEvent.Name}' has no prereq group {group}.");
-                    if (!storyEvent.PrereqGroups[group].Tokens.Any(t =>
-                            string.Equals(t.Text, request.Token, StringComparison.OrdinalIgnoreCase)))
-                        return Error($"Prereq group {group} of '{storyEvent.Name}' has no token '{request.Token}'.");
-                    edits = StoryXmlWriter.RemovePrereq(text, storyEvent, group, request.Token!);
+                    if (string.IsNullOrEmpty(request.Token))
+                        return Error("removePrereq needs a token.");
+                    if (request.GroupIndex is { } group)
+                    {
+                        if (group < 0 || group >= storyEvent.PrereqGroups.Count)
+                            return Error($"'{storyEvent.Name}' has no prereq group {group}.");
+                        if (!storyEvent.PrereqGroups[group].Tokens.Any(t =>
+                                string.Equals(t.Text, request.Token, StringComparison.OrdinalIgnoreCase)))
+                            return Error(
+                                $"Prereq group {group} of '{storyEvent.Name}' has no token '{request.Token}'.");
+                    }
+                    else if (!storyEvent.PrereqGroups.Any(g => g.Tokens.Any(t =>
+                                 string.Equals(t.Text, request.Token, StringComparison.OrdinalIgnoreCase))))
+                    {
+                        return Error($"'{storyEvent.Name}' has no prereq '{request.Token}'.");
+                    }
+
+                    // Without a group index (edge-removal gesture) the token goes from every line.
+                    edits = StoryXmlWriter.RemovePrereq(text, storyEvent, request.GroupIndex, request.Token!);
                     label = $"Remove prereq from '{storyEvent.Name}'";
                     break;
                 }
@@ -193,12 +203,35 @@ public sealed class ExecuteStoryCommandHandler(
         if (edits.Count == 0)
             return Error("The command produced no changes.");
 
-        var applied = await applier.ApplyAsync(ToWorkspaceEdit(uri, edits), label, ct);
-        if (!applied)
-            return Error("The editor rejected the edit.");
+        logger.LogDebug("Story command {Kind} → applyEdit for {Uri}", request.Kind, uri);
+        return ApplyDetached(ToWorkspaceEdit(uri, edits), label);
+    }
 
-        logger.LogDebug("Story command {Kind} applied to {Uri}", request.Kind, uri);
+    /// <summary>
+    ///     Sends <c>workspace/applyEdit</c> without awaiting it inside this request. The client
+    ///     applying the edit sends <c>textDocument/didChange</c> back BEFORE answering, and
+    ///     OmniSharp (content-modified support is on by default) cancels every in-flight request
+    ///     with <c>ContentModified</c> when content changes — awaiting the round-trip here would
+    ///     kill our own response with the client's "Content Modified" error. Rejections are rare
+    ///     (the client auto-applies well-formed edits) and get logged instead of surfaced.
+    /// </summary>
+    private ExecuteStoryCommandResult ApplyDetached(WorkspaceEdit edit, string label)
+    {
+        _ = SendAsync();
         return new ExecuteStoryCommandResult(true);
+
+        async Task SendAsync()
+        {
+            try
+            {
+                if (!await applier.ApplyAsync(edit, label, CancellationToken.None))
+                    logger.LogWarning("workspace/applyEdit was rejected: {Label}", label);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "workspace/applyEdit failed: {Label}", label);
+            }
+        }
     }
 
     private static (StoryEvent? Event, string? Error) LocateEvent(StoryThread thread, string? eventName)
@@ -218,8 +251,7 @@ public sealed class ExecuteStoryCommandHandler(
 
     // ── Plot manifest operations ─────────────────────────────────────────────
 
-    private async Task<ExecuteStoryCommandResult> ManifestOpAsync(
-        ExecuteStoryCommandParams request, CancellationToken ct)
+    private ExecuteStoryCommandResult ManifestOp(ExecuteStoryCommandParams request)
     {
         if (string.IsNullOrEmpty(request.File))
             return Error("The command needs the plot manifest file.");
@@ -297,15 +329,12 @@ public sealed class ExecuteStoryCommandHandler(
         if (edits.Count == 0)
             return Error("The command produced no changes.");
 
-        var workspaceEdit = ToWorkspaceEdit(uri, edits, extraChanges);
-        var applied = await applier.ApplyAsync(workspaceEdit, label, ct);
-        return applied ? new ExecuteStoryCommandResult(true) : Error("The editor rejected the edit.");
+        return ApplyDetached(ToWorkspaceEdit(uri, edits, extraChanges), label);
     }
 
     // ── Campaign set operations ──────────────────────────────────────────────
 
-    private async Task<ExecuteStoryCommandResult> CampaignOpAsync(
-        ExecuteStoryCommandParams request, CancellationToken ct)
+    private ExecuteStoryCommandResult CampaignOp(ExecuteStoryCommandParams request)
     {
         if (string.IsNullOrEmpty(request.File))
             return Error("The command needs the plot manifest file.");
@@ -368,8 +397,7 @@ public sealed class ExecuteStoryCommandHandler(
             label = $"Detach plot manifest '{request.File}'";
         }
 
-        var applied = await applier.ApplyAsync(ToWorkspaceEdit(uri, edits, extraChanges), label, ct);
-        return applied ? new ExecuteStoryCommandResult(true) : Error("The editor rejected the edit.");
+        return ApplyDetached(ToWorkspaceEdit(uri, edits, extraChanges), label);
     }
 
     /// <summary>Resolves an xml-relative file against the workspace's xml roots, highest layer first.</summary>
@@ -390,8 +418,7 @@ public sealed class ExecuteStoryCommandHandler(
 
     // ── Rename delegation ────────────────────────────────────────────────────
 
-    private async Task<ExecuteStoryCommandResult> RenameEventAsync(
-        ExecuteStoryCommandParams request, CancellationToken ct)
+    private ExecuteStoryCommandResult RenameEvent(ExecuteStoryCommandParams request)
     {
         if (string.IsNullOrEmpty(request.EventName) || string.IsNullOrWhiteSpace(request.NewName))
             return Error("renameEvent needs eventName and newName.");
@@ -408,8 +435,7 @@ public sealed class ExecuteStoryCommandHandler(
         if (edit is null)
             return Error($"'{request.EventName}' cannot be renamed (not owned by the project layer).");
 
-        var applied = await applier.ApplyAsync(edit, $"Rename story event '{request.EventName}'", ct);
-        return applied ? new ExecuteStoryCommandResult(true) : Error("The editor rejected the edit.");
+        return ApplyDetached(edit, $"Rename story event '{request.EventName}'");
     }
 
     // ── Shared ───────────────────────────────────────────────────────────────

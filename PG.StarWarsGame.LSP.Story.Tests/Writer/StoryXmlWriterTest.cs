@@ -258,6 +258,27 @@ public sealed class StoryXmlWriterTest
         Assert.Empty(StoryXmlWriter.RemovePrereq(Fixture, Event(Fixture, "Next"), 0, "Ghost"));
     }
 
+    [Fact]
+    public void RemovePrereq_NoGroupIndex_RemovesTheTokenFromEveryLine()
+    {
+        // The edge-removal gesture doesn't know AND-line indices — the token goes everywhere.
+        const string text =
+            "<Story>\n" +
+            "\t<Event Name=\"Multi\">\n" +
+            "\t\t<Event_Type>STORY_TRIGGER</Event_Type>\n" +
+            "\t\t<Prereq>Start</Prereq>\n" +
+            "\t\t<Prereq>Start AltA</Prereq>\n" +
+            "\t</Event>\n" +
+            "</Story>\n";
+
+        var edits = StoryXmlWriter.RemovePrereq(text, Event(text, "Multi"), null, "Start");
+
+        Assert.Equal(text
+                .Replace("\t\t<Prereq>Start</Prereq>\n", "")
+                .Replace("<Prereq>Start AltA</Prereq>", "<Prereq>AltA</Prereq>"),
+            Apply(text, edits));
+    }
+
     // ── CRLF fidelity ────────────────────────────────────────────────────────
 
     [Fact]
