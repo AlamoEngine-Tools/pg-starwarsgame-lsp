@@ -113,7 +113,10 @@ public sealed class StoryChainScanner
             }
 
             if (campaignName.Length > 0 && factionManifests.Count > 0)
-                state.Campaigns.Add(new StoryCampaignChain(campaignName, factionManifests));
+                state.Campaigns.Add(new StoryCampaignChain(campaignName, factionManifests)
+                {
+                    SourceFile = campaignRel
+                });
         }
 
         // Story-name tags outside a <Campaign> element (malformed nesting) still get their

@@ -9,7 +9,14 @@ namespace PG.StarWarsGame.LSP.Story.Discovery;
 public sealed record StoryFactionManifest(string Faction, string ManifestFile);
 
 /// <summary>A campaign and its per-faction plot manifests, in document order.</summary>
-public sealed record StoryCampaignChain(string Name, IReadOnlyList<StoryFactionManifest> FactionManifests);
+public sealed record StoryCampaignChain(string Name, IReadOnlyList<StoryFactionManifest> FactionManifests)
+{
+    /// <summary>
+    ///     Xml-relative path of the campaign set file that declared this campaign — the target
+    ///     for manifest attach/detach mutations. Empty for pre-mutation-era cached results.
+    /// </summary>
+    public string SourceFile { get; init; } = "";
+}
 
 /// <summary>The parsed entries of one plot manifest (xml-relative thread files, raw Lua names).</summary>
 public sealed record StoryManifestContents(

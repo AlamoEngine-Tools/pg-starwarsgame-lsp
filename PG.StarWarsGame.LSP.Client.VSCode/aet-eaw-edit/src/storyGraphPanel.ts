@@ -28,6 +28,9 @@ interface GetStorySchemaResult {
     rewardTypes: { name: string; untested: boolean }[];
     error?: string | null;
 }
+interface ExecuteStoryCommandResult { success: boolean; error?: string | null; }
+interface StoryLayoutEntryDto { file: string; eventName: string; x: number; y: number; }
+interface GetStoryLayoutResult { entries: StoryLayoutEntryDto[]; error?: string | null; }
 
 interface GraphFilters {
     nameFilter?: string; branch?: string; lifecycle?: string; reachableFrom?: string;
@@ -103,8 +106,57 @@ export class StoryGraphPanel {
                 case 'openXml':
                     await this._openXml(msg.threadUri as string, msg.line as number | undefined);
                     break;
+                case 'command':
+                    await this._runCommand(
+                        msg.payload as Record<string, unknown>,
+                        msg.confirm as string | undefined,
+                        msg.refreshDetail as string | undefined);
+                    break;
+                case 'saveLayout':
+                    await this._saveLayout(msg.entries as StoryLayoutEntryDto[]);
+                    break;
             }
         });
+    }
+
+    /**
+     * Executes a mutation. `confirm` shows a modal first (destructive ops); `refreshDetail`
+     * re-fetches the given node's property view after success so the panel doesn't go stale
+     * while the graph re-render is still in flight.
+     */
+    private async _runCommand(
+        payload: Record<string, unknown>, confirm: string | undefined, refreshDetail: string | undefined
+    ): Promise<void> {
+        const client = this._getLspClient();
+        if (!client) {
+            void vscode.window.showWarningMessage('EaWEdit LSP: server is not running.');
+            return;
+        }
+        if (confirm) {
+            const choice = await vscode.window.showWarningMessage(confirm, { modal: true }, 'Continue');
+            if (choice !== 'Continue') { return; }
+        }
+        try {
+            const result = await client.sendRequest<ExecuteStoryCommandResult>('aet/executeStoryCommand', {
+                campaign: this._campaign,
+                ...payload,
+            });
+            if (!result.success) {
+                void vscode.window.showErrorMessage(`EaWEdit: ${result.error ?? 'The story command failed.'}`);
+                return;
+            }
+            if (refreshDetail) { await this._sendDetail(refreshDetail); }
+        } catch (e) {
+            void vscode.window.showErrorMessage(`EaWEdit: story command failed: ${e}`);
+        }
+    }
+
+    private async _saveLayout(entries: StoryLayoutEntryDto[]): Promise<void> {
+        const client = this._getLspClient();
+        if (!client || !entries?.length) { return; }
+        try {
+            await client.sendRequest('aet/setStoryLayout', { campaign: this._campaign, entries });
+        } catch { /* layout persistence is best-effort */ }
     }
 
     private async _sendSchema(): Promise<void> {
@@ -114,6 +166,8 @@ export class StoryGraphPanel {
             const schema = await client.sendRequest<GetStorySchemaResult>('aet/getStorySchema', {});
             this._post({
                 type: 'schema',
+                eventTypes: (schema.eventTypes ?? []).map(t => t.name),
+                rewardTypes: (schema.rewardTypes ?? []).map(t => t.name),
                 untestedEventTypes: (schema.eventTypes ?? []).filter(t => t.untested).map(t => t.name),
                 untestedRewardTypes: (schema.rewardTypes ?? []).filter(t => t.untested).map(t => t.name),
             });
@@ -138,11 +192,19 @@ export class StoryGraphPanel {
                 this._post({ type: 'error', message: result.error });
                 return;
             }
+            let layout: StoryLayoutEntryDto[] = [];
+            try {
+                const stored = await client.sendRequest<GetStoryLayoutResult>('aet/getStoryLayout', {
+                    campaign: this._campaign,
+                });
+                layout = stored.entries ?? [];
+            } catch { /* stored positions are optional — auto-layout covers it */ }
             this._post({
                 type: 'graph',
                 campaign: this._campaign,
                 nodes: result.nodes ?? [],
                 edges: result.edges ?? [],
+                layout,
             });
         } catch (e) {
             this._post({ type: 'error', message: `Cannot load story graph: ${e}` });

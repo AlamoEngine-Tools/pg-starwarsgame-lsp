@@ -122,6 +122,9 @@ public static class ServerConfigurator
             .WithHandler<GetStoryGraphHandler>()
             .WithHandler<GetStoryNodeDetailHandler>()
             .WithHandler<GetStorySchemaHandler>()
+            .WithHandler<ExecuteStoryCommandHandler>()
+            .WithHandler<GetStoryLayoutHandler>()
+            .WithHandler<SetStoryLayoutHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
@@ -158,6 +161,12 @@ public static class ServerConfigurator
                         p => sp.GetRequiredService<ILanguageServerFacade>()
                             .SendNotification("aet/storyGraphChanged", p),
                         sp.GetRequiredService<ILogger<StoryGraphChangeNotifier>>()));
+
+                // Story editor mutations reach the client via workspace/applyEdit (undo/redo and
+                // open-editor sync come free); the facade is resolved lazily per call.
+                services.AddSingleton<IWorkspaceEditApplier>(sp => new FacadeWorkspaceEditApplier(
+                    () => sp.GetRequiredService<ILanguageServerFacade>()));
+                services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();

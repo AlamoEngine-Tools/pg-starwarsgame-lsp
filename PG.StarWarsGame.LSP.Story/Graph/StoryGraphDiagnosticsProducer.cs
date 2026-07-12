@@ -17,15 +17,6 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
 {
     private const int MaxFlagNameLength = 31;
 
-    // Documented event block order ("Story Mode and Tutorial Scripting System"); tags not listed
-    // here carry no order constraint. Param slots share their prefix's rank.
-    private static readonly string[] CanonicalOrder =
-    [
-        "EVENT_TYPE", "EVENT_PARAM", "EVENT_FILTER", "REWARD_TYPE", "REWARD_PARAM", "PREREQ",
-        "STORY_DIALOG", "STORY_CHAPTER", "STORY_TAG", "STORY_VAR", "BRANCH", "PERPETUAL",
-        "MULTIPLAYER", "STORY_DIALOG_POPUP"
-    ];
-
     public IReadOnlyList<StoryGraphDiagnostic> Produce(StoryCampaignModel model, string documentUri)
     {
         var diagnostics = new List<StoryGraphDiagnostic>();
@@ -145,7 +136,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
             var maxTag = string.Empty;
             foreach (var tag in storyEvent.Tags)
             {
-                var rank = RankOf(tag.Name);
+                var rank = StoryEventTagOrder.RankOf(tag.Name);
                 if (rank is null) continue;
                 if (rank < maxRank)
                     diagnostics.Add(At(tag.ValueRange,
@@ -189,21 +180,6 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                             XmlDiagnosticSeverity.Error));
             }
         }
-    }
-
-    private static int? RankOf(string tagName)
-    {
-        var upper = tagName.ToUpperInvariant();
-        for (var i = 0; i < CanonicalOrder.Length; i++)
-        {
-            var entry = CanonicalOrder[i];
-            var matches = entry is "EVENT_PARAM" or "REWARD_PARAM"
-                ? upper.StartsWith(entry, StringComparison.Ordinal)
-                : upper == entry;
-            if (matches) return i;
-        }
-
-        return null;
     }
 
     private static StoryGraphDiagnostic At(StorySourceRange range, string message, XmlDiagnosticSeverity severity)

@@ -3,13 +3,16 @@
 
 // Story graph webview app: rete.js renders and lays out the graph (auto-arrange = elk.js),
 // React renders toolbar/detail chrome. The extension side (storyGraphPanel.ts) owns all LSP
-// traffic; this file only exchanges postMessage envelopes with it.
+// traffic; this file only exchanges postMessage envelopes with it. Editing is command-based
+// and never optimistic: every mutation round-trips through aet/executeStoryCommand and the
+// graph re-renders on the server's aet/storyGraphChanged push.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
 import { AutoArrangePlugin, Presets as ArrangePresets } from 'rete-auto-arrange-plugin';
+import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-plugin';
 import { Presets, ReactArea2D, ReactPlugin, RenderEmit } from 'rete-react-plugin';
 import styled, { createGlobalStyle } from 'styled-components';
 
@@ -33,12 +36,24 @@ interface StoryNodeDetailDto {
     storyDialog?: string | null; storyChapter?: number | null;
     tags: { name: string; value: string }[];
 }
+interface StoryLayoutEntry { file: string; eventName: string; x: number; y: number; }
 interface GraphFilters { nameFilter: string; branch: string; lifecycle: string; reachableFrom: string; }
 
 const EMPTY_FILTERS: GraphFilters = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
 
 /** Event/reward type names flagged `untested` in the schema — set once, read during render. */
 const untestedTypes = new Set<string>();
+
+function baseName(uri: string | null | undefined): string {
+    if (!uri) { return ''; }
+    const idx = uri.lastIndexOf('/');
+    return idx < 0 ? uri : uri.slice(idx + 1);
+}
+
+/** Sends a mutation to the extension (which owns confirmation dialogs and error toasts). */
+function sendCommand(payload: Record<string, unknown>, confirm?: string, refreshDetail?: string): void {
+    vscode.postMessage({ type: 'command', payload, confirm, refreshDetail });
+}
 
 // ── Rete setup ───────────────────────────────────────────────────────────────────────────────────
 
@@ -50,8 +65,9 @@ class StoryNode extends ClassicPreset.Node {
 
     constructor(public readonly dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
         super(dto.label);
-        if (hasInputs) { this.addInput('in', new ClassicPreset.Input(flowSocket)); }
-        if (hasOutputs) { this.addOutput('out', new ClassicPreset.Output(flowSocket)); }
+        // Event nodes always expose sockets so prereq edges can be drawn to/from them.
+        if (hasInputs || dto.kind === 'Event') { this.addInput('in', new ClassicPreset.Input(flowSocket)); }
+        if (hasOutputs || dto.kind === 'Event') { this.addOutput('out', new ClassicPreset.Output(flowSocket)); }
         if (dto.kind === 'AndJunction' || dto.kind === 'OrJunction') {
             this.width = 48; this.height = 48;
         } else if (dto.kind === 'Event') {
@@ -74,12 +90,12 @@ type Schemes = GetSchemes<StoryNode, StoryConnection>;
 type AreaExtra = ReactArea2D<Schemes>;
 
 interface EditorHandle {
-    setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[]): Promise<void>;
+    setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]): Promise<void>;
     fit(): void;
     destroy(): void;
 }
 
-/** Set by the React app before the editor exists; invoked from the area's nodepicked pipe. */
+/** Set by the React app before the editor exists; invoked from area/editor pipes. */
 let onNodePicked: (node: StoryNode) => void = () => { /* replaced by App */ };
 
 async function createEditor(container: HTMLElement): Promise<EditorHandle> {
@@ -87,6 +103,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const area = new AreaPlugin<Schemes, AreaExtra>(container);
     const render = new ReactPlugin<Schemes, AreaExtra>({ createRoot });
     const arrange = new AutoArrangePlugin<Schemes>();
+    const connection = new ConnectionPlugin<Schemes, AreaExtra>();
 
     render.addPreset(Presets.classic.setup({
         customize: {
@@ -96,44 +113,104 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         },
     }));
     arrange.addPreset(ArrangePresets.classic.setup());
+    connection.addPreset(ConnectionPresets.classic.setup());
 
     editor.use(area);
     area.use(render);
     area.use(arrange);
+    area.use(connection);
 
     AreaExtensions.selectableNodes(area, AreaExtensions.selector(), {
         accumulating: AreaExtensions.accumulateOnCtrl(),
     });
     AreaExtensions.simpleNodesOrder(area);
 
+    let applyingServerGraph = false;
+
+    // Edge gesture: a user-drawn event→event connection becomes an addPrereq command (new
+    // OR-line on the target). The local connection is blocked — the real edge arrives with
+    // the server's re-render.
+    editor.addPipe(context => {
+        if (context.type === 'connectioncreate' && !applyingServerGraph) {
+            const source = editor.getNode(context.data.source);
+            const target = editor.getNode(context.data.target);
+            if (source?.dto.kind === 'Event' && target?.dto.kind === 'Event' && target.dto.threadUri) {
+                sendCommand({
+                    kind: 'addPrereq',
+                    threadUri: target.dto.threadUri,
+                    eventName: target.dto.label,
+                    token: source.dto.label,
+                });
+            }
+            return undefined; // never materialise gesture connections locally
+        }
+        return context;
+    });
+
+    const saveAllPositions = (): void => {
+        const entries: StoryLayoutEntry[] = [];
+        for (const node of editor.getNodes()) {
+            if (node.dto.kind !== 'Event') { continue; }
+            const view = area.nodeViews.get(node.id);
+            if (!view) { continue; }
+            entries.push({
+                file: baseName(node.dto.threadUri),
+                eventName: node.dto.label,
+                x: view.position.x,
+                y: view.position.y,
+            });
+        }
+        if (entries.length) { vscode.postMessage({ type: 'saveLayout', entries }); }
+    };
+
     area.addPipe(context => {
         if (context.type === 'nodepicked') {
             const node = editor.getNode(context.data.id);
             if (node) { onNodePicked(node); }
         }
+        if (context.type === 'nodedragged') {
+            saveAllPositions();
+        }
         return context;
     });
 
     return {
-        async setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[]): Promise<void> {
-            await editor.clear();
-            const byId = new Map<string, StoryNode>();
-            const hasIn = new Set(edges.map(e => e.toId));
-            const hasOut = new Set(edges.map(e => e.fromId));
-            for (const dto of nodes) {
-                const node = new StoryNode(dto, hasIn.has(dto.id), hasOut.has(dto.id));
-                byId.set(dto.id, node);
-                await editor.addNode(node);
-            }
-            for (const edge of edges) {
-                const source = byId.get(edge.fromId);
-                const target = byId.get(edge.toId);
-                if (source && target) {
-                    await editor.addConnection(new StoryConnection(source, target, edge.kind));
+        async setGraph(
+            nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        ): Promise<void> {
+            applyingServerGraph = true;
+            try {
+                await editor.clear();
+                const byId = new Map<string, StoryNode>();
+                const hasIn = new Set(edges.map(e => e.toId));
+                const hasOut = new Set(edges.map(e => e.fromId));
+                for (const dto of nodes) {
+                    const node = new StoryNode(dto, hasIn.has(dto.id), hasOut.has(dto.id));
+                    byId.set(dto.id, node);
+                    await editor.addNode(node);
                 }
+                for (const edge of edges) {
+                    const source = byId.get(edge.fromId);
+                    const target = byId.get(edge.toId);
+                    if (source && target) {
+                        await editor.addConnection(new StoryConnection(source, target, edge.kind));
+                    }
+                }
+                await arrange.layout({ options: { 'elk.direction': 'RIGHT' } });
+
+                // Stored positions win over auto-layout for the events that have them.
+                const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+                for (const node of editor.getNodes()) {
+                    if (node.dto.kind !== 'Event') { continue; }
+                    const key = `${baseName(node.dto.threadUri)} ${node.dto.label}`.toLowerCase();
+                    const entry = stored.get(key);
+                    if (entry) { await area.translate(node.id, { x: entry.x, y: entry.y }); }
+                }
+
+                void AreaExtensions.zoomAt(area, editor.getNodes());
+            } finally {
+                applyingServerGraph = false;
             }
-            await arrange.layout({ options: { 'elk.direction': 'RIGHT' } });
-            void AreaExtensions.zoomAt(area, editor.getNodes());
         },
         fit(): void {
             void AreaExtensions.zoomAt(area, editor.getNodes());
@@ -198,8 +275,8 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border-radius: 12px;
     }
 
-    .input-socket  { position: absolute; left: -5px;  top: 50%; transform: translateY(-50%); }
-    .output-socket { position: absolute; right: -5px; top: 50%; transform: translateY(-50%); }
+    .input-socket  { position: absolute; left: -7px;  top: 50%; transform: translateY(-50%); }
+    .output-socket { position: absolute; right: -7px; top: 50%; transform: translateY(-50%); }
     &.k-OrJunction .input-socket  { transform: translateY(-50%) rotate(-45deg); }
     &.k-OrJunction .output-socket { transform: translateY(-50%) rotate(-45deg); }
 `;
@@ -277,18 +354,21 @@ function StoryConnectionView(props: { data: StoryConnection }): JSX.Element | nu
     const { path } = Presets.classic.useConnection();
     if (!path) { return null; }
     return (
-        <ConnSvg className={'k-' + props.data.kind} data-testid="connection">
+        <ConnSvg className={'k-' + (props.data.kind ?? '')} data-testid="connection">
             <path d={path} />
         </ConnSvg>
     );
 }
 
 const SocketDot = styled.div`
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
     border-radius: 50%;
     background: var(--vscode-charts-foreground, #999);
-    opacity: 0.5;
+    opacity: 0.55;
+    cursor: crosshair;
+
+    &:hover { opacity: 1; }
 `;
 
 function StorySocketView(): JSX.Element {
@@ -347,13 +427,18 @@ const Shell = styled.div`
         flex-shrink: 0;
     }
     button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-hoverBackground)); }
+    button.primary {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+    }
+    button.danger { color: var(--vscode-errorForeground, #f44); }
 
     .main { flex: 1; display: flex; overflow: hidden; }
     .canvas { flex: 1; position: relative; overflow: hidden; }
     .status { padding: 16px; color: var(--vscode-disabledForeground); }
 
     .detail {
-        width: 300px;
+        width: 320px;
         flex-shrink: 0;
         border-left: 1px solid var(--vscode-panel-border);
         background: var(--vscode-sideBar-background);
@@ -361,14 +446,25 @@ const Shell = styled.div`
         padding: 8px;
     }
     .detail h2 { font-size: 13px; margin-bottom: 6px; word-break: break-all; }
-    .detail dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; font-size: 12px; }
-    .detail dt { color: var(--vscode-descriptionForeground); white-space: nowrap; }
-    .detail dd { word-break: break-all; }
-    .detail .section { margin-top: 8px; font-weight: bold; font-size: 12px; }
-    .detail ul { list-style: none; font-size: 12px; }
-    .detail li { padding: 1px 0; word-break: break-all; }
-    .detail li.or-sep { color: var(--vscode-descriptionForeground); font-style: italic; }
-    .detail .actions { margin-top: 10px; display: flex; gap: 6px; }
+    .detail .row { display: flex; gap: 4px; align-items: center; margin: 3px 0; font-size: 12px; }
+    .detail .row label { min-width: 80px; color: var(--vscode-descriptionForeground); flex-shrink: 0; }
+    .detail .row input[type=text], .detail .row select { flex: 1; }
+    .detail .section { margin-top: 10px; font-weight: bold; font-size: 12px; }
+    .detail .chips { display: flex; flex-wrap: wrap; gap: 4px; margin: 3px 0; align-items: center; }
+    .detail .chip {
+        display: inline-flex;
+        gap: 2px;
+        align-items: center;
+        padding: 1px 4px;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 3px;
+        font-size: 11px;
+    }
+    .detail .chip button { padding: 0 3px; background: transparent; color: var(--vscode-descriptionForeground); }
+    .detail .chip button:hover { color: var(--vscode-errorForeground, #f44); }
+    .detail .or-sep { color: var(--vscode-descriptionForeground); font-style: italic; font-size: 11px; }
+    .detail .actions { margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap; }
+    .detail p.hint { font-size: 11px; color: var(--vscode-descriptionForeground); margin-top: 6px; }
 
     .legend {
         padding: 2px 8px;
@@ -408,12 +504,18 @@ function App(): JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
     const filtersRef = useRef<GraphFilters>({ ...EMPTY_FILTERS });
-    const pendingGraphRef = useRef<{ nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[] } | null>(null);
+    const pendingGraphRef = useRef<{
+        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntry[];
+    } | null>(null);
 
     const [filters, setFiltersState] = useState<GraphFilters>({ ...EMPTY_FILTERS });
     const [branches, setBranches] = useState<string[]>([]);
+    const [threads, setThreads] = useState<string[]>([]);
+    const [eventTypes, setEventTypes] = useState<string[]>([]);
+    const [rewardTypes, setRewardTypes] = useState<string[]>([]);
     const [detail, setDetail] = useState<Detail>(null);
     const [status, setStatus] = useState<string | null>('Loading story graph…');
+    const [createOpen, setCreateOpen] = useState(false);
 
     const fetchGraph = useCallback((next: GraphFilters) => {
         filtersRef.current = next;
@@ -421,13 +523,15 @@ function App(): JSX.Element {
         vscode.postMessage({ type: 'fetch', filters: next });
     }, []);
 
-    const applyGraph = useCallback((nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[]) => {
-        setBranches(previous => {
+    const applyGraph = useCallback((
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+    ) => {
+        setBranches(() => {
             const found = [...new Set(nodes.map(n => n.branch).filter((b): b is string => !!b))].sort();
-            // Keep a currently-filtered branch selectable even when the filter removed its nodes.
             const active = filtersRef.current.branch;
             return active && !found.includes(active) ? [...found, active].sort() : found;
         });
+        setThreads([...new Set(nodes.map(n => n.threadUri).filter((u): u is string => !!u))].sort());
         if (!nodes.length) {
             setStatus('No events match the current filters.');
             return;
@@ -436,9 +540,9 @@ function App(): JSX.Element {
         const handle = editorRef.current;
         if (handle) {
             pendingGraphRef.current = null;
-            void handle.setGraph(nodes, edges);
+            void handle.setGraph(nodes, edges, layout);
         } else {
-            pendingGraphRef.current = { nodes, edges };
+            pendingGraphRef.current = { nodes, edges, layout };
         }
     }, []);
 
@@ -462,12 +566,15 @@ function App(): JSX.Element {
                     untestedTypes.clear();
                     for (const name of (msg.untestedEventTypes as string[] | undefined) ?? []) { untestedTypes.add(name); }
                     for (const name of (msg.untestedRewardTypes as string[] | undefined) ?? []) { untestedTypes.add(name); }
+                    setEventTypes((msg.eventTypes as string[] | undefined) ?? []);
+                    setRewardTypes((msg.rewardTypes as string[] | undefined) ?? []);
                     break;
                 }
                 case 'graph':
                     applyGraph(
                         (msg.nodes as StoryGraphNodeDto[] | undefined) ?? [],
-                        (msg.edges as StoryGraphEdgeDto[] | undefined) ?? []);
+                        (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
+                        (msg.layout as StoryLayoutEntry[] | undefined) ?? []);
                     break;
                 case 'detail': {
                     const node = msg.node as StoryNodeDetailDto | null;
@@ -501,7 +608,7 @@ function App(): JSX.Element {
             const pending = pendingGraphRef.current;
             if (pending) {
                 pendingGraphRef.current = null;
-                void created.setGraph(pending.nodes, pending.edges);
+                void created.setGraph(pending.nodes, pending.edges, pending.layout);
             }
         });
         return () => {
@@ -540,12 +647,30 @@ function App(): JSX.Element {
                 {filters.reachableFrom
                     ? <button onClick={() => setFilter({ reachableFrom: '' })} title="Clear the reachable-from filter">⭯ Whole graph</button>
                     : null}
+                <button className="primary" onClick={() => setCreateOpen(v => !v)} title="Create a new story event">
+                    ＋ Event
+                </button>
                 <button onClick={() => editorRef.current?.fit()} title="Fit graph to view">Fit</button>
             </div>
+            {createOpen ? (
+                <CreateBar
+                    eventTypes={eventTypes}
+                    threads={threads}
+                    onClose={() => setCreateOpen(false)}
+                />
+            ) : null}
             <div className="main">
                 <div className="canvas" ref={containerRef} style={{ display: status ? 'none' : undefined }} />
                 {status ? <p className="status">{status}</p> : null}
-                {detail ? <DetailPanel detail={detail} onReachableFrom={id => setFilter({ reachableFrom: id })} /> : null}
+                {detail ? (
+                    <DetailPanel
+                        detail={detail}
+                        eventTypes={eventTypes}
+                        rewardTypes={rewardTypes}
+                        onReachableFrom={id => setFilter({ reachableFrom: id })}
+                        onClosed={() => setDetail(null)}
+                    />
+                ) : null}
             </div>
             <div className="legend">
                 <span><span className="swatch" style={{ borderColor: 'var(--vscode-disabledForeground, #888)' }} />Inactive</span>
@@ -554,13 +679,54 @@ function App(): JSX.Element {
                 <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-purple, #b180d7)' }} />Fired</span>
                 <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-red, #f14c4c)' }} />Disabled</span>
                 <span>◇ OR</span><span>○ AND</span><span>dashed = portal / tactical / untested</span>
-                <span>dimmed = unreachable</span>
+                <span>drag socket→socket = prereq</span>
             </div>
         </Shell>
     );
 }
 
-function DetailPanel(props: { detail: Exclude<Detail, null>; onReachableFrom(id: string): void }): JSX.Element {
+function CreateBar(props: { eventTypes: string[]; threads: string[]; onClose(): void }): JSX.Element {
+    const [name, setName] = useState('New_Event');
+    const [eventType, setEventType] = useState('');
+    const [thread, setThread] = useState(props.threads[0] ?? '');
+
+    const create = (): void => {
+        if (!name.trim() || !thread) { return; }
+        sendCommand({
+            kind: 'createEvent',
+            threadUri: thread,
+            newName: name.trim(),
+            eventType: eventType || null,
+        });
+        props.onClose();
+    };
+
+    return (
+        <div className="toolbar">
+            <span>New event:</span>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { create(); } }} />
+            <select value={eventType} onChange={e => setEventType(e.target.value)} title="Event type">
+                <option value="">(no event type)</option>
+                {props.eventTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+            <select value={thread} onChange={e => setThread(e.target.value)} title="Thread file">
+                {props.threads.length === 0 ? <option value="">(no thread files)</option> : null}
+                {props.threads.map(t => <option key={t} value={t}>{baseName(t)}</option>)}
+            </select>
+            <button className="primary" onClick={create} disabled={!thread}>Create</button>
+            <button onClick={props.onClose}>Cancel</button>
+        </div>
+    );
+}
+
+function DetailPanel(props: {
+    detail: Exclude<Detail, null>;
+    eventTypes: string[];
+    rewardTypes: string[];
+    onReachableFrom(id: string): void;
+    onClosed(): void;
+}): JSX.Element {
     if (props.detail.kind === 'virtual') {
         return (
             <div className="detail">
@@ -569,49 +735,145 @@ function DetailPanel(props: { detail: Exclude<Detail, null>; onReachableFrom(id:
             </div>
         );
     }
-    const node = props.detail.node;
-    const rows: [string, string][] = [];
-    const push = (label: string, value: string | number | null | undefined): void => {
-        if (value !== null && value !== undefined && value !== '') { rows.push([label, String(value)]); }
-    };
-    push('Event type', node.eventType);
-    push('Event filter', node.eventFilter);
-    for (const p of node.eventParams ?? []) { push(`Param ${p.position}`, p.value); }
-    push('Reward type', node.rewardType);
-    for (const p of node.rewardParams ?? []) { push(`Reward ${p.position}`, p.value); }
-    push('Branch', node.branch);
-    push('Perpetual', node.perpetual ? 'yes' : '');
-    push('Dialog', node.storyDialog);
-    push('Chapter', node.storyChapter);
+    return (
+        <EventForm
+            key={props.detail.node.id}
+            node={props.detail.node}
+            eventTypes={props.eventTypes}
+            rewardTypes={props.rewardTypes}
+            onReachableFrom={props.onReachableFrom}
+            onClosed={props.onClosed}
+        />
+    );
+}
+
+/** Editable property view. Every commit is a command; the panel re-fetches detail on success. */
+function EventForm(props: {
+    node: StoryNodeDetailDto;
+    eventTypes: string[];
+    rewardTypes: string[];
+    onReachableFrom(id: string): void;
+    onClosed(): void;
+}): JSX.Element {
+    const node = props.node;
+    const target = { threadUri: node.threadUri, eventName: node.name };
+    const refresh = node.id;
+
+    const [name, setName] = useState(node.name);
+    const [branch, setBranch] = useState(node.branch ?? '');
+    const [dialog, setDialog] = useState(node.storyDialog ?? '');
+    const [newToken, setNewToken] = useState('');
+
+    const commitTag = (kind: string, value: string): void =>
+        sendCommand({ kind, ...target, value: value || null }, undefined, refresh);
+
+    const commitParam = (paramKind: 'event' | 'reward', position: number, value: string): void =>
+        sendCommand({
+            kind: 'setParams', ...target, paramKind,
+            params: [{ position, value: value || null }],
+        }, undefined, refresh);
 
     return (
         <div className="detail">
             <h2>{node.name}</h2>
-            <dl>
-                {rows.map(([label, value], i) => [
-                    <dt key={`t${i}`}>{label}</dt>,
-                    <dd key={`d${i}`}>{value}</dd>,
-                ])}
-            </dl>
-            {(node.prereqGroups ?? []).length ? (
-                <>
-                    <div className="section">Prerequisites</div>
-                    <ul>
-                        {node.prereqGroups.flatMap((group, i) => [
-                            ...(i > 0 ? [<li className="or-sep" key={`s${i}`}>— or —</li>] : []),
-                            <li key={`g${i}`}>{group.join(' + ')}</li>,
-                        ])}
-                    </ul>
-                </>
-            ) : null}
-            {(node.tags ?? []).length ? (
-                <>
-                    <div className="section">Raw tags</div>
-                    <ul>
-                        {node.tags.map((tag, i) => <li key={i}>{tag.name} = {tag.value}</li>)}
-                    </ul>
-                </>
-            ) : null}
+            <div className="row">
+                <label>Name</label>
+                <input type="text" value={name} onChange={e => setName(e.target.value)} />
+                <button
+                    disabled={name.trim() === node.name || !name.trim()}
+                    onClick={() => sendCommand({ kind: 'renameEvent', eventName: node.name, newName: name.trim() })}
+                    title="Renames the event and every reference, campaign-wide"
+                >Rename</button>
+            </div>
+            <div className="row">
+                <label>Event type</label>
+                <select value={node.eventType ?? ''} onChange={e => commitTag('setEventType', e.target.value)}>
+                    <option value="">(none)</option>
+                    {[...new Set([node.eventType ?? '', ...props.eventTypes])].filter(t => t)
+                        .map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+            </div>
+            <ParamRows kind="event" params={node.eventParams} onCommit={commitParam} />
+            <div className="row">
+                <label>Reward type</label>
+                <select value={node.rewardType ?? ''} onChange={e => commitTag('setRewardType', e.target.value)}>
+                    <option value="">(none)</option>
+                    {[...new Set([node.rewardType ?? '', ...props.rewardTypes])].filter(t => t)
+                        .map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+            </div>
+            <ParamRows kind="reward" params={node.rewardParams} onCommit={commitParam} />
+            <div className="row">
+                <label>Branch</label>
+                <input
+                    type="text" value={branch}
+                    onChange={e => setBranch(e.target.value)}
+                    onBlur={() => { if (branch !== (node.branch ?? '')) { commitTag('setBranch', branch); } }}
+                />
+            </div>
+            <div className="row">
+                <label>Perpetual</label>
+                <input
+                    type="checkbox" checked={node.perpetual}
+                    onChange={e => sendCommand({ kind: 'setPerpetual', ...target, flag: e.target.checked }, undefined, refresh)}
+                />
+            </div>
+            <div className="row">
+                <label>Dialog</label>
+                <input
+                    type="text" value={dialog}
+                    onChange={e => setDialog(e.target.value)}
+                    onBlur={() => { if (dialog !== (node.storyDialog ?? '')) { commitTag('setDialog', dialog); } }}
+                />
+            </div>
+
+            <div className="section">Prerequisites</div>
+            {node.prereqGroups.map((group, gi) => (
+                <div key={gi}>
+                    {gi > 0 ? <div className="or-sep">— or —</div> : null}
+                    <div className="chips">
+                        {group.map(token => (
+                            <span className="chip" key={token}>
+                                {token}
+                                <button
+                                    title="Remove prereq token"
+                                    onClick={() => sendCommand(
+                                        { kind: 'removePrereq', ...target, groupIndex: gi, token },
+                                        undefined, refresh)}
+                                >×</button>
+                            </span>
+                        ))}
+                        <button
+                            title="AND another event onto this line"
+                            onClick={() => {
+                                const token = newToken.trim();
+                                if (token) {
+                                    sendCommand({ kind: 'addPrereq', ...target, groupIndex: gi, token }, undefined, refresh);
+                                    setNewToken('');
+                                }
+                            }}
+                        >+&amp;</button>
+                    </div>
+                </div>
+            ))}
+            <div className="row">
+                <input
+                    type="text" placeholder="Event name…" value={newToken}
+                    onChange={e => setNewToken(e.target.value)}
+                />
+                <button
+                    title="Add as a new OR line"
+                    onClick={() => {
+                        const token = newToken.trim();
+                        if (token) {
+                            sendCommand({ kind: 'addPrereq', ...target, token }, undefined, refresh);
+                            setNewToken('');
+                        }
+                    }}
+                >+ OR</button>
+            </div>
+            <p className="hint">Dragging a connection between two events also adds an OR-line prereq.</p>
+
             <div className="actions">
                 <button onClick={() => vscode.postMessage({ type: 'openXml', threadUri: node.threadUri, line: node.line })}>
                     Open XML
@@ -619,8 +881,64 @@ function DetailPanel(props: { detail: Exclude<Detail, null>; onReachableFrom(id:
                 <button onClick={() => props.onReachableFrom(node.id)}>
                     Reachable from here
                 </button>
+                <button
+                    className="danger"
+                    onClick={() => {
+                        sendCommand({ kind: 'deleteEvent', ...target },
+                            `Delete story event '${node.name}'? References to it are not removed.`);
+                        props.onClosed();
+                    }}
+                >Delete event</button>
             </div>
         </div>
+    );
+}
+
+function ParamRows(props: {
+    kind: 'event' | 'reward';
+    params: { position: number; value: string }[];
+    onCommit(kind: 'event' | 'reward', position: number, value: string): void;
+}): JSX.Element {
+    const [values, setValues] = useState<Record<number, string>>(
+        Object.fromEntries(props.params.map(p => [p.position, p.value])));
+    const [newValue, setNewValue] = useState('');
+    const nextFree = props.params.length
+        ? Math.max(...props.params.map(p => p.position)) + 1
+        : 0;
+
+    const addParam = (): void => {
+        if (newValue.trim()) {
+            props.onCommit(props.kind, nextFree, newValue.trim());
+            setNewValue('');
+        }
+    };
+
+    return (
+        <>
+            {props.params.map(p => (
+                <div className="row" key={p.position}>
+                    <label>{props.kind === 'event' ? 'Param' : 'Reward'} {p.position + 1}</label>
+                    <input
+                        type="text" value={values[p.position] ?? ''}
+                        onChange={e => setValues(v => ({ ...v, [p.position]: e.target.value }))}
+                        onBlur={() => {
+                            if ((values[p.position] ?? '') !== p.value) {
+                                props.onCommit(props.kind, p.position, values[p.position] ?? '');
+                            }
+                        }}
+                    />
+                </div>
+            ))}
+            <div className="row">
+                <label>{props.kind === 'event' ? 'Param' : 'Reward'} {nextFree + 1}</label>
+                <input
+                    type="text" placeholder="New value…" value={newValue}
+                    onChange={e => setNewValue(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') { addParam(); } }}
+                />
+                <button title={`Add ${props.kind} param ${nextFree + 1}`} onClick={addParam}>＋</button>
+            </div>
+        </>
     );
 }
 
