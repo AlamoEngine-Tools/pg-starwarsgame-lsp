@@ -337,8 +337,12 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         // The schema drives what the parser emits (which tags produce references, which files
         // carry types), so snapshots built under a different schema are stale even when every
-        // file's content hash matches. Computed once per scan.
+        // file's content hash matches. Computed once per scan. Flags that change INDEX CONTENT
+        // (story symbol emission) fold into the same fingerprint — flags are restart-based, so
+        // this is the only place a flip can invalidate cached parses.
         var schemaFingerprint = SchemaFingerprint.Compute(_schema);
+        if (!_configProvider.Current.Features.Story.Symbols)
+            schemaFingerprint += ";story-symbols-off";
 
         // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
         var layerOverallHashes = new Dictionary<string, string>(StringComparer.Ordinal);

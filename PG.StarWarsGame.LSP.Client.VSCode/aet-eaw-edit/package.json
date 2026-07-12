@@ -423,6 +423,12 @@
             "default": false,
             "markdownDescription": "Enables campaign story-graph diagnostics on story thread files: dangling or cyclic prerequisites, duplicate and ambiguous event names, unreachable events, suspended plots nothing activates, event tag order, and over-long flag names.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery, story files are not typed and these diagnostics never trigger.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.story.symbols": {
+            "order": 1857,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables cross-language story symbol indexing: story event names, flags, and AI-notification ids become navigable symbols across XML story threads and Lua scripts (hover, go-to-definition, find references).\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery, story files are not typed and nothing is indexed.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.dialog.diagnostics": {
             "order": 1860,
             "type": "boolean",

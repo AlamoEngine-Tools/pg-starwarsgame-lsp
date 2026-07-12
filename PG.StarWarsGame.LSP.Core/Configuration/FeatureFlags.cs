@@ -65,6 +65,12 @@ public record StoryFeatureFlags
     ///     duplicate/ambiguous event names, unreachable events, tag order, flag length).
     /// </summary>
     public bool GraphDiagnostics { get; init; } = true;
+
+    /// <summary>
+    ///     Gates story symbol/reference indexing across XML and Lua (event names, flags,
+    ///     AI-notification ids) and thereby hover/definition/references on them.
+    /// </summary>
+    public bool Symbols { get; init; } = true;
 }
 
 /// <summary>

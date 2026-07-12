@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using HtmlAgilityPack;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -13,6 +14,7 @@ namespace PG.StarWarsGame.LSP.Xml.Parsing;
 
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
@@ -21,16 +23,18 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
     // parseCache is optional so minimal test setups can omit it; production wires the shared
     // cache so the indexing parse seeds it — the diagnostics publish and the first hover/inlay
-    // request after an edit then reuse this parse instead of re-parsing.
+    // request after an edit then reuse this parse instead of re-parsing. A null configProvider
+    // (test convenience) means every feature flag reads as enabled.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
         IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
-        IXmlParseCache? parseCache = null)
+        IXmlParseCache? parseCache = null, ILspConfigurationProvider? configProvider = null)
     {
         _fileHelper = fileHelper;
         _schema = schema;
         _fileTypeRegistry = fileTypeRegistry;
         _logger = logger;
         _parseCache = parseCache;
+        _configProvider = configProvider;
     }
 
     public bool CanParse(string fileExtension)
@@ -53,6 +57,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var references = CollectReferences(doc, canonicalUri, lineIndex, ct);
         var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, lineIndex, registeredTypes, references, ct);
         symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
+
+        if ((_configProvider?.Current.Features.Story.Symbols ?? true) &&
+            registeredTypes.Contains("StoryParser", StringComparer.OrdinalIgnoreCase))
+            StoryDocumentSymbolCollector.Collect(parsed, canonicalUri, _schema, symbols, references);
 
         var groupMemberships = CollectGroupMemberships(doc, canonicalUri, lineIndex, ct);
 

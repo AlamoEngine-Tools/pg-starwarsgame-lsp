@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
@@ -19,6 +20,13 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
         {
             if (sym.Origin is not FileOrigin fo)
                 continue;
+
+            // Story symbols repeat legally across threads and campaigns (event names are only
+            // unique per thread; flags per campaign) — campaign-scoped duplicate detection lives
+            // in the story graph diagnostics, not the index-wide check.
+            if (StoryReferenceTypes.IsStorySymbolType(sym.TypeName))
+                continue;
+
             if (!index.WorkspaceDefinitions.TryGetValue(sym.Id, out var all) || all.Length <= 1)
                 continue;
 
@@ -48,6 +56,11 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             // Engine placeholders ("null"/"Default"/"None") are a valid "no object" value in any
             // reference position — never unresolved, never a type mismatch.
             if (EnginePlaceholders.IsPlaceholder(reference.TargetId))
+                continue;
+
+            // Story references exist for navigation and rename; their existence validation is
+            // campaign-scoped (story graph diagnostics), not index-wide.
+            if (StoryReferenceTypes.IsStorySymbolType(reference.ExpectedTypeName))
                 continue;
 
             var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
