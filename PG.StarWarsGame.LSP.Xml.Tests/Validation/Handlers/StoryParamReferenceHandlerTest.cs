@@ -96,6 +96,38 @@ public sealed class StoryParamReferenceHandlerTest
     }
 
     [Fact]
+    public void Null_object_type_with_referenceTypeName_still_validates()
+    {
+        // StoryEventType.yaml params say only "referenceType: Planet" (no referenceKind), so
+        // ObjectType never resolves — the preserved raw name must drive the check instead.
+        var fact = new StoryParamFact("file:///test.xml", 1, 0, 0, "MY_EVENT", false, 0,
+            new ParamDefinition
+            {
+                Position = 0, ValueType = XmlValueType.NameReference,
+                ReferenceTypeName = "Planet"
+            }, "NotAPlanet");
+
+        var d = Assert.Single(Sut.Handle(fact, CtxWith(GameIndex.Empty)));
+        Assert.Contains("NotAPlanet", d.Message);
+        Assert.Contains("Planet", d.Message);
+    }
+
+    [Fact]
+    public void Story_scoped_referenceTypeName_is_not_validated_here()
+    {
+        // Story references resolve campaign-scoped; existence checks belong to the story graph
+        // diagnostics, so an index-wide miss must stay silent.
+        var fact = new StoryParamFact("file:///test.xml", 1, 0, 0, "TRIGGER_EVENT", true, 0,
+            new ParamDefinition
+            {
+                Position = 0, ValueType = XmlValueType.NameReference,
+                ReferenceTypeName = "StoryEventName"
+            }, "Some_Event_Elsewhere");
+
+        Assert.Empty(Sut.Handle(fact, CtxWith(GameIndex.Empty)));
+    }
+
+    [Fact]
     public void Tab_separated_tokens_in_ref_list_all_resolved_emits_no_diagnostics()
     {
         var index = GameIndex.Empty with

@@ -162,8 +162,8 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
 
     private void AddOverlongFlagNames(List<StoryGraphDiagnostic> diagnostics, StoryThread thread)
     {
-        var eventRefTypes = StoryParamReferenceTypes.Build(schema.GetEnum("StoryEventType"));
-        var rewardRefTypes = StoryParamReferenceTypes.Build(schema.GetEnum("StoryRewardType"));
+        var eventRefTypes = StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryEventType"));
+        var rewardRefTypes = StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryRewardType"));
 
         foreach (var storyEvent in thread.Events)
         {
@@ -180,9 +180,9 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
             foreach (var slot in slots)
             {
                 if (!refTypes.TryGetValue((typeName.ToUpperInvariant(), slot.Position), out var refType)
-                    || refType != StoryParamReferenceTypes.Flag)
+                    || refType != StoryReferenceTypes.Flag)
                     continue;
-                foreach (var flag in StoryParamReferenceTypes.SplitList(slot.RawValue))
+                foreach (var flag in StoryReferenceTypes.SplitList(slot.RawValue))
                     if (flag.Length > MaxFlagNameLength)
                         diagnostics.Add(At(slot.Range,
                             $"Flag name '{flag}' is {flag.Length} characters long — the engine truncates at {MaxFlagNameLength}.",

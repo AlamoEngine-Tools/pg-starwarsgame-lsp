@@ -14,8 +14,12 @@ public sealed class StoryParamReferenceHandler : XmlDiagnosticsHandler<StoryPara
         if (fact.Def is null || fact.RawValue.Length == 0)
             return [];
 
-        var refType = fact.Def.ObjectType?.TypeName;
-        if (refType is null)
+        // The raw referenceType covers params whose target is not a types.yaml object type
+        // (e.g. Planet without an explicit referenceKind). Story-scoped references resolve
+        // campaign-wide, not index-wide — their existence checks belong to the story graph
+        // diagnostics, so they are skipped here.
+        var refType = fact.Def.ObjectType?.TypeName ?? fact.Def.ReferenceTypeName;
+        if (refType is null || StoryReferenceTypes.IsStoryScoped(refType))
             return [];
 
         if (fact.Def.ValueType == XmlValueType.NameReference)

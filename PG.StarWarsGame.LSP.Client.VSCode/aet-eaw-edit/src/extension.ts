@@ -206,6 +206,7 @@ function resolveFeatureFlags() {
 		story: {
 			discovery:        flag('story.discovery', false),
 			graphDiagnostics: flag('story.graphDiagnostics', false),
+			symbols:          flag('story.symbols', false),
 		},
 		dialog: {
 			diagnostics: flag('dialog.diagnostics', false),

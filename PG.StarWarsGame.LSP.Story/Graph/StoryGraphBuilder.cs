@@ -17,16 +17,16 @@ namespace PG.StarWarsGame.LSP.Story.Graph;
 /// </summary>
 public sealed class StoryGraphBuilder(ISchemaProvider schema)
 {
-    private const string RefStoryEventName = StoryParamReferenceTypes.EventName;
-    private const string RefStoryFlag = StoryParamReferenceTypes.Flag;
-    private const string RefStoryPlotFile = StoryParamReferenceTypes.PlotFile;
-    private const string RefStoryBranch = StoryParamReferenceTypes.Branch;
+    private const string RefStoryEventName = StoryReferenceTypes.EventName;
+    private const string RefStoryFlag = StoryReferenceTypes.Flag;
+    private const string RefStoryPlotFile = StoryReferenceTypes.PlotFile;
+    private const string RefStoryBranch = StoryReferenceTypes.Branch;
 
     public StoryGraph Build(IReadOnlyList<StoryThread> threads)
     {
         var state = new BuildState(
-            StoryParamReferenceTypes.Build(schema.GetEnum("StoryEventType")),
-            StoryParamReferenceTypes.Build(schema.GetEnum("StoryRewardType")));
+            StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryEventType")),
+            StoryReferenceTypes.BuildParamMap(schema.GetEnum("StoryRewardType")));
 
         // Pass 1: event nodes and the campaign-wide name index. Duplicate names within one file
         // are a diagnostic elsewhere; here they get deterministic disambiguated ids so the graph
@@ -203,7 +203,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
     private static IEnumerable<string> SplitList(string rawValue)
     {
-        return StoryParamReferenceTypes.SplitList(rawValue);
+        return StoryReferenceTypes.SplitList(rawValue);
     }
 
     private sealed class BuildState(

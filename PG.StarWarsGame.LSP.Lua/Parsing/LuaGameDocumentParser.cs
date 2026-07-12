@@ -6,6 +6,7 @@ using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
@@ -17,6 +18,7 @@ namespace PG.StarWarsGame.LSP.Lua.Parsing;
 public sealed class LuaGameDocumentParser : IGameDocumentParser
 {
     private readonly ILuaAnnotationRepository _annotationRepository;
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaGameDocumentParser> _logger;
     private readonly ILuaParseCache? _parseCache;
@@ -24,19 +26,22 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
 
     // parseCache is optional so minimal test setups can omit it; production wires the shared
     // cache so the indexing parse seeds it — the diagnostics publish and the first request after
-    // an edit then reuse this parse instead of re-parsing.
+    // an edit then reuse this parse instead of re-parsing. A null configProvider (test
+    // convenience) means every feature flag reads as enabled.
     public LuaGameDocumentParser(
         ILuaApiSchemaProvider schemaProvider,
         IFileHelper fileHelper,
         ILogger<LuaGameDocumentParser> logger,
         ILuaAnnotationRepository annotationRepository,
-        ILuaParseCache? parseCache = null)
+        ILuaParseCache? parseCache = null,
+        ILspConfigurationProvider? configProvider = null)
     {
         _schemaProvider = schemaProvider;
         _fileHelper = fileHelper;
         _logger = logger;
         _annotationRepository = annotationRepository;
         _parseCache = parseCache;
+        _configProvider = configProvider;
     }
 
     public bool CanParse(string fileExtension)
@@ -55,6 +60,9 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         var (symbols, annotations, functionAnnotations) = CollectSymbols(root, canonicalUri);
         var references = CollectReferences(root, canonicalUri, tree);
         var requireArgs = CollectRequireArgs(root);
+
+        if (_configProvider?.Current.Features.Story.Symbols ?? true)
+            LuaStorySymbolCollector.Collect(root, canonicalUri, symbols, references);
 
         _annotationRepository.Update(canonicalUri, [.. annotations]);
         _annotationRepository.UpdateFunctionAnnotations(canonicalUri, functionAnnotations);
