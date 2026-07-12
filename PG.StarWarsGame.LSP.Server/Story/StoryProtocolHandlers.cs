@@ -194,6 +194,36 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
     }
 }
 
+public sealed class GetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<GetStoryLayoutParams, GetStoryLayoutResult>
+{
+    public Task<GetStoryLayoutResult> Handle(GetStoryLayoutParams request, CancellationToken ct)
+    {
+        if (StoryEditorFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new GetStoryLayoutResult([], rejection));
+
+        var entries = store.Get(request.Campaign)
+            .Select(e => new StoryLayoutEntryDto(e.File, e.EventName, e.X, e.Y))
+            .ToList();
+        return Task.FromResult(new GetStoryLayoutResult(entries));
+    }
+}
+
+public sealed class SetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<SetStoryLayoutParams, SetStoryLayoutResult>
+{
+    public Task<SetStoryLayoutResult> Handle(SetStoryLayoutParams request, CancellationToken ct)
+    {
+        if (StoryEditorFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new SetStoryLayoutResult(false, rejection));
+
+        store.Set(request.Campaign, request.Entries
+            .Select(e => new StoryLayoutEntry(e.File, e.EventName, e.X, e.Y))
+            .ToList());
+        return Task.FromResult(new SetStoryLayoutResult(true));
+    }
+}
+
 public sealed class GetStorySchemaHandler(ISchemaProvider schema, ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetStorySchemaParams, GetStorySchemaResult>
 {

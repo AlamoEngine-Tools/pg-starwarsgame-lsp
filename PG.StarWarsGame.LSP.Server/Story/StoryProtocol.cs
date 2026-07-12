@@ -141,6 +141,21 @@ public sealed record StoryParamSchemaDto(
     bool Optional,
     string? Description);
 
+// ── aet/getStoryLayout / aet/setStoryLayout — node position sidecar ──────────
+
+[Method("aet/getStoryLayout", Direction.ClientToServer)]
+public sealed record GetStoryLayoutParams(string Campaign) : IRequest<GetStoryLayoutResult>;
+
+public sealed record GetStoryLayoutResult(IReadOnlyList<StoryLayoutEntryDto> Entries, string? Error = null);
+
+[Method("aet/setStoryLayout", Direction.ClientToServer)]
+public sealed record SetStoryLayoutParams(string Campaign, IReadOnlyList<StoryLayoutEntryDto> Entries)
+    : IRequest<SetStoryLayoutResult>;
+
+public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
+
+public sealed record StoryLayoutEntryDto(string File, string EventName, double X, double Y);
+
 // ── aet/storyGraphChanged — server push after model invalidation ─────────────
 
 [Method("aet/storyGraphChanged", Direction.ServerToClient)]
