@@ -43,6 +43,24 @@ public static class XmlUtility
     }
 
     /// <summary>
+    ///     Value of an object's identifier attribute, trimmed, or null when absent or blank.
+    ///     HtmlAgilityPack lowercases attribute names, so the match is case-insensitive.
+    /// </summary>
+    /// <param name="node">The object element.</param>
+    /// <param name="nameTag">
+    ///     The identifier attribute, from the object type's <c>nameTag</c>. Defaults to <c>Name</c>,
+    ///     which every currently registered type uses - pass the schema's value where it is known
+    ///     rather than relying on that.
+    /// </param>
+    public static string? GetNameAttributeValue(HtmlNode node, string nameTag = "Name")
+    {
+        var attr = node.Attributes.FirstOrDefault(a =>
+            a.Name.Equals(nameTag, StringComparison.OrdinalIgnoreCase));
+        var value = attr?.Value?.Trim();
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    /// <summary>
     ///     Recovers the original (case-preserving) tag name for <paramref name="node" /> from the
     ///     source <paramref name="text" />. HtmlAgilityPack lowercases <see cref="HtmlNode.Name" />,
     ///     which is wrong for user-facing messages on the case-sensitive EaW/FoC XML format.

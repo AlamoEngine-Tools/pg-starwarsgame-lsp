@@ -17,6 +17,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private const string HardpointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
     private const string IsTurretTag = "Is_Turret";
+    private const string SpecialAbilityNameTag = "Special_Ability_Name";
 
     // Bones that always live on the model of the object mounting the hardpoint.
     private static readonly string[] ParentModelBoneTags =
@@ -45,34 +46,29 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         if (index.ModelBones.IsEmpty)
             return [];
 
-        var facts = new List<XmlFact>();
-        var unavailable = new Dictionary<(string Model, string Owner), UnavailableModel>();
-        var hapDoc = document.Html;
+        var pass = new Pass(document, index, documentUri, schema, tagSource);
 
         foreach (var symbol in docIndex.Symbols)
         {
-            var node = FindObjectNode(hapDoc, symbol.Id);
-            if (node is null) continue;
+            if (!pass.NodesById.TryGetValue(symbol.Id, out var node)) continue;
 
             if (string.Equals(symbol.TypeName, HardpointTypeName, StringComparison.OrdinalIgnoreCase))
-                CheckHardpoint(symbol.Id, node, index, documentUri, facts, unavailable);
+                CheckHardpoint(symbol.Id, node, pass);
             else
-                CheckMountingObject(symbol.Id, node, index, documentUri, facts, unavailable);
+                CheckMountingObject(symbol.Id, node, pass);
         }
 
         // One diagnostic per unreadable model rather than per bone pointing at it.
-        foreach (var (key, info) in unavailable)
-            facts.Add(new HardpointModelBonesUnavailableFact(documentUri,
+        foreach (var (key, info) in pass.Unavailable)
+            pass.Facts.Add(new HardpointModelBonesUnavailableFact(documentUri,
                 info.Line, info.Column, info.Length, key.Model, key.Owner, info.Count));
 
-        return facts;
+        return pass.Facts;
     }
 
     // ── direction 1: a hardpoint file is open ────────────────────────────────
 
-    private void CheckHardpoint(string hardpointId, HtmlNode hardpointNode, GameIndex index,
-        string documentUri, List<XmlFact> facts,
-        Dictionary<(string Model, string Owner), UnavailableModel> unavailable)
+    private static void CheckHardpoint(string hardpointId, HtmlNode hardpointNode, Pass pass)
     {
         var bones = CollectBoneTags(hardpointNode);
         if (bones.Count == 0) return;
@@ -83,46 +79,75 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         // Turret-side bones resolve against the hardpoint's own attached model, so they can be
         // checked without knowing anything about who mounts it.
         foreach (var bone in bones.Where(b => TargetsTurretModel(b.Tag, isTurret)))
-            CheckBoneAgainstModels(bone, [turretModel], hardpointId, hardpointId, index, documentUri, facts, unavailable);
+            CheckBoneAgainstModels(bone, [turretModel], hardpointId, hardpointId, pass);
 
-        // Parent-side bones need the mounting objects' models.
+        // Parent-side bones and the special ability both need the mounting objects.
         var parentBones = bones.Where(b => !TargetsTurretModel(b.Tag, isTurret)).ToList();
-        if (parentBones.Count == 0) return;
+        var abilityNode = hardpointNode.ChildNodes.LastOrDefault(n =>
+            n.NodeType == HtmlNodeType.Element &&
+            n.Name.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase));
+        var ability = abilityNode?.InnerText.Trim();
+        if (parentBones.Count == 0 && string.IsNullOrEmpty(ability)) return;
 
-        foreach (var owner in FindMountingObjects(hardpointId, index))
+        foreach (var owner in pass.FindMountingObjects(hardpointId))
         {
-            var models = DeclaredModels(owner, index);
+            if (!string.IsNullOrEmpty(ability) && abilityNode is not null)
+                CheckSpecialAbility(hardpointId, ability, owner.Id,
+                    new Position(XmlUtility.GetLine(abilityNode),
+                        XmlUtility.GetOpeningTagStartColumn(abilityNode), abilityNode.Name.Length),
+                    pass);
+
+            var models = pass.DeclaredModels(owner.Id);
             if (models.Count == 0) continue;
 
             foreach (var bone in parentBones)
-                CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, index, documentUri, facts, unavailable);
+                CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, pass);
         }
+    }
+
+    /// <summary>
+    ///     The engine enables <c>Special_Ability_Name</c> on the object mounting the hardpoint, so the
+    ///     ability has to exist on that object - not merely somewhere in the workspace. Abilities are
+    ///     indexed owner-scoped under whichever object declares them, and a variant inherits its base's
+    ///     abilities without re-declaring them, so the whole variant chain counts as "this object".
+    /// </summary>
+    private static void CheckSpecialAbility(string hardpointId, string ability, string ownerId,
+        Position position, Pass pass)
+    {
+        if (pass.OwnerHasAbility(ownerId, ability)) return;
+
+        pass.Facts.Add(new HardpointAbilityNotOnOwnerFact(pass.DocumentUri,
+            position.Line, position.Column, position.Length,
+            hardpointId, ability, ownerId,
+            pass.Index.ResolveOwnerAgnostic(ability) is not null));
     }
 
     // ── direction 2: a file mounting hardpoints is open ──────────────────────
 
-    private void CheckMountingObject(string ownerId, HtmlNode objectNode, GameIndex index,
-        string documentUri, List<XmlFact> facts,
-        Dictionary<(string Model, string Owner), UnavailableModel> unavailable)
+    private static void CheckMountingObject(string ownerId, HtmlNode objectNode, Pass pass)
     {
         var hardpointsNode = objectNode.ChildNodes.FirstOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             n.Name.Equals(HardpointsTag, StringComparison.OrdinalIgnoreCase));
         if (hardpointsNode is null) return;
 
-        var owner = index.Resolve(ownerId);
-        if (owner is null) return;
-
-        var models = DeclaredModels(owner, index);
+        var models = pass.DeclaredModels(ownerId);
         if (models.Count == 0) return;
 
         foreach (var (hardpointId, offset) in XmlUtility.SplitListWithOffsets(hardpointsNode.InnerText))
         {
-            var hardpointTags = tagSource.TryGetTags(hardpointId);
+            var hardpointTags = pass.TagSource.TryGetTags(hardpointId);
             if (hardpointTags is null) continue; // unresolved hardpoint: the reference pipeline owns that
 
             var isTurret = IsTurretFromTags(hardpointTags);
-            var position = TokenPosition(hardpointsNode, offset, hardpointId, documentUri);
+            var position = pass.TokenPosition(hardpointsNode, offset, hardpointId);
+
+            // The same ability check from this side: the squiggle lands on the hardpoint token in
+            // this object's HardPoints list, which is where the pairing is declared.
+            var ability = hardpointTags.LastOrDefault(t =>
+                t.TagName.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
+            if (!string.IsNullOrEmpty(ability))
+                CheckSpecialAbility(hardpointId, ability, ownerId, position, pass);
 
             foreach (var tag in hardpointTags)
             {
@@ -130,9 +155,8 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
                 var bone = tag.Value.Trim();
                 if (bone.Length == 0) continue;
 
-                CheckBoneAgainstModels(
-                    new BoneReference(tag.TagName, bone, position),
-                    models, hardpointId, ownerId, index, documentUri, facts, unavailable);
+                CheckBoneAgainstModels(new BoneReference(tag.TagName, bone, position),
+                    models, hardpointId, ownerId, pass);
             }
         }
     }
@@ -140,19 +164,18 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     // ── shared ───────────────────────────────────────────────────────────────
 
     private static void CheckBoneAgainstModels(BoneReference bone, IReadOnlyList<string?> models,
-        string hardpointId, string ownerId, GameIndex index, string documentUri, List<XmlFact> facts,
-        Dictionary<(string Model, string Owner), UnavailableModel> unavailable)
+        string hardpointId, string ownerId, Pass pass)
     {
         foreach (var model in models)
         {
             if (string.IsNullOrEmpty(model)) continue;
 
-            if (!index.ModelBones.TryGetValue(model, out var modelBones) || modelBones.Length == 0)
+            if (!pass.Index.ModelBones.TryGetValue(model, out var modelBones) || modelBones.Length == 0)
             {
                 // Accumulate: one diagnostic per unreadable model, anchored at the first bone that
                 // could not be checked, rather than one per bone.
                 var key = (model, ownerId);
-                unavailable[key] = unavailable.TryGetValue(key, out var seen)
+                pass.Unavailable[key] = pass.Unavailable.TryGetValue(key, out var seen)
                     ? seen with { Count = seen.Count + 1 }
                     : new UnavailableModel(bone.Position.Line, bone.Position.Column,
                         bone.Position.Length, 1);
@@ -161,61 +184,13 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
             if (modelBones.Contains(bone.Value, StringComparer.OrdinalIgnoreCase)) continue;
 
-            facts.Add(new HardpointBoneNotOnModelFact(documentUri,
+            pass.Facts.Add(new HardpointBoneNotOnModelFact(pass.DocumentUri,
                 bone.Position.Line, bone.Position.Column, bone.Position.Length,
                 hardpointId, bone.Tag, bone.Value, model, ownerId));
         }
     }
 
-    /// <summary>
-    ///     Objects whose <c>HardPoints</c> list mounts <paramref name="hardpointId" />. Reached through
-    ///     the reference index, so only documents that actually mention the hardpoint are inspected.
-    /// </summary>
-    private IEnumerable<GameSymbol> FindMountingObjects(string hardpointId, GameIndex index)
-    {
-        if (!index.WorkspaceReferences.TryGetValue(hardpointId, out var references))
-            yield break;
-
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var uri in references.Select(r => r.DocumentUri).Distinct(StringComparer.Ordinal))
-        {
-            if (!index.Documents.TryGetValue(uri, out var doc)) continue;
-
-            foreach (var symbol in doc.Symbols)
-            {
-                if (!seen.Add(symbol.Id)) continue;
-
-                var tags = tagSource.TryGetTags(symbol.Id);
-                if (tags is null) continue;
-
-                var mounts = tags.Any(t =>
-                    t.TagName.Equals(HardpointsTag, StringComparison.OrdinalIgnoreCase) &&
-                    t.Value.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)
-                        .Any(v => v.Equals(hardpointId, StringComparison.OrdinalIgnoreCase)));
-                if (mounts) yield return symbol;
-            }
-        }
-    }
-
-    /// <summary>
-    ///     Every model the object declares, resolved through variant inheritance so a variant that
-    ///     inherits its model is still checked. All of them must carry the bone.
-    /// </summary>
-    private IReadOnlyList<string?> DeclaredModels(GameSymbol owner, GameIndex index)
-    {
-        var effective = new EffectiveObjectResolver(index, schema, tagSource).Resolve(owner.Id);
-        if (!effective.Found || effective.Cyclic) return [];
-
-        return effective.Tags
-            .Where(t => schema.GetTag(t.TagName)?.ReferenceKind == ReferenceKind.ModelFile)
-            .Select(t => t.Value.Trim())
-            .Where(v => v.Length > 0)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Cast<string?>()
-            .ToList();
-    }
-
-    private List<BoneReference> CollectBoneTags(HtmlNode hardpointNode)
+    private static List<BoneReference> CollectBoneTags(HtmlNode hardpointNode)
     {
         var result = new List<BoneReference>();
         foreach (var child in hardpointNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
@@ -248,22 +223,13 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     private static bool IsTurret(HtmlNode hardpointNode)
     {
-        return IsAffirmative(SingleValue(hardpointNode, IsTurretTag));
+        return EngineBoolean.IsTrue(SingleValue(hardpointNode, IsTurretTag));
     }
 
     private static bool IsTurretFromTags(IReadOnlyList<VariantTag> tags)
     {
-        return IsAffirmative(tags.LastOrDefault(t =>
+        return EngineBoolean.IsTrue(tags.LastOrDefault(t =>
             t.TagName.Equals(IsTurretTag, StringComparison.OrdinalIgnoreCase))?.Value);
-    }
-
-    private static bool IsAffirmative(string? value)
-    {
-        value = value?.Trim();
-        return value is not null
-               && (value.Equals("Yes", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("True", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("1", StringComparison.Ordinal));
     }
 
     private static string? SingleValue(HtmlNode objectNode, string tagName)
@@ -275,26 +241,161 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         return string.IsNullOrEmpty(value) ? null : value;
     }
 
-    private static Position TokenPosition(HtmlNode listNode, int offset, string token, string documentUri)
-    {
-        var absolute = listNode.InnerStartIndex + offset;
-        var (line, column) = new LineOffsetIndex(listNode.OwnerDocument.Text).GetPosition(absolute);
-        return new Position(line, column, token.Length);
-    }
-
-    private static HtmlNode? FindObjectNode(HtmlDocument doc, string objectId)
-    {
-        return doc.DocumentNode.Descendants()
-            .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element &&
-                                 n.Attributes.Any(a =>
-                                     a.Name.Equals("Name", StringComparison.OrdinalIgnoreCase) &&
-                                     string.Equals(a.Value?.Trim(), objectId, StringComparison.OrdinalIgnoreCase)));
-    }
-
     private readonly record struct Position(int Line, int Column, int Length);
 
     /// <summary>A model with no readable bone list, and how many bone references it left unchecked.</summary>
     private readonly record struct UnavailableModel(int Line, int Column, int Length, int Count);
 
     private readonly record struct BoneReference(string Tag, string Value, Position Position);
+
+    /// <summary>
+    ///     Per-document state for one <see cref="Produce" /> call. Exists to hold the work that is
+    ///     otherwise repeated per symbol or per token: the object-node lookup, the resolved model list
+    ///     of each owner, and the document's line index. A class rather than captured locals so it
+    ///     copies only the fields it needs instead of keeping the enclosing scope alive.
+    /// </summary>
+    private sealed class Pass
+    {
+        private readonly ParsedXmlDocument _document;
+        private readonly Dictionary<string, IReadOnlyList<string>> _chainByOwner =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Dictionary<string, IReadOnlyList<string?>> _modelsByOwner =
+            new(StringComparer.OrdinalIgnoreCase);
+        private readonly EffectiveObjectResolver _resolver;
+        private readonly ISchemaProvider _schema;
+
+        public Pass(ParsedXmlDocument document, GameIndex index, string documentUri,
+            ISchemaProvider schema, IVariantTagSource tagSource)
+        {
+            _document = document;
+            _schema = schema;
+            Index = index;
+            DocumentUri = documentUri;
+            TagSource = tagSource;
+            _resolver = new EffectiveObjectResolver(index, schema, tagSource);
+            NodesById = BuildNodeIndex(document.Html);
+        }
+
+        public GameIndex Index { get; }
+        public string DocumentUri { get; }
+        public IVariantTagSource TagSource { get; }
+        public List<XmlFact> Facts { get; } = [];
+        public Dictionary<(string Model, string Owner), UnavailableModel> Unavailable { get; } = [];
+
+        /// <summary>
+        ///     Every named object in the document, keyed by id. Built in one pass: resolving each
+        ///     symbol with a fresh Descendants() scan made this quadratic (194 hardpoints over a
+        ///     6461-line file re-walked the whole tree 194 times).
+        /// </summary>
+        public Dictionary<string, HtmlNode> NodesById { get; }
+
+        /// <summary>
+        ///     Models the object declares, resolved through variant inheritance so a variant that
+        ///     inherits its model is still checked. Memoised: the same owner is reached once per
+        ///     hardpoint it mounts, and each miss walks and merges the whole variant chain.
+        /// </summary>
+        public IReadOnlyList<string?> DeclaredModels(string ownerId)
+        {
+            if (_modelsByOwner.TryGetValue(ownerId, out var cached)) return cached;
+
+            var effective = _resolver.Resolve(ownerId);
+            var models = !effective.Found || effective.Cyclic
+                ? []
+                : effective.Tags
+                    .Where(t => _schema.GetTag(t.TagName)?.ReferenceKind == ReferenceKind.ModelFile)
+                    .Select(t => t.Value.Trim())
+                    .Where(v => v.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Cast<string?>()
+                    .ToList();
+
+            return _modelsByOwner[ownerId] = models;
+        }
+
+        /// <summary>
+        ///     Whether <paramref name="ownerId" /> has an ability of that name, counting the ones it
+        ///     inherits. Abilities are indexed owner-scoped (<c>{ownerId}$Name</c>) under the object that
+        ///     declares them, and a variant does not re-declare what it inherits, so every link of the
+        ///     variant chain is a valid place for the declaration to live.
+        /// </summary>
+        public bool OwnerHasAbility(string ownerId, string abilityName)
+        {
+            foreach (var link in Chain(ownerId))
+                if (Index.Resolve($"{link}{GameIndex.OwnerScopeSeparator}{abilityName}") is not null)
+                    return true;
+
+            return false;
+        }
+
+        /// <summary>The object's variant chain, itself first. Memoised alongside the model lookup.</summary>
+        private IReadOnlyList<string> Chain(string ownerId)
+        {
+            if (_chainByOwner.TryGetValue(ownerId, out var cached)) return cached;
+
+            var effective = _resolver.Resolve(ownerId);
+            var chain = effective.Found && !effective.Cyclic
+                ? effective.Chain
+                : (IReadOnlyList<string>) [ownerId];
+
+            return _chainByOwner[ownerId] = chain;
+        }
+
+        /// <summary>
+        ///     Objects whose <c>HardPoints</c> list mounts <paramref name="hardpointId" />. Reached
+        ///     through the reference index, so only documents that actually mention it are inspected.
+        /// </summary>
+        public IEnumerable<GameSymbol> FindMountingObjects(string hardpointId)
+        {
+            if (!Index.WorkspaceReferences.TryGetValue(hardpointId, out var references))
+                yield break;
+
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var uri in references.Select(r => r.DocumentUri).Distinct(StringComparer.Ordinal))
+            {
+                if (!Index.Documents.TryGetValue(uri, out var doc)) continue;
+
+                foreach (var symbol in doc.Symbols)
+                {
+                    if (!seen.Add(symbol.Id)) continue;
+
+                    var tags = TagSource.TryGetTags(symbol.Id);
+                    if (tags is null) continue;
+
+                    var mounts = tags.Any(t =>
+                        t.TagName.Equals(HardpointsTag, StringComparison.OrdinalIgnoreCase) &&
+                        t.Value.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)
+                            .Any(v => v.Equals(hardpointId, StringComparison.OrdinalIgnoreCase)));
+                    if (mounts) yield return symbol;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     Position of one token inside a list element. Uses the document's memoised line index -
+        ///     building a fresh <see cref="LineOffsetIndex" /> here re-scanned the whole file per token.
+        /// </summary>
+        public Position TokenPosition(HtmlNode listNode, int offset, string token)
+        {
+            var (line, column) = _document.LineIndex.GetPosition(listNode.InnerStartIndex + offset);
+            return new Position(line, column, token.Length);
+        }
+
+        private static Dictionary<string, HtmlNode> BuildNodeIndex(HtmlDocument doc)
+        {
+            var map = new Dictionary<string, HtmlNode>(StringComparer.OrdinalIgnoreCase);
+            foreach (var node in doc.DocumentNode.Descendants())
+            {
+                if (node.NodeType != HtmlNodeType.Element) continue;
+
+                var id = XmlUtility.GetNameAttributeValue(node);
+                if (id is null) continue;
+
+                // First definition wins, matching how the rest of the pipeline treats duplicate ids.
+                map.TryAdd(id, node);
+            }
+
+            return map;
+        }
+    }
 }

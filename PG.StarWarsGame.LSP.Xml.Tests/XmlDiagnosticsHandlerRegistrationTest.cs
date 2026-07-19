@@ -66,7 +66,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Attachment_Bone is indestructible (#53).
         // 102 → 104: HardpointBoneNotOnModelHandler + HardpointModelBonesUnavailableHandler added -
         // hardpoint bones cross-checked against the models of the objects mounting them (#53).
-        const int expectedHandlerCount = 104;
+        // 104 → 105: HardpointAbilityNotOnOwnerHandler added - Special_Ability_Name must name an
+        // ability the mounting object actually has (#53).
+        const int expectedHandlerCount = 105;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

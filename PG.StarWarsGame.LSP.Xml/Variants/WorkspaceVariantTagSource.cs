@@ -88,10 +88,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
 
     private static string? GetNameAttribute(HtmlNode node)
     {
-        var attr = node.Attributes.FirstOrDefault(a =>
-            a.Name.Equals(NameAttribute, StringComparison.OrdinalIgnoreCase));
-        var value = attr?.Value?.Trim();
-        return string.IsNullOrEmpty(value) ? null : value;
+        return XmlUtility.GetNameAttributeValue(node, NameAttribute);
     }
 
     private static List<VariantTag> CollectChildTags(HtmlNode objectNode, string uri, string text)

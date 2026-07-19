@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
@@ -49,7 +50,7 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
         if (!IsExplicitlyDestroyable(childrenByName))
             return [];
 
-        var id = NameAttribute(objectNode);
+        var id = XmlUtility.GetNameAttributeValue(objectNode);
         if (id is null)
             return []; // an unnamed hardpoint is a different problem, reported elsewhere
 
@@ -71,18 +72,7 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
             return false;
 
         // Last occurrence wins, matching how the engine reads duplicated tags.
-        var value = nodes.LastOrDefault(n => n.InnerText.Trim().Length > 0)?.InnerText.Trim();
-        return value is not null
-               && (value.Equals("Yes", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("True", StringComparison.OrdinalIgnoreCase)
-                   || value.Equals("1", StringComparison.Ordinal));
-    }
-
-    private static string? NameAttribute(HtmlNode node)
-    {
-        var attr = node.Attributes.FirstOrDefault(a =>
-            a.Name.Equals("Name", StringComparison.OrdinalIgnoreCase));
-        var value = attr?.Value?.Trim();
-        return string.IsNullOrEmpty(value) ? null : value;
+        return EngineBoolean.IsTrue(
+            nodes.LastOrDefault(n => n.InnerText.Trim().Length > 0)?.InnerText);
     }
 }

@@ -268,20 +268,27 @@ public sealed class EawSchemaA2TagTest
         Assert.Contains(tag.Enum!.Values, v => v.Name == "Landing Transport");
     }
 
-    // ── HardPoint:Special_Ability_Name → deliberately UNVALIDATED ────────────
+    // ── HardPoint:Special_Ability_Name → owner-agnostic ability reference ────
 
+    /// <summary>
+    ///     Was deliberately <c>referenceKind: unknown</c> until 2026-07-19: the ability lives on the
+    ///     object the hardpoint is ATTACHED to, abilities are indexed owner-scoped
+    ///     (<c>{ownerId}$Name</c>), and a bare name matched nothing - so indexing it would have
+    ///     produced only false "missing object" diagnostics (2026-07-05 smoketest decision).
+    ///     <para>
+    ///         Owner-agnostic resolution removed that blocker, so the value is a real reference now:
+    ///         navigable across owners, with the stricter "is it on the mounting object's chain?"
+    ///         question owned by XmlHardpointFactProducer, which can see who mounts the hardpoint.
+    ///     </para>
+    /// </summary>
     [Fact]
-    public void HardPoint_SpecialAbilityName_IsUnknownKind_NoFalseMissingObjectDiagnostics()
+    public void HardPoint_SpecialAbilityName_IsAnOwnerAgnosticReference()
     {
-        // The referenced ability lives on the object the hardpoint is ATTACHED to; validating it
-        // needs an owner-object ability lookup (which unit mounts this hardpoint?) that is not
-        // supported yet. Until then the tag stays referenceKind: unknown so no false "missing
-        // object" diagnostics are emitted (2026-07-05 smoketest decision).
         var tag = Schema.GetTagsForType("HardPoint")
             .First(t => string.Equals(t.Tag, "Special_Ability_Name", StringComparison.OrdinalIgnoreCase));
 
-        Assert.Equal(ReferenceKind.Unknown, tag.ReferenceKind);
-        Assert.Null(tag.ObjectType);
+        Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
+        Assert.Equal(TagSemanticType.OwnerAgnosticReference, tag.SemanticType);
     }
 
     // ── RadioactiveContaminateAbility:Contamination_Object_Name → GameObjectType

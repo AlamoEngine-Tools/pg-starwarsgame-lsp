@@ -152,6 +152,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();
 
         // Shared parse source: one HAP parse per (document, content) reused by indexing,
         // diagnostics, and every request handler. Capacity from ServerOptions.ParseCacheCapacity.
