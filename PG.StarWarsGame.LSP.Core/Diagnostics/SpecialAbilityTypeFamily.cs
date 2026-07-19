@@ -39,6 +39,11 @@ internal static class SpecialAbilityTypeFamily
         "TacticalBribeAbility", "ClusterBombAbility", "SensorJammingAbility", "RemoteBombAbility",
         "InfectionAbility", "ProximityMinesAbility", "DrainLifeAbility", "BlastAbility",
         "BuzzDroidsAbility", "ShieldFlareAbility", "SummonAbility", "CorruptSystemsAbility",
-        "SpawnAbility", "CorruptionAbility", "PermanentWeaponSwapAbility"
+        "SpawnAbility", "CorruptionAbility", "PermanentWeaponSwapAbility",
+        // Ability subtypes registered as object types for owner-scoped indexing; kept in the family so
+        // references to them (e.g. a hardpoint's Special_Ability_Name) type-check as a SpecialAbility.
+        "BasePowerAbility", "CableAbility", "EnableAbility", "HackSuperWeaponAbility",
+        "PlanetDestructionAbility", "PoliticalControlProtectionAbility", "RetreatPreventionAbility",
+        "StarbaseUpgradeAbility"
     };
 }
