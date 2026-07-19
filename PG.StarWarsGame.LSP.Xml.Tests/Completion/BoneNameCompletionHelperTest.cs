@@ -153,7 +153,9 @@ public sealed class BoneNameCompletionHelperTest
         var bone = Node(
             "<SpaceUnit><Space_Model_Name>Data\\Art\\Models\\Unit.ALO</Space_Model_Name><Bone_Name></Bone_Name></SpaceUnit>",
             "//bone_name");
-        var index = IndexWithBones(("data/art/models/unit.alo", ["root"]));
+        // Catalog keyed by bare filename (ModelBoneKey); the path-qualified, mixed-case model
+        // reference must reduce to that same key to find the bones.
+        var index = IndexWithBones(("unit.alo", ["root"]));
 
         var result = helper.GetProposals(bone, "", index);
 

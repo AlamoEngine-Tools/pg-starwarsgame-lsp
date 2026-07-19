@@ -214,7 +214,9 @@ public static class MegAssetCatalogBuilder
             if (stream is null) return;
             var bones = extractBones(stream);
             if (bones.Count > 0)
-                bonesBuilder[normalizedPath] = bones.ToImmutableArray();
+                // Keyed by bare filename: XML references models by name and the engine resolves them
+                // by name across the VFS. Later archives override earlier ones at the same filename.
+                bonesBuilder[Core.Symbols.ModelBoneKey.From(normalizedPath)] = bones.ToImmutableArray();
         }
         catch
         {

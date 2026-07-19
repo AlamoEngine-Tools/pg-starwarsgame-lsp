@@ -62,7 +62,7 @@ public sealed class BoneNameCompletionHelper
 
                 var value = child.InnerText.Trim();
                 if (value.Length > 0)
-                    result.Add(Normalize(value));
+                    result.Add(ModelBoneKey.From(value));
             }
 
             if (result.Count > 0)
@@ -72,10 +72,5 @@ public sealed class BoneNameCompletionHelper
         }
 
         return result;
-    }
-
-    private static string Normalize(string path)
-    {
-        return path.Replace('\\', '/').ToLowerInvariant();
     }
 }

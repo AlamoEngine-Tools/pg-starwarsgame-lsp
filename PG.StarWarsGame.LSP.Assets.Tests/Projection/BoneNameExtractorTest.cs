@@ -30,7 +30,7 @@ public sealed class BoneNameExtractorTest
     }
 
     [Fact]
-    public void Extract_AloFile_ReturnsBonesKeyedByNormalisedRelativePath()
+    public void Extract_AloFile_ReturnsBonesKeyedByFilename()
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -39,8 +39,10 @@ public sealed class BoneNameExtractorTest
 
         var result = BoneNameExtractor.Extract(fs, @"C:\Game", _ => ["root", "turret_bone"]);
 
-        Assert.True(result.ContainsKey("data/art/models/unit.alo"));
-        Assert.Equal(["root", "turret_bone"], result["data/art/models/unit.alo"]);
+        // Keyed by bare filename (ModelBoneKey), matching how XML references models and how the
+        // bone catalog is looked up.
+        Assert.True(result.ContainsKey("unit.alo"));
+        Assert.Equal(["root", "turret_bone"], result["unit.alo"]);
     }
 
     [Fact]

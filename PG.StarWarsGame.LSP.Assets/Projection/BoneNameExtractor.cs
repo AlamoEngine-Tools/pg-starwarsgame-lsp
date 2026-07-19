@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 
 /// <summary>
 ///     Extracts the animation-bone names exposed by each loose <c>.alo</c> model file under a game
-///     repository root. The result is keyed by the model's path normalised relative to that root
-///     (lowercase, forward-slash). Used by the BaselineBuilder to populate
+///     repository root. The result is keyed by the model's bare lowercased filename
+///     (<see cref="Core.Symbols.ModelBoneKey" />). Used by the BaselineBuilder to populate
 ///     <see cref="Core.Symbols.BaselineIndex.ModelBones" /> and by the workspace scanner for mod models.
 /// </summary>
 /// <remarks>
@@ -64,8 +64,9 @@ public static class BoneNameExtractor
             if (bones is null || bones.Count == 0)
                 continue;
 
-            var relative = fileSystem.Path.GetRelativePath(root, file);
-            result[Normalize(relative)] = bones.ToArray();
+            // Keyed by bare filename (ModelBoneKey), matching the MEG baseline catalog and how XML
+            // references models. A loose workspace model overrides a shipped one of the same name.
+            result[Core.Symbols.ModelBoneKey.From(file)] = bones.ToArray();
         }
 
         return result;
@@ -86,10 +87,5 @@ public static class BoneNameExtractor
             using var model = aloService.LoadModel(stream);
             return model.Content.Bones;
         };
-    }
-
-    private static string Normalize(string relativePath)
-    {
-        return relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
     }
 }

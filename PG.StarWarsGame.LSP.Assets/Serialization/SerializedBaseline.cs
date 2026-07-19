@@ -16,7 +16,9 @@ public sealed class SerializedBaseline
     // never wrote this key) deserialize it as the CLR default 0 - itself a natural version
     // mismatch, with no separate migration path needed.
     // v2: FileTypeMap now carries the story chain (StoryPlotManifest/StoryParser entries).
-    public const int CurrentSchemaVersion = 2;
+    // v3: ModelBones re-keyed from full relative path to bare filename (ModelBoneKey); old caches
+    //     carry the wrong keys and must regenerate or every model reads as bones-unavailable.
+    public const int CurrentSchemaVersion = 3;
 
     [Key(0)] public GameSymbol[] Symbols { get; set; } = [];
     [Key(1)] public long BuiltAtMs { get; set; }

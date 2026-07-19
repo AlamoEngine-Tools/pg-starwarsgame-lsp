@@ -170,7 +170,10 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         {
             if (string.IsNullOrEmpty(model)) continue;
 
-            if (!pass.Index.ModelBones.TryGetValue(model, out var modelBones) || modelBones.Length == 0)
+            // The bone catalog is keyed by bare filename; XML may spell the model in any case and
+            // (rarely) with a path, so reduce to the same key before looking it up.
+            if (!pass.Index.ModelBones.TryGetValue(ModelBoneKey.From(model), out var modelBones)
+                || modelBones.Length == 0)
             {
                 // Accumulate: one diagnostic per unreadable model, anchored at the first bone that
                 // could not be checked, rather than one per bone.

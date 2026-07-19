@@ -170,7 +170,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
     /// <summary>
     ///     Extracts bone names from loose workspace .alo models, unions them with the baseline bone
-    ///     catalog (workspace models override shipped ones at the same path), and publishes the
+    ///     catalog (workspace models override shipped ones of the same filename), and publishes the
     ///     merged map on the GameIndex for boneName completion.
     /// </summary>
     public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
