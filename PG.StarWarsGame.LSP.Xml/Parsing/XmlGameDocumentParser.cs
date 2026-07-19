@@ -195,6 +195,19 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // (key, SFXEvent) tuples: slot 0 is an enum / hardcoded ability code / unit type and
+                // slot 1 is the SFXEvent name. These tags carry no referenceKind - the pair is
+                // validated by the *SfxMap handlers - so without this the SFXEvent half is invisible
+                // to go-to-definition even though the same event resolves from a plain
+                // SFXEventReference tag. The slot is optional and legitimately left empty.
+                if (tagDef.ValueType is XmlValueType.HardPointSfxMap or XmlValueType.AbilitySfxMap
+                    or XmlValueType.ConditionalSfxEvent)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectTupleSfxEventReference(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
                 // Variant base references are emitted by the symbol passes with the enclosing
@@ -278,6 +291,33 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             $"enum:GameObjectCategoryType/{token}",
             null,
             null,
+            documentUri,
+            line,
+            column,
+            token.Length));
+    }
+
+    // Slot 1 of a (key, SFXEvent) tuple, as an SFXEvent object reference. Vanilla data never uses
+    // more than two slots, and the SFXEvent slot is frequently absent ("DEFEND, ") - both the
+    // one-token and empty-second-token forms simply yield no reference.
+    private static void CollectTupleSfxEventReference(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var comma = innerText.IndexOf(',');
+        if (comma < 0) return;
+
+        var slot = innerText[(comma + 1)..];
+        var token = slot.Trim();
+        if (token.Length == 0) return;
+
+        var tokenOffset = comma + 1 + slot.IndexOf(token, StringComparison.Ordinal);
+        var absPos = child.InnerStartIndex + tokenOffset;
+        var (line, column) = lineIndex.GetPosition(absPos);
+        references.Add(new GameReference(
+            token,
+            GameSymbolKind.XmlObject,
+            "SFXEvent",
             documentUri,
             line,
             column,

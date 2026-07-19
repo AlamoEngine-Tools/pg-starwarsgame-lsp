@@ -211,6 +211,73 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("file:///f.xml", reference.DocumentUri);
     }
 
+    // ── (key, SFXEvent) tuple tags - #78 ──────────────────────────────────────
+
+    private static XmlTagDefinition TupleSfxTag(string tag, XmlValueType valueType)
+    {
+        // Deliberately no ReferenceKind: these tags carry none in the real schema, which is why
+        // their SFXEvent slot used to be invisible to go-to-definition.
+        return new XmlTagDefinition { Tag = tag, ValueType = valueType };
+    }
+
+    [Theory]
+    [InlineData(XmlValueType.HardPointSfxMap)]
+    [InlineData(XmlValueType.AbilitySfxMap)]
+    [InlineData(XmlValueType.ConditionalSfxEvent)]
+    public async Task ParseAsync_TupleSfxTag_EmitsSfxEventReferenceForSecondSlot(XmlValueType valueType)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(TupleSfxTag("SFXEvent_Hardpoint_Destroyed", valueType));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><SFXEvent_Hardpoint_Destroyed> HARD_POINT_WEAPON_LASER, Unit_Lost_Laser </SFXEvent_Hardpoint_Destroyed></Unit>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Unit_Lost_Laser", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Equal("SFXEvent", reference.ExpectedTypeName);
+        Assert.Equal("Unit_Lost_Laser".Length, reference.Length);
+    }
+
+    [Theory]
+    // The SFXEvent half is legitimately absent in ~424 vanilla occurrences; neither form may
+    // produce a reference, or every one of them would raise a bogus unresolved-reference warning.
+    [InlineData("DEFEND, ")]
+    [InlineData("DEFEND")]
+    [InlineData("")]
+    public async Task ParseAsync_TupleSfxTag_MissingSecondSlot_EmitsNoReference(string value)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(TupleSfxTag("SFXEvent_GUI_Toggle_Non_Hero_Ability_On", XmlValueType.AbilitySfxMap));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            $"""<Unit Name="UNIT_A"><SFXEvent_GUI_Toggle_Non_Hero_Ability_On>{value}</SFXEvent_GUI_Toggle_Non_Hero_Ability_On></Unit>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_TupleSfxTag_ReferenceRangeCoversOnlyTheSfxToken()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(TupleSfxTag("SFXEvent_Attack_Hardpoint", XmlValueType.HardPointSfxMap));
+
+        const string xml =
+            """<Unit Name="UNIT_A"><SFXEvent_Attack_Hardpoint>HARD_POINT_WEAPON_LASER, Unit_HP_LASER</SFXEvent_Attack_Hardpoint></Unit>""";
+        var result = await Build(schema).ParseAsync("file:///f.xml", xml, 1,
+            TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        var lineText = xml.Split('\n')[reference.Line];
+        Assert.Equal("Unit_HP_LASER",
+            lineText.Substring(reference.Column, reference.Length));
+    }
+
     [Fact]
     public async Task ParseAsync_ContainerSharingReferenceTagName_DoesNotEmitWholeObjectAsReference()
     {

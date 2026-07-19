@@ -87,6 +87,18 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     }
 
     [Fact]
+    public async Task XmlGoTo_SfxEventInsideTupleTag_ReturnsSfxEventDefinition()
+    {
+        // #78: tuple-valued SFX tags (HardPointSfxMap / AbilitySfxMap / ConditionalSfxEvent) get
+        // positional completion and pair validation, but XmlGameDocumentParser emits no
+        // GameReference for their elements - so go-to on the SFXEvent half silently does nothing
+        // while the very same event name navigates fine from a plain SFXEventReference tag.
+        // <SFXEvent_Hardpoint_Destroyed> HARD_POINT_WEAPON_LASER, Unit_Lost_Laser_Calamari </…>
+        await RunGoToAsync(null, "Unit_Lost_Laser_Calamari", "Sfxeventsunitscapital",
+            "Data/Xml/Spaceunitscapital.xml");
+    }
+
+    [Fact]
     public async Task XmlGoTo_AfterOpenCloseCyclesOfTargetFile_StillResolvesWorkspaceDefinition()
     {
         // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML
