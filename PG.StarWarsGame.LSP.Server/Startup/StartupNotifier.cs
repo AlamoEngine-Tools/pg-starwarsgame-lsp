@@ -2,9 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
-using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -19,10 +17,13 @@ public sealed class StartupNotifier : IStartupNotifier
 {
     private readonly ILanguageServerFacade _facade;
     private readonly ILogger<StartupNotifier> _logger;
+    private readonly IClientRefreshNotifier _refresh;
 
-    public StartupNotifier(ILanguageServerFacade facade, ILogger<StartupNotifier> logger)
+    public StartupNotifier(ILanguageServerFacade facade, IClientRefreshNotifier refresh,
+        ILogger<StartupNotifier> logger)
     {
         _facade = facade;
+        _refresh = refresh;
         _logger = logger;
     }
 
@@ -41,28 +42,7 @@ public sealed class StartupNotifier : IStartupNotifier
         // VS Code requests codeLens and inlayHint once, when a document opens - which happens
         // during the startup buffering window while the index is still empty, so those requests
         // return nothing. Tell the client to re-request them now that the index is populated.
-        // Access the workspace endpoint via _facade.Workspace; the facade itself is not an
-        // IWorkspaceLanguageServer.
-        var workspace = _facade.Workspace;
-
-        try
-        {
-            workspace.SendCodeLensRefresh(new CodeLensRefreshParams());
-            _logger.LogInformation("Sent workspace/codeLens/refresh after scan.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "workspace/codeLens/refresh failed (non-fatal)");
-        }
-
-        try
-        {
-            workspace.SendInlayHintRefresh(new InlayHintRefreshParams());
-            _logger.LogInformation("Sent workspace/inlayHint/refresh after scan.");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "workspace/inlayHint/refresh failed (non-fatal)");
-        }
+        _refresh.RefreshDerivedState();
+        _logger.LogInformation("Requested client refresh of inlay hints and code lenses after scan.");
     }
 }

@@ -225,6 +225,7 @@ public static class ServerConfigurator
                 services.AddSingleton<ISchemaBootstrapper, SchemaBootstrapper>();
                 services.AddSingleton<IBaselineBootstrapper, BaselineBootstrapper>();
                 services.AddSingleton<IStartupProgress, StartupProgress>();
+                services.AddSingleton<IClientRefreshNotifier, ClientRefreshNotifier>();
                 services.AddSingleton<IStartupNotifier, StartupNotifier>();
                 services.AddSingleton<IUserNotifier, WindowUserNotifier>();
                 services.AddSingleton<StartupPipeline>();
