@@ -8,4 +8,6 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 [Method("aet/addLocalisationLanguage", Direction.ClientToServer)]
 public sealed record AddLocalisationLanguageParams(
-    string ProjectFilePath, string Language, string? ExpectedContentHash) : IRequest<LocalisationWriteResult>;
+    string ProjectFilePath,
+    string Language,
+    string? ExpectedContentHash) : IRequest<LocalisationWriteResult>;

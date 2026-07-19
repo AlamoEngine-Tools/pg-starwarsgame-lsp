@@ -12,11 +12,11 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class SetLocalisationEntryHandler
     : IJsonRpcRequestHandler<SetLocalisationEntryParams, LocalisationWriteResult>
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationEntryWriter _entryWriter;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<SetLocalisationEntryHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
-    private readonly ILspConfigurationProvider _config;
 
     public SetLocalisationEntryHandler(
         ILocalisationEntryWriter entryWriter,
@@ -54,7 +54,7 @@ public sealed class SetLocalisationEntryHandler
         {
             _logger.LogWarning("aet/setLocalisationEntry: could not write '{Key}' to '{Path}'.",
                 request.Key, request.ProjectFilePath);
-            return LocalisationWriteResult.Fail($"Could not write '{request.Key}' — unsupported file format.");
+            return LocalisationWriteResult.Fail($"Could not write '{request.Key}' - unsupported file format.");
         }
 
         var newContent = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);

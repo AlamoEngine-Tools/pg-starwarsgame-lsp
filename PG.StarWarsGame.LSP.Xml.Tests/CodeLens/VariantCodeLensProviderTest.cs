@@ -56,7 +56,7 @@ public sealed class VariantCodeLensProviderTest
     [Fact]
     public void Handle_VariantsFlagOff_KeepsVariantsPeekLensOnBaseSymbol()
     {
-        // Only the showEffectiveObject lens is variant tooling — the "N variants" references peek
+        // Only the showEffectiveObject lens is variant tooling - the "N variants" references peek
         // stays available with the flag off.
         var b = Sym("B");
         var index = IndexWith(b, Sym("V1", "B"), Sym("V2", "B"));

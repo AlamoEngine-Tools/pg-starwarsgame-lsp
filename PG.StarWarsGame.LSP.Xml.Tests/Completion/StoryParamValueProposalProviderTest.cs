@@ -61,6 +61,18 @@ public sealed class StoryParamValueProposalProviderTest
         };
     }
 
+    /// <summary>A story-style param: raw referenceType string only, no resolved ObjectType.</summary>
+    private static ParamDefinition RawRefParam(string referenceTypeName,
+        XmlValueType valueType = XmlValueType.NameReference)
+    {
+        return new ParamDefinition
+        {
+            Position = 0,
+            ValueType = valueType,
+            ReferenceTypeName = referenceTypeName
+        };
+    }
+
     private static GameIndex IndexWithSymbols(params (string id, string typeName)[] symbols)
     {
         var dict = ImmutableDictionary.CreateRange(
@@ -180,6 +192,75 @@ public sealed class StoryParamValueProposalProviderTest
         var labels = proposals.Select(p => p.Label).ToList();
         Assert.Contains("X_Wing", labels);
         Assert.Contains("TIE_Fighter", labels);
+    }
+
+    // ── Raw referenceType fallback (story params carry no resolved ObjectType) ─
+
+    [Fact]
+    public void GetProposals_NameReference_FallsBackToRawReferenceTypeName()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithSymbols(("Coruscant", "Planet"), ("X_Wing", "SpaceUnit"));
+
+        var proposals = sut.GetProposals(RawRefParam("Planet"), "", index);
+
+        Assert.Single(proposals);
+        Assert.Equal("Coruscant", proposals[0].Label);
+    }
+
+    [Fact]
+    public void GetProposals_GameObjectTypeUmbrella_ProposesEveryConcreteObjectType()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithWorkspaceSymbols(("X_Wing", "SpaceUnit"), ("Vader_Team", "HeroCompany"));
+
+        var proposals = sut.GetProposals(
+            RawRefParam("GameObjectType", XmlValueType.NameReferenceList), "", index);
+
+        var labels = proposals.Select(p => p.Label).ToList();
+        Assert.Contains("X_Wing", labels);
+        Assert.Contains("Vader_Team", labels);
+    }
+
+    [Fact]
+    public void GetProposals_GameObjectTypeUmbrella_ExcludesStorySymbolsAndThreadObjects()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithWorkspaceSymbols(
+            ("X_Wing", "SpaceUnit"),
+            ("Some_Flag", "StoryFlag"),
+            ("Some_Event", "StoryEvent"),
+            ("Some_Notification", "StoryNotification"),
+            ("Thread_Event_Obj", "StoryParser"));
+
+        var proposals = sut.GetProposals(RawRefParam("GameObjectType"), "", index);
+
+        Assert.Single(proposals);
+        Assert.Equal("X_Wing", proposals[0].Label);
+    }
+
+    [Fact]
+    public void GetProposals_ScopedAbilityIds_ProposeAndFilterByStrippedDisplayName()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithWorkspaceSymbols(("MY_UNIT$Medic_Healing", "UnitAbility"));
+
+        var proposals = sut.GetProposals(RawRefParam("UnitAbility"), "Med", index);
+
+        Assert.Single(proposals);
+        Assert.Equal("Medic_Healing", proposals[0].Label);
+    }
+
+    [Fact]
+    public void GetProposals_StoryEventNameRefType_ProposesStoryEventSymbols()
+    {
+        var sut = new StoryParamValueProposalProvider();
+        var index = IndexWithWorkspaceSymbols(("Open_Act_1", "StoryEvent"), ("X_Wing", "SpaceUnit"));
+
+        var proposals = sut.GetProposals(RawRefParam("StoryEventName"), "", index);
+
+        Assert.Single(proposals);
+        Assert.Equal("Open_Act_1", proposals[0].Label);
     }
 
     // ── Scalar kinds return empty ─────────────────────────────────────────────

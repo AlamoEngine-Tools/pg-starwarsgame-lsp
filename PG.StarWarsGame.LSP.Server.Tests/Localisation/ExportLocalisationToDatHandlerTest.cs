@@ -86,7 +86,7 @@ public sealed class ExportLocalisationToDatHandlerTest
         var result = await handler.Handle(new ExportLocalisationToDatParams(CsvPath), CancellationToken.None);
 
         // Languages absent from both the baseline DATs and the workspace file must not produce a DAT.
-        // CHINESE has no vanilla baseline data and is not in the test CSV — it must be skipped.
+        // CHINESE has no vanilla baseline data and is not in the test CSV - it must be skipped.
         Assert.DoesNotContain(result.WrittenFiles, p => p.EndsWith("_CHINESE.dat", StringComparison.OrdinalIgnoreCase));
         Assert.False(fs.File.Exists("/mod/Data/Text/MasterTextFile_CHINESE.dat"));
     }
@@ -94,7 +94,7 @@ public sealed class ExportLocalisationToDatHandlerTest
     [Fact]
     public async Task Handle_WithCsvContainingEmptyLanguageColumn_SkipsAllEmptyLanguage()
     {
-        // CHINESE column present in CSV but every value is empty — no real content.
+        // CHINESE column present in CSV but every value is empty - no real content.
         const string csvWithEmptyChinese = "key,ENGLISH,CHINESE\nMY_TEST_KEY,Hello World,\n";
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {

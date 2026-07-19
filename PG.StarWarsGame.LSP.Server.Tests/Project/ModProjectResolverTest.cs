@@ -323,7 +323,7 @@ public sealed class ModProjectResolverTest
         Assert.Equal(2, config.Layers.Count);
         Assert.Equal(0, config.Layers[0].Rank);
         Assert.Equal("Dep", config.Layers[0].Name);
-        // The dependency keeps its OWN resource type — not collapsed to the root's. This is the
+        // The dependency keeps its OWN resource type - not collapsed to the root's. This is the
         // fix for dependency .csv text being skipped when the root declares a different type.
         Assert.Equal("CSV", config.Layers[0].TextResourceType);
         Assert.Contains(Abs(DepDir, "data/text"), config.Layers[0].TextRoots);

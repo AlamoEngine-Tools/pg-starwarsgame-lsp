@@ -11,13 +11,13 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 
 public sealed class StoryDialogScopeServiceTest
 {
+    private static readonly string DialogRoot = Root("ws/data/scripts/story");
+    private static readonly string DepDialogRoot = Root("dep/data/scripts/story");
+
     private static string Root(string sub)
     {
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub).Replace('\\', '/').ToLowerInvariant();
     }
-
-    private static readonly string DialogRoot = Root("ws/data/scripts/story");
-    private static readonly string DepDialogRoot = Root("dep/data/scripts/story");
 
     private static (StoryDialogScopeService Scope, FileHelper FileHelper) Build(
         MockFileSystem? fs = null,

@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 /// </summary>
 /// <remarks>
 ///     The engine's <c>IGameRepository</c> only exposes <c>OpenFile</c>/<c>FileExists</c>, with no
-///     listing API, so assets packed inside .meg archives cannot be enumerated here — only loose
+///     listing API, so assets packed inside .meg archives cannot be enumerated here - only loose
 ///     files on disk under the repository root are collected. This is a known coverage gap for
 ///     fully MEG-packed installs.
 /// </remarks>

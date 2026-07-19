@@ -30,9 +30,9 @@ public sealed class LocalisationLoader : ILocalisationLoader
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILanguageService _langService;
+    private readonly LocalisationLayerRegistry _layerRegistry;
     private readonly ILogger<LocalisationLoader> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
-    private readonly LocalisationLayerRegistry _layerRegistry;
     private readonly LocalisationProjectRegistry _registry;
     private readonly IXmlTranslationImporter _xmlImporter;
 
@@ -172,7 +172,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         string path, string resourceType, IAlamoLanguageDefinition language,
         IKeyedTranslationDatabase db, CancellationToken ct)
     {
-        // DAT is binary — never goes through the text-read path below. It's also one file per
+        // DAT is binary - never goes through the text-read path below. It's also one file per
         // language with no self-describing language tag, so the language comes from the file
         // name, not the workspace default passed in above (used by CSV/XML/NLS only).
         if (string.Equals(resourceType, "dat", StringComparison.OrdinalIgnoreCase))

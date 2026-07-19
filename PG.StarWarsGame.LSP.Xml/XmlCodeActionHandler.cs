@@ -11,8 +11,8 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCodeActionHandler : CodeActionHandlerBase
 {
-    private readonly IXmlCodeActionRegistry _registry;
     private readonly ILspConfigurationProvider _config;
+    private readonly IXmlCodeActionRegistry _registry;
 
     public XmlCodeActionHandler(IXmlCodeActionRegistry registry, ILspConfigurationProvider config)
     {

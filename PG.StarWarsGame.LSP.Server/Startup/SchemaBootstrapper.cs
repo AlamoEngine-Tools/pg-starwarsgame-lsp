@@ -15,7 +15,7 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 
 /// <summary>
 ///     First pipeline stage: selects the local or HTTP schema source from the loaded configuration,
-///     configures the late-binding <see cref="SchemaProviderProxy" />, and — crucially — awaits the
+///     configures the late-binding <see cref="SchemaProviderProxy" />, and - crucially - awaits the
 ///     load to completion before returning, so indexing never starts against an empty schema. The
 ///     Lua API schema is loaded the same way. Treated as static for the session: no hot-reload.
 /// </summary>
@@ -75,7 +75,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
             // LocalFileSchemaProvider loads synchronously in its constructor.
             LoadLuaSchemaFromDisk(src.LocalPath!);
         else
-            // Both HTTP downloads are independent — fan them out in parallel.
+            // Both HTTP downloads are independent - fan them out in parallel.
             await Task.WhenAll(
                 LoadEaWSchemaAsync((HttpSchemaProvider)realProvider, ct),
                 LoadLuaSchemaFromHttpAsync(DeriveLuaHttpUrl(src.Url), ct));

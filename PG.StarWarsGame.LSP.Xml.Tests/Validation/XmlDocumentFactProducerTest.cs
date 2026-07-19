@@ -119,9 +119,10 @@ public sealed class XmlDocumentFactProducerTest
     [Fact]
     public void XmlDuplicateTagFact_marks_only_the_last_occurrence_as_last()
     {
-        // The game keeps the LAST occurrence — the facts must say which one that is so earlier
+        // The game keeps the LAST occurrence - the facts must say which one that is so earlier
         // ones can be greyed out.
-        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n<Max_Speed>3.0</Max_Speed>\n</Root>";
+        const string xml =
+            "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n<Max_Speed>3.0</Max_Speed>\n</Root>";
         var facts = Build().Produce(xml, Uri);
         var dups = facts.OfType<XmlDuplicateTagFact>().OrderBy(d => d.Line).ToList();
 

@@ -107,7 +107,7 @@ public sealed class ModProjectReloadServiceTest
 
         await service.ReloadLocalisationAsync(CancellationToken.None);
 
-        // Only the localisation loader ran again — the full XML/Lua/asset/bone/enum indexer did not.
+        // Only the localisation loader ran again - the full XML/Lua/asset/bone/enum indexer did not.
         Assert.Equal(indexCallsAfterLoad, indexer.IndexCallCount);
         Assert.Equal(localisationCallsAfterLoad + 1, localisation.LoadCallCount);
         Assert.Same(SampleConfig, localisation.LastConfig);

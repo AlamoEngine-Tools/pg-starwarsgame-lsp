@@ -21,7 +21,7 @@ public sealed record WorkspaceConfiguration(
 
     /// <summary>
     ///     Union of every layer's resolved story-dialog directories (dependencies first, root
-    ///     project last) — the registry scope for the story-dialog language service.
+    ///     project last) - the registry scope for the story-dialog language service.
     /// </summary>
     public IReadOnlyList<string> StoryDialogRoots { get; init; } = [];
 }

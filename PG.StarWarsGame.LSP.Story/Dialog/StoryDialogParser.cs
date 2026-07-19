@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 
 /// <summary>
 ///     Line-based parser for story-dialog .txt scripts: <c>[CHAPTER n]</c> section headers,
-///     <c>#</c> comment lines, one command per line. Purely structural — command semantics
+///     <c>#</c> comment lines, one command per line. Purely structural - command semantics
 ///     (arity, argument types, references) are validated downstream against the
 ///     <c>StoryDialogCommand</c> schema enum.
 /// </summary>

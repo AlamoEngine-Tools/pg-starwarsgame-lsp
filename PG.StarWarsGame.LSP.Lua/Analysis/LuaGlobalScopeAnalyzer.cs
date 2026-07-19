@@ -20,7 +20,7 @@ internal static class LuaGlobalScopeAnalyzer
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
-    // Standard Lua 5.1 globals — never flag these as missing requires.
+    // Standard Lua 5.1 globals - never flag these as missing requires.
     private static readonly HashSet<string> s_lua51Globals = new(StringComparer.OrdinalIgnoreCase)
     {
         "pairs", "ipairs", "table", "string", "math", "type", "print", "error", "assert",
@@ -59,7 +59,7 @@ internal static class LuaGlobalScopeAnalyzer
             requiredUris, index.Documents, fileHelper);
 
         // Compute the shared URIs (Tier 1 library + Tier 2 dependency files) once for
-        // sandbox isolation — standalone files' globals must not bleed into other files.
+        // sandbox isolation - standalone files' globals must not bleed into other files.
         var sharedUris = LuaFileClassifier.GetSharedUris(index.Documents, fileHelper);
 
         // Phase 2: collect all identifier names used in this file.
@@ -224,7 +224,7 @@ internal static class LuaGlobalScopeAnalyzer
             diagnostics.Add(new LspDiagnostic
             {
                 Severity = LspDiagnosticSeverity.Hint,
-                Message = $"require(\"{arg}\") is unused — no exported globals are referenced.",
+                Message = $"require(\"{arg}\") is unused - no exported globals are referenced.",
                 Range = new LspRange(
                     new LspPosition(start.Line, start.Character),
                     new LspPosition(end.Line, end.Character)),

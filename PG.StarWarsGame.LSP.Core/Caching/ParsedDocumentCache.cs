@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 /// <summary>
 ///     Bounded LRU cache for per-document parse artifacts, keyed by canonical URI and validated by
 ///     content hash. Invalidation is automatic and total: a changed text carries a different hash,
-///     misses, and replaces the entry — nothing is wired into edit/watcher/reload paths. Parsing
+///     misses, and replaces the entry - nothing is wired into edit/watcher/reload paths. Parsing
 ///     runs outside the lock; a rare duplicate parse under contention is tolerated (that is
 ///     today's baseline cost on every call), but all callers converge on the first stored
 ///     instance, so consumers may rely on artifact identity for identical content.
@@ -20,7 +20,7 @@ namespace PG.StarWarsGame.LSP.Core.Caching;
 /// </remarks>
 public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
 {
-    // Statistics are logged at debug every this many GetOrParse calls — frequent enough to be
+    // Statistics are logged at debug every this many GetOrParse calls - frequent enough to be
     // visible in a live session's log, cheap enough to never matter (one masked counter check).
     private const int LogInterval = 256;
 
@@ -77,7 +77,7 @@ public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
             }
         }
 
-        var artifact = parse(text); // potentially slow — never under the lock
+        var artifact = parse(text); // potentially slow - never under the lock
 
         lock (_gate)
         {
@@ -85,7 +85,7 @@ public sealed class ParsedDocumentCache<TArtifact> where TArtifact : class
             {
                 if (node.Value.ContentHash == contentHash)
                 {
-                    // A concurrent caller stored the same content while we parsed — adopt its
+                    // A concurrent caller stored the same content while we parsed - adopt its
                     // artifact so identical content always yields one instance.
                     Touch(node);
                     _hits++;

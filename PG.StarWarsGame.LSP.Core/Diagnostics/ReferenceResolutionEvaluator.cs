@@ -35,7 +35,7 @@ public static class ReferenceResolutionEvaluator
             return null;
 
         // SpecialAbility has no schema-level type hierarchy (types.yaml lists concrete ability
-        // subtypes as flat siblings) — consult the hardcoded family allowlist instead of requiring
+        // subtypes as flat siblings) - consult the hardcoded family allowlist instead of requiring
         // an exact match, so e.g. GUI_Activated_Ability_Name accepts any concrete ability type.
         if (string.Equals(expectedTypeName, "SpecialAbility", StringComparison.OrdinalIgnoreCase) &&
             resolved.TypeName is not null && SpecialAbilityTypeFamily.TypeNames.Contains(resolved.TypeName))

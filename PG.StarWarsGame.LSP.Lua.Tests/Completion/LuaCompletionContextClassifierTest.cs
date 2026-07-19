@@ -49,7 +49,7 @@ public sealed class LuaCompletionContextClassifierTest
     [Fact]
     public void Classify_CursorInsideNonArgString_ReturnsNull()
     {
-        // local s = "hello|  — not inside a function call
+        // local s = "hello|  - not inside a function call
         const string text = "local s = \"hello";
         var ctx = Classify(text, character: text.Length);
         Assert.Null(ctx);
@@ -60,7 +60,7 @@ public sealed class LuaCompletionContextClassifierTest
     [Fact]
     public void Classify_CursorAfterDot_ReturnsMemberAccessContextFieldAccess()
     {
-        // "playerObj." — cursor right after the dot
+        // "playerObj." - cursor right after the dot
         const string text = "playerObj.";
         var ctx = Classify(text, character: text.Length);
         var m = Assert.IsType<MemberAccessContext>(ctx);
@@ -108,7 +108,7 @@ public sealed class LuaCompletionContextClassifierTest
     [Fact]
     public void Classify_CursorAtBareIdentifier_ReturnsIdentifierContext()
     {
-        // "GetP" — partial identifier
+        // "GetP" - partial identifier
         const string text = "GetP";
         var ctx = Classify(text, character: text.Length);
         Assert.IsType<IdentifierContext>(ctx);
@@ -127,7 +127,7 @@ public sealed class LuaCompletionContextClassifierTest
     [Fact]
     public void Classify_CursorAfterAssignment_IdentifierContextAtStatementStartFalse()
     {
-        // "local x = Get" — cursor after "= "
+        // "local x = Get" - cursor after "= "
         const string text = "local x = Get";
         var ctx = Classify(text, character: text.Length);
         var id = Assert.IsType<IdentifierContext>(ctx);

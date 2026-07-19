@@ -32,7 +32,7 @@ jobs:
 
     - name: Unit & Integration Tests
       # E2E tests require /foc (game data) and /schema (EaW YAML) which are in .gitignore.
-      # Run each project individually — solution-wide run with all E2E tests filtered produces
+      # Run each project individually - solution-wide run with all E2E tests filtered produces
       # exit code 8 (MTP ZeroTestsRan policy) even when all other tests pass.
       # xunit v3 + MTP uses --filter-not-trait, not --filter.
       run: |

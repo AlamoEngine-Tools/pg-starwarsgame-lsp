@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Core.Rename;
 /// <summary>
 ///     Story-specific rename guard rails. Story renames are index-wide text operations, so an
 ///     event name that several events share (legal across threads/campaigns) must not be renamed
-///     blindly — every holder and every reference would change. Flag names additionally carry the
+///     blindly - every holder and every reference would change. Flag names additionally carry the
 ///     engine's 31-character limit.
 /// </summary>
 public static class StoryRenameGuard
@@ -34,12 +34,12 @@ public static class StoryRenameGuard
         var eventDefinitions = defs.Count(d =>
             string.Equals(d.TypeName, StoryReferenceTypes.EventSymbol, StringComparison.OrdinalIgnoreCase));
         if (eventDefinitions > 1)
-            return $"'{id}' names {eventDefinitions} story events in this workspace — renaming would " +
+            return $"'{id}' names {eventDefinitions} story events in this workspace - renaming would " +
                    "change all of them and their references. Disambiguate the event names first.";
 
         if (newName is not null && newName.Length > MaxFlagNameLength && defs.Any(d =>
                 string.Equals(d.TypeName, StoryReferenceTypes.FlagSymbol, StringComparison.OrdinalIgnoreCase)))
-            return $"'{newName}' is {newName.Length} characters long — story flag names are limited to " +
+            return $"'{newName}' is {newName.Length} characters long - story flag names are limited to " +
                    $"{MaxFlagNameLength} (the engine truncates longer names).";
 
         return null;

@@ -185,7 +185,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_NoPgprojAtAll_NoFileCreated()
     {
-        // No resolved project at all (heuristic/no-.pgproj mode) — nothing to write a
+        // No resolved project at all (heuristic/no-.pgproj mode) - nothing to write a
         // localisation node into, so bootstrap is impossible.
         var (handler, fs, reload, writer) = BuildHandler(null);
 

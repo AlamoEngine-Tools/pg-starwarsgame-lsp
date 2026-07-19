@@ -11,7 +11,7 @@ internal sealed record RawEnumValueDefinition
     public IReadOnlyDictionary<string, string> Notes { get; init; } = new Dictionary<string, string>();
     public bool Deprecated { get; init; }
 
-    /// <summary>Documented but never engine-verified — consumers surface a warning instead of trusting it.</summary>
+    /// <summary>Documented but never engine-verified - consumers surface a warning instead of trusting it.</summary>
     public bool Untested { get; init; }
 
     public string? AvailableSince { get; init; }

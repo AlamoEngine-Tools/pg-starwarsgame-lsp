@@ -158,7 +158,7 @@ public sealed class GameIndexServiceTest
         Assert.False(fired);
     }
 
-    // ── URI normalization — canonical form at the index boundary ────────────
+    // ── URI normalization - canonical form at the index boundary ────────────
 
     [Fact]
     public async Task UpdateDocumentAsync_MixedCaseUri_DocumentKeyIsCanonicalLowercase()
@@ -199,7 +199,7 @@ public sealed class GameIndexServiceTest
         Assert.False(svc.Current.WorkspaceDefinitions.ContainsKey("UNIT_A"));
     }
 
-    // ── UpdateDocumentAsync — basic ──────────────────────────────────────────
+    // ── UpdateDocumentAsync - basic ──────────────────────────────────────────
 
     [Fact]
     public async Task UpdateDocumentAsync_BarePathAndFileUri_TreatedAsSameDocument()
@@ -294,13 +294,13 @@ public sealed class GameIndexServiceTest
         var svc = Build(new FakeParser(Doc("", 0, [Symbol("A")])));
         svc.IndexChanged += _ => throw new Exception("should not fire");
 
-        // .lua extension — FakeParser only handles .xml
+        // .lua extension - FakeParser only handles .xml
         await svc.UpdateDocumentAsync("file:///script.lua", "fn()", 1, default);
 
         Assert.Empty(svc.Current.WorkspaceDefinitions);
     }
 
-    // ── UpdateDocumentAsync — stale-version guard ────────────────────────────
+    // ── UpdateDocumentAsync - stale-version guard ────────────────────────────
 
     [Fact]
     public async Task UpdateDocumentAsync_Drops_Strictly_Older_Version()
@@ -329,7 +329,7 @@ public sealed class GameIndexServiceTest
         Assert.True(fired);
     }
 
-    // ── OpenDocumentAsync — didOpen version-epoch reset ──────────────────────
+    // ── OpenDocumentAsync - didOpen version-epoch reset ──────────────────────
     // LSP client versions restart at 1 for every open session, but the committed version
     // survives a didClose re-index (deliberately, so an unsaved-edit revert is not dropped).
     // Without an epoch reset the NEXT session's didOpen/didChange at v1/v2 lose against the
@@ -365,7 +365,7 @@ public sealed class GameIndexServiceTest
     public async Task OpenDocumentAsync_EpochReset_ThenChangeAtLowerClientVersion_Applies()
     {
         // The full reported sequence: session 1 leaves v3 committed; session 2 opens at v1
-        // (unchanged content) and edits at v2 — the edit must not be dropped as stale.
+        // (unchanged content) and edits at v2 - the edit must not be dropped as stale.
         var svc = Build(new TextSymbolParser());
         await svc.UpdateDocumentAsync("file:///f.xml", "OLD", 3, default);
 
@@ -408,7 +408,7 @@ public sealed class GameIndexServiceTest
         Assert.True(fired);
     }
 
-    // ── UpdateDocumentAsync — document replacement ───────────────────────────
+    // ── UpdateDocumentAsync - document replacement ───────────────────────────
 
     [Fact]
     public async Task UpdateDocumentAsync_Replaces_Old_Symbols_With_New_Ones()
@@ -500,7 +500,7 @@ public sealed class GameIndexServiceTest
         // Commit version 5 via UpdateDocumentAsync
         await svc.UpdateDocumentAsync("file:///f.xml", "<X/>", 5, default);
 
-        // Inject version 0 (stale) — should be ignored
+        // Inject version 0 (stale) - should be ignored
         svc.InjectDocument(Doc("file:///f.xml", 0, []));
 
         // Original v5 doc (with UNIT_A) is preserved
@@ -561,7 +561,7 @@ public sealed class GameIndexServiceTest
     [Fact]
     public async Task RemoveDocument_Preserves_Same_Symbol_Id_From_Other_Document()
     {
-        // Two documents each define the same ID (duplicate — flagged as error in diagnostics,
+        // Two documents each define the same ID (duplicate - flagged as error in diagnostics,
         // but the index must still track both and survive individual removal correctly).
         var symA = Symbol("DUP", "file:///a.xml");
         var symB = Symbol("DUP", "file:///b.xml");
@@ -670,7 +670,7 @@ public sealed class GameIndexServiceTest
     [Fact]
     public void InjectDocument_WithoutLayerMap_PreservesSerializedRank()
     {
-        // Minimal setups (tests) have no layer map — the snapshot's own stamp stays authoritative.
+        // Minimal setups (tests) have no layer map - the snapshot's own stamp stays authoritative.
         var svc = Build(new FakeParser(Doc("", 0)));
 
         svc.InjectDocument(Doc("file:///f.xml", 0) with { LayerRank = 2, LayerName = "FromSnapshot" });
@@ -900,7 +900,7 @@ public sealed class GameIndexServiceTest
     public async Task UpdateDocumentAsync_SameSymbolsRefsGroups_KeepsWorkspaceDictionariesReferenceIdentical()
     {
         // A re-parse whose symbols/references/group memberships are value-identical (e.g. an edit
-        // in a comment or non-indexed value) must not rebuild the workspace dictionaries — the
+        // in a comment or non-indexed value) must not rebuild the workspace dictionaries - the
         // diagnostics publisher relies on their reference identity to scope re-publishing.
         var svc = Build(new DelegateParser((uri, _, v, _) => ValueTask.FromResult(
             Doc(uri, v, [Symbol("UNIT_A", uri)], [Reference("TARGET", uri)],
@@ -978,7 +978,7 @@ public sealed class GameIndexServiceTest
         // Wait for the first parse to actually be in-flight
         Assert.True(await firstParseStarted.WaitAsync(TimeSpan.FromSeconds(2)));
 
-        // A newer edit for the same URI — should cancel the first parse
+        // A newer edit for the same URI - should cancel the first parse
         await svc.UpdateDocumentAsync("file:///f.xml", "v2", 2, default);
 
         // The first UpdateDocumentAsync must complete without throwing
@@ -1017,7 +1017,7 @@ public sealed class GameIndexServiceTest
         var aTask = svc.UpdateDocumentAsync("file:///a.xml", "v1", 1, default);
         Assert.True(await aStarted.WaitAsync(TimeSpan.FromSeconds(2)));
 
-        // Edit a different URI — must not cancel a.xml's in-flight parse
+        // Edit a different URI - must not cancel a.xml's in-flight parse
         await svc.UpdateDocumentAsync("file:///b.xml", "v1", 1, default);
 
         aRelease.Release();
@@ -1204,8 +1204,16 @@ public sealed class GameIndexServiceTest
 
     private sealed class StubLocalisationIndex : ILocalisationIndex
     {
-        public bool ContainsKey(string key) => false;
+        public bool ContainsKey(string key)
+        {
+            return false;
+        }
+
         public IEnumerable<string> Keys => [];
-        public string? GetValue(string key) => null;
+
+        public string? GetValue(string key)
+        {
+            return null;
+        }
     }
 }

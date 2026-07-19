@@ -16,13 +16,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 [Trait("Category", "E2E")]
 public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAsyncDisposable
 {
-    private readonly List<DocumentUri> _openedUris = [];
     private readonly LspServerFixture _fixture;
+    private readonly List<DocumentUri> _openedUris = [];
 
     public MetafileTypeSmokeTest(LspServerFixture fixture)
     {
         _fixture = fixture;
     }
+
+    private static string XmlDir =>
+        Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML");
 
     /// <summary>
     ///     Closes all documents opened during this test so that large files (e.g.
@@ -41,10 +44,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
             await Task.Delay(500);
     }
 
-    private static string XmlDir =>
-        Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "XML");
-
-    // ── GameObjectType (CIN_SpaceUnitsFrigates.xml — 757 B) ──────────────────
+    // ── GameObjectType (CIN_SpaceUnitsFrigates.xml - 757 B) ──────────────────
 
     [Fact]
     public async Task GameObjectType_TypeHover_ReturnsTypeNameAndSchemaDescription()
@@ -87,7 +87,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         Assert.Equal(uri, diags.Uri);
     }
 
-    // ── Faction (Expansion_Factions.xml — 60 KB) ─────────────────────────────
+    // ── Faction (Expansion_Factions.xml - 60 KB) ─────────────────────────────
 
     [Fact]
     public async Task Faction_TypeHover_ReturnsTypeNameAndSchemaDescription()
@@ -130,7 +130,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         Assert.Equal(uri, diags.Uri);
     }
 
-    // ── Campaign (Campaigns_Underworld_Tutorial.xml — 7 KB) ──────────────────
+    // ── Campaign (Campaigns_Underworld_Tutorial.xml - 7 KB) ──────────────────
 
     [Fact]
     public async Task Campaign_TypeHover_ReturnsTypeNameAndSchemaDescription()
@@ -210,14 +210,14 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         await WaitForScanAsync();
         var filePath = Path.Combine(XmlDir, "CommandBarComponents.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
-        // CommandBarComponents.xml is 683 KB — allow extra time in debug builds.
+        // CommandBarComponents.xml is 683 KB - allow extra time in debug builds.
         var received = WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(60));
         await OpenAndWaitAsync(filePath);
         var diags = await received;
         Assert.Equal(uri, diags.Uri);
     }
 
-    // ── TargetingPrioritySet (TurretTargetingPriorities.xml — 1 KB) ──────────
+    // ── TargetingPrioritySet (TurretTargetingPriorities.xml - 1 KB) ──────────
 
     [Fact]
     public async Task TargetingPrioritySet_TypeHover_ReturnsTypeNameAndSchemaDescription()
@@ -303,7 +303,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         Assert.Equal(uri, diags.Uri);
     }
 
-    // ── BinkMovie (Movies.xml — directContent) ────────────────────────────────
+    // ── BinkMovie (Movies.xml - directContent) ────────────────────────────────
 
     [Fact]
     public async Task BinkMovie_TypeHover_ReturnsTypeNameAndSchemaDescription()
@@ -346,7 +346,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         Assert.Equal(uri, diags.Uri);
     }
 
-    // ── MusicEvent (Musicevents.xml — directContent) ──────────────────────────
+    // ── MusicEvent (Musicevents.xml - directContent) ──────────────────────────
 
     [Fact]
     public async Task MusicEvent_TypeHover_ReturnsTypeNameAndSchemaDescription()
@@ -389,7 +389,7 @@ public sealed class MetafileTypeSmokeTest : IClassFixture<LspServerFixture>, IAs
         Assert.Equal(uri, diags.Uri);
     }
 
-    // ── HardPoint (CIN_HardPoints.xml — 14 KB) ───────────────────────────────
+    // ── HardPoint (CIN_HardPoints.xml - 14 KB) ───────────────────────────────
 
     [Fact]
     public async Task HardPoint_TypeHover_ReturnsTypeNameAndSchemaDescription()

@@ -16,6 +16,13 @@ public sealed record StoryCampaignModel(
 {
     /// <summary>Lua script names (extensionless) attached by the included plot manifests.</summary>
     public IReadOnlyList<string> LuaScripts { get; init; } = [];
+
+    /// <summary>
+    ///     Tactical plot manifest file (chain-scanner-canonical) → document URIs of the threads
+    ///     it includes. Drives <see cref="StoryGraphBuilder" />'s tactical-entry edges.
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlySet<string>> TacticalManifestThreads { get; init; } =
+        new Dictionary<string, IReadOnlySet<string>>();
 }
 
 /// <summary>
@@ -39,6 +46,8 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             manifestsByFile.TryAdd(manifest.ManifestFile, manifest);
         var tacticalByThread = chain.TacticalReferences
             .ToLookup(t => t.ThreadFile, StringComparer.OrdinalIgnoreCase);
+        var tacticalManifestFiles = new HashSet<string>(
+            chain.TacticalReferences.Select(t => t.ManifestFile), StringComparer.OrdinalIgnoreCase);
 
         var manifestQueue = new Queue<string>(
             campaigns.SelectMany(c => c.FactionManifests.Select(f => f.ManifestFile)));
@@ -47,6 +56,9 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
         var threadSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var activeFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var luaScripts = new List<string>();
+        // Manifest file (only those reached via a tactical reference) → the raw thread files it
+        // lists, resolved to document URIs once threads are read below.
+        var tacticalManifestThreadFiles = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         while (manifestQueue.Count > 0)
         {
@@ -55,6 +67,10 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             if (!manifestsByFile.TryGetValue(manifestFile, out var contents)) continue;
 
             luaScripts.AddRange(contents.LuaScripts);
+
+            if (tacticalManifestFiles.Contains(manifestFile))
+                tacticalManifestThreadFiles[manifestFile] =
+                    [..contents.ActiveThreads, ..contents.SuspendedThreads];
 
             foreach (var thread in contents.ActiveThreads)
             {
@@ -68,6 +84,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
 
         var threads = new List<StoryThread>();
         var suspendedUris = new HashSet<string>(StringComparer.Ordinal);
+        var uriByThreadFile = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var threadFile in threadFiles)
         {
             // Unreadable threads (baseline-only) are typed by discovery but cannot join the model.
@@ -75,12 +92,24 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             if (read is null) continue;
             var (uri, text) = read.Value;
             threads.Add(StoryThreadParser.Parse(text, uri));
+            uriByThreadFile[threadFile] = uri;
             if (!activeFiles.Contains(threadFile))
                 suspendedUris.Add(uri);
         }
 
+        var tacticalManifestThreads = tacticalManifestThreadFiles.ToDictionary(
+            kvp => kvp.Key,
+            kvp => (IReadOnlySet<string>)new HashSet<string>(
+                kvp.Value.Select(f => uriByThreadFile.GetValueOrDefault(f)).Where(u => u is not null)!,
+                StringComparer.Ordinal),
+            StringComparer.OrdinalIgnoreCase);
+
         return new StoryCampaignModel(campaignName, threads, suspendedUris,
-            new StoryGraphBuilder(schema).Build(threads)) { LuaScripts = luaScripts };
+            new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads))
+        {
+            LuaScripts = luaScripts,
+            TacticalManifestThreads = tacticalManifestThreads
+        };
 
         void AddThread(string threadFile)
         {

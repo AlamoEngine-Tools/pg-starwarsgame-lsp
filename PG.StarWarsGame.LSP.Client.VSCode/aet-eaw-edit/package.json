@@ -1,7 +1,7 @@
 {
   "name": "aet-eaw-edit",
   "displayName": "Alamo Engine Tools - Empire at War Edit",
-  "description": "Editor intelligence for Star Wars: Empire at War and Forces of Corruption mod development — XML completions, diagnostics, hover, go-to-definition, rename, and Lua support.",
+  "description": "Editor intelligence for Star Wars: Empire at War and Forces of Corruption mod development - XML completions, diagnostics, hover, go-to-definition, rename, and Lua support.",
   "author": {
     "name": "Lukas Grünwald"
   },
@@ -248,7 +248,7 @@
             "order": 1200,
             "type": "string",
             "default": "format-dat",
-            "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node — an existing project's own declared format always wins.",
+            "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node - an existing project's own declared format always wins.",
             "enum": [
               "format-dat",
               "format-csv",
@@ -413,13 +413,13 @@
             "order": 1200,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables hover tooltips in Lua script files.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables hover tooltips in Lua script files.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.lua.diagnostics": {
             "order": 1300,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables diagnostics (error and warning squiggles) in Lua script files.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables diagnostics (error and warning squiggles) in Lua script files.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.lua.goToDefinition": {
             "order": 1400,
@@ -455,55 +455,61 @@
             "order": 1850,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables campaign story-chain discovery: plot manifests and story thread files are typed and validated (story event/reward parameters, chain errors like missing plot files).\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables campaign story-chain discovery: plot manifests and story thread files are typed and validated (story event/reward parameters, chain errors like missing plot files).\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.story.graphDiagnostics": {
             "order": 1855,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables campaign story-graph diagnostics on story thread files: dangling or cyclic prerequisites, duplicate and ambiguous event names, unreachable events, suspended plots nothing activates, event tag order, and over-long flag names.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery, story files are not typed and these diagnostics never trigger.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables campaign story-graph diagnostics on story thread files: dangling or cyclic prerequisites, duplicate and ambiguous event names, unreachable events, suspended plots nothing activates, event tag order, and over-long flag names.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` - without discovery, story files are not typed and these diagnostics never trigger.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.story.symbols": {
             "order": 1857,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables cross-language story symbol indexing: story event names, flags, and AI-notification ids become navigable symbols across XML story threads and Lua scripts (hover, go-to-definition, find references).\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery, story files are not typed and nothing is indexed.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables cross-language story symbol indexing: story event names, flags, and AI-notification ids become navigable symbols across XML story threads and Lua scripts (hover, go-to-definition, find references).\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` - without discovery, story files are not typed and nothing is indexed.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.story.rename": {
             "order": 1858,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables cross-language story symbol rename: renaming a story event, flag, or AI-notification id updates every XML and Lua occurrence in the workspace. Ambiguous event names (defined more than once) are rejected instead of mass-renamed.\n\nBuilds on `#aet-eaw-edit.features.story.symbols#` — without symbol indexing there is nothing to rename.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables cross-language story symbol rename: renaming a story event, flag, or AI-notification id updates every XML and Lua occurrence in the workspace. Ambiguous event names (defined more than once) are rejected instead of mass-renamed.\n\nBuilds on `#aet-eaw-edit.features.story.symbols#` - without symbol indexing there is nothing to rename.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.dialog.diagnostics": {
             "order": 1860,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables the story-dialog language service: diagnostics for dialog `.txt` scripts under the `.pgproj` `directories.storyDialog` folders (unknown commands, argument errors, missing localisation keys and speech/movie/SFX references) plus the XML-side `Story_Dialog`/`Story_Chapter` cross-checks.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables the story-dialog language service: diagnostics for dialog `.txt` scripts under the `.pgproj` `directories.storyDialog` folders (unknown commands, argument errors, missing localisation keys and speech/movie/SFX references) plus the XML-side `Story_Dialog`/`Story_Chapter` cross-checks.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.dialog.inlayHints": {
             "order": 1862,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables inlay hints in story-dialog `.txt` scripts: `TEXT`/`TITLE` lines show the referenced localisation text at the end of the line (or a MISSING marker for unknown keys).\n\nOnly applies to files under the `.pgproj` `directories.storyDialog` folders.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables inlay hints in story-dialog `.txt` scripts: `TEXT`/`TITLE` lines show the referenced localisation text at the end of the line (or a MISSING marker for unknown keys).\n\nOnly applies to files under the `.pgproj` `directories.storyDialog` folders.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.dialog.goToDefinition": {
             "order": 1864,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables go-to-definition in story-dialog `.txt` scripts: `DIALOG`, `MOVIE`/`MOVIE_ONCE`, and `SFX` arguments jump to the defining XML object.\n\nOnly applies to files under the `.pgproj` `directories.storyDialog` folders.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables go-to-definition in story-dialog `.txt` scripts: `DIALOG`, `MOVIE`/`MOVIE_ONCE`, and `SFX` arguments jump to the defining XML object.\n\nOnly applies to files under the `.pgproj` `directories.storyDialog` folders.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.tools.localisation": {
             "order": 1900,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables the localisation tooling: the localisation editor panel's data source, the initialise/import commands, and the create-key code action.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables the localisation tooling: the localisation editor panel's data source, the initialise/import commands, and the create-key code action.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.tools.storyEditor": {
             "order": 1950,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Enables the story editor protocol surface: the `aet/getStoryPlots`, `aet/getStoryGraph`, `aet/getStoryNodeDetail`, and `aet/getStorySchema` requests plus the `aet/storyGraphChanged` change notification.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` — without discovery there are no campaigns to serve.\n\n*Work in progress — disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables the story editor protocol surface: the `aet/getStoryPlots`, `aet/getStoryGraph`, `aet/getStoryNodeDetail`, and `aet/getStorySchema` requests plus the `aet/storyGraphChanged` change notification.\n\nBuilds on `#aet-eaw-edit.features.story.discovery#` - without discovery there are no campaigns to serve.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.tools.storyEditing": {
+            "order": 1955,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables **Edit mode** in the story graph panel: staging changes, previewing and validating them, and writing them back to the story XML.\n\nWithout this the panel is read-only - the graph can still be browsed in View mode.\n\nBuilds on `#aet-eaw-edit.features.tools.storyEditor#` (the panel hosting it).\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.tools.variants": {
             "order": 2000,

@@ -23,7 +23,7 @@ public sealed class StoryGraphDiagnosticsServiceTest
     [Fact]
     public void GetForDocument_FlagOn_SurfacesModelDiagnostics()
     {
-        var diagnostics = Build(flagOn: true).GetForDocument(ThreadUri);
+        var diagnostics = Build(true).GetForDocument(ThreadUri);
 
         // The stub campaign contains a dangling prereq in this document.
         Assert.Contains(diagnostics, d => d.Message.Contains("Ghost"));
@@ -32,20 +32,20 @@ public sealed class StoryGraphDiagnosticsServiceTest
     [Fact]
     public void GetForDocument_FlagOff_ReturnsNothing()
     {
-        Assert.Empty(Build(flagOn: false).GetForDocument(ThreadUri));
+        Assert.Empty(Build(false).GetForDocument(ThreadUri));
     }
 
     [Fact]
     public void GetForDocument_SameFindingFromTwoCampaigns_IsDeduplicated()
     {
-        var diagnostics = Build(flagOn: true).GetForDocument(ThreadUri);
+        var diagnostics = Build(true).GetForDocument(ThreadUri);
 
         Assert.Single(diagnostics, d => d.Message.Contains("Ghost"));
     }
 
     private sealed class StubModelService : IStoryModelService
     {
-        // Two campaigns share the same thread — findings must not double up.
+        // Two campaigns share the same thread - findings must not double up.
         public IReadOnlyList<string> GetCampaignNames()
         {
             return ["GC_One", "GC_Two"];

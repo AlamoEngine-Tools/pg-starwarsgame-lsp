@@ -86,7 +86,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void HardPointSfxMap_Slot1_QueriesSFXEventReference()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
         strategy.Handle(Ctx(Tag("X", XmlValueType.HardPointSfxMap), 1, "SFX_")).ToList();
 
@@ -115,7 +116,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void AbilitySfxMap_Slot1_QueriesSFXEventReference()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
         strategy.Handle(Ctx(Tag("X", XmlValueType.AbilitySfxMap), 1)).ToList();
 
@@ -128,7 +130,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void ConditionalSfxEvent_Slot0_ReturnsNoCompletions()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
         var result = strategy.Handle(Ctx(Tag("X", XmlValueType.ConditionalSfxEvent), 0)).ToList();
 
@@ -140,7 +143,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void ConditionalSfxEvent_Slot1_QueriesSFXEventReference()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
         strategy.Handle(Ctx(Tag("X", XmlValueType.ConditionalSfxEvent), 1)).ToList();
 
@@ -153,7 +157,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void UnitSpawnTable_Slot0_QueriesGameObjectTypeWildcardReference()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
         strategy.Handle(Ctx(Tag("X", XmlValueType.UnitSpawnTable), 0)).ToList();
 
@@ -164,7 +169,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void UnitSpawnTable_Slot1_ReturnsNoCompletions()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
 
         var result = strategy.Handle(Ctx(Tag("X", XmlValueType.UnitSpawnTable), 1)).ToList();
 
@@ -210,7 +216,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void TupleList_ContextNamePair_Slot0_ReturnsNoCompletions()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
         var tag = Tag("Music_Event_List_Ambient", XmlValueType.TupleList,
             new TagValidationOverride { ValidationId = "context-name-pair" });
 
@@ -224,7 +231,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void TupleList_ContextNamePair_Slot1_QueriesMusicEventReference()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
         var tag = Tag("Music_Event_List_Ambient", XmlValueType.TupleList,
             new TagValidationOverride { ValidationId = "context-name-pair" });
 
@@ -237,7 +245,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void TupleList_ContextNameList_ReturnsNoCompletions()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
         var tag = Tag("Land_Terrain_Model_Mapping", XmlValueType.TupleList,
             new TagValidationOverride { ValidationId = "context-name-list" });
 
@@ -253,7 +262,8 @@ public sealed class TupleValueCompletionStrategyTest
     public void TupleList_NoValidationOverride_ReturnsNoCompletions()
     {
         var completion = new CapturingCompletionRegistry();
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
+        var strategy =
+            new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), completion);
         var tag = Tag("Music_Events", XmlValueType.TupleList);
 
         var result = strategy.Handle(Ctx(tag, 0)).ToList();
@@ -266,12 +276,13 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void StoryParamContext_ReturnsNoCompletions()
     {
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), new CapturingCompletionRegistry());
+        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(),
+            new CapturingCompletionRegistry());
         var doc = XmlUtility.CreateHtmlDocument("<Root><Foo>x</Foo></Root>");
         var node = doc.DocumentNode.SelectSingleNode("//Foo")!;
         var ctx = new TagValueCompletionContext(
             "file:///test.xml", GameIndex.Empty, new FakeSchemaProvider(), doc, node, "Foo", 2,
-            Tag("X", XmlValueType.HardPointSfxMap), "", 0, 0, true, "Event", 0, 0);
+            Tag("X", XmlValueType.HardPointSfxMap), "", 0, 0, true, "Event", 0);
 
         Assert.Empty(strategy.Handle(ctx));
     }
@@ -279,7 +290,8 @@ public sealed class TupleValueCompletionStrategyTest
     [Fact]
     public void NonTupleValueType_ReturnsNoCompletions()
     {
-        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(), new CapturingCompletionRegistry());
+        var strategy = new TupleValueCompletionStrategy(new FakeSchemaProvider(), new CapturingProposalRegistry(),
+            new CapturingCompletionRegistry());
 
         Assert.Empty(strategy.Handle(Ctx(Tag("X", XmlValueType.Float), 0)));
     }
@@ -297,11 +309,30 @@ public sealed class TupleValueCompletionStrategyTest
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [.. _sets.Values];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => _enums.GetValueOrDefault(enumName);
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return _enums.GetValueOrDefault(enumName);
+        }
 
         public event EventHandler? SchemaRefreshed
         {
@@ -326,13 +357,15 @@ public sealed class TupleValueCompletionStrategyTest
         public XmlTagDefinition? LastTag { get; private set; }
         public string? LastPartialValue { get; private set; }
 
-        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType valueType, XmlTagDefinition tag, string partialValue)
+        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType valueType, XmlTagDefinition tag,
+            string partialValue)
         {
             LastValueType = valueType;
             LastTag = tag;
             LastPartialValue = partialValue;
             return tag.Enum?.Values
-                .Where(v => partialValue.Length == 0 || v.Name.StartsWith(partialValue, StringComparison.OrdinalIgnoreCase))
+                .Where(v => partialValue.Length == 0 ||
+                            v.Name.StartsWith(partialValue, StringComparison.OrdinalIgnoreCase))
                 .Select(v => new ValueProposal { Label = v.Name })
                 .ToList() ?? [];
         }

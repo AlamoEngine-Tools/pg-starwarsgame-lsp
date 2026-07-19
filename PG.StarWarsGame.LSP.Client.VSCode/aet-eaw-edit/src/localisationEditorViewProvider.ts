@@ -33,7 +33,7 @@ export class LocalisationEditorViewProvider implements vscode.WebviewViewProvide
         _token: vscode.CancellationToken
     ): void {
         this._view = view;
-        // Codicons are copied into out/codicons by esbuild.js — node_modules is not part of
+        // Codicons are copied into out/codicons by esbuild.js - node_modules is not part of
         // the packaged VSIX (vsce --no-dependencies), so it must never be referenced here.
         view.webview.options = {
             enableScripts: true,
@@ -109,7 +109,7 @@ export class LocalisationEditorViewProvider implements vscode.WebviewViewProvide
         });
     }
 
-    /** Re-fetch project list and reload the current file — called when the localisation index updates. */
+    /** Re-fetch project list and reload the current file - called when the localisation index updates. */
     async refresh(): Promise<void> {
         if (!this._view) { return; }
         const client = this._getLspClient();
@@ -618,7 +618,7 @@ showInheritedCb.addEventListener('change', () => {
     }
 });
 
-// Delegated editable-cell events — attached once here, not recreated per render.
+// Delegated editable-cell events - attached once here, not recreated per render.
 gridBody.addEventListener('focusout', e => {
     const td = e.target.closest('td[contenteditable="true"]');
     if (!td) return;
@@ -696,7 +696,7 @@ window.addEventListener('message', event => {
             btnExportDat.disabled = false;
             currentExt = currentFilePath.split('.').pop().toLowerCase();
             // Dictionary string keys (e.g. "ENGLISH") get camelCased by OmniSharp's JSON
-            // serializer (see the 'baselineRows' handler below) — normalise the same way here.
+            // serializer (see the 'baselineRows' handler below) - normalise the same way here.
             allRows = (msg.entries || []).map(e => {
                 const translations = {};
                 for (const [k, v] of Object.entries(e.translations ?? {}))
@@ -756,19 +756,19 @@ function renderProjects(projects) {
     if (!projects || !projects.length) {
         const opt = document.createElement('option');
         opt.value = '';
-        opt.textContent = '(no projects — use + New)';
+        opt.textContent = '(no projects - use + New)';
         projectPicker.appendChild(opt);
         return;
     }
     // Same-named files from different .pgproj layers (root vs. a dependency) are otherwise
-    // indistinguishable — append the owning project's name when a label collides.
+    // indistinguishable - append the owning project's name when a label collides.
     const labelCounts = new Map();
     for (const p of projects) labelCounts.set(p.label, (labelCounts.get(p.label) || 0) + 1);
     for (const p of projects) {
         const opt = document.createElement('option');
         opt.value = p.filePath;
         opt.textContent = (labelCounts.get(p.label) > 1 && p.projectName)
-            ? \`\${p.label} — \${p.projectName}\`
+            ? \`\${p.label} - \${p.projectName}\`
             : p.label;
         projectPicker.appendChild(opt);
     }
@@ -894,7 +894,7 @@ function renderRows() {
         if (!effectiveLangs.length) {
             emptyMsg.textContent = 'No localisation project loaded.';
         } else if (!showInherited && inheritedKeys.size) {
-            emptyMsg.textContent = 'All entries are inherited — check “Inherited” to view them.';
+            emptyMsg.textContent = 'All entries are inherited - check “Inherited” to view them.';
         } else {
             emptyMsg.textContent = 'No entries match the current filter.';
         }
@@ -972,14 +972,14 @@ function renderViewport(langs) {
         tdDel.className = 'del-col';
         if (!row._baseline && !inheritedKeys.has(row.key)) {
             if (baselineKeySet.has(row.key)) {
-                // Overrides a baseline value — gutter indicator only, no action.
+                // Overrides a baseline value - gutter indicator only, no action.
                 const icon = document.createElement('i');
                 icon.className = 'codicon codicon-arrow-up gutter-icon';
                 icon.title = 'Reset to inherited';
                 icon.dataset.resetKey = row.key;
                 tdDel.appendChild(icon);
             } else {
-                // Novel key with no baseline — actual delete button.
+                // Novel key with no baseline - actual delete button.
                 const btn = document.createElement('button');
                 btn.className = 'del-btn';
                 btn.title = 'Delete entry';

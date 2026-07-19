@@ -4,7 +4,6 @@
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
@@ -85,9 +84,9 @@ public sealed class StoryDialogReferenceHandlerTest
 
     private sealed class FakeStoryDialogScope : IStoryDialogScope
     {
-        public bool Enabled { get; init; } = true;
         public Dictionary<string, string> Files { get; } = new(StringComparer.OrdinalIgnoreCase);
         public HashSet<int> Chapters { get; init; } = [];
+        public bool Enabled { get; init; } = true;
 
         public bool IsInScope(string canonicalUri)
         {

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
@@ -86,8 +87,8 @@ public sealed class DialogNavigationTest
     {
         return new DialogInlayHintHandler(
             new StubIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
-            new FileHelper(new System.IO.Abstractions.TestingHelpers.MockFileSystem()),
-            new StubTextSource(Uri, text), Config(inlayHints: flag));
+            new FileHelper(new MockFileSystem()),
+            new StubTextSource(Uri, text), Config(flag));
     }
 
     private static DialogDefinitionHandler DefinitionHandler(
@@ -95,7 +96,7 @@ public sealed class DialogNavigationTest
     {
         return new DialogDefinitionHandler(
             new StubIndexService(Index()), new StubScope(inScope), new DialogFactProducer(Schema),
-            new FileHelper(new System.IO.Abstractions.TestingHelpers.MockFileSystem()),
+            new FileHelper(new MockFileSystem()),
             new StubTextSource(Uri, text), NullLogger<DialogDefinitionHandler>.Instance,
             Config(goToDefinition: flag));
     }
@@ -147,7 +148,7 @@ public sealed class DialogNavigationTest
     {
         var handler = HintHandler("[CHAPTER 0]\nTEXT TEXT_INTRO");
 
-        var hints = await handler.Handle(Hints(endLine: 0), CancellationToken.None);
+        var hints = await handler.Handle(Hints(0), CancellationToken.None);
 
         Assert.Empty(hints!);
     }
@@ -155,7 +156,7 @@ public sealed class DialogNavigationTest
     [Fact]
     public async Task InlayHints_OutOfScopeDocument_ReturnsNull()
     {
-        var handler = HintHandler("[CHAPTER 0]\nTEXT TEXT_INTRO", inScope: false);
+        var handler = HintHandler("[CHAPTER 0]\nTEXT TEXT_INTRO", false);
 
         Assert.Null(await handler.Handle(Hints(), CancellationToken.None));
     }
@@ -186,7 +187,7 @@ public sealed class DialogNavigationTest
     [Fact]
     public async Task Definition_OnLocalisationKeyArgument_ReturnsNull()
     {
-        // Localisation keys have no recorded file/line — deliberately not navigable.
+        // Localisation keys have no recorded file/line - deliberately not navigable.
         var handler = DefinitionHandler("[CHAPTER 0]\nTEXT TEXT_INTRO");
 
         Assert.Null(await handler.Handle(At(1, 8), CancellationToken.None));
@@ -211,7 +212,7 @@ public sealed class DialogNavigationTest
     [Fact]
     public async Task Definition_OutOfScopeDocument_ReturnsNull()
     {
-        var handler = DefinitionHandler("[CHAPTER 0]\nDIALOG Speech_Intro", inScope: false);
+        var handler = DefinitionHandler("[CHAPTER 0]\nDIALOG Speech_Intro", false);
 
         Assert.Null(await handler.Handle(At(1, 10), CancellationToken.None));
     }
@@ -251,7 +252,7 @@ public sealed class DialogNavigationTest
         public DocumentText? GetText(string canonicalUri)
         {
             return string.Equals(canonicalUri, uri, StringComparison.OrdinalIgnoreCase)
-                ? new DocumentText(text, 0, FromOpenBuffer: true)
+                ? new DocumentText(text, 0, true)
                 : null;
         }
     }

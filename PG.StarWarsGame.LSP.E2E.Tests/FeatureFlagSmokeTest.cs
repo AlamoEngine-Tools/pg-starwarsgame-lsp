@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 /// <summary>
 ///     E2E pin for the feature-flag wire contract: a client-supplied <c>features</c> node in
-///     <c>initializationOptions</c> must selectively disable only the flags it names — everything
+///     <c>initializationOptions</c> must selectively disable only the flags it names - everything
 ///     else keeps the server's all-true default. <see cref="FeatureFlagsServerFixture" /> turns off
 ///     <c>xml.completion</c>, <c>xml.diagnostics</c>, and <c>tools.localisation</c>; go-to-definition
 ///     (left untouched) must still work, proving this isn't an all-or-nothing kill switch.
@@ -97,7 +97,7 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
         RequireEawWorkspace();
         await WaitForFullScanAsync();
 
-        var (uri, lines) = await OpenCorvettesAsync(alreadyOpened: false);
+        var (uri, lines) = await OpenCorvettesAsync(false);
         var diagnosticsReceived = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(3));
         try
         {
@@ -213,7 +213,7 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
     {
         if (LspTestEnvironment.EawWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception(
-                "$XunitDynamicSkip$eaw/ workspace or schema/eaw/ not found — cannot run feature-flag smoke tests.");
+                "$XunitDynamicSkip$eaw/ workspace or schema/eaw/ not found - cannot run feature-flag smoke tests.");
     }
 
     private async Task WaitForFullScanAsync()

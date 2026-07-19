@@ -9,8 +9,6 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Caching;
 
 public sealed class ParsedDocumentCacheTest
 {
-    private sealed record Artifact(string Source);
-
     private static Artifact Parse(string text)
     {
         return new Artifact(text);
@@ -23,6 +21,7 @@ public sealed class ParsedDocumentCacheTest
     {
         var cache = new ParsedDocumentCache<Artifact>(4);
         var parses = 0;
+
         Artifact CountingParse(string text)
         {
             parses++;
@@ -98,6 +97,7 @@ public sealed class ParsedDocumentCacheTest
     {
         var cache = new ParsedDocumentCache<Artifact>(0);
         var parses = 0;
+
         Artifact CountingParse(string text)
         {
             parses++;
@@ -160,6 +160,26 @@ public sealed class ParsedDocumentCacheTest
         Assert.Empty(logger.Entries);
     }
 
+    // ── concurrency ──────────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetOrParse_ConcurrentCallersForSameContent_ConvergeOnOneInstance()
+    {
+        var cache = new ParsedDocumentCache<Artifact>(4);
+        const string text = "<Shared/>";
+        var hash = ContentHasher.Hash(text);
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 16).Select(_ => Task.Run(() =>
+            cache.GetOrParse("file:///a.xml", text, hash, Parse))));
+
+        // Duplicate parses under contention are tolerated, but every caller must receive the same
+        // instance once one is stored — consumers may rely on artifact identity.
+        Assert.All(results, r => Assert.Same(results[0], r));
+        Assert.Same(results[0], cache.GetOrParse("file:///a.xml", text, hash, Parse));
+    }
+
+    private sealed record Artifact(string Source);
+
     private sealed class CapturingLogger : ILogger
     {
         public List<(LogLevel Level, string Message)> Entries { get; } = [];
@@ -182,23 +202,5 @@ public sealed class ParsedDocumentCacheTest
                 Entries.Add((logLevel, formatter(state, exception)));
             }
         }
-    }
-
-    // ── concurrency ──────────────────────────────────────────────────────────
-
-    [Fact]
-    public async Task GetOrParse_ConcurrentCallersForSameContent_ConvergeOnOneInstance()
-    {
-        var cache = new ParsedDocumentCache<Artifact>(4);
-        const string text = "<Shared/>";
-        var hash = ContentHasher.Hash(text);
-
-        var results = await Task.WhenAll(Enumerable.Range(0, 16).Select(_ => Task.Run(() =>
-            cache.GetOrParse("file:///a.xml", text, hash, Parse))));
-
-        // Duplicate parses under contention are tolerated, but every caller must receive the same
-        // instance once one is stored — consumers may rely on artifact identity.
-        Assert.All(results, r => Assert.Same(results[0], r));
-        Assert.Same(results[0], cache.GetOrParse("file:///a.xml", text, hash, Parse));
     }
 }

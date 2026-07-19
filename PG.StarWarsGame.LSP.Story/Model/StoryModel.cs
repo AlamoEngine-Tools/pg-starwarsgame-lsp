@@ -14,7 +14,7 @@ public sealed record StoryToken(string Text, StorySourceRange Range);
 
 /// <summary>
 ///     One child element of an <c>&lt;Event&gt;</c> block, in document order, with the original
-///     source casing — the substrate for the canonical-tag-order validation and the future
+///     source casing - the substrate for the canonical-tag-order validation and the future
 ///     minimal-edit writer.
 /// </summary>
 public sealed record StoryEventTag(string Name, string Value, StorySourceRange ValueRange);
@@ -26,7 +26,7 @@ public sealed record StoryPrereqGroup(IReadOnlyList<StoryToken> Tokens, StorySou
 public sealed record StoryParamSlot(int Position, string RawValue, StorySourceRange Range);
 
 /// <summary>
-///     One story event block. A single class regardless of event/reward type — which slots mean
+///     One story event block. A single class regardless of event/reward type - which slots mean
 ///     what is the schema's business (<c>StoryEventType</c>/<c>StoryRewardType</c> enums), not a
 ///     type hierarchy's. <see cref="Tags" /> carries every child element in document order;
 ///     the semantic fields are parsed projections of the well-known tags.

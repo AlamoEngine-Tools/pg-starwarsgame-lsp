@@ -106,7 +106,7 @@ public sealed class LuaHoverHandlerTest
         const string xmlUri = "file:///units.xml";
         const string targetId = "UNIT_A";
 
-        // reference at col 19, length 6 — matches "UNIT_A" in Find_First_Object("UNIT_A")
+        // reference at col 19, length 6 - matches "UNIT_A" in Find_First_Object("UNIT_A")
         var reference = new GameReference(targetId, GameSymbolKind.XmlObject, "Unit", LuaUri, 0, 19, 6);
         var sym = new GameSymbol(targetId, GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(xmlUri, 0, null), null);
@@ -320,12 +320,15 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var repo = new LuaAnnotationRepository();
-        repo.UpdateFunctionAnnotations(LibUri, [("RunMission", EmmyLuaAnnotations.Empty with
-        {
-            Description = "Runs the mission.",
-            Params = [new LuaParamAnnotation("missionName", false, new LuaTypeRef("string"), "The mission to run.")],
-            Returns = [new LuaReturnAnnotation(new LuaTypeRef("boolean"), null, null)]
-        })]);
+        repo.UpdateFunctionAnnotations(LibUri, [
+            ("RunMission", EmmyLuaAnnotations.Empty with
+            {
+                Description = "Runs the mission.",
+                Params =
+                [new LuaParamAnnotation("missionName", false, new LuaTypeRef("string"), "The mission to run.")],
+                Returns = [new LuaReturnAnnotation(new LuaTypeRef("boolean"), null, null)]
+            })
+        ]);
 
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(LuaUri, "RunMission()", 1);
@@ -354,11 +357,13 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var repo = new LuaAnnotationRepository();
-        repo.UpdateFunctionAnnotations(LibUri, [("OldFunc", EmmyLuaAnnotations.Empty with
-        {
-            IsDeprecated = true,
-            Description = "Use NewFunc instead."
-        })]);
+        repo.UpdateFunctionAnnotations(LibUri, [
+            ("OldFunc", EmmyLuaAnnotations.Empty with
+            {
+                IsDeprecated = true,
+                Description = "Use NewFunc instead."
+            })
+        ]);
 
         var host = new FakeWorkspaceHost();
         host.AddOrUpdate(LuaUri, "OldFunc()", 1);
@@ -429,13 +434,13 @@ public sealed class LuaHoverHandlerTest
 
         var handler = new LuaHoverHandler(
             new FakeIndexService { Current = GameIndex.Empty },
-            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
+            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             new LuaApiSchemaProvider([]),
             new LuaAnnotationRepository(),
             NullLogger<LuaHoverHandler>.Instance);
 
-        // Cursor inside "SomeModule" — require hover should produce a result from disk content
+        // Cursor inside "SomeModule" - require hover should produce a result from disk content
         var result = await handler.Handle(
             new HoverParams
             {
@@ -585,6 +590,7 @@ public sealed class LuaHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

@@ -216,7 +216,7 @@ public sealed class XmlGameDocumentParserTest
     {
         // A <Faction Name="X">…</Faction> object definition shares its tag name with the <Faction>
         // reference tag used elsewhere. Its InnerText (the entire object) must NOT be captured as one
-        // giant bogus reference — only leaf elements are reference values.
+        // giant bogus reference - only leaf elements are reference values.
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Faction"));
         schema.AddTag(RefTag("Faction", "Faction"));
@@ -236,7 +236,7 @@ public sealed class XmlGameDocumentParserTest
     {
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Unit"));
-        schema.AddTag(PlainTag("Max_Health")); // plain float — not a reference
+        schema.AddTag(PlainTag("Max_Health")); // plain float - not a reference
 
         var result = await Build(schema).ParseAsync("file:///f.xml",
             """<Unit Name="UNIT_A"><Max_Health>200</Max_Health></Unit>""", 1, TestContext.Current.CancellationToken);
@@ -345,11 +345,11 @@ public sealed class XmlGameDocumentParserTest
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("Unit"));
 
-        // Unclosed tag — HtmlAgilityPack recovers gracefully
+        // Unclosed tag - HtmlAgilityPack recovers gracefully
         var result = await Build(schema).ParseAsync("file:///f.xml", """<Unit Name="UNIT_A"><Spawn_Unit>UNIT_B""", 1,
             TestContext.Current.CancellationToken);
 
-        // May return partial results — must not throw
+        // May return partial results - must not throw
         Assert.NotNull(result);
     }
 
@@ -410,8 +410,8 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PerFactionObjectList_Emits_Reference_Per_Token()
     {
-        // PerFactionObjectList is a map<Faction, List<GameObjectType>>. All tokens — faction names
-        // and game objects alike — are emitted as references to enable go-to-definition.
+        // PerFactionObjectList is a map<Faction, List<GameObjectType>>. All tokens - faction names
+        // and game objects alike - are emitted as references to enable go-to-definition.
         // Structural + faction-identity validation is owned by PerFactionObjectListHandler;
         // game object existence is validated by the reference pipeline.
         var schema = new FakeSchemaProvider();
@@ -511,7 +511,7 @@ public sealed class XmlGameDocumentParserTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("ships.xml", ["SpaceUnit"]);
 
-        // Line 1 (0-based): "<SpaceUnit Name="SHIP_A">..." — value "SHIP_A" starts at col 17
+        // Line 1 (0-based): "<SpaceUnit Name="SHIP_A">..." - value "SHIP_A" starts at col 17
         // "<SpaceUnit Name=\"" = 17 chars (0-16), so value starts at col 17
         var result = await Build(schema, registry).ParseAsync("file:///ships.xml",
             "<GameObjectFiles>\n<SpaceUnit Name=\"SHIP_A\"><Hp>100</Hp></SpaceUnit>\n</GameObjectFiles>", 1,
@@ -530,7 +530,7 @@ public sealed class XmlGameDocumentParserTest
         var registry = new FakeFileTypeRegistry();
         registry.Register("ships.xml", ["SpaceUnit"]);
 
-        // Line 1 (0-based): "    <SpaceUnit Name="SHIP_B">..." — 4-space indent → value at col 21
+        // Line 1 (0-based): "    <SpaceUnit Name="SHIP_B">..." - 4-space indent → value at col 21
         var result = await Build(schema, registry).ParseAsync(
             "file:///ships.xml",
             "<GameObjectFiles>\n    <SpaceUnit Name=\"SHIP_B\"><Hp>50</Hp></SpaceUnit>\n</GameObjectFiles>",
@@ -549,7 +549,7 @@ public sealed class XmlGameDocumentParserTest
         // Files not registered in IFileTypeRegistry must produce no symbols.
         // The legacy element-name fallback must be gone.
         var schema = new FakeSchemaProvider();
-        schema.AddType(Type("Unit")); // element name matches type name — old code would emit a symbol
+        schema.AddType(Type("Unit")); // element name matches type name - old code would emit a symbol
 
         var result = await Build(schema).ParseAsync( // no registry
             "file:///units.xml",
@@ -692,7 +692,7 @@ public sealed class XmlGameDocumentParserTest
         Assert.Empty(result.References);
     }
 
-    // ── ReferenceGroup — group membership emission ───────────────────────────
+    // ── ReferenceGroup - group membership emission ───────────────────────────
 
     [Fact]
     public async Task ParseAsync_ReferenceGroup_Tag_Does_Not_Emit_GameReference()
@@ -744,7 +744,7 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("file:///sfx.xml", origin.Uri);
         Assert.Equal(1, origin.Line); // line 1 (0-indexed)
         // Column points into the Name attribute value "SFX_LASER":
-        // "<SFXEvent Name=\"SFX_LASER\">" — 'N' of "Name" is at col 10; col = 10 + len("Name") + 2 = 16
+        // "<SFXEvent Name=\"SFX_LASER\">" - 'N' of "Name" is at col 10; col = 10 + len("Name") + 2 = 16
         Assert.Equal(16, origin.Column);
     }
 
@@ -945,7 +945,7 @@ public sealed class XmlGameDocumentParserTest
     public async Task ParseAsync_AbilityOwner_ElementNameNotASchemaType_ScopesViaNameAttribute()
     {
         // Real game files use concrete element names (<SpaceUnit>, <SpecialStructure>, …) that are
-        // NOT schema object types — the schema models one umbrella GameObjectType. Owner scoping
+        // NOT schema object types - the schema models one umbrella GameObjectType. Owner scoping
         // must fall back to the nearest ancestor with a Name attribute, or every ability id stays
         // bare and cross-object duplicates fire (SD_Tractor_Beam_Attack_Ability, 2026-07-05).
         var schema = new FakeSchemaProvider();
@@ -1005,7 +1005,7 @@ public sealed class XmlGameDocumentParserTest
     {
         // The ability's own id is owner-scoped ("MY_UNIT$My_Ability") specifically to prevent
         // cross-object collisions when two units share an ability name. Its Variant_Of_Existing_Type
-        // base must be scoped the same way — otherwise a bare "Base_Ability" base id can coincidentally
+        // base must be scoped the same way - otherwise a bare "Base_Ability" base id can coincidentally
         // resolve to some unrelated object's same-named ability elsewhere in the workspace.
         var schema = new FakeSchemaProvider();
         schema.AddTag(SubObjectListTag("Abilities"));
@@ -1053,7 +1053,7 @@ public sealed class XmlGameDocumentParserTest
     public async Task ParseAsync_OwnerScopedReference_ElementNameNotASchemaType_ScopesViaNameAttribute()
     {
         // Mirrors the symbol-side fallback: <SpaceUnit> is not a schema object type, but its Name
-        // attribute still identifies the owner — the reference must match the scoped symbol id.
+        // attribute still identifies the owner - the reference must match the scoped symbol id.
         var schema = new FakeSchemaProvider();
         schema.AddTag(new XmlTagDefinition
         {
@@ -1099,7 +1099,7 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_PresenceInducedAnimations_CollectsObjectRefsSkippingTheAnimation()
     {
-        // Format: AnimationStateId, ObjectName, ObjectName, ... — the first token is an
+        // Format: AnimationStateId, ObjectName, ObjectName, ... - the first token is an
         // engine animation state (not indexable); the rest are game objects whose presence
         // triggers it, and must be navigable/validated as object references.
         var schema = new FakeSchemaProvider();
@@ -1130,7 +1130,7 @@ public sealed class XmlGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_InaccuracyMap_CollectsCategoryEnumReferenceForSlot0()
     {
-        // Fire_Inaccuracy_Distance is a (GameObjectCategoryType, float) tuple — slot 0 must be
+        // Fire_Inaccuracy_Distance is a (GameObjectCategoryType, float) tuple - slot 0 must be
         // recorded as an enum: reference so go-to-definition lands on the category's definition
         // (2026-07-05 smoketest report).
         var schema = new FakeSchemaProvider();

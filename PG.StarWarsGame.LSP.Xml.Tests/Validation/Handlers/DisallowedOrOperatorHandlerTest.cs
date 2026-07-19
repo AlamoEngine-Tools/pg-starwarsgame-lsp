@@ -30,7 +30,8 @@ public sealed class DisallowedOrOperatorHandlerTest
     [Fact]
     public void Suggested_fix_normalizes_mixed_separators_and_drops_trailing_pipe()
     {
-        var tag = XmlHandlerTestFixtures.MakeTag("Tactical_Build_Prerequisites", XmlValueType.GameObjectTypeReferenceList);
+        var tag = XmlHandlerTestFixtures.MakeTag("Tactical_Build_Prerequisites",
+            XmlValueType.GameObjectTypeReferenceList);
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "Prereq_0 Prereq_1 |"),
             XmlHandlerTestFixtures.EmptyCtx).ToList();
 
@@ -44,7 +45,8 @@ public sealed class DisallowedOrOperatorHandlerTest
     [InlineData("StructA")]
     public void Values_without_pipe_return_no_diagnostics(string value)
     {
-        var tag = XmlHandlerTestFixtures.MakeTag("Tactical_Build_Prerequisites", XmlValueType.GameObjectTypeReferenceList);
+        var tag = XmlHandlerTestFixtures.MakeTag("Tactical_Build_Prerequisites",
+            XmlValueType.GameObjectTypeReferenceList);
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }
@@ -53,7 +55,8 @@ public sealed class DisallowedOrOperatorHandlerTest
     public void Prerequisite_expression_tags_are_exempt()
     {
         var tag = XmlHandlerTestFixtures.MakeTag(
-            "Required_Special_Structures", XmlValueType.GameObjectTypeReferenceList, TagSemanticType.PrerequisiteExpression);
+            "Required_Special_Structures", XmlValueType.GameObjectTypeReferenceList,
+            TagSemanticType.PrerequisiteExpression);
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "StructA | StructB"),
             XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
@@ -63,7 +66,8 @@ public sealed class DisallowedOrOperatorHandlerTest
     public void Non_list_value_types_return_no_diagnostics()
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Max_Speed", XmlValueType.Float);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "1 | 2"), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "1 | 2"), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Empty(results);
     }
 }

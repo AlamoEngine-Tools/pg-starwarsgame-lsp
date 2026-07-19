@@ -135,7 +135,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Symbol_Origin_ColumnPointsToFunctionName_NotKeyword()
     {
-        // "function Foo()" — 'F' is at column 9 ("function " = 9 chars)
+        // "function Foo()" - 'F' is at column 9 ("function " = 9 chars)
         var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
 
         var sym = Assert.Single(result.Symbols);
@@ -146,7 +146,7 @@ public sealed class LuaGameDocumentParserTest
     [Fact]
     public async Task ParseAsync_Symbol_Origin_Column_IndentedFunction()
     {
-        // "  function Bar() end" — 'B' is at column 11 ("  function " = 11 chars)
+        // "  function Bar() end" - 'B' is at column 11 ("  function " = 11 chars)
         var result = await Build().ParseAsync("file:///s.lua", "  function Bar() end", 1, default);
 
         var sym = Assert.Single(result.Symbols);
@@ -438,10 +438,10 @@ public sealed class LuaGameDocumentParserTest
         var repo = new LuaAnnotationRepository();
         const string uri = "file:///funcs.lua";
         const string text = """
-            --- Runs the named mission.
-            ---@param name string
-            function RunMission(name) end
-            """;
+                            --- Runs the named mission.
+                            ---@param name string
+                            function RunMission(name) end
+                            """;
 
         await Build(repo).ParseAsync(uri, text, 1, default);
 
@@ -456,11 +456,11 @@ public sealed class LuaGameDocumentParserTest
         var repo = new LuaAnnotationRepository();
         const string uri = "file:///types.lua";
         const string text = """
-            ---@class PGUnit
-            ---@field name string
-            ---@field id integer
-            PGUnit = {}
-            """;
+                            ---@class PGUnit
+                            ---@field name string
+                            ---@field id integer
+                            PGUnit = {}
+                            """;
 
         await Build(repo).ParseAsync(uri, text, 1, default);
 
@@ -477,9 +477,9 @@ public sealed class LuaGameDocumentParserTest
         var repo = new LuaAnnotationRepository();
         const string uri = "file:///types.lua";
         const string text = """
-            ---@alias GameCommandType string
-            GameCommandType = nil
-            """;
+                            ---@alias GameCommandType string
+                            GameCommandType = nil
+                            """;
 
         await Build(repo).ParseAsync(uri, text, 1, default);
 
@@ -493,9 +493,9 @@ public sealed class LuaGameDocumentParserTest
         var repo = new LuaAnnotationRepository();
         const string uri = "file:///types.lua";
         const string text = """
-            ---@enum PlanetStatus
-            PlanetStatus = { Owned = 0, Contested = 1 }
-            """;
+                            ---@enum PlanetStatus
+                            PlanetStatus = { Owned = 0, Contested = 1 }
+                            """;
 
         await Build(repo).ParseAsync(uri, text, 1, default);
 
@@ -509,17 +509,17 @@ public sealed class LuaGameDocumentParserTest
         var repo = new LuaAnnotationRepository();
         const string uri = "file:///api.d.lua";
         const string text = """
-            ---@class GameEntity
-            ---@field id integer
-            GameEntity = {}
+                            ---@class GameEntity
+                            ---@field id integer
+                            GameEntity = {}
 
-            ---@alias GameEntityId integer
-            GameEntityId = nil
+                            ---@alias GameEntityId integer
+                            GameEntityId = nil
 
-            --- Finds by name.
-            ---@param name string
-            function Find_Entity(name) end
-            """;
+                            --- Finds by name.
+                            ---@param name string
+                            function Find_Entity(name) end
+                            """;
 
         await Build(repo).ParseAsync(uri, text, 1, default);
 
@@ -547,11 +547,11 @@ public sealed class LuaGameDocumentParserTest
     {
         var repo = new LuaAnnotationRepository();
         const string lua = """
-            --- Runs the mission.
-            ---@param missionName string The mission to run.
-            ---@return boolean
-            function RunMission(missionName) end
-            """;
+                           --- Runs the mission.
+                           ---@param missionName string The mission to run.
+                           ---@return boolean
+                           function RunMission(missionName) end
+                           """;
 
         await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
 
@@ -582,10 +582,10 @@ public sealed class LuaGameDocumentParserTest
     {
         var repo = new LuaAnnotationRepository();
         const string lua = """
-            --- Local helper.
-            ---@param x number
-            local function Helper(x) end
-            """;
+                           --- Local helper.
+                           ---@param x number
+                           local function Helper(x) end
+                           """;
 
         await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
 
@@ -601,10 +601,10 @@ public sealed class LuaGameDocumentParserTest
     {
         var repo = new LuaAnnotationRepository();
         const string lua = """
-            --- Sets the value.
-            ---@param value number
-            function Obj.SetValue(value) end
-            """;
+                           --- Sets the value.
+                           ---@param value number
+                           function Obj.SetValue(value) end
+                           """;
 
         await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
 
@@ -620,10 +620,10 @@ public sealed class LuaGameDocumentParserTest
     {
         var repo = new LuaAnnotationRepository();
         const string lua = """
-            --- Gets the value.
-            ---@return number
-            function Obj:GetValue() end
-            """;
+                           --- Gets the value.
+                           ---@return number
+                           function Obj:GetValue() end
+                           """;
 
         await Build(repo).ParseAsync("file:///s.lua", lua, 1, default);
 

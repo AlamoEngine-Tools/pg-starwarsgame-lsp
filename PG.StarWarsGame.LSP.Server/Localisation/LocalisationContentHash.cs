@@ -5,7 +5,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 public static class LocalisationContentHash
 {
-    // FNV-1a 64-bit over the UTF-16 code units — stable within a session, allocation-free, ample
+    // FNV-1a 64-bit over the UTF-16 code units - stable within a session, allocation-free, ample
     // collision resistance for the "did this file change on disk since it was last fetched"
     // concurrency guard. Mirrors GameIndexService.ComputeContentHash's algorithm.
     public static string Compute(string text)

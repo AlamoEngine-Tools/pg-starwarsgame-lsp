@@ -67,7 +67,7 @@ public sealed class BaselineLoader
             var baseline = BaselineSerializer.Deserialize(bytes);
             if (baseline is not null)
             {
-                // Only persist to cache once confirmed loadable — a stale/incompatible download must
+                // Only persist to cache once confirmed loadable - a stale/incompatible download must
                 // never overwrite a previously-good cached copy that the fallback below could still use.
                 _fileHelper.FileSystem.Directory.CreateDirectory(CacheDir);
                 await _fileHelper.FileSystem.File.WriteAllBytesAsync(cacheFile, bytes, ct);

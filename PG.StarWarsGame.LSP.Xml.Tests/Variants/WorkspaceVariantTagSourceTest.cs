@@ -28,7 +28,10 @@ public sealed class WorkspaceVariantTagSourceTest
     private static DocumentIndex Doc(string uri, int version = 1, int layerRank = 0)
     {
         return new DocumentIndex(uri, version, ImmutableArray<GameSymbol>.Empty,
-            ImmutableArray<GameReference>.Empty) with { LayerRank = layerRank };
+                ImmutableArray<GameReference>.Empty) with
+            {
+                LayerRank = layerRank
+            };
     }
 
     // Index with one definition per (id, uri) and a Documents entry per distinct uri.
@@ -134,7 +137,7 @@ public sealed class WorkspaceVariantTagSourceTest
     [Fact]
     public void TryGetTags_BaselineOnlyObject_ReturnsNull()
     {
-        // No workspace definition — the resolver must fall back to the shipped baseline tags,
+        // No workspace definition - the resolver must fall back to the shipped baseline tags,
         // so the workspace source reports "not mine".
         var (source, index, _, _) = Build();
         index.Current = GameIndex.Empty with
@@ -216,11 +219,6 @@ public sealed class WorkspaceVariantTagSourceTest
     private sealed class FakeIndexService : IGameIndexService
     {
         public GameIndex Current { get; set; } = GameIndex.Empty;
-#pragma warning disable CS0067
-        public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-        public event Action<GameIndex>? DynamicEnumChanged;
-#pragma warning restore CS0067
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
@@ -271,6 +269,11 @@ public sealed class WorkspaceVariantTagSourceTest
             {
             }
         }
+#pragma warning disable CS0067
+        public event Action<GameIndex>? IndexChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged;
+        public event Action<GameIndex>? DynamicEnumChanged;
+#pragma warning restore CS0067
     }
 
     private sealed class FakeHost : IGameWorkspaceHost

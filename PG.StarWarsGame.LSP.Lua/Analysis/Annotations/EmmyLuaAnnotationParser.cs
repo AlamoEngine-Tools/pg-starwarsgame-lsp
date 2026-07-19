@@ -6,12 +6,12 @@ using System.Collections.Immutable;
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
 /// <summary>
-/// Parses EmmyLua/LuaCATS annotation lines into a structured <see cref="EmmyLuaAnnotations"/> record.
+///     Parses EmmyLua/LuaCATS annotation lines into a structured <see cref="EmmyLuaAnnotations" /> record.
 /// </summary>
 /// <remarks>
-/// Input: comment lines with the leading <c>---</c> marker already stripped by the caller.
-/// Lines that start with <c>@</c> are annotation lines; all others are prose description.
-/// Unknown or Tier-3 annotations are silently ignored.
+///     Input: comment lines with the leading <c>---</c> marker already stripped by the caller.
+///     Lines that start with <c>@</c> are annotation lines; all others are prose description.
+///     Unknown or Tier-3 annotations are silently ignored.
 /// </remarks>
 public static class EmmyLuaAnnotationParser
 {
@@ -22,30 +22,30 @@ public static class EmmyLuaAnnotationParser
         if (commentLines.Count == 0)
             return EmmyLuaAnnotations.Empty;
 
-        var proseLines         = new List<string>();
-        var pendingParams      = new List<LuaParamAnnotation>();
-        var pendingReturns     = new List<LuaReturnAnnotation>();
-        var overloads          = new List<string>();
-        var genericParams      = new List<string>();
-        var seeRefs            = new List<string>();
-        LuaClassDefinition? classDef       = null;
-        LuaAliasDefinition? aliasDef       = null;
-        LuaEnumDefinition?  enumDef        = null;
-        LuaTypeRef?         typeAnnotation = null;
+        var proseLines = new List<string>();
+        var pendingParams = new List<LuaParamAnnotation>();
+        var pendingReturns = new List<LuaReturnAnnotation>();
+        var overloads = new List<string>();
+        var genericParams = new List<string>();
+        var seeRefs = new List<string>();
+        LuaClassDefinition? classDef = null;
+        LuaAliasDefinition? aliasDef = null;
+        LuaEnumDefinition? enumDef = null;
+        LuaTypeRef? typeAnnotation = null;
         var isDeprecated = false;
-        var isNodiscard  = false;
-        var isAsync      = false;
+        var isNodiscard = false;
+        var isAsync = false;
         LuaAccessModifier? accessModifier = null;
 
         // Mutable state for multi-line constructs
-        string?              pendingClassName   = null;
-        bool                 pendingClassExact  = false;
-        List<string>?        pendingClassParents = null;
+        string? pendingClassName = null;
+        var pendingClassExact = false;
+        List<string>? pendingClassParents = null;
         List<LuaFieldDefinition>? pendingFields = null;
-        string?              pendingClassDesc   = null;
+        string? pendingClassDesc = null;
 
-        bool          pendingAliasOpen     = false;
-        string?       pendingAliasName     = null;
+        var pendingAliasOpen = false;
+        string? pendingAliasName = null;
         List<string>? pendingAliasVariants = null;
 
         foreach (var rawLine in commentLines)
@@ -66,7 +66,9 @@ public static class EmmyLuaAnnotationParser
                 if (pendingAliasOpen)
                 {
                     aliasDef = BuildAlias(pendingAliasName!, pendingAliasVariants);
-                    pendingAliasOpen = false; pendingAliasName = null; pendingAliasVariants = null;
+                    pendingAliasOpen = false;
+                    pendingAliasName = null;
+                    pendingAliasVariants = null;
                 }
 
                 // Tier 1: type-system annotations
@@ -74,7 +76,8 @@ public static class EmmyLuaAnnotationParser
                 {
                     // Flush any in-progress class
                     if (pendingClassName is not null)
-                        classDef = BuildClass(pendingClassName, pendingClassExact, pendingClassParents, pendingFields, pendingClassDesc);
+                        classDef = BuildClass(pendingClassName, pendingClassExact, pendingClassParents, pendingFields,
+                            pendingClassDesc);
 
                     ParseClass(line, out pendingClassName, out pendingClassExact, out pendingClassParents);
                     pendingFields = null;
@@ -92,8 +95,12 @@ public static class EmmyLuaAnnotationParser
                 // A non-@field annotation closes any open @class block
                 if (pendingClassName is not null)
                 {
-                    classDef = BuildClass(pendingClassName, pendingClassExact, pendingClassParents, pendingFields, pendingClassDesc);
-                    pendingClassName = null; pendingClassParents = null; pendingFields = null; pendingClassDesc = null;
+                    classDef = BuildClass(pendingClassName, pendingClassExact, pendingClassParents, pendingFields,
+                        pendingClassDesc);
+                    pendingClassName = null;
+                    pendingClassParents = null;
+                    pendingFields = null;
+                    pendingClassDesc = null;
                 }
 
                 if (line.StartsWith("@param", StringComparison.OrdinalIgnoreCase))
@@ -101,11 +108,13 @@ public static class EmmyLuaAnnotationParser
                     if (TryParseParam(line, out var p)) pendingParams.Add(p);
                     continue;
                 }
+
                 if (line.StartsWith("@return", StringComparison.OrdinalIgnoreCase))
                 {
                     if (TryParseReturn(line, out var r)) pendingReturns.Add(r);
                     continue;
                 }
+
                 if (line.StartsWith("@alias", StringComparison.OrdinalIgnoreCase))
                 {
                     ParseAliasOpen(line, out pendingAliasName, out pendingAliasVariants);
@@ -114,22 +123,26 @@ public static class EmmyLuaAnnotationParser
                         aliasDef = BuildAlias(pendingAliasName, pendingAliasVariants);
                     continue;
                 }
+
                 if (line.StartsWith("@enum", StringComparison.OrdinalIgnoreCase))
                 {
                     enumDef = ParseEnum(line);
                     continue;
                 }
+
                 if (line.StartsWith("@type", StringComparison.OrdinalIgnoreCase))
                 {
                     typeAnnotation = ParseTypeAnnotation(line);
                     continue;
                 }
+
                 if (line.StartsWith("@overload", StringComparison.OrdinalIgnoreCase))
                 {
                     var rest = line["@overload".Length..].Trim();
                     if (rest.Length > 0) overloads.Add(rest);
                     continue;
                 }
+
                 if (line.StartsWith("@generic", StringComparison.OrdinalIgnoreCase))
                 {
                     ParseGenerics(line, genericParams);
@@ -137,18 +150,45 @@ public static class EmmyLuaAnnotationParser
                 }
 
                 // Tier 2: documentation markers
-                if (line.StartsWith("@deprecated", StringComparison.OrdinalIgnoreCase)) { isDeprecated = true; continue; }
-                if (line.StartsWith("@nodiscard", StringComparison.OrdinalIgnoreCase))  { isNodiscard  = true; continue; }
-                if (line.StartsWith("@async",     StringComparison.OrdinalIgnoreCase))  { isAsync      = true; continue; }
-                if (line.StartsWith("@see",       StringComparison.OrdinalIgnoreCase))
+                if (line.StartsWith("@deprecated", StringComparison.OrdinalIgnoreCase))
+                {
+                    isDeprecated = true;
+                    continue;
+                }
+
+                if (line.StartsWith("@nodiscard", StringComparison.OrdinalIgnoreCase))
+                {
+                    isNodiscard = true;
+                    continue;
+                }
+
+                if (line.StartsWith("@async", StringComparison.OrdinalIgnoreCase))
+                {
+                    isAsync = true;
+                    continue;
+                }
+
+                if (line.StartsWith("@see", StringComparison.OrdinalIgnoreCase))
                 {
                     var sym = line["@see".Length..].Trim();
                     if (sym.Length > 0) seeRefs.Add(sym);
                     continue;
                 }
-                if (line.StartsWith("@private",   StringComparison.OrdinalIgnoreCase)) { accessModifier = LuaAccessModifier.Private;   continue; }
-                if (line.StartsWith("@protected",  StringComparison.OrdinalIgnoreCase)) { accessModifier = LuaAccessModifier.Protected; continue; }
-                if (line.StartsWith("@package",   StringComparison.OrdinalIgnoreCase)) { accessModifier = LuaAccessModifier.Package;   continue; }
+
+                if (line.StartsWith("@private", StringComparison.OrdinalIgnoreCase))
+                {
+                    accessModifier = LuaAccessModifier.Private;
+                    continue;
+                }
+
+                if (line.StartsWith("@protected", StringComparison.OrdinalIgnoreCase))
+                {
+                    accessModifier = LuaAccessModifier.Protected;
+                    continue;
+                }
+
+                if (line.StartsWith("@package", StringComparison.OrdinalIgnoreCase))
+                    accessModifier = LuaAccessModifier.Package;
 
                 // Tier 3: silently skip (@cast, @diagnostic, @meta, @module, @operator,
                 //          @source, @vararg, @version, @as, @xmlref, @Override, and others)
@@ -160,7 +200,9 @@ public static class EmmyLuaAnnotationParser
             if (pendingAliasOpen)
             {
                 aliasDef = BuildAlias(pendingAliasName!, pendingAliasVariants);
-                pendingAliasOpen = false; pendingAliasName = null; pendingAliasVariants = null;
+                pendingAliasOpen = false;
+                pendingAliasName = null;
+                pendingAliasVariants = null;
             }
 
             if (line.Length > 0)
@@ -169,7 +211,8 @@ public static class EmmyLuaAnnotationParser
 
         // Flush any remaining open constructs
         if (pendingClassName is not null)
-            classDef = BuildClass(pendingClassName, pendingClassExact, pendingClassParents, pendingFields, pendingClassDesc);
+            classDef = BuildClass(pendingClassName, pendingClassExact, pendingClassParents, pendingFields,
+                pendingClassDesc);
         if (pendingAliasOpen && pendingAliasName is not null)
             aliasDef = BuildAlias(pendingAliasName, pendingAliasVariants);
 
@@ -193,13 +236,17 @@ public static class EmmyLuaAnnotationParser
     {
         // @param name[?] Type [description]
         var parts = line["@param".Length..].TrimStart().Split(s_spaceSep, 3, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 1) { result = default!; return false; }
+        if (parts.Length < 1)
+        {
+            result = default!;
+            return false;
+        }
 
-        var namePart   = parts[0];
+        var namePart = parts[0];
         var isOptional = namePart.EndsWith('?');
-        var name       = isOptional ? namePart[..^1] : namePart;
-        var type       = parts.Length >= 2 ? new LuaTypeRef(parts[1]) : LuaTypeRef.Unknown;
-        var desc       = parts.Length >= 3 ? parts[2].Trim() : null;
+        var name = isOptional ? namePart[..^1] : namePart;
+        var type = parts.Length >= 2 ? new LuaTypeRef(parts[1]) : LuaTypeRef.Unknown;
+        var desc = parts.Length >= 3 ? parts[2].Trim() : null;
 
         result = new LuaParamAnnotation(name, isOptional, type, string.IsNullOrEmpty(desc) ? null : desc);
         return true;
@@ -211,13 +258,18 @@ public static class EmmyLuaAnnotationParser
     {
         // @return Type [name] [description]
         var parts = line["@return".Length..].TrimStart().Split(s_spaceSep, 3, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length < 1) { result = default!; return false; }
+        if (parts.Length < 1)
+        {
+            result = default!;
+            return false;
+        }
 
-        var type       = new LuaTypeRef(parts[0]);
-        string? name   = parts.Length >= 2 ? parts[1] : null;
-        string? desc   = parts.Length >= 3 ? parts[2].Trim() : null;
+        var type = new LuaTypeRef(parts[0]);
+        var name = parts.Length >= 2 ? parts[1] : null;
+        var desc = parts.Length >= 3 ? parts[2].Trim() : null;
 
-        result = new LuaReturnAnnotation(type, string.IsNullOrEmpty(name) ? null : name, string.IsNullOrEmpty(desc) ? null : desc);
+        result = new LuaReturnAnnotation(type, string.IsNullOrEmpty(name) ? null : name,
+            string.IsNullOrEmpty(desc) ? null : desc);
         return true;
     }
 
@@ -227,26 +279,29 @@ public static class EmmyLuaAnnotationParser
         out string name, out bool exact, out List<string>? parents)
     {
         // @class [(exact)] Name [: Parent1, Parent2]
-        var rest  = line["@class".Length..].TrimStart();
-        exact     = false;
-        parents   = null;
+        var rest = line["@class".Length..].TrimStart();
+        exact = false;
+        parents = null;
 
         if (rest.StartsWith("(exact)", StringComparison.OrdinalIgnoreCase))
         {
             exact = true;
-            rest  = rest["(exact)".Length..].TrimStart();
+            rest = rest["(exact)".Length..].TrimStart();
         }
 
         // Split on ':' to separate name from parents
         var colonIdx = rest.IndexOf(':');
         if (colonIdx >= 0)
         {
-            name    = rest[..colonIdx].Trim();
+            name = rest[..colonIdx].Trim();
             var parentStr = rest[(colonIdx + 1)..].Trim();
             if (parentStr.Length > 0)
-                parents = [.. parentStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
-                                        .Select(p => p.Trim())
-                                        .Where(p => p.Length > 0)];
+                parents =
+                [
+                    .. parentStr.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                        .Select(p => p.Trim())
+                        .Where(p => p.Length > 0)
+                ];
         }
         else
         {
@@ -262,7 +317,7 @@ public static class EmmyLuaAnnotationParser
     {
         // @field [scope] name[?] Type [description]
         // Strip the @field tag and check for an optional scope keyword first.
-        var rest   = line["@field".Length..].TrimStart();
+        var rest = line["@field".Length..].TrimStart();
         var access = LuaAccessModifier.Public;
 
         var firstSpace = rest.IndexOfAny(s_spaceSep);
@@ -274,9 +329,9 @@ public static class EmmyLuaAnnotationParser
                 access = firstWord switch
                 {
                     "protected" => LuaAccessModifier.Protected,
-                    "private"   => LuaAccessModifier.Private,
-                    "package"   => LuaAccessModifier.Package,
-                    _           => LuaAccessModifier.Public
+                    "private" => LuaAccessModifier.Private,
+                    "package" => LuaAccessModifier.Package,
+                    _ => LuaAccessModifier.Public
                 };
                 rest = rest[(firstSpace + 1)..].TrimStart();
             }
@@ -284,14 +339,14 @@ public static class EmmyLuaAnnotationParser
 
         if (rest.Length == 0) return new LuaFieldDefinition("?", false, LuaTypeRef.Unknown, null, access);
 
-        // Rest is now "name[?] Type [description]" — split at most 3 parts so the
+        // Rest is now "name[?] Type [description]" - split at most 3 parts so the
         // description may contain spaces.
-        var parts      = rest.Split(s_spaceSep, 3, StringSplitOptions.RemoveEmptyEntries);
-        var namePart   = parts[0];
+        var parts = rest.Split(s_spaceSep, 3, StringSplitOptions.RemoveEmptyEntries);
+        var namePart = parts[0];
         var isOptional = namePart.EndsWith('?');
-        var name       = isOptional ? namePart[..^1] : namePart;
-        var type       = parts.Length >= 2 ? new LuaTypeRef(parts[1]) : LuaTypeRef.Unknown;
-        var desc       = parts.Length >= 3 ? parts[2].Trim() : null;
+        var name = isOptional ? namePart[..^1] : namePart;
+        var type = parts.Length >= 2 ? new LuaTypeRef(parts[1]) : LuaTypeRef.Unknown;
+        var desc = parts.Length >= 3 ? parts[2].Trim() : null;
 
         return new LuaFieldDefinition(name, isOptional, type, string.IsNullOrEmpty(desc) ? null : desc, access);
     }
@@ -302,20 +357,28 @@ public static class EmmyLuaAnnotationParser
         out string? name, out List<string>? variants)
     {
         // @alias Name [Type | Type2 | ...]  OR  @alias Name  (followed by | lines)
-        var rest  = line["@alias".Length..].TrimStart();
-        variants  = null;
+        var rest = line["@alias".Length..].TrimStart();
+        variants = null;
 
         var parts = rest.Split(s_spaceSep, 2, StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length == 0) { name = null; return; }
+        if (parts.Length == 0)
+        {
+            name = null;
+            return;
+        }
+
         name = parts[0];
 
         if (parts.Length < 2) return; // just the name; variants come on subsequent | lines
 
         // Inline variants separated by |
         var variantStr = parts[1];
-        variants = [.. variantStr.Split('|', StringSplitOptions.RemoveEmptyEntries)
-                                  .Select(v => v.Trim())
-                                  .Where(v => v.Length > 0)];
+        variants =
+        [
+            .. variantStr.Split('|', StringSplitOptions.RemoveEmptyEntries)
+                .Select(v => v.Trim())
+                .Where(v => v.Length > 0)
+        ];
     }
 
     private static LuaAliasDefinition BuildAlias(string name, List<string>? variants)
@@ -331,13 +394,14 @@ public static class EmmyLuaAnnotationParser
     private static LuaEnumDefinition ParseEnum(string line)
     {
         // @enum [(key)] Name
-        var rest   = line["@enum".Length..].TrimStart();
+        var rest = line["@enum".Length..].TrimStart();
         var useKeys = false;
         if (rest.StartsWith("(key)", StringComparison.OrdinalIgnoreCase))
         {
             useKeys = true;
-            rest    = rest["(key)".Length..].TrimStart();
+            rest = rest["(key)".Length..].TrimStart();
         }
+
         var name = rest.Split(s_spaceSep, 2)[0].Trim();
         return new LuaEnumDefinition(name.Length > 0 ? name : "?", useKeys);
     }
@@ -374,10 +438,12 @@ public static class EmmyLuaAnnotationParser
         return new LuaClassDefinition(
             name, exact,
             parents is { Count: > 0 } ? parents.ToImmutableArray() : ImmutableArray<string>.Empty,
-            fields  is { Count: > 0 } ? fields.ToImmutableArray()  : ImmutableArray<LuaFieldDefinition>.Empty,
+            fields is { Count: > 0 } ? fields.ToImmutableArray() : ImmutableArray<LuaFieldDefinition>.Empty,
             desc);
     }
 
     private static ImmutableArray<T> ToImmutable<T>(List<T> list)
-        => list.Count > 0 ? list.ToImmutableArray() : ImmutableArray<T>.Empty;
+    {
+        return list.Count > 0 ? list.ToImmutableArray() : ImmutableArray<T>.Empty;
+    }
 }

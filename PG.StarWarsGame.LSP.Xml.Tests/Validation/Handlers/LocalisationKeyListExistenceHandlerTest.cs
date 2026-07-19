@@ -22,7 +22,7 @@ public sealed class LocalisationKeyListExistenceHandlerTest
             referenceKind: ReferenceKind.XmlObject);
 
     // Encyclopedia_Text/MP_Encyclopedia_Text are declared as TypeReferenceList in schema, not
-    // NameReferenceList — the handler must cover both.
+    // NameReferenceList - the handler must cover both.
     private static readonly XmlTagDefinition EncyclopediaTextTag =
         XmlHandlerTestFixtures.MakeTag("Encyclopedia_Text", XmlValueType.TypeReferenceList,
             referenceKind: ReferenceKind.LocalisationKey);
@@ -127,7 +127,7 @@ public sealed class LocalisationKeyListExistenceHandlerTest
     [Fact]
     public void OneKeyAbsent_DiagnosticPointsAtSpecificToken_NotWholeListStart()
     {
-        // Fact starts at (line 4, col 5) — "TEXT_A TEXT_MISSING TEXT_C" — TEXT_MISSING starts at
+        // Fact starts at (line 4, col 5) - "TEXT_A TEXT_MISSING TEXT_C" - TEXT_MISSING starts at
         // relative offset 7, so its absolute column must be 5 + 7 = 12, not the fact's own col 5.
         var fact = new XmlTagValueFact("file:///test.xml", 4, 5, 27, LocKeyListTag, "TEXT_A TEXT_MISSING TEXT_C");
         var ctx = CtxWithKeys("TEXT_A", "TEXT_C");
@@ -143,7 +143,7 @@ public sealed class LocalisationKeyListExistenceHandlerTest
     [Fact]
     public void MultilineList_MissingKeyOnLaterLine_DiagnosticPointsAtThatLine()
     {
-        // Fact starts at (line 2, col 0); RawValue = "TEXT_A\nTEXT_MISSING\nTEXT_C" — TEXT_MISSING
+        // Fact starts at (line 2, col 0); RawValue = "TEXT_A\nTEXT_MISSING\nTEXT_C" - TEXT_MISSING
         // is on the line right after the first newline, i.e. absolute line 3, col 0.
         var fact = new XmlTagValueFact("file:///test.xml", 2, 0, 26, LocKeyListTag,
             "TEXT_A\nTEXT_MISSING\nTEXT_C");

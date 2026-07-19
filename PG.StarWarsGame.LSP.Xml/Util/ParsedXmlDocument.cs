@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Xml.Util;
 
 /// <summary>
 ///     A document text with its HtmlAgilityPack parse and derived lookup structures, produced once
-///     and shared by every diagnostics fact producer — a single publish run used to re-parse the
+///     and shared by every diagnostics fact producer - a single publish run used to re-parse the
 ///     same text up to six times. <see cref="LineIndex" /> and <see cref="Lines" /> are built
 ///     lazily so consumers that never resolve positions pay nothing for them.
 /// </summary>

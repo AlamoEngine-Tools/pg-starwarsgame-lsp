@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 
 // Patches the "localisation" node of an existing .pgproj file in place, preserving every other
 // property (modinfo, directories, projectReferences, ...). Round-trips through JsonNode rather
-// than hand-building JSON text — note this means // and /* */ comments in the original file are
+// than hand-building JSON text - note this means // and /* */ comments in the original file are
 // NOT preserved: System.Text.Json discards them while parsing, and JsonNode has no concept of
 // them to write back out.
 public sealed class ModProjectFileWriter : IModProjectFileWriter

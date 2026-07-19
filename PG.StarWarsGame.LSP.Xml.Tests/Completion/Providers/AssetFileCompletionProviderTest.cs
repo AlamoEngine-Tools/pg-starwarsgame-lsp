@@ -54,7 +54,7 @@ public sealed class AssetFileCompletionProviderTest
         Assert.False(Provider.CanHandle(Tag(kind)));
     }
 
-    // ── GetProposals — extension filtering by ReferenceKind ──────────────────
+    // ── GetProposals - extension filtering by ReferenceKind ──────────────────
 
     [Fact]
     public void GetProposals_TextureKind_OnlyTextureExtensions()
@@ -108,7 +108,7 @@ public sealed class AssetFileCompletionProviderTest
         Assert.Equal(2, result.Count(p => p.Label == "unit.tga"));
     }
 
-    // ── GetProposals — prefix filtering ─────────────────────────────────────
+    // ── GetProposals - prefix filtering ─────────────────────────────────────
 
     [Fact]
     public void GetProposals_PrefixMatchesFilename_CaseInsensitive()

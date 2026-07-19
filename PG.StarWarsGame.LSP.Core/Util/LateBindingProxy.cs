@@ -11,12 +11,12 @@ public abstract class LateBindingProxy<T> where T : class
 {
     private T _inner;
 
-    protected T Inner => Volatile.Read(ref _inner);
-
     protected LateBindingProxy(T defaultValue)
     {
         _inner = defaultValue ?? throw new ArgumentNullException(nameof(defaultValue));
     }
+
+    protected T Inner => Volatile.Read(ref _inner);
 
     public void Configure(T provider)
     {
@@ -24,5 +24,7 @@ public abstract class LateBindingProxy<T> where T : class
         OnConfigured(provider);
     }
 
-    protected virtual void OnConfigured(T provider) { }
+    protected virtual void OnConfigured(T provider)
+    {
+    }
 }

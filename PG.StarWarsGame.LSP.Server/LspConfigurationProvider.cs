@@ -16,6 +16,7 @@ namespace PG.StarWarsGame.LSP.Server;
 /// </summary>
 public sealed class LspConfigurationProvider : ILspConfigurationProvider
 {
+    private static readonly JsonSerializerOptions FeatureJsonOptions = new() { PropertyNameCaseInsensitive = true };
     private readonly IFileSystem _fileSystem;
     private readonly ILogger<LspConfigurationProvider> _logger;
 
@@ -158,9 +159,8 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         }
     }
 
-    private static readonly JsonSerializerOptions FeatureJsonOptions = new() { PropertyNameCaseInsensitive = true };
-
-    private static LspConfiguration Merge(LspConfiguration file, LspConfiguration overlay, FeatureFlags? overlayFeatures)
+    private static LspConfiguration Merge(LspConfiguration file, LspConfiguration overlay,
+        FeatureFlags? overlayFeatures)
     {
         return new LspConfiguration
         {

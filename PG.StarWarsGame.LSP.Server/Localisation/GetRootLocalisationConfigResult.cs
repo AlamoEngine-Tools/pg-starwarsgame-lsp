@@ -3,7 +3,7 @@
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
-// Whether the root .pgproj already declares a "localisation" node — the same precedence check
+// Whether the root .pgproj already declares a "localisation" node - the same precedence check
 // InitLocalisationProjectCommandHandler makes, exposed so the client knows whether to prompt for
 // format/directory or just confirm.
 public sealed record GetRootLocalisationConfigResult(bool Configured, string? Type, string? Directory)

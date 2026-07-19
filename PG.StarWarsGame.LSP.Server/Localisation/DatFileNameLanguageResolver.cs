@@ -6,7 +6,7 @@ using PG.StarWarsGame.Localisation.Services;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
-// DAT is one file per language with no self-describing language tag inside the binary — the
+// DAT is one file per language with no self-describing language tag inside the binary - the
 // language has to come from the file name. Resolves the "_<LANGUAGE>" suffix convention
 // ExportLocalisationToDatHandler already writes (e.g. "MasterTextFile_ENGLISH.dat").
 public static class DatFileNameLanguageResolver

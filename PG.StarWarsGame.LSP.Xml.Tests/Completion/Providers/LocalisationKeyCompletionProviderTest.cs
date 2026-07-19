@@ -52,7 +52,7 @@ public sealed class LocalisationKeyCompletionProviderTest
         Assert.False(Provider.CanHandle(tag));
     }
 
-    // ── GetProposals — all keys ──────────────────────────────────────────────
+    // ── GetProposals - all keys ──────────────────────────────────────────────
 
     [Fact]
     public void GetProposals_EmptyPartial_ReturnsAllKeys()
@@ -73,7 +73,7 @@ public sealed class LocalisationKeyCompletionProviderTest
         Assert.Empty(result);
     }
 
-    // ── GetProposals — prefix filtering ─────────────────────────────────────
+    // ── GetProposals - prefix filtering ─────────────────────────────────────
 
     [Fact]
     public void GetProposals_PartialPrefix_FiltersResults()

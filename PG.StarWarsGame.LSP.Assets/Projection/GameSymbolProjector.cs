@@ -50,7 +50,7 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         }
 
         // STOPGAP: PG.StarWarsGame.Engine has no MusicEvent game manager (unlike SFXEvent's
-        // ISfxEventGameManager) — entries come from BaselineBuilder parsing MusicEvents.xml
+        // ISfxEventGameManager) - entries come from BaselineBuilder parsing MusicEvents.xml
         // directly. See the big comment in BaselineBuilder/Program.cs for the full rationale and
         // the TODO to replace this once the engine adds first-class support.
         foreach (var entry in musicEvents ?? [])
@@ -64,7 +64,7 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         }
 
         // Same stopgap as music events: no engine-level manager exists for shadow blob
-        // materials — entries come from BaselineBuilder parsing Shadowblobmaterials.xml directly.
+        // materials - entries come from BaselineBuilder parsing Shadowblobmaterials.xml directly.
         foreach (var entry in shadowBlobMaterials ?? [])
         {
             var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "ShadowBlobMaterial",

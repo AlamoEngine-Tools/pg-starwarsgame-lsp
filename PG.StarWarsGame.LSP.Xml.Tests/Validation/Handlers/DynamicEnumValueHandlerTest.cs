@@ -114,7 +114,7 @@ public sealed class DynamicEnumValueHandlerTest
         Assert.Empty(results);
     }
 
-    // ── DynamicXml enum — baseline validation ─────────────────────────────────
+    // ── DynamicXml enum - baseline validation ─────────────────────────────────
 
     [Fact]
     public void DynamicXml_unknown_value_with_populated_baseline_emits_warning()

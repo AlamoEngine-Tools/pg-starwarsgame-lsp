@@ -3,6 +3,7 @@
 
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
+using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -10,7 +11,7 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 namespace PG.StarWarsGame.LSP.Lua.Parsing;
 
 /// <summary>
-///     A Lua document's text with its Loretta parse — the two always travel together so consumers
+///     A Lua document's text with its Loretta parse - the two always travel together so consumers
 ///     never have to reverse the text out of the tree. Mirrors <c>ParsedXmlDocument</c> on the XML
 ///     side. Loretta trees are Roslyn-style immutable red/green trees and are safe for concurrent
 ///     readers by design.
@@ -59,7 +60,7 @@ public sealed class LuaParseCache : ILuaParseCache
     private readonly IDocumentTextSource _textSource;
 
     public LuaParseCache(IDocumentTextSource textSource, int capacity,
-        Microsoft.Extensions.Logging.ILogger<LuaParseCache>? logger = null)
+        ILogger<LuaParseCache>? logger = null)
     {
         _textSource = textSource;
         _cache = new ParsedDocumentCache<ParsedLuaDocument>(capacity, "Lua", logger);

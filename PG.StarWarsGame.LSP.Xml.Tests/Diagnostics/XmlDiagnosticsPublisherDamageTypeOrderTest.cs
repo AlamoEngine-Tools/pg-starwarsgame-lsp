@@ -19,7 +19,7 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
 
 public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
 {
-    // The 20 values the engine hardcodes at fixed positions — must appear as the exact tail of
+    // The 20 values the engine hardcodes at fixed positions - must appear as the exact tail of
     // <Damage_Types>, in this exact order, or the game crashes at runtime.
     private const string RequiredTail =
         "Damage_Normal Damage_Force_Whirlwind Damage_Force_Telekinesis Damage_Force_Lightning " +
@@ -88,7 +88,7 @@ public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
     [Fact]
     public void ModValueAppendedAfterRequiredTail_EmitsError()
     {
-        // The required tail must be at the VERY end — appending anything after it shifts the window.
+        // The required tail must be at the VERY end - appending anything after it shifts the window.
         var xml = GameConstantsWith($"{RequiredTail} MOD_DAMAGE_AFTER");
 
         var diags = BuildPublisher().CollectDamageTypeOrderDiagnostics("file:///gameconstants.xml", xml);
@@ -118,7 +118,7 @@ public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
     [Fact]
     public void BoundaryCommentBetweenModAndHardcodedValues_DoesNotAffectPositions()
     {
-        // "ABOVE this point" boundary comment is a real convention in the shipped file — the tail
+        // "ABOVE this point" boundary comment is a real convention in the shipped file - the tail
         // check must still work with it present, since a mod's own gameconstants.xml often retains it.
         var xml = GameConstantsWith(
             $"MOD_DAMAGE_A <!-- Do not add anything ABOVE this point --> {RequiredTail}");
@@ -137,11 +137,30 @@ file sealed class StubSchemaProvider2 : ISchemaProvider
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
-    public XmlTagDefinition? GetTag(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public EnumDefinition? GetEnum(string _) => null;
+    public XmlTagDefinition? GetTag(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
 
     public event EventHandler? SchemaRefreshed
     {
@@ -152,17 +171,26 @@ file sealed class StubSchemaProvider2 : ISchemaProvider
 
 file sealed class StubDocumentFactProducer2 : IXmlDocumentFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri) => [];
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    {
+        return [];
+    }
 }
 
 file sealed class StubIndexFactProducer2 : IXmlIndexFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index) => [];
+    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+    {
+        return [];
+    }
 }
 
 file sealed class StubStoryFactProducer2 : IStoryFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri) => [];
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    {
+        return [];
+    }
 }
 
 file sealed class StubIndexService2 : IGameIndexService
@@ -172,34 +200,74 @@ file sealed class StubIndexService2 : IGameIndexService
     public event Action<ILocalisationIndex>? LocalisationChanged;
     public event Action<GameIndex>? DynamicEnumChanged;
 
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-    public void InjectDocument(DocumentIndex document) { }
-    public void RemoveDocument(string uri) { }
-    public void ApplyBaseline(BaselineIndex baseline) { }
-    public void ApplyLocalisation(ILocalisationIndex index) { }
-    public void ApplyAssetFiles(IAssetFileIndex index) { }
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values) { }
+    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return Task.CompletedTask;
+    }
+
+    public void InjectDocument(DocumentIndex document)
+    {
+    }
+
+    public void RemoveDocument(string uri)
+    {
+    }
+
+    public void ApplyBaseline(BaselineIndex baseline)
+    {
+    }
+
+    public void ApplyLocalisation(ILocalisationIndex index)
+    {
+    }
+
+    public void ApplyAssetFiles(IAssetFileIndex index)
+    {
+    }
+
+    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+    {
+    }
+
+    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+    {
+    }
 
     public void ApplyWorkspaceEnumValueDefinitions(
         ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
     {
     }
 
-    public IDisposable BeginBulkUpdate() => NullDisposable2.Instance;
+    public IDisposable BeginBulkUpdate()
+    {
+        return NullDisposable2.Instance;
+    }
 
     private sealed class NullDisposable2 : IDisposable
     {
         public static readonly NullDisposable2 Instance = new();
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }
 
 file sealed class StubFileTypeRegistry2 : IFileTypeRegistry
 {
-    public ImmutableArray<string> GetTypesForFile(string normalizedPath) => ImmutableArray<string>.Empty;
-    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames) { }
-    public void UnregisterFile(string normalizedPath) { }
+    public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+    {
+        return ImmutableArray<string>.Empty;
+    }
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string normalizedPath)
+    {
+    }
+
     public IReadOnlyDictionary<string, ImmutableArray<string>> All => new Dictionary<string, ImmutableArray<string>>();
 }
 
@@ -212,7 +280,15 @@ file sealed class StubWorkspaceHost2 : IGameWorkspaceHost
         _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
     }
 
-    public void Remove(string uri) => _docs.Remove(uri);
-    public bool TryGet(string uri, out TrackedDocument doc) => _docs.TryGetValue(uri, out doc!);
+    public void Remove(string uri)
+    {
+        _docs.Remove(uri);
+    }
+
+    public bool TryGet(string uri, out TrackedDocument doc)
+    {
+        return _docs.TryGetValue(uri, out doc!);
+    }
+
     public IEnumerable<TrackedDocument> All => _docs.Values;
 }

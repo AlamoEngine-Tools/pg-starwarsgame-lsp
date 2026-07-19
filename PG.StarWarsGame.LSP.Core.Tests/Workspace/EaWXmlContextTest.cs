@@ -72,7 +72,7 @@ public sealed class EaWXmlContextTest
     [Fact]
     public void IsEaWXmlFile_SiblingDirectoryWithSharedPrefix_ReturnsFalse()
     {
-        // Registered: data/xml/  — must NOT match data/xmlExtra/
+        // Registered: data/xml/  - must NOT match data/xmlExtra/
         var dir = Path.Combine(Root("game"), "data", "xml");
         var ctx = Build();
         ctx.AddDirectory(dir);
@@ -157,7 +157,7 @@ public sealed class EaWXmlContextTest
     [Fact]
     public void IsEaWXmlFile_DirectoryWithAiPrefix_ReturnsTrue()
     {
-        // "AI_players" is not the AI subdirectory — only an exact "AI" segment is excluded.
+        // "AI_players" is not the AI subdirectory - only an exact "AI" segment is excluded.
         var dir = Path.Combine(Root("game"), "data", "xml");
         var ctx = Build();
         ctx.AddDirectory(dir);

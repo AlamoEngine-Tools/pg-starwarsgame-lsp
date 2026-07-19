@@ -25,7 +25,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
     private readonly ILuaApiSchemaProvider _schemaProvider;
 
     // parseCache is optional so minimal test setups can omit it; production wires the shared
-    // cache so the indexing parse seeds it — the diagnostics publish and the first request after
+    // cache so the indexing parse seeds it - the diagnostics publish and the first request after
     // an edit then reuse this parse instead of re-parsing. A null configProvider (test
     // convenience) means every feature flag reads as enabled.
     public LuaGameDocumentParser(
@@ -76,19 +76,18 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
 
     private (List<GameSymbol> Symbols, List<EmmyLuaAnnotations> Annotations,
         List<(string Name, EmmyLuaAnnotations Ann)> FunctionAnnotations) CollectSymbols(
-        SyntaxNode root, string documentUri)
+            SyntaxNode root, string documentUri)
     {
         var symbols = new List<GameSymbol>();
         var annotations = new List<EmmyLuaAnnotations>();
         var functionAnnotations = new List<(string Name, EmmyLuaAnnotations Ann)>();
 
         foreach (var node in root.DescendantNodes())
-        {
             if (node is FunctionDeclarationStatementSyntax funcDecl)
             {
                 if (funcDecl.Name is SimpleFunctionNameSyntax simpleName)
                 {
-                    // Simple global function: Foo() — becomes a workspace symbol and a named annotation.
+                    // Simple global function: Foo() - becomes a workspace symbol and a named annotation.
                     var id = simpleName.Name.Text;
                     if (string.IsNullOrEmpty(id))
                         continue;
@@ -107,14 +106,14 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
                 }
                 else if (funcDecl.Name is MemberFunctionNameSyntax memberName)
                 {
-                    // Obj.Foo() — not a global symbol; index annotation by simple name for hover.
+                    // Obj.Foo() - not a global symbol; index annotation by simple name for hover.
                     var id = memberName.Name.Text;
                     if (!string.IsNullOrEmpty(id))
                         functionAnnotations.Add((id, ExtractAnnotations(funcDecl)));
                 }
                 else if (funcDecl.Name is MethodFunctionNameSyntax methodName)
                 {
-                    // Obj:Foo() — not a global symbol; index annotation by simple name for hover.
+                    // Obj:Foo() - not a global symbol; index annotation by simple name for hover.
                     var id = methodName.Name.Text;
                     if (!string.IsNullOrEmpty(id))
                         functionAnnotations.Add((id, ExtractAnnotations(funcDecl)));
@@ -122,7 +121,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             }
             else if (node is LocalFunctionDeclarationStatementSyntax localFunc)
             {
-                // local function Foo() — not a global symbol; index annotation by name for hover.
+                // local function Foo() - not a global symbol; index annotation by name for hover.
                 var id = localFunc.Name.Name;
                 if (!string.IsNullOrEmpty(id))
                     functionAnnotations.Add((id, ExtractAnnotations(localFunc)));
@@ -136,7 +135,6 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
                 if (ann.ClassDef is not null || ann.AliasDef is not null || ann.EnumDef is not null)
                     annotations.Add(ann);
             }
-        }
 
         return (symbols, annotations, functionAnnotations);
     }
@@ -147,8 +145,10 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         return lines.Count == 0 ? EmmyLuaAnnotations.Empty : EmmyLuaAnnotationParser.Parse(lines);
     }
 
-    private static IReadOnlyList<string> CollectDocCommentLines(SyntaxNode node) =>
-        LuaDocCommentScanner.CollectLeadingDocLines(node);
+    private static IReadOnlyList<string> CollectDocCommentLines(SyntaxNode node)
+    {
+        return LuaDocCommentScanner.CollectLeadingDocLines(node);
+    }
 
     private List<GameReference> CollectReferences(
         SyntaxNode root, string documentUri, SyntaxTree tree)
@@ -173,7 +173,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             var entries = _schemaProvider.GetXmlRefs(functionName);
             if (entries.Count > 0)
             {
-                // Known EaW API function — emit XML object refs for the relevant arguments.
+                // Known EaW API function - emit XML object refs for the relevant arguments.
                 foreach (var entry in entries)
                 {
                     if (TryExtractStringArgument(call, entry.ParamIndex) is not { } value)
@@ -194,7 +194,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             }
             else
             {
-                // User-defined or unknown function — track the call site as a LuaGlobal
+                // User-defined or unknown function - track the call site as a LuaGlobal
                 // reference so rename can locate all callers via the index (O(1) lookup).
                 var calleeSpan = callee.GetLocation().GetLineSpan().StartLinePosition;
                 references.Add(new GameReference(
@@ -248,7 +248,7 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
             }
             case StringFunctionArgumentSyntax strArg when paramIndex == 0:
             {
-                // String shorthand: func "value" — token position after the opening quote
+                // String shorthand: func "value" - token position after the opening quote
                 var span = strArg.Expression.Token.GetLocation().GetLineSpan();
                 var startLine = span.StartLinePosition.Line;
                 // Column points to the character after the opening quote

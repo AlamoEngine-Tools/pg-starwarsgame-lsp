@@ -179,7 +179,7 @@ public sealed class HoverUtilityTest
     [Fact]
     public void BuildAssetReferenceHover_TgaReferenced_OnlyDdsPresent_ResolvesToDds()
     {
-        // The engine treats TGA and DDS interchangeably — hover must resolve the reference the
+        // The engine treats TGA and DDS interchangeably - hover must resolve the reference the
         // same way instead of showing nothing.
         var hover = HoverUtility.BuildAssetReferenceHover(
             AssetTag(ReferenceKind.TextureFile), "foo.tga",

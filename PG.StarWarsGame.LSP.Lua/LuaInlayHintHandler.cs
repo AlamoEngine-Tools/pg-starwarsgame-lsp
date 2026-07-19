@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
@@ -10,7 +11,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
@@ -22,12 +22,12 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
 
     private readonly ILuaAnnotationRepository _annotationRepository;
+    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaInlayHintHandler> _logger;
-    private readonly ILuaApiSchemaProvider _schemaProvider;
     private readonly ILuaParseCache _parseCache;
-    private readonly ILspConfigurationProvider _config;
+    private readonly ILuaApiSchemaProvider _schemaProvider;
 
     public LuaInlayHintHandler(
         IGameIndexService indexService,
@@ -82,7 +82,7 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
             {
                 @params = _annotationRepository.GetFunctionAnnotation(funcName.Name)?.Params
                           ?? (IReadOnlyList<LuaParamAnnotation>)[];
-                if (@params is System.Collections.Immutable.ImmutableArray<LuaParamAnnotation> arr
+                if (@params is ImmutableArray<LuaParamAnnotation> arr
                     && arr.IsDefaultOrEmpty)
                     @params = [];
             }
@@ -123,7 +123,9 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
     }
 
     public override Task<InlayHint> Handle(InlayHint request, CancellationToken ct)
-        => Task.FromResult(request);
+    {
+        return Task.FromResult(request);
+    }
 
     protected override InlayHintRegistrationOptions CreateRegistrationOptions(
         InlayHintClientCapabilities capability, ClientCapabilities clientCapabilities)
@@ -135,12 +137,15 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
         };
     }
 
-    private static string? ExtractArgumentText(ExpressionSyntax arg) => arg switch
+    private static string? ExtractArgumentText(ExpressionSyntax arg)
     {
-        IdentifierNameSyntax id => id.Name,
-        LiteralExpressionSyntax lit => lit.Token.ValueText,
-        _ => null
-    };
+        return arg switch
+        {
+            IdentifierNameSyntax id => id.Name,
+            LiteralExpressionSyntax lit => lit.Token.ValueText,
+            _ => null
+        };
+    }
 
     private static bool ShouldShowHint(string paramName, string? argText)
     {

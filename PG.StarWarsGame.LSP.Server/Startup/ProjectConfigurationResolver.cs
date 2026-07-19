@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// <summary>
 ///     Resolves the session's <see cref="WorkspaceConfiguration" /> from the <c>.pgproj</c> found
 ///     under the given roots, following project references. Returns <see langword="null" /> when no
-///     project file exists or when it fails to load — there is no directory heuristic, so without a
+///     project file exists or when it fails to load - there is no directory heuristic, so without a
 ///     valid project there is nothing to index.
 /// </summary>
 public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
@@ -41,7 +41,7 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
 
         // Detection (e.g. multiple .pgproj files under one root) and loading both need to surface
         // as a user-facing notification rather than failing silently or crashing startup, so both
-        // are covered by the same catch — ModProjectDetector.TryFind can throw just like the loader.
+        // are covered by the same catch - ModProjectDetector.TryFind can throw just like the loader.
         try
         {
             if (_detector.TryFind(roots, out var pgprojPath) && pgprojPath is not null)

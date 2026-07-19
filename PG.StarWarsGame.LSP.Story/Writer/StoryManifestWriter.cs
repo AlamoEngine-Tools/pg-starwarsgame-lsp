@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Story.Writer;
 ///     Minimal edits over plot manifests (<c>Story_Mode_Plots</c>: Active_Plot / Suspended_Plot /
 ///     Lua_Script entries) and campaign set files (<c>&lt;Campaign&gt;</c> faction story names).
 ///     Same contract as <see cref="StoryXmlWriter" />: untouched lines stay byte-identical.
-///     Parses fresh per call — manifests are tiny.
+///     Parses fresh per call - manifests are tiny.
 /// </summary>
 public static class StoryManifestWriter
 {
@@ -71,8 +71,11 @@ public static class StoryManifestWriter
         var indent = LeadingWhitespace(text, line);
         var inner = entry.InnerText.Trim();
         var lineCount = CountLines(entry.OuterHtml);
-        return [new StoryTextEdit(new StorySourceRange(line, 0, line + lineCount + 1, 0),
-            indent + "<" + toTag + ">" + inner + "</" + toTag + ">" + DetectEol(text))];
+        return
+        [
+            new StoryTextEdit(new StorySourceRange(line, 0, line + lineCount + 1, 0),
+                indent + "<" + toTag + ">" + inner + "</" + toTag + ">" + DetectEol(text))
+        ];
     }
 
     /// <summary>
@@ -107,9 +110,12 @@ public static class StoryManifestWriter
             indent = LeadingWhitespace(text, campaignLine) + "\t";
         }
 
-        return [Insert(anchorLine + 1, 0,
-            indent + "<" + faction + "_Story_Name>" + manifestFile + "</" + faction + "_Story_Name>" +
-            DetectEol(text))];
+        return
+        [
+            Insert(anchorLine + 1, 0,
+                indent + "<" + faction + "_Story_Name>" + manifestFile + "</" + faction + "_Story_Name>" +
+                DetectEol(text))
+        ];
     }
 
     /// <summary>Removes a faction story-name entry from the named campaign.</summary>

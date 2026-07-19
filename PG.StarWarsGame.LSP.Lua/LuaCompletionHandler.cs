@@ -8,7 +8,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 using PG.StarWarsGame.LSP.Lua.Completion;
@@ -20,12 +19,12 @@ namespace PG.StarWarsGame.LSP.Lua;
 public sealed class LuaCompletionHandler : CompletionHandlerBase
 {
     private readonly ILuaAnnotationRepository _annotationRepository;
+    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCompletionHandler> _logger;
-    private readonly ILuaApiSchemaProvider _schemaProvider;
     private readonly ILuaParseCache _parseCache;
-    private readonly ILspConfigurationProvider _config;
+    private readonly ILuaApiSchemaProvider _schemaProvider;
 
     public LuaCompletionHandler(
         IGameIndexService indexService,
@@ -168,7 +167,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
             }
             else
             {
-                // Standalone — omit from require completions
+                // Standalone - omit from require completions
                 continue;
             }
 

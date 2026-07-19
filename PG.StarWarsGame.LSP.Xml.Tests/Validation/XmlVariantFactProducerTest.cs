@@ -139,7 +139,7 @@ public sealed class XmlVariantFactProducerTest
     {
         const string text =
             """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></SpaceUnit></X>""";
-        // Mark the variant tag as Ignored too — it must still be skipped, not flagged.
+        // Mark the variant tag as Ignored too - it must still be skipped, not flagged.
         var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
         var source = new FakeTagSource().With("B", new VariantTag("Variant_Of_Existing_Type", "B", "", 0));
 

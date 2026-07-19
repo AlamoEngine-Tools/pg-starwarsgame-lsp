@@ -1,17 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using Loretta.CodeAnalysis.Lua;
-using Loretta.CodeAnalysis.Lua.Syntax;
 using Loretta.CodeAnalysis;
+using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
-using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 using PG.StarWarsGame.LSP.Lua.Parsing;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Rename;
 
@@ -29,7 +26,7 @@ public static class LuaGlobalRenameBuilder
 
         var changes = new Dictionary<DocumentUri, List<TextEdit>>();
 
-        // Definition edits — find `function <id>(` in the definition file.
+        // Definition edits - find `function <id>(` in the definition file.
         if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
             foreach (var sym in defs)
             {
@@ -42,7 +39,7 @@ public static class LuaGlobalRenameBuilder
                 AddEdit(changes, fo.Uri, new TextEdit { NewText = newName, Range = range });
             }
 
-        // Reference edits — use indexed LuaGlobal refs (O(1) lookup, no per-file re-parse).
+        // Reference edits - use indexed LuaGlobal refs (O(1) lookup, no per-file re-parse).
         if (index.WorkspaceReferences.TryGetValue(id, out var refs))
             foreach (var r in refs)
             {

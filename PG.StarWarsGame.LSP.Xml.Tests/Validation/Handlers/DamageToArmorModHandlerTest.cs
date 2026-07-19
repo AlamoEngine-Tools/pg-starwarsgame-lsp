@@ -69,7 +69,8 @@ public sealed class DamageToArmorModHandlerTest
     public void Known_damage_and_armor_types_emit_no_diagnostics()
     {
         var ctx = CtxWithEnums(["Damage_Default", "Damage_Crush"], ["Armor_Default", "Armor_Heavy"]);
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Damage_Default, Armor_Heavy, 1.5"), ctx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Damage_Default, Armor_Heavy, 1.5"), ctx)
+            .ToList();
         Assert.Empty(results);
     }
 
@@ -156,7 +157,8 @@ public sealed class DamageToArmorModHandlerTest
     [Fact]
     public void Workspace_values_merged_with_baseline_values()
     {
-        var baselineDict = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
+        var baselineDict =
+            ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
         baselineDict["DamageType"] = ImmutableArray.Create("Damage_Default");
         baselineDict["ArmorType"] = ImmutableArray.Create("Armor_Default");
         var workspaceDict = ImmutableDictionary<string, ImmutableArray<string>>
@@ -170,7 +172,7 @@ public sealed class DamageToArmorModHandlerTest
         };
         var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
 
-        // Damage_Mod is workspace-only, Armor_Default is baseline-only — both valid
+        // Damage_Mod is workspace-only, Armor_Default is baseline-only - both valid
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Damage_Mod, Armor_Default, 1.0"), ctx).ToList();
         Assert.Empty(results);
     }

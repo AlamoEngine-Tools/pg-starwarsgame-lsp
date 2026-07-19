@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Loretta.CodeAnalysis;
-using Loretta.CodeAnalysis.Lua;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
@@ -14,6 +14,7 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
@@ -23,18 +24,16 @@ using LspDiagnosticSeverity = OmniSharp.Extensions.LanguageServer.Protocol.Model
 using LspPosition = OmniSharp.Extensions.LanguageServer.Protocol.Models.Position;
 using LspPublishParams = OmniSharp.Extensions.LanguageServer.Protocol.Models.PublishDiagnosticsParams;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
-using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua.Diagnostics;
 
 public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 {
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<LuaDiagnosticsPublisher> _logger;
     private readonly ILuaParseCache _parseCache;
     private readonly ILuaApiSchemaProvider _schemaProvider;
-    private readonly ILspConfigurationProvider? _configProvider;
 
     public LuaDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -85,7 +84,7 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         var diagnostics = new List<LspDiagnostic>();
 
         // One parse shared by the syntax-error pass and all three analyzers (previously four
-        // separate parses of the same text) — and via the cache, with indexing and every request
+        // separate parses of the same text) - and via the cache, with indexing and every request
         // handler touching the same content.
         var parsed = _parseCache.GetOrParse(_fileHelper.NormalizeUri(uri), text);
 

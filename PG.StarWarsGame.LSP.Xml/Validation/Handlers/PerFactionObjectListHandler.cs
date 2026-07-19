@@ -39,7 +39,7 @@ public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
                 var (line, col) = TokenPosition(fact, factionOffset);
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'{factionToken}' is not a known faction for <{fact.Tag.Tag}>.",
-                    OverrideLine: line, OverrideColumn: col, OverrideLength: factionToken.Length));
+                    line, col, factionToken.Length));
                 break;
             }
 
@@ -51,9 +51,11 @@ public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
         return results;
     }
 
-    private static bool IsFaction(DiagnosticsContext ctx, string token) =>
-        ctx.Index.Resolve(token) is { TypeName: { } tn } &&
-        tn.Equals("Faction", StringComparison.OrdinalIgnoreCase);
+    private static bool IsFaction(DiagnosticsContext ctx, string token)
+    {
+        return ctx.Index.Resolve(token) is { TypeName: { } tn } &&
+               tn.Equals("Faction", StringComparison.OrdinalIgnoreCase);
+    }
 
     private static (int Line, int Col) TokenPosition(XmlTagValueFact fact, int tokenOffset)
     {
@@ -66,6 +68,7 @@ public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
             lineInc++;
             lastNewlineAt = i;
         }
+
         var col = lastNewlineAt < 0 ? fact.Column + tokenOffset : tokenOffset - lastNewlineAt - 1;
         return (fact.Line + lineInc, col);
     }

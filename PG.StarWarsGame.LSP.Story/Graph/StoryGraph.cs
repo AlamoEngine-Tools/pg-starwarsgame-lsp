@@ -30,7 +30,14 @@ public enum StoryEdgeKind
     Flag,
 
     /// <summary>Reserved: XML ↔ Lua couplings; produced once the Lua artifacts exist (Issue 3).</summary>
-    LuaLink
+    LuaLink,
+
+    /// <summary>
+    ///     A tactical plot node to a root event (no incoming Prereq/Control) of one of the
+    ///     threads its manifest includes - lets the editor jump from the stub into that
+    ///     battle's own story via the existing reachable-from traversal.
+    /// </summary>
+    TacticalEntry
 }
 
 /// <summary>

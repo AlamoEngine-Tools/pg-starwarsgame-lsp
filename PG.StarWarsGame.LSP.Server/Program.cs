@@ -17,7 +17,7 @@ var waitForDebugger = args.Contains("--wait-for-debugger") ||
 
 if (waitForDebugger)
 {
-    Console.Error.WriteLine($"[LSP] Waiting for debugger — PID {Environment.ProcessId}");
+    Console.Error.WriteLine($"[LSP] Waiting for debugger - PID {Environment.ProcessId}");
     while (!Debugger.IsAttached)
         Thread.Sleep(100);
     Console.Error.WriteLine("[LSP] Debugger attached, continuing startup.");
@@ -41,7 +41,7 @@ if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out va
     var listener = new TcpListener(IPAddress.Loopback, tcpPort);
     listener.Start();
     Console.Error.WriteLine(
-        $"[LSP] PID {Environment.ProcessId} listening on TCP port {tcpPort} — connect your LSP client now");
+        $"[LSP] PID {Environment.ProcessId} listening on TCP port {tcpPort} - connect your LSP client now");
 
     // Accept one connection at a time; loop so multiple sequential test fixtures can reuse this server process.
     while (true)
@@ -54,7 +54,7 @@ if (tcpPortArg is not null && int.TryParse(tcpPortArg["--tcp=".Length..], out va
                 .WithInput(stream)
                 .WithOutput(stream), serverOptions));
         await server.WaitForExit;
-        Console.Error.WriteLine("[LSP] Client disconnected — waiting for next connection");
+        Console.Error.WriteLine("[LSP] Client disconnected - waiting for next connection");
     }
 }
 

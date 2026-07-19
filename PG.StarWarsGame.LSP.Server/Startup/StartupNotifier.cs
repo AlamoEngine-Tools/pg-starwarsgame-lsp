@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// <summary>
 ///     Fires the one-shot client signals emitted when the startup pipeline finishes and the gate is
 ///     open: the <c>$/workspaceScanComplete</c> notification plus codeLens and inlayHint refreshes.
-///     VS Code requests codeLens/inlayHint once, when a document opens — which falls inside the
+///     VS Code requests codeLens/inlayHint once, when a document opens - which falls inside the
 ///     startup buffering window while the index is still empty, so the results come back blank. The
 ///     refreshes tell the client to re-request them against the now-populated index.
 /// </summary>
@@ -38,7 +38,7 @@ public sealed class StartupNotifier : IStartupNotifier
             _logger.LogWarning(ex, "Failed to send $/workspaceScanComplete (non-fatal)");
         }
 
-        // VS Code requests codeLens and inlayHint once, when a document opens — which happens
+        // VS Code requests codeLens and inlayHint once, when a document opens - which happens
         // during the startup buffering window while the index is still empty, so those requests
         // return nothing. Tell the client to re-request them now that the index is populated.
         // Access the workspace endpoint via _facade.Workspace; the facade itself is not an

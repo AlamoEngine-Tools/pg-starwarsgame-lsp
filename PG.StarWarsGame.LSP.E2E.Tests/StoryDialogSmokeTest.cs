@@ -15,13 +15,16 @@ namespace PG.StarWarsGame.LSP.E2E.Tests;
 [Trait("Category", "E2E")]
 public sealed class StoryDialogSmokeTest : IClassFixture<LspServerFixture>, IAsyncDisposable
 {
-    private readonly List<DocumentUri> _openedUris = [];
     private readonly LspServerFixture _fixture;
+    private readonly List<DocumentUri> _openedUris = [];
 
     public StoryDialogSmokeTest(LspServerFixture fixture)
     {
         _fixture = fixture;
     }
+
+    private static string DialogDir =>
+        Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "Scripts", "Story");
 
     public async ValueTask DisposeAsync()
     {
@@ -34,9 +37,6 @@ public sealed class StoryDialogSmokeTest : IClassFixture<LspServerFixture>, IAsy
         if (_openedUris.Count > 0)
             await Task.Delay(500);
     }
-
-    private static string DialogDir =>
-        Path.Combine(LspTestEnvironment.WorkspacePath!, "Data", "Scripts", "Story");
 
     [Fact]
     public async Task DialogScript_VanillaTypo_GetsUnknownCommandDiagnostic()
@@ -69,7 +69,7 @@ public sealed class StoryDialogSmokeTest : IClassFixture<LspServerFixture>, IAsy
         await OpenAsync(filePath);
 
         var diags = await received;
-        Assert.Equal(uri.ToString(), diags.Uri.ToString(), ignoreCase: true);
+        Assert.Equal(uri.ToString(), diags.Uri.ToString(), true);
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

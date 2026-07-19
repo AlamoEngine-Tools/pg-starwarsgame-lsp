@@ -9,8 +9,8 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class GetLocalisationProjectsHandler
     : IJsonRpcRequestHandler<GetLocalisationProjectsParams, GetLocalisationProjectsResult>
 {
-    private readonly ILocalisationProjectRegistry _registry;
     private readonly ILspConfigurationProvider _config;
+    private readonly ILocalisationProjectRegistry _registry;
 
     public GetLocalisationProjectsHandler(ILocalisationProjectRegistry registry, ILspConfigurationProvider config)
     {

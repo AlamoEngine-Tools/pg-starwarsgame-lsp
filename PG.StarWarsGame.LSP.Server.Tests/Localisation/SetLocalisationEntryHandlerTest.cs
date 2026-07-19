@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -27,7 +26,8 @@ public sealed class SetLocalisationEntryHandlerTest
         var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(Path));
 
         var result = await handler.Handle(
-            new SetLocalisationEntryParams(Path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" }, hash),
+            new SetLocalisationEntryParams(Path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" },
+                hash),
             CancellationToken.None);
 
         Assert.False(result.Success);
@@ -43,7 +43,8 @@ public sealed class SetLocalisationEntryHandlerTest
         var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(Path));
 
         var result = await handler.Handle(
-            new SetLocalisationEntryParams(Path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" }, hash),
+            new SetLocalisationEntryParams(Path, "TEXT_B", new Dictionary<string, string> { ["ENGLISH"] = "World" },
+                hash),
             CancellationToken.None);
 
         Assert.True(result.Success);
@@ -60,7 +61,8 @@ public sealed class SetLocalisationEntryHandlerTest
         var hash = LocalisationContentHash.Compute(fs.File.ReadAllText(Path));
 
         await handler.Handle(
-            new SetLocalisationEntryParams(Path, "TEXT_A", new Dictionary<string, string> { ["ENGLISH"] = "New" }, hash),
+            new SetLocalisationEntryParams(Path, "TEXT_A", new Dictionary<string, string> { ["ENGLISH"] = "New" },
+                hash),
             CancellationToken.None);
 
         var lines = fs.File.ReadAllText(Path).Split('\n', StringSplitOptions.RemoveEmptyEntries);

@@ -189,7 +189,7 @@ public sealed class LuaDiagnosticsPublisherTest
         workspaceHost.Set(LuaUri, """Spawn_Object("UNIT_A")""");
         var symbol = new GameSymbol("UNIT_A", GameSymbolKind.XmlObject, "Unit",
             new FileOrigin(XmlUri, 0, null), null);
-        // GameObjectType is a wildcard — any XmlObject matches, no diagnostic expected.
+        // GameObjectType is a wildcard - any XmlObject matches, no diagnostic expected.
         var index = IndexWithLuaRef(LuaUri, "UNIT_A", "GameObjectType", symbol);
 
         indexService.Fire(index);
@@ -234,7 +234,7 @@ public sealed class LuaDiagnosticsPublisherTest
     public void OnIndexChanged_LuaSyntaxError_EmitsErrorDiagnostic()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        // Incomplete function — a real Lua syntax error
+        // Incomplete function - a real Lua syntax error
         workspaceHost.Set(LuaUri, "function Foo(");
         var doc = new DocumentIndex(LuaUri, 1, [], []);
         var index = new GameIndex(BaselineIndex.Empty,
@@ -462,6 +462,7 @@ public sealed class LuaDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

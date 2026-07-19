@@ -22,7 +22,9 @@ public sealed class SchemaProviderProxy : LateBindingProxy<ISchemaProvider>, ISc
     // (HTTP/local) were never delivered to downstream subscribers.
     private EventHandler? _schemaRefreshed;
 
-    public SchemaProviderProxy() : base(SchemaIndex.EmptyProvider) { }
+    public SchemaProviderProxy() : base(SchemaIndex.EmptyProvider)
+    {
+    }
 
     public Task ReadyAsync => _readyTcs.Task;
 
@@ -31,6 +33,39 @@ public sealed class SchemaProviderProxy : LateBindingProxy<ISchemaProvider>, ISc
         add => _schemaRefreshed += value;
         remove => _schemaRefreshed -= value;
     }
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        return Inner.GetTag(tagName);
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+    {
+        return Inner.GetAllTagDefinitions(tagName);
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => Inner.AllTags;
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        return Inner.GetObjectType(typeName);
+    }
+
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => Inner.AllObjectTypes;
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        return Inner.GetTagsForType(typeName);
+    }
+
+    public EnumDefinition? GetEnum(string enumName)
+    {
+        return Inner.GetEnum(enumName);
+    }
+
+    public IReadOnlyList<EnumDefinition> AllEnums => Inner.AllEnums;
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => Inner.AllHardcodedSets;
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => Inner.AllMetafiles;
 
     protected override void OnConfigured(ISchemaProvider inner)
     {
@@ -45,25 +80,4 @@ public sealed class SchemaProviderProxy : LateBindingProxy<ISchemaProvider>, ISc
         if (inner.ReadyAsync.IsCompleted)
             _readyTcs.TrySetResult();
     }
-
-    public XmlTagDefinition? GetTag(string tagName) => Inner.GetTag(tagName);
-
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) =>
-        Inner.GetAllTagDefinitions(tagName);
-
-    public IReadOnlyList<XmlTagDefinition> AllTags => Inner.AllTags;
-
-    public GameObjectTypeDefinition? GetObjectType(string typeName) =>
-        Inner.GetObjectType(typeName);
-
-    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => Inner.AllObjectTypes;
-
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) =>
-        Inner.GetTagsForType(typeName);
-
-    public EnumDefinition? GetEnum(string enumName) => Inner.GetEnum(enumName);
-
-    public IReadOnlyList<EnumDefinition> AllEnums => Inner.AllEnums;
-    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => Inner.AllHardcodedSets;
-    public IReadOnlyList<MetafileDefinition> AllMetafiles => Inner.AllMetafiles;
 }

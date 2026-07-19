@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     Pushes <c>aet/storyGraphChanged</c> after index changes invalidate campaign models, so the
 ///     client re-fetches instead of polling. Debounced like the diagnostics publishers: rapid
 ///     consecutive changes (bulk indexing, workspace-wide rename) produce one notification. Only
-///     already-built models are inspected — the notifier never triggers a rebuild itself.
+///     already-built models are inspected - the notifier never triggers a rebuild itself.
 /// </summary>
 public sealed class StoryGraphChangeNotifier
 {

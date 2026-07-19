@@ -52,7 +52,7 @@ public sealed class LuaCompletionHandlerTest
     [Fact]
     public async Task Handle_LuaCompletionFlagOff_ReturnsEmpty()
     {
-        // Same arrange as Handle_InsideApiStringArg_ReturnsMatchingTypeSymbols — only the flag differs.
+        // Same arrange as Handle_InsideApiStringArg_ReturnsMatchingTypeSymbols - only the flag differs.
         var schema = new LuaApiSchemaProvider([
             """
             ---@param objectName string
@@ -120,7 +120,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var host = new FakeWorkspaceHost();
-        // Find_First_Object("UNIT")  — cursor at col 21, inside "UNIT"
+        // Find_First_Object("UNIT")  - cursor at col 21, inside "UNIT"
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"UNIT\")", 1);
 
         var handler = BuildHandler(index, schema, host);
@@ -154,7 +154,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var host = new FakeWorkspaceHost();
-        // Find_First_Object("")  — cursor at col 19 inside empty string
+        // Find_First_Object("")  - cursor at col 19 inside empty string
         host.AddOrUpdate(LuaUri, "Find_First_Object(\"\")", 1);
 
         var handler = BuildHandler(index, schema, host);
@@ -213,7 +213,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
 
         var host = new FakeWorkspaceHost();
-        // require("")  — cursor at col 9, inside empty string
+        // require("")  - cursor at col 9, inside empty string
         host.AddOrUpdate(LuaUri, "require(\"\")", 1);
 
         var handler = BuildHandler(index, new LuaApiSchemaProvider([]), host);
@@ -375,7 +375,7 @@ public sealed class LuaCompletionHandlerTest
         var path = Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, "scripts", "script.lua");
         var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            // cursor will be at col 21 — inside the "UNIT" string argument
+            // cursor will be at col 21 - inside the "UNIT" string argument
             [path] = new("Find_First_Object(\"UNIT\")")
         });
         var fileHelper = new FileHelper(fileSystem);
@@ -398,7 +398,7 @@ public sealed class LuaCompletionHandlerTest
 
         var handler = new LuaCompletionHandler(
             new FakeIndexService { Current = index },
-            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
+            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             schema,
             new LuaAnnotationRepository(),
@@ -459,6 +459,7 @@ public sealed class LuaCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

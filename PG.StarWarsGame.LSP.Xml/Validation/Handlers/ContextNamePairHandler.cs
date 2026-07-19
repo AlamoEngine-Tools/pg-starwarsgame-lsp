@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
 ///     Named handler (ID: <c>context-name-pair</c>) for tags that hold a single
-///     (ContextName, ValueName) pair — e.g. <c>Music_Event_List_Ambient</c> and
+///     (ContextName, ValueName) pair - e.g. <c>Music_Event_List_Ambient</c> and
 ///     <c>Music_Event_List_Battle</c>. Replaces the default TupleList
 ///     handler for those tags via <c>validationOverride</c> in YAML.
 /// </summary>
@@ -39,7 +39,9 @@ public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFa
         return [];
     }
 
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact) =>
-        new(XmlDiagnosticSeverity.Error,
+    private static XmlDiagnosticResult Error(XmlTagValueFact fact)
+    {
+        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"'{fact.RawValue.Trim()}' is not a valid context-name pair for <{fact.Tag.Tag}>. Expected: ContextName, ValueName.");
+    }
 }

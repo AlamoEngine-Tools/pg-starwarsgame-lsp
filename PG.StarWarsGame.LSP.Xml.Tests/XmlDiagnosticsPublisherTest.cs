@@ -90,7 +90,6 @@ public sealed class XmlDiagnosticsPublisherTest
             new StoryParamNotesHandler(),
             new StoryParamValueHandler(),
             new StoryParamEnumHandler(),
-            new StoryParamReferenceHandler(),
             new StoryParamUnknownSlotHandler()
         ];
 
@@ -151,7 +150,8 @@ public sealed class XmlDiagnosticsPublisherTest
                 XmlDiagnosticSeverity.Error)
         ]);
         var (publisher, published, _, workspaceHost) = BuildSubscribed(storyChainProblems: store);
-        workspaceHost.Set("file:///a.xml", "<Campaigns>\n<Campaign Name=\"T\">\n    <Rebel_Story_Name>Story_Plots_Gone.xml</Rebel_Story_Name>\n</Campaign>\n</Campaigns>");
+        workspaceHost.Set("file:///a.xml",
+            "<Campaigns>\n<Campaign Name=\"T\">\n    <Rebel_Story_Name>Story_Plots_Gone.xml</Rebel_Story_Name>\n</Campaign>\n</Campaigns>");
 
         await publisher.RevalidateDocumentAsync("file:///a.xml", CancellationToken.None);
 
@@ -284,7 +284,7 @@ public sealed class XmlDiagnosticsPublisherTest
     public void IndexChanged_LuaFileOpen_DoesNotPublishForLuaFile()
     {
         // Lua files may be in the workspace host (opened via LuaTextDocumentSyncHandler).
-        // The XML publisher must ignore them — they are handled by LuaDiagnosticsPublisher.
+        // The XML publisher must ignore them - they are handled by LuaDiagnosticsPublisher.
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         workspaceHost.Set("file:///script.lua", "function Definitions() end");
 
@@ -463,7 +463,7 @@ public sealed class XmlDiagnosticsPublisherTest
     [Fact]
     public void OnIndexChanged_MixedCaseWorkspaceUri_IndexProducerStillEmitsDuplicateDiagnostic()
     {
-        // Workspace host stores the raw LSP URI — VS Code may send mixed case on Windows.
+        // Workspace host stores the raw LSP URI - VS Code may send mixed case on Windows.
         // The index (from GameIndexService) stores canonical lowercase URIs. The publisher
         // must normalize before looking up in the index.
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
@@ -701,45 +701,6 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Equal(9, diag.Range.End.Character);
     }
 
-    private sealed record SpanFact(string DocumentUri, int Line, int Column, int Length, int? EndLine,
-        int? EndColumn) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);
-
-    private sealed class SpanFactStubDocumentProducer : IXmlDocumentFactProducer
-    {
-        public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
-        {
-            return [new SpanFact(documentUri, 2, 4, 3, 6, 9)];
-        }
-    }
-
-    private sealed class StubIndexFactProducerForSpan : IXmlIndexFactProducer
-    {
-        public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
-        {
-            return [];
-        }
-    }
-
-    private sealed class PlainResultForSpanFactHandler : XmlDiagnosticsHandler<SpanFact>
-    {
-        protected override IEnumerable<XmlDiagnosticResult> Handle(SpanFact fact, DiagnosticsContext ctx)
-        {
-            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "whole-node span")];
-        }
-    }
-
-    private sealed class EndPositionOverrideStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
-    {
-        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
-        {
-            return
-            [
-                new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "spans multiple lines",
-                    OverrideEndLine: 3, OverrideEndColumn: 7)
-            ];
-        }
-    }
-
     // ── revalidation ────────────────────────────────────────────────────────────
 
     private static (XmlDiagnosticsPublisher publisher,
@@ -845,7 +806,7 @@ public sealed class XmlDiagnosticsPublisherTest
         indexService.Fire(IndexWithDoc(uri)); // records uri in _lastPublishedUris
         published.Clear();
 
-        // Now remove it from the index — uri no longer indexed
+        // Now remove it from the index - uri no longer indexed
         indexService.Current = GameIndex.Empty;
 
         // Revalidate: should clear the stale uri
@@ -853,6 +814,50 @@ public sealed class XmlDiagnosticsPublisherTest
 
         var clear = Assert.Single(published, p => p.Uri.ToString() == uri);
         Assert.Empty(clear.Diagnostics);
+    }
+
+    private sealed record SpanFact(
+        string DocumentUri,
+        int Line,
+        int Column,
+        int Length,
+        int? EndLine,
+        int? EndColumn) : XmlFact(DocumentUri, Line, Column, Length, EndLine, EndColumn);
+
+    private sealed class SpanFactStubDocumentProducer : IXmlDocumentFactProducer
+    {
+        public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+        {
+            return [new SpanFact(documentUri, 2, 4, 3, 6, 9)];
+        }
+    }
+
+    private sealed class StubIndexFactProducerForSpan : IXmlIndexFactProducer
+    {
+        public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+        {
+            return [];
+        }
+    }
+
+    private sealed class PlainResultForSpanFactHandler : XmlDiagnosticsHandler<SpanFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(SpanFact fact, DiagnosticsContext ctx)
+        {
+            return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "whole-node span")];
+        }
+    }
+
+    private sealed class EndPositionOverrideStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
+    {
+        protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
+        {
+            return
+            [
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, "spans multiple lines",
+                    OverrideEndLine: 3, OverrideEndColumn: 7)
+            ];
+        }
     }
 
     private sealed class SuggestedFixStubHandler : XmlDiagnosticsHandler<XmlTagValueFact>
@@ -1007,9 +1012,11 @@ public sealed class XmlDiagnosticsPublisherTest
             ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

@@ -178,7 +178,8 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
 
             // ── Xml → Xml (cross-file): <Armor_Type> Armor_Tartan </Armor_Type> ─
             var (xmlLine, xmlCol) = FindXmlTagBodyValuePosition(xmlLines, "Armor_Type", "Armor_Tartan");
-            Assert.True(xmlLine >= 0, "Could not find <Armor_Type> Armor_Tartan </Armor_Type> in Spaceunitscorvettes.xml");
+            Assert.True(xmlLine >= 0,
+                "Could not find <Armor_Type> Armor_Tartan </Armor_Type> in Spaceunitscorvettes.xml");
 
             using var xmlCts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var xmlResult = await _fixture.Client.RequestDefinition(
@@ -213,8 +214,8 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
     // ── helpers ────────────────────────────────────────────────────────────────
 
     /// <summary>
-    ///     Returns the position of the first grandchild element — the first field tag
-    ///     inside the first type container — so tag-name completion hits a known context.
+    ///     Returns the position of the first grandchild element - the first field tag
+    ///     inside the first type container - so tag-name completion hits a known context.
     /// </summary>
     private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
     {
@@ -267,7 +268,7 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
 
     /// <summary>
     ///     Returns the 0-based (line, column) immediately after <paramref name="identifier" />
-    ///     in a call like <c>identifier(...)</c> — i.e. a position inside the identifier token
+    ///     in a call like <c>identifier(...)</c> - i.e. a position inside the identifier token
     ///     itself, so it classifies as a Lua identifier-completion context.
     /// </summary>
     private static (int line, int col) FindIdentifierEndBeforeParen(string[] lines, string identifier)
@@ -308,7 +309,7 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
     {
         if (LspTestEnvironment.EawWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception(
-                "$XunitDynamicSkip$eaw/ workspace or schema/eaw/ not found — cannot run dual-registration routing tests.");
+                "$XunitDynamicSkip$eaw/ workspace or schema/eaw/ not found - cannot run dual-registration routing tests.");
     }
 
     private async Task WaitForFullScanAsync()

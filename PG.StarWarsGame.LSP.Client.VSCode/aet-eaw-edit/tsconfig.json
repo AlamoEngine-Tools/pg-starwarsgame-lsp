@@ -18,6 +18,6 @@
 		// "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
 		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
 	},
-	/* The webview bundle is browser code (DOM, JSX) with its own tsconfig — see src/webview. */
+	/* The webview bundle is browser code (DOM, JSX) with its own tsconfig - see src/webview. */
 	"exclude": ["src/webview", "node_modules"]
 }

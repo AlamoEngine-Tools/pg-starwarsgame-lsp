@@ -3,6 +3,7 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Story.Discovery;
@@ -14,7 +15,7 @@ namespace PG.StarWarsGame.LSP.Story.Discovery;
 ///     from thread events (STORY_LAND_TACTICAL / STORY_SPACE_TACTICAL event param 1, LINK_TACTICAL
 ///     reward param 7). Missing files that the shipped baseline knows are accepted silently
 ///     (registration only); anything else produces a <see cref="StoryChainProblem" /> anchored to
-///     the referencing value — no silent guessing.
+///     the referencing value - no silent guessing.
 /// </summary>
 public sealed class StoryChainScanner
 {
@@ -120,10 +121,10 @@ public sealed class StoryChainScanner
         }
 
         // Story-name tags outside a <Campaign> element (malformed nesting) still get their
-        // manifests typed — only the campaign association is lost.
+        // manifests typed - only the campaign association is lost.
         foreach (var node in source.Doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTags.Contains(n.Name)
-                                 && !processed.Contains(n)))
+                                                                    && !processed.Contains(n)))
         {
             var value = node.InnerText.Trim();
             if (value.Length == 0) continue;
@@ -141,7 +142,7 @@ public sealed class StoryChainScanner
         if (file is null)
         {
             if (_resolver.IsKnownToBaseline(rel))
-                state.Manifests.Add(rel); // baseline ships it — typed, but nothing to recurse into
+                state.Manifests.Add(rel); // baseline ships it - typed, but nothing to recurse into
             else
                 state.AddProblem(origin, unresolvedKind,
                     $"Story plot file '{rawReference}' does not exist in any project layer or the baseline.");
@@ -158,7 +159,7 @@ public sealed class StoryChainScanner
         if (!XmlUtility.TryGetRootNode(source.Doc, out var root) ||
             !root!.Name.Equals("Story_Mode_Plots", StringComparison.OrdinalIgnoreCase))
         {
-            // Anchored to the entry that referenced the manifest — that is where the user can act.
+            // Anchored to the entry that referenced the manifest - that is where the user can act.
             state.AddProblem(origin, StoryChainProblemKind.MalformedManifest,
                 $"'{origin.Reference}' is not a valid story plot manifest: missing <Story_Mode_Plots> root element.");
             return;
@@ -248,15 +249,12 @@ public sealed class StoryChainScanner
     // ── Helpers ──────────────────────────────────────────────────────────────
 
     // References come in two forms: xml-dir-relative ("Story_Plots_X.xml") or game-root-relative
-    // ("DATA\XML\CAMPAIGNS_X.XML"). Collapse both to an xml-dir-relative path with '/' separators,
-    // preserving casing and subdirectories (mirrors WorkspaceIndexer.ToXmlRelativePath).
+    // ("DATA\XML\CAMPAIGNS_X.XML"). Shared with StoryGraphBuilder's tactical-node keying so a
+    // manifest reference correlates to the same node regardless of which event's raw text it
+    // came from (mirrors WorkspaceIndexer.ToXmlRelativePath).
     private static string ToXmlRelativePath(string reference)
     {
-        var normalized = reference.Replace('\\', '/').TrimStart('/');
-        const string xmlPrefix = "data/xml/";
-        return normalized.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase)
-            ? normalized[xmlPrefix.Length..]
-            : normalized;
+        return StoryReferenceTypes.NormalizeRelativePath(reference);
     }
 
     private static HtmlNode? FindChild(HtmlNode parent, string tagName)
@@ -307,7 +305,7 @@ public sealed class StoryChainScanner
         {
             // HAP reports the element's 1-based line; the value itself is located textually so the
             // problem range covers exactly the reference (values sit on the element's line in
-            // practice — fall back to the element start otherwise).
+            // practice - fall back to the element start otherwise).
             var line = Math.Max(0, XmlUtility.GetLine(valueElement));
             for (var i = line; i < Lines.Length && i <= line + 3; i++)
             {
@@ -320,5 +318,9 @@ public sealed class StoryChainScanner
     }
 
     private sealed record SourceLocation(
-        string SourceFile, string? DocumentUri, int Line, int Column, string Reference);
+        string SourceFile,
+        string? DocumentUri,
+        int Line,
+        int Column,
+        string Reference);
 }

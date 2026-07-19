@@ -29,7 +29,7 @@ public sealed class XmlCodeActionHandlerTest
     [Fact]
     public async Task Handle_CodeActionsFlagOff_ReturnsEmpty()
     {
-        // Same arrange as DiagnosticWithFix_ReturnsSingleCodeActionWithEdit — only the flag differs.
+        // Same arrange as DiagnosticWithFix_ReturnsSingleCodeActionWithEdit - only the flag differs.
         const string uri = "file:///test.xml";
         var range = new LspRange(new Position(0, 10), new Position(0, 13));
         var request = ParamsWithDiagnostics(uri, DiagWithFix(range, "42"));

@@ -50,18 +50,18 @@ public static class ServerConfigurator
             // InformationalVersion carries SemVer build metadata ("+<gitHash>") appended by the
             // SDK. Strip it so the client version check gets a clean "major.minor.patch" string.
             Version = (typeof(ServerConfigurator).Assembly
-                .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
-                ?? "unknown").Split('+')[0]
+                           .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+                       ?? "unknown").Split('+')[0]
         };
 
         return options
             .ConfigureLogging(x => x
-                .SetMinimumLevel(LogLevel.Information)
-                .AddLanguageProtocolLogging()
+                    .SetMinimumLevel(LogLevel.Information)
+                    .AddLanguageProtocolLogging()
 #if DEBUG
-                .AddSerilog(dispose: true)
+                    .AddSerilog(dispose: true)
 #endif
-                )
+            )
             // ── Two wiring conventions coexist below, deliberately ──────────────────
             // Most capabilities (Sync, Completion, Definition, CodeAction, CodeLens,
             // InlayHint) are "dual-registered": the Xml* and Lua* handler for a capability
@@ -77,7 +77,7 @@ public static class ServerConfigurator
             // registration specifically produced a DryIoc conflict historically. An E2E test
             // (DualRegistrationRoutingSmokeTest, added 2026-07-02) opens an XML and a Lua
             // document in the same live server and proves Completion/Definition route to the
-            // correct language handler with no crosstalk under dual-registration — so that
+            // correct language handler with no crosstalk under dual-registration - so that
             // convention is equally safe for the capabilities that use it. If either
             // convention needs to change, extend that test first as the regression gate.
             .WithHandler<LuaTextDocumentSyncHandler>()
@@ -122,9 +122,24 @@ public static class ServerConfigurator
             .WithHandler<GetStoryGraphHandler>()
             .WithHandler<GetStoryNodeDetailHandler>()
             .WithHandler<GetStorySchemaHandler>()
+            .WithHandler<GetStoryParamOptionsHandler>()
+            .WithHandler<ResolveStoryReferenceHandler>()
+            .WithHandler<GetStoryDiagnosticsHandler>()
             .WithHandler<ExecuteStoryCommandHandler>()
+            .WithHandler<ApplyStoryCommandBatchHandler>()
+            .WithHandler<ValidateStoryCommandBatchHandler>()
+            .WithHandler<PreviewStoryGraphHandler>()
+            .WithHandler<GetWorkspaceSettingsHandler>()
+            .WithHandler<SetWorkspaceSettingsHandler>()
             .WithHandler<GetStoryLayoutHandler>()
             .WithHandler<SetStoryLayoutHandler>()
+            .WithHandler<StorySimStartHandler>()
+            .WithHandler<StorySimStopHandler>()
+            .WithHandler<StorySimGetStateHandler>()
+            .WithHandler<StorySimSatisfyTriggerHandler>()
+            .WithHandler<StorySimSetFlagHandler>()
+            .WithHandler<StorySimAdvanceClockHandler>()
+            .WithHandler<StorySimLuaNotifyHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);
@@ -164,9 +179,16 @@ public static class ServerConfigurator
 
                 // Story editor mutations reach the client via workspace/applyEdit (undo/redo and
                 // open-editor sync come free); the facade is resolved lazily per call.
-                services.AddSingleton<IWorkspaceEditApplier>(sp => new FacadeWorkspaceEditApplier(
-                    () => sp.GetRequiredService<ILanguageServerFacade>()));
+                services.AddSingleton<IWorkspaceEditApplier>(sp =>
+                    new FacadeWorkspaceEditApplier(() => sp.GetRequiredService<ILanguageServerFacade>()));
                 services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
+                services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
+                services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
+                    sp.GetRequiredService<IStoryModelService>(),
+                    sp.GetRequiredService<IGameIndexService>(),
+                    sp.GetRequiredService<ISchemaProvider>(),
+                    campaign => sp.GetRequiredService<ILanguageServerFacade>()
+                        .SendNotification("aet/storySimChanged", new StorySimChangedParams(campaign))));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
@@ -235,7 +257,7 @@ public static class ServerConfigurator
 
                 // GameHoverHandler routes by extension to one of these providers. Registered as
                 // interfaces only so DryIoc does not see them as competing IHoverHandler
-                // registrations — see the router-vs-dual-registration note above .WithHandler<>().
+                // registrations - see the router-vs-dual-registration note above .WithHandler<>().
                 services.AddSingleton<IXmlHoverProvider, XmlHoverHandler>();
                 services.AddSingleton<ILuaHoverProvider, LuaHoverHandler>();
 
@@ -274,7 +296,7 @@ public static class ServerConfigurator
 
                 var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
 
-                // Log whether a .pgproj was found under the scan roots — useful startup breadcrumb only.
+                // Log whether a .pgproj was found under the scan roots - useful startup breadcrumb only.
                 // Not authoritative: the real resolution (with a user-facing notification on failure,
                 // e.g. multiple .pgproj files found) happens moments later via
                 // ProjectConfigurationResolver inside the Task.Run below, so any exception here
@@ -303,7 +325,7 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<XmlDiagnosticsPublisher>();
                 server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
-                server.Services.GetRequiredService<Story.StoryGraphChangeNotifier>();
+                server.Services.GetRequiredService<StoryGraphChangeNotifier>();
                 var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
                 var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
                 var reload = server.Services.GetRequiredService<IModProjectReloadService>();
@@ -335,7 +357,7 @@ public static class ServerConfigurator
     // Builds the scan roots: start from protocol-level workspace folders or RootUri, then always
     // add the configured workspaceRoot if not already covered. The extension sends
     // workspaceRoot = the game data directory, which may be a subdirectory of the VS Code
-    // workspace root — so it must always be included, not used as a mere fallback.
+    // workspace root - so it must always be included, not used as a mere fallback.
     private static IReadOnlyList<string> ComputeScanRoots(InitializeParams request, string? configWorkspaceRoot)
     {
         var folders = new List<string>();

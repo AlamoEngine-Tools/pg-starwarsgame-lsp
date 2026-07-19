@@ -80,7 +80,7 @@ public sealed class XmlDefinitionHandlerTest
     [Fact]
     public async Task Handle_GoToDefinitionFlagOff_ReturnsNull()
     {
-        // Same arrange as a resolvable reference — only the feature flag differs.
+        // Same arrange as a resolvable reference - only the feature flag differs.
         var doc = DocWithRef(TestUri, "UNIT_A", 0, 4, 6);
         var symbol = SymbolAt("UNIT_A", TargetUri, 3);
         var config = FakeLspConfigurationProvider.WithFeatures(
@@ -223,14 +223,14 @@ public sealed class XmlDefinitionHandlerTest
         Assert.Equal(lowercaseUri, link.Location!.Uri.ToString());
     }
 
-    // ── group key — no canonical definition ──────────────────────────────────
+    // ── group key - no canonical definition ──────────────────────────────────
 
     [Fact]
     public async Task Handle_CursorOnGroupKey_ReturnsNull_EvenWhenSymbolWithSameIdExists()
     {
         // A symbol "Unit_AT_AT" exists in the workspace, but the cursor is on a
         // group-membership tag value (not on a reference to that symbol). The definition
-        // handler must return null — group keys have no canonical single definition.
+        // handler must return null - group keys have no canonical single definition.
         var groupMembership = new DocumentGroupMembership(
             new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin(TestUri, 2, 4)),
             1, 5, 10);
@@ -240,7 +240,7 @@ public sealed class XmlDefinitionHandlerTest
             ImmutableArray<GameReference>.Empty,
             GroupMemberships: ImmutableArray.Create(groupMembership));
 
-        // Also put a real symbol with the same id in the index — collision scenario.
+        // Also put a real symbol with the same id in the index - collision scenario.
         var collidingSymbol = SymbolAt("Unit_AT_AT", TargetUri, 10);
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             .Add("Unit_AT_AT", ImmutableArray.Create(collidingSymbol));
@@ -256,7 +256,7 @@ public sealed class XmlDefinitionHandlerTest
         };
 
         var handler = BuildHandler(index);
-        // Cursor lands on the tag value span (line 1, col 7 — within [5..15))
+        // Cursor lands on the tag value span (line 1, col 7 - within [5..15))
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
         Assert.Null(result);
@@ -362,9 +362,11 @@ public sealed class XmlDefinitionHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

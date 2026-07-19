@@ -38,7 +38,7 @@ public sealed class GetEffectiveObjectHandlerTest
     [Fact]
     public async Task Handle_VariantsFlagOff_NotFoundDespiteResolvableObject()
     {
-        // Same arrange as Handle_Variant_RendersMergedEffectiveXml — only the flag differs.
+        // Same arrange as Handle_Variant_RendersMergedEffectiveXml - only the flag differs.
         var index = IndexWith(Sym("V", "B"), Sym("B"));
         var source = new FakeTagSource()
             .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0))
@@ -194,6 +194,7 @@ public sealed class GetEffectiveObjectHandlerTest
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

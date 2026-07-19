@@ -231,11 +231,11 @@ public sealed class LuaApiSchemaProviderTest
     public void GetClassDefinition_ReturnsClass_WhenDeclaredInContent()
     {
         var provider = Build("""
-            ---@class PGUnit
-            ---@field name string
-            ---@field id integer
-            PGUnit = {}
-            """);
+                             ---@class PGUnit
+                             ---@field name string
+                             ---@field id integer
+                             PGUnit = {}
+                             """);
 
         var cls = provider.GetClassDefinition("PGUnit");
         Assert.NotNull(cls);
@@ -249,9 +249,9 @@ public sealed class LuaApiSchemaProviderTest
     public void GetClassDefinition_LookupIsCaseInsensitive()
     {
         var provider = Build("""
-            ---@class GameEntity
-            GameEntity = {}
-            """);
+                             ---@class GameEntity
+                             GameEntity = {}
+                             """);
 
         Assert.NotNull(provider.GetClassDefinition("gameentity"));
         Assert.NotNull(provider.GetClassDefinition("GAMEENTITY"));
@@ -261,12 +261,12 @@ public sealed class LuaApiSchemaProviderTest
     public void GetClassDefinition_DoesNotInterfereWithFunctionParsing()
     {
         var provider = Build("""
-            ---@class PGUnit
-            PGUnit = {}
-            ---@param typeName string
-            ---@xmlref XmlObject
-            function Find_First_Object(typeName) end
-            """);
+                             ---@class PGUnit
+                             PGUnit = {}
+                             ---@param typeName string
+                             ---@xmlref XmlObject
+                             function Find_First_Object(typeName) end
+                             """);
 
         Assert.NotNull(provider.GetClassDefinition("PGUnit"));
         Assert.Contains("Find_First_Object", provider.AllFunctionNames);
@@ -284,9 +284,9 @@ public sealed class LuaApiSchemaProviderTest
     {
         var proxy = new LuaApiSchemaProxy();
         proxy.Configure(Build("""
-            ---@class PGUnit
-            PGUnit = {}
-            """));
+                              ---@class PGUnit
+                              PGUnit = {}
+                              """));
 
         Assert.NotNull(proxy.GetClassDefinition("PGUnit"));
     }

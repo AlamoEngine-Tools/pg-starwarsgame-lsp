@@ -14,11 +14,11 @@ public sealed class GetBaselineEntriesHandler
     : IJsonRpcRequestHandler<GetBaselineEntriesParams, GetBaselineEntriesResult>
 {
     private readonly IBaselineTranslationProvider _baselineProvider;
+    private readonly ILspConfigurationProvider _config;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly ILanguageService _langService;
     private readonly ILocalisationLayerRegistry _layerRegistry;
     private readonly ILocalisationProjectRegistry _projectRegistry;
-    private readonly ILspConfigurationProvider _config;
 
     public GetBaselineEntriesHandler(
         IBaselineTranslationProvider baselineProvider,
@@ -59,14 +59,14 @@ public sealed class GetBaselineEntriesHandler
         return Task.FromResult(new GetBaselineEntriesResult(entries));
     }
 
-    // The rank of the layer that owns projectFilePath — everything strictly below it (dependency
+    // The rank of the layer that owns projectFilePath - everything strictly below it (dependency
     // layers) is "inherited" for that file. Null (baseline only) when no file was specified or it
     // isn't a currently registered localisation project file.
     private int? ResolveBelowRank(string? projectFilePath)
     {
         if (string.IsNullOrEmpty(projectFilePath)) return null;
-        var project = _projectRegistry.Projects.FirstOrDefault(
-            p => string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
+        var project = _projectRegistry.Projects.FirstOrDefault(p =>
+            string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
         return project?.Rank;
     }
 }

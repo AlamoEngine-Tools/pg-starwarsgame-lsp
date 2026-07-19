@@ -143,7 +143,7 @@ internal static class HoverUtility
         var matches = FindMatches(assetFiles, value, ext);
 
         // The engine treats TGA and DDS as one texture (TGA wins when both exist, otherwise it
-        // silently falls back to the other format) — resolve the hover the same way.
+        // silently falls back to the other format) - resolve the hover the same way.
         if (matches.Count == 0 && tag.ReferenceKind == ReferenceKind.TextureFile)
         {
             var altExt = ext.Equals(".tga", StringComparison.OrdinalIgnoreCase) ? ".dds"
@@ -220,7 +220,7 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append($"📦 Packed in the base game — `{shipped.Uri.Replace('\\', '/')}`");
+        sb.Append($"📦 Packed in the base game - `{shipped.Uri.Replace('\\', '/')}`");
     }
 
     // A navigable workspace definition that lives in a DEPENDENCY project's layer (rank below the

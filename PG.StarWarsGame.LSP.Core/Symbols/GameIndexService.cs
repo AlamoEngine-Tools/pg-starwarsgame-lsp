@@ -67,140 +67,6 @@ public sealed class GameIndexService : IGameIndexService
         return IndexDocumentAsync(uri, text, version, true, ct);
     }
 
-    // force = didOpen semantics: LSP client versions restart at 1 for every open session while the
-    // committed version deliberately survives a didClose re-index, so an open starts a new version
-    // epoch — the committed version must never suppress it.
-    private async Task IndexDocumentAsync(string uri, string text, int version, bool force,
-        CancellationToken ct)
-    {
-        uri = NormalizeUri(uri);
-        var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
-        if (parser is null) return;
-
-        // Fast path: identical content is already indexed (re-opening or closing an unedited file).
-        // Skip the expensive re-parse, but still notify so diagnostics re-publish for the document.
-        // Not taken while an operation for this URI is queued in a bulk scope: a pending removal
-        // followed by this re-add would otherwise merge to "removed" and drop the document.
-        var contentHash = ContentHasher.Hash(text);
-        if (!_pendingUris.ContainsKey(uri)
-            && Volatile.Read(ref _current).Documents.GetValueOrDefault(uri) is { } indexed
-            && indexed.ContentHash == contentHash)
-        {
-            if (!force || indexed.Version == version)
-            {
-                _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
-                RaiseIndexChanged(Volatile.Read(ref _current));
-                return;
-            }
-
-            // Unchanged-content open: no re-parse needed, but the stored version must still be
-            // re-stamped to the new session's client version — otherwise its subsequent
-            // didChanges (v2, v3, …) are dropped as stale against the previous session's version.
-            if (TryRestampVersion(uri, contentHash, version))
-            {
-                _logger.LogDebug("Re-opened {Uri} unchanged; version epoch reset to v{Version}",
-                    uri, version);
-                RaiseIndexChanged(Volatile.Read(ref _current));
-                return;
-            }
-            // The document changed concurrently — fall through to the full parse.
-        }
-
-        // Cancel any in-flight parse for this URI and register the new one.
-        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored.
-        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        _inflightCts.AddOrUpdate(
-            uri,
-            _ => cts,
-            (_, prior) =>
-            {
-                prior.Cancel();
-                return cts;
-            });
-
-        // Parse outside the CAS loop — potentially slow, must not hold a lock.
-        DocumentIndex newDoc;
-        try
-        {
-            newDoc = await parser.ParseAsync(uri, text, version, cts.Token);
-        }
-        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
-        {
-            // Cancelled internally by a newer edit for the same URI — silently discard.
-            return;
-        }
-        finally
-        {
-            // Remove our slot only if it hasn't been replaced by a newer edit.
-            _inflightCts.TryRemove(new KeyValuePair<string, CancellationTokenSource>(uri, cts));
-            cts.Dispose();
-        }
-
-        // Stamp the owning project layer's precedence (and name) so same-id overrides resolve by
-        // rank and the override hint can name the shadowed layer, plus the content hash for the
-        // unchanged-content fast path above.
-        var layerRank = _layerMap?.GetRank(uri) ?? 0;
-        newDoc = newDoc with
-        {
-            LayerRank = layerRank,
-            LayerName = _layerMap?.GetLayerName(layerRank),
-            ContentHash = contentHash
-        };
-
-        if (TryDeferToBulk(new PendingOp(newDoc, null, force)))
-        {
-            _logger.LogDebug("Queued {Uri} v{Version} for bulk merge", uri, newDoc.Version);
-            return;
-        }
-
-        GameIndex snapshot, updated;
-        do
-        {
-            snapshot = Volatile.Read(ref _current);
-
-            // Drop stale parses: a strictly newer version has already been committed.
-            // Using strict > (not >=) so that re-opening the same file at the same version
-            // (e.g. DidOpen after a workspace scan at v0, then again at v1) still fires
-            // IndexChanged and re-publishes diagnostics. A didOpen (force) is exempt — it
-            // starts a new version epoch.
-            var existing = snapshot.Documents.GetValueOrDefault(uri);
-            if (!force && existing is not null && existing.Version > newDoc.Version)
-            {
-                _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri,
-                    newDoc.Version, existing.Version);
-                return;
-            }
-
-            updated = ApplyDocumentIndex(snapshot, newDoc);
-        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
-
-        _logger.LogDebug("Indexed {Uri} v{Version} ({Symbols} symbols, {Refs} refs)",
-            uri, newDoc.Version, newDoc.Symbols.Length, newDoc.References.Length);
-        RaiseIndexChanged(Volatile.Read(ref _current));
-    }
-
-    // CAS-replaces only the stored version of an unchanged document (didOpen epoch reset).
-    // Returns false when the document disappeared or its content changed concurrently, in which
-    // case the caller falls back to a full parse.
-    private bool TryRestampVersion(string uri, long contentHash, int version)
-    {
-        GameIndex snapshot, updated;
-        do
-        {
-            snapshot = Volatile.Read(ref _current);
-            if (snapshot.Documents.GetValueOrDefault(uri) is not { } current
-                || current.ContentHash != contentHash)
-                return false;
-            if (current.Version == version) return true;
-            updated = snapshot with
-            {
-                Documents = snapshot.Documents.SetItem(uri, current with { Version = version })
-            };
-        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
-
-        return true;
-    }
-
     public void InjectDocument(DocumentIndex document)
     {
         var uri = NormalizeUri(document.DocumentUri);
@@ -346,6 +212,140 @@ public sealed class GameIndexService : IGameIndexService
         RaiseIndexChanged(Volatile.Read(ref _current));
     }
 
+    // force = didOpen semantics: LSP client versions restart at 1 for every open session while the
+    // committed version deliberately survives a didClose re-index, so an open starts a new version
+    // epoch - the committed version must never suppress it.
+    private async Task IndexDocumentAsync(string uri, string text, int version, bool force,
+        CancellationToken ct)
+    {
+        uri = NormalizeUri(uri);
+        var parser = _parsers.FirstOrDefault(p => p.CanParse(Path.GetExtension(uri)));
+        if (parser is null) return;
+
+        // Fast path: identical content is already indexed (re-opening or closing an unedited file).
+        // Skip the expensive re-parse, but still notify so diagnostics re-publish for the document.
+        // Not taken while an operation for this URI is queued in a bulk scope: a pending removal
+        // followed by this re-add would otherwise merge to "removed" and drop the document.
+        var contentHash = ContentHasher.Hash(text);
+        if (!_pendingUris.ContainsKey(uri)
+            && Volatile.Read(ref _current).Documents.GetValueOrDefault(uri) is { } indexed
+            && indexed.ContentHash == contentHash)
+        {
+            if (!force || indexed.Version == version)
+            {
+                _logger.LogDebug("Skipping re-parse of {Uri}: content unchanged", uri);
+                RaiseIndexChanged(Volatile.Read(ref _current));
+                return;
+            }
+
+            // Unchanged-content open: no re-parse needed, but the stored version must still be
+            // re-stamped to the new session's client version - otherwise its subsequent
+            // didChanges (v2, v3, …) are dropped as stale against the previous session's version.
+            if (TryRestampVersion(uri, contentHash, version))
+            {
+                _logger.LogDebug("Re-opened {Uri} unchanged; version epoch reset to v{Version}",
+                    uri, version);
+                RaiseIndexChanged(Volatile.Read(ref _current));
+                return;
+            }
+            // The document changed concurrently - fall through to the full parse.
+        }
+
+        // Cancel any in-flight parse for this URI and register the new one.
+        // AddOrUpdate is atomic: the prior CTS is cancelled before the new one is stored.
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        _inflightCts.AddOrUpdate(
+            uri,
+            _ => cts,
+            (_, prior) =>
+            {
+                prior.Cancel();
+                return cts;
+            });
+
+        // Parse outside the CAS loop - potentially slow, must not hold a lock.
+        DocumentIndex newDoc;
+        try
+        {
+            newDoc = await parser.ParseAsync(uri, text, version, cts.Token);
+        }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+        {
+            // Cancelled internally by a newer edit for the same URI - silently discard.
+            return;
+        }
+        finally
+        {
+            // Remove our slot only if it hasn't been replaced by a newer edit.
+            _inflightCts.TryRemove(new KeyValuePair<string, CancellationTokenSource>(uri, cts));
+            cts.Dispose();
+        }
+
+        // Stamp the owning project layer's precedence (and name) so same-id overrides resolve by
+        // rank and the override hint can name the shadowed layer, plus the content hash for the
+        // unchanged-content fast path above.
+        var layerRank = _layerMap?.GetRank(uri) ?? 0;
+        newDoc = newDoc with
+        {
+            LayerRank = layerRank,
+            LayerName = _layerMap?.GetLayerName(layerRank),
+            ContentHash = contentHash
+        };
+
+        if (TryDeferToBulk(new PendingOp(newDoc, null, force)))
+        {
+            _logger.LogDebug("Queued {Uri} v{Version} for bulk merge", uri, newDoc.Version);
+            return;
+        }
+
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+
+            // Drop stale parses: a strictly newer version has already been committed.
+            // Using strict > (not >=) so that re-opening the same file at the same version
+            // (e.g. DidOpen after a workspace scan at v0, then again at v1) still fires
+            // IndexChanged and re-publishes diagnostics. A didOpen (force) is exempt - it
+            // starts a new version epoch.
+            var existing = snapshot.Documents.GetValueOrDefault(uri);
+            if (!force && existing is not null && existing.Version > newDoc.Version)
+            {
+                _logger.LogDebug("Dropping stale parse for {Uri} v{Incoming} (committed v{Current})", uri,
+                    newDoc.Version, existing.Version);
+                return;
+            }
+
+            updated = ApplyDocumentIndex(snapshot, newDoc);
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        _logger.LogDebug("Indexed {Uri} v{Version} ({Symbols} symbols, {Refs} refs)",
+            uri, newDoc.Version, newDoc.Symbols.Length, newDoc.References.Length);
+        RaiseIndexChanged(Volatile.Read(ref _current));
+    }
+
+    // CAS-replaces only the stored version of an unchanged document (didOpen epoch reset).
+    // Returns false when the document disappeared or its content changed concurrently, in which
+    // case the caller falls back to a full parse.
+    private bool TryRestampVersion(string uri, long contentHash, int version)
+    {
+        GameIndex snapshot, updated;
+        do
+        {
+            snapshot = Volatile.Read(ref _current);
+            if (snapshot.Documents.GetValueOrDefault(uri) is not { } current
+                || current.ContentHash != contentHash)
+                return false;
+            if (current.Version == version) return true;
+            updated = snapshot with
+            {
+                Documents = snapshot.Documents.SetItem(uri, current with { Version = version })
+            };
+        } while (Interlocked.CompareExchange(ref _current, updated, snapshot) != snapshot);
+
+        return true;
+    }
+
     private void EndBulkUpdate()
     {
         if (Interlocked.Decrement(ref _suppressionDepth) > 0)
@@ -365,7 +365,7 @@ public sealed class GameIndexService : IGameIndexService
         _pendingUris.AddOrUpdate(uri, 1, (_, count) => count + 1);
         _pendingOps.Enqueue(op);
 
-        // The bulk may have ended between the depth check and the enqueue — drain so the
+        // The bulk may have ended between the depth check and the enqueue - drain so the
         // operation is not stranded until the next bulk opens.
         if (Volatile.Read(ref _suppressionDepth) == 0)
             DrainPendingOps();
@@ -401,7 +401,6 @@ public sealed class GameIndexService : IGameIndexService
     private void ReleasePendingUri(string uri)
     {
         while (_pendingUris.TryGetValue(uri, out var count))
-        {
             if (count <= 1)
             {
                 if (_pendingUris.TryRemove(KeyValuePair.Create(uri, count))) return;
@@ -410,7 +409,6 @@ public sealed class GameIndexService : IGameIndexService
             {
                 return;
             }
-        }
     }
 
     // Applies all queued operations to the index in one builder pass: O(ops + size of the touched
@@ -455,7 +453,8 @@ public sealed class GameIndexService : IGameIndexService
             if (docs.TryGetValue(uri, out var old))
             {
                 foreach (var sym in old.Symbols) DeltaFor(defDeltas, sym.Id).Removed.Add(sym);
-                foreach (var reference in old.References) DeltaFor(refDeltas, reference.TargetId).Removed.Add(reference);
+                foreach (var reference in old.References)
+                    DeltaFor(refDeltas, reference.TargetId).Removed.Add(reference);
                 if (!old.GroupMemberships.IsDefault)
                     foreach (var dgm in old.GroupMemberships)
                         DeltaFor(groupDeltas, dgm.Membership.GroupKey).Removed.Add(dgm.Membership);
@@ -509,14 +508,6 @@ public sealed class GameIndexService : IGameIndexService
         }
 
         return builder.ToImmutable();
-    }
-
-    private sealed record PendingOp(DocumentIndex? Document, string? RemoveUri, bool Force = false);
-
-    private sealed class Delta<T>
-    {
-        public List<T> Removed { get; } = [];
-        public List<T> Added { get; } = [];
     }
 
     private void RaiseIndexChanged(GameIndex index)
@@ -628,6 +619,14 @@ public sealed class GameIndexService : IGameIndexService
     private string NormalizeUri(string uri)
     {
         return _fileHelper.NormalizeUri(uri);
+    }
+
+    private sealed record PendingOp(DocumentIndex? Document, string? RemoveUri, bool Force = false);
+
+    private sealed class Delta<T>
+    {
+        public List<T> Removed { get; } = [];
+        public List<T> Added { get; } = [];
     }
 
     private sealed class BulkUpdateScope : IDisposable

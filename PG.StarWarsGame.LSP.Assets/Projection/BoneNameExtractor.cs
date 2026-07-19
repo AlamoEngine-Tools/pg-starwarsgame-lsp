@@ -18,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 /// <remarks>
 ///     Bone names are read via the engine's <see cref="IAloFileService" /> ALO model loader
 ///     (<c>AlamoModel.Bones</c>). Any model that fails to load (corrupt, unsupported version, or not a
-///     model ALO) is skipped silently — extraction never throws for a single bad file.
+///     model ALO) is skipped silently - extraction never throws for a single bad file.
 /// </remarks>
 public static class BoneNameExtractor
 {
@@ -57,7 +57,7 @@ public static class BoneNameExtractor
             }
             catch
             {
-                // Corrupt, unsupported, or non-model ALO — skip without failing the whole scan.
+                // Corrupt, unsupported, or non-model ALO - skip without failing the whole scan.
                 continue;
             }
 

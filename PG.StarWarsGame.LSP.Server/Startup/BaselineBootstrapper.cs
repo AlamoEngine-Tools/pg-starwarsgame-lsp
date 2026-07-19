@@ -14,8 +14,8 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 /// <summary>
 ///     Second pipeline stage: loads the shipped-game baseline index and baseline localisation keys
 ///     from the configured source and applies them to the <see cref="IGameIndexService" />. Each
-///     part degrades independently — a failed baseline becomes <see cref="BaselineIndex.Empty" /> and
-///     a failed localisation load simply leaves baseline keys unavailable — so startup always
+///     part degrades independently - a failed baseline becomes <see cref="BaselineIndex.Empty" /> and
+///     a failed localisation load simply leaves baseline keys unavailable - so startup always
 ///     continues.
 /// </summary>
 public sealed class BaselineBootstrapper : IBaselineBootstrapper

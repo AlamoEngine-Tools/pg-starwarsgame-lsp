@@ -16,7 +16,7 @@ public sealed class LuaRequireCallLocatorTest
         const string source = "local x = require(\"PGStateMachine\")";
         var root = LuaSyntaxTree.ParseText(source, ParseOptions).GetRoot();
 
-        // Cursor inside "PGStateMachine" — after the opening quote at column 19.
+        // Cursor inside "PGStateMachine" - after the opening quote at column 19.
         var result = LuaRequireCallLocator.TryFindAt(root, 0, 22);
 
         Assert.NotNull(result);

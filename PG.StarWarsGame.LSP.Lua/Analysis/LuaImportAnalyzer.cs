@@ -1,9 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
-using Loretta.CodeAnalysis;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -39,7 +39,7 @@ internal static class LuaImportAnalyzer
             if (requireArg is null) continue;
 
             var resolved = LuaRequireResolver.Resolve(requireArg, documents, fileHelper, documentUri);
-            // Unresolved relative requires are silently skipped — target may be outside the workspace.
+            // Unresolved relative requires are silently skipped - target may be outside the workspace.
             // Unresolved absolute requires are a real error.
             if (resolved is null && !LuaRequireResolver.IsRelative(requireArg))
                 diagnostics.Add(BuildDiagnostic(call, requireArg));

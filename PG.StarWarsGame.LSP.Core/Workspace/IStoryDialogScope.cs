@@ -5,7 +5,7 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 
 /// <summary>
 ///     The registry scope of the story-dialog language: which files are story-dialog scripts
-///     (the .pgproj <c>directories.storyDialog</c> node — filename conventions deliberately play
+///     (the .pgproj <c>directories.storyDialog</c> node - filename conventions deliberately play
 ///     no part), how <c>Story_Dialog</c> names resolve to files, and which chapters a dialog file
 ///     defines. Implemented server-side over the resolved workspace configuration; consumed by
 ///     the dialog diagnostics publisher and the XML-side cross-checks.

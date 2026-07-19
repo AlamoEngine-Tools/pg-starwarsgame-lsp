@@ -10,8 +10,8 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class GetRootLocalisationConfigHandler
     : IJsonRpcRequestHandler<GetRootLocalisationConfigParams, GetRootLocalisationConfigResult>
 {
-    private readonly IModProjectReloadService _reloadService;
     private readonly ILspConfigurationProvider _config;
+    private readonly IModProjectReloadService _reloadService;
 
     public GetRootLocalisationConfigHandler(IModProjectReloadService reloadService, ILspConfigurationProvider config)
     {

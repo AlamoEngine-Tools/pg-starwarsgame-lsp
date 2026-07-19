@@ -14,9 +14,9 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCodeActionHandler : CodeActionHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameWorkspaceHost _workspaceHost;
-    private readonly ILspConfigurationProvider _config;
 
     public LuaCodeActionHandler(IGameWorkspaceHost workspaceHost, IFileHelper fileHelper,
         ILspConfigurationProvider config)

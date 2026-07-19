@@ -63,8 +63,8 @@ public sealed class XmlCompletionHandlerTest
         ]);
 
         return (new XmlCompletionHandler(TestParseCache.For(host), schema, indexService, fileTypeReg,
-            new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
-            tagNameRegistry, tagValueRegistry, config ?? new FakeLspConfigurationProvider()), host, schema,
+                new FileHelper(new MockFileSystem()), ctx ?? new AllowAllEaWContext(),
+                tagNameRegistry, tagValueRegistry, config ?? new FakeLspConfigurationProvider()), host, schema,
             proposals);
     }
 
@@ -255,7 +255,7 @@ public sealed class XmlCompletionHandlerTest
 
         host.AddOrUpdate(TestUri.ToString(), AbilityXmlForCompletion, 1);
 
-        // Line 3: "  <" — cursor at char 3, right after '<'
+        // Line 3: "  <" - cursor at char 3, right after '<'
         var result = await handler.Handle(At(3, 3, "<"), CancellationToken.None);
 
         var labels = result.Items.Select(i => i.Label).ToList();
@@ -396,7 +396,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddTagForType("SomeOtherType", MakeTag("Hardpoints"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "HP_01" }];
 
-        // Cursor inside the root <Hardpoints> body — must not offer value completions
+        // Cursor inside the root <Hardpoints> body - must not offer value completions
         host.AddOrUpdate(TestUri.ToString(), "<Hardpoints>\n  \n</Hardpoints>", 1);
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
@@ -412,7 +412,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddTagForType("SomeOtherType", MakeTag("Faction"));
         proposals.ProposalsToReturn = [new ValueProposal { Label = "EMPIRE" }];
 
-        // Cursor inside the type-container body — not inside a field tag
+        // Cursor inside the type-container body - not inside a field tag
         host.AddOrUpdate(TestUri.ToString(), "<Faction>\n  \n</Faction>", 1);
         var result = await handler.Handle(At(1, 2), CancellationToken.None);
 
@@ -540,7 +540,7 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task Handle_ValueCompletion_CursorDirectlyAfterSeparator_PartialValueIsEmpty()
     {
-        // "SHIELDED,|" — cursor right after comma with no space.
+        // "SHIELDED,|" - cursor right after comma with no space.
         // ExtractPartialValue must treat comma as a word boundary and return "",
         // not walk back through "SHIELDED," producing a prefix nothing matches.
         var capturing = new CapturingCompletionRegistry();
@@ -591,7 +591,7 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task Handle_XmlCompletionFlagOff_ReturnsEmptyList()
     {
-        // Same arrange as StoryParser_ValueOnEventParam_BooleanInt — only the flag differs.
+        // Same arrange as StoryParser_ValueOnEventParam_BooleanInt - only the flag differs.
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("StoryParser"));
         var config = FakeLspConfigurationProvider.WithFeatures(
@@ -619,7 +619,7 @@ public sealed class XmlCompletionHandlerTest
         var (handler, host, schema, _) = Build(registry);
         schema.AddType(MakeType("StoryParser"));
         schema.AddEnum(StoryEventTypeWith(StoryEvent("STORY_ACCUMULATE", Param(0))));
-        // Root is <StoryPlots>, not <StoryParser> — registry detection must still trigger story completions.
+        // Root is <StoryPlots>, not <StoryParser> - registry detection must still trigger story completions.
         // STORY_ACCUMULATE has 1 param, so Event_Param1 should appear (Event_Type is already present).
         var xml = "<StoryPlots>\n<Event>\n<Event_Type>STORY_ACCUMULATE</Event_Type>\n<\n</Event>\n</StoryPlots>";
         host.AddOrUpdate(TestUri.ToString(), xml, 1);
@@ -818,7 +818,7 @@ public sealed class XmlCompletionHandlerTest
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Max_Speed", ValueType = XmlValueType.Float
-            // ReferenceKind = None (default) — no provider covers this
+            // ReferenceKind = None (default) - no provider covers this
         });
 
         host.AddOrUpdate(TestUri.ToString(),
@@ -834,7 +834,7 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task Handle_ValueCompletion_XmlObjectTag_ProvidersAreCalled()
     {
-        // XmlObject references DO have completions — providers must be called.
+        // XmlObject references DO have completions - providers must be called.
         var capturing = new CapturingCompletionRegistry();
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
@@ -964,12 +964,12 @@ public sealed class XmlCompletionHandlerTest
         {
             Tag = "Unit_Abilities_Data", ValueType = XmlValueType.GuiActivatedAbilityDefinitionSubObjectList
         });
-        // UnitAbility.Type = HardcodedSet (the correct def) — added first
+        // UnitAbility.Type = HardcodedSet (the correct def) - added first
         schema.AddTagForType("UnitAbility", new XmlTagDefinition
         {
             Tag = "Type", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.HardcodedSet
         });
-        // SpaceUnit.Type = XmlObject (the wrong def) — added last so flat GetTag returns this
+        // SpaceUnit.Type = XmlObject (the wrong def) - added last so flat GetTag returns this
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "Type", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject
@@ -999,13 +999,13 @@ public sealed class XmlCompletionHandlerTest
         {
             Tag = "Abilities", ValueType = XmlValueType.AbilityDefinitionSubObjectList
         });
-        // LuckyShotAttackAbility.Applicable_Unit_Categories = Enum (the correct def) — added first
+        // LuckyShotAttackAbility.Applicable_Unit_Categories = Enum (the correct def) - added first
         schema.AddTagForType("LuckyShotAttackAbility", new XmlTagDefinition
         {
             Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.DynamicEnumValue,
             ReferenceKind = ReferenceKind.Enum
         });
-        // GameObjectType.Applicable_Unit_Categories = XmlObject (wrong def) — added last so flat lookup returns it
+        // GameObjectType.Applicable_Unit_Categories = XmlObject (wrong def) - added last so flat lookup returns it
         schema.AddTagForType("GameObjectType", new XmlTagDefinition
         {
             Tag = "Applicable_Unit_Categories", ValueType = XmlValueType.NameReference,
@@ -1066,14 +1066,14 @@ public sealed class XmlCompletionHandlerTest
         var (handler, host, schema, _) = Build(registry, completionReg: capturing);
 
         schema.AddType(new GameObjectTypeDefinition { TypeName = "SpaceUnit", NameTag = "Name" });
-        // SpaceUnit.SFXEvent_Attack = XmlObject → SFXEvent (the correct def) — added first
+        // SpaceUnit.SFXEvent_Attack = XmlObject → SFXEvent (the correct def) - added first
         schema.AddTagForType("SpaceUnit", new XmlTagDefinition
         {
             Tag = "SFXEvent_Attack", ValueType = XmlValueType.SFXEventReference,
             ReferenceKind = ReferenceKind.XmlObject,
             ObjectType = new GameObjectTypeDefinition { TypeName = "SFXEvent" }
         });
-        // OtherType.SFXEvent_Attack = XmlObject → GameObjectType (wrong def) — added last so flat lookup returns it
+        // OtherType.SFXEvent_Attack = XmlObject → GameObjectType (wrong def) - added last so flat lookup returns it
         schema.AddTagForType("OtherType", new XmlTagDefinition
         {
             Tag = "SFXEvent_Attack", ValueType = XmlValueType.NameReference, ReferenceKind = ReferenceKind.XmlObject,
@@ -1138,7 +1138,7 @@ public sealed class XmlCompletionHandlerTest
         host.AddOrUpdate(TestUri.ToString(),
             "<Root>\n<SpaceUnit Name=\"X\">\n<HardPoint_SFX></HardPoint_SFX>\n</SpaceUnit>\n</Root>", 1);
 
-        // "<HardPoint_SFX>" is 15 chars — cursor right after the opening tag, before any comma.
+        // "<HardPoint_SFX>" is 15 chars - cursor right after the opening tag, before any comma.
         await handler.Handle(At(2, 15), CancellationToken.None);
 
         Assert.Equal("HardPointType", proposals.LastTag?.Enum?.Name);
@@ -1162,7 +1162,7 @@ public sealed class XmlCompletionHandlerTest
             "<Root>\n<SpaceUnit Name=\"X\">\n<HardPoint_SFX>HARD_POINT_WEAPON_LASER, </HardPoint_SFX>\n</SpaceUnit>\n</Root>",
             1);
 
-        // "<HardPoint_SFX>HARD_POINT_WEAPON_LASER, " is 40 chars — cursor right after the comma+space.
+        // "<HardPoint_SFX>HARD_POINT_WEAPON_LASER, " is 40 chars - cursor right after the comma+space.
         await handler.Handle(At(2, 40), CancellationToken.None);
 
         Assert.Equal(ReferenceKind.XmlObject, capturing.LastTagDef?.ReferenceKind);
@@ -1172,7 +1172,7 @@ public sealed class XmlCompletionHandlerTest
     [Fact]
     public async Task Handle_HardPointSfxMap_CursorBeforeComma_WithTrailingNullAfterIt_StillOffersSlot0()
     {
-        // Regression guard for the reported bug: "<Tag> |, null</Tag>" — a later comma/value must
+        // Regression guard for the reported bug: "<Tag> |, null</Tag>" - a later comma/value must
         // not be counted; only commas strictly BEFORE the cursor matter.
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
@@ -1191,7 +1191,7 @@ public sealed class XmlCompletionHandlerTest
         host.AddOrUpdate(TestUri.ToString(),
             "<Root>\n<SpaceUnit Name=\"X\">\n<HardPoint_SFX> , null</HardPoint_SFX>\n</SpaceUnit>\n</Root>", 1);
 
-        // "<HardPoint_SFX>" is 15 chars — cursor right after the opening tag, before the space/comma/null.
+        // "<HardPoint_SFX>" is 15 chars - cursor right after the opening tag, before the space/comma/null.
         await handler.Handle(At(2, 15), CancellationToken.None);
 
         Assert.Equal("HardPointType", proposals.LastTag?.Enum?.Name);
@@ -1262,7 +1262,7 @@ public sealed class XmlCompletionHandlerTest
             "<Root>\n<Faction Name=\"X\">\n<Music_Event_List_Ambient>Space, </Music_Event_List_Ambient>\n</Faction>\n</Root>",
             1);
 
-        // "<Music_Event_List_Ambient>Space, " is 33 chars — cursor right after the comma+space.
+        // "<Music_Event_List_Ambient>Space, " is 33 chars - cursor right after the comma+space.
         await handler.Handle(At(2, 33), CancellationToken.None);
 
         Assert.Equal("MusicEvent", capturing.LastTagDef?.ObjectType?.TypeName);
@@ -1369,7 +1369,10 @@ public sealed class XmlCompletionHandlerTest
     private sealed class FakeSchemaProvider : ISchemaProvider
     {
         private readonly Dictionary<string, EnumDefinition> _enums = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, HardcodedReferenceSet> _hardcodedSets = new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly Dictionary<string, HardcodedReferenceSet> _hardcodedSets =
+            new(StringComparer.OrdinalIgnoreCase);
+
         private readonly Dictionary<string, XmlTagDefinition> _tags = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, List<XmlTagDefinition>> _tagsByType = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, GameObjectTypeDefinition> _types = new(StringComparer.OrdinalIgnoreCase);
@@ -1514,9 +1517,11 @@ public sealed class XmlCompletionHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

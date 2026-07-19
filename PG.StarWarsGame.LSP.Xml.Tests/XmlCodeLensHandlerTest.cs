@@ -80,7 +80,7 @@ public sealed class XmlCodeLensHandlerTest
     [Fact]
     public async Task Handle_CodeLensFlagOff_ReturnsNull()
     {
-        // Same arrange as Handle_DocumentWithSymbolAndZeroRefs — only the flag differs.
+        // Same arrange as Handle_DocumentWithSymbolAndZeroRefs - only the flag differs.
         var sym = SymbolAt("UNIT_A", TestUri, 3);
         var doc = new DocumentIndex(TestUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
@@ -321,9 +321,11 @@ public sealed class XmlCodeLensHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

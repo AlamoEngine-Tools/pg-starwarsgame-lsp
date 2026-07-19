@@ -45,7 +45,7 @@ public sealed class LuaDefinitionHandlerTest
     [Fact]
     public async Task Handle_LuaGoToDefinitionFlagOff_ReturnsNull()
     {
-        // Same arrange as Handle_CursorOnGlobalReference — only the flag differs.
+        // Same arrange as Handle_CursorOnGlobalReference - only the flag differs.
         var reference = new GameReference("Foo", GameSymbolKind.LuaGlobal, null, LuaUri, 0, 0, 3);
         var docIndex = new DocumentIndex(LuaUri, 1, [], [reference]);
         var symbol = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null, new FileOrigin(LibUri, 5, 9), null);
@@ -131,7 +131,7 @@ public sealed class LuaDefinitionHandlerTest
         var reference = new GameReference("Foo", GameSymbolKind.LuaGlobal, null, LuaUri, 0, 0, 3);
         var docIndex = new DocumentIndex(LuaUri, 1, [], [reference]);
 
-        // Symbol has UnknownOrigin — not navigable
+        // Symbol has UnknownOrigin - not navigable
         var symbol = new GameSymbol("Foo", GameSymbolKind.LuaGlobal, null, new UnknownOrigin("test"), null);
         var index = MakeIndex(
             [("Foo", ImmutableArray.Create(symbol))],
@@ -159,7 +159,7 @@ public sealed class LuaDefinitionHandlerTest
 
         var result = await BuildHandler(index).Handle(RequestAt(0, 12), CancellationToken.None);
 
-        // Cursor at (0, 12) is inside [10, 16) — must resolve to the XML file.
+        // Cursor at (0, 12) is inside [10, 16) - must resolve to the XML file.
         var loc = Assert.Single(result!.Select(l => l.Location!));
         Assert.Equal(xmlUri, loc.Uri.ToString());
         Assert.Equal(5, loc.Range.Start.Line);
@@ -169,7 +169,7 @@ public sealed class LuaDefinitionHandlerTest
     [Fact]
     public async Task Handle_CursorOnXmlObjectStringLiteral_MegArchiveOrigin_ReturnsNull()
     {
-        // Symbol exists but lives in a packaged .meg archive — cannot navigate.
+        // Symbol exists but lives in a packaged .meg archive - cannot navigate.
         var reference = new GameReference("UNIT_A", GameSymbolKind.XmlObject, "Unit", LuaUri, 0, 10, 6);
         var docIndex = new DocumentIndex(LuaUri, 1, [], [reference]);
 
@@ -200,7 +200,7 @@ public sealed class LuaDefinitionHandlerTest
     [Fact]
     public async Task Handle_CursorOnRequireArg_ReturnsTargetFileStart()
     {
-        // require("foo/bar") — cursor at col 10 (inside the string)
+        // require("foo/bar") - cursor at col 10 (inside the string)
         const string fooBarUri = "file:///scripts/foo/bar.lua";
         var docIndex = new DocumentIndex(LuaUri, 1, [], []);
         var fooDocIndex = new DocumentIndex(fooBarUri, 1, [], []);
@@ -264,10 +264,10 @@ public sealed class LuaDefinitionHandlerTest
         var targetDocIndex = new DocumentIndex(targetUri, 1, [], []);
         var index = MakeIndex(documents: [(scriptUri, docIndex), (targetUri, targetDocIndex)]);
 
-        // No document in workspace host — simulates not-yet-synced state
+        // No document in workspace host - simulates not-yet-synced state
         var handler = new LuaDefinitionHandler(
             new FakeIndexService { Current = index },
-            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc — read from disk
+            TestLuaParseCache.For(new FakeWorkspaceHost(), fileHelper), // no open doc - read from disk
             fileHelper,
             NullLogger<LuaDefinitionHandler>.Instance,
             new FakeLspConfigurationProvider());
@@ -343,6 +343,7 @@ public sealed class LuaDefinitionHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

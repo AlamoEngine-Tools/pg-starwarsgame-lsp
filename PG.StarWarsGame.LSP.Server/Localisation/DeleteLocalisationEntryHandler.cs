@@ -12,11 +12,11 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class DeleteLocalisationEntryHandler
     : IJsonRpcRequestHandler<DeleteLocalisationEntryParams, LocalisationWriteResult>
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationEntryWriter _entryWriter;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<DeleteLocalisationEntryHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
-    private readonly ILspConfigurationProvider _config;
 
     public DeleteLocalisationEntryHandler(
         ILocalisationEntryWriter entryWriter,

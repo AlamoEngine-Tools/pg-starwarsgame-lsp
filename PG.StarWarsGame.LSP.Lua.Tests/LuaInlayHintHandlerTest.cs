@@ -57,13 +57,13 @@ public sealed class LuaInlayHintHandlerTest
     [Fact]
     public async Task Handle_LuaInlayHintsFlagOff_ReturnsNull()
     {
-        // Same arrange as Handle_EngineFunction_NonSpeakingArg_ShowsHint — only the flag differs.
+        // Same arrange as Handle_EngineFunction_NonSpeakingArg_ShowsHint - only the flag differs.
         const string lua = """
-            --- Plays a movie.
-            ---@param mission_name string
-            ---@param force_level integer
-            function PlayMovie(mission_name, force_level) end
-            """;
+                           --- Plays a movie.
+                           ---@param mission_name string
+                           ---@param force_level integer
+                           function PlayMovie(mission_name, force_level) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Lua = new LuaFeatureFlags { InlayHints = false } });
@@ -75,7 +75,9 @@ public sealed class LuaInlayHintHandlerTest
     }
 
     private static IReadOnlyList<InlayHint> GetHints(InlayHintContainer? container)
-        => container?.ToList() ?? [];
+    {
+        return container?.ToList() ?? [];
+    }
 
     // ── gating ────────────────────────────────────────────────────────────────
 
@@ -110,11 +112,11 @@ public sealed class LuaInlayHintHandlerTest
     public async Task Handle_EngineFunction_NonSpeakingArg_ShowsHint()
     {
         const string lua = """
-            --- Plays a movie.
-            ---@param mission_name string
-            ---@param force_level integer
-            function PlayMovie(mission_name, force_level) end
-            """;
+                           --- Plays a movie.
+                           ---@param mission_name string
+                           ---@param force_level integer
+                           function PlayMovie(mission_name, force_level) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         // Call with short non-speaking args
         var handler = BuildHandler(schema: schema, docText: "PlayMovie(x, y)");
@@ -129,9 +131,9 @@ public sealed class LuaInlayHintHandlerTest
     public async Task Handle_EngineFunction_SpeakingArgContainsParamName_SuppressesHint()
     {
         const string lua = """
-            ---@param mission string
-            function StartMission(mission) end
-            """;
+                           ---@param mission string
+                           function StartMission(mission) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         // "run_mission" contains "mission" → should suppress hint
         var handler = BuildHandler(schema: schema, docText: "StartMission(run_mission)");
@@ -143,9 +145,9 @@ public sealed class LuaInlayHintHandlerTest
     public async Task Handle_EngineFunction_ShortArgNotInParamName_ShowsHint()
     {
         const string lua = """
-            ---@param count integer
-            function SetCount(count) end
-            """;
+                           ---@param count integer
+                           function SetCount(count) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         // "x" (len < 3) is not in "count" → show hint
         var handler = BuildHandler(schema: schema, docText: "SetCount(x)");
@@ -159,9 +161,9 @@ public sealed class LuaInlayHintHandlerTest
     public async Task Handle_EngineFunction_ShortArgIsInParamName_SuppressesHint()
     {
         const string lua = """
-            ---@param id string
-            function SetId(id) end
-            """;
+                           ---@param id string
+                           function SetId(id) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         // "id" (len == 2, < 3) IS in param name "id" → suppress
         var handler = BuildHandler(schema: schema, docText: "SetId(id)");
@@ -189,7 +191,7 @@ public sealed class LuaInlayHintHandlerTest
         };
         repo.UpdateFunctionAnnotations("file:///lib.lua", [("MyFunc", ann)]);
 
-        var handler = BuildHandler(index: index, repo: repo, docText: "MyFunc(x)");
+        var handler = BuildHandler(index, repo: repo, docText: "MyFunc(x)");
         var result = await handler.Handle(RequestAt(0, 0), CancellationToken.None);
         var hints = GetHints(result);
         Assert.Single(hints);
@@ -215,7 +217,7 @@ public sealed class LuaInlayHintHandlerTest
         repo.UpdateFunctionAnnotations("file:///lib.lua", [("MyFunc", ann)]);
 
         // "the_target_unit" contains "target" → suppress
-        var handler = BuildHandler(index: index, repo: repo, docText: "MyFunc(the_target_unit)");
+        var handler = BuildHandler(index, repo: repo, docText: "MyFunc(the_target_unit)");
         var result = await handler.Handle(RequestAt(0, 0), CancellationToken.None);
         Assert.Empty(GetHints(result));
     }
@@ -226,9 +228,9 @@ public sealed class LuaInlayHintHandlerTest
     public async Task Handle_CallOutsideRange_ReturnsNoHints()
     {
         const string lua = """
-            ---@param x integer
-            function Foo(x) end
-            """;
+                           ---@param x integer
+                           function Foo(x) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         // Call is on line 0; range covers only line 5+
         var handler = BuildHandler(schema: schema, docText: "Foo(z)");
@@ -242,9 +244,9 @@ public sealed class LuaInlayHintHandlerTest
     public async Task Handle_HintPosition_IsAtStartOfArgument()
     {
         const string lua = """
-            ---@param count integer
-            function SetCount(count) end
-            """;
+                           ---@param count integer
+                           function SetCount(count) end
+                           """;
         var schema = new LuaApiSchemaProvider([lua]);
         var handler = BuildHandler(schema: schema, docText: "SetCount(z)");
         var result = await handler.Handle(RequestAt(0, 0), CancellationToken.None);
@@ -257,7 +259,10 @@ public sealed class LuaInlayHintHandlerTest
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
-    private static string GetLabel(InlayHint hint) => hint.Label.String ?? "";
+    private static string GetLabel(InlayHint hint)
+    {
+        return hint.Label.String ?? "";
+    }
 
     // ── fakes ─────────────────────────────────────────────────────────────────
 
@@ -268,21 +273,56 @@ public sealed class LuaInlayHintHandlerTest
         public event Action<ILocalisationIndex>? LocalisationChanged;
         public event Action<GameIndex>? DynamicEnumChanged;
 
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) => Task.CompletedTask;
-        public void InjectDocument(DocumentIndex document) { }
-        public void RemoveDocument(string uri) { }
-        public void ApplyBaseline(BaselineIndex baseline) { }
-        public void ApplyLocalisation(ILocalisationIndex index) { }
-        public void ApplyAssetFiles(IAssetFileIndex index) { }
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values) { }
-        public void ApplyWorkspaceEnumValueDefinitions(ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions) { }
-        public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+        {
+            return Task.CompletedTask;
+        }
+
+        public void InjectDocument(DocumentIndex document)
+        {
+        }
+
+        public void RemoveDocument(string uri)
+        {
+        }
+
+        public void ApplyBaseline(BaselineIndex baseline)
+        {
+        }
+
+        public void ApplyLocalisation(ILocalisationIndex index)
+        {
+        }
+
+        public void ApplyAssetFiles(IAssetFileIndex index)
+        {
+        }
+
+        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+        {
+        }
+
+        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+        {
+        }
+
+        public void ApplyWorkspaceEnumValueDefinitions(
+            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+        {
+        }
+
+        public IDisposable BeginBulkUpdate()
+        {
+            return NullDisposable.Instance;
+        }
 
         private sealed class NullDisposable : IDisposable
         {
             public static readonly NullDisposable Instance = new();
-            public void Dispose() { }
+
+            public void Dispose()
+            {
+            }
         }
     }
 
@@ -291,10 +331,20 @@ public sealed class LuaInlayHintHandlerTest
         private readonly Dictionary<string, TrackedDocument> _docs = [];
 
         public void AddOrUpdate(string uri, string text, int version, bool publishDiagnostics = true)
-            => _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
+        {
+            _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
+        }
 
-        public void Remove(string uri) => _docs.Remove(uri);
-        public bool TryGet(string uri, out TrackedDocument doc) => _docs.TryGetValue(uri, out doc!);
+        public void Remove(string uri)
+        {
+            _docs.Remove(uri);
+        }
+
+        public bool TryGet(string uri, out TrackedDocument doc)
+        {
+            return _docs.TryGetValue(uri, out doc!);
+        }
+
         public IEnumerable<TrackedDocument> All => _docs.Values;
     }
 }

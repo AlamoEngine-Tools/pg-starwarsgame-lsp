@@ -54,8 +54,12 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
         ctx.Index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspace);
         if (baseline.IsDefaultOrEmpty && workspace.IsDefaultOrEmpty) return null;
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (!baseline.IsDefaultOrEmpty) foreach (var v in baseline) set.Add(v);
-        if (!workspace.IsDefaultOrEmpty) foreach (var v in workspace) set.Add(v);
+        if (!baseline.IsDefaultOrEmpty)
+            foreach (var v in baseline)
+                set.Add(v);
+        if (!workspace.IsDefaultOrEmpty)
+            foreach (var v in workspace)
+                set.Add(v);
         return set;
     }
 }

@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
+using HtmlAgilityPack;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -23,7 +24,7 @@ public sealed class XmlParseCacheTest
         return (new XmlParseCache(textSource, capacity), host);
     }
 
-    // ── (uri, text) overload — caller already holds the text ────────────────
+    // ── (uri, text) overload - caller already holds the text ────────────────
 
     [Fact]
     public void GetOrParse_SameText_ReturnsSameInstance()
@@ -48,7 +49,7 @@ public sealed class XmlParseCacheTest
         Assert.Equal("<Root2/>", second.Text);
     }
 
-    // ── (uri) overload — text resolved via IDocumentTextSource ──────────────
+    // ── (uri) overload - text resolved via IDocumentTextSource ──────────────
 
     [Fact]
     public void GetOrParse_ByUri_OpenDocument_ParsesBufferText()
@@ -164,7 +165,7 @@ public sealed class XmlParseCacheTest
         var innerTextLength = 0;
         var innerHtmlLength = 0;
         foreach (var node in parsed.Html.DocumentNode.Descendants()
-                     .Where(n => n.NodeType == HtmlAgilityPack.HtmlNodeType.Element))
+                     .Where(n => n.NodeType == HtmlNodeType.Element))
         {
             names.Add(node.Name);
             attrCount += node.Attributes.Count;

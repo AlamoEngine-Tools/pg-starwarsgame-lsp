@@ -12,8 +12,9 @@ public sealed class LuaTypeIndex : ILuaTypeIndex
         new Dictionary<string, LuaAliasDefinition>(StringComparer.OrdinalIgnoreCase),
         new Dictionary<string, LuaEnumDefinition>(StringComparer.OrdinalIgnoreCase));
 
-    private readonly IReadOnlyDictionary<string, LuaClassDefinition> _classes;
     private readonly IReadOnlyDictionary<string, LuaAliasDefinition> _aliases;
+
+    private readonly IReadOnlyDictionary<string, LuaClassDefinition> _classes;
     private readonly IReadOnlyDictionary<string, LuaEnumDefinition> _enums;
 
     private LuaTypeIndex(
@@ -34,9 +35,20 @@ public sealed class LuaTypeIndex : ILuaTypeIndex
 
     public IReadOnlySet<string> AllTypeNames { get; }
 
-    public LuaClassDefinition? GetClass(string typeName) => _classes.GetValueOrDefault(typeName);
-    public LuaAliasDefinition? GetAlias(string typeName) => _aliases.GetValueOrDefault(typeName);
-    public LuaEnumDefinition? GetEnum(string typeName) => _enums.GetValueOrDefault(typeName);
+    public LuaClassDefinition? GetClass(string typeName)
+    {
+        return _classes.GetValueOrDefault(typeName);
+    }
+
+    public LuaAliasDefinition? GetAlias(string typeName)
+    {
+        return _aliases.GetValueOrDefault(typeName);
+    }
+
+    public LuaEnumDefinition? GetEnum(string typeName)
+    {
+        return _enums.GetValueOrDefault(typeName);
+    }
 
     public static ILuaTypeIndex Build(IEnumerable<EmmyLuaAnnotations> annotations)
     {

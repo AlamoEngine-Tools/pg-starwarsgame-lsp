@@ -8,13 +8,13 @@ namespace PG.StarWarsGame.LSP.Story.Graph;
 
 public enum StoryEventLifecycle
 {
-    /// <summary>The owning thread is suspended — the event cannot participate yet.</summary>
+    /// <summary>The owning thread is suspended - the event cannot participate yet.</summary>
     Inactive,
 
     /// <summary>Prerequisites are not satisfied.</summary>
     Waiting,
 
-    /// <summary>Prerequisites satisfied — the trigger condition can trip.</summary>
+    /// <summary>Prerequisites satisfied - the trigger condition can trip.</summary>
     Armed,
 
     /// <summary>Fired and not perpetual.</summary>
@@ -25,7 +25,7 @@ public enum StoryEventLifecycle
 }
 
 /// <summary>
-///     Immutable story runtime state — which events fired, which are disabled, which threads are
+///     Immutable story runtime state - which events fired, which are disabled, which threads are
 ///     suspended, and the flag table. Shared by static analysis (reachability, filtering) today
 ///     and the simulator sessions later; every mutation returns a new state.
 /// </summary>
@@ -74,9 +74,9 @@ public sealed record StoryRuntimeState
 /// </summary>
 public sealed class StoryEvaluator
 {
+    private readonly ILookup<string, StoryEdge> _controlEdgesByFrom;
     private readonly Dictionary<string, StoryNode> _eventNodesById;
     private readonly Dictionary<string, List<StoryNode>> _eventsByName;
-    private readonly ILookup<string, StoryEdge> _controlEdgesByFrom;
 
     public StoryEvaluator(StoryGraph graph)
     {

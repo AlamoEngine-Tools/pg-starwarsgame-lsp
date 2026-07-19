@@ -64,7 +64,7 @@ eawCommand.SetAction((parseResult, _) =>
 
 var focEawOption = new Option<DirectoryInfo>("--eaw", "-e")
 {
-    Description = "EaW game data directory — loaded first as the base asset layer",
+    Description = "EaW game data directory - loaded first as the base asset layer",
     Required = true
 };
 var focFocOption = new Option<DirectoryInfo>("--foc", "-f")
@@ -125,7 +125,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     else
     {
         Console.Error.WriteLine(
-            $"Schema directory not found ({schemaPath ?? "none"}) — type names will fall back to GameObjectType.");
+            $"Schema directory not found ({schemaPath ?? "none"}) - type names will fall back to GameObjectType.");
     }
 
     var sp = services.BuildServiceProvider();
@@ -133,7 +133,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     var engineService = sp.GetRequiredService<IPetroglyphStarWarsGameEngineService>();
 
     Console.WriteLine($"Initializing engine from: {enginePath}");
-    // For foc: enginePath=FoC, eawLayerPath=EaW — FocGameRepository loads EaW MEGs from the
+    // For foc: enginePath=FoC, eawLayerPath=EaW - FocGameRepository loads EaW MEGs from the
     // fallback path first, then FoC MEGs on top. Without the EaW fallback, only FoC-specific
     // game objects are found and EaW-defined objects are absent from the symbol set.
     var locations = new GameLocations(enginePath, eawLayerPath ?? enginePath);
@@ -170,21 +170,21 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     // ── Music events ────────────────────────────────────────────────────────
     //
-    // !!! STOPGAP — DO NOT TREAT AS THE PERMANENT SHAPE OF THIS FEATURE !!!
+    // !!! STOPGAP - DO NOT TREAT AS THE PERMANENT SHAPE OF THIS FEATURE !!!
     //
     // PG.StarWarsGame.Engine has NO MusicEvent support at all today: no game manager, no entity
-    // type — unlike SFXEvent, which has a real ISfxEventGameManager (see engine.SfxGameManager
+    // type - unlike SFXEvent, which has a real ISfxEventGameManager (see engine.SfxGameManager
     // above). This block reads and parses MusicEvents.xml directly against the engine's virtual
     // file system, entirely bypassing the engine's game-manager abstraction, purely so the LSP
     // baseline can carry MusicEvent symbols for go-to-definition/rename/find-references parity
     // with SFXEvent. It intentionally does NOT replicate anything else ISfxEventGameManager does
-    // (locale-aware MEG loading, engine-level validation/error reporting) — those aren't needed
+    // (locale-aware MEG loading, engine-level validation/error reporting) - those aren't needed
     // for symbol-level baseline projection, and adding them here would be reimplementing engine
     // internals in the wrong layer.
     //
     // MusicEvents.xml is a single direct-content file (schema/eaw/meta/metafiles.yaml declares it
     // as `metaFileType: directContent`), not a MEG-packed file-list registry like SFXEventFiles.XML
-    // — so a flat `<MusicEvents><MusicEvent Name="...">...</MusicEvent></MusicEvents>` parse is
+    // - so a flat `<MusicEvents><MusicEvent Name="...">...</MusicEvent></MusicEvents>` parse is
     // sufficient; there is no per-language variation to resolve.
     //
     // TODO(music-events): delete this entire block and switch to `engine.MusicEventGameManager`
@@ -214,13 +214,14 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
             }
         }
     }
-    Console.WriteLine($"Music events: {musicEvents.Count} (direct-parsed stopgap — see TODO(music-events))");
+
+    Console.WriteLine($"Music events: {musicEvents.Count} (direct-parsed stopgap - see TODO(music-events))");
 
     // ── Shadow blob materials ───────────────────────────────────────────────
     //
     // Same stopgap as music events above (see that comment for the full rationale):
     // PG.StarWarsGame.Engine has no shadow-blob-material support, and Shadowblobmaterials.xml is
-    // another single direct-content file — a flat <Shadow_Blob_Materials><Material name="…">
+    // another single direct-content file - a flat <Shadow_Blob_Materials><Material name="…">
     // list, so a direct parse is sufficient. Note the LOWERCASE `name` attribute (unlike every
     // other object type's `Name`); matched case-insensitively for robustness.
     //
@@ -253,6 +254,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
             }
         }
     }
+
     Console.WriteLine($"Shadow blob materials: {shadowBlobMaterials.Count} (direct-parsed stopgap)");
 
     var schemaProvider = sp.GetService<ISchemaProvider>();
@@ -360,7 +362,7 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
                 // Campaign story chain: type every reachable plot manifest and story thread so
                 // workspaces without these files still validate references into vanilla data.
                 var chain = new StoryChainScanner(
-                    new GameRepositoryStoryChainFileResolver(p => engine.GameRepository.TryOpenFile(p)))
+                        new GameRepositoryStoryChainFileResolver(p => engine.GameRepository.TryOpenFile(p)))
                     .Scan(def.Path);
                 foreach (var rel in chain.ManifestFiles)
                     fileTypeMapBuilder[NormalizeChainPath(rel)] = ["StoryPlotManifest"];
@@ -531,14 +533,14 @@ file sealed class GameRepositoryStoryChainFileResolver(Func<string, Stream?> ope
         return stream is null ? null : new StoryChainFile(new StreamReader(stream).ReadToEnd(), null);
     }
 
-    // The game repository IS the baseline source — there is nothing behind it to fall back to.
+    // The game repository IS the baseline source - there is nothing behind it to fall back to.
     public bool IsKnownToBaseline(string xmlRelativePath)
     {
         return false;
     }
 }
 
-// Minimal fallback when no schema is wired — all types become GameObjectType.
+// Minimal fallback when no schema is wired - all types become GameObjectType.
 file sealed class NullSchemaProvider : ISchemaProvider
 {
     public event EventHandler? SchemaRefreshed

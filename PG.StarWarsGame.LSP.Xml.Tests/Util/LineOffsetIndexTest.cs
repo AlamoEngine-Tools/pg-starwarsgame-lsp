@@ -44,7 +44,7 @@ public sealed class LineOffsetIndexTest
     [Fact]
     public void GetPosition_OffsetAtNewlineChar_StaysOnCurrentLine()
     {
-        // The '\n' at offset 2 belongs to line 0 — only characters BEFORE the
+        // The '\n' at offset 2 belongs to line 0 - only characters BEFORE the
         // offset are counted, matching XmlUtility.OffsetToPosition.
         var index = new LineOffsetIndex("ab\ncd");
 
@@ -89,7 +89,7 @@ public sealed class LineOffsetIndexTest
     public void GetPosition_OffsetBeyondLength_CountsFromLastLineStart()
     {
         // Offsets past the end resolve against the last line, with the column
-        // running past the text — mirrors OffsetToPosition's unclamped column.
+        // running past the text - mirrors OffsetToPosition's unclamped column.
         var index = new LineOffsetIndex("ab\ncd");
 
         Assert.Equal((1, 4), index.GetPosition(7));

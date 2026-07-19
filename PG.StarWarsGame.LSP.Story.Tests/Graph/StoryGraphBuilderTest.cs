@@ -256,6 +256,74 @@ public sealed class StoryGraphBuilderTest
         Assert.Equal("A", node.Event!.Name);
         Assert.Equal("A", node.Label);
     }
+
+    // ── Tactical entry edges (jump-to-tactical-story) ───────────────────────
+
+    [Fact]
+    public void TacticalManifestThreads_LinksTacticalNodeToRootEventsOfItsThreads()
+    {
+        var graph = new StoryGraphBuilder(Schema).Build(
+            [
+                Thread(UriA,
+                    "<Event Name=\"E\"><Event_Type>STORY_LAND_TACTICAL</Event_Type>" +
+                    "<Event_Param1>Story_Plots_M2_Land.xml</Event_Param1></Event>"),
+                Thread(UriB,
+                    "<Event Name=\"Ambush\"/>" +
+                    "<Event Name=\"Reinforcements\"><Prereq>Ambush</Prereq></Event>")
+            ],
+            new Dictionary<string, IReadOnlySet<string>>
+            {
+                ["Story_Plots_M2_Land.xml"] = new HashSet<string> { UriB }
+            });
+
+        var tactical = Assert.Single(graph.Nodes, n => n.Kind == StoryNodeKind.TacticalPlot);
+        var entryEdge = Assert.Single(graph.Edges, e => e.Kind == StoryEdgeKind.TacticalEntry);
+        Assert.Equal(tactical.Id, entryEdge.FromId);
+        Assert.Equal(EventId(UriB, "Ambush"), entryEdge.ToId);
+    }
+
+    [Fact]
+    public void TacticalManifestThreads_ManifestKeyNormalizesLikeChainScanner()
+    {
+        // The raw slot value carries a game-root prefix and backslashes; the manifest-file key
+        // supplied by the assembler is already chain-scanner-canonical (prefix stripped, slashes).
+        // Both must resolve to the same tactical node for the entry edge to land.
+        var graph = new StoryGraphBuilder(Schema).Build(
+            [
+                Thread(UriA,
+                    "<Event Name=\"E\"><Event_Type>STORY_LAND_TACTICAL</Event_Type>" +
+                    "<Event_Param1>DATA\\XML\\Story_Plots_M2_Land.xml</Event_Param1></Event>"),
+                Thread(UriB, "<Event Name=\"Ambush\"/>")
+            ],
+            new Dictionary<string, IReadOnlySet<string>>
+            {
+                ["Story_Plots_M2_Land.xml"] = new HashSet<string> { UriB }
+            });
+
+        var entryEdge = Assert.Single(graph.Edges, e => e.Kind == StoryEdgeKind.TacticalEntry);
+        Assert.Equal(EventId(UriB, "Ambush"), entryEdge.ToId);
+    }
+
+    [Fact]
+    public void TacticalManifestThreads_NonRootEventsGetNoEntryEdge()
+    {
+        var graph = new StoryGraphBuilder(Schema).Build(
+            [
+                Thread(UriA,
+                    "<Event Name=\"E\"><Event_Type>STORY_LAND_TACTICAL</Event_Type>" +
+                    "<Event_Param1>Story_Plots_M2_Land.xml</Event_Param1></Event>"),
+                Thread(UriB,
+                    "<Event Name=\"Ambush\"/>" +
+                    "<Event Name=\"Reinforcements\"><Prereq>Ambush</Prereq></Event>")
+            ],
+            new Dictionary<string, IReadOnlySet<string>>
+            {
+                ["Story_Plots_M2_Land.xml"] = new HashSet<string> { UriB }
+            });
+
+        Assert.DoesNotContain(graph.Edges,
+            e => e.Kind == StoryEdgeKind.TacticalEntry && e.ToId == EventId(UriB, "Reinforcements"));
+    }
 }
 
 file sealed class StubSchemaProvider(params EnumDefinition[] enums) : ISchemaProvider

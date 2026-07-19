@@ -30,7 +30,7 @@ public enum XmlValueType
     /// <summary>Unsigned integer for hardware capability metrics (CPU MHz, texture memory MB, fill/vertex rates).</summary>
     HardwareUInt = 10,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type11 = 11,
 
     /// <summary>Hex-encoded DirectX shader version string (e.g. "0x0200" = SM 2.0).</summary>
@@ -53,18 +53,18 @@ public enum XmlValueType
     RGBA = 22,
 
     /// <summary>
-    ///     Any string value — filenames, text IDs, and named-object references. Use referenceType in YAML to distinguish
+    ///     Any string value - filenames, text IDs, and named-object references. Use referenceType in YAML to distinguish
     ///     actual object refs.
     /// </summary>
     NameReference = 23,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type24 = 24,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type25 = 25,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type26 = 26,
 
     /// <summary>A space-separated list of named-object references. referenceType in YAML identifies the referenced pool.</summary>
@@ -102,7 +102,7 @@ public enum XmlValueType
     ConditionalSpeechEvent = 40,
 
     /// <summary>Per-faction music event map.</summary>
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     MusicEventPerFactionMap = 41,
 
     /// <summary>A space-separated list of type references.</summary>
@@ -111,24 +111,24 @@ public enum XmlValueType
     /// <summary>Per-faction scalar value (e.g. starting credits per faction).</summary>
     PerFactionValue = 43,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type44 = 44,
 
     /// <summary>Per-faction planet reference pair ("FactionName, PlanetName").</summary>
     PerFactionPlanet = 45,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type46 = 46,
     FloatTupleList = 47,
     IntFloatTupleList = 48,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type49 = 49,
 
     /// <summary>Ship class enum value (ShipClass, not the generic DynamicEnumValue).</summary>
     ShipClassType = 50,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type51 = 51,
 
     /// <summary>Weighted list of music events.</summary>
@@ -137,7 +137,7 @@ public enum XmlValueType
     /// <summary>Per-faction object list pair (faction name + space-separated object names).</summary>
     PerFactionObjectList = 53,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     ShipNameTextFileList = 54,
 
     /// <summary>Campaign force deployment tuple (faction name, planet name, unit type name).</summary>
@@ -157,7 +157,7 @@ public enum XmlValueType
     /// </summary>
     GuiActivatedAbilityDefinitionSubObjectList = 57,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type58 = 58,
 
     /// <summary>Death clone specification (condition + type pair).</summary>
@@ -184,10 +184,10 @@ public enum XmlValueType
     /// <summary>Faction name reference (single faction identifier string).</summary>
     FactionReference = 67,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type68 = 68,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type69 = 69,
 
     /// <summary>
@@ -202,16 +202,16 @@ public enum XmlValueType
     /// </summary>
     UnitSpawnProbabilityTable = 71,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     CategoryToIntegerMap = 72,
 
     /// <summary>
     ///     Ability behaviour type identifier (engine internal: AbilityType C++ enum). Names the engine behaviour
     ///     associated with a SpecialAbilityData entry (e.g. HUNT, FORCE_CLOAK, DEFEND).
-    ///     Values overlap with BehaviorModule names but are a separate enum — do not conflate them.
+    ///     Values overlap with BehaviorModule names but are a separate enum - do not conflate them.
     /// </summary>
     /// <remarks>No YAML tag uses <c>type: AbilityType</c>; validation is handled via NameReference + hardcodedSet.</remarks>
-    [Obsolete("No YAML tag maps to this value type — validated via NameReference+hardcodedSet instead.")]
+    [Obsolete("No YAML tag maps to this value type - validated via NameReference+hardcodedSet instead.")]
     AbilityType = 73,
 
     /// <summary>Projectile category enum name (e.g. a named combat category used for targeting logic).</summary>
@@ -244,9 +244,9 @@ public enum XmlValueType
     /// <summary>CommandBarComponent boolean/numeric GUI property (property name + value pair).</summary>
     CommandBarProperty = 80,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type81 = 81,
 
-    [Obsolete("No usages found in EaW XML data files — see docs/xml_type_analysis.md.")]
+    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type82 = 82
 }

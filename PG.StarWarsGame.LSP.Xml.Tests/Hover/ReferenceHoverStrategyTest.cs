@@ -117,7 +117,7 @@ public sealed class ReferenceHoverStrategyTest
     }
 
     // ── dependency-layer indicator ────────────────────────────────────────────
-    // A workspace definition living in a DEPENDENCY project's layer must say so — without the
+    // A workspace definition living in a DEPENDENCY project's layer must say so - without the
     // note it is indistinguishable from a leaf-project definition, and users read a
     // non-navigating experience as "broken" (2026-07-05 smoketest report).
 
@@ -128,7 +128,7 @@ public sealed class ReferenceHoverStrategyTest
         var schema = SchemaWithType("Faction");
         // Referencing doc is the leaf (rank 1); the definition lives in a rank-0 dependency.
         var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"),
-            referencingDocRank: 1, originDocRank: 0, originLayerName: "Base EaW");
+            1, 0, "Base EaW");
         var ctx = MakeCtx(index, schema, line: 1, character: 14);
 
         var hover = strategy.Handle(ctx);
@@ -145,7 +145,7 @@ public sealed class ReferenceHoverStrategyTest
         var strategy = new ReferenceHoverStrategy();
         var schema = SchemaWithType("Faction");
         var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"),
-            referencingDocRank: 1, originDocRank: 0);
+            1, 0);
         var ctx = MakeCtx(index, schema, line: 1, character: 14);
 
         var hover = strategy.Handle(ctx);
@@ -162,7 +162,7 @@ public sealed class ReferenceHoverStrategyTest
         var schema = SchemaWithType("Faction");
         // Definition doc is at the same (leaf) rank as the referencing doc.
         var index = IndexWith(Ref(1, 13, 6), Symbol("Faction"),
-            referencingDocRank: 1, originDocRank: 1, originLayerName: "My Mod");
+            1, 1, "My Mod");
         var ctx = MakeCtx(index, schema, line: 1, character: 14);
 
         var hover = strategy.Handle(ctx);

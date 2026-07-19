@@ -17,13 +17,14 @@ namespace PG.StarWarsGame.LSP.Server;
 /// </summary>
 public sealed class StoryDialogScopeService : IStoryDialogScope
 {
-    private readonly ILspConfigurationProvider _configProvider;
-    private readonly IFileHelper _fileHelper;
-    private readonly IModProjectReloadService _reloadService;
-
-    private readonly object _gate = new();
     private readonly Dictionary<string, (DateTime WriteTimeUtc, IReadOnlyCollection<int> Chapters)> _chapterCache =
         new(StringComparer.OrdinalIgnoreCase);
+
+    private readonly ILspConfigurationProvider _configProvider;
+    private readonly IFileHelper _fileHelper;
+
+    private readonly object _gate = new();
+    private readonly IModProjectReloadService _reloadService;
 
     public StoryDialogScopeService(
         IModProjectReloadService reloadService,

@@ -3,7 +3,6 @@
 
 using Loretta.CodeAnalysis;
 using Loretta.CodeAnalysis.Lua;
-using Loretta.CodeAnalysis.Lua.Syntax;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
@@ -11,24 +10,23 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Util;
 using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
-using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 {
     private static readonly LuaParseOptions s_parseOptions = new(LuaSyntaxOptions.Lua51);
+    private readonly ILspConfigurationProvider _config;
 
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaDefinitionHandler> _logger;
     private readonly ILuaParseCache _parseCache;
-    private readonly ILspConfigurationProvider _config;
 
     public LuaDefinitionHandler(
         IGameIndexService indexService,
@@ -76,7 +74,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             }
         }
 
-        // Path B: require() argument — resolve via the shared parse.
+        // Path B: require() argument - resolve via the shared parse.
         var parsed = _parseCache.GetOrParse(uri);
         if (parsed is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);

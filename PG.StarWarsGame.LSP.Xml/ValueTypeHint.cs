@@ -15,7 +15,7 @@ internal static class ValueTypeHint
                 "**Format:** `1`, `1.0`, or `1.0f`",
 
             XmlValueType.NormalizedFloat =>
-                "**Format:** float in `[0.0, 1.0]` — e.g. `0.5`, `0.75f`",
+                "**Format:** float in `[0.0, 1.0]` - e.g. `0.5`, `0.75f`",
 
             XmlValueType.Boolean =>
                 "**Format:** `True`, `False`, `Yes`, `No`, `1`, or `0`",
@@ -39,16 +39,16 @@ internal static class ValueTypeHint
                 "**Format:** hex string GPU vendor ID, e.g. `0x10DE` (NVIDIA)",
 
             XmlValueType.FloatVector2 =>
-                "**Format:** `X, Y` — two comma-separated floats",
+                "**Format:** `X, Y` - two comma-separated floats",
 
             XmlValueType.FloatVector3 =>
-                "**Format:** `X, Y, Z` — three comma-separated floats",
+                "**Format:** `X, Y, Z` - three comma-separated floats",
 
             XmlValueType.FloatVector4 =>
-                "**Format:** `X, Y, Z, W` — four comma-separated floats",
+                "**Format:** `X, Y, Z, W` - four comma-separated floats",
 
             XmlValueType.RGBA =>
-                "**Format:** `R, G, B, A` — four integers `0`–`255`",
+                "**Format:** `R, G, B, A` - four integers `0`–`255`",
 
             XmlValueType.IntList =>
                 "**Format:** comma or space-separated integers",
@@ -86,7 +86,7 @@ internal static class ValueTypeHint
             XmlValueType.DynamicEnumValue => BuildEnumHint(tag),
 
             XmlValueType.ShipClassType =>
-                "**Enum:** ship class — e.g. `Infantry`, `Corvette`, `Frigate`, `Capital`",
+                "**Enum:** ship class - e.g. `Infantry`, `Corvette`, `Frigate`, `Capital`",
 
             XmlValueType.PerFactionValue =>
                 "**Format:** `FactionName, value` pairs",

@@ -23,7 +23,7 @@ public static class ProjectFileHasher
         var bytes = fs.File.ReadAllBytes(absolutePath);
         var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
         using var ms = new MemoryStream(bytes);
-        using var reader = new StreamReader(ms, detectEncodingFromByteOrderMarks: true);
+        using var reader = new StreamReader(ms, true);
         return (hash, reader.ReadToEnd());
     }
 

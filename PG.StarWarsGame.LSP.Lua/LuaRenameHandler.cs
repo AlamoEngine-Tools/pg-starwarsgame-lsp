@@ -9,7 +9,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Rename;
@@ -66,7 +65,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
 
     public RangeOrPlaceholderRange? HandlePrepare(string uri, int line, int character, GameIndex index)
     {
-        // LuaGlobal path — requires document in the index.
+        // LuaGlobal path - requires document in the index.
         if (index.Documents.TryGetValue(uri, out var docIndex))
         {
             var hit = LuaPositionResolver.FindAtPosition(docIndex, line, character);
@@ -84,7 +83,7 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
             }
         }
 
-        // XmlObject string literal path — requires the parsed document.
+        // XmlObject string literal path - requires the parsed document.
         var parsed = _parseCache.GetOrParse(uri);
         if (parsed is null) return null;
 
@@ -182,5 +181,4 @@ public sealed class LuaRenameHandler : ILuaRenameProvider
         if (line == end.Line && character > end.Character) return false;
         return true;
     }
-
 }

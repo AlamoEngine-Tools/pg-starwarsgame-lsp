@@ -8,4 +8,6 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 [Method("aet/deleteLocalisationEntry", Direction.ClientToServer)]
 public sealed record DeleteLocalisationEntryParams(
-    string ProjectFilePath, string Key, string? ExpectedContentHash) : IRequest<LocalisationWriteResult>;
+    string ProjectFilePath,
+    string Key,
+    string? ExpectedContentHash) : IRequest<LocalisationWriteResult>;

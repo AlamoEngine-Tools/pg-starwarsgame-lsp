@@ -24,24 +24,24 @@ internal static class YamlSchemaParser
         {
             if (!Enum.TryParse<XmlValueType>(entry.Type, true, out var valueType))
             {
-                logger?.LogWarning("Unknown tag type '{Type}' for tag '{Tag}' — skipping", entry.Type, entry.Tag);
+                logger?.LogWarning("Unknown tag type '{Type}' for tag '{Tag}' - skipping", entry.Type, entry.Tag);
                 continue;
             }
 
             var rk = ReferenceKind.None;
             if (entry.ReferenceKind is not null && !Enum.TryParse(entry.ReferenceKind, true, out rk))
-                logger?.LogWarning("Unknown referenceKind '{Kind}' for tag '{Tag}' — defaulting to None",
+                logger?.LogWarning("Unknown referenceKind '{Kind}' for tag '{Tag}' - defaulting to None",
                     entry.ReferenceKind, entry.Tag);
 
             var st = TagSemanticType.Default;
             if (entry.SemanticType is not null && !Enum.TryParse(entry.SemanticType, true, out st))
-                logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' — defaulting to Default",
+                logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' - defaulting to Default",
                     entry.SemanticType, entry.Tag);
 
             var variantMode = VariantMode.Replace;
             if (entry.VariantMode is not null && !Enum.TryParse(entry.VariantMode, true, out variantMode))
             {
-                logger?.LogWarning("Unknown variantMode '{VariantMode}' for tag '{Tag}' — defaulting to Replace",
+                logger?.LogWarning("Unknown variantMode '{VariantMode}' for tag '{Tag}' - defaulting to Replace",
                     entry.VariantMode, entry.Tag);
                 variantMode = VariantMode.Replace;
             }
@@ -53,7 +53,7 @@ internal static class YamlSchemaParser
                 if (vo.Mode is not null && !Enum.TryParse(vo.Mode, true, out mode))
                 {
                     logger?.LogWarning(
-                        "Unknown validationOverride mode '{Mode}' for tag '{Tag}' — defaulting to Additive",
+                        "Unknown validationOverride mode '{Mode}' for tag '{Tag}' - defaulting to Additive",
                         vo.Mode, entry.Tag);
                     mode = ValidationOverrideMode.Additive;
                 }
@@ -62,7 +62,7 @@ internal static class YamlSchemaParser
                 if (vo.Order is not null && !Enum.TryParse(vo.Order, true, out order))
                 {
                     logger?.LogWarning(
-                        "Unknown validationOverride order '{Order}' for tag '{Tag}' — defaulting to Append",
+                        "Unknown validationOverride order '{Order}' for tag '{Tag}' - defaulting to Append",
                         vo.Order, entry.Tag);
                     order = ValidationOverrideOrder.Append;
                 }
@@ -166,7 +166,7 @@ internal static class YamlSchemaParser
                     if (!Enum.TryParse<XmlValueType>(p.Type, true, out var paramValueType))
                     {
                         logger?.LogWarning(
-                            "Unknown param type '{Type}' at position {Position} for enum value '{Value}' — skipping",
+                            "Unknown param type '{Type}' at position {Position} for enum value '{Value}' - skipping",
                             p.Type, p.Position, v.Name);
                         continue;
                     }
@@ -174,7 +174,7 @@ internal static class YamlSchemaParser
                     var prk = ReferenceKind.None;
                     if (p.ReferenceKind is not null && !Enum.TryParse(p.ReferenceKind, true, out prk))
                         logger?.LogWarning(
-                            "Unknown referenceKind '{Kind}' for param at position {Position} for enum value '{Value}' — defaulting to None",
+                            "Unknown referenceKind '{Kind}' for param at position {Position} for enum value '{Value}' - defaulting to None",
                             p.ReferenceKind, p.Position, v.Name);
 
                     paramDefs.Add(new RawParamDefinition

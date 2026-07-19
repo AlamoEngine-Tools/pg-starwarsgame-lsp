@@ -7,7 +7,6 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Rename;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -87,7 +86,7 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
         return new RangeOrPlaceholderRange(hit.Value.Range);
     }
 
-    // id format: "enum:{EnumName}/{ValueName}" — see XmlGameDocumentParser.CollectEnumReferences.
+    // id format: "enum:{EnumName}/{ValueName}" - see XmlGameDocumentParser.CollectEnumReferences.
     private static bool TryParseEnumValueId(string id, out string enumName, out string valueName)
     {
         enumName = "";

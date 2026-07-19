@@ -148,7 +148,7 @@ public sealed class LocalisationLoaderTest
 
         var config = new LspConfiguration
         {
-            // User config has no source paths and a different resource type — both must be ignored.
+            // User config has no source paths and a different resource type - both must be ignored.
             Localisation = new LocalisationConfig { ResourceType = "Dat", SourcePaths = [] }
         };
 
@@ -206,7 +206,7 @@ public sealed class LocalisationLoaderTest
             }
         };
 
-        // TextRoots empty — workspace TextResourceType should be ignored.
+        // TextRoots empty - workspace TextResourceType should be ignored.
         var workspaceConfig = new WorkspaceConfiguration([], [], [], [], "Dat");
 
         var (loader, indexService, _, _) = BuildLoader(fs, config);

@@ -73,7 +73,7 @@ internal static class LuaStorySymbolCollector
     private static (string Id, int Line, int Column)? TryExtractFirstStringArgument(
         FunctionCallExpressionSyntax call)
     {
-        LiteralExpressionSyntax? literal = call.Argument switch
+        var literal = call.Argument switch
         {
             ExpressionListFunctionArgumentSyntax { Expressions: [LiteralExpressionSyntax lit, ..] } => lit,
             StringFunctionArgumentSyntax stringArg => stringArg.Expression,

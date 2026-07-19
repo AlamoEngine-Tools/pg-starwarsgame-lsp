@@ -226,6 +226,122 @@ public sealed class StoryXmlWriterTest
             Apply(Fixture, edits));
     }
 
+    // ── AddPrereqGroup — atomic multi-token new AND-line, for the AND-junction authoring gesture ─
+
+    [Fact]
+    public void AddPrereqGroup_MultipleTokens_JoinedIntoOneLine()
+    {
+        var edits = StoryXmlWriter.AddPrereqGroup(Fixture, Event(Fixture, "Next"), ["AltC", "AltD"]);
+
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Prereq>AltA AltB</Prereq>\n",
+                "\t\t<Prereq>AltA AltB</Prereq>\n\t\t<Prereq>AltC AltD</Prereq>\n"),
+            Apply(Fixture, edits));
+    }
+
+    [Fact]
+    public void AddPrereqGroup_SingleToken_SameAsPlainAddPrereq()
+    {
+        var edits = StoryXmlWriter.AddPrereqGroup(Fixture, Event(Fixture, "Next"), ["AltNew"]);
+
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Prereq>AltA AltB</Prereq>\n",
+                "\t\t<Prereq>AltA AltB</Prereq>\n\t\t<Prereq>AltNew</Prereq>\n"),
+            Apply(Fixture, edits));
+    }
+
+    [Fact]
+    public void AddPrereqGroup_FirstPrereq_LandsAtCanonicalPositionAndEscapes()
+    {
+        // "Start" has no existing Prereq — same insertion-point rule as AddPrereq — and the joined
+        // value goes through XML escaping exactly once (not per-token then again on insert).
+        var edits = StoryXmlWriter.AddPrereqGroup(Fixture, Event(Fixture, "Start"), ["Next", "A&B"]);
+
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Event_Param1>10</Event_Param1>\n",
+                "\t\t<Event_Param1>10</Event_Param1>\n\t\t<Prereq>Next A&amp;B</Prereq>\n"),
+            Apply(Fixture, edits));
+    }
+
+    // ── ClearTypeBlock — atomic trigger/reward removal (immutable-type UI rule) ─
+
+    [Fact]
+    public void ClearTypeBlock_Event_RemovesTypeAndParamLines()
+    {
+        var edits = StoryXmlWriter.ClearTypeBlock(Fixture, Event(Fixture, "Start"), "Event");
+
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n\t\t<Event_Param1>10</Event_Param1>\n", ""),
+            Apply(Fixture, edits));
+    }
+
+    [Fact]
+    public void ClearTypeBlock_Reward_LeavesTriggerAndPrereqsAlone()
+    {
+        var edits = StoryXmlWriter.ClearTypeBlock(Fixture, Event(Fixture, "Next"), "Reward");
+
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Reward_Type>TRIGGER_EVENT</Reward_Type>\n\t\t<Reward_Param1>Start</Reward_Param1>\n", ""),
+            Apply(Fixture, edits));
+    }
+
+    [Fact]
+    public void ClearTypeBlock_Event_AlsoRemovesEventFilter()
+    {
+        const string withFilter =
+            "<Story>\n" +
+            "\t<Event Name=\"F\">\n" +
+            "\t\t<Event_Type>STORY_WIN_BATTLES</Event_Type>\n" +
+            "\t\t<Event_Param1>3</Event_Param1>\n" +
+            "\t\t<Event_Filter>SPACE</Event_Filter>\n" +
+            "\t\t<Reward_Type>CREDITS</Reward_Type>\n" +
+            "\t\t<Reward_Param1>1000</Reward_Param1>\n" +
+            "\t</Event>\n" +
+            "</Story>\n";
+
+        var edits = StoryXmlWriter.ClearTypeBlock(withFilter, Event(withFilter, "F"), "Event");
+
+        Assert.Equal(withFilter.Replace(
+                "\t\t<Event_Type>STORY_WIN_BATTLES</Event_Type>\n\t\t<Event_Param1>3</Event_Param1>\n" +
+                "\t\t<Event_Filter>SPACE</Event_Filter>\n", ""),
+            Apply(withFilter, edits));
+    }
+
+    [Fact]
+    public void ClearTypeBlock_NoTypePresent_ProducesNoEdits()
+    {
+        const string bare = "<Story>\n\t<Event Name=\"B\">\n\t\t<Branch>Act1</Branch>\n\t</Event>\n</Story>\n";
+
+        Assert.Empty(StoryXmlWriter.ClearTypeBlock(bare, Event(bare, "B"), "Reward"));
+    }
+
+    // ── AddPrereqAlternatives — one new OR-line per token, for the OR-junction authoring gesture ─
+
+    [Fact]
+    public void AddPrereqAlternatives_EachTokenGetsItsOwnLine_InOneMergedEdit()
+    {
+        var edits = StoryXmlWriter.AddPrereqAlternatives(Fixture, Event(Fixture, "Next"), ["AltC", "AltD"]);
+
+        // One merged insert — N sequential addPrereq commands would race the detached applyEdits.
+        Assert.Single(edits);
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Prereq>AltA AltB</Prereq>\n",
+                "\t\t<Prereq>AltA AltB</Prereq>\n\t\t<Prereq>AltC</Prereq>\n\t\t<Prereq>AltD</Prereq>\n"),
+            Apply(Fixture, edits));
+    }
+
+    [Fact]
+    public void AddPrereqAlternatives_FirstPrereqs_LandAtCanonicalPositionAndEscape()
+    {
+        // "Start" has no existing Prereq — the lines land after the params, each escaped once.
+        var edits = StoryXmlWriter.AddPrereqAlternatives(Fixture, Event(Fixture, "Start"), ["Next", "A&B"]);
+
+        Assert.Equal(Fixture.Replace(
+                "\t\t<Event_Param1>10</Event_Param1>\n",
+                "\t\t<Event_Param1>10</Event_Param1>\n\t\t<Prereq>Next</Prereq>\n\t\t<Prereq>A&amp;B</Prereq>\n"),
+            Apply(Fixture, edits));
+    }
+
     [Fact]
     public void RemovePrereq_MiddleToken_SwallowsSeparator()
     {
@@ -256,6 +372,27 @@ public sealed class StoryXmlWriterTest
     public void RemovePrereq_UnknownToken_NoEdits()
     {
         Assert.Empty(StoryXmlWriter.RemovePrereq(Fixture, Event(Fixture, "Next"), 0, "Ghost"));
+    }
+
+    [Fact]
+    public void RemovePrereq_NoGroupIndex_RemovesTheTokenFromEveryLine()
+    {
+        // The edge-removal gesture doesn't know AND-line indices — the token goes everywhere.
+        const string text =
+            "<Story>\n" +
+            "\t<Event Name=\"Multi\">\n" +
+            "\t\t<Event_Type>STORY_TRIGGER</Event_Type>\n" +
+            "\t\t<Prereq>Start</Prereq>\n" +
+            "\t\t<Prereq>Start AltA</Prereq>\n" +
+            "\t</Event>\n" +
+            "</Story>\n";
+
+        var edits = StoryXmlWriter.RemovePrereq(text, Event(text, "Multi"), null, "Start");
+
+        Assert.Equal(text
+                .Replace("\t\t<Prereq>Start</Prereq>\n", "")
+                .Replace("<Prereq>Start AltA</Prereq>", "<Prereq>AltA</Prereq>"),
+            Apply(text, edits));
     }
 
     // ── CRLF fidelity ────────────────────────────────────────────────────────

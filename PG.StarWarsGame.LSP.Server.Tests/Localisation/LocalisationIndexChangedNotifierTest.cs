@@ -64,7 +64,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
 
-        // No notifier ever constructed — raising the event must not call our spy
+        // No notifier ever constructed - raising the event must not call our spy
         indexService.RaiseLocalisation(GameIndex.Empty.Localisation);
 
         Assert.Empty(sent);
@@ -74,7 +74,7 @@ public sealed class LocalisationIndexChangedNotifierTest
     public void GenericIndexChanged_Fires_NoLocalisationNotificationSent()
     {
         // The notifier must be decoupled from the general IndexChanged event (which also fires
-        // for unrelated XML/Lua/asset changes) — only LocalisationChanged should trigger it.
+        // for unrelated XML/Lua/asset changes) - only LocalisationChanged should trigger it.
         var sent = new List<string>();
         var indexService = new RaisableIndexService();
         _ = new LocalisationIndexChangedNotifier(
@@ -129,6 +129,7 @@ public sealed class LocalisationIndexChangedNotifierTest
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

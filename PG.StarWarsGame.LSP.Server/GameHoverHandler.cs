@@ -14,11 +14,11 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GameHoverHandler : HoverHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<GameHoverHandler> _logger;
     private readonly ILuaHoverProvider _lua;
     private readonly IXmlHoverProvider _xml;
-    private readonly ILspConfigurationProvider _config;
 
     public GameHoverHandler(IXmlHoverProvider xml, ILuaHoverProvider lua, IFileHelper fileHelper,
         ILogger<GameHoverHandler> logger, ILspConfigurationProvider config)

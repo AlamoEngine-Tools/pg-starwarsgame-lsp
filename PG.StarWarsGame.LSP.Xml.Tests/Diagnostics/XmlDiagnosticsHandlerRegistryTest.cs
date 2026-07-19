@@ -119,7 +119,7 @@ public sealed class XmlDiagnosticsHandlerRegistryTest
     public void Dispatch_KeysOnFactTypeOnly_IgnoresHandledValueType()
     {
         // Two handlers for the same fact type but with different HandledValueType overrides.
-        // Dispatch must invoke BOTH — it keys on FactType, never on HandledValueType.
+        // Dispatch must invoke BOTH - it keys on FactType, never on HandledValueType.
         var calledBoolean = false;
         var calledFloat = false;
         var registry = new XmlDiagnosticsHandlerRegistry(

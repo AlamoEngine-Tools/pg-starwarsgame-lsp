@@ -16,12 +16,12 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlCodeLensHandler : CodeLensHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlCodeLensHandler> _logger;
     private readonly IXmlCodeLensRegistry _registry;
-    private readonly ILspConfigurationProvider _config;
 
     public XmlCodeLensHandler(
         IGameIndexService indexService,

@@ -12,7 +12,7 @@ public static class XmlPositionResolver
     {
         return DocumentPositionResolver.FindAtPosition(
             docIndex, line, character,
-            referenceFilter: _ => true,
-            symbolRangeLength: s => s.Id.Length);
+            _ => true,
+            s => s.Id.Length);
     }
 }

@@ -39,11 +39,11 @@ public sealed class SchemaIndex
         AllHardcodedSets = hardcodedSets?.ToArray() ?? [];
         var hardcodedByName = AllHardcodedSets.ToDictionary(s => s.Name, StringComparer.OrdinalIgnoreCase);
 
-        // Phase 1: resolve enums (params may reference types — types are already indexed above)
+        // Phase 1: resolve enums (params may reference types - types are already indexed above)
         foreach (var rawEnum in enums)
             _enums[rawEnum.Name] = ResolveEnum(rawEnum);
 
-        // Phase 2: resolve tags (may reference types, hardcoded sets, and enums — all indexed above)
+        // Phase 2: resolve tags (may reference types, hardcoded sets, and enums - all indexed above)
         foreach (var (typeName, rawTags) in tagsByType)
         {
             var resolved = rawTags.Select(raw => ResolveTag(raw, hardcodedByName)).ToArray();

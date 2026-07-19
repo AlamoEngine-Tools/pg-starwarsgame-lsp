@@ -31,7 +31,7 @@ public sealed class StartupBufferingSmokeTest : IClassFixture<LspServerFixture>
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
-        // Open FIRST — before waiting for the scan — so the didOpen races the pipeline and is
+        // Open FIRST - before waiting for the scan - so the didOpen races the pipeline and is
         // most likely buffered by the still-closed gate.
         _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
         {
@@ -47,7 +47,7 @@ public sealed class StartupBufferingSmokeTest : IClassFixture<LspServerFixture>
         // If the gate hangs draining the buffered open, this notification never arrives.
         var completed = await Task.WhenAny(_fixture.ScanCompleted, Task.Delay(TimeSpan.FromSeconds(60)));
         Assert.True(completed == _fixture.ScanCompleted,
-            "$/workspaceScanComplete never arrived — the StartupGate likely hung or threw while draining the buffered didOpen.");
+            "$/workspaceScanComplete never arrived - the StartupGate likely hung or threw while draining the buffered didOpen.");
 
         // Give the drain a moment to apply the buffered open to the workspace host.
         await Task.Delay(500);

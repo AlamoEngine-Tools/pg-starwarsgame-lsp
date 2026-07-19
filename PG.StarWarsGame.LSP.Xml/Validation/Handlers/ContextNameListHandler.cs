@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
 ///     Named handler (ID: <c>context-name-list</c>) for tags that hold multiple
-///     (ContextName, ValueName) pairs in a single tag value — e.g.
+///     (ContextName, ValueName) pairs in a single tag value - e.g.
 ///     <c>Land_Terrain_Model_Mapping</c>. Replaces the default TupleList
 ///     handler for that tag via <c>validationOverride</c> in YAML.
 /// </summary>
@@ -32,7 +32,9 @@ public sealed class ContextNameListHandler : XmlDiagnosticsHandler<XmlTagValueFa
         return [];
     }
 
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact) =>
-        new(XmlDiagnosticSeverity.Error,
+    private static XmlDiagnosticResult Error(XmlTagValueFact fact)
+    {
+        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"'{fact.RawValue.Trim()}' is not a valid context-name list for <{fact.Tag.Tag}>. Expected alternating ContextName, ValueName pairs.");
+    }
 }

@@ -15,11 +15,11 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlReferencesHandler : ReferencesHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlReferencesHandler> _logger;
-    private readonly ILspConfigurationProvider _config;
 
     public XmlReferencesHandler(IGameIndexService indexService, ILogger<XmlReferencesHandler> logger,
         IEaWXmlContext eaWXmlContext, IFileHelper fileHelper, ILspConfigurationProvider config)
@@ -55,7 +55,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
         {
             foreach (var m in members)
             {
-                // Baseline members carry a non-openable game-relative path — skip them.
+                // Baseline members carry a non-openable game-relative path - skip them.
                 if (m.MemberOrigin is not FileOrigin { IsNavigable: true } fo) continue;
                 locations.Add(fo.ToLspLocation());
             }

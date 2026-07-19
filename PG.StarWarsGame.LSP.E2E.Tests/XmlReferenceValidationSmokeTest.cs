@@ -56,7 +56,7 @@ public sealed class XmlReferenceValidationSmokeTest : IClassFixture<LspServerFix
 
         var diags = await OpenAndCollectDiagnosticsAsync("reference_validation.xml");
 
-        // Synthetic names (LSP_TEST_*) don't exist in the workspace — unresolved errors are expected.
+        // Synthetic names (LSP_TEST_*) don't exist in the workspace - unresolved errors are expected.
         var unresolved = diags.Where(d =>
             d.Message.Contains("Cannot resolve reference", StringComparison.OrdinalIgnoreCase)).ToList();
 

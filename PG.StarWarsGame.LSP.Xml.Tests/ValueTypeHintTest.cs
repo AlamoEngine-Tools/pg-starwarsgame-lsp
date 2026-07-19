@@ -150,7 +150,7 @@ public sealed class ValueTypeHintTest
         Assert.Contains("1.0f", hint);
     }
 
-    // ── reference types — NameReference ─────────────────────────────────────
+    // ── reference types - NameReference ─────────────────────────────────────
 
     [Fact]
     public void NameReference_XmlObject_WithReferenceType_ContainsTypeName()
@@ -233,7 +233,7 @@ public sealed class ValueTypeHintTest
         Assert.Null(hint);
     }
 
-    // ── reference types — NameReferenceList ──────────────────────────────────
+    // ── reference types - NameReferenceList ──────────────────────────────────
 
     [Fact]
     public void NameReferenceList_XmlObject_WithReferenceType_ContainsSpaceSeparatedAndTypeName()

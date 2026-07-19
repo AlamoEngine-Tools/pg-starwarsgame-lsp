@@ -80,7 +80,7 @@ public sealed class ProjectDependencyGraphTest
         var paths = result.Select(r => r.Path).ToList();
         Assert.Equal(4, paths.Count);
         Assert.Single(paths, p => p == "/mods/c/c.pgproj");
-        // C is the deepest shared dep — appears first.
+        // C is the deepest shared dep - appears first.
         Assert.Equal("/mods/c/c.pgproj", paths[0]);
         // Root is always last.
         Assert.Equal("/mods/root/root.pgproj", paths[^1]);

@@ -13,7 +13,7 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        // Pairs are separated by commas AND/OR whitespace incl. newlines — the vanilla
+        // Pairs are separated by commas AND/OR whitespace incl. newlines - the vanilla
         // Destruction_Survivors format puts one "Name, Float" pair per line. Tokenize with
         // original-offset tracking so every diagnostic points at its exact token.
         var tokens = XmlUtility.SplitListWithOffsets(fact.RawValue);
@@ -43,7 +43,9 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
         return results;
     }
 
-    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed) =>
-        new(XmlDiagnosticSeverity.Error,
+    private static XmlDiagnosticResult Error(XmlTagValueFact fact, string trimmed)
+    {
+        return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"'{trimmed}' is not a valid spawn probability table for <{fact.Tag.Tag}>. Expected pairs of UnitTypeName, Float [0.0, 1.0].");
+    }
 }

@@ -12,9 +12,9 @@ using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 namespace PG.StarWarsGame.LSP.Xml.CodeLens;
 
 /// <summary>
-///     Emits a code lens on variant objects ("▲ variant of BASE — show effective object", which triggers the
+///     Emits a code lens on variant objects ("▲ variant of BASE - show effective object", which triggers the
 ///     effective-object view) and on base objects ("N variants"). Only the show-effective lens is gated on
-///     <c>features.tools.variants</c> — the "N variants" references peek is plain navigation and stays on.
+///     <c>features.tools.variants</c> - the "N variants" references peek is plain navigation and stays on.
 /// </summary>
 internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
 {
@@ -41,7 +41,7 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
                 Range = range,
                 Command = new Command
                 {
-                    Title = $"▲ variant of {ctx.Symbol.VariantBaseId} — show effective object",
+                    Title = $"▲ variant of {ctx.Symbol.VariantBaseId} - show effective object",
                     Name = ShowEffectiveCommand,
                     Arguments = JArray.FromObject(new object[] { ctx.Symbol.Id })
                 }

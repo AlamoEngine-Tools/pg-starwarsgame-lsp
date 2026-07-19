@@ -14,6 +14,16 @@ public sealed record GameIndex(
     ImmutableDictionary<string, ImmutableArray<GameReference>> WorkspaceReferences
 )
 {
+    // WorkspaceDefinitions and WorkspaceReferences are keyed by game object Name, which
+    // the engine resolves case-insensitively. Use OrdinalIgnoreCase so "X-wing" and
+    // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI
+    // (already lowercased by IFileHelper.NormalizeUri) and stays ordinal.
+    public static readonly GameIndex Empty = new(
+        BaselineIndex.Empty,
+        ImmutableDictionary<string, DocumentIndex>.Empty,
+        ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
+        ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
+
     // Memoization fields for the computed members below. The custom copy constructor deliberately
     // does NOT copy them: a `with` mutation produces a copy that must recompute against its own
     // (possibly changed) dictionaries. -1 marks LeafLayerRank as not-yet-computed (ranks are >= 0).
@@ -21,7 +31,7 @@ public sealed record GameIndex(
     private int _leafLayerRank = -1;
 
     // Replaces the compiler-synthesised copy constructor used by `with` expressions. Every
-    // property must be copied here — add new properties to this list when extending the record.
+    // property must be copied here - add new properties to this list when extending the record.
     // NOTE: field initializers do NOT run in a user-defined record copy constructor, so the
     // LeafLayerRank sentinel must be reset explicitly (the group-memberships cache defaults to
     // null, which is already "not computed").
@@ -39,16 +49,6 @@ public sealed record GameIndex(
         WorkspaceDynamicEnumValues = original.WorkspaceDynamicEnumValues;
         WorkspaceEnumValueDefinitions = original.WorkspaceEnumValueDefinitions;
     }
-
-    // WorkspaceDefinitions and WorkspaceReferences are keyed by game object Name, which
-    // the engine resolves case-insensitively. Use OrdinalIgnoreCase so "X-wing" and
-    // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI
-    // (already lowercased by IFileHelper.NormalizeUri) and stays ordinal.
-    public static readonly GameIndex Empty = new(
-        BaselineIndex.Empty,
-        ImmutableDictionary<string, DocumentIndex>.Empty,
-        ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
-        ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
 
     /// <summary>
     ///     Group memberships aggregated across all workspace documents. Keyed case-insensitively by
@@ -80,7 +80,7 @@ public sealed record GameIndex(
         ImmutableDictionary.Create<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    ///     Dynamic enum values discovered by scanning the workspace XML enum files — values the mod has
+    ///     Dynamic enum values discovered by scanning the workspace XML enum files - values the mod has
     ///     added or overridden beyond the shipped baseline. Keyed case-insensitively by enum name
     ///     (e.g. <c>SurfaceFXTriggerType</c>). Unioned with <see cref="BaselineIndex.DynamicEnumValues" />
     ///     by <c>NamedEnumValueHandlerBase</c> so workspace-defined values are never flagged as unknown.
@@ -94,7 +94,10 @@ public sealed record GameIndex(
     ///     Inner key: value name (case-insensitive). Used by go-to-definition on enum-value references.
     /// </summary>
     public ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> WorkspaceEnumValueDefinitions
-    { get; init; } =
+    {
+        get;
+        init;
+    } =
         ImmutableDictionary.Create<string, ImmutableDictionary<string, FileOrigin>>(
             StringComparer.OrdinalIgnoreCase);
 
@@ -181,7 +184,7 @@ public sealed record GameIndex(
             : 0;
     }
 
-    // Same lookup as LayerRankOf, but keyed directly by URI — for origins that don't carry a
+    // Same lookup as LayerRankOf, but keyed directly by URI - for origins that don't carry a
     // GameSymbol (e.g. WorkspaceEnumValueDefinitions' FileOrigin). Every workspace .xml file is
     // indexed as a Document regardless of whether it defines any symbols (XmlGameDocumentParser
     // accepts any .xml), so dynamic-enum source files land here with a correctly stamped rank too.
@@ -226,7 +229,7 @@ public sealed record GameIndex(
             string.Equals(b.TypeName, preferredTypeName, StringComparison.OrdinalIgnoreCase))
             return b;
 
-        // No type-matched definition found — fall back to untyped resolution so TypeMismatchHandler
+        // No type-matched definition found - fall back to untyped resolution so TypeMismatchHandler
         // fires rather than UnresolvedReferenceHandler.
         return Resolve(id);
     }

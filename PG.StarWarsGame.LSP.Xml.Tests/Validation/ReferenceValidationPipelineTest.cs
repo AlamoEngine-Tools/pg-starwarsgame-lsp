@@ -58,7 +58,7 @@ public sealed class ReferenceValidationPipelineTest
             .ToList();
     }
 
-    // ── GameObjectType wildcard — no false-positive ───────────────────────────
+    // ── GameObjectType wildcard - no false-positive ───────────────────────────
 
     [Fact]
     public async Task GameObjectType_ref_with_SpaceUnit_symbol_emits_no_TypeMismatch()

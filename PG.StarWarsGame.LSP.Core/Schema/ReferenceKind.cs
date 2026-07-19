@@ -5,7 +5,7 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 
 public enum ReferenceKind
 {
-    /// <summary>Non-reference type — no semantic constraint on the value.</summary>
+    /// <summary>Non-reference type - no semantic constraint on the value.</summary>
     None,
 
     /// <summary>
@@ -32,7 +32,7 @@ public enum ReferenceKind
     /// <summary>Localisation string key (TEXT_xxx format).</summary>
     LocalisationKey,
 
-    /// <summary>Enum value — either a dynamic XML enum (see <see cref="XmlTagDefinition.Enum" />) or a hardcoded C++ enum.</summary>
+    /// <summary>Enum value - either a dynamic XML enum (see <see cref="XmlTagDefinition.Enum" />) or a hardcoded C++ enum.</summary>
     Enum,
 
     /// <summary>

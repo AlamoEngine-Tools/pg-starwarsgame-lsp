@@ -22,6 +22,7 @@ public sealed class ExportLocalisationToDatHandler
     : IJsonRpcRequestHandler<ExportLocalisationToDatParams, ExportLocalisationToDatResult>
 {
     private readonly IBaselineTranslationProvider _baselineProvider;
+    private readonly ILspConfigurationProvider _config;
     private readonly ICsvTranslationImporter _csvImporter;
     private readonly IDatTranslationExporter _datExporter;
     private readonly IDatFileService _datFileService;
@@ -33,7 +34,6 @@ public sealed class ExportLocalisationToDatHandler
     private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly ILocalisationProjectRegistry _projectRegistry;
     private readonly IXmlTranslationImporter _xmlImporter;
-    private readonly ILspConfigurationProvider _config;
 
     public ExportLocalisationToDatHandler(
         ICsvTranslationImporter csvImporter,
@@ -84,7 +84,7 @@ public sealed class ExportLocalisationToDatHandler
 
         // Seed with baseline + every dependency layer below the exported file's own layer, so a
         // patch mod's export includes translations it inherits from a base-translation dependency,
-        // not just the shipped game text — then the selected file is imported on top below.
+        // not just the shipped game text - then the selected file is imported on top below.
         var merged = _factory.CreateKeyed(languages);
         LocalisationLayerMerge.MergeBaselineAndLowerLayers(
             merged, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
@@ -143,13 +143,13 @@ public sealed class ExportLocalisationToDatHandler
         return Task.FromResult(new ExportLocalisationToDatResult(written, null));
     }
 
-    // The rank of the layer that owns projectFilePath — everything strictly below it (dependency
+    // The rank of the layer that owns projectFilePath - everything strictly below it (dependency
     // layers) is merged in as "inherited" before the file itself is imported on top.
     private int? ResolveBelowRank(string? projectFilePath)
     {
         if (string.IsNullOrEmpty(projectFilePath)) return null;
-        var project = _projectRegistry.Projects.FirstOrDefault(
-            p => string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
+        var project = _projectRegistry.Projects.FirstOrDefault(p =>
+            string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
         return project?.Rank;
     }
 }

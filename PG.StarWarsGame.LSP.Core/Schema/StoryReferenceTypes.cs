@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 ///     The story-scoped <c>referenceType</c> names on <c>StoryEventType</c>/<c>StoryRewardType</c>
 ///     params and the symbol <c>TypeName</c> strings they map to. Story references resolve
 ///     campaign-scoped (an event name may legally repeat across threads and campaigns), so the
-///     generic index-wide existence and duplicate validation must not own them — the campaign
+///     generic index-wide existence and duplicate validation must not own them - the campaign
 ///     graph diagnostics do.
 /// </summary>
 public static class StoryReferenceTypes
@@ -23,6 +23,12 @@ public static class StoryReferenceTypes
     public const string EventSymbol = "StoryEvent";
     public const string FlagSymbol = "StoryFlag";
     public const string NotificationSymbol = "StoryNotification";
+
+    /// <summary>
+    ///     The story thread file type from the metafile registry. The generic symbol pass indexes
+    ///     every <c>&lt;Event&gt;</c> block as an object of this type.
+    /// </summary>
+    public const string ThreadFileTypeName = "StoryParser";
 
     /// <summary>Whether the referenceType belongs to the story domain (campaign-scoped semantics).</summary>
     public static bool IsStoryScoped(string referenceTypeName)
@@ -51,5 +57,21 @@ public static class StoryReferenceTypes
     public static IEnumerable<string> SplitList(string rawValue)
     {
         return rawValue.Split([' ', '\t', ','], StringSplitOptions.RemoveEmptyEntries);
+    }
+
+    /// <summary>
+    ///     Collapses a story file reference - written either xml-dir-relative
+    ///     (<c>"Story_Plots_X.xml"</c>) or game-root-relative (<c>"DATA\XML\CAMPAIGNS_X.XML"</c>)
+    ///     - to a single xml-dir-relative shape with '/' separators, preserving casing. The
+    ///     shared normal form so a reference can be correlated wherever it's written against
+    ///     wherever it's discovered.
+    /// </summary>
+    public static string NormalizeRelativePath(string reference)
+    {
+        var normalized = reference.Replace('\\', '/').TrimStart('/');
+        const string xmlPrefix = "data/xml/";
+        return normalized.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase)
+            ? normalized[xmlPrefix.Length..]
+            : normalized;
     }
 }

@@ -173,6 +173,6 @@ public sealed class LorrettaParserSmokeTest
             dir = dir.Parent;
         }
 
-        throw new Exception("$XunitDynamicSkip$Could not find foc/Data/Scripts — is the game data in the repo?");
+        throw new Exception("$XunitDynamicSkip$Could not find foc/Data/Scripts - is the game data in the repo?");
     }
 }

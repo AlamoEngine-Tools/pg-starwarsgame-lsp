@@ -61,7 +61,7 @@ public sealed class TagValueCompletionContext
     /// <summary>
     ///     0-based comma-separated slot the cursor sits in, clamped to 1, for tuple-shaped
     ///     <see cref="XmlTagDefinition.ValueType" />s (e.g. <c>HardPointSfxMap</c>). Clamped because every
-    ///     tuple validator splits on the FIRST comma only — anything past it belongs to slot 1 regardless
+    ///     tuple validator splits on the FIRST comma only - anything past it belongs to slot 1 regardless
     ///     of further commas within that slot's own value. Meaningless (always 0) for non-tuple types.
     /// </summary>
     public int TupleSlotIndex { get; }

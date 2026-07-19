@@ -44,7 +44,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
         {
             _workspaceHost.AddOrUpdate(uri, text, version);
             // Open (not Update): client versions restart at 1 per open session, while the didClose
-            // re-index below preserves the committed version — the open starts a new version epoch.
+            // re-index below preserves the committed version - the open starts a new version epoch.
             await _indexService.OpenDocumentAsync(uri, text, version, token);
         }, ct);
         return Unit.Value;
@@ -77,10 +77,10 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
             var localPath = _fileHelper.FileUriToPath(_fileHelper.NormalizeUri(uri));
             if (localPath is not null && _fileHelper.FileSystem.File.Exists(localPath))
             {
-                // File still on disk — restore the saved state in the INDEX so workspace-wide
+                // File still on disk - restore the saved state in the INDEX so workspace-wide
                 // references keep working after close; the host tracks only open documents.
                 // Never remove-then-re-add here: the removal is applied by the bulk merge while
-                // the re-add's parse runs asynchronously, and whichever lands last wins — a
+                // the re-add's parse runs asynchronously, and whichever lands last wins - a
                 // removal landing last silently deleted the document's symbols from the index.
                 // UpdateDocumentAsync alone skips the re-parse when the buffer already matched
                 // disk. Pass the current version so an unsaved-edit revert is not dropped as stale.
@@ -90,7 +90,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
             }
             else
             {
-                // File was deleted from disk — remove it entirely from the index.
+                // File was deleted from disk - remove it entirely from the index.
                 _indexService.RemoveDocument(uri);
             }
         }, ct);

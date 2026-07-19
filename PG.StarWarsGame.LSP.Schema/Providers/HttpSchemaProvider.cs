@@ -134,7 +134,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
                 _rawTagFallbacks.TryGetValue(typeName, out var fallback);
                 if (fallback is null || fallback.Count == 0)
                     _logger.LogWarning(
-                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                        "304 Not Modified for '{Path}' but no prior schema in memory - treating as empty", path);
                 tagsByType.Add((typeName, fallback ?? []));
             }
             else
@@ -154,7 +154,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
                 var fallback = _current.AllObjectTypes;
                 if (fallback.Count == 0)
                     _logger.LogWarning(
-                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                        "304 Not Modified for '{Path}' but no prior schema in memory - treating as empty", path);
                 types.AddRange(fallback);
             }
             else
@@ -174,7 +174,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             {
                 if (_rawEnumFallbacks.Count == 0)
                     _logger.LogWarning(
-                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                        "304 Not Modified for '{Path}' but no prior schema in memory - treating as empty", path);
                 enums.AddRange(_rawEnumFallbacks);
             }
             else
@@ -195,7 +195,7 @@ public sealed class HttpSchemaProvider : ISchemaProvider
                 var fallback = _current.AllHardcodedSets;
                 if (fallback.Count == 0)
                     _logger.LogWarning(
-                        "304 Not Modified for '{Path}' but no prior schema in memory — treating as empty", path);
+                        "304 Not Modified for '{Path}' but no prior schema in memory - treating as empty", path);
                 hardcodedSets.AddRange(fallback);
             }
             else

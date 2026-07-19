@@ -35,7 +35,7 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
 
     /// <summary>
     ///     Returns <paramref name="result" /> positioned at an arbitrary token of the fact's raw
-    ///     value, given the token's offset within <see cref="XmlTagValueFact.RawValue" /> — for
+    ///     value, given the token's offset within <see cref="XmlTagValueFact.RawValue" /> - for
     ///     handlers that tokenize beyond the first-comma pair (e.g. alternating tuple lists).
     /// </summary>
     protected static XmlDiagnosticResult AtToken(
@@ -46,7 +46,7 @@ public abstract class CommaSeparatedPairHandlerBase : SingleValueTypeHandlerBase
     }
 
     // Span of one side of the first-comma pair within the UNTRIMMED raw value, with each slot's
-    // surrounding whitespace excluded — offsets stay valid against the fact's own position even
+    // surrounding whitespace excluded - offsets stay valid against the fact's own position even
     // when the value spans multiple lines.
     private static (int Offset, int Length)? PairSlotSpan(string raw, int slotIndex)
     {

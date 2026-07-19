@@ -96,7 +96,7 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
             campaign.name, vscode.TreeItemCollapsibleState.Collapsed, 'campaign', campaign.name);
         item.iconPath = new vscode.ThemeIcon('map');
         item.contextValue = 'aetStoryCampaign';
-        item.tooltip = `${campaign.name} — click the graph icon to open the story graph`;
+        item.tooltip = `${campaign.name} - click the graph icon to open the story graph`;
         return item;
     }
 
@@ -116,7 +116,7 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
         item.iconPath = new vscode.ThemeIcon(thread.suspended ? 'circle-slash' : 'type-hierarchy-sub');
         item.description = thread.suspended ? 'suspended' : undefined;
         item.tooltip = thread.suspended
-            ? `${thread.file} — suspended until a STORY_ELEMENT reward activates it`
+            ? `${thread.file} - suspended until a STORY_ELEMENT reward activates it`
             : thread.file;
         item.command = {
             command: 'aet-eaw-edit.lsp.openStoryFile',

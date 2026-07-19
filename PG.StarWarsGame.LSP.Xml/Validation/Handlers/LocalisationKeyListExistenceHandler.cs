@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class LocalisationKeyListExistenceHandler : LocalisationKeyHandlerBase
 {
     // Encyclopedia_Text/MP_Encyclopedia_Text are declared as TypeReferenceList in schema even
-    // though they're semantically a localisation-key list like any NameReferenceList tag — the
+    // though they're semantically a localisation-key list like any NameReferenceList tag - the
     // inlay-hint provider already treats both as equivalent (LocalisationKeyMultiValueInlayHintProvider).
     protected override IReadOnlyList<XmlValueType> TargetTypes =>
         [XmlValueType.NameReferenceList, XmlValueType.TypeReferenceList];

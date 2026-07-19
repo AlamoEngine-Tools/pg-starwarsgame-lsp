@@ -82,7 +82,7 @@ public sealed class XmlLayerShadowFactProducerTest
         var leafDoc = Doc(LeafUri, 1, "Mod", leafSym);
         var index = BuildIndex(null, depDoc, leafDoc);
 
-        // Producing for the dep document — warning belongs on the leaf side
+        // Producing for the dep document - warning belongs on the leaf side
         var facts = Produce(DepUri, @"<Units><Unit Name=""UNIT_A""/></Units>", index);
 
         Assert.Empty(facts.OfType<XmlLayerShadowFact>());
@@ -145,7 +145,7 @@ public sealed class XmlLayerShadowFactProducerTest
         var depDoc = Doc(DepUri, 0, "Core", depSym);
         var index = BuildIndex(null, leafDoc, depDoc);
 
-        // Suppression comment uses lowercase name — must still match UNIT_A
+        // Suppression comment uses lowercase name - must still match UNIT_A
         const string text = @"<Units><!-- <Override Name=""unit_a""/> --><Unit Name=""UNIT_A""/></Units>";
         var facts = Produce(LeafUri, text, index);
 
@@ -202,7 +202,7 @@ public sealed class XmlLayerShadowFactProducerTest
     public void Produce_StoryEventAndStoryParserForSameElement_EmitsNoCrossTypeShadowFact()
     {
         // Every story event is indexed twice by design: the generic pass emits a StoryParser
-        // object symbol, the story collector a StoryEvent symbol — same element, two passes.
+        // object symbol, the story collector a StoryEvent symbol - same element, two passes.
         // Warning about that collision would flag every event in every story thread.
         var parserSym = XmlSym("Reveal_Ryloth", "StoryParser", LeafUri);
         var eventSym = XmlSym("Reveal_Ryloth", "StoryEvent", LeafUri);
@@ -217,7 +217,7 @@ public sealed class XmlLayerShadowFactProducerTest
     [Fact]
     public void Produce_StorySymbolCollidingWithOtherType_EmitsNoCrossTypeShadowFact()
     {
-        // SET_FLAG names double as Lua globals and story ids may match object names — story
+        // SET_FLAG names double as Lua globals and story ids may match object names - story
         // symbols coexist with other types by design, from whichever side the fact would come.
         var unitSym = XmlSym("Shared_Name", "Unit", LeafUri);
         var flagSym = XmlSym("Shared_Name", "StoryFlag", DepUri, 3);
@@ -233,7 +233,7 @@ public sealed class XmlLayerShadowFactProducerTest
     [Fact]
     public void Produce_CrossTypeShadow_EmitsOnce_PerTypeCollision()
     {
-        // Two separate Faction symbols from two dep docs — both TypeName="Faction"
+        // Two separate Faction symbols from two dep docs - both TypeName="Faction"
         var unitSym = XmlSym("REBEL", "Unit", LeafUri);
         var faction1 = XmlSym("REBEL", "Faction", DepUri, 1);
         var faction2 = XmlSym("REBEL", "Faction", DepUri2, 2);
@@ -244,7 +244,7 @@ public sealed class XmlLayerShadowFactProducerTest
 
         var facts = Produce(LeafUri, @"<Units><Unit Name=""REBEL""/></Units>", index);
 
-        // Should emit exactly one cross-type fact for (REBEL, Unit, Faction) — not two
+        // Should emit exactly one cross-type fact for (REBEL, Unit, Faction) - not two
         var crossTypeFacts = facts.OfType<XmlCrossTypeShadowFact>().ToList();
         Assert.Single(crossTypeFacts);
         Assert.Equal("Faction", crossTypeFacts[0].CollidingTypeName);

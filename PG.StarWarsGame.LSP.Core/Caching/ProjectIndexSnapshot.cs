@@ -12,11 +12,11 @@ public sealed class ProjectIndexSnapshot
     // reference kinds, id scoping, group membership shapes, …); a mismatched snapshot is treated
     // as a full miss. Content hashes cannot catch semantic staleness: a snapshot written by an
     // older parser replays its pre-fix output forever, file by file, until each file happens to
-    // be edited — so any change to what XmlGameDocumentParser/LuaGameDocumentParser emit MUST
+    // be edited - so any change to what XmlGameDocumentParser/LuaGameDocumentParser emit MUST
     // come with a bump here.
     // History: 1 = initial; 2 = discard pre-2026-07 snapshots lacking enum:-prefixed references
     // and owner-scoped ability ids (parser changes of 2026-07-02/04 shipped without a bump);
-    // 3 = owner-id resolution gained the Name-attribute fallback (2026-07-05) — ability
+    // 3 = owner-id resolution gained the Name-attribute fallback (2026-07-05) - ability
     // symbol/reference ids changed from bare to owner-scoped for real game files;
     // 4 = Presence_Induced_Animations object references added (2026-07-05).
     public const int CurrentSchemaVersion = 4;

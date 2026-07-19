@@ -20,7 +20,7 @@ public sealed record StoryDialogCommand(
 
 /// <summary>
 ///     A <c>[CHAPTER n]</c> section and the commands inside it. Sections opened by a malformed or
-///     duplicate header carry <see cref="AnonymousIndex" /> — their commands still get validated,
+///     duplicate header carry <see cref="AnonymousIndex" /> - their commands still get validated,
 ///     but the section is not addressable via <c>Story_Chapter</c>.
 /// </summary>
 public sealed record StoryDialogChapter(int Index, int HeaderLine, IReadOnlyList<StoryDialogCommand> Commands)

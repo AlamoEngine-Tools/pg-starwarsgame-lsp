@@ -23,8 +23,23 @@ using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
-public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiagnosticsRevalidator, IXmlFixCache
+public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiagnosticsRevalidator, IXmlFixCache,
+    IXmlDiagnosticsCollector
 {
+    // The engine hardcodes these 20 damage types at fixed positions relative to the end of
+    // GameConstants.xml's <Damage_Types> list. If they aren't present as the exact tail, in this
+    // exact order, the game crashes at runtime.
+    private static readonly string[] RequiredDamageTypeTail =
+    [
+        "Damage_Normal", "Damage_Force_Whirlwind", "Damage_Force_Telekinesis", "Damage_Force_Lightning",
+        "Damage_Force_Corruption", "Damage_Hard_Point_Self_Destruct", "Damage_Fire", "Damage_Cable_Attack",
+        "Damage_Explosion", "Damage_Asteroid", "Damage_Cable_Attack_Deployed", "Damage_Normal_Deployed",
+        "Damage_Vehicle_Thief", "Damage_Crush", "Damage_Eat", "Damage_Redirected", "Damage_Wampa",
+        "Damage_Infection", "Damage_Remote_Bomb", "Damage_Drain_Life"
+    ];
+
+    private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
+    private readonly ILspConfigurationProvider? _configProvider;
     private readonly IXmlDocumentFactProducer _documentProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
@@ -34,16 +49,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IXmlIndexFactProducer _indexProducer;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
+    private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
-    private readonly IXmlParseCache _parseCache;
     private readonly IStoryChainProblemStore? _storyChainProblems;
     private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
     private readonly IStoryFactProducer _storyProducer;
     private readonly IDocumentTextSource _textSource;
     private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
-    private readonly ILspConfigurationProvider? _configProvider;
 
     public XmlDiagnosticsPublisher(
         ILanguageServerFacade server,
@@ -122,6 +136,49 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     protected override bool DiagnosticsEnabled =>
         _configProvider?.Current.Features.Xml.Diagnostics ?? true;
 
+    /// <summary>
+    ///     The full pipeline for one document, publish-free (<see cref="IXmlDiagnosticsCollector" />) —
+    ///     the push path below and on-demand consumers (story graph) share this body.
+    /// </summary>
+    public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
+    {
+        var canonicalUri = _fileHelper.NormalizeUri(uri);
+        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
+
+        // One parse shared by every producer - and via the parse cache, shared with the indexing
+        // parse and every request handler touching the same content.
+        var parsed = _parseCache.GetOrParse(canonicalUri, text);
+
+        var facts = new List<XmlFact>();
+        facts.AddRange(_documentProducer.Produce(parsed, uri));
+        facts.AddRange(_indexProducer.Produce(canonicalUri, index));
+        if (_variantProducer is not null)
+            facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index));
+        if (_shadowProducer is not null)
+            facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
+        if (IsStoryParserDocument(uri))
+            facts.AddRange(_storyProducer.Produce(parsed, uri));
+
+        var lines = parsed.Lines;
+        var allDiags = new List<Diagnostic>();
+        foreach (var fact in facts)
+        {
+            if (fact is XmlSymbolFact symbolFact && IsDuplicateSymbolSuppressed(lines, symbolFact.Line))
+                continue;
+            foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
+                allDiags.Add(ToLspDiagnostic(fact, result));
+        }
+
+        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index));
+        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
+        if (_storyChainProblems is not null)
+            allDiags.AddRange(_storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+        if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
+            allDiags.AddRange(_storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+
+        return allDiags;
+    }
+
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
         if (!DiagnosticsEnabled) return;
@@ -155,39 +212,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)
     {
-        var canonicalUri = _fileHelper.NormalizeUri(uri);
-        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
-
-        // One parse shared by every producer — and via the parse cache, shared with the indexing
-        // parse and every request handler touching the same content.
-        var parsed = _parseCache.GetOrParse(canonicalUri, text);
-
-        var facts = new List<XmlFact>();
-        facts.AddRange(_documentProducer.Produce(parsed, uri));
-        facts.AddRange(_indexProducer.Produce(canonicalUri, index));
-        if (_variantProducer is not null)
-            facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index));
-        if (_shadowProducer is not null)
-            facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
-        if (IsStoryParserDocument(uri))
-            facts.AddRange(_storyProducer.Produce(parsed, uri));
-
-        var lines = parsed.Lines;
-        var allDiags = new List<Diagnostic>();
-        foreach (var fact in facts)
-        {
-            if (fact is XmlSymbolFact symbolFact && IsDuplicateSymbolSuppressed(lines, symbolFact.Line))
-                continue;
-            foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
-                allDiags.Add(ToLspDiagnostic(fact, result));
-        }
-
-        allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index));
-        allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
-        if (_storyChainProblems is not null)
-            allDiags.AddRange(_storyChainProblems.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
-        if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
-            allDiags.AddRange(_storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
+        var allDiags = Collect(uri, text, index);
 
         var normalizedUri = _fileHelper.NormalizeUri(uri);
         var fixes = new Dictionary<(int, int), string>();
@@ -226,27 +251,13 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var fileTypes = _fileTypeRegistry.GetTypesForFile(normalizedUri);
         if (!fileTypes.IsDefaultOrEmpty &&
             !fileTypes.Any(t => _schema.GetTagsForType(t)
-                                       .Any(tag => tag.ReferenceKind == ReferenceKind.HardcodedSet)))
+                .Any(tag => tag.ReferenceKind == ReferenceKind.HardcodedSet)))
             return [];
 
         var diagnostics = new List<Diagnostic>();
         WalkForHardcodedRefs(document.Html.DocumentNode, document.LineIndex, diagnostics);
         return diagnostics;
     }
-
-    // The engine hardcodes these 20 damage types at fixed positions relative to the end of
-    // GameConstants.xml's <Damage_Types> list. If they aren't present as the exact tail, in this
-    // exact order, the game crashes at runtime.
-    private static readonly string[] RequiredDamageTypeTail =
-    [
-        "Damage_Normal", "Damage_Force_Whirlwind", "Damage_Force_Telekinesis", "Damage_Force_Lightning",
-        "Damage_Force_Corruption", "Damage_Hard_Point_Self_Destruct", "Damage_Fire", "Damage_Cable_Attack",
-        "Damage_Explosion", "Damage_Asteroid", "Damage_Cable_Attack_Deployed", "Damage_Normal_Deployed",
-        "Damage_Vehicle_Thief", "Damage_Crush", "Damage_Eat", "Damage_Redirected", "Damage_Wampa",
-        "Damage_Infection", "Damage_Remote_Bomb", "Damage_Drain_Life"
-    ];
-
-    private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
 
     // Test convenience: parses the text itself; the publish path shares one ParsedXmlDocument.
     internal IReadOnlyList<Diagnostic> CollectDamageTypeOrderDiagnostics(string documentUri, string text)
@@ -259,7 +270,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         var text = document.Text;
 
-        // Cheap pre-check before walking the tree — almost no documents declare this element.
+        // Cheap pre-check before walking the tree - almost no documents declare this element.
         if (!text.Contains("Damage_Types", StringComparison.OrdinalIgnoreCase))
             return [];
 
@@ -311,7 +322,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             {
                 Severity = DiagnosticSeverity.Error,
                 Message =
-                    $"'{tail[i].Token}' must be '{RequiredDamageTypeTail[i]}' — the last " +
+                    $"'{tail[i].Token}' must be '{RequiredDamageTypeTail[i]}' - the last " +
                     $"{RequiredDamageTypeTail.Length} entries of <Damage_Types> must exactly match the " +
                     "engine's hardcoded order or the game will crash.",
                 Range = SafeRange(line, col, tail[i].Token.Length),
@@ -416,10 +427,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var start = Math.Max(0, symbolLine0 - 5);
         var end = Math.Min(symbolLine0, lines.Length - 1);
         for (var i = start; i <= end; i++)
-        {
             if (lines[i].Contains("lsp:suppress duplicate-symbol", StringComparison.OrdinalIgnoreCase))
                 return true;
-        }
 
         return false;
     }
@@ -460,7 +469,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         var endLine = result.OverrideEndLine ?? fact.EndLine;
 
         // A cross-line span (fact or result carries an explicit end line) wins over the default
-        // same-line col+length range — used e.g. to grey out a whole multi-line element.
+        // same-line col+length range - used e.g. to grey out a whole multi-line element.
         var range = endLine is { } el
             ? SafeRange(line, col, el, result.OverrideEndColumn ?? fact.EndColumn ?? 0)
             : SafeRange(line, col, result.OverrideLength ?? fact.Length);
@@ -519,7 +528,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     }
 
     // Cross-line variant: the end position may legitimately be on a later line (e.g. a whole
-    // multi-line element) — clamp endLine to at least startLine so a malformed/negative value can't
+    // multi-line element) - clamp endLine to at least startLine so a malformed/negative value can't
     // produce an inverted range.
     private static Range SafeRange(int startLine, int startCol, int endLine, int endCol)
     {

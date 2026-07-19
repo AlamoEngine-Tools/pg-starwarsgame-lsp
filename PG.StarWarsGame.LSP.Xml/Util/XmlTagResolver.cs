@@ -24,7 +24,7 @@ internal static class XmlTagResolver
     {
         if (context is null) return Default;
 
-        // Walk to the root context node — that's the file-level type
+        // Walk to the root context node - that's the file-level type
         // (e.g. "GameObjectType" for spaceunitsfrigates.xml, "SFXEvent" for an SFX file,
         //  a singleton type name for files like GameConstants etc.).
         var root = context;

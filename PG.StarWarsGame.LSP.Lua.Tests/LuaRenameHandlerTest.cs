@@ -324,7 +324,7 @@ public sealed class LuaRenameHandlerTest
     public void HandleRename_LuaGlobal_ArchiveOrigin_ReturnsNull()
     {
         // LuaGlobal with MegArchiveOrigin; the builder currently silently produces a ref-only
-        // edit — after the upfront IsLeafOwned guard it must return null.
+        // edit - after the upfront IsLeafOwned guard it must return null.
         var archiveSym = new GameSymbol("ArchiveFunc", GameSymbolKind.LuaGlobal, null,
             new MegArchiveOrigin("scripts.meg", "lib.lua", 0, 0), null);
         var callerRef = LuaGlobalRef("ArchiveFunc", LuaUri, 0, 0, 11);
@@ -635,6 +635,7 @@ public sealed class LuaRenameHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

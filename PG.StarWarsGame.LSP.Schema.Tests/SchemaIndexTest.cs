@@ -296,7 +296,7 @@ public sealed class SchemaIndexTest
     public void SchemaIndex_ParamReferenceTypeName_IsPreservedEvenWithoutResolution()
     {
         // Story edge extraction is driven by the raw referenceType string (StoryEventName,
-        // StoryFlag, StoryPlotFile) — these are not types.yaml object types, so the name must
+        // StoryFlag, StoryPlotFile) - these are not types.yaml object types, so the name must
         // survive resolution even though ObjectType stays null.
         var rawParam = new RawParamDefinition
         {

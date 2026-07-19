@@ -82,7 +82,7 @@ public sealed class GetLocalisationEntriesHandlerTest
     [Fact]
     public async Task Handle_Csv_EmptyLanguageColumn_StillReportedInLanguages()
     {
-        // The header is the source of truth for "which languages exist" — not whether any row
+        // The header is the source of truth for "which languages exist" - not whether any row
         // has a non-empty value for that language.
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {

@@ -38,7 +38,7 @@ public sealed class XmlEnumValueRenameSmokeTest : IClassFixture<EawLspServerFixt
     [Fact]
     public async Task XmlRename_CategoryMaskEnumValue_FromPipeListToken_EditsDefinitionAndUsages()
     {
-        // <CategoryMask> Corvette | AntiFighter | AntiBomber </CategoryMask> — rename triggered
+        // <CategoryMask> Corvette | AntiFighter | AntiBomber </CategoryMask> - rename triggered
         // from the second token of a pipe-separated dynamic-enum list; the value is defined in
         // bare <EnumDefinition> format (element name) in Enum/Gameobjectcategorytype.xml.
         await RunRenameAsync(null, "AntiFighter", "AntiFighter_Renamed", "Gameobjectcategorytype");

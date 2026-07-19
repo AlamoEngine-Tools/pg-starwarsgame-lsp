@@ -46,7 +46,8 @@ public sealed class UnitSpawnProbabilityTableHandlerTest
         //       Rebel_Survivors_Small, 1.0
         //       Rebel_Survivors_Medium, 1.0
         //   </Destruction_Survivors>
-        const string value = "\n\t\t\tRebel_Survivors_Small, 1.0\n\t\t\tRebel_Survivors_Medium, 1.0\n\t\t\tRebel_Survivors_Large, 1.0 \n\t\t";
+        const string value =
+            "\n\t\t\tRebel_Survivors_Small, 1.0\n\t\t\tRebel_Survivors_Medium, 1.0\n\t\t\tRebel_Survivors_Large, 1.0 \n\t\t";
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Empty(results);
     }

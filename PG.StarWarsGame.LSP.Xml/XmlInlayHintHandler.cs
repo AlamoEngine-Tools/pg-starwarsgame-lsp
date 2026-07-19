@@ -18,6 +18,7 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
@@ -25,7 +26,6 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     private readonly IXmlParseCache _parseCache;
     private readonly IXmlInlayHintRegistry _registry;
     private readonly ISchemaProvider _schema;
-    private readonly ILspConfigurationProvider _config;
 
     public XmlInlayHintHandler(
         IXmlParseCache parseCache,

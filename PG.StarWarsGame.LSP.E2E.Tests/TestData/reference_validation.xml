@@ -2,7 +2,7 @@
 <!-- E2E test fixture: exercises tags whose reference kind was previously wrong or missing.
      Synthetic names (LSP_TEST_*) are intentionally absent from the workspace so
      UnresolvedReference errors are expected.  What must NOT appear is a TypeMismatch
-     warning — that would mean the GameObjectType wildcard fix regressed. -->
+     warning - that would mean the GameObjectType wildcard fix regressed. -->
 <GameObjectFiles>
     <GameObjectType Name="LSP_TEST_SQUADRON">
         <!-- Squadron_Units: type=GameObjectTypeReferenceList, referenceType=GameObjectType -->

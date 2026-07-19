@@ -190,10 +190,10 @@ public sealed class LuaLocalScopeCollectorTest
     public void Local_WithTypeAnnotation_HasTypeNameSet()
     {
         const string text = """
-            ---@type PGUnit
-            local myUnit = nil
-            |
-            """;
+                            ---@type PGUnit
+                            local myUnit = nil
+                            |
+                            """;
         var (src, line, ch) = ExtractCursor(text);
         var entries = Collect(src, line, ch);
         var entry = entries.FirstOrDefault(e => e.Name == "myUnit");
@@ -205,9 +205,9 @@ public sealed class LuaLocalScopeCollectorTest
     public void Local_WithoutTypeAnnotation_HasNullTypeName()
     {
         const string text = """
-            local myVar = nil
-            |
-            """;
+                            local myVar = nil
+                            |
+                            """;
         var (src, line, ch) = ExtractCursor(text);
         var entries = Collect(src, line, ch);
         var entry = entries.FirstOrDefault(e => e.Name == "myVar");
@@ -219,10 +219,10 @@ public sealed class LuaLocalScopeCollectorTest
     public void Local_WithDocCommentButNoTypeAnnotation_HasNullTypeName()
     {
         const string text = """
-            --- Just a description, no @type.
-            local helper = nil
-            |
-            """;
+                            --- Just a description, no @type.
+                            local helper = nil
+                            |
+                            """;
         var (src, line, ch) = ExtractCursor(text);
         var entries = Collect(src, line, ch);
         var entry = entries.FirstOrDefault(e => e.Name == "helper");
@@ -241,6 +241,7 @@ public sealed class LuaLocalScopeCollectorTest
             lines[i] = lines[i].Remove(col, 1);
             return (string.Join('\n', lines), i, col);
         }
+
         throw new InvalidOperationException("No | cursor marker found in text.");
     }
 
@@ -266,8 +267,19 @@ public sealed class LuaLocalScopeCollectorTest
             return null;
         }
 
-        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName) => [];
-        public PG.StarWarsGame.LSP.Lua.Analysis.Annotations.LuaClassDefinition? GetClassDefinition(string typeName) => null;
-        public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName) => [];
+        public IReadOnlyList<LuaTypeMember> GetMembersOf(string typeName)
+        {
+            return [];
+        }
+
+        public LuaClassDefinition? GetClassDefinition(string typeName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<LuaParamAnnotation> GetFunctionParams(string functionName)
+        {
+            return [];
+        }
     }
 }

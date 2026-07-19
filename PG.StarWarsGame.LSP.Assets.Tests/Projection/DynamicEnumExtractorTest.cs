@@ -3,7 +3,6 @@
 
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
@@ -76,7 +75,8 @@ public sealed class DynamicEnumExtractorTest
     {
         const string xml = "<GameConstants><Damage_Types>EXPLOSIVE ENERGY GRENADE</Damage_Types></GameConstants>";
 
-        var result = DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
+        var result =
+            DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
 
         Assert.Equal(3, result.Count);
         Assert.Equal("EXPLOSIVE", result[0].Name);
@@ -100,7 +100,8 @@ public sealed class DynamicEnumExtractorTest
                            </GameConstants>
                            """;
 
-        var result = DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
+        var result =
+            DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
 
         Assert.Equal(2, result.Count);
         Assert.Equal("EXPLOSIVE", result[0].Name);
@@ -121,7 +122,8 @@ public sealed class DynamicEnumExtractorTest
                            </GameConstants>
                            """;
 
-        var result = DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
+        var result =
+            DynamicEnumExtractor.ParseElementTextWithLocations(xml, "Damage_Types", "file:///gameconstants.xml");
 
         // Only MOD_DMG is before the boundary; EXPLOSIVE and ENERGY are hardcoded
         Assert.Equal("MOD_DMG", Assert.Single(result).Name);
@@ -176,7 +178,7 @@ public sealed class DynamicEnumExtractorTest
         Assert.Empty(DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations("<bad xml <<", "file:///x.xml"));
     }
 
-    // ── Extract — schema with no DynamicXml enums ─────────────────────────────
+    // ── Extract - schema with no DynamicXml enums ─────────────────────────────
 
     [Fact]
     public void Extract_EmptySchema_ReturnsEmpty()
@@ -209,7 +211,7 @@ public sealed class DynamicEnumExtractorTest
         Assert.Empty(dyn);
     }
 
-    // ── Extract — dollar-format (GameConstants.xml$Element) ───────────────────
+    // ── Extract - dollar-format (GameConstants.xml$Element) ───────────────────
 
     [Fact]
     public void Extract_DollarFormat_ExtractsValuesFromGameConstantsXml()
@@ -288,7 +290,7 @@ public sealed class DynamicEnumExtractorTest
         Assert.Equal<IEnumerable<string>>(["ARMOR_INFANTRY"], dyn["ArmorType"]);
     }
 
-    // ── Extract — file-format (data/xml/enum/*.xml) ───────────────────────────
+    // ── Extract - file-format (data/xml/enum/*.xml) ───────────────────────────
 
     [Fact]
     public void Extract_FileFormat_ReadsFromFileReader()
@@ -313,7 +315,7 @@ public sealed class DynamicEnumExtractorTest
         Assert.Empty(dyn);
     }
 
-    // ── Extract — mixed formats ────────────────────────────────────────────────
+    // ── Extract - mixed formats ────────────────────────────────────────────────
 
     [Fact]
     public void Extract_BothFormats_AllEnumsExtracted()

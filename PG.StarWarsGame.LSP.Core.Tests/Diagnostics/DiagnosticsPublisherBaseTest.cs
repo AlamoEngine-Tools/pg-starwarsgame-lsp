@@ -74,7 +74,7 @@ public sealed class DiagnosticsPublisherBaseTest
         indexService.Fire(IndexWithDoc("file:///a.xml"));
         published.Clear();
 
-        // Remove doc from workspace host — next fire should clear it
+        // Remove doc from workspace host - next fire should clear it
         workspaceHost.Remove("file:///a.xml");
         indexService.Fire(GameIndex.Empty);
 
@@ -91,7 +91,7 @@ public sealed class DiagnosticsPublisherBaseTest
         indexService.Fire(IndexWithDoc("file:///a.xml"));
         var countAfterFirst = published.Count;
 
-        // Doc remains open — fire again; no stale-clear publish expected for it
+        // Doc remains open - fire again; no stale-clear publish expected for it
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
         // Second fire: 1 publish for the open doc, no extra stale-clear
@@ -122,7 +122,7 @@ public sealed class DiagnosticsPublisherBaseTest
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
-        Assert.Empty(published); // not yet — still within debounce window
+        Assert.Empty(published); // not yet - still within debounce window
 
         await Task.Delay(250);
 
@@ -144,7 +144,7 @@ public sealed class DiagnosticsPublisherBaseTest
     public void OnIndexChanged_SkipsDocumentsWithPublishDiagnosticsFalse()
     {
         var (_, published, indexService, workspaceHost) = Build();
-        workspaceHost.AddOrUpdate("file:///a.xml", "content", 1, publishDiagnostics: false);
+        workspaceHost.AddOrUpdate("file:///a.xml", "content", 1, false);
 
         indexService.Fire(IndexWithDoc("file:///a.xml"));
 
@@ -218,7 +218,7 @@ public sealed class DiagnosticsPublisherBaseTest
         published.Clear();
 
         // didOpen of an unedited, already-indexed file re-fires IndexChanged with the same index
-        // (the unchanged-content fast path) — the newly opened doc still needs its diagnostics.
+        // (the unchanged-content fast path) - the newly opened doc still needs its diagnostics.
         workspaceHost.Add("file:///b.xml", "content");
         indexService.Fire(index);
 
@@ -236,7 +236,7 @@ public sealed class DiagnosticsPublisherBaseTest
         var workspaceHost = new FakeWorkspaceHost();
         // a.xml throws; b.xml should still receive diagnostics
         var publisher = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
-            throwingUri: "file:///a.xml");
+            "file:///a.xml");
         workspaceHost.Add("file:///a.xml", "content");
         workspaceHost.Add("file:///b.xml", "content");
 
@@ -253,7 +253,7 @@ public sealed class DiagnosticsPublisherBaseTest
         var indexService = new FakeIndexService();
         var workspaceHost = new FakeWorkspaceHost();
         var publisher = new ThrowingPublisher(p => published.Add(p), indexService, workspaceHost,
-            throwingUri: "file:///a.xml");
+            "file:///a.xml");
         workspaceHost.Add("file:///a.xml", "content");
 
         indexService.Fire(GameIndex.Empty);
@@ -303,7 +303,7 @@ public sealed class DiagnosticsPublisherBaseTest
             IGameIndexService indexService,
             IGameWorkspaceHost workspaceHost,
             string throwingUri)
-            : base(publish, indexService, workspaceHost, debounceMs: 0)
+            : base(publish, indexService, workspaceHost, 0)
         {
             _throwingUri = throwingUri;
         }
@@ -323,7 +323,7 @@ public sealed class DiagnosticsPublisherBaseTest
         }
     }
 
-    private sealed class FakeIndexService  : IGameIndexService
+    private sealed class FakeIndexService : IGameIndexService
     {
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
@@ -364,6 +364,7 @@ public sealed class DiagnosticsPublisherBaseTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

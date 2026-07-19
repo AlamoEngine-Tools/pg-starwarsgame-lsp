@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
@@ -174,11 +175,6 @@ public sealed class DialogDiagnosticsPublisherTest
             remove { }
         }
 
-        public void Fire(GameIndex index)
-        {
-            IndexChanged?.Invoke(index);
-        }
-
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
@@ -210,24 +206,29 @@ public sealed class DialogDiagnosticsPublisherTest
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 
         public void ApplyWorkspaceDynamicEnumValues(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> values)
+            ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
 
         public void ApplyWorkspaceEnumValueDefinitions(
-            System.Collections.Immutable.ImmutableDictionary<string,
-                System.Collections.Immutable.ImmutableDictionary<string, FileOrigin>> definitions)
+            ImmutableDictionary<string,
+                ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 
         public IDisposable BeginBulkUpdate()
         {
             return new Noop();
+        }
+
+        public void Fire(GameIndex index)
+        {
+            IndexChanged?.Invoke(index);
         }
 
         private sealed class Noop : IDisposable

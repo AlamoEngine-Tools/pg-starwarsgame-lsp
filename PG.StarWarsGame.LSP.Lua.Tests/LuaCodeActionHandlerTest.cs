@@ -28,7 +28,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_LuaCodeActionsFlagOff_ReturnsEmpty()
     {
-        // Same arrange as Handle_RedundantRequireDiagnostic — only the flag differs.
+        // Same arrange as Handle_RedundantRequireDiagnostic - only the flag differs.
         var diag = RedundantRequireDiag(3, 0, 12);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
         var config = FakeLspConfigurationProvider.WithFeatures(
@@ -119,7 +119,7 @@ public sealed class LuaCodeActionHandlerTest
     [Fact]
     public async Task Handle_RedundantDiagnostic_EditDeletesEntireLine()
     {
-        // Diagnostic is on line 5 — edit must cover (5,0)..(6,0) to delete the full line.
+        // Diagnostic is on line 5 - edit must cover (5,0)..(6,0) to delete the full line.
         var diag = RedundantRequireDiag(5, 0, 14);
         var request = ParamsWithDiagnostics("file:///s.lua", diag);
 

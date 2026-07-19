@@ -10,7 +10,7 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Tests;
 
 /// <summary>
-///     Builds a real <see cref="XmlParseCache" /> over a test workspace host — the standard way
+///     Builds a real <see cref="XmlParseCache" /> over a test workspace host - the standard way
 ///     for handler tests to satisfy the <c>IXmlParseCache</c> dependency.
 /// </summary>
 internal static class TestParseCache

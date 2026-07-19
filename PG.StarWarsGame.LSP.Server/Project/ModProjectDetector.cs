@@ -31,7 +31,7 @@ public sealed class ModProjectDetector : IModProjectDetector
             if (matches.Length > 1)
                 throw new ModProjectLoadException(
                     $"Found multiple .pgproj files under '{root}': {string.Join(", ", matches)}. " +
-                    "Only one .pgproj is supported per workspace — remove or relocate the extras, " +
+                    "Only one .pgproj is supported per workspace - remove or relocate the extras, " +
                     "or open the specific directory that contains the one you want to use.");
 
             projectFilePath = matches[0];

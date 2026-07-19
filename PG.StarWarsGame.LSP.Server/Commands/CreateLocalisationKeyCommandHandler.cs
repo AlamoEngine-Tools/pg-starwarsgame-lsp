@@ -17,12 +17,12 @@ namespace PG.StarWarsGame.LSP.Server.Commands;
 public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerBase
 {
     public const string CommandName = "aet-eaw-edit.lsp.createLocalisationKey";
+    private readonly ILspConfigurationProvider _config;
 
     private readonly ILocalisationEntryWriter _entryWriter;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<CreateLocalisationKeyCommandHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
-    private readonly ILspConfigurationProvider _config;
 
     public CreateLocalisationKeyCommandHandler(
         ILocalisationEntryWriter entryWriter,

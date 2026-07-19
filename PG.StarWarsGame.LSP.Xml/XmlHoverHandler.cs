@@ -20,8 +20,8 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlHoverHandler> _logger;
-    private readonly IXmlHoverStrategyRegistry _registry;
     private readonly IXmlParseCache _parseCache;
+    private readonly IXmlHoverStrategyRegistry _registry;
     private readonly ISchemaProvider _schema;
 
     public XmlHoverHandler(

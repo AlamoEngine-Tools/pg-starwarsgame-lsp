@@ -42,6 +42,11 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
         return _byExtension.GetValueOrDefault(ext, ImmutableArray<string>.Empty);
     }
 
+    public bool IsPackedAsset(string normalisedPath)
+    {
+        return _packedPaths.Contains(normalisedPath);
+    }
+
     private static ImmutableDictionary<string, ImmutableArray<string>> BucketByExtension(
         ImmutableHashSet<string> paths)
     {
@@ -59,11 +64,6 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
             kv => kv.Key, kv => kv.Value.ToImmutableArray(), StringComparer.OrdinalIgnoreCase);
     }
 
-    public bool IsPackedAsset(string normalisedPath)
-    {
-        return _packedPaths.Contains(normalisedPath);
-    }
-
     /// <summary>
     ///     Unions the baseline (packed game) catalog with the workspace (loose) asset paths.
     ///     Baseline paths are tracked separately so <see cref="IsPackedAsset" /> can distinguish them.
@@ -73,7 +73,7 @@ public sealed class MergedAssetFileIndex : IAssetFileIndex
     {
         var workspace = workspaceFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
         var baseline = baselineFiles.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
-        // Paths that also exist as loose workspace files are not "packed" — workspace overrides baseline.
+        // Paths that also exist as loose workspace files are not "packed" - workspace overrides baseline.
         var packed = baseline
             .Where(p => !workspace.Contains(p))
             .ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);

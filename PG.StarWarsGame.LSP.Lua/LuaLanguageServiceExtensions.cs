@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -25,7 +26,7 @@ public static class LuaLanguageServiceExtensions
         services.AddSingleton<ILuaParseCache>(sp => new LuaParseCache(
             sp.GetRequiredService<IDocumentTextSource>(),
             sp.GetRequiredService<ServerOptions>().ParseCacheCapacity,
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<LuaParseCache>>()));
+            sp.GetRequiredService<ILogger<LuaParseCache>>()));
         services.AddSingleton<IGameDocumentParser, LuaGameDocumentParser>();
         services.AddSingleton<LuaDiagnosticsPublisher>();
         return services;
