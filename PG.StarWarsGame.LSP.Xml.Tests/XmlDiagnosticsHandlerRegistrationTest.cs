@@ -62,7 +62,11 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // variant and its base accumulates rather than replaces (#63).
         // 100 → 101: PlanetModeExclusionListHandler added - validates the mode half and the pairing
         // of Autoresolve_Exclusion_Locations.
-        const int expectedHandlerCount = 101;
+        // 101 → 102: HardpointMissingAttachmentBoneHandler added - a destroyable hardpoint with no
+        // Attachment_Bone is indestructible (#53).
+        // 102 → 104: HardpointBoneNotOnModelHandler + HardpointModelBonesUnavailableHandler added -
+        // hardpoint bones cross-checked against the models of the objects mounting them (#53).
+        const int expectedHandlerCount = 104;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
