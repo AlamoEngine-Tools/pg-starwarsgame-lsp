@@ -50,13 +50,27 @@ public sealed class EffectiveObjectResolver
                     continue; // the variant-declaration tag is metadata, not part of the effective object
 
                 var mode = schemaTag?.VariantMode ?? VariantMode.Replace;
+
+                // An additive tag that may appear several times (Death_Clone and friends) is a list
+                // of independent elements, not one list-valued element: each occurrence carries its
+                // own tuple. Unioning their tokens would drop a repeated leading token - e.g. a
+                // second Damage_Fire - as a "duplicate" and detach the rest of that entry from it.
+                // Keep every occurrence as its own tag instead.
+                if (mode == VariantMode.Merge && (schemaTag?.MultipleAllowed ?? false))
+                {
+                    AppendOccurrence(state, order, layer.Id, tag);
+                    continue;
+                }
+
                 ApplyTag(state, order, layer.Id, tag, mode, isRootLayer);
             }
         }
 
         var single = chain.Count == 1;
         var tags = order
-            .Select(name => ToEffectiveTag(state[name], root.Id, single))
+            .SelectMany(key => state[key].Occurrences is { } occurrences
+                ? occurrences.Select(o => ToEffectiveTag(o, root.Id, single))
+                : [ToEffectiveTag(state[key], root.Id, single)])
             .ToImmutableArray();
 
         return new EffectiveObject(root.Id, root.TypeName, true, cyclic, cycleAt,
@@ -108,6 +122,30 @@ public sealed class EffectiveObjectResolver
         };
     }
 
+    /// <summary>
+    ///     Records one occurrence of a repeatable additive tag, preserving the order every layer
+    ///     contributed them in (base's first, then the variant's).
+    /// </summary>
+    private static void AppendOccurrence(Dictionary<string, Accum> state, List<string> order,
+        string layerId, VariantTag tag)
+    {
+        if (!state.TryGetValue(tag.TagName, out var existing))
+        {
+            order.Add(tag.TagName);
+            existing = new Accum(tag.TagName, tag.Value, tag.Fragment, layerId, tag.Origin,
+                VariantMode.Merge, false, null) { Occurrences = [] };
+            state[tag.TagName] = existing;
+        }
+
+        // What this occurrence is being added to: the first entry an earlier layer contributed. An
+        // additive entry displaces nothing of its own, so without this it would report no base at all.
+        var occurrences = existing.Occurrences!;
+        var firstExisting = occurrences.FirstOrDefault();
+
+        occurrences.Add(new Accum(tag.TagName, tag.Value, tag.Fragment, layerId, tag.Origin,
+            VariantMode.Merge, occurrences.Count > 0, firstExisting?.Value));
+    }
+
     private static void ApplyTag(Dictionary<string, Accum> state, List<string> order, string layerId,
         VariantTag tag, VariantMode mode, bool isRootLayer)
     {
@@ -133,8 +171,13 @@ public sealed class EffectiveObjectResolver
         if (!hadPrev)
             order.Add(tag.TagName);
 
+        // The value being displaced by this layer. Deliberately the immediately-preceding one, not
+        // the chain's oldest: for A > B > C the UX must report what A actually inherited (B's), and
+        // a layer that adds a tag no earlier layer had displaces nothing.
+        var displaced = hadPrev ? prev!.Value : null;
+
         state[tag.TagName] = new Accum(tag.TagName, value, fragment, layerId, tag.Origin, mode,
-            hadPrev || (prev?.EverInBase ?? false));
+            hadPrev || (prev?.EverInBase ?? false), displaced);
     }
 
     private static EffectiveTag ToEffectiveTag(Accum a, string topId, bool single)
@@ -149,7 +192,13 @@ public sealed class EffectiveObjectResolver
         else
             provenance = VariantProvenance.Inherited;
 
-        return new EffectiveTag(a.TagName, a.Value, a.Fragment, provenance, a.OriginObjectId, a.Origin);
+        // Only the provenances that actually displaced something carry the old value.
+        var baseValue = provenance is VariantProvenance.Overridden or VariantProvenance.Merged
+            ? a.DisplacedValue
+            : null;
+
+        return new EffectiveTag(a.TagName, a.Value, a.Fragment, provenance, a.OriginObjectId, a.Origin,
+            baseValue);
     }
 
     private static string MergeValues(string baseValue, string variantValue)
@@ -171,6 +220,14 @@ public sealed class EffectiveObjectResolver
         string OriginObjectId,
         SymbolOrigin? Origin,
         VariantMode Mode,
-        bool EverInBase
-    );
+        bool EverInBase,
+        string? DisplacedValue
+    )
+    {
+        /// <summary>
+        ///     Set only on the placeholder entry for a repeatable additive tag; holds one Accum per
+        ///     occurrence, in contribution order. Null for ordinary single-valued tags.
+        /// </summary>
+        public List<Accum>? Occurrences { get; init; }
+    }
 }

@@ -102,6 +102,121 @@ public sealed class EffectiveObjectResolverTest
         Assert.Equal("V", health.OriginObjectId);
     }
 
+    // ── base value carried alongside the winning value (#73 / #63) ───────────
+
+    [Fact]
+    public void Resolve_OverriddenTag_CarriesTheValueItReplaced()
+    {
+        // The UX has to be able to say "tech_level 0 (was 99)", so the replaced value must survive
+        // resolution rather than being silently overwritten.
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tech_Level", "99"))
+            .With("V", Tag("Tech_Level", "0"));
+
+        var result = Resolver(index, source).Resolve("V");
+
+        var tech = TagNamed(result, "Tech_Level");
+        Assert.Equal("0", tech.Value);
+        Assert.Equal("99", tech.BaseValue);
+    }
+
+    [Fact]
+    public void Resolve_MergedTag_CarriesTheBaseValueItWasUnionedWith()
+    {
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Death_Clone", "Damage_Normal, Base_Clone"))
+            .With("V", Tag("Death_Clone", "Hero_Clone"));
+        var schema = new FakeSchema().WithMode("Death_Clone", VariantMode.Merge);
+
+        var result = Resolver(index, source, schema).Resolve("V");
+
+        var clone = TagNamed(result, "Death_Clone");
+        Assert.Equal("Damage_Normal, Base_Clone, Hero_Clone", clone.Value);
+        Assert.Equal("Damage_Normal, Base_Clone", clone.BaseValue);
+    }
+
+    [Fact]
+    public void Resolve_AddedAndInheritedTags_HaveNoBaseValue()
+    {
+        // Nothing was replaced in either case, so there is no "was X" to report.
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Max_Health", "100"))
+            .With("V", Tag("Shield", "50"));
+
+        var result = Resolver(index, source).Resolve("V");
+
+        Assert.Null(TagNamed(result, "Shield").BaseValue);
+        Assert.Null(TagNamed(result, "Max_Health").BaseValue);
+    }
+
+    [Fact]
+    public void Resolve_ThreeLayerChain_BaseValueIsTheOneImmediatelyReplaced()
+    {
+        // A > B > C: the value V replaces is B's, not the root C's - "was" must mean the value the
+        // object actually inherited, not the oldest one in the chain.
+        var index = WorkspaceIndex(Sym("A", "B"), Sym("B", "C"), Sym("C"));
+        var source = new FakeTagSource()
+            .With("C", Tag("Tech_Level", "1"))
+            .With("B", Tag("Tech_Level", "2"))
+            .With("A", Tag("Tech_Level", "3"));
+
+        var result = Resolver(index, source).Resolve("A");
+
+        var tech = TagNamed(result, "Tech_Level");
+        Assert.Equal("3", tech.Value);
+        Assert.Equal("2", tech.BaseValue);
+    }
+
+    [Fact]
+    public void Resolve_MultipleAllowedMergeTag_KeepsEachOccurrenceSeparate()
+    {
+        // Death_Clone is a (DamageType, CloneObject) pair, one element per damage type. Unioning the
+        // tokens of every occurrence into one flat list drops repeated damage types as "duplicates",
+        // which silently detaches the surviving clone names from their damage type. Each element has
+        // to survive as its own tag.
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B",
+                Tag("Death_Clone", "Damage_Fire, A_Fire_Clone"),
+                Tag("Death_Clone", "Damage_Force_Lightning, A_Lightning_Clone"))
+            .With("V",
+                Tag("Death_Clone", "Damage_Fire, B_Fire_Clone"),
+                Tag("Death_Clone", "Damage_Force_Lightning, B_Lightning_Clone"));
+        var schema = new FakeSchema().WithMode("Death_Clone", VariantMode.Merge).WithMultiple("Death_Clone");
+
+        var result = Resolver(index, source, schema).Resolve("V");
+
+        var clones = result.Tags.Where(t => t.TagName == "Death_Clone").ToList();
+        Assert.Equal(4, clones.Count);
+        Assert.Equal(
+            ["Damage_Fire, A_Fire_Clone", "Damage_Force_Lightning, A_Lightning_Clone",
+                "Damage_Fire, B_Fire_Clone", "Damage_Force_Lightning, B_Lightning_Clone"],
+            clones.Select(c => c.Value));
+        // The base's own entries are inherited; only the variant's are the additive ones.
+        Assert.Equal(
+            [VariantProvenance.Inherited, VariantProvenance.Inherited,
+                VariantProvenance.Merged, VariantProvenance.Merged],
+            clones.Select(c => c.Provenance));
+    }
+
+    [Fact]
+    public void Resolve_SingleOccurrenceMergeTag_StillUnionsTokens()
+    {
+        // A flat list-valued tag that is not multipleAllowed keeps the union semantics.
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tags", "A, B"))
+            .With("V", Tag("Tags", "C"));
+        var schema = new FakeSchema().WithMode("Tags", VariantMode.Merge);
+
+        var result = Resolver(index, source, schema).Resolve("V");
+
+        Assert.Equal("A, B, C", TagNamed(result, "Tags").Value);
+    }
+
     [Fact]
     public void Resolve_Variant_AddsNewTag()
     {
@@ -322,6 +437,14 @@ public sealed class EffectiveObjectResolverTest
         public FakeSchema WithMode(string tag, VariantMode mode)
         {
             _tags[tag] = new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.NameReference, VariantMode = mode };
+            return this;
+        }
+
+        public FakeSchema WithMultiple(string tag)
+        {
+            var existing = _tags.GetValueOrDefault(tag)
+                           ?? new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.NameReference };
+            _tags[tag] = existing with { MultipleAllowed = true };
             return this;
         }
 

@@ -58,7 +58,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // deliberately whenever a handler is added or removed so the change is reviewed.
         // 100 → 99: StoryParamReferenceHandler retired - story object params are validated by
         // the generic reference pipeline since the collector emits GameReferences for them.
-        const int expectedHandlerCount = 99;
+        // 99 → 100: VariantAdditiveMergeHandler added - reports that an additive tag set on both a
+        // variant and its base accumulates rather than replaces (#63).
+        const int expectedHandlerCount = 100;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

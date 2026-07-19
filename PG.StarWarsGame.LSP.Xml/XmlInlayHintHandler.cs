@@ -76,7 +76,8 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
             if (tagDef is null)
                 continue;
 
-            var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line);
+            var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line,
+                LineEndCharacter(parsed, line));
             foreach (var hint in _registry.Dispatch(ctx))
             {
                 _logger.LogDebug("InlayHint at line {Line}", line);
@@ -90,6 +91,17 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
     public override Task<InlayHint> Handle(InlayHint request, CancellationToken ct)
     {
         return Task.FromResult(request);
+    }
+
+    /// <summary>
+    ///     Character offset just past the end of <paramref name="line" />, excluding the CR of a CRLF
+    ///     pair so the anchor lands on the visible end of the line rather than one past it.
+    /// </summary>
+    private static int LineEndCharacter(ParsedXmlDocument parsed, int line)
+    {
+        var lines = parsed.Lines;
+        if (line < 0 || line >= lines.Length) return 0;
+        return lines[line].TrimEnd('\r').Length;
     }
 
     protected override InlayHintRegistrationOptions CreateRegistrationOptions(
