@@ -12,7 +12,7 @@ public sealed record StoryFactionManifest(string Faction, string ManifestFile);
 public sealed record StoryCampaignChain(string Name, IReadOnlyList<StoryFactionManifest> FactionManifests)
 {
     /// <summary>
-    ///     Xml-relative path of the campaign set file that declared this campaign — the target
+    ///     Xml-relative path of the campaign set file that declared this campaign - the target
     ///     for manifest attach/detach mutations. Empty for pre-mutation-era cached results.
     /// </summary>
     public string SourceFile { get; init; } = "";

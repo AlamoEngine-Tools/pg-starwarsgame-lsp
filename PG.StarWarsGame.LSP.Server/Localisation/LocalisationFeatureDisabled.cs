@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 ///     Shared user-facing error returned by every aet/* localisation request that arrives while
 ///     the <c>features.tools.localisation</c> flag is off. A well-behaved client never sends these
 ///     (its own commands and views are gated on the same flag), so this surfaces only for stale or
-///     misconfigured clients — the message tells the user exactly which setting to flip.
+///     misconfigured clients - the message tells the user exactly which setting to flip.
 /// </summary>
 public static class LocalisationFeatureDisabled
 {

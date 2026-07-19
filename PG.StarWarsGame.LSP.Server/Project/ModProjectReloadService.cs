@@ -12,7 +12,7 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 ///     The single workspace index path, shared by startup (via <see cref="StartupPipeline" />), the
 ///     reload command, and the <c>.pgproj</c> file watcher. Resolves the project configuration and
 ///     drives the <see cref="IWorkspaceIndexer" /> stages in a fixed order. No <c>.pgproj</c> means
-///     no directories to index — the resolver returns null and this becomes a no-op.
+///     no directories to index - the resolver returns null and this becomes a no-op.
 /// </summary>
 public sealed class ModProjectReloadService : IModProjectReloadService
 {
@@ -55,7 +55,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
 
         LastWorkspaceConfig = config;
         // Publish layer precedence before indexing so each document is stamped with its rank
-        // (indexing itself stays parallel — correctness comes from the rank, not insertion order).
+        // (indexing itself stays parallel - correctness comes from the rank, not insertion order).
         _layerMap.SetLayers(config.Layers);
         _indexer.PreScanMetafiles(config, roots);
         await _indexer.IndexDocumentsAsync(config, ct);

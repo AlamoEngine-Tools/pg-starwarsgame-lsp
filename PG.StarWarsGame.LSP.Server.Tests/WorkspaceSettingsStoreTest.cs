@@ -5,7 +5,6 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Server;
 using PG.StarWarsGame.LSP.Server.Tests.Story;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
@@ -21,8 +20,11 @@ public sealed class WorkspaceSettingsStoreTest
     {
         var config = WorkspaceConfiguration.Empty with
         {
-            Layers = [new ProjectLayer(1, "Mod", [], [], [], [], null,
-                ProjectPath: Path.Combine(Rooted("proj"), "mod.pgproj"))]
+            Layers =
+            [
+                new ProjectLayer(1, "Mod", [], [], [], [], null,
+                    Path.Combine(Rooted("proj"), "mod.pgproj"))
+            ]
         };
         return new WorkspaceSettingsStore(
             new StoryCommandTestFixtures.StubReloadService(config),
@@ -77,7 +79,7 @@ public sealed class WorkspaceSettingsStoreTest
         var store = NewStore(new MockFileSystem());
 
         await new SetWorkspaceSettingsHandler(store)
-            .Handle(new SetWorkspaceSettingsParams(SkipStoryDeleteConfirmation: true), CancellationToken.None);
+            .Handle(new SetWorkspaceSettingsParams(true), CancellationToken.None);
         // A later set touching only the lane toggle must not clobber the delete-confirm preference.
         await new SetWorkspaceSettingsHandler(store)
             .Handle(new SetWorkspaceSettingsParams(ShowThreadLanes: true), CancellationToken.None);

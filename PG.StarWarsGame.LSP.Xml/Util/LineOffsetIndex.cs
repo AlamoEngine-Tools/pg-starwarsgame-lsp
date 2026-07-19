@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Xml.Util;
 ///     Precomputed offset→(line, column) lookup over a document text. Building the index walks the
 ///     text once (O(n)); each <see cref="GetPosition" /> is then a binary search over the line
 ///     starts (O(log lines)). Use this instead of <see cref="XmlUtility.OffsetToPosition" /> wherever
-///     positions are resolved in a loop — the latter rescans the text from the start on every call,
+///     positions are resolved in a loop - the latter rescans the text from the start on every call,
 ///     which turns per-token position lookups quadratic on large documents.
 ///     Semantics match <see cref="XmlUtility.OffsetToPosition" /> exactly: lines split on '\n' only
 ///     ('\r' counts as a column character), a negative offset clamps the column to 0, and an offset

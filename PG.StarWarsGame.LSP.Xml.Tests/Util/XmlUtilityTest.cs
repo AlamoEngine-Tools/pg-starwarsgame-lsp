@@ -107,7 +107,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void IsOnTagName_CursorOnOpeningTagName_ReturnsTrue()
     {
-        // Line 1: <Foo/>  — 'F' at col 1, 'o' at 2, 'o' at 3
+        // Line 1: <Foo/>  - 'F' at col 1, 'o' at 2, 'o' at 3
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Foo/>\n</Root>");
         XmlUtility.TryFindNode(doc, 1, out var node);
         Assert.True(XmlUtility.IsOnTagName(node!, 1, 1));
@@ -133,7 +133,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void IsOnTagName_CursorOnContent_ReturnsFalse()
     {
-        // Line 1: <Foo>bar</Foo> — 'b' of "bar" at col 5
+        // Line 1: <Foo>bar</Foo> - 'b' of "bar" at col 5
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Foo>bar</Foo>\n</Root>");
         XmlUtility.TryFindNode(doc, 1, out var node);
         Assert.False(XmlUtility.IsOnTagName(node!, 1, 5));
@@ -153,7 +153,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void IsOnTagName_CursorOnClosingAngleOrSlash_ReturnsFalse()
     {
-        // Line 1: <Max_Speed>500</Max_Speed> — '<' at 14, '/' at 15
+        // Line 1: <Max_Speed>500</Max_Speed> - '<' at 14, '/' at 15
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Max_Speed>500</Max_Speed>\n</Root>");
         XmlUtility.TryFindNode(doc, 1, out var node);
         Assert.False(XmlUtility.IsOnTagName(node!, 1, 14)); // '<'
@@ -251,7 +251,7 @@ public sealed class XmlUtilityTest
     public void FindEnclosingElement_TruncatedDocument_ReturnsUnclosedParent()
     {
         // Simulates text truncated at cursor before a '<' typed inside GameObjectType.
-        // The truncated text has no </GameObjectType> — HAP auto-closes it.
+        // The truncated text has no </GameObjectType> - HAP auto-closes it.
         const string truncated =
             "<GameObjectFiles>\n  <GameObjectType Name=\"Foo\">\n    <Max_Speed>500</Max_Speed>\n    ";
         var doc = XmlUtility.CreateHtmlDocument(truncated);
@@ -313,7 +313,7 @@ public sealed class XmlUtilityTest
         // line 1:   <p>leaf0  ← synthetic EndNode(Line=0) → int.MaxValue → steals cursor
         // line 2:   <p>leaf1  ← same
         // line 3:   <div>     ← depth=1 sibling; loses because depth not > 1
-        // line 4:     (cursor — should return div, not p)
+        // line 4:     (cursor - should return div, not p)
         // line 5:   </div>
         // line 6: </Root>
         const string xml =
@@ -334,7 +334,7 @@ public sealed class XmlUtilityTest
     public void FindEnclosingElement_CursorAfterAllElements_ReturnsNull()
     {
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n<Child>x</Child>\n</Root>");
-        // Line 5 is beyond the document — nothing contains it
+        // Line 5 is beyond the document - nothing contains it
         var node = XmlUtility.FindEnclosingElement(doc, 5);
         Assert.Null(node);
     }
@@ -344,7 +344,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void GetTagBracketColumn_TagAtStartOfLine_ReturnsZero()
     {
-        // "<Foo>bar</Foo>" — '<' is at column 0
+        // "<Foo>bar</Foo>" - '<' is at column 0
         var doc = XmlUtility.CreateHtmlDocument("<Foo>bar</Foo>");
         XmlUtility.TryFindNode(doc, 0, out var node);
         Assert.Equal(0, XmlUtility.GetTagBracketColumn(node));
@@ -353,7 +353,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void GetTagBracketColumn_IndentedTag_ReturnsIndentColumn()
     {
-        // line 1: "  <Bar>x</Bar>" — '<' is at column 2
+        // line 1: "  <Bar>x</Bar>" - '<' is at column 2
         var doc = XmlUtility.CreateHtmlDocument("<Root>\n  <Bar>x</Bar>\n</Root>");
         XmlUtility.TryFindNode(doc, 1, out var node);
         Assert.Equal(2, XmlUtility.GetTagBracketColumn(node));
@@ -370,7 +370,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void GetOpeningTagLength_SimpleTag_ReturnsCorrectLength()
     {
-        // "<Foo>bar</Foo>" — opening tag "<Foo>" has length 5
+        // "<Foo>bar</Foo>" - opening tag "<Foo>" has length 5
         var doc = XmlUtility.CreateHtmlDocument("<Foo>bar</Foo>");
         XmlUtility.TryFindNode(doc, 0, out var node);
         Assert.Equal(5, XmlUtility.GetOpeningTagLength(node));
@@ -379,7 +379,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void GetOpeningTagLength_TagWithAttribute_IncludesAttribute()
     {
-        // "<Unit Name=\"Foo\">x</Unit>" — opening tag has length 17
+        // "<Unit Name=\"Foo\">x</Unit>" - opening tag has length 17
         var doc = XmlUtility.CreateHtmlDocument("<Unit Name=\"Foo\">x</Unit>");
         XmlUtility.TryFindNode(doc, 0, out var node);
         Assert.Equal(17, XmlUtility.GetOpeningTagLength(node));
@@ -404,7 +404,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void AdvancePosition_CrossesNewline_ResetsColumnAndAdvancesLine()
     {
-        // "TEXT_A\nTEXT_B" — offset 7 is the 'T' right after the newline.
+        // "TEXT_A\nTEXT_B" - offset 7 is the 'T' right after the newline.
         var (line, col) = XmlUtility.AdvancePosition(3, 10, "TEXT_A\nTEXT_B", 7);
         Assert.Equal(4, line);
         Assert.Equal(0, col);
@@ -421,7 +421,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void AdvancePosition_MultipleNewlines_AdvancesLineForEach()
     {
-        // "A\nB\nC" — offset 4 is 'C', two newlines crossed.
+        // "A\nB\nC" - offset 4 is 'C', two newlines crossed.
         var (line, col) = XmlUtility.AdvancePosition(0, 0, "A\nB\nC", 4);
         Assert.Equal(2, line);
         Assert.Equal(0, col);
@@ -432,7 +432,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void GetElementEndPosition_SingleLineElement_ReturnsPositionAfterClosingTag()
     {
-        // "<Root>\n<Foo>bar</Foo>\n</Root>" — line 1 is "<Foo>bar</Foo>", closing '>' at col 14.
+        // "<Root>\n<Foo>bar</Foo>\n</Root>" - line 1 is "<Foo>bar</Foo>", closing '>' at col 14.
         const string text = "<Root>\n<Foo>bar</Foo>\n</Root>";
         var doc = XmlUtility.CreateHtmlDocument(text);
         XmlUtility.TryFindNode(doc, 1, out var node);
@@ -447,7 +447,7 @@ public sealed class XmlUtilityTest
     public void GetElementEndPosition_MultilineElement_ReturnsPositionOnClosingTagLine()
     {
         // Line 0: <Root>  Line 1: <Foo>  Line 2: bar  Line 3: </Foo>  Line 4: </Root>
-        // Line 3 "</Foo>" — closing '>' at index 5, so end position is col 6.
+        // Line 3 "</Foo>" - closing '>' at index 5, so end position is col 6.
         const string text = "<Root>\n<Foo>\nbar\n</Foo>\n</Root>";
         var doc = XmlUtility.CreateHtmlDocument(text);
         XmlUtility.TryFindNode(doc, 1, out var node);
@@ -461,7 +461,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void GetElementEndPosition_SelfClosingElement_ReturnsPositionAfterOpeningTag()
     {
-        // "<Root>\n<Foo/>\n</Root>" — line 1 "<Foo/>", closing '>' at index 5, so end position is col 6.
+        // "<Root>\n<Foo/>\n</Root>" - line 1 "<Foo/>", closing '>' at index 5, so end position is col 6.
         const string text = "<Root>\n<Foo/>\n</Root>";
         var doc = XmlUtility.CreateHtmlDocument(text);
         XmlUtility.TryFindNode(doc, 1, out var node);
@@ -500,7 +500,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void OffsetToPosition_OffsetAfterNewline_ReturnsLine1()
     {
-        // "ab\ncd" — offset 3 = 'c', line 1 col 0
+        // "ab\ncd" - offset 3 = 'c', line 1 col 0
         var (line, col) = XmlUtility.OffsetToPosition("ab\ncd", 3);
         Assert.Equal(1, line);
         Assert.Equal(0, col);
@@ -509,7 +509,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void OffsetToPosition_OffsetMidSecondLine_ReturnsCorrectPosition()
     {
-        // "ab\ncd\nef" — offset 7 = 'e' on line 2 at col 0... wait let's count:
+        // "ab\ncd\nef" - offset 7 = 'e' on line 2 at col 0... wait let's count:
         // 0:'a' 1:'b' 2:'\n' 3:'c' 4:'d' 5:'\n' 6:'e' 7:'f'
         // offset 6 = 'e' → line 2, col 0
         var (line, col) = XmlUtility.OffsetToPosition("ab\ncd\nef", 6);
@@ -548,7 +548,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void PositionToOffset_SecondLine_SkipsFirstLineAndNewline()
     {
-        // "ab\ncd" — line 1, char 1 = 'd' → offset 4
+        // "ab\ncd" - line 1, char 1 = 'd' → offset 4
         var offset = XmlUtility.PositionToOffset("ab\ncd", 1, 1);
         Assert.Equal(4, offset);
     }
@@ -556,7 +556,7 @@ public sealed class XmlUtilityTest
     [Fact]
     public void PositionToOffset_ThirdLine_SkipsTwoNewlines()
     {
-        // "ab\ncd\nef" — line 2, char 0 = 'e' → offset 6
+        // "ab\ncd\nef" - line 2, char 0 = 'e' → offset 6
         var offset = XmlUtility.PositionToOffset("ab\ncd\nef", 2, 0);
         Assert.Equal(6, offset);
     }

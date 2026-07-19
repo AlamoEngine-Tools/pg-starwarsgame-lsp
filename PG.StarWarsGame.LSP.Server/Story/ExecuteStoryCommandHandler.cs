@@ -35,7 +35,7 @@ public sealed class ExecuteStoryCommandHandler(
 {
     public Task<ExecuteStoryCommandResult> Handle(ExecuteStoryCommandParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
+        if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(Error(rejection));
 
         var model = modelService.GetCampaignModel(request.Campaign);

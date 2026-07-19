@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public static class LocalisationLayerMerge
 {
     // Merges every database in baselineDatabases (lowest precedence) into target, then every
-    // registered layer ranked strictly below belowRank (nearest-first-wins — the layer closest to
+    // registered layer ranked strictly below belowRank (nearest-first-wins - the layer closest to
     // belowRank is merged last so it overrides farther dependencies and the baseline). Pass null
     // for belowRank to merge baseline only (no file/layer context available).
     public static void MergeBaselineAndLowerLayers(

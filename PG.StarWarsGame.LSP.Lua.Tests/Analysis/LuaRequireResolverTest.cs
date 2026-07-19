@@ -21,7 +21,9 @@ public sealed class LuaRequireResolverTest
     );
 
     private static Dictionary<string, DocumentIndex> MakeDocs(params string[] uris)
-        => MakeDocs(uris.Select((u, i) => (u, i)));
+    {
+        return MakeDocs(uris.Select((u, i) => (u, i)));
+    }
 
     private static Dictionary<string, DocumentIndex> MakeDocs(IEnumerable<(string Uri, int Rank)> entries)
     {
@@ -76,7 +78,7 @@ public sealed class LuaRequireResolverTest
     [Fact]
     public void Resolve_RelativePathWithDots_ReturnsSkip()
     {
-        // Relative traversal (../../X) cannot be reliably resolved — should return null
+        // Relative traversal (../../X) cannot be reliably resolved - should return null
         // without triggering a false-positive diagnostic (caller must distinguish).
         var result = LuaRequireResolver.Resolve("../../CustomFactionName", WorkspaceDocs, s_fileHelper);
         Assert.Null(result);
@@ -110,7 +112,7 @@ public sealed class LuaRequireResolverTest
     [Fact]
     public void Resolve_RelativeDotSlash_WithCallerUri_ResolvesCorrectly()
     {
-        const string callerUri  = "file:///scripts/ai/foo.lua";
+        const string callerUri = "file:///scripts/ai/foo.lua";
         const string siblingUri = "file:///scripts/ai/sibling.lua";
         var docs = MakeDocs([(siblingUri, 0)]);
 
@@ -123,7 +125,7 @@ public sealed class LuaRequireResolverTest
     public void Resolve_RelativeDotDotSlash_WithCallerUri_ResolvesCorrectly()
     {
         const string callerUri = "file:///scripts/ai/foo.lua";
-        const string libUri    = "file:///scripts/lib.lua";
+        const string libUri = "file:///scripts/lib.lua";
         var docs = MakeDocs([(libUri, 0)]);
 
         var result = LuaRequireResolver.Resolve("../lib", docs, s_fileHelper, callerUri);
@@ -135,7 +137,7 @@ public sealed class LuaRequireResolverTest
     public void Resolve_RelativeTwoDotDot_WithCallerUri_ResolvesCorrectly()
     {
         const string callerUri = "file:///scripts/ai/sub/foo.lua";
-        const string rootUri   = "file:///scripts/lib.lua";
+        const string rootUri = "file:///scripts/lib.lua";
         var docs = MakeDocs([(rootUri, 0)]);
 
         var result = LuaRequireResolver.Resolve("../../lib", docs, s_fileHelper, callerUri);
@@ -169,8 +171,8 @@ public sealed class LuaRequireResolverTest
     [Fact]
     public void Resolve_MultipleLayerMatches_ReturnsHighestRankUri()
     {
-        // Two files with the same logical name in different layers — highest rank wins.
-        const string basePath  = "file:///base/scripts/foo.lua";
+        // Two files with the same logical name in different layers - highest rank wins.
+        const string basePath = "file:///base/scripts/foo.lua";
         const string addonPath = "file:///addon/scripts/foo.lua";
         var docs = MakeDocs([(basePath, 1), (addonPath, 2)]);
 

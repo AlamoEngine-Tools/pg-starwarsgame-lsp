@@ -318,7 +318,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [Fact]
     public async Task Handle_XmlUnderTextRoot_RoutesToLocalisationReload_NotDocumentParser()
     {
-        // A localisation XML file matches the blanket **/*.xml watcher too — it must be routed to
+        // A localisation XML file matches the blanket **/*.xml watcher too - it must be routed to
         // the localisation reload, not the game-XML document parser (no parser understands it).
         const string xmlUri = "file:///c:/mods/mymod/data/text/mastertextfile.xml";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -406,7 +406,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [Fact]
     public async Task Handle_CsvChanged_NoWorkspaceConfigYet_NotRoutedToLocalisationReload()
     {
-        // LastWorkspaceConfig is null before the first successful LoadAsync — the handler must not
+        // LastWorkspaceConfig is null before the first successful LoadAsync - the handler must not
         // throw, and the change is simply ignored as an unrecognised document.
         const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
@@ -501,7 +501,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     [Fact]
     public async Task Handle_PgprojAndAssetChanged_ReloadSubsumesAssetReglob()
     {
-        // The full project reload re-runs every catalog itself — a separate asset re-glob in the
+        // The full project reload re-runs every catalog itself - a separate asset re-glob in the
         // same notification would be redundant work on the old configuration.
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -621,9 +621,12 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
 
     private sealed class SpyIndexService : IGameIndexService
     {
+        public readonly List<ImmutableDictionary<string, ImmutableArray<string>>> DynamicEnumApplications = [];
         public readonly List<string> Removals = [];
 
         public readonly List<(string Uri, string Text)> Updates = [];
+
+        public int AssetApplications { get; private set; }
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
@@ -652,8 +655,6 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
         }
 
-        public int AssetApplications { get; private set; }
-
         public void ApplyAssetFiles(IAssetFileIndex index)
         {
             AssetApplications++;
@@ -664,12 +665,11 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         {
         }
 
-        public readonly List<ImmutableDictionary<string, ImmutableArray<string>>> DynamicEnumApplications = [];
-
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
             DynamicEnumApplications.Add(values);
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

@@ -53,7 +53,7 @@ public sealed class XmlInlayHintHandlerTest
     [Fact]
     public async Task Handle_InlayHintsFlagOff_ReturnsNull()
     {
-        // Same arrange as LocKeyTag_WithKnownTranslation — only the flag differs.
+        // Same arrange as LocKeyTag_WithKnownTranslation - only the flag differs.
         const string xml = "<GameObjectType>\n  <Text_ID>TEXT_UNIT_NAME</Text_ID>\n</GameObjectType>";
         var schema = new LocKeySchemaProvider("Text_ID");
         var loc = new ValueLocalisationIndex("TEXT_UNIT_NAME", "X-Wing Fighter");
@@ -197,7 +197,7 @@ public sealed class XmlInlayHintHandlerTest
     [Fact]
     public async Task Handle_SameContentTwice_ReusesOneParse()
     {
-        // Inlay hints are re-requested by clients on every scroll — with unchanged content the
+        // Inlay hints are re-requested by clients on every scroll - with unchanged content the
         // second request must be a cache hit, not a re-parse.
         const string xml = "<GameObjectType><Text_ID>TEXT_NAME</Text_ID></GameObjectType>";
         var host = new FakeWorkspaceHost();
@@ -304,9 +304,11 @@ public sealed class XmlInlayHintHandlerTest
         public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

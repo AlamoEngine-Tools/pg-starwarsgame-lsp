@@ -31,7 +31,7 @@ public interface IWorkspaceSettingsStore
 
 /// <summary>
 ///     JSON sidecar under the project's <c>.aetswg/settings/workspace.settings.json</c>
-///     (<see cref="ProjectIndexLocator" /> conventions) — editor preferences that belong with the
+///     (<see cref="ProjectIndexLocator" /> conventions) - editor preferences that belong with the
 ///     workspace, not the mod's xml tree. Without a .pgproj the store degrades to in-memory (the
 ///     preference survives the session only). A corrupt file is treated as defaults, never fatal.
 /// </summary>
@@ -85,7 +85,7 @@ public sealed class WorkspaceSettingsStore(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "workspace.settings.json unreadable — using defaults");
+            logger.LogWarning(ex, "workspace.settings.json unreadable - using defaults");
         }
 
         return _cache;
@@ -105,7 +105,7 @@ public sealed class WorkspaceSettingsStore(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Could not persist workspace.settings.json — the preference stays in-memory");
+            logger.LogWarning(ex, "Could not persist workspace.settings.json - the preference stays in-memory");
         }
     }
 

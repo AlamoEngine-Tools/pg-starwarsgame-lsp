@@ -172,7 +172,7 @@ public sealed class GameIndexTest
         var core = At("UNIT_A", "file:///core/units.xml");
         var rev = At("UNIT_A", "file:///rev/units.xml");
 
-        // Higher-rank symbol inserted first — winner must still be by rank, not position.
+        // Higher-rank symbol inserted first - winner must still be by rank, not position.
         var index = WithLayers((rev, 1), (core, 0));
 
         Assert.Equal(rev, index.Resolve("UNIT_A"));
@@ -413,7 +413,7 @@ public sealed class GameIndexTest
     [Fact]
     public void AllGroupMemberships_RepeatedAccess_ReturnsSameInstance()
     {
-        // The merge is memoized — handlers call this property on hot request paths (go-to-def,
+        // The merge is memoized - handlers call this property on hot request paths (go-to-def,
         // find-references) and must not pay a full baseline∪workspace merge per access.
         var baselineMember =
             new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin("file:///shipped.xml", 0, null));
@@ -476,7 +476,10 @@ public sealed class GameIndexTest
 
         var b = At("B", "file:///leaf/b.xml");
         var docB = new DocumentIndex("file:///leaf/b.xml", 1,
-            ImmutableArray.Create(b), ImmutableArray<GameReference>.Empty) with { LayerRank = 2 };
+                ImmutableArray.Create(b), ImmutableArray<GameReference>.Empty) with
+            {
+                LayerRank = 2
+            };
         var mutated = index with { Documents = index.Documents.SetItem("file:///leaf/b.xml", docB) };
 
         Assert.Equal(2, mutated.LeafLayerRank);
@@ -569,7 +572,7 @@ public sealed class GameIndexTest
         var faction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
         var unit = AtTyped("REBEL", "file:///dep/units.xml", "Unit");
         var index = WithLayers((faction, 1), (unit, 0));
-        // Faction has higher rank but we ask for Unit — type match wins over rank
+        // Faction has higher rank but we ask for Unit - type match wins over rank
         Assert.Equal(unit, index.Resolve("REBEL", "Unit"));
     }
 
@@ -579,7 +582,7 @@ public sealed class GameIndexTest
         var unitDep = AtTyped("REBEL", "file:///dep/units.xml", "Unit");
         var unitLeaf = AtTyped("REBEL", "file:///leaf/units.xml", "Unit");
         var index = WithLayers((unitDep, 0), (unitLeaf, 1));
-        // Both are Unit — highest rank wins among type-matches
+        // Both are Unit - highest rank wins among type-matches
         Assert.Equal(unitLeaf, index.Resolve("REBEL", "Unit"));
     }
 
@@ -588,7 +591,7 @@ public sealed class GameIndexTest
     {
         var faction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
         var index = WithLayers((faction, 1));
-        // No Planet definition exists — fall back to untyped winner (Faction)
+        // No Planet definition exists - fall back to untyped winner (Faction)
         Assert.Equal(faction, index.Resolve("REBEL", "Planet"));
     }
 
@@ -598,7 +601,7 @@ public sealed class GameIndexTest
         var baselineUnit = AtTyped("REBEL", "file:///units.xml", "Unit");
         var wsFaction = AtTyped("REBEL", "file:///leaf/factions.xml", "Faction");
         var index = WithLayers((wsFaction, 1)) with { Baseline = Baseline(baselineUnit) };
-        // Unit lives only in baseline — typed resolve should find it
+        // Unit lives only in baseline - typed resolve should find it
         Assert.Equal(baselineUnit, index.Resolve("REBEL", "Unit"));
     }
 

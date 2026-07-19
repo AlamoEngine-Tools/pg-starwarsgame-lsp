@@ -25,7 +25,8 @@ public sealed class UintHandlerTest
     public void Valid_uint_values_return_no_diagnostics(string value)
     {
         Assert.Empty(Sut.Handle(XmlHandlerTestFixtures.MakeFact(UintTag, value), XmlHandlerTestFixtures.EmptyCtx));
-        Assert.Empty(Sut.Handle(XmlHandlerTestFixtures.MakeFact(HardwareUIntTag, value), XmlHandlerTestFixtures.EmptyCtx));
+        Assert.Empty(Sut.Handle(XmlHandlerTestFixtures.MakeFact(HardwareUIntTag, value),
+            XmlHandlerTestFixtures.EmptyCtx));
     }
 
     [Theory]
@@ -36,7 +37,8 @@ public sealed class UintHandlerTest
         var r1 = Sut.Handle(XmlHandlerTestFixtures.MakeFact(UintTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
         Assert.Equal(XmlDiagnosticSeverity.Error, Assert.Single(r1).Severity);
 
-        var r2 = Sut.Handle(XmlHandlerTestFixtures.MakeFact(HardwareUIntTag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+        var r2 = Sut.Handle(XmlHandlerTestFixtures.MakeFact(HardwareUIntTag, value), XmlHandlerTestFixtures.EmptyCtx)
+            .ToList();
         Assert.Equal(XmlDiagnosticSeverity.Error, Assert.Single(r2).Severity);
     }
 
@@ -48,7 +50,8 @@ public sealed class UintHandlerTest
     {
         foreach (var tag in new[] { UintTag, HardwareUIntTag })
         {
-            var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx).ToList();
+            var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, value), XmlHandlerTestFixtures.EmptyCtx)
+                .ToList();
             var d = Assert.Single(results);
             Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
             Assert.Equal(expectedFix, d.SuggestedFix);

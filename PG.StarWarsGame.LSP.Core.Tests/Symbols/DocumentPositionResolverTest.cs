@@ -60,9 +60,9 @@ public sealed class DocumentPositionResolverTest
     public void FindAtPosition_ReferenceFailsFilter_SkipsReference()
     {
         var doc = Doc(references: ImmutableArray.Create(
-            MakeRef("UNIT_A", 0, 4, 6, GameSymbolKind.XmlObject)));
+            MakeRef("UNIT_A", 0, 4, 6)));
 
-        // Filter only accepts LuaGlobal references — the XmlObject ref must be ignored.
+        // Filter only accepts LuaGlobal references - the XmlObject ref must be ignored.
         var result = DocumentPositionResolver.FindAtPosition(
             doc, 0, 5, r => r.ExpectedKind == GameSymbolKind.LuaGlobal, IdLengthSizer);
 
@@ -74,7 +74,7 @@ public sealed class DocumentPositionResolverTest
     {
         var membership = new DocumentGroupMembership(
             new GroupMembership("GROUP_A", "Unit", new FileOrigin("file:///a.xml", 0, 0)),
-            TagLine: 2, TagColumn: 8, TagLength: 7);
+            2, 8, 7);
         var doc = Doc(groupMemberships: ImmutableArray.Create(membership));
 
         var result = DocumentPositionResolver.FindAtPosition(doc, 2, 10, AllRefs, IdLengthSizer);
@@ -88,9 +88,9 @@ public sealed class DocumentPositionResolverTest
     [Fact]
     public void FindAtPosition_SymbolSizerReturnsNull_SkipsSymbol()
     {
-        var doc = Doc(symbols: ImmutableArray.Create(MakeSym("UNIT_A", 5)));
+        var doc = Doc(ImmutableArray.Create(MakeSym("UNIT_A", 5)));
 
-        // Sizer rejects every symbol — must fall through to no match.
+        // Sizer rejects every symbol - must fall through to no match.
         var result = DocumentPositionResolver.FindAtPosition(doc, 5, 0, AllRefs, _ => null);
 
         Assert.Null(result);
@@ -99,7 +99,7 @@ public sealed class DocumentPositionResolverTest
     [Fact]
     public void FindAtPosition_SymbolSizerReturnsZero_ReturnsZeroWidthRange()
     {
-        var doc = Doc(symbols: ImmutableArray.Create(MakeSym("GLOBAL_A", 5, 3)));
+        var doc = Doc(ImmutableArray.Create(MakeSym("GLOBAL_A", 5, 3)));
 
         var result = DocumentPositionResolver.FindAtPosition(doc, 5, 0, AllRefs, _ => 0);
 
@@ -113,8 +113,8 @@ public sealed class DocumentPositionResolverTest
     public void FindAtPosition_ReferenceTakesPriorityOverSymbolOnSameLine()
     {
         var doc = Doc(
-            symbols: ImmutableArray.Create(MakeSym("UNIT_DEF", 0)),
-            references: ImmutableArray.Create(MakeRef("UNIT_REF", 0, 4, 8)));
+            ImmutableArray.Create(MakeSym("UNIT_DEF", 0)),
+            ImmutableArray.Create(MakeRef("UNIT_REF", 0, 4, 8)));
 
         var result = DocumentPositionResolver.FindAtPosition(doc, 0, 6, AllRefs, IdLengthSizer);
 

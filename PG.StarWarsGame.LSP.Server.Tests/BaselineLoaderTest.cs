@@ -44,7 +44,10 @@ public sealed class BaselineLoaderTest
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
         using (var gz = new GZipStream(ms, CompressionLevel.Optimal))
+        {
             gz.Write(msgpack);
+        }
+
         return ms.ToArray();
     }
 

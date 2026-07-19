@@ -21,7 +21,7 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     file the command creates (with its skeleton). A single command edits one file (most kinds),
 ///     two (manifest/campaign ops that both create a thread/manifest and edit its parent), or many
 ///     (a campaign-wide rename). <see cref="PrebuiltEdit" /> carries an opaque edit the executor
-///     cannot decompose (the symbol-index rename, which also spans Lua) — it is applied as-is.
+///     cannot decompose (the symbol-index rename, which also spans Lua) - it is applied as-is.
 /// </summary>
 internal sealed record StoryCommandEdit(
     IReadOnlyList<StoryFileEdit> Files,
@@ -31,7 +31,7 @@ internal sealed record StoryCommandEdit(
 
 /// <summary>
 ///     Edits for one file. <see cref="CreateWithSkeleton" /> (non-null) means the file must be
-///     created with that skeleton before <see cref="Edits" /> apply — for a fresh thread/manifest
+///     created with that skeleton before <see cref="Edits" /> apply - for a fresh thread/manifest
 ///     the skeleton is the whole content and <see cref="Edits" /> is empty.
 /// </summary>
 internal sealed record StoryFileEdit(
@@ -63,7 +63,7 @@ internal sealed class StoryCommandExecutor(
 
     /// <summary>
     ///     Produces the edits for one command against the given working set, or an error message.
-    ///     The working set is NOT advanced here — callers that compose commands apply the returned
+    ///     The working set is NOT advanced here - callers that compose commands apply the returned
     ///     edits (<see cref="WorkingTextSet.Apply" />) before producing the next command.
     ///     <paramref name="composable" /> forces a rename to use the model-only path (re-parses the
     ///     working text, so it composes cleanly) instead of the symbol-index path, whose opaque
@@ -92,14 +92,14 @@ internal sealed class StoryCommandExecutor(
     ///     Composes a batch of commands over one working set, in order, re-parsing each step so a
     ///     command sees the results of the ones before it. Returns the 0-based index and message of
     ///     the first command that fails (nothing further is applied), or (null, null) on full
-    ///     success. Renames run in composable (model-only) mode — see <see cref="Produce" />.
+    ///     success. Renames run in composable (model-only) mode - see <see cref="Produce" />.
     /// </summary>
     public (int? FailedIndex, string? Error) Compose(
         StoryCampaignModel model, IReadOnlyList<ExecuteStoryCommandParams> commands, WorkingTextSet texts)
     {
         for (var i = 0; i < commands.Count; i++)
         {
-            var (produced, error) = Produce(commands[i], model, texts, composable: true);
+            var (produced, error) = Produce(commands[i], model, texts, true);
             if (error is not null) return (i, error);
 
             foreach (var file in produced!.Files)
@@ -141,7 +141,7 @@ internal sealed class StoryCommandExecutor(
             if (model.Threads.SelectMany(t => t.Events).Any(e =>
                     string.Equals(e.Name, request.NewName, StringComparison.OrdinalIgnoreCase)))
                 return (null, $"'{request.NewName}' already names an event in campaign " +
-                              $"'{request.Campaign}' — event names resolve campaign-wide.");
+                              $"'{request.Campaign}' - event names resolve campaign-wide.");
             if (request.Kind == "createTacticalAttachment")
             {
                 if (string.IsNullOrEmpty(request.File))
@@ -157,9 +157,11 @@ internal sealed class StoryCommandExecutor(
             {
                 var extraTags = new List<(string Tag, string Value)>();
                 foreach (var p in request.EventParams ?? [])
-                    if (p.Value is not null) extraTags.Add(($"Event_Param{p.Position + 1}", p.Value));
+                    if (p.Value is not null)
+                        extraTags.Add(($"Event_Param{p.Position + 1}", p.Value));
                 foreach (var p in request.RewardParams ?? [])
-                    if (p.Value is not null) extraTags.Add(($"Reward_Param{p.Position + 1}", p.Value));
+                    if (p.Value is not null)
+                        extraTags.Add(($"Reward_Param{p.Position + 1}", p.Value));
                 edits = StoryXmlWriter.CreateEvent(text, thread, request.NewName!,
                     request.EventType, request.RewardType, extraTags.Count > 0 ? extraTags : null);
                 label = $"Create story event '{request.NewName}'";
@@ -291,7 +293,7 @@ internal sealed class StoryCommandExecutor(
         {
             0 => (null, $"Event '{eventName}' was not found in the thread."),
             1 => (matches[0], null),
-            _ => (null, $"'{eventName}' names {matches.Count} events in this thread — fix the duplicate first.")
+            _ => (null, $"'{eventName}' names {matches.Count} events in this thread - fix the duplicate first.")
         };
     }
 
@@ -331,7 +333,7 @@ internal sealed class StoryCommandExecutor(
                 edits = StoryManifestWriter.RemoveEntry(text, ["Active_Plot", "Suspended_Plot"], request.Value!);
                 if (edits.Count == 0)
                     return (null, $"'{request.Value}' is not listed in '{request.File}'. " +
-                                  "The file itself is never deleted — remove it manually if intended.");
+                                  "The file itself is never deleted - remove it manually if intended.");
                 label = $"Detach story thread '{request.Value}'";
                 break;
             case "setThreadState":
@@ -439,10 +441,10 @@ internal sealed class StoryCommandExecutor(
         // In a batch (composable), always take the model-only path: it re-parses the working text so
         // its positions are correct after earlier commands, and it produces per-file XML edits that
         // compose. The symbol-index path below produces an opaque, index-position (Lua-spanning) edit
-        // that can't be folded into a batch — the trade-off is that a staged rename doesn't rewrite
+        // that can't be folded into a batch - the trade-off is that a staged rename doesn't rewrite
         // Lua references (story-symbol indexing is opt-in and off by default anyway).
         //
-        // Outside a batch, prefer the index-wide symbol rename when the event is a story symbol — it
+        // Outside a batch, prefer the index-wide symbol rename when the event is a story symbol - it
         // also renames Lua occurrences. When story-symbol indexing is off or the event was just
         // created and isn't indexed yet, fall back to the campaign-scoped model rename.
         var index = indexService.Current;
@@ -462,7 +464,7 @@ internal sealed class StoryCommandExecutor(
 
     /// <summary>
     ///     Renames a story event using only the campaign model (no symbol-index dependency): the
-    ///     event's <c>Name</c> attribute plus every in-campaign reference — prereq tokens and
+    ///     event's <c>Name</c> attribute plus every in-campaign reference - prereq tokens and
     ///     <c>StoryEventName</c> params (<c>TRIGGER_EVENT</c>, <c>RESET_EVENT</c>,
     ///     <c>DISABLE_STORY_EVENT</c>, …). Story event names are campaign-scoped, so this is the
     ///     correct breadth; Lua occurrences are only renamed by the symbol-based path (and there are
@@ -474,12 +476,12 @@ internal sealed class StoryCommandExecutor(
         var oldName = request.EventName!;
         var newName = request.NewName!.Trim();
 
-        // Re-parse each thread from its CURRENT text — the cached model's ranges may predate
+        // Re-parse each thread from its CURRENT text - the cached model's ranges may predate
         // unflushed edits, which produces stale/out-of-bounds ranges the client rejects wholesale
         // (this is exactly why ThreadOp re-parses before writing). Compute the rename off the fresh
         // parse so every range matches the document the edit lands on.
         // Parse each distinct file ONCE: a thread can appear in the model more than once (the same
-        // file referenced by multiple faction manifests — common for shared tutorial threads), and
+        // file referenced by multiple faction manifests - common for shared tutorial threads), and
         // parsing it twice would emit the definition/reference edits twice, i.e. overlapping edits
         // that the client rejects wholesale.
         var seenUris = new HashSet<string>(StringComparer.Ordinal);
@@ -499,7 +501,7 @@ internal sealed class StoryCommandExecutor(
         if (definitionCount == 0)
             return (null, $"Event '{oldName}' was not found in campaign '{request.Campaign}'.");
         if (definitionCount > 1)
-            return (null, $"'{oldName}' names {definitionCount} events in campaign '{request.Campaign}' — " +
+            return (null, $"'{oldName}' names {definitionCount} events in campaign '{request.Campaign}' - " +
                           "rename is ambiguous. Disambiguate them first.");
         if (!string.Equals(oldName, newName, StringComparison.OrdinalIgnoreCase)
             && allEvents.Any(e => string.Equals(e.Name, newName, StringComparison.OrdinalIgnoreCase)))
@@ -522,6 +524,7 @@ internal sealed class StoryCommandExecutor(
         }
 
         var byUri = new Dictionary<string, List<StoryTextEdit>>(StringComparer.Ordinal);
+
         void AddEdit(string threadUri, StorySourceRange range)
         {
             if (!byUri.TryGetValue(threadUri, out var list)) byUri[threadUri] = list = [];
@@ -564,7 +567,7 @@ internal sealed class StoryCommandExecutor(
             logger.LogDebug("Rename '{Old}'→'{New}' in {Uri}: {Edits}", oldName, newName, file.Uri,
                 string.Join(", ", file.Edits.Select(e =>
                     $"[{e.Range.StartLine},{e.Range.StartColumn}-{e.Range.EndLine},{e.Range.EndColumn}]")));
-        return (new StoryCommandEdit(files, $"Rename story event '{oldName}'", UseChangesMap: true), null);
+        return (new StoryCommandEdit(files, $"Rename story event '{oldName}'", true), null);
     }
 
     // ── Shared ───────────────────────────────────────────────────────────────
@@ -592,8 +595,8 @@ internal sealed class StoryCommandExecutor(
     }
 
     /// <summary>
-    ///     documentChanges form: file creations (with skeleton) first — so a freshly created
-    ///     thread/manifest exists before anything references it — then one text-edit change per file.
+    ///     documentChanges form: file creations (with skeleton) first - so a freshly created
+    ///     thread/manifest exists before anything references it - then one text-edit change per file.
     /// </summary>
     public static WorkspaceEdit BuildDocumentChangesEdit(IReadOnlyList<StoryFileEdit> files)
     {
@@ -662,8 +665,8 @@ internal sealed class StoryCommandExecutor(
         {
             var last = result.Count > 0 ? result[^1].Range : null;
             var startsAfterLast = last is null
-                || edit.Range.StartLine > last.EndLine
-                || (edit.Range.StartLine == last.EndLine && edit.Range.StartColumn >= last.EndColumn);
+                                  || edit.Range.StartLine > last.EndLine
+                                  || (edit.Range.StartLine == last.EndLine && edit.Range.StartColumn >= last.EndColumn);
             if (startsAfterLast) result.Add(edit);
         }
 

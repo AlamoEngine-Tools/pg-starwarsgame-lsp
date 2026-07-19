@@ -77,7 +77,7 @@ public record StoryFeatureFlags
 }
 
 /// <summary>
-///     Flags for the story-dialog (.txt) language capabilities — its own family like
+///     Flags for the story-dialog (.txt) language capabilities - its own family like
 ///     <see cref="LuaFeatureFlags" />, so completion/hover flags can join later.
 /// </summary>
 public record DialogFeatureFlags
@@ -108,8 +108,16 @@ public record ToolsFeatureFlags
     /// <summary>
     ///     Gates the story editor protocol: every <c>aet/getStory*</c> endpoint and the
     ///     <c>aet/storyGraphChanged</c> notification (builds on <c>features.story.discovery</c>).
+    ///     This is the read surface - the panel and its View mode.
     /// </summary>
     public bool StoryEditor { get; init; } = true;
+
+    /// <summary>
+    ///     Gates Edit mode: the authoring endpoints that stage, preview, validate and write story
+    ///     changes (builds on <see cref="StoryEditor" />, which hosts them). Separate so the graph
+    ///     can be browsed read-only without exposing mutation.
+    /// </summary>
+    public bool StoryEditing { get; init; } = true;
 
     /// <summary>
     ///     Gates the story simulator: every <c>aet/storySim*</c> endpoint and the

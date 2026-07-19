@@ -164,8 +164,8 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     }
 
     /// <summary>
-    ///     Returns the position of the first grandchild element — the first field tag
-    ///     inside the first type container — so hover and completion tests hit a known tag.
+    ///     Returns the position of the first grandchild element - the first field tag
+    ///     inside the first type container - so hover and completion tests hit a known tag.
     /// </summary>
     private static (int line, int col) FindFirstGrandchildElementPosition(string[] lines)
     {

@@ -4,7 +4,7 @@
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
 // ContentHash must be echoed back on every subsequent write request for this file (see
-// LocalisationConcurrencyGuard) — it's how the server detects the file changed on disk since the
+// LocalisationConcurrencyGuard) - it's how the server detects the file changed on disk since the
 // client last fetched it.
 public sealed record GetLocalisationEntriesResult(
     IReadOnlyList<LocalisationEntryDto> Entries,

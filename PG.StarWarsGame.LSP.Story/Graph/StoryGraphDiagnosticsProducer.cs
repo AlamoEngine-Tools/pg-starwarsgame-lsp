@@ -74,7 +74,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 var node = nodesById[id];
                 if (node.ThreadUri != documentUri) continue;
                 diagnostics.Add(At(node.Event!.NameRange,
-                    $"'{node.Label}' is part of a prerequisite cycle ({names}) — none of these events can arm.",
+                    $"'{node.Label}' is part of a prerequisite cycle ({names}) - none of these events can arm.",
                     XmlDiagnosticSeverity.Warning));
             }
         }
@@ -86,7 +86,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
         StoryCampaignModel model, StoryEvaluator evaluator, string documentUri,
         HashSet<string> cycleMembers)
     {
-        // Suspended threads are inactive wholesale — flagging every event inside them is noise.
+        // Suspended threads are inactive wholesale - flagging every event inside them is noise.
         if (model.SuspendedThreadUris.Contains(documentUri)) return;
 
         var reachable = evaluator.ComputeReachableEvents();
@@ -139,9 +139,11 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 var rank = StoryEventTagOrder.RankOf(tag.Name);
                 if (rank is null) continue;
                 if (rank < maxRank)
+                {
                     diagnostics.Add(At(tag.ValueRange,
-                        $"'{tag.Name}' appears after '{maxTag}' — the engine expects the documented event tag order.",
+                        $"'{tag.Name}' appears after '{maxTag}' - the engine expects the documented event tag order.",
                         XmlDiagnosticSeverity.Warning));
+                }
                 else
                 {
                     maxRank = rank.Value;
@@ -176,7 +178,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
                 foreach (var flag in StoryReferenceTypes.SplitList(slot.RawValue))
                     if (flag.Length > MaxFlagNameLength)
                         diagnostics.Add(At(slot.Range,
-                            $"Flag name '{flag}' is {flag.Length} characters long — the engine truncates at {MaxFlagNameLength}.",
+                            $"Flag name '{flag}' is {flag.Length} characters long - the engine truncates at {MaxFlagNameLength}.",
                             XmlDiagnosticSeverity.Error));
             }
         }

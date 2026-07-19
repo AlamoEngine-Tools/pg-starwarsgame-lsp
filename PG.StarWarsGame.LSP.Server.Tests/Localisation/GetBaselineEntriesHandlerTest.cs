@@ -133,7 +133,7 @@ public sealed class GetBaselineEntriesHandlerTest
     public async Task Handle_ProjectFilePathIsTheDependencyItself_DoesNotIncludeOwnLayer()
     {
         // Querying with the dependency's own file (the lowest-ranked layer) must not merge in its
-        // own database — only baseline, since there's nothing below rank 0.
+        // own database - only baseline, since there's nothing below rank 0.
         var (handler, projectRegistry, layerRegistry, factory, langService) = BuildHandlerWithRegistries();
         var english = langService.Default;
 

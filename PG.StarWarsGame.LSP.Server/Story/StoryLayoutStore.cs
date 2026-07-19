@@ -24,7 +24,7 @@ public interface IStoryLayoutStore
 /// <summary>
 ///     JSON sidecar under the project's <c>.aetswg/</c> directory
 ///     (<c>story-layout.json</c>, <see cref="ProjectIndexLocator" /> conventions). Layout is
-///     editor state, not game data — it deliberately lives next to the index caches, not in the
+///     editor state, not game data - it deliberately lives next to the index caches, not in the
 ///     mod's xml tree. Without a .pgproj the store degrades to in-memory (positions survive the
 ///     session only). Orphaned entries (deleted events) are harmless and left in place.
 /// </summary>
@@ -93,8 +93,8 @@ public sealed class StoryLayoutStore(
         }
         catch (Exception ex)
         {
-            // A corrupt sidecar must never break the editor — start over.
-            logger.LogWarning(ex, "story-layout.json unreadable — starting with an empty layout");
+            // A corrupt sidecar must never break the editor - start over.
+            logger.LogWarning(ex, "story-layout.json unreadable - starting with an empty layout");
         }
 
         return _cache;
@@ -114,7 +114,7 @@ public sealed class StoryLayoutStore(
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Could not persist story-layout.json — positions stay in-memory");
+            logger.LogWarning(ex, "Could not persist story-layout.json - positions stay in-memory");
         }
     }
 

@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 
 /// <summary>
 ///     Document sync for story-dialog .txt scripts. Registered for every .txt file but gates all
-///     work on the <see cref="IStoryDialogScope" /> registry scope — a .txt outside the pgproj
+///     work on the <see cref="IStoryDialogScope" /> registry scope - a .txt outside the pgproj
 ///     storyDialog directories is never tracked and never produces diagnostics. Dialog documents
 ///     do not enter the GameIndex (they define no symbols yet), so open/change revalidation is
 ///     driven directly instead of via index changes.
@@ -81,7 +81,7 @@ public sealed class DialogTextDocumentSyncHandler : TextDocumentSyncHandlerBase
 
         await _gate.RunOrBufferAsync(token =>
         {
-            // Only documents this handler tracked get cleared — scope membership may have
+            // Only documents this handler tracked get cleared - scope membership may have
             // changed since open, so the tracked state decides, not the current scope.
             if (_workspaceHost.TryGet(uri, out _))
             {
@@ -105,7 +105,7 @@ public sealed class DialogTextDocumentSyncHandler : TextDocumentSyncHandlerBase
     }
 
     // Like the Lua handler: OmniSharp routes didChange/didClose by tracked attributes, so this
-    // handler also sees XML/Lua notifications — the extension guard keeps it out of their flows.
+    // handler also sees XML/Lua notifications - the extension guard keeps it out of their flows.
     private static bool IsDialogCandidate(string uri)
     {
         return uri.EndsWith(".txt", StringComparison.OrdinalIgnoreCase);

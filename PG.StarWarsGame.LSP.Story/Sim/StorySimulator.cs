@@ -32,12 +32,12 @@ public sealed record StorySimIntervention(
     IReadOnlyList<string> Options);
 
 /// <summary>
-///     Semantic story simulation over <see cref="StoryEvaluator" /> — no game process, no DAP.
+///     Semantic story simulation over <see cref="StoryEvaluator" /> - no game process, no DAP.
 ///     Deterministic by construction: state transitions are pure, cascades fire events in graph
 ///     node order, and every event auto-fires at most once per cascade (perpetual events re-arm
 ///     and may fire again on the NEXT command).
 ///     Modelled semantics: <c>STORY_ELAPSED</c> fires from the virtual clock; control edges
-///     (schema <c>StoryEventName</c> reward params — TRIGGER_EVENT and friends) satisfy the
+///     (schema <c>StoryEventName</c> reward params - TRIGGER_EVENT and friends) satisfy the
 ///     target's trigger, or disable it when the edge label carries <c>DISABLE</c>;
 ///     <c>STORY_FLAG</c> fires when ANY of its listed flags (param 0, OR semantics per the
 ///     schema) compares true against param 1 (operator from param 2 by name: GREATER/LESS,
@@ -50,12 +50,12 @@ public sealed record StorySimIntervention(
 /// </summary>
 public sealed class StorySimulator
 {
-    private readonly StoryEvaluator _evaluator;
-    private readonly Dictionary<(string Type, int Position), string> _eventParamTypes;
-    private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
-    private readonly StoryCampaignModel _model;
-    private readonly IReadOnlyList<StoryNode> _eventNodes;
     private readonly ILookup<string, StoryEdge> _controlEdgesByFrom;
+    private readonly StoryEvaluator _evaluator;
+    private readonly IReadOnlyList<StoryNode> _eventNodes;
+    private readonly Dictionary<(string Type, int Position), string> _eventParamTypes;
+    private readonly StoryCampaignModel _model;
+    private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
 
     public StorySimulator(StoryCampaignModel model, ISchemaProvider schema)
     {
@@ -92,7 +92,7 @@ public sealed class StorySimulator
         if (_evaluator.GetLifecycle(nodeId, snapshot.Runtime) != StoryEventLifecycle.Armed)
             return snapshot with
             {
-                Log = snapshot.Log.Add($"⚠ '{node.Event!.Name}' is not armed — trigger ignored.")
+                Log = snapshot.Log.Add($"⚠ '{node.Event!.Name}' is not armed - trigger ignored.")
             };
 
         return Cascade(Fire(snapshot, node, "manual trigger"));
@@ -246,7 +246,6 @@ public sealed class StorySimulator
 
         // Control edges: DISABLE_* rewards disable the target, everything else satisfies its trigger.
         foreach (var edge in _controlEdgesByFrom[node.Id].SelectMany(ExpandThroughPortals))
-        {
             if (edge.Label?.Contains("DISABLE", StringComparison.OrdinalIgnoreCase) == true)
             {
                 runtime = runtime.WithDisabled(edge.ToId);
@@ -257,7 +256,6 @@ public sealed class StorySimulator
                 triggered = triggered.Add(edge.ToId);
                 log = log.Add($"  → triggered '{EventNameOf(edge.ToId)}'.");
             }
-        }
 
         // Flag-writing rewards (schema StoryFlag params on the reward side). SET_FLAG writes
         // param 1 (default 1), INCREMENT_FLAG adds param 1 (default 1, may be negative), other

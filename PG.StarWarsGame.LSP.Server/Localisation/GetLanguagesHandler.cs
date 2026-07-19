@@ -10,8 +10,8 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class GetLanguagesHandler
     : IJsonRpcRequestHandler<GetLanguagesParams, GetLanguagesResult>
 {
-    private readonly ILanguageService _langService;
     private readonly ILspConfigurationProvider _config;
+    private readonly ILanguageService _langService;
 
     public GetLanguagesHandler(ILanguageService langService, ILspConfigurationProvider config)
     {

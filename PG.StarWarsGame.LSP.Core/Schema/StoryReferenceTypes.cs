@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Core.Schema;
 ///     The story-scoped <c>referenceType</c> names on <c>StoryEventType</c>/<c>StoryRewardType</c>
 ///     params and the symbol <c>TypeName</c> strings they map to. Story references resolve
 ///     campaign-scoped (an event name may legally repeat across threads and campaigns), so the
-///     generic index-wide existence and duplicate validation must not own them — the campaign
+///     generic index-wide existence and duplicate validation must not own them - the campaign
 ///     graph diagnostics do.
 /// </summary>
 public static class StoryReferenceTypes
@@ -60,9 +60,9 @@ public static class StoryReferenceTypes
     }
 
     /// <summary>
-    ///     Collapses a story file reference — written either xml-dir-relative
+    ///     Collapses a story file reference - written either xml-dir-relative
     ///     (<c>"Story_Plots_X.xml"</c>) or game-root-relative (<c>"DATA\XML\CAMPAIGNS_X.XML"</c>)
-    ///     — to a single xml-dir-relative shape with '/' separators, preserving casing. The
+    ///     - to a single xml-dir-relative shape with '/' separators, preserving casing. The
     ///     shared normal form so a reference can be correlated wherever it's written against
     ///     wherever it's discovered.
     /// </summary>

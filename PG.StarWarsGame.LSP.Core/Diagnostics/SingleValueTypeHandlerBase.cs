@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
 ///     Base for handlers that validate a single <see cref="XmlValueType" />. Gates once on
-///     <see cref="TargetType" /> — when the fact's value type differs, no diagnostics are
+///     <see cref="TargetType" /> - when the fact's value type differs, no diagnostics are
 ///     produced and <see cref="HandleValue" /> is never called. This is the single source of
 ///     truth for the value-type gate, replacing the per-handler
 ///     <c>if (fact.Tag.ValueType != X) return [];</c> guard.

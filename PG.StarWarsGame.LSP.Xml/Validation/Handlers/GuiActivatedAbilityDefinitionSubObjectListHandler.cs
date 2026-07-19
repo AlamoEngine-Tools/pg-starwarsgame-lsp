@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
 ///     Structural container handler for <c>Unit_Abilities_Data</c> (GuiActivatedAbilityDefinitionSubObjectList).
-///     The tag holds anonymous Unit_Ability child elements — there is no scalar value to validate.
+///     The tag holds anonymous Unit_Ability child elements - there is no scalar value to validate.
 /// </summary>
 public sealed class GuiActivatedAbilityDefinitionSubObjectListHandler : SingleValueTypeHandlerBase
 {

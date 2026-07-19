@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
 public sealed class PreviewStoryGraphHandlerTest
 {
-    private static PreviewStoryGraphHandler Handler(bool storyEditor = true)
+    private static PreviewStoryGraphHandler Handler(bool storyEditor = true, bool storyEditing = true)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -19,7 +19,7 @@ public sealed class PreviewStoryGraphHandlerTest
             new StoryTestSchema(),
             fileHelper,
             Reload(),
-            Config(storyEditor));
+            Config(storyEditor, storyEditing));
     }
 
     private static PreviewStoryGraphParams Preview(params StoryCommandDto[] commands)
@@ -30,9 +30,21 @@ public sealed class PreviewStoryGraphHandlerTest
     [Fact]
     public async Task StoryEditorOff_ReturnsDisabledMessage()
     {
-        var result = await Handler(storyEditor: false).Handle(Preview(), CancellationToken.None);
+        var result = await Handler(false).Handle(Preview(), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+    }
+
+    /// <summary>
+    ///     Previewing is an authoring operation: with the panel enabled for read-only viewing but
+    ///     Edit mode off, it must be refused - and name the editing flag, not the panel flag.
+    /// </summary>
+    [Fact]
+    public async Task StoryEditingOff_ReturnsDisabledMessage()
+    {
+        var result = await Handler(storyEditing: false).Handle(Preview(), CancellationToken.None);
+
+        Assert.Equal(StoryEditingFeature.DisabledMessage, result.Error);
     }
 
     [Fact]
@@ -49,7 +61,7 @@ public sealed class PreviewStoryGraphHandlerTest
     [Fact]
     public async Task StagedCreateEvent_AppearsInPreview()
     {
-        // The new event exists only in the composed working copy (nothing was written) — its node
+        // The new event exists only in the composed working copy (nothing was written) - its node
         // in the preview proves the model was re-assembled from the staged text.
         var result = await Handler().Handle(
             Preview(Cmd("createEvent", newName: "Fresh", eventType: "STORY_TRIGGER")), CancellationToken.None);

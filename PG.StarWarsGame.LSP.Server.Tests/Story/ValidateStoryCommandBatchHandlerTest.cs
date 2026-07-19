@@ -9,7 +9,8 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
 public sealed class ValidateStoryCommandBatchHandlerTest
 {
-    private static ValidateStoryCommandBatchHandler Handler(string marker, bool storyEditor = true)
+    private static ValidateStoryCommandBatchHandler Handler(
+        string marker, bool storyEditor = true, bool storyEditing = true)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -21,7 +22,7 @@ public sealed class ValidateStoryCommandBatchHandlerTest
             fileHelper,
             Reload(),
             new MarkerCollector(marker),
-            Config(storyEditor));
+            Config(storyEditor, storyEditing));
     }
 
     private static ValidateStoryCommandBatchParams Batch(params StoryCommandDto[] commands)
@@ -32,16 +33,32 @@ public sealed class ValidateStoryCommandBatchHandlerTest
     [Fact]
     public async Task StoryEditorOff_ReturnsDisabledMessage()
     {
-        var result = await Handler("anything", storyEditor: false)
+        var result = await Handler("anything", false)
             .Handle(Batch(), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
     }
 
+    /// <summary>
+    ///     Validation must survive Edit mode being off. The panel's Validate button renders in every
+    ///     mode and is the only source of story diagnostics there, so gating this on the editing flag
+    ///     silently left read-only users with none - regression guard for exactly that.
+    /// </summary>
+    [Fact]
+    public async Task StoryEditingOff_StillValidates()
+    {
+        var result = await Handler("STORY_ELAPSED", storyEditing: false)
+            .Handle(Batch(), CancellationToken.None);
+
+        Assert.Null(result.Error);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(StoryGraphBuilder.EventNodeId(ThreadUri, "Start"), diagnostic.NodeId);
+    }
+
     [Fact]
     public async Task NoBatch_DiagnosesCommittedText()
     {
-        // STORY_ELAPSED is the committed trigger of "Start" — with no staged commands the validation
+        // STORY_ELAPSED is the committed trigger of "Start" - with no staged commands the validation
         // runs over buffer text and pins the marker to Start's node.
         var result = await Handler("STORY_ELAPSED").Handle(Batch(), CancellationToken.None);
 
@@ -52,7 +69,7 @@ public sealed class ValidateStoryCommandBatchHandlerTest
     [Fact]
     public async Task StagedEdit_DiagnosesPendingText_WithoutTouchingTheBuffer()
     {
-        // The marker exists nowhere in the committed text — only the staged setDialog introduces it.
+        // The marker exists nowhere in the committed text - only the staged setDialog introduces it.
         // A diagnostic for it proves the collector ran over the composed (pending) text.
         var handler = Handler("ZZBAD");
 

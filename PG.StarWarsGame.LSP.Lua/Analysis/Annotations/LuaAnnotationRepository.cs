@@ -2,26 +2,31 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Lua.Analysis;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
 public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
 {
-    private readonly object _lock = new();
-    private readonly Dictionary<string, ImmutableArray<EmmyLuaAnnotations>> _store =
-        new(StringComparer.Ordinal);
-    private ILuaTypeIndex _current = LuaTypeIndex.Empty;
-
-    // name → { uri → annotation } — keeps all definitions so richest-wins can pick the best one.
+    // name → { uri → annotation } - keeps all definitions so richest-wins can pick the best one.
     private readonly Dictionary<string, Dictionary<string, EmmyLuaAnnotations>> _functionAnnotationsMap =
         new(StringComparer.Ordinal);
+
     private readonly Dictionary<string, HashSet<string>> _functionsByUri =
         new(StringComparer.Ordinal);
 
+    private readonly object _lock = new();
+
+    private readonly Dictionary<string, ImmutableArray<EmmyLuaAnnotations>> _store =
+        new(StringComparer.Ordinal);
+
+    private ILuaTypeIndex _current = LuaTypeIndex.Empty;
+
     public void Update(string uri, ImmutableArray<EmmyLuaAnnotations> annotations)
     {
-        lock (_lock) _store[uri] = annotations;
+        lock (_lock)
+        {
+            _store[uri] = annotations;
+        }
     }
 
     public void Remove(string uri)
@@ -43,10 +48,12 @@ public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
             foreach (var (name, ann) in functions)
             {
                 if (!_functionAnnotationsMap.TryGetValue(name, out var byUri))
-                    _functionAnnotationsMap[name] = byUri = new Dictionary<string, EmmyLuaAnnotations>(StringComparer.Ordinal);
+                    _functionAnnotationsMap[name] =
+                        byUri = new Dictionary<string, EmmyLuaAnnotations>(StringComparer.Ordinal);
                 byUri[uri] = ann;
                 names.Add(name);
             }
+
             _functionsByUri[uri] = names;
         }
     }
@@ -65,22 +72,9 @@ public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
                     return ann;
                 fallback ??= ann;
             }
+
             return fallback;
         }
-    }
-
-    private void RemoveFunctionAnnotationsForUri(string uri)
-    {
-        if (!_functionsByUri.TryGetValue(uri, out var names)) return;
-        foreach (var name in names)
-        {
-            if (_functionAnnotationsMap.TryGetValue(name, out var byUri))
-            {
-                byUri.Remove(uri);
-                if (byUri.Count == 0) _functionAnnotationsMap.Remove(name);
-            }
-        }
-        _functionsByUri.Remove(uri);
     }
 
     public IReadOnlyDictionary<string, ImmutableArray<EmmyLuaAnnotations>> All
@@ -88,20 +82,48 @@ public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
         get
         {
             lock (_lock)
+            {
                 return new Dictionary<string, ImmutableArray<EmmyLuaAnnotations>>(_store, StringComparer.Ordinal);
+            }
         }
     }
 
     public ILuaTypeIndex Current
     {
-        get { lock (_lock) return _current; }
+        get
+        {
+            lock (_lock)
+            {
+                return _current;
+            }
+        }
     }
 
     public void RebuildIndex()
     {
         List<EmmyLuaAnnotations> snapshot;
-        lock (_lock) snapshot = [.. _store.Values.SelectMany(a => a)];
+        lock (_lock)
+        {
+            snapshot = [.. _store.Values.SelectMany(a => a)];
+        }
+
         var newIndex = LuaTypeIndex.Build(snapshot);
-        lock (_lock) _current = newIndex;
+        lock (_lock)
+        {
+            _current = newIndex;
+        }
+    }
+
+    private void RemoveFunctionAnnotationsForUri(string uri)
+    {
+        if (!_functionsByUri.TryGetValue(uri, out var names)) return;
+        foreach (var name in names)
+            if (_functionAnnotationsMap.TryGetValue(name, out var byUri))
+            {
+                byUri.Remove(uri);
+                if (byUri.Count == 0) _functionAnnotationsMap.Remove(name);
+            }
+
+        _functionsByUri.Remove(uri);
     }
 }

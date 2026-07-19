@@ -45,7 +45,7 @@ public sealed class DocumentTextSource : IDocumentTextSource
     public DocumentText? GetText(string canonicalUri)
     {
         if (_host.TryGet(canonicalUri, out var doc))
-            return new DocumentText(doc.Text, ContentHasher.Hash(doc.Text), FromOpenBuffer: true);
+            return new DocumentText(doc.Text, ContentHasher.Hash(doc.Text), true);
 
         var path = _fileHelper.FileUriToPath(canonicalUri);
         if (path is null || !_fileHelper.FileSystem.File.Exists(path))
@@ -54,7 +54,7 @@ public sealed class DocumentTextSource : IDocumentTextSource
         try
         {
             var text = _fileHelper.FileSystem.File.ReadAllText(path);
-            return new DocumentText(text, ContentHasher.Hash(text), FromOpenBuffer: false);
+            return new DocumentText(text, ContentHasher.Hash(text), false);
         }
         catch (Exception ex)
         {

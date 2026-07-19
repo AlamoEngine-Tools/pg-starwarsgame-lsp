@@ -10,7 +10,7 @@ using PG.StarWarsGame.LSP.Lua.Parsing;
 namespace PG.StarWarsGame.LSP.Lua.Tests;
 
 /// <summary>
-///     Builds a real <see cref="LuaParseCache" /> over a test workspace host — the standard way
+///     Builds a real <see cref="LuaParseCache" /> over a test workspace host - the standard way
 ///     for handler tests to satisfy the <c>ILuaParseCache</c> dependency.
 /// </summary>
 internal static class TestLuaParseCache

@@ -19,7 +19,7 @@ public sealed class LocalisationIndexChangedNotifier
     {
         _sendNotification = sendNotification;
         _logger = logger;
-        // Scoped to localisation-only changes — NOT the general IndexChanged, which also fires
+        // Scoped to localisation-only changes - NOT the general IndexChanged, which also fires
         // for unrelated XML/Lua/asset edits and would otherwise reset the editor panel's UI state
         // on every unrelated workspace change.
         indexService.LocalisationChanged += OnLocalisationChanged;

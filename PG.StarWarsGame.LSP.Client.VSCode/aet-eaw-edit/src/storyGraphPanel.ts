@@ -86,7 +86,7 @@ export class StoryGraphPanel {
         StoryGraphPanel._panels.set(campaign, new StoryGraphPanel(campaign, extensionUri, getLspClient));
     }
 
-    /** Called on `aet/storyGraphChanged` — refreshes only panels whose campaign was invalidated. */
+    /** Called on `aet/storyGraphChanged` - refreshes only panels whose campaign was invalidated. */
     static refreshInvalidated(campaigns: string[]): void {
         for (const campaign of campaigns) {
             StoryGraphPanel._panels.get(campaign)?._post({ type: 'invalidate' });
@@ -101,7 +101,7 @@ export class StoryGraphPanel {
 
     private readonly _panel: vscode.WebviewPanel;
     // Mirror of the webview's staged command queue, kept in sync via 'pendingSync'. Lets the panel
-    // offer to save if the tab is closed while dirty — the disposed webview can no longer prompt.
+    // offer to save if the tab is closed while dirty - the disposed webview can no longer prompt.
     private _pendingCommands: Record<string, unknown>[] = [];
     // Cached "skip the delete-event confirmation" preference (undefined = not fetched yet).
     private _skipDeleteConfirm: boolean | undefined;
@@ -134,6 +134,7 @@ export class StoryGraphPanel {
         this._panel.webview.onDidReceiveMessage(async (msg: { type: string; [key: string]: unknown }) => {
             switch (msg.type) {
                 case 'ready':
+                    this._sendAvailableModes();
                     await this._sendSchema();
                     await this._sendWorkspaceSettings();
                     await this._sendGraph({});
@@ -194,7 +195,7 @@ export class StoryGraphPanel {
         });
     }
 
-    /** Called on `aet/storySimChanged` — the panel's webview re-fetches the sim state. */
+    /** Called on `aet/storySimChanged` - the panel's webview re-fetches the sim state. */
     static simChanged(campaign: string): void {
         StoryGraphPanel._panels.get(campaign)?._post({ type: 'simChanged' });
     }
@@ -248,7 +249,7 @@ export class StoryGraphPanel {
             if (!result.success) {
                 void vscode.window.showErrorMessage(`EaWEdit: ${result.error ?? 'The story command failed.'}`);
                 // A gesture may have changed the view optimistically (e.g. a picked-off
-                // connection) — have the webview re-fetch so it matches reality again.
+                // connection) - have the webview re-fetch so it matches reality again.
                 this._post({ type: 'invalidate' });
                 return;
             }
@@ -281,7 +282,7 @@ export class StoryGraphPanel {
         }
     }
 
-    /** Go-to-definition for a reference-typed param value — opens the XML beside the graph. */
+    /** Go-to-definition for a reference-typed param value - opens the XML beside the graph. */
     private async _resolveRef(value: string, referenceType: string | undefined): Promise<void> {
         const client = this._getLspClient();
         if (!client || !value) { return; }
@@ -350,8 +351,8 @@ export class StoryGraphPanel {
             confirm,
             {
                 modal: true,
-                detail: 'References to this event — prereqs and event-name params (TRIGGER_EVENT, '
-                    + 'RESET_EVENT, …) in other events — are NOT removed and will become unresolved. '
+                detail: 'References to this event - prereqs and event-name params (TRIGGER_EVENT, '
+                    + 'RESET_EVENT, …) in other events - are NOT removed and will become unresolved. '
                     + 'Run Validate afterwards to find them. Nothing is written until you Save.',
             },
             'Delete', dontAskAgain);
@@ -367,6 +368,23 @@ export class StoryGraphPanel {
         this._post({ type: 'confirmStageResult', proceed: true, payload });
     }
 
+    /**
+     * Tells the webview which editor modes it may offer. Edit and Simulation are separately flagged
+     * and both default off, so the rotary switch must not advertise a mode whose every request the
+     * server would reject - the panel itself is already gated on `tools.storyEditor`, so View is
+     * always available by the time this runs. Read here rather than in the webview because only the
+     * extension host can see configuration.
+     */
+    private _sendAvailableModes(): void {
+        const features = vscode.workspace.getConfiguration('aet-eaw-edit.features');
+        this._post({
+            type: 'availableModes',
+            edit: features.get<boolean>('tools.storyEditing', false) === true,
+            // Not contributed in package.json (WIP): only ever true if hand-written into settings.
+            simulate: features.get<boolean>('tools.storySimulator', false) === true,
+        });
+    }
+
     /** Fetches the workspace preferences and pushes the swimlane-lane toggles to the webview. */
     private async _sendWorkspaceSettings(): Promise<void> {
         const client = this._getLspClient();
@@ -379,7 +397,7 @@ export class StoryGraphPanel {
                 showThreadLanes: settings.showThreadLanes === true,
                 showChapterLanes: settings.showChapterLanes === true,
             });
-        } catch { /* preferences are optional — the graph works without them */ }
+        } catch { /* preferences are optional - the graph works without them */ }
     }
 
     /** Persists the swimlane-lane toggles (best-effort). */
@@ -412,7 +430,7 @@ export class StoryGraphPanel {
 
     /**
      * The tab was closed with unsaved staged changes. A disposed webview can't veto its own close, so
-     * this can only offer to flush the mirrored queue after the fact — not cancel the close.
+     * this can only offer to flush the mirrored queue after the fact - not cancel the close.
      */
     private async _promptSaveOnClose(): Promise<void> {
         if (this._pendingCommands.length === 0) { return; }
@@ -455,8 +473,8 @@ export class StoryGraphPanel {
 
     /**
      * Builds the graph as it would look with the staged batch applied (server-side, no file write)
-     * and patches it into the view. This is how structural staged edits — new/deleted/renamed events,
-     * new prereq edges — appear before Save without the XML changing on disk.
+     * and patches it into the view. This is how structural staged edits - new/deleted/renamed events,
+     * new prereq edges - appear before Save without the XML changing on disk.
      */
     private async _sendPreview(commands: Record<string, unknown>[], filters: GraphFilters): Promise<void> {
         const client = this._getLspClient();
@@ -480,7 +498,7 @@ export class StoryGraphPanel {
                     campaign: this._campaign,
                 });
                 layout = stored.entries ?? [];
-            } catch { /* stored positions are optional — auto-layout covers it */ }
+            } catch { /* stored positions are optional - auto-layout covers it */ }
             this._post({
                 type: 'graph', preview: true, campaign: this._campaign,
                 nodes: result.nodes ?? [], edges: result.edges ?? [], layout,
@@ -527,7 +545,7 @@ export class StoryGraphPanel {
                 eventTypeParams: Object.fromEntries((schema.eventTypes ?? []).map(t => [t.name, t.params ?? []])),
                 rewardTypeParams: Object.fromEntries((schema.rewardTypes ?? []).map(t => [t.name, t.params ?? []])),
             });
-        } catch { /* schema is styling sugar — the graph renders without it */ }
+        } catch { /* schema is styling sugar - the graph renders without it */ }
     }
 
     private async _sendGraph(filters: GraphFilters): Promise<void> {
@@ -554,7 +572,7 @@ export class StoryGraphPanel {
                     campaign: this._campaign,
                 });
                 layout = stored.entries ?? [];
-            } catch { /* stored positions are optional — auto-layout covers it */ }
+            } catch { /* stored positions are optional - auto-layout covers it */ }
             this._post({
                 type: 'graph',
                 campaign: this._campaign,
@@ -562,7 +580,7 @@ export class StoryGraphPanel {
                 edges: result.edges ?? [],
                 layout,
             });
-            // Diagnostics are NO LONGER pushed on every graph refresh — they were the "live"
+            // Diagnostics are NO LONGER pushed on every graph refresh - they were the "live"
             // validation that made editing sluggish. They now come only from the explicit Validate
             // action (aet/validateStoryCommandBatch), which reflects the staged/pending state.
         } catch (e) {

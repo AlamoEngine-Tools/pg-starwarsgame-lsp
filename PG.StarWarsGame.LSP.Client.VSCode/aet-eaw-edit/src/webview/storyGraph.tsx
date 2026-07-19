@@ -10,7 +10,7 @@
 // aet/applyStoryCommandBatch on Save (or dry-run through aet/validateStoryCommandBatch on Validate).
 // Property edits are reflected instantly by an optimistic dto patch; structural gestures
 // (create/delete/rename/edges) instead ask the server for a preview graph built from the composed
-// working copy (aet/previewStoryGraph — the server does the graph build, the client never
+// working copy (aet/previewStoryGraph - the server does the graph build, the client never
 // re-implements it). Staged edits are re-applied after each graph rebuild (reapplyStagedCommands) so
 // a reconcile never reverts them.
 
@@ -19,6 +19,7 @@ import {
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
+import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -90,10 +91,10 @@ function fetchParamOptions(
 
 const EMPTY_FILTERS: GraphFilters = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
 
-/** Event/reward type names flagged `untested` in the schema — set once, read during render. */
+/** Event/reward type names flagged `untested` in the schema - set once, read during render. */
 const untestedTypes = new Set<string>();
 
-/** Event/reward type name → its param schema — set once from the 'schema' message; read by node bodies. */
+/** Event/reward type name → its param schema - set once from the 'schema' message; read by node bodies. */
 const eventTypeParams = new Map<string, StoryParamSchemaDto[]>();
 const rewardTypeParams = new Map<string, StoryParamSchemaDto[]>();
 
@@ -102,7 +103,7 @@ interface ParamRowSpec { position: number; value: string; missing: boolean; }
 
 /**
  * Rows to render for one param kind on a node body: EVERY schema-declared param (the type
- * dictates the fields — optional ones render as empty "(optional)" slots), plus any value present
+ * dictates the fields - optional ones render as empty "(optional)" slots), plus any value present
  * in the XML beyond what the schema declares (legacy/unknown slots still need to be visible and
  * editable). Shared between rendering and node-height estimation so the two never disagree about
  * how tall the node actually is.
@@ -142,7 +143,7 @@ const LARGE_GRAPH_NODE_COUNT = 60;
 type NodeSection = 'general' | 'trigger' | 'reward';
 
 /**
- * Per-node collapse state of the General/Trigger/Reward sections — module scope (not React
+ * Per-node collapse state of the General/Trigger/Reward sections - module scope (not React
  * state) because `estimateEventNodeHeight` must read it when the node is (re)measured, and the
  * node views render through rete's portal pipeline where App state isn't reachable. Never
  * pruned: ids are stable per campaign and the value is three booleans.
@@ -162,13 +163,13 @@ function toggleSection(nodeId: string, section: NodeSection): void {
 
 /**
  * Diagnostics per node id, from the server's aet/getStoryDiagnostics (via the extension's
- * 'diagnostics' message) — module scope for the same portal-rendering reason as the maps above.
+ * 'diagnostics' message) - module scope for the same portal-rendering reason as the maps above.
  */
 const nodeDiagnostics = new Map<string, StoryDiagnosticDto[]>();
 
 /**
  * `{threadUri}|{name}` keys for events just created via drag/drop whose node should open its
- * rename box the moment it mounts — so naming a new event is one continuous gesture (drop → type),
+ * rename box the moment it mounts - so naming a new event is one continuous gesture (drop → type),
  * as it was in the old create dialog. Consumed once, on first mount of the matching node.
  */
 const pendingAutoRename = new Set<string>();
@@ -176,7 +177,7 @@ const autoRenameKey = (threadUri: string | null | undefined, name: string): stri
     `${threadUri ?? ''}|${name}`;
 
 /**
- * In-progress rename drafts, keyed by node id — module scope (like `collapsedSections`) so an
+ * In-progress rename drafts, keyed by node id - module scope (like `collapsedSections`) so an
  * open rename and its typed text SURVIVE a re-mount of the node's React view. A graph refresh
  * (storyGraphChanged) rebuilds node views through rete's portal; a controlled input's local state
  * is lost on re-mount, which reset the field to the old name and dropped the rename entirely.
@@ -186,7 +187,7 @@ const renameDrafts = new Map<string, string>();
 
 /**
  * A short row label from a schema param description ("Attacker faction." → "Attacker faction"),
- * or null when the schema has nothing usable — the caller falls back to "Param N".
+ * or null when the schema has nothing usable - the caller falls back to "Param N".
  */
 function shortParamLabel(schema: StoryParamSchemaDto | undefined): string | null {
     const description = schema?.description?.trim();
@@ -208,7 +209,7 @@ function booleanParamLabel(description: string | null | undefined): string | nul
 }
 
 /**
- * VS Code's themed categorical chart palette — these track the active colour theme (and invert with
+ * VS Code's themed categorical chart palette - these track the active colour theme (and invert with
  * light/dark), so branch colours belong to the theme rather than being hard-coded hues. Branches
  * beyond the palette length reuse a colour; that's fine for the handful of branches a thread has.
  */
@@ -221,7 +222,7 @@ const BRANCH_CHART_VARS = [
     '--vscode-charts-yellow',
 ];
 
-/** Stable themed chart colour per branch name — shared by the node glow and the edge glow. */
+/** Stable themed chart colour per branch name - shared by the node glow and the edge glow. */
 function branchColor(branch: string): string {
     let hash = 0;
     for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }
@@ -232,7 +233,7 @@ function branchColor(branch: string): string {
  * The sankey node glow: a faint branch-coloured background tint plus a soft outer halo, so a
  * branch's member nodes read as belonging to the same coloured strand as its edges. `withBorder`
  * also tints the border (virtual junctions have no lifecycle border to preserve; event nodes keep
- * theirs). One modest box-shadow per branched node — far cheaper than the per-edge SVG filter it
+ * theirs). One modest box-shadow per branched node - far cheaper than the per-edge SVG filter it
  * replaces. `color-mix` derives the translucent tints from the theme's chart colour.
  */
 function branchGlowStyle(branch: string | null, withBorder: boolean): CSSProperties | undefined {
@@ -247,7 +248,7 @@ function branchGlowStyle(branch: string | null, withBorder: boolean): CSSPropert
     return style;
 }
 
-/** Row count → pixel height for an Event node body — kept in lockstep with what EventNodeView renders. */
+/** Row count → pixel height for an Event node body - kept in lockstep with what EventNodeView renders. */
 function estimateEventNodeHeight(dto: StoryGraphNodeDto): number {
     // Expanded General = branch/perpetual/dialog; expanded Trigger/Reward = type chip row + params.
     const generalRows = isSectionCollapsed(dto.id, 'general') ? 0 : 3;
@@ -264,7 +265,7 @@ function estimateEventNodeHeight(dto: StoryGraphNodeDto): number {
  * Event types that need the manifest-file form (`TacticalCreateBar`) instead of the generic
  * create flow: their manifest param is declared `optional: true` in the schema even though a
  * tactical trigger without one is useless, so generic mandatory-param enforcement can't catch a
- * missing file — this is a UX rule stricter than the schema, kept as an explicit exception.
+ * missing file - this is a UX rule stricter than the schema, kept as an explicit exception.
  * `LINK_TACTICAL` (the reward) needs no such exception: every one of its params is schema-mandatory,
  * so it's just an ordinary reward in the palette's Rewards list.
  */
@@ -287,7 +288,7 @@ function baseName(uri: string | null | undefined): string {
 
 /**
  * Routes a mutation. In Edit mode a staged kind is applied optimistically to the local graph and
- * queued (flushed to the server only on Save — see `stageCommand`); everything else posts straight
+ * queued (flushed to the server only on Save - see `stageCommand`); everything else posts straight
  * to the extension (which owns confirmation dialogs and error toasts). View/Simulate never mutate.
  */
 function sendCommand(payload: Record<string, unknown>, confirm?: string, refreshDetail?: string): void {
@@ -312,20 +313,20 @@ class StoryNode extends ClassicPreset.Node {
     width = 0;
     height = 0;
     dto: StoryGraphNodeDto;
-    /** Branch name this node belongs to, for the sankey glow — null when unbranched. */
+    /** Branch name this node belongs to, for the sankey glow - null when unbranched. */
     branchGlow: string | null = null;
 
     constructor(dto: StoryGraphNodeDto, hasInputs: boolean, hasOutputs: boolean) {
         super(dto.label);
         // ClassicPreset.Node otherwise self-assigns a random UID here, unrelated to the server's
-        // dto id — patch()'s whole reconciliation (editor.getNode(dto.id), connection endpoint
+        // dto id - patch()'s whole reconciliation (editor.getNode(dto.id), connection endpoint
         // matching, incoming.has(node.id)) depends on rete's node identity being the dto id.
         this.id = dto.id;
         this.dto = dto;
         // Event nodes always expose sockets so prereq edges can be drawn to/from them.
         // multipleConnections must be explicit: ClassicPreset.Input defaults it to false (Output
         // defaults to true), so rete-connection-plugin's syncConnections() silently evicts any
-        // existing prereq edge into this socket the moment a second one is dropped on it — the
+        // existing prereq edge into this socket the moment a second one is dropped on it - the
         // AND/OR junction never gets a chance to materialise; the prior source just vanishes.
         if (hasInputs || dto.kind === 'Event') {
             this.addInput('in', new ClassicPreset.Input(flowSocket, undefined, true));
@@ -334,7 +335,7 @@ class StoryNode extends ClassicPreset.Node {
         this.applyDto(dto);
     }
 
-    /** Refreshes label/size/state from a newer server dto — the in-place update path. */
+    /** Refreshes label/size/state from a newer server dto - the in-place update path. */
     applyDto(dto: StoryGraphNodeDto): void {
         this.dto = dto;
         this.label = dto.label;
@@ -354,7 +355,7 @@ class StoryNode extends ClassicPreset.Node {
 }
 
 class StoryConnection extends ClassicPreset.Connection<StoryNode, StoryNode> {
-    /** <param name="branch">Branch this prereq edge feeds — drives the sankey-style glow.</param> */
+    /** <param name="branch">Branch this prereq edge feeds - drives the sankey-style glow.</param> */
     constructor(
         source: StoryNode, target: StoryNode, public readonly kind: string,
         public readonly branch: string | null = null,
@@ -369,7 +370,7 @@ type AreaExtra = ReactArea2D<Schemes>;
 interface EditorHandle {
     /**
      * Applies a server graph. `full` clears and auto-arranges (first load, filter changes);
-     * otherwise the graph is patched in place — the viewport and node positions stay put.
+     * otherwise the graph is patched in place - the viewport and node positions stay put.
      */
     setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[],
         full: boolean): Promise<void>;
@@ -377,14 +378,14 @@ interface EditorHandle {
     applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void;
     fit(): void;
     /**
-     * Recomputes the automatic layout for the current graph, discarding manual positions — the
+     * Recomputes the automatic layout for the current graph, discarding manual positions - the
      * new positions are persisted, so the arrangement survives re-renders and reopening.
      */
     autoArrange(): Promise<void>;
     /** Converts a browser client point (e.g. a drop event) to graph coordinates. */
     toGraphPosition(clientX: number, clientY: number): { x: number; y: number };
     /**
-     * Remembers where a not-yet-created event should land once the server confirms it — used by
+     * Remembers where a not-yet-created event should land once the server confirms it - used by
      * palette drag-and-drop, where the drop position is known well before the event exists.
      */
     presetPosition(threadUri: string, eventName: string, position: { x: number; y: number }): void;
@@ -395,7 +396,7 @@ interface EditorHandle {
      */
     carryPosition(oldNodeId: string, threadUri: string | null | undefined, newName: string): void;
     /**
-     * Resolves an Event node's identity and current types from its id — used by the
+     * Resolves an Event node's identity and current types from its id - used by the
      * drag-a-type-onto-a-node gesture, which only has a `data-node-id` DOM attribute to go on,
      * not a rete node reference. Null for an unknown id or a non-Event (virtual) node.
      */
@@ -403,54 +404,58 @@ interface EditorHandle {
         threadUri: string | null; eventName: string;
         eventType: string | null; rewardType: string | null;
     } | null;
-    /** Brings one node into view and flashes it — the problems list's jump-to. */
+    /** Brings one node into view and flashes it - the problems list's jump-to. */
     centerNode(nodeId: string): void;
     /**
      * The thread file a new event dropped at `position` should belong to: the nearest existing
      * event node's thread, else the first thread. Null only when the campaign has no thread.
      */
     nearestEventThread(position: { x: number; y: number }, threads: string[]): string | null;
-    /** Every current event node label — used to pick a unique default name for a new event. */
+    /** Every current event node label - used to pick a unique default name for a new event. */
     eventLabels(): string[];
-    /** The current viewport centre in graph coordinates — where a toolbar-created node lands. */
+    /** The current viewport centre in graph coordinates - where a toolbar-created node lands. */
     viewportCentre(): { x: number; y: number };
     /** Node rects + the current viewport rect, all in graph coordinates, for the dock minimap. */
     getMinimap(): {
         nodes: { x: number; y: number; w: number; h: number }[];
         viewport: { x: number; y: number; w: number; h: number };
     };
-    /** Pans the viewport so (graphX, graphY) sits at the centre — the minimap's click-to-navigate. */
+    /** Pans the viewport so (graphX, graphY) sits at the centre - the minimap's click-to-navigate. */
     panTo(graphX: number, graphY: number): void;
     /** The area transform (k = zoom, x/y = pan), so overlays can place themselves over the nodes. */
-    getTransform(): { k: number; x: number; y: number };
-    /** Bounding boxes (graph coords) of Event nodes grouped by thread or chapter — the swimlanes. */
+    /**
+     * The in-holder element the swimlane overlay portals into. Being inside rete's transformed
+     * content holder is what keeps the lanes pinned to the nodes during pan/zoom.
+     */
+    getSwimlaneLayer(): HTMLElement;
+    /** Bounding boxes (graph coords) of Event nodes grouped by thread or chapter - the swimlanes. */
     getGroupBounds(by: 'thread' | 'chapter'): {
         key: string; title: string; x: number; y: number; w: number; h: number;
     }[];
     /**
-     * Drops a local-only staging AND/OR-junction at the given position — no server round trip.
+     * Drops a local-only staging AND/OR-junction at the given position - no server round trip.
      * The user wires Event outputs into its input to accumulate prereq sources, then drags its
      * output onto a target Event to commit them: AND = all sources as one new AND-line, OR = one
      * new prereq line per source (see the `connectioncreate` pipe).
      */
     createStagingJunction(position: { x: number; y: number }, kind: 'and' | 'or'): void;
-    /** Discards an unattached staging junction (its own "×" button) — never sent to the server. */
+    /** Discards an unattached staging junction (its own "×" button) - never sent to the server. */
     discardStagingJunction(nodeId: string): void;
     /**
-     * Re-renders every node's body — needed on top of `applyLifecycles`' targeted updates because
+     * Re-renders every node's body - needed on top of `applyLifecycles`' targeted updates because
      * switching Edit/View/Simulate mode changes an Event node's own layout (the blank "add a new
      * param" row appears/disappears, inputs enable/disable), not just its lifecycle border.
      */
     refreshMode(): void;
-    /** Re-measures and re-renders one node — e.g. after its section collapse state changed. */
+    /** Re-measures and re-renders one node - e.g. after its section collapse state changed. */
     refreshNode(nodeId: string): void;
     /**
-     * Optimistically updates one Event node's dto and re-renders it — the Edit-mode staging path,
+     * Optimistically updates one Event node's dto and re-renders it - the Edit-mode staging path,
      * so a property change shows instantly without a server round trip. No-op for unknown ids.
      */
     patchEventNode(nodeId: string, update: (dto: StoryGraphNodeDto) => StoryGraphNodeDto): void;
     /**
-     * Repaints only the given nodes (no re-measure — diagnostics don't change height). Used by the
+     * Repaints only the given nodes (no re-measure - diagnostics don't change height). Used by the
      * diagnostics push so a validation refresh touches just the nodes whose markers changed,
      * instead of re-rendering every node like `refreshMode`.
      */
@@ -459,14 +464,14 @@ interface EditorHandle {
 }
 
 /** Set by the React app before the editor exists; invoked from an Event node's "reachable from
- * here" button — a node body has no direct line to App's `setFilter`, so it goes through this
+ * here" button - a node body has no direct line to App's `setFilter`, so it goes through this
  * bridge, the same pattern `onGraphDesynced` already uses. */
 let onReachableFromRequested: (nodeId: string) => void = () => { /* replaced by App */ };
 
-/** A gesture locally changed the graph without a server command — re-fetch to reconcile. */
+/** A gesture locally changed the graph without a server command - re-fetch to reconcile. */
 let onGraphDesynced: () => void = () => { /* replaced by App */ };
 
-/** Subscribers (minimap, swimlane overlay) notified when the viewport pans/zooms or a node moves. */
+/** Subscribers (the minimap) notified when the viewport pans/zooms or a node moves. */
 const areaChangeSubs = new Set<() => void>();
 function subscribeAreaChange(cb: () => void): () => void {
     areaChangeSubs.add(cb);
@@ -482,7 +487,28 @@ function scheduleAreaChanged(): void {
     });
 }
 
-/** Set by App once the editor exists — VirtualNodeView's staging-junction discard button needs
+/**
+ * Subscribers notified when node *geometry* changes (a node moved, or the graph was rebuilt) —
+ * deliberately NOT on pan/zoom. The swimlane overlay lives inside rete's transformed content
+ * holder, so panning moves it for free; recomputing its bounds per pan frame would walk every node
+ * for nothing.
+ */
+const geometryChangeSubs = new Set<() => void>();
+function subscribeGeometryChange(cb: () => void): () => void {
+    geometryChangeSubs.add(cb);
+    return () => { geometryChangeSubs.delete(cb); };
+}
+let geometryChangeScheduled = false;
+function scheduleGeometryChanged(): void {
+    if (geometryChangeScheduled) { return; }
+    geometryChangeScheduled = true;
+    requestAnimationFrame(() => {
+        geometryChangeScheduled = false;
+        for (const cb of geometryChangeSubs) { cb(); }
+    });
+}
+
+/** Set by App once the editor exists - VirtualNodeView's staging-junction discard button needs
  * to call straight into the editor (`discardStagingJunction`), not through a command round trip. */
 let editorHandleRef: EditorHandle | null = null;
 
@@ -496,13 +522,13 @@ let currentMode: EditorMode = 'view';
 
 // ── Edit-mode staging ──────────────────────────────────────────────────────────────────────────
 //
-// In Edit mode, gestures don't round-trip per change (the old behaviour — sluggish even on a
+// In Edit mode, gestures don't round-trip per change (the old behaviour - sluggish even on a
 // checkbox). Each staged command mutates the local graph immediately and is queued here; the whole
 // queue is flushed to aet/applyStoryCommandBatch on Save, or dry-run through
 // aet/validateStoryCommandBatch on Validate. The command payloads are exactly the server's command
 // envelopes, so batching them needs no client-side model logic.
 
-/** The queued command envelopes, in gesture order — flushed to the server only on Save. */
+/** The queued command envelopes, in gesture order - flushed to the server only on Save. */
 const pendingCommands: Record<string, unknown>[] = [];
 
 /** App subscribes so the toolbar's Save/Validate buttons reflect the pending count. */
@@ -512,12 +538,12 @@ let onPendingChanged: () => void = () => { /* replaced by App */ };
 let requestPreview: () => void = () => { /* replaced by App */ };
 
 // Chain of staged renames (oldName → latest name). A gesture reads the node's dto.label, which lags
-// a staged rename until the preview lands — so an edit made in that window would carry a name the
+// a staged rename until the preview lands - so an edit made in that window would carry a name the
 // batch no longer knows once its rename runs. Resolving through this map keeps every staged command
 // pointed at the event's latest name, so the batch composes in order without "event not found".
 const stagedRenames = new Map<string, string>();
 
-/** Whether there are unsaved staged changes — drives the dirty-exit prompt and Save button. */
+/** Whether there are unsaved staged changes - drives the dirty-exit prompt and Save button. */
 function hasPendingChanges(): boolean {
     return pendingCommands.length > 0;
 }
@@ -554,7 +580,7 @@ function stageCommand(payload: Record<string, unknown>): void {
     pendingCommands.push(payload);
     onPendingChanged();
 
-    // Structural gestures have no cheap local representation — let the server rebuild the graph from
+    // Structural gestures have no cheap local representation - let the server rebuild the graph from
     // the composed working copy (no disk write) and re-render from that.
     if (PREVIEW_KINDS.has(payload.kind as string)) { schedulePreview(); }
 }
@@ -569,7 +595,7 @@ function schedulePreview(): void {
 /**
  * Re-applies every staged command on top of a freshly (re)built graph. Staged commands aren't
  * committed, so any reconcile (a filter change, a preview, or a post-save push) would otherwise
- * revert the optimistic property edits. Replaying them is idempotent — the staged view survives
+ * revert the optimistic property edits. Replaying them is idempotent - the staged view survives
  * every rebuild until Save flushes the queue (and clears it, so a post-save rebuild shows committed
  * truth). Structural kinds are already baked into a preview graph, so their replay is a no-op.
  */
@@ -589,7 +615,7 @@ function applyOptimistic(payload: Record<string, unknown>): void {
 const andJunctionId = /^(.*)#g(\d+)$/;
 
 /**
- * elk auto-arrange options — Event nodes are full-blueprint-style forms, several times taller
+ * elk auto-arrange options - Event nodes are full-blueprint-style forms, several times taller
  * than plain boxes; the default spacing crowded them together enough to overlap.
  */
 const ARRANGE_OPTIONS = {
@@ -626,12 +652,21 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     AreaExtensions.simpleNodesOrder(area);
 
     // Promote the transformed content to its own GPU layer so pan/zoom composites instead of
-    // repainting the whole node tree each frame — a cheap, large win on big campaigns.
+    // repainting the whole node tree each frame - a cheap, large win on big campaigns.
     (area.area.content.holder as HTMLElement).style.willChange = 'transform';
+
+    // Swimlanes live INSIDE the transformed content holder, so rete's own pan/zoom transform moves
+    // them in the same compositor frame as the nodes. The earlier sibling-overlay version recomputed
+    // screen positions in JS one rAF later, which is exactly what made the lanes visibly trail the
+    // graph while dragging. Depth is handled by `.swimlane-layer`'s z-index, not by this position —
+    // rete re-orders the holder's children as the graph changes.
+    const swimlaneLayer = document.createElement('div');
+    swimlaneLayer.className = 'swimlane-layer';
+    (area.area.content.holder as HTMLElement).prepend(swimlaneLayer);
 
     // Sankey-style branch glow: a node's own branch (events) or its owner event's (AND/OR
     // junctions inherit it, so the coloured strand stays unbroken across them). Resolved from the
-    // dto set at build/patch time — see `stampBranchGlow` — and stamped onto `StoryNode.branchGlow`
+    // dto set at build/patch time - see `stampBranchGlow` - and stamped onto `StoryNode.branchGlow`
     // so the node/connection views paint it without any editor lookup on the hot render path.
     const junctionOwnerId = (id: string): string | null =>
         andJunctionId.exec(id)?.[1] ?? (id.endsWith('#or') ? id.slice(0, -'#or'.length) : null);
@@ -642,7 +677,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         return owner ? branchByEvent.get(owner) ?? null : null;
     };
 
-    /** The branch a prereq edge belongs to (its target's, source as fallback) — the glow colour key. */
+    /** The branch a prereq edge belongs to (its target's, source as fallback) - the glow colour key. */
     const edgeBranchFrom = (
         fromId: string, toId: string, kind: string, branchByEvent: Map<string, string>
     ): string | null => {
@@ -650,7 +685,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         return branchOfNodeId(toId, branchByEvent) ?? branchOfNodeId(fromId, branchByEvent);
     };
 
-    /** Event id → branch, for a whole incoming graph — one build, reused for every node and edge. */
+    /** Event id → branch, for a whole incoming graph - one build, reused for every node and edge. */
     const branchIndex = (nodes: StoryGraphNodeDto[]): Map<string, string> => {
         const map = new Map<string, string>();
         for (const dto of nodes) { if (dto.kind === 'Event' && dto.branch) { map.set(dto.id, dto.branch); } }
@@ -671,14 +706,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     let applyingServerGraph = false;
     // Serializes setGraph calls: buildFull/patch mutate shared rete state step by step across many
     // awaits, so two overlapping calls (e.g. a rapid pair of server pushes) interleave their
-    // mutations and corrupt the model — nodes misjudged as new, connections dropped, etc.
+    // mutations and corrupt the model - nodes misjudged as new, connections dropped, etc.
     let graphQueue: Promise<unknown> = Promise.resolve();
 
-    /** Numbers `local:and:N` staging-junction ids — unique for this session, never sent to the server. */
+    /** Numbers `local:and:N` staging-junction ids - unique for this session, never sent to the server. */
     let stagingCounter = 0;
 
     /**
-     * rete's `editor.removeNode` only splices the node out of the node list — connections attached
+     * rete's `editor.removeNode` only splices the node out of the node list - connections attached
      * to it stay in the editor and render as edges pointing at nothing (and `patch()` deliberately
      * never reconciles `local:` connections away). Every staging-node removal must go through here.
      */
@@ -695,7 +730,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
      * Re-applies a node's dto and pushes the recomputed size into the area. The size MUST go
      * through `area.resize`: auto-arrange stamped every node element with an INLINE width/height
      * style (AreaPlugin's node view does that on resize), and inline styles beat the styled
-     * component's `$w`/`$h` classes — `applyDto` alone updates the node object while the DOM
+     * component's `$w`/`$h` classes - `applyDto` alone updates the node object while the DOM
      * keeps the stale size. `area.resize` also re-anchors the node's connections.
      */
     const remeasure = async (node: StoryNode, dto?: StoryGraphNodeDto): Promise<void> => {
@@ -732,15 +767,15 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // that AND-line, event→staging-junction (a local-only AND/OR node the user dropped from the
     // palette) just wires up locally with no server command yet, staging-junction→event is the
     // commit gesture (AND: every accumulated source becomes one new AND-line via addPrereqGroup;
-    // OR: one new prereq line per source via addPrereqAlternatives — atomically either way, then
+    // OR: one new prereq line per source via addPrereqAlternatives - atomically either way, then
     // the staging node is discarded and the real server-synthesized junction arrives with the
     // next graph push). Every case except the two
-    // local-only staging ones blocks local materialisation — the real edge arrives with the
+    // local-only staging ones blocks local materialisation - the real edge arrives with the
     // server's re-render. Removing (the connection plugin lets you pick an existing connection off
     // a socket): prereq edges become removePrereq commands; a wire into a still-unattached staging
     // node is removed locally with no server round trip (nothing was ever sent for it); anything
     // else (control/flag/tactical edges are derived data, junction plumbing is structural) is not
-    // removable — the local removal is allowed to play out and a re-fetch restores it.
+    // removable - the local removal is allowed to play out and a re-fetch restores it.
     editor.addPipe(context => {
         if (context.type === 'connectioncreate' && !applyingServerGraph) {
             if (currentMode !== 'edit') { return undefined; }
@@ -748,7 +783,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const target = editor.getNode(context.data.target);
             if (source?.dto.kind === 'Event'
                 && (target?.dto.kind === 'StagingAnd' || target?.dto.kind === 'StagingOr')) {
-                return context; // local bookkeeping only — nothing to send yet
+                return context; // local bookkeeping only - nothing to send yet
             }
             if ((source?.dto.kind === 'StagingAnd' || source?.dto.kind === 'StagingOr')
                 && target?.dto.kind === 'Event' && target.dto.threadUri) {
@@ -769,7 +804,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                             x: position.x, y: position.y,
                         });
                     }
-                    // consumed — the real junction arrives via push
+                    // consumed - the real junction arrives via push
                     void removeNodeWithConnections(source.id);
                 }
                 return undefined;
@@ -801,7 +836,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const source = editor.getNode(removed.source);
             const target = editor.getNode(removed.target);
             if (target?.dto.kind === 'StagingAnd' || target?.dto.kind === 'StagingOr') {
-                return context; // discarding one accumulated source — nothing was ever sent for it
+                return context; // discarding one accumulated source - nothing was ever sent for it
             }
             const isPrereq = (removed.kind ?? 'Prereq') === 'Prereq';
             if (isPrereq && source?.dto.kind === 'Event'
@@ -862,6 +897,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             || context.type === 'nodetranslated') {
             scheduleAreaChanged();
         }
+        // Swimlane bounds only depend on where the nodes are, not on the viewport.
+        if (context.type === 'nodetranslated') {
+            scheduleGeometryChanged();
+        }
         return context;
     });
 
@@ -888,7 +927,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
      * A sensible spot for a node the server introduced mid-session. Junctions (and any node with
      * several relevant edges, e.g. an AND-junction with many prereq sources) are placed at the
      * midpoint between the average position of their already-rendered sources and targets, rather
-     * than beside whichever single neighbour happened to be first in the edge list — otherwise the
+     * than beside whichever single neighbour happened to be first in the edge list - otherwise the
      * junction lands next to one arbitrary parent instead of between the events it actually joins.
      */
     const placeNewNode = (dto: StoryGraphNodeDto, edges: StoryGraphEdgeDto[]): { x: number; y: number } => {
@@ -957,7 +996,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         void AreaExtensions.zoomAt(area, editor.getNodes());
     };
 
-    /** Reconciles the live graph against the server's — no re-layout, viewport untouched. */
+    /** Reconciles the live graph against the server's - no re-layout, viewport untouched. */
     const patch = async (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
     ): Promise<void> => {
@@ -968,7 +1007,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         const incomingConnections = new Set(edges.map(e => connectionKey(e.fromId, e.toId, e.kind)));
 
         // Local-only staging junctions (dropped from the palette, not yet wired to a target event)
-        // are never known to the server — reconciliation must leave them and their wires alone
+        // are never known to the server - reconciliation must leave them and their wires alone
         // rather than treating them as stale.
         const isLocal = (id: string): boolean => id.startsWith('local:');
 
@@ -1063,6 +1102,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     }
                 } finally {
                     applyingServerGraph = false;
+                    // Node *removals* emit no 'nodetranslated', so the pipe alone would leave a
+                    // lane for a thread whose last event just vanished.
+                    scheduleGeometryChanged();
                 }
             };
             // Chain onto the queue regardless of whether the previous run succeeded or threw, so
@@ -1088,7 +1130,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         },
         autoArrange(): Promise<void> {
             const run = async (): Promise<void> => {
-                // nodetranslate is frozen outside Edit mode for USER gestures — the arrange
+                // nodetranslate is frozen outside Edit mode for USER gestures - the arrange
                 // plugin's translations must pass, same as during setGraph.
                 applyingServerGraph = true;
                 try {
@@ -1099,7 +1141,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 void AreaExtensions.zoomAt(area, editor.getNodes());
                 saveAllPositions(); // the recomputed layout replaces the saved one
             };
-            // Same serialization as setGraph — arranging mid-patch would interleave mutations.
+            // Same serialization as setGraph - arranging mid-patch would interleave mutations.
             const result = graphQueue.then(run, run);
             graphQueue = result.catch(() => undefined);
             return result;
@@ -1184,9 +1226,8 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const rect = container.getBoundingClientRect();
             void area.area.translate(rect.width / 2 - graphX * k, rect.height / 2 - graphY * k);
         },
-        getTransform(): { k: number; x: number; y: number } {
-            const { k, x, y } = area.area.transform;
-            return { k, x, y };
+        getSwimlaneLayer(): HTMLElement {
+            return swimlaneLayer;
         },
         getGroupBounds(by: 'thread' | 'chapter') {
             const groups = new Map<string,
@@ -1268,19 +1309,19 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
 // ── Node / connection / socket components ────────────────────────────────────────────────────────
 
-/** Native-tooltip text for virtual nodes — nothing on them is editable, so a hover suffices. */
+/** Native-tooltip text for virtual nodes - nothing on them is editable, so a hover suffices. */
 const VIRTUAL_DESCRIPTIONS: Record<string, string> = {
-    AndJunction: 'AND junction — every input on this prereq line must fire.',
-    OrJunction: 'OR junction — any one prereq line arms the event.',
-    Portal: 'Portal — stands in for a cross-file target event.',
+    AndJunction: 'AND junction - every input on this prereq line must fire.',
+    OrJunction: 'OR junction - any one prereq line arms the event.',
+    Portal: 'Portal - stands in for a cross-file target event.',
     TacticalPlot: 'Tactical plot manifest attached to this campaign.',
-    StagingAnd: 'Not yet attached — wire event outputs into this, then drag its output onto the '
+    StagingAnd: 'Not yet attached - wire event outputs into this, then drag its output onto the '
         + "event that should require all of them together. Nothing is saved until then.",
-    StagingOr: 'Not yet attached — wire event outputs into this, then drag its output onto the '
+    StagingOr: 'Not yet attached - wire event outputs into this, then drag its output onto the '
         + "event that any one of them should arm. Nothing is saved until then.",
 };
 
-/** AND/OR/Portal/TacticalPlot — nothing on them is editable, so they keep the old compact shape. */
+/** AND/OR/Portal/TacticalPlot - nothing on them is editable, so they keep the old compact shape. */
 const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     position: relative;
     width: ${p => p.$w}px;
@@ -1337,7 +1378,7 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border-radius: 12px;
     }
     /* Dashed = "not yet attached", same visual language as Portal/TacticalPlot's "not fully
-       resolved" — nothing about a staging junction is saved until its output reaches an event. */
+       resolved" - nothing about a staging junction is saved until its output reaches an event. */
     &.k-StagingAnd { border-style: dashed; }
     &.k-StagingOr .diamond { border-style: dashed; }
     .discard {
@@ -1375,7 +1416,7 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     }
     .jump:hover { color: var(--vscode-focusBorder); }
 
-    /* top uses calc(50% - 7px), not transform: translateY(-50%) — rete positions connection
+    /* top uses calc(50% - 7px), not transform: translateY(-50%) - rete positions connection
        endpoints from offsetTop/offsetLeft (rete-render-utils' getElementCenter), which does not
        reflect CSS transforms, so a translateY-centered socket draws edges anchored below it. */
     .input-socket  { position: absolute; left: -7px;  top: calc(50% - 7px); }
@@ -1396,7 +1437,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
         : dto.kind === 'OrJunction' || dto.kind === 'StagingOr' ? 'OR'
         : dto.label;
     // Glow only the solid AND junctions; the OR box is transparent (the diamond carries its
-    // shape), so a background tint there would show as an odd square — its edges glow instead.
+    // shape), so a background tint there would show as an odd square - its edges glow instead.
     const glow = dto.kind === 'AndJunction'
         ? branchGlowStyle(props.data.branchGlow, true) : undefined;
 
@@ -1416,7 +1457,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
             {(dto.kind === 'StagingAnd' || dto.kind === 'StagingOr') && currentMode === 'edit' ? (
                 <Drag.NoDrag>
                     <button
-                        className="discard" title="Discard — nothing was saved"
+                        className="discard" title="Discard - nothing was saved"
                         onClick={() => editorHandleRef?.discardStagingJunction(dto.id)}
                     >×</button>
                 </Drag.NoDrag>
@@ -1452,7 +1493,7 @@ function StoryNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
 }
 
 /**
- * Blueprint-style node body: every trigger/reward field lives here now, editable in place — no
+ * Blueprint-style node body: every trigger/reward field lives here now, editable in place - no
  * more side panel. Every interactive element is wrapped in `Drag.NoDrag` (rete-react-plugin's own
  * mechanism, used internally by its context-menu search input): rete's `NodeView` attaches a plain
  * pointerdown listener to the whole node element with no target check, so without this an input
@@ -1508,7 +1549,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-overflow: ellipsis;
         white-space: nowrap;
     }
-    /* The title is the node's drag handle — grab it to move the node (rename is the ✎ button). */
+    /* The title is the node's drag handle - grab it to move the node (rename is the ✎ button). */
     .header .title { cursor: move; }
     .header input.title-edit {
         background: var(--vscode-input-background);
@@ -1565,7 +1606,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         white-space: nowrap;
     }
     .section-toggle:hover { color: var(--vscode-editor-foreground); }
-    /* Drag.NoDrag's own wrapper is an unstyleable <span> — flex it via the child combinator so the
+    /* Drag.NoDrag's own wrapper is an unstyleable <span> - flex it via the child combinator so the
        control it wraps still fills the row like every other field. */
     .row > span {
         flex: 1;
@@ -1619,14 +1660,14 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     }
     .row button.goto:hover { color: var(--vscode-focusBorder); }
 
-    /* same socket-offset rule as NodeBox — see the comment there for why calc(), not transform. */
+    /* same socket-offset rule as NodeBox - see the comment there for why calc(), not transform. */
     .input-socket  { position: absolute; left: -7px;  top: calc(50% - 7px); }
     .output-socket { position: absolute; right: -7px; top: calc(50% - 7px); }
 `;
 
 /**
  * A text input that commits on blur, matching the rest of this file's edit UX (`ParamRows` before
- * it). Resyncs from `value` on prop change UNLESS the field is currently focused — Event nodes are
+ * it). Resyncs from `value` on prop change UNLESS the field is currently focused - Event nodes are
  * now always mounted (no more open-a-node/close-a-node lifecycle to reset stale local state), so an
  * unconditional reset-on-remount isn't available, but an unconditional resync-on-every-prop-change
  * would clobber in-progress typing every time an unrelated graph refresh lands.
@@ -1655,7 +1696,7 @@ function BlurCommitInput(props: {
 /**
  * A reference-typed value input: commits on blur like `BlurCommitInput`, plus a debounced
  * suggestion dropdown fed by the server (aet/getStoryParamOptions via the extension). Picking a
- * suggestion commits immediately — `onMouseDown` + `preventDefault` so the input never blurs
+ * suggestion commits immediately - `onMouseDown` + `preventDefault` so the input never blurs
  * mid-pick (a blur would commit the half-typed prefix first). `lastSent` guards the follow-up
  * blur from re-committing the same value while the server round trip is still in flight.
  */
@@ -1726,7 +1767,7 @@ function RefValueInput(props: {
                             key={option.value} className="suggest-item"
                             title={option.detail ?? undefined}
                             onMouseDown={e => {
-                                e.preventDefault(); // keep the input focused — no blur-commit race
+                                e.preventDefault(); // keep the input focused - no blur-commit race
                                 setValue(option.value);
                                 props.onInput?.(option.value);
                                 setOpen(false);
@@ -1791,13 +1832,13 @@ function EventParamRows(props: {
                     diagnostic ? `diag-${diagnostic.severity === 'error' ? 'error' : 'warning'}` : '',
                 ].filter(c => c).join(' ');
                 const title = `${label} ${row.position + 1}`
-                    + (schemaParam?.description ? ` — ${schemaParam.description}` : '')
+                    + (schemaParam?.description ? ` - ${schemaParam.description}` : '')
                     + (row.missing ? ' (required)' : optionalUnset ? ' (optional)' : '')
                     + (diagnostic ? `\n⚠ ${diagnostic.message}` : '');
                 // List params hold several tokens; go-to targets the first one.
                 const firstToken = row.value.split(/[\s,]+/).filter(t => t)[0] ?? '';
                 if (isBoolean) {
-                    // Checkbox-first layout with the FULL cleaned description as its label — the
+                    // Checkbox-first layout with the FULL cleaned description as its label - the
                     // checkbox already encodes the 0/1 mechanics, so the "1 = …" prefix goes and
                     // the label is no longer squeezed into the 72px label column.
                     return (
@@ -1888,7 +1929,7 @@ function SectionHead(props: {
                     onClick={() => toggleSection(props.nodeId, props.section)}
                 >
                     {collapsed ? '▸' : '▾'} {label}
-                    {collapsed && props.summary ? ` — ${props.summary}` : ''}
+                    {collapsed && props.summary ? ` - ${props.summary}` : ''}
                 </span>
             </Drag.NoDrag>
         </div>
@@ -1898,7 +1939,7 @@ function SectionHead(props: {
 /**
  * The Type row of a Trigger/Reward section. Types are immutable: the chip shows the attached
  * type, its ✕ clears the type AND its params atomically (server `clearEventType`/`clearRewardType`);
- * an empty slot is filled by dropping a type from the palette onto the node — there is no dropdown,
+ * an empty slot is filled by dropping a type from the palette onto the node - there is no dropdown,
  * so stale params can never survive a type change.
  */
 function TypeRow(props: {
@@ -1917,7 +1958,7 @@ function TypeRow(props: {
                     <Drag.NoDrag>
                         <span
                             className="type-chip"
-                            title={`${props.typeName} — remove it (✕) to attach a different type`}
+                            title={`${props.typeName} - remove it (✕) to attach a different type`}
                         >{props.typeName}</span>
                     </Drag.NoDrag>
                     {props.readOnly ? null : (
@@ -1955,7 +1996,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
 
     // Editing is SEEDED from the module-scoped draft so a re-mount (graph refresh rebuilding this
     // node's view) restores the open rename box. The input itself is UNCONTROLLED and reads/writes
-    // the durable `renameDrafts` — a controlled `value` can be silently reverted by a re-render,
+    // the durable `renameDrafts` - a controlled `value` can be silently reverted by a re-render,
     // and the typed text must survive a re-mount too. `inputRef` also drives explicit focus.
     const [editingTitle, setEditingTitle] = useState(() => renameDrafts.has(dto.id));
     const inputRef = useRef<HTMLInputElement>(null);
@@ -1970,13 +2011,13 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
     };
     const commitTitle = (): void => {
         // Read the live DOM value (the source of truth for the uncontrolled input), falling back
-        // to the durable draft — never to a possibly-stale React state.
+        // to the durable draft - never to a possibly-stale React state.
         const next = (inputRef.current?.value ?? renameDrafts.get(dto.id) ?? dto.label).trim();
         renameDrafts.delete(dto.id);
         setEditingTitle(false);
         if (next && next !== dto.label) {
             // Renaming re-keys the node id (it's derived from the name), so carry its current spot
-            // to the new name — otherwise the renamed node re-materialises beside a neighbour.
+            // to the new name - otherwise the renamed node re-materialises beside a neighbour.
             editorHandleRef?.carryPosition(dto.id, dto.threadUri, next);
             sendCommand({ kind: 'renameEvent', eventName: dto.label, newName: next });
         }
@@ -1984,7 +2025,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
 
     // Focus the input explicitly when the box opens: autoFocus is unreliable here because
     // rete-react-plugin's Drag.NoDrag intercepts pointerdown and re-dispatches a synthetic copy,
-    // which does NOT carry the browser's default focus action — so a click never focused the field
+    // which does NOT carry the browser's default focus action - so a click never focused the field
     // and keystrokes went nowhere (the rename silently reset to the old name on commit).
     useEffect(() => {
         if (editingTitle && !readOnly) {
@@ -2033,7 +2074,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
                                 }}
                             />
                         </Drag.NoDrag>
-                        {/* Explicit commit/cancel — an unambiguous way to apply the rename besides
+                        {/* Explicit commit/cancel - an unambiguous way to apply the rename besides
                             Enter. onMouseDown+preventDefault keeps the input focused so the click
                             doesn't blur-then-fight the button; there's no onBlur commit (a blur that
                             landed anywhere would otherwise fire an unintended rename). */}
@@ -2053,10 +2094,10 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
                 ) : (
                     // NOT NoDrag-wrapped: the title is the node's drag handle (grab it to move the
                     // node). Renaming is the explicit ✎ button below, so a drag never lands in the
-                    // rename box by accident. (A plain onClick here wouldn't fire anyway — rete's
+                    // rename box by accident. (A plain onClick here wouldn't fire anyway - rete's
                     // simpleNodesOrder reparents the node on pointerdown and the browser drops the
                     // click; that's why rename is a dedicated NoDrag button.)
-                    <span className="title" title={`${dto.label} — drag to move`}>{dto.label}</span>
+                    <span className="title" title={`${dto.label} - drag to move`}>{dto.label}</span>
                 )}
                 {readOnly || editingTitle ? null : (
                     <Drag.NoDrag>
@@ -2213,7 +2254,7 @@ function StoryConnectionView(props: { data: StoryConnection }): JSX.Element | nu
     // Sankey-style branch glow: prereq edges feeding a branch carry its hue, so a branch's flow
     // reads as one coloured strand even where it crosses other paths.
     // `?? null` matters: the connection plugin's transient drag pseudo-connection is a plain
-    // ClassicPreset.Connection with no `branch` field (undefined) — coalesce it so the guard below
+    // ClassicPreset.Connection with no `branch` field (undefined) - coalesce it so the guard below
     // doesn't call branchColor(undefined).
     const branch = props.data.branch ?? null;
     const c = branch !== null ? branchColor(branch) : null;
@@ -2257,6 +2298,25 @@ const GlobalStyle = createGlobalStyle`
         font-size: var(--vscode-font-size);
         color: var(--vscode-editor-foreground);
         background: var(--vscode-editor-background);
+        /* This is a canvas app, not a document: nearly every pointer gesture is a drag (pan, node
+           move, socket wiring), and a drag that starts on a label or ends over the dock would
+           otherwise leave a text selection behind. A live selection then hijacks subsequent
+           drags - the browser extends the selection instead of letting the gesture through, so
+           panning appears to stop working. Selection is re-enabled below only where typing or
+           copying is the point. */
+        user-select: none;
+        -webkit-user-select: none;
+    }
+    /* Text entry needs a caret and selection to be usable at all. */
+    input, textarea {
+        user-select: text;
+        -webkit-user-select: text;
+    }
+    /* Diagnostic messages and sim log lines are worth copying out, and neither panel has a drag
+       gesture of its own, so a selection there can't strand one. */
+    .problem-msg, .sim-log-line {
+        user-select: text;
+        -webkit-user-select: text;
     }
 
     /* Jump-to-node flash: a bright pulsing ring so a diagnostic's culprit node is unmistakable in
@@ -2274,7 +2334,7 @@ const GlobalStyle = createGlobalStyle`
         z-index: 5;
     }
 
-    /* Server-backed suggestion dropdown (RefValueInput) — global because it renders both inside
+    /* Server-backed suggestion dropdown (RefValueInput) - global because it renders both inside
        Event node bodies and in the toolbar's create forms. */
     .suggest {
         position: relative;
@@ -2304,7 +2364,7 @@ const GlobalStyle = createGlobalStyle`
     }
     .suggest-item:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.2)); }
 
-    /* Diagnostic severity accents — node header badges and the problems list. */
+    /* Diagnostic severity accents - node header badges and the problems list. */
     .diag-badge {
         font-size: 10px;
         font-weight: bold;
@@ -2313,13 +2373,13 @@ const GlobalStyle = createGlobalStyle`
     .diag-badge.diag-error { color: var(--vscode-errorForeground, #f44); }
     .diag-badge.diag-warning { color: var(--vscode-charts-yellow, #cca700); }
 
-    /* Immutable-type chips — used in node bodies and the toolbar's create form. */
+    /* Immutable-type chips - used in node bodies and the toolbar's create form. */
     .type-chip {
         padding: 1px 6px;
         border: 1px solid var(--vscode-panel-border);
         border-radius: 3px;
         background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
-        /* Pair the text with the badge background — without this the chip inherited the dark
+        /* Pair the text with the badge background - without this the chip inherited the dark
            editor foreground and read as near-black on the theme's (often blue) badge colour. */
         color: var(--vscode-badge-foreground, var(--vscode-editor-foreground));
         overflow: hidden;
@@ -2400,8 +2460,14 @@ const Shell = styled.div`
     .canvas-area { flex: 1; position: relative; overflow: hidden; }
     .canvas { position: absolute; inset: 0; z-index: 1; }
 
-    /* Swimlane overlay sits behind the rete nodes (z-index below .canvas) and never eats pointers. */
-    .swimlanes { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+    /* Zero-size anchor at the graph origin inside rete's transformed content holder: its absolutely
+       positioned children are therefore laid out in graph coordinates and inherit pan/zoom.
+       z-index:-1 (not DOM order) keeps it beneath the nodes AND the connections - rete's content
+       manager re-orders holder children as nodes/connections come and go, and it inserts
+       connections ahead of a merely-prepended element, which left the lanes painting over the
+       edges. The holder's will-change:transform makes it a stacking context, so the negative
+       index stays contained here. */
+    .swimlane-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; z-index: -1; }
     .swimlane { position: absolute; border: 1.5px solid; border-radius: 10px; box-sizing: border-box; }
     .swimlane-chapter { border-style: dashed; }
     .swimlane-title {
@@ -2504,7 +2570,7 @@ const Shell = styled.div`
     .rotary-pos .codicon { font-size: 13px; }
     .sim-head .codicon { font-size: 13px; vertical-align: -1px; }
 
-    /* Rotary mode switch — large clickable readout (cycles modes) with the three modes on an arc above. */
+    /* Rotary mode switch - large clickable readout (cycles modes) with the three modes on an arc above. */
     .rotary { position: relative; width: 100px; height: 72px; flex-shrink: 0; }
     .rotary-center {
         position: absolute;
@@ -2576,7 +2642,7 @@ const Shell = styled.div`
     .palette-head.toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
     .palette-head.toggle:hover { color: var(--vscode-editor-foreground); }
     .palette-head .palette-count { margin-left: auto; font-weight: normal; opacity: 0.6; }
-    /* Colour family: just a gap between groups — no box (the tile tint is the grouping). */
+    /* Colour family: just a gap between groups - no box (the tile tint is the grouping). */
     .tile-family { margin-bottom: 7px; }
     /* auto-rows keeps every tile the same (fixed-minimum) height, whatever its label wrapping. */
     .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(46px, auto); gap: 4px; }
@@ -2599,7 +2665,7 @@ const Shell = styled.div`
         line-height: 1.15;
         text-align: center;
         width: 100%;
-        /* Never truncate a type name — wrap it instead. */
+        /* Never truncate a type name - wrap it instead. */
         white-space: normal;
         overflow-wrap: anywhere;
         word-break: break-word;
@@ -2765,6 +2831,11 @@ function App(): JSX.Element {
     const [simState, setSimState] = useState<SimState | null>(null);
     const simRef = useRef<SimState | null>(null);
     const [mode, setMode] = useState<EditorMode>('view');
+    // Which modes the flags permit. Both default off, matching the extension's own fallbacks, so a
+    // panel that somehow never receives the message stays read-only rather than offering modes whose
+    // every request the server would reject. View is implied - the panel wouldn't open without it.
+    const [availableModes, setAvailableModes] = useState<{ edit: boolean; simulate: boolean }>(
+        { edit: false, simulate: false });
     const [problems, setProblems] = useState<StoryDiagnosticDto[]>([]);
     const [showProblems, setShowProblems] = useState(false);
     const [showSimLog, setShowSimLog] = useState(true);
@@ -2773,7 +2844,7 @@ function App(): JSX.Element {
     // Swimlane overlays, toggled independently (persisted per-workspace via WorkspaceSettings).
     const [showThreadLanes, setShowThreadLanes] = useState(false);
     const [showChapterLanes, setShowChapterLanes] = useState(false);
-    // Count of unsaved staged edits — drives the Save button's enabled/dirty state.
+    // Count of unsaved staged edits - drives the Save button's enabled/dirty state.
     const [pendingCount, setPendingCount] = useState(0);
     const [saving, setSaving] = useState(false);
 
@@ -2784,7 +2855,7 @@ function App(): JSX.Element {
             setPendingCount(pendingCommands.length);
             setValidated(false); // the staged set changed → the last validation is stale
             // Mirror the queue to the extension so it can offer to save if the tab is closed while
-            // dirty (a disposed webview can't prompt — the panel owns that).
+            // dirty (a disposed webview can't prompt - the panel owns that).
             vscode.postMessage({ type: 'pendingSync', commands: [...pendingCommands] });
         };
         return () => { onPendingChanged = () => { /* detached on unmount */ }; };
@@ -2801,7 +2872,7 @@ function App(): JSX.Element {
     }, []);
 
     // When a Save is triggered by leaving Edit with unsaved changes, the mode switch waits for the
-    // save to land (View/Simulate must run against committed text) — this holds the target mode.
+    // save to land (View/Simulate must run against committed text) - this holds the target mode.
     const pendingModeAfterSave = useRef<EditorMode | null>(null);
 
     const doSwitchMode = useCallback((next: EditorMode) => {
@@ -2816,6 +2887,10 @@ function App(): JSX.Element {
     }, []);
 
     const switchMode = useCallback((next: EditorMode) => {
+        // A disabled mode is not offered by the switch, but guard here too - this is the single
+        // funnel every mode change goes through, including the centre-button cycle.
+        if ((next === 'edit' && !availableModes.edit)
+            || (next === 'simulate' && !availableModes.simulate)) { return; }
         // Leaving Edit with unsaved staged changes → ask (the panel shows the modal and replies with
         // 'dirtyExitChoice'); the switch happens then. Simulate/View therefore run on committed text.
         if (mode === 'edit' && next !== 'edit' && hasPendingChanges()) {
@@ -2823,7 +2898,7 @@ function App(): JSX.Element {
             return;
         }
         doSwitchMode(next);
-    }, [mode, doSwitchMode]);
+    }, [mode, doSwitchMode, availableModes]);
 
     const onCanvasDragOver = useCallback((e: DragEvent): void => {
         if (mode !== 'edit') { return; }
@@ -2833,8 +2908,8 @@ function App(): JSX.Element {
 
     /**
      * Creates a new event node directly on the canvas (no toolbar form): a unique default name in
-     * the nearest thread, at `position`, optionally pre-typed. Everything about it — the name,
-     * Branch/Perpetual/Dialog, and trigger/reward types (dropped on) — is then editable in the node
+     * the nearest thread, at `position`, optionally pre-typed. Everything about it - the name,
+     * Branch/Perpetual/Dialog, and trigger/reward types (dropped on) - is then editable in the node
      * body. The name is auto so the user can just drop and rename in place.
      */
     const createEventAt = useCallback((
@@ -2844,14 +2919,14 @@ function App(): JSX.Element {
         if (!handle) { return; }
         const thread = handle.nearestEventThread(position, threads);
         if (!thread) {
-            setStatus('This campaign has no thread file to add events to — create a thread first.');
+            setStatus('This campaign has no thread file to add events to - create a thread first.');
             return;
         }
         const taken = new Set(handle.eventLabels());
         let name = 'New_Event';
         for (let i = 2; taken.has(name); i++) { name = `New_Event_${i}`; }
         handle.presetPosition(thread, name, position);
-        // Open the new node's rename box as soon as it materialises — drop then type the name.
+        // Open the new node's rename box as soon as it materialises - drop then type the name.
         pendingAutoRename.add(autoRenameKey(thread, name));
         sendCommand({ kind: 'createEvent', threadUri: thread, newName: name, eventType: eventType || null });
     }, [threads]);
@@ -2862,7 +2937,7 @@ function App(): JSX.Element {
         if (!raw) { return; }
         e.preventDefault();
         const drag = JSON.parse(raw) as PaletteDrag;
-        // Types attach by dropping onto a node (data-node-id lookup, not geometry) — and only
+        // Types attach by dropping onto a node (data-node-id lookup, not geometry) - and only
         // into an EMPTY slot: types are immutable, an occupied slot must be cleared (✕) first.
         const targetId = e.target instanceof HTMLElement
             ? e.target.closest('[data-node-id]')?.getAttribute('data-node-id') ?? null
@@ -2879,7 +2954,7 @@ function App(): JSX.Element {
             return;
         }
         if (drag.category === 'trigger' && target) {
-            // Tactical triggers need their manifest-file form — no drop-on-node shortcut for them.
+            // Tactical triggers need their manifest-file form - no drop-on-node shortcut for them.
             if (drag.type && !target.eventType && !TACTICAL_EVENT_TYPES.has(drag.type)) {
                 sendCommand({
                     kind: 'setEventType', threadUri: target.threadUri, eventName: target.eventName,
@@ -2889,7 +2964,7 @@ function App(): JSX.Element {
             return;
         }
         if (drag.category === 'andJunction' || drag.category === 'orJunction') {
-            // Local-only — no server command, no create form. Wiring it up is itself the gesture.
+            // Local-only - no server command, no create form. Wiring it up is itself the gesture.
             const position = editorRef.current?.toGraphPosition(e.clientX, e.clientY) ?? null;
             if (position) {
                 editorRef.current?.createStagingJunction(
@@ -2901,7 +2976,7 @@ function App(): JSX.Element {
         if (!position) { return; }
         // Land/space tactical triggers still need the dedicated manifest-file form (their plot
         // file is mandatory and can't be filled in-node later); everything else drops as an
-        // editable node straight onto the canvas — no toolbar form.
+        // editable node straight onto the canvas - no toolbar form.
         if (drag.type && TACTICAL_EVENT_TYPES.has(drag.type)) {
             setCreateRequest({ ...drag, category: 'tactical', position });
             return;
@@ -2980,7 +3055,7 @@ function App(): JSX.Element {
                     setEventTypes((msg.eventTypes as string[] | undefined) ?? []);
                     setRewardTypes((msg.rewardTypes as string[] | undefined) ?? []);
                     // EventNodeView is rendered by rete's own portal pipeline, not as an App
-                    // child, so it can't receive these as React props — mirrored into module
+                    // child, so it can't receive these as React props - mirrored into module
                     // scope (eventTypeParams/rewardTypeParams/untestedTypes) for that reason.
                     eventTypeParams.clear();
                     for (const [name, params] of Object.entries(
@@ -2996,17 +3071,17 @@ function App(): JSX.Element {
                     break;
                 }
                 case 'graph': {
-                    // A preview (staged structural change) always patches in place — never re-layout,
-                    // so the viewport and node positions stay put — and must not consume a pending
+                    // A preview (staged structural change) always patches in place - never re-layout,
+                    // so the viewport and node positions stay put - and must not consume a pending
                     // full render queued by a real fetch/filter change.
                     const full = msg.preview ? false : fullRenderRef.current;
                     if (!msg.preview) { fullRenderRef.current = false; }
                     const graphNodes = (msg.nodes as StoryGraphNodeDto[] | undefined) ?? [];
-                    // Big campaigns render hundreds of full form nodes — collapse the Trigger and
+                    // Big campaigns render hundreds of full form nodes - collapse the Trigger and
                     // Reward sections by default past a threshold so first paint (and every later
                     // measure) touches far less DOM. Only seeds nodes with no explicit choice yet,
                     // so a user's expand/collapse persists across refreshes. Must run BEFORE the
-                    // graph is applied — buildFull reads collapse state when it measures heights.
+                    // graph is applied - buildFull reads collapse state when it measures heights.
                     if (graphNodes.length > LARGE_GRAPH_NODE_COUNT) {
                         for (const dto of graphNodes) {
                             if (dto.kind === 'Event' && !collapsedSections.has(dto.id)) {
@@ -3040,7 +3115,7 @@ function App(): JSX.Element {
                 case 'diagnostics': {
                     const diags = (msg.diagnostics as StoryDiagnosticDto[] | undefined) ?? [];
                     // Repaint only the nodes whose marker set actually changed (union of before
-                    // and after), not every node — a whole-graph refreshMode() here was a real
+                    // and after), not every node - a whole-graph refreshMode() here was a real
                     // hitch on large campaigns.
                     const affected = new Set<string>(nodeDiagnostics.keys());
                     nodeDiagnostics.clear();
@@ -3053,7 +3128,7 @@ function App(): JSX.Element {
                     }
                     setProblems(diags);
                     setValidated(true); // a validation run just completed
-                    // Validate is the only source of diagnostics now — auto-open the bottom panel
+                    // Validate is the only source of diagnostics now - auto-open the bottom panel
                     // when there's something to show (clean run just greens the Validate button).
                     setShowProblems(diags.length > 0);
                     editorRef.current?.repaintNodes(affected);
@@ -3066,18 +3141,21 @@ function App(): JSX.Element {
                     setShowThreadLanes(msg.showThreadLanes === true);
                     setShowChapterLanes(msg.showChapterLanes === true);
                     break;
+                case 'availableModes':
+                    setAvailableModes({ edit: msg.edit === true, simulate: msg.simulate === true });
+                    break;
                 case 'confirmStageResult':
                     if (msg.proceed) { stageCommand(msg.payload as Record<string, unknown>); }
                     break;
                 case 'saveResult':
                     setSaving(false);
                     // Success clears the queue; the server's storyGraphChanged then reconciles the
-                    // graph to committed truth. Failure keeps the queue — the panel surfaced the
+                    // graph to committed truth. Failure keeps the queue - the panel surfaced the
                     // error and named the offending change, so the user can fix and re-save.
                     if (msg.success) {
                         clearPendingCommands();
                         // A successful save returns to View mode (a dirty-exit save targets whatever
-                        // mode the user was switching to — View or Simulate).
+                        // mode the user was switching to - View or Simulate).
                         doSwitchMode(pendingModeAfterSave.current ?? 'view');
                         pendingModeAfterSave.current = null;
                     } else {
@@ -3091,7 +3169,7 @@ function App(): JSX.Element {
                         saveEdits();
                     } else if (msg.choice === 'discard') {
                         clearPendingCommands();
-                        // Staged edits were local-only — re-fetch to drop them and show committed state.
+                        // Staged edits were local-only - re-fetch to drop them and show committed state.
                         vscode.postMessage({ type: 'fetch', filters: filtersRef.current });
                         doSwitchMode(next);
                     }
@@ -3183,12 +3261,9 @@ function App(): JSX.Element {
             ) : null}
             <div className="body">
                 <div className="canvas-area">
-                    {showThreadLanes || showChapterLanes ? (
-                        <div className="swimlanes">
-                            {showThreadLanes ? <SwimlaneOverlay getHandle={() => editorRef.current} by="thread" /> : null}
-                            {showChapterLanes ? <SwimlaneOverlay getHandle={() => editorRef.current} by="chapter" /> : null}
-                        </div>
-                    ) : null}
+                    {/* These render into rete's content holder via a portal, not here. */}
+                    {showThreadLanes ? <SwimlaneOverlay getHandle={() => editorRef.current} by="thread" /> : null}
+                    {showChapterLanes ? <SwimlaneOverlay getHandle={() => editorRef.current} by="chapter" /> : null}
                     <div
                         className="canvas" ref={containerRef}
                         onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
@@ -3203,14 +3278,14 @@ function App(): JSX.Element {
                                 className={'icon-btn header-left' + (pendingCount > 0 ? ' active' : '')}
                                 disabled={pendingCount === 0 || saving}
                                 onClick={saveEdits}
-                                title="Save — write all staged changes to the XML files"
+                                title="Save - write all staged changes to the XML files"
                             ><span className="codicon codicon-save" />{pendingCount > 0 ? ` ${pendingCount}` : ''}</button>
                         ) : null}
-                        <RotaryModeSwitch mode={mode} onSelect={switchMode} />
+                        <RotaryModeSwitch mode={mode} onSelect={switchMode} available={availableModes} />
                         <button
                             className={'icon-btn validate-btn header-right sev-' + severity}
                             onClick={() => { validateEdits(); }}
-                            title="Validate — check the story for problems (opens the panel below)"
+                            title="Validate - check the story for problems (opens the panel below)"
                         ><span className={'codicon codicon-' + severityIcon} />{problems.length ? ` ${problems.length}` : ''}</button>
                     </div>
                     <div className="dock-content">
@@ -3243,7 +3318,7 @@ function App(): JSX.Element {
                                         setLayouting(true);
                                         void handle.autoArrange().finally(() => setLayouting(false));
                                     }}
-                                    title="Arrange — recompute the automatic layout"
+                                    title="Arrange - recompute the automatic layout"
                                 ><span className="codicon codicon-type-hierarchy" /></button>
                                 <button className="icon-btn" onClick={() => editorRef.current?.fit()} title="Fit graph to view">
                                     <span className="codicon codicon-screen-full" />
@@ -3307,7 +3382,7 @@ let simBarHeightMemo = 140;
  * Pointer-capture drag resizing for one panel edge. `axis` maps pointer movement to growth:
  * 'e' = dragging right grows (a left panel's right edge), 'w' = dragging left grows (a right dock's
  * left edge), 'n' = dragging up grows (a bottom bar's top edge). Plain pointer capture on the handle
- * — no window listeners to leak.
+ * - no window listeners to leak.
  */
 function useEdgeResize(
     initial: number, min: number, max: number, axis: 'e' | 'w' | 'n', persist: (v: number) => void,
@@ -3389,7 +3464,7 @@ function ProblemsBar(props: {
 }
 
 /** The running simulation: clock, flag inspector, intervention queue, and the step log. */
-/** The simulation driver controls — clock, flags, and pending interventions — stacked for the dock. */
+/** The simulation driver controls - clock, flags, and pending interventions - stacked for the dock. */
 function SimControls(props: { state: SimState }): JSX.Element {
     const state = props.state;
     const [advanceBy, setAdvanceBy] = useState('10');
@@ -3398,7 +3473,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
     return (
         <div className="sim-controls">
             <div className="sim-section">
-                <div className="sim-head"><span className="codicon codicon-watch" /> Clock — {state.clock.toFixed(0)}s</div>
+                <div className="sim-head"><span className="codicon codicon-watch" /> Clock - {state.clock.toFixed(0)}s</div>
                 <div className="sim-row">
                     <input type="text" value={advanceBy} onChange={e => setAdvanceBy(e.target.value)} title="Seconds" />
                     <button onClick={() => {
@@ -3433,7 +3508,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
             </div>
             <div className="sim-section">
                 <div className="sim-head">Waiting on</div>
-                {state.interventions.length === 0 ? <div className="sim-row">nothing — story exhausted</div> : null}
+                {state.interventions.length === 0 ? <div className="sim-row">nothing - story exhausted</div> : null}
                 {state.interventions.map(i => (
                     <div className="sim-row" key={i.nodeId}>
                         <span className={'sim-kind k-' + i.kind}>{i.kind}</span>
@@ -3464,7 +3539,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
     );
 }
 
-/** The simulation step log — full-width bottom panel (VS Code-style), resizable by its top edge. */
+/** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
 function SimLog(props: { state: SimState; onClose: () => void }): JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
         simBarHeightMemo, 60, 320, 'n', v => { simBarHeightMemo = v; });
@@ -3475,7 +3550,9 @@ function SimLog(props: { state: SimState; onClose: () => void }): JSX.Element {
                 <span className="panel-title">Simulation log</span>
                 <button className="panel-close" onClick={props.onClose} title="Close"><span className="codicon codicon-close" /></button>
             </div>
-            {props.state.log.slice(-100).map((line, i) => <div key={i}>{line}</div>)}
+            {props.state.log.slice(-100).map((line, i) => (
+                <div className="sim-log-line" key={i}>{line}</div>
+            ))}
         </div>
     );
 }
@@ -3492,16 +3569,30 @@ const ROTARY_MODES: { id: EditorMode; icon: string; label: string; angle: number
 
 /**
  * A rotary-switch-style mode selector: the active mode's icon reads out large in the centre, the
- * three modes arc above it like a half horizon, and clicking one "rotates" to it.
+ * available modes arc above it like a half horizon, and clicking one "rotates" to it.
+ *
+ * Edit and Simulation are feature-flagged (both off by default), and a mode that is off is omitted
+ * entirely rather than shown disabled - there is nothing the user could do about it from here, and
+ * every request it makes would be refused server-side. Each mode keeps its fixed angle when others
+ * are hidden, so View stays where the eye expects it.
  */
-function RotaryModeSwitch(props: { mode: EditorMode; onSelect: (m: EditorMode) => void }): JSX.Element {
-    const active = ROTARY_MODES.find(m => m.id === props.mode) ?? ROTARY_MODES[0];
+function RotaryModeSwitch(props: {
+    mode: EditorMode; onSelect: (m: EditorMode) => void;
+    available: { edit: boolean; simulate: boolean };
+}): JSX.Element {
+    const enabled = ROTARY_MODES.filter(
+        m => (m.id === 'edit' ? props.available.edit
+            : m.id === 'simulate' ? props.available.simulate : true));
+    const active = enabled.find(m => m.id === props.mode) ?? enabled[0];
     const radius = 34;
-    const order: EditorMode[] = ['view', 'edit', 'simulate'];
-    const cycle = (): void => props.onSelect(order[(order.indexOf(props.mode) + 1) % order.length]);
+    const order = enabled.map(m => m.id);
+    const cycle = (): void => {
+        const at = order.indexOf(props.mode);
+        props.onSelect(order[(at + 1) % order.length]);
+    };
     return (
         <div className="rotary">
-            {ROTARY_MODES.map(m => {
+            {enabled.map(m => {
                 const rad = (m.angle * Math.PI) / 180;
                 const x = Math.cos(rad) * radius;
                 const y = Math.sin(rad) * radius;
@@ -3515,7 +3606,13 @@ function RotaryModeSwitch(props: { mode: EditorMode; onSelect: (m: EditorMode) =
                     ><span className={'codicon codicon-' + m.icon} /></button>
                 );
             })}
-            <button className="rotary-center" title={`${active.label} — click to switch mode`} onClick={cycle}>
+            <button
+                className="rotary-center"
+                title={order.length > 1
+                    ? `${active.label} - click to switch mode`
+                    : `${active.label} - the other modes are disabled in settings`}
+                onClick={cycle}
+            >
                 <span className={'codicon codicon-' + active.icon} />
             </button>
         </div>
@@ -3527,7 +3624,7 @@ const MINIMAP_H = 118;
 /**
  * A hand-built overview of the whole graph (the rete minimap plugin can only overlay the canvas, not
  * dock here). Draws every node scaled to the graph extent plus the current viewport rectangle;
- * click/drag pans. Width is dynamic — measured from its flex slot — with a fixed height. Stays live
+ * click/drag pans. Width is dynamic - measured from its flex slot - with a fixed height. Stays live
  * via the `onAreaChanged` bridge (pan/zoom/node-move) and re-reads node geometry on every render.
  */
 function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
@@ -3553,8 +3650,13 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
     if (!data || data.nodes.length === 0) {
         inner = <div className="minimap minimap-empty">no nodes</div>;
     } else {
+        // Extent comes from the NODES only. The viewport rect is measured in graph coordinates, so
+        // zooming out inflates it without bound (w = canvasWidth / k); letting it drive the extent
+        // collapsed `scale` toward zero and rendered every node sub-pixel - the minimap went blank
+        // exactly when a large campaign was zoomed out far enough to fit on screen. The viewport is
+        // still drawn, just clipped to the node extent.
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-        for (const r of [...data.nodes, data.viewport]) {
+        for (const r of data.nodes) {
             minX = Math.min(minX, r.x); minY = Math.min(minY, r.y);
             maxX = Math.max(maxX, r.x + r.w); maxY = Math.max(maxY, r.y + r.h);
         }
@@ -3578,14 +3680,26 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
                 onPointerMove={e => { if (dragging.current) { panFromEvent(e); } }}
                 onPointerUp={() => { dragging.current = false; }}
             >
-                <title>Overview — click or drag to navigate</title>
+                <title>Overview - click or drag to navigate</title>
                 {data.nodes.map((n, i) => (
                     <rect key={i} className="mm-node"
                         x={sx(n.x)} y={sy(n.y)} width={n.w * scale} height={n.h * scale} rx={1} />
                 ))}
-                <rect className="mm-view"
-                    x={sx(data.viewport.x)} y={sy(data.viewport.y)}
-                    width={data.viewport.w * scale} height={data.viewport.h * scale} />
+                {/* Clamped to the drawn extent so a zoomed-out viewport (which can be many times
+                    the graph's size) still reads as a bordered box hugging the edges, rather than
+                    an off-screen rectangle leaving only a flat wash of fill behind. */}
+                {(() => {
+                    const vx0 = Math.max(data.viewport.x, minX);
+                    const vy0 = Math.max(data.viewport.y, minY);
+                    const vx1 = Math.min(data.viewport.x + data.viewport.w, maxX);
+                    const vy1 = Math.min(data.viewport.y + data.viewport.h, maxY);
+                    return (
+                        <rect className="mm-view"
+                            x={sx(vx0)} y={sy(vy0)}
+                            width={Math.max(0, (vx1 - vx0) * scale)}
+                            height={Math.max(0, (vy1 - vy0) * scale)} />
+                    );
+                })()}
             </svg>
         );
     }
@@ -3601,19 +3715,20 @@ function laneColorFor(key: string): string {
 }
 
 /**
- * Tinted grouping rectangles drawn behind the nodes — one per thread or per chapter — that track
- * pan/zoom by applying the area transform to each group's graph-coordinate bounding box. Toggled
- * independently; thread lanes are solid, chapter lanes dashed, so the two can overlap legibly.
+ * Tinted grouping rectangles drawn behind the nodes - one per thread or per chapter. Rendered
+ * through a portal into rete's transformed content holder, so the boxes are positioned in raw
+ * GRAPH coordinates and rete's own pan/zoom transform carries them along with the nodes; there is
+ * deliberately no per-frame screen-space math here. Toggled independently; thread lanes are solid,
+ * chapter lanes dashed, so the two can overlap legibly.
  */
 function SwimlaneOverlay(props: {
     getHandle: () => EditorHandle | null; by: 'thread' | 'chapter';
 }): JSX.Element | null {
     const [, force] = useReducer((x: number) => x + 1, 0);
-    useEffect(() => subscribeAreaChange(() => force()), []);
+    useEffect(() => subscribeGeometryChange(() => force()), []);
     const handle = props.getHandle();
     if (!handle) { return null; }
-    const t = handle.getTransform();
-    return (
+    return createPortal(
         <>
             {handle.getGroupBounds(props.by).map(g => {
                 const color = laneColorFor(props.by + ':' + g.key);
@@ -3622,8 +3737,7 @@ function SwimlaneOverlay(props: {
                         key={g.key}
                         className={'swimlane swimlane-' + props.by}
                         style={{
-                            left: g.x * t.k + t.x, top: g.y * t.k + t.y,
-                            width: g.w * t.k, height: g.h * t.k,
+                            left: g.x, top: g.y, width: g.w, height: g.h,
                             borderColor: color,
                             background: `color-mix(in srgb, ${color} 7%, transparent)`,
                         }}
@@ -3632,11 +3746,12 @@ function SwimlaneOverlay(props: {
                     </div>
                 );
             })}
-        </>
+        </>,
+        handle.getSwimlaneLayer()
     );
 }
 
-/** Wires the palette's Tactical category to `createTacticalAttachment` — no other UI reaches it. */
+/** Wires the palette's Tactical category to `createTacticalAttachment` - no other UI reaches it. */
 function TacticalCreateBar(props: {
     threads: string[];
     initialType: string | null;
@@ -3683,13 +3798,13 @@ function TacticalCreateBar(props: {
  * then the Structure (AND/OR) group, then the long, collapsible Event-types and Rewards lists —
  * so the common actions aren't buried under 100+ type entries. Dropping New event / an Event type
  * on the canvas creates the node directly; dropping a Reward attaches it to the event node under
- * the cursor (see `onCanvasDrop`). Rewards default collapsed — you usually attach them onto a node
+ * the cursor (see `onCanvasDrop`). Rewards default collapsed - you usually attach them onto a node
  * rather than pick one to create.
  */
 /**
  * A CX-inspired colour family for a palette step, keyed heuristically off the type name (we have no
- * per-type art). The point is at-a-glance grouping — flags amber, event-control blue, combat red,
- * media purple, timing yellow — not an exact taxonomy.
+ * per-type art). The point is at-a-glance grouping - flags amber, event-control blue, combat red,
+ * media purple, timing yellow - not an exact taxonomy.
  */
 function stepColor(category: string, name: string | null): string {
     if (category === 'blank') { return 'var(--vscode-charts-foreground, #bbb)'; }
@@ -3712,7 +3827,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
 
     const eventTypes = props.eventTypes.filter(matches);
     const rewardTypes = props.rewardTypes.filter(matches);
-    // The structural actions (New event / AND / OR) always stay — the search only filters the types.
+    // The structural actions (New event / AND / OR) always stay - the search only filters the types.
     const showBlank = true;
     const showAndJunction = true;
     const showOrJunction = true;
@@ -3722,7 +3837,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
         e.dataTransfer.effectAllowed = 'copy';
     };
 
-    // The whole tile is washed in its family colour — no glyph (they were all identical). Structural
+    // The whole tile is washed in its family colour - no glyph (they were all identical). Structural
     // tiles (New/AND/OR) keep a distinguishing glyph since their shapes actually differ.
     const fadedBg = (color: string): string =>
         `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
@@ -3746,7 +3861,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
 
     /**
      * A collapsible type group. Its items are sub-grouped by colour family, each family in its own
-     * boxed grid (no family name — the colour is the label). An active search always expands.
+     * boxed grid (no family name - the colour is the label). An active search always expands.
      */
     const typeGroup = (
         label: string, category: 'trigger' | 'reward', items: string[], hint: string

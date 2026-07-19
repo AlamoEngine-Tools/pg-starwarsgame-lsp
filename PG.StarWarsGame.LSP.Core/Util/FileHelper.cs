@@ -43,7 +43,7 @@ public sealed class FileHelper : IFileHelper
             if (found is not null) return found;
         }
 
-        // XML-dir fallback: workspace root IS the data/xml/ directory — strip the prefix.
+        // XML-dir fallback: workspace root IS the data/xml/ directory - strip the prefix.
         const string xmlPrefix = "data/xml/";
         if (normalizedRelPath.StartsWith(xmlPrefix, StringComparison.OrdinalIgnoreCase))
         {

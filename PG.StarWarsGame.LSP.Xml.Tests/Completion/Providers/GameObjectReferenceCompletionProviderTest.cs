@@ -106,7 +106,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         Assert.False(Provider.CanHandle(tag));
     }
 
-    // ── GetProposals — no ObjectType ─────────────────────────────────────────
+    // ── GetProposals - no ObjectType ─────────────────────────────────────────
 
     [Fact]
     public void GetProposals_TagHasNoObjectType_ReturnsEmpty()
@@ -119,7 +119,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         Assert.Empty(result);
     }
 
-    // ── GetProposals — type filtering ────────────────────────────────────────
+    // ── GetProposals - type filtering ────────────────────────────────────────
 
     [Fact]
     public void GetProposals_FiltersSymbolsByObjectType()
@@ -144,7 +144,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         Assert.Single(result);
     }
 
-    // ── GetProposals — prefix filtering ──────────────────────────────────────
+    // ── GetProposals - prefix filtering ──────────────────────────────────────
 
     [Fact]
     public void GetProposals_FiltersSymbolsByPartialValue()
@@ -180,7 +180,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         Assert.Single(result);
     }
 
-    // ── GetProposals — baseline symbols ──────────────────────────────────────
+    // ── GetProposals - baseline symbols ──────────────────────────────────────
 
     [Fact]
     public void GetProposals_IncludesBaselineSymbols()
@@ -204,7 +204,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         Assert.Equal("Millennium_Falcon", result[0].Label);
     }
 
-    // ── GetProposals — Detail from Description ───────────────────────────────
+    // ── GetProposals - Detail from Description ───────────────────────────────
 
     [Fact]
     public void GetProposals_SymbolWithDescription_SetsDetail()
@@ -224,7 +224,7 @@ public sealed class GameObjectReferenceCompletionProviderTest
         Assert.Equal("Rebel starfighter", result[0].Detail);
     }
 
-    // ── GetProposals — GameObjectType wildcard ───────────────────────────────
+    // ── GetProposals - GameObjectType wildcard ───────────────────────────────
 
     [Fact]
     public void GetProposals_GameObjectType_ReturnsAllSymbolsRegardlessOfType()

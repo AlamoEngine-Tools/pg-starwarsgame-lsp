@@ -34,6 +34,7 @@ public sealed class GetStoryPlotsHandler(
         foreach (var campaign in chain.Campaigns)
         {
             var model = modelService.GetCampaignModel(campaign.Name);
+
             // Manifest entries use engine casing; canonical thread URIs are lowercase.
             string? ResolveUri(string thread)
             {
@@ -47,12 +48,12 @@ public sealed class GetStoryPlotsHandler(
                 manifestsByFile.TryGetValue(faction.ManifestFile, out var contents);
                 var threads = new List<StoryPlotThreadDto>();
                 foreach (var thread in contents?.ActiveThreads ?? [])
-                    threads.Add(new StoryPlotThreadDto(thread, Suspended: false, ResolveUri(thread)));
+                    threads.Add(new StoryPlotThreadDto(thread, false, ResolveUri(thread)));
                 foreach (var thread in contents?.SuspendedThreads ?? [])
                 {
                     var uri = ResolveUri(thread);
                     threads.Add(new StoryPlotThreadDto(thread,
-                        Suspended: uri is null || model!.SuspendedThreadUris.Contains(uri), uri));
+                        uri is null || model!.SuspendedThreadUris.Contains(uri), uri));
                 }
 
                 var luaScripts = new List<StoryLuaScriptDto>();
@@ -226,7 +227,7 @@ public sealed class GetStoryParamOptionsHandler(
         var prefix = request.Prefix ?? string.Empty;
         var limit = request.Limit is int l and > 0 ? l : DefaultLimit;
 
-        // Story-scoped names resolve campaign-wide — the campaign model gives a far tighter
+        // Story-scoped names resolve campaign-wide - the campaign model gives a far tighter
         // candidate set than the index (which mixes every campaign's names together).
         var campaignScoped = CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, prefix);
         if (campaignScoped is not null)
@@ -242,7 +243,7 @@ public sealed class GetStoryParamOptionsHandler(
     /// <summary>
     ///     Candidates for the campaign-scoped story referenceTypes, from the campaign model:
     ///     event names, branches, thread files. Null when the referenceType is not one of them
-    ///     (flags/notifications included — their index symbols already give better coverage,
+    ///     (flags/notifications included - their index symbols already give better coverage,
     ///     e.g. Lua-side Story_Event ids, and the generic provider handles them).
     /// </summary>
     private IEnumerable<StoryParamOptionDto>? CampaignScopedOptions(
@@ -262,7 +263,7 @@ public sealed class GetStoryParamOptionsHandler(
             StoryReferenceTypes.Branch => events
                 .Select(e => e.Branch)
                 .Where(b => !string.IsNullOrEmpty(b))!,
-            _ => model.Threads.Select(t => FileNameOf(t.DocumentUri)),
+            _ => model.Threads.Select(t => FileNameOf(t.DocumentUri))
         };
 
         return names
@@ -297,7 +298,7 @@ public sealed class GetStoryDiagnosticsHandler(
             return Task.FromResult(new GetStoryDiagnosticsResult([],
                 $"Campaign '{request.Campaign}' was not found."));
 
-        // Graph node per event INSTANCE (reference identity — duplicate names get distinct
+        // Graph node per event INSTANCE (reference identity - duplicate names get distinct
         // disambiguated node ids, and StoryEvent's record equality would conflate them).
         var nodeByEvent = new Dictionary<StoryEvent, string>(ReferenceEqualityComparer.Instance);
         foreach (var node in model.Graph.Nodes)
@@ -344,7 +345,7 @@ public sealed class ResolveStoryReferenceHandler(
 
         if (symbol.Origin is not FileOrigin origin)
             return Task.FromResult(new ResolveStoryReferenceResult(
-                Error: $"'{request.Value}' is defined in the base game or an archive — " +
+                Error: $"'{request.Value}' is defined in the base game or an archive - " +
                        "there is no workspace file to open."));
 
         return Task.FromResult(new ResolveStoryReferenceResult(

@@ -183,7 +183,7 @@ public sealed class StorySimulatorTest
         snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Incrementer"));
         snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Incrementer"));
 
-        // 2 + 2×2 = 6 > 3 — the greater-than watcher fires after the second increment.
+        // 2 + 2×2 = 6 > 3 - the greater-than watcher fires after the second increment.
         Assert.Equal(6, snapshot.Runtime.Flags["FLAG_C"]);
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
     }
@@ -321,20 +321,26 @@ public sealed class StorySimulatorTest
                 new EnumValueDefinition
                 {
                     Name = "STORY_FLAG",
-                    Params = [new ParamDefinition
-                    {
-                        Position = 0, ValueType = XmlValueType.NameReference,
-                        ReferenceTypeName = StoryReferenceTypes.Flag
-                    }]
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.Flag
+                        }
+                    ]
                 },
                 new EnumValueDefinition
                 {
                     Name = "STORY_AI_NOTIFICATION",
-                    Params = [new ParamDefinition
-                    {
-                        Position = 0, ValueType = XmlValueType.NameReference,
-                        ReferenceTypeName = StoryReferenceTypes.Notification
-                    }]
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.Notification
+                        }
+                    ]
                 },
                 new EnumValueDefinition { Name = "STORY_GENERIC" }
             ]
@@ -348,38 +354,50 @@ public sealed class StorySimulatorTest
                 new EnumValueDefinition
                 {
                     Name = "TRIGGER_EVENT",
-                    Params = [new ParamDefinition
-                    {
-                        Position = 0, ValueType = XmlValueType.NameReference,
-                        ReferenceTypeName = StoryReferenceTypes.EventName
-                    }]
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.EventName
+                        }
+                    ]
                 },
                 new EnumValueDefinition
                 {
                     Name = "SET_FLAG",
-                    Params = [new ParamDefinition
-                    {
-                        Position = 0, ValueType = XmlValueType.NameReference,
-                        ReferenceTypeName = StoryReferenceTypes.Flag
-                    }]
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.Flag
+                        }
+                    ]
                 },
                 new EnumValueDefinition
                 {
                     Name = "INCREMENT_FLAG",
-                    Params = [new ParamDefinition
-                    {
-                        Position = 0, ValueType = XmlValueType.NameReference,
-                        ReferenceTypeName = StoryReferenceTypes.Flag
-                    }]
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.Flag
+                        }
+                    ]
                 },
                 new EnumValueDefinition
                 {
                     Name = "DISABLE_STORY_EVENT",
-                    Params = [new ParamDefinition
-                    {
-                        Position = 0, ValueType = XmlValueType.NameReference,
-                        ReferenceTypeName = StoryReferenceTypes.EventName
-                    }]
+                    Params =
+                    [
+                        new ParamDefinition
+                        {
+                            Position = 0, ValueType = XmlValueType.NameReference,
+                            ReferenceTypeName = StoryReferenceTypes.EventName
+                        }
+                    ]
                 },
                 new EnumValueDefinition { Name = "STORY_ELEMENT" }
             ]

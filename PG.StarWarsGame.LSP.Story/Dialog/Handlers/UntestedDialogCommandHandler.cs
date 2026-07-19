@@ -14,7 +14,7 @@ public sealed class UntestedDialogCommandHandler : IDialogDiagnosticsHandler
 
         var command = fact.Command;
         yield return new DialogDiagnostic(XmlDiagnosticSeverity.Warning,
-            $"'{command.Name}' is documented but untested — it may not work in the engine.",
+            $"'{command.Name}' is documented but untested - it may not work in the engine.",
             command.Line, command.Column, command.Column + command.RawName.Length);
     }
 }

@@ -43,7 +43,7 @@ public sealed class XmlDuplicateTagHandlerTest
     {
         // The engine ignores everything but the last occurrence - grey out the dead ones so the
         // user is prompted to investigate.
-        var fact = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4], IsLastOccurrence: false);
+        var fact = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4], false);
         var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
         Assert.NotNull(d.Tags);
         Assert.Contains(XmlDiagnosticTag.Unnecessary, d.Tags!);
@@ -52,7 +52,7 @@ public sealed class XmlDuplicateTagHandlerTest
     [Fact]
     public void Last_occurrence_is_not_tagged_unnecessary()
     {
-        var fact = new XmlDuplicateTagFact("file:///test.xml", 6, 0, 11, Tag, [2, 4], IsLastOccurrence: true);
+        var fact = new XmlDuplicateTagFact("file:///test.xml", 6, 0, 11, Tag, [2, 4], true);
         var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
         Assert.True(d.Tags is null || !d.Tags.Contains(XmlDiagnosticTag.Unnecessary));
     }
@@ -60,8 +60,8 @@ public sealed class XmlDuplicateTagHandlerTest
     [Fact]
     public void Every_occurrence_offers_the_remove_earlier_duplicates_fix()
     {
-        var earlier = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4], IsLastOccurrence: false);
-        var last = new XmlDuplicateTagFact("file:///test.xml", 4, 0, 11, Tag, [2], IsLastOccurrence: true);
+        var earlier = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4], false);
+        var last = new XmlDuplicateTagFact("file:///test.xml", 4, 0, 11, Tag, [2], true);
 
         Assert.True(Assert.Single(Sut.Handle(earlier, XmlHandlerTestFixtures.EmptyCtx)).OfferRemoveEarlierDuplicates);
         Assert.True(Assert.Single(Sut.Handle(last, XmlHandlerTestFixtures.EmptyCtx)).OfferRemoveEarlierDuplicates);

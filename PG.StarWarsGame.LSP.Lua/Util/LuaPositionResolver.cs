@@ -12,7 +12,7 @@ public static class LuaPositionResolver
     {
         return DocumentPositionResolver.FindAtPosition(
             docIndex, line, character,
-            referenceFilter: r => r.ExpectedKind == GameSymbolKind.LuaGlobal || r.ExpectedKind == GameSymbolKind.XmlObject,
-            symbolRangeLength: s => s.Kind == GameSymbolKind.LuaGlobal ? 0 : null);
+            r => r.ExpectedKind == GameSymbolKind.LuaGlobal || r.ExpectedKind == GameSymbolKind.XmlObject,
+            s => s.Kind == GameSymbolKind.LuaGlobal ? 0 : null);
     }
 }

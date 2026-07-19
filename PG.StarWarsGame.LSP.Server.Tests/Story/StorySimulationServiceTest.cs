@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -60,8 +61,8 @@ public sealed class StorySimulationServiceTest
 
         Assert.Null(error);
         Assert.True(state!.Running);
-        Assert.Contains(state.Nodes, n => n.Lifecycle == "Fired");   // Begin (elapsed 0)
-        Assert.Contains(state.Nodes, n => n.Lifecycle == "Armed");   // Manual
+        Assert.Contains(state.Nodes, n => n.Lifecycle == "Fired"); // Begin (elapsed 0)
+        Assert.Contains(state.Nodes, n => n.Lifecycle == "Armed"); // Manual
         Assert.Equal(["GC"], notified);
     }
 
@@ -170,17 +171,6 @@ public sealed class StorySimulationServiceTest
     {
         private static readonly StoryCampaignModel Model = BuildModel();
 
-        private static StoryCampaignModel BuildModel()
-        {
-            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
-            return new StoryCampaignModel("GC", [thread],
-                new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new SimEnumSchema()).Build([thread]))
-            {
-                LuaScripts = ["Story_Lua"]
-            };
-        }
-
         public IReadOnlyList<string> GetCampaignNames()
         {
             return ["GC"];
@@ -204,6 +194,17 @@ public sealed class StorySimulationServiceTest
         public IReadOnlyList<string> GetInvalidatedCampaigns()
         {
             return [];
+        }
+
+        private static StoryCampaignModel BuildModel()
+        {
+            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
+            return new StoryCampaignModel("GC", [thread],
+                new HashSet<string>(StringComparer.Ordinal),
+                new StoryGraphBuilder(new SimEnumSchema()).Build([thread]))
+            {
+                LuaScripts = ["Story_Lua"]
+            };
         }
     }
 
@@ -305,7 +306,7 @@ public sealed class StorySimulationServiceTest
         {
         }
 
-        public void ApplyAssetFiles(Core.Assets.IAssetFileIndex index)
+        public void ApplyAssetFiles(IAssetFileIndex index)
         {
         }
 

@@ -230,7 +230,7 @@ public sealed class XmlHoverHandlerTest
     public async Task Handle_HoverRange_MatchesTagNameSpan()
     {
         var (handler, host, schema, _) = Build();
-        // "<Root>\n<Foo/>\n</Root>" — on line 1, 'F' at col 1, length 3
+        // "<Root>\n<Foo/>\n</Root>" - on line 1, 'F' at col 1, length 3
         host.AddOrUpdate(TestUri.ToString(), "<Root>\n<Foo/>\n</Root>", 1);
         schema.TagToReturn = MakeTag("Foo");
 
@@ -315,7 +315,7 @@ public sealed class XmlHoverHandlerTest
     [Fact]
     public async Task Handle_RegistryMappedMultiInstance_TypeContainerArbitraryName_ReturnsTypeHover()
     {
-        // "Fighter_Mk2" is an arbitrary element name — not a registered tag, so no hover.
+        // "Fighter_Mk2" is an arbitrary element name - not a registered tag, so no hover.
         var registry = new FakeFileTypeRegistry();
         registry.Register("test.xml", ImmutableArray.Create("SpaceUnit"));
         var (handler, host, schema, _) = Build(registry);
@@ -512,7 +512,7 @@ public sealed class XmlHoverHandlerTest
     [Fact]
     public async Task Handle_CrossTypePlaceholderId_ResolvesUsingExpectedTypeName()
     {
-        // Two symbols share the id "Null" — an SFXEvent placeholder and an unrelated TradeRouteLine
+        // Two symbols share the id "Null" - an SFXEvent placeholder and an unrelated TradeRouteLine
         // placeholder (the engine allows distinct types to share an id, e.g. "Null"/"Default"). The
         // reference's ExpectedTypeName ("SFXEvent") must disambiguate which one hover resolves to.
         var uri = TestUri.ToString();
@@ -523,7 +523,7 @@ public sealed class XmlHoverHandlerTest
         var reference = new GameReference("Null", GameSymbolKind.XmlObject, "SFXEvent", uri, 1, 18, 4);
         var doc = new DocumentIndex(uri, 1, ImmutableArray<GameSymbol>.Empty, ImmutableArray.Create(reference));
         // otherNull inserted first so untyped Resolve's stable-order tie-break would pick the WRONG
-        // symbol if ExpectedTypeName weren't consulted — proves the fix, not just insertion luck.
+        // symbol if ExpectedTypeName weren't consulted - proves the fix, not just insertion luck.
         var defs = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
             .Add("Null", ImmutableArray.Create(otherNull, sfxNull));
         var index = new GameIndex(BaselineIndex.Empty,
@@ -580,7 +580,7 @@ public sealed class XmlHoverHandlerTest
         schema.AddTagByName(AbilitiesContainerTag());
         schema.AddType(AbilityTypeDef("LuckyShotAttackAbility"));
 
-        // Line 2: "<Lucky_Shot_Attack_Ability Name="Luke_Shot">" — cursor on 'L'
+        // Line 2: "<Lucky_Shot_Attack_Ability Name="Luke_Shot">" - cursor on 'L'
         var result = await handler.Handle(At(2, 1), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -601,7 +601,7 @@ public sealed class XmlHoverHandlerTest
                 Description = new Dictionary<string, string> { ["en"] = "Unit category filter" }
             });
 
-        // Line 3: "<Applicable_Unit_Categories>..." — cursor on 'A'
+        // Line 3: "<Applicable_Unit_Categories>..." - cursor on 'A'
         var result = await handler.Handle(At(3, 1), CancellationToken.None);
 
         Assert.NotNull(result);
@@ -820,9 +820,11 @@ public sealed class XmlHoverHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

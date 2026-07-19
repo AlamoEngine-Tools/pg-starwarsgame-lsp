@@ -22,7 +22,7 @@ public sealed class SchemaBootstrapperTest
         // Barrier: blocks every HTTP request until at least 2 have started.
         // EaW schema = 1+ requests (first is _index.json); Lua schema = 1 request.
         // If sequential, the first request blocks here waiting for a second that never
-        // starts — deadlock. If parallel, both fire, the barrier opens, all requests
+        // starts - deadlock. If parallel, both fire, the barrier opens, all requests
         // get (failure) responses and both branches degrade gracefully.
         var handler = new BarrierHttpHandler(2);
         var bootstrapper = Build(new FakeHttpClientFactory(handler));
@@ -82,7 +82,7 @@ public sealed class SchemaBootstrapperTest
 
     /// <summary>
     ///     Blocks each request until <paramref name="releaseAfter" /> requests have started,
-    ///     then releases all (with 503 — both bootstrappers degrade gracefully on failure).
+    ///     then releases all (with 503 - both bootstrappers degrade gracefully on failure).
     /// </summary>
     private sealed class BarrierHttpHandler(int releaseAfter) : HttpMessageHandler
     {

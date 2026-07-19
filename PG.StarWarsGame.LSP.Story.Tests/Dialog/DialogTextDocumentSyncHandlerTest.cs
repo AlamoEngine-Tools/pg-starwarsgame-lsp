@@ -77,7 +77,7 @@ public sealed class DialogTextDocumentSyncHandlerTest
     [Fact]
     public async Task DidOpen_ScopeDisabled_IsIgnored()
     {
-        var (handler, host, revalidator) = Build(scopeEnabled: false);
+        var (handler, host, revalidator) = Build(false);
 
         await handler.Handle(Open(InScopeUri), CancellationToken.None);
 

@@ -145,10 +145,10 @@ public sealed class HttpSchemaProviderTest
             return YamlResponse(tagYaml, "v1");
         });
 
-        await provider.LoadAsync(); // first load — downloads + populates cache
+        await provider.LoadAsync(); // first load - downloads + populates cache
         fake.Requests.Clear();
 
-        await provider.LoadAsync(); // second load — cache hit; only manifest is fetched
+        await provider.LoadAsync(); // second load - cache hit; only manifest is fetched
 
         Assert.Single(fake.Requests);
         Assert.EndsWith("_index.json", fake.Requests[0].RequestUri!.ToString());
@@ -171,8 +171,8 @@ public sealed class HttpSchemaProviderTest
                 : NotModified();
         });
 
-        await provider.LoadAsync(); // first load — populates index
-        await provider.LoadAsync(); // second load — 304, should keep existing
+        await provider.LoadAsync(); // first load - populates index
+        await provider.LoadAsync(); // second load - 304, should keep existing
 
         Assert.NotNull(provider.GetTag("Tactical_Health"));
     }

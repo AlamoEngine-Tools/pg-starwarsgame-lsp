@@ -2,12 +2,12 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using PG.StarWarsGame.LSP.Xml.Commands;
@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Xml.Completion;
 using PG.StarWarsGame.LSP.Xml.Completion.Providers;
 using PG.StarWarsGame.LSP.Xml.HoverStrategies;
 using PG.StarWarsGame.LSP.Xml.InlayHints;
+using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -141,7 +142,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamEnumHandler>();
         // Story param object references (Planet, GameObjectType, …) are validated by the generic
-        // reference pipeline — the story symbol collector emits GameReferences for them.
+        // reference pipeline - the story symbol collector emits GameReferences for them.
         services.AddSingleton<IXmlDiagnosticsHandler, StoryParamUnknownSlotHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, StoryDialogReferenceHandler>();
 
@@ -153,7 +154,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlParseCache>(sp => new XmlParseCache(
             sp.GetRequiredService<IDocumentTextSource>(),
             sp.GetRequiredService<ServerOptions>().ParseCacheCapacity,
-            sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<XmlParseCache>>()));
+            sp.GetRequiredService<ILogger<XmlParseCache>>()));
 
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
@@ -162,14 +163,14 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
 
-        // Proposal system — add IXmlValueProposalProvider implementations here to register new providers
+        // Proposal system - add IXmlValueProposalProvider implementations here to register new providers
         services.AddSingleton<IXmlValueProposalRegistry, XmlValueProposalRegistry>();
         services.AddSingleton<IXmlValueProposalProvider, BooleanValueProposalProvider>();
         services.AddSingleton<IXmlValueProposalProvider, DynamicEnumValueProposalProvider>();
 
         services.AddSingleton<StoryParamValueProposalProvider>();
 
-        // Completion registry — add IXmlCompletionProvider implementations here for index-aware completion
+        // Completion registry - add IXmlCompletionProvider implementations here for index-aware completion
         services.AddSingleton<IXmlCompletionRegistry, XmlCompletionRegistry>();
         services.AddSingleton<IXmlCompletionProvider, GameObjectReferenceCompletionProvider>();
         services.AddSingleton<IXmlCompletionProvider, HardcodedSetCompletionProvider>();
@@ -179,19 +180,19 @@ public static class XmlLanguageServiceExtensions
         // boneName completion helper (resolved into BoneNameValueCompletionStrategy via DI)
         services.AddSingleton<BoneNameCompletionHelper>();
 
-        // Tag-name completion strategies — add IXmlTagNameCompletionStrategy implementations here
+        // Tag-name completion strategies - add IXmlTagNameCompletionStrategy implementations here
         services.AddSingleton<IXmlTagNameCompletionStrategyRegistry, XmlTagNameCompletionStrategyRegistry>();
         services.AddSingleton<IXmlTagNameCompletionStrategy, StoryEventTagNameStrategy>();
         services.AddSingleton<IXmlTagNameCompletionStrategy, StandardTagNameStrategy>();
 
-        // Tag-value completion strategies — add IXmlTagValueCompletionStrategy implementations here
+        // Tag-value completion strategies - add IXmlTagValueCompletionStrategy implementations here
         services.AddSingleton<IXmlTagValueCompletionStrategyRegistry, XmlTagValueCompletionStrategyRegistry>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, StoryParamValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, BoneNameValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, StandardValueCompletionStrategy>();
         services.AddSingleton<IXmlTagValueCompletionStrategy, TupleValueCompletionStrategy>();
 
-        // Code action providers — add IXmlCodeActionProvider implementations here to register new providers
+        // Code action providers - add IXmlCodeActionProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
         services.AddSingleton<IXmlCodeActionProvider, FixSuggestionCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
@@ -199,25 +200,25 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveEarlierDuplicatesCodeActionProvider>();
 
-        // Hover strategies — add IXmlHoverStrategy implementations here to register new strategies
+        // Hover strategies - add IXmlHoverStrategy implementations here to register new strategies
         services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();
         services.AddSingleton<IXmlHoverStrategy, ReferenceHoverStrategy>();
         services.AddSingleton<IXmlHoverStrategy, AssetHoverStrategy>();
         services.AddSingleton<IXmlHoverStrategy, TagNameHoverStrategy>();
 
-        // Code lens providers — add IXmlCodeLensProvider implementations here to register new providers
+        // Code lens providers - add IXmlCodeLensProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeLensRegistry, XmlCodeLensRegistry>();
         services.AddSingleton<IXmlCodeLensProvider, ReferencesCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, VariantCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, OverrideCodeLensProvider>();
 
-        // Inlay hint providers — add IXmlInlayHintProvider implementations here to register new providers
+        // Inlay hint providers - add IXmlInlayHintProvider implementations here to register new providers
         services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
 
-        // Variant inheritance (Variant_Of_Existing_Type) — workspace tag source feeds the
+        // Variant inheritance (Variant_Of_Existing_Type) - workspace tag source feeds the
         // EffectiveObjectResolver; shadows shipped-game baseline tags.
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
         services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();

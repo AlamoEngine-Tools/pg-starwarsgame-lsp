@@ -13,19 +13,21 @@ using PG.StarWarsGame.LSP.Lua.Schema;
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
 
 /// <summary>
-/// Regression tests verifying that Library/Dependency/Standalone tier classification
-/// and sandbox isolation work correctly when the workspace spans multiple mod projects
-/// (a root mod plus one or more dependency mods at lower layer ranks).
+///     Regression tests verifying that Library/Dependency/Standalone tier classification
+///     and sandbox isolation work correctly when the workspace spans multiple mod projects
+///     (a root mod plus one or more dependency mods at lower layer ranks).
 /// </summary>
 public sealed class CrossModTierClassificationTest
 {
     // ── URIs representing a two-mod workspace ────────────────────────────────
     // Base mod (dependency, lower rank) paths:
-    private const string BaseLibUri      = "file:///base_mod/data/scripts/library/baseutils.lua";
+    private const string BaseLibUri = "file:///base_mod/data/scripts/library/baseutils.lua";
+
     private const string BaseStandaloneUri = "file:///base_mod/data/scripts/ai/base_plan.lua";
+
     // Root (addon) mod paths:
-    private const string RootScriptUri  = "file:///addon_mod/data/scripts/story/rootscript.lua";
-    private const string RootLibUri     = "file:///addon_mod/data/scripts/library/addonutils.lua";
+    private const string RootScriptUri = "file:///addon_mod/data/scripts/story/rootscript.lua";
+    private const string RootLibUri = "file:///addon_mod/data/scripts/library/addonutils.lua";
 
     private static readonly IFileHelper s_fileHelper = new FileHelper(new MockFileSystem());
     private static readonly ILuaApiSchemaProvider s_emptySchema = new LuaApiSchemaProvider([]);
@@ -33,7 +35,9 @@ public sealed class CrossModTierClassificationTest
     // ── helpers ──────────────────────────────────────────────────────────────
 
     private static DocumentIndex MakeDoc(string uri, int rank = 0, params string[] requireArgs)
-        => new(uri, 1, [], [], ImmutableArray.Create(requireArgs), LayerRank: rank);
+    {
+        return new DocumentIndex(uri, 1, [], [], ImmutableArray.Create(requireArgs), LayerRank: rank);
+    }
 
     private static DocumentIndex MakeDocWithSymbol(string uri, string globalName, int rank = 0)
     {
@@ -56,13 +60,13 @@ public sealed class CrossModTierClassificationTest
         var workspaceDefs = ImmutableDictionary.CreateBuilder<string, ImmutableArray<GameSymbol>>(
             StringComparer.OrdinalIgnoreCase);
         foreach (var doc in docs.Values)
-            foreach (var sym in doc.Symbols)
-            {
-                workspaceDefs.TryGetValue(sym.Id, out var existing);
-                workspaceDefs[sym.Id] = existing.IsDefault
-                    ? [sym]
-                    : existing.Add(sym);
-            }
+        foreach (var sym in doc.Symbols)
+        {
+            workspaceDefs.TryGetValue(sym.Id, out var existing);
+            workspaceDefs[sym.Id] = existing.IsDefault
+                ? [sym]
+                : existing.Add(sym);
+        }
 
         return new GameIndex(
             BaselineIndex.Empty,
@@ -77,8 +81,8 @@ public sealed class CrossModTierClassificationTest
     public void GetTier_DepModLibraryFile_IsLibraryRegardlessOfModPath()
     {
         var docs = MakeDocs(
-            (BaseLibUri, MakeDoc(BaseLibUri, rank: 1)),
-            (RootScriptUri, MakeDoc(RootScriptUri, rank: 2)));
+            (BaseLibUri, MakeDoc(BaseLibUri, 1)),
+            (RootScriptUri, MakeDoc(RootScriptUri, 2)));
 
         var tier = LuaFileClassifier.GetTier(BaseLibUri, docs, s_fileHelper);
 
@@ -90,8 +94,8 @@ public sealed class CrossModTierClassificationTest
     {
         // base_plan.lua is in a non-library directory and nobody requires it
         var docs = MakeDocs(
-            (BaseStandaloneUri, MakeDoc(BaseStandaloneUri, rank: 1)),
-            (RootScriptUri, MakeDoc(RootScriptUri, rank: 2)));
+            (BaseStandaloneUri, MakeDoc(BaseStandaloneUri, 1)),
+            (RootScriptUri, MakeDoc(RootScriptUri, 2)));
 
         var tier = LuaFileClassifier.GetTier(BaseStandaloneUri, docs, s_fileHelper);
 
@@ -103,8 +107,8 @@ public sealed class CrossModTierClassificationTest
     {
         // Root mod explicitly requires base_plan; it becomes Dependency tier
         var docs = MakeDocs(
-            (BaseStandaloneUri, MakeDoc(BaseStandaloneUri, rank: 1)),
-            (RootScriptUri, MakeDoc(RootScriptUri, rank: 2, "base_plan")));
+            (BaseStandaloneUri, MakeDoc(BaseStandaloneUri, 1)),
+            (RootScriptUri, MakeDoc(RootScriptUri, 2, "base_plan")));
 
         var tier = LuaFileClassifier.GetTier(BaseStandaloneUri, docs, s_fileHelper);
 
@@ -115,10 +119,10 @@ public sealed class CrossModTierClassificationTest
     public void GetSharedUris_MultiModWorkspace_IncludesDepModLibraryAndExcludesStandalone()
     {
         var docs = MakeDocs(
-            (BaseLibUri, MakeDoc(BaseLibUri, rank: 1)),
-            (BaseStandaloneUri, MakeDoc(BaseStandaloneUri, rank: 1)),
-            (RootScriptUri, MakeDoc(RootScriptUri, rank: 2)),
-            (RootLibUri, MakeDoc(RootLibUri, rank: 2)));
+            (BaseLibUri, MakeDoc(BaseLibUri, 1)),
+            (BaseStandaloneUri, MakeDoc(BaseStandaloneUri, 1)),
+            (RootScriptUri, MakeDoc(RootScriptUri, 2)),
+            (RootLibUri, MakeDoc(RootLibUri, 2)));
 
         var shared = LuaFileClassifier.GetSharedUris(docs, s_fileHelper);
 
@@ -140,10 +144,10 @@ public sealed class CrossModTierClassificationTest
                                 function Base_Util() end
                                 """;
 
-        var baseLibDoc = MakeDocWithSymbol(BaseLibUri, "Base_Util", rank: 1);
-        var rootDoc    = MakeDoc(RootScriptUri, rank: 2, "baseutils");
-        var docs       = MakeDocs((BaseLibUri, baseLibDoc), (RootScriptUri, rootDoc));
-        var index      = BuildIndex(docs);
+        var baseLibDoc = MakeDocWithSymbol(BaseLibUri, "Base_Util", 1);
+        var rootDoc = MakeDoc(RootScriptUri, 2, "baseutils");
+        var docs = MakeDocs((BaseLibUri, baseLibDoc), (RootScriptUri, rootDoc));
+        var index = BuildIndex(docs);
 
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
             RootScriptUri, rootText, index, s_emptySchema, s_fileHelper);
@@ -158,15 +162,15 @@ public sealed class CrossModTierClassificationTest
     public void GlobalOverride_DepModStandaloneNotRequired_NoWarning()
     {
         // Root script defines the same function name as a standalone dep-mod file,
-        // but doesn't require it — no cross-sandbox bleed, no warning.
+        // but doesn't require it - no cross-sandbox bleed, no warning.
         const string rootText = """
                                 function Base_Plan() end
                                 """;
 
-        var baseDoc = MakeDocWithSymbol(BaseStandaloneUri, "Base_Plan", rank: 1);
-        var rootDoc = MakeDoc(RootScriptUri, rank: 2);
-        var docs    = MakeDocs((BaseStandaloneUri, baseDoc), (RootScriptUri, rootDoc));
-        var index   = BuildIndex(docs);
+        var baseDoc = MakeDocWithSymbol(BaseStandaloneUri, "Base_Plan", 1);
+        var rootDoc = MakeDoc(RootScriptUri, 2);
+        var docs = MakeDocs((BaseStandaloneUri, baseDoc), (RootScriptUri, rootDoc));
+        var index = BuildIndex(docs);
 
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
             RootScriptUri, rootText, index, s_emptySchema, s_fileHelper);
@@ -179,20 +183,20 @@ public sealed class CrossModTierClassificationTest
     {
         // Both the root and dep-mod standalone files define the same global name.
         // Since neither is in a shared (Library/Dependency) tier, the analyzer must NOT
-        // emit a cross-sandbox global-override warning — the sandboxes are isolated.
+        // emit a cross-sandbox global-override warning - the sandboxes are isolated.
         const string rootText = """
                                 function Shared_Impl() end
                                 """;
 
-        var depDoc  = MakeDocWithSymbol(BaseStandaloneUri, "Shared_Impl", rank: 1);
-        var rootDoc = MakeDoc(RootScriptUri, rank: 2);
-        var docs    = MakeDocs((BaseStandaloneUri, depDoc), (RootScriptUri, rootDoc));
-        var index   = BuildIndex(docs);
+        var depDoc = MakeDocWithSymbol(BaseStandaloneUri, "Shared_Impl", 1);
+        var rootDoc = MakeDoc(RootScriptUri, 2);
+        var docs = MakeDocs((BaseStandaloneUri, depDoc), (RootScriptUri, rootDoc));
+        var index = BuildIndex(docs);
 
         var diagnostics = LuaGlobalScopeAnalyzer.Analyze(
             RootScriptUri, rootText, index, s_emptySchema, s_fileHelper);
 
-        // No override warning — the dep-mod's standalone file is not in the shared URI set
+        // No override warning - the dep-mod's standalone file is not in the shared URI set
         Assert.DoesNotContain(diagnostics, d =>
             d.Severity == DiagnosticSeverity.Warning && d.Message.Contains("Shared_Impl"));
     }
@@ -203,12 +207,12 @@ public sealed class CrossModTierClassificationTest
     public void CompletionScope_RequiredDepModGlobal_AppearsAsRequiredGlobal()
     {
         // Root script requires the base lib; its global must appear in completion scope.
-        var baseDoc = MakeDocWithSymbol(BaseLibUri, "Base_Util", rank: 1);
+        var baseDoc = MakeDocWithSymbol(BaseLibUri, "Base_Util", 1);
         var rootDoc = new DocumentIndex(
             RootScriptUri, 1, [], [],
             ImmutableArray.Create("baseutils"),
             LayerRank: 2);
-        var docs  = MakeDocs((BaseLibUri, baseDoc), (RootScriptUri, rootDoc));
+        var docs = MakeDocs((BaseLibUri, baseDoc), (RootScriptUri, rootDoc));
         var index = BuildIndex(docs);
 
         var entries = LuaLocalScopeCollector.CollectAt(
@@ -224,10 +228,10 @@ public sealed class CrossModTierClassificationTest
     {
         // Root script never requires the dep-mod standalone file;
         // its globals must not appear in completion.
-        var baseDoc = MakeDocWithSymbol(BaseStandaloneUri, "Base_Plan", rank: 1);
-        var rootDoc = MakeDoc(RootScriptUri, rank: 2);
-        var docs    = MakeDocs((BaseStandaloneUri, baseDoc), (RootScriptUri, rootDoc));
-        var index   = BuildIndex(docs);
+        var baseDoc = MakeDocWithSymbol(BaseStandaloneUri, "Base_Plan", 1);
+        var rootDoc = MakeDoc(RootScriptUri, 2);
+        var docs = MakeDocs((BaseStandaloneUri, baseDoc), (RootScriptUri, rootDoc));
+        var index = BuildIndex(docs);
 
         var entries = LuaLocalScopeCollector.CollectAt(
             "", 0, 0,

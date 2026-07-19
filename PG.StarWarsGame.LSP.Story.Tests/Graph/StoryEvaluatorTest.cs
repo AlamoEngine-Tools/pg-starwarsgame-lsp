@@ -156,7 +156,7 @@ public sealed class StoryEvaluatorTest
     [Fact]
     public void Reachability_ControlEdgeFromReachableEvent_RescuesTarget()
     {
-        // Locked's prereq dangles, but a reachable TRIGGER_EVENT forces it — so it IS reachable.
+        // Locked's prereq dangles, but a reachable TRIGGER_EVENT forces it - so it IS reachable.
         var graph = BuildGraph(
             (UriA,
                 "<Event Name=\"Root\"><Reward_Type>TRIGGER_EVENT</Reward_Type>" +

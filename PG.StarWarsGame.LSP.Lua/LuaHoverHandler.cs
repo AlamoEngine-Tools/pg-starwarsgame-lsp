@@ -10,12 +10,11 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
-using PG.StarWarsGame.LSP.Lua.Parsing;
 
 namespace PG.StarWarsGame.LSP.Lua;
 
@@ -60,7 +59,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         var character = request.Position.Character;
         var index = _indexService.Current;
 
-        // Phase 1: XML reference hover from DocumentIndex — no AST needed.
+        // Phase 1: XML reference hover from DocumentIndex - no AST needed.
         var xmlRefHover = TryBuildXmlRefHover(index, uri, line, character);
         if (xmlRefHover is not null)
             return Task.FromResult<Hover?>(xmlRefHover);
@@ -98,14 +97,10 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 
             string markdown;
             if (sym?.Origin is MegArchiveOrigin meg)
-            {
                 markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*\n\n" +
                            MegArchiveOriginHoverText.Describe(meg);
-            }
             else
-            {
                 markdown = $"### `{typeName}` *`\"{reference.TargetId}\"`*";
-            }
 
             return new Hover
             {
@@ -256,7 +251,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         {
             sb.AppendLine();
             foreach (var field in cls.Fields)
-                sb.AppendLine($"`{field.Name}` — {field.Type.Raw}");
+                sb.AppendLine($"`{field.Name}` - {field.Type.Raw}");
         }
 
         return BuildHover(sb.ToString().TrimEnd(), range);
@@ -302,7 +297,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 sb.AppendLine();
                 var pName = p.IsOptional ? $"`{p.Name}?`" : $"`{p.Name}`";
                 if (p.Description is not null)
-                    sb.Append($"- {pName} `{p.Type.Raw}` — {p.Description}");
+                    sb.Append($"- {pName} `{p.Type.Raw}` - {p.Description}");
                 else
                     sb.Append($"- {pName} `{p.Type.Raw}`");
             }
@@ -317,7 +312,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 var r = ann.Returns[0];
                 sb.Append($"**Returns:** `{r.Type.Raw}`");
                 if (r.Description is not null)
-                    sb.Append($" — {r.Description}");
+                    sb.Append($" - {r.Description}");
             }
             else
             {
@@ -326,7 +321,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
                 {
                     sb.AppendLine();
                     var line = $"- `{r.Type.Raw}`";
-                    if (r.Description is not null) line += $" — {r.Description}";
+                    if (r.Description is not null) line += $" - {r.Description}";
                     sb.Append(line);
                 }
             }
@@ -335,8 +330,9 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         return sb.ToString().TrimEnd();
     }
 
-    private static Hover BuildHover(string markdown, LspRange range) =>
-        new()
+    private static Hover BuildHover(string markdown, LspRange range)
+    {
+        return new Hover
         {
             Contents = new MarkedStringsOrMarkupContent(new MarkupContent
             {
@@ -345,4 +341,5 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             }),
             Range = range
         };
+    }
 }

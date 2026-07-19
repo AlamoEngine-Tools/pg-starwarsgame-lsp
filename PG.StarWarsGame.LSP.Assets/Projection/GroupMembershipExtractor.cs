@@ -25,7 +25,7 @@ public static class GroupMembershipExtractor
     /// </summary>
     /// <param name="entries">
     ///     Named game objects paired with the archive-root-relative path to the XML file that defines them.
-    ///     Entries sharing a file path are deduplicated — each file is read at most once.
+    ///     Entries sharing a file path are deduplicated - each file is read at most once.
     /// </param>
     /// <param name="readFile">
     ///     Callback that returns the XML text for a given file path, or <see langword="null" /> if

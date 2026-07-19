@@ -78,7 +78,7 @@ public sealed class XmlReferencesHandlerTest
     [Fact]
     public async Task Handle_FindReferencesFlagOff_ReturnsNull()
     {
-        // Same arrange as Handle_CursorOnReference_ReturnsAllRefs — only the flag differs.
+        // Same arrange as Handle_CursorOnReference_ReturnsAllRefs - only the flag differs.
         var callerDoc = DocWithRef(TestUri, "UNIT_A", 0, 4, 6);
         var refs = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty.Add(
             "UNIT_A", ImmutableArray.Create(
@@ -291,7 +291,7 @@ public sealed class XmlReferencesHandlerTest
     [Fact]
     public async Task Handle_CursorOnGroupKey_NormalReferencePathNotTaken()
     {
-        // The group key happens to match a real symbol id — but since cursor resolves
+        // The group key happens to match a real symbol id - but since cursor resolves
         // to a group membership, only group members should be returned (not workspace refs).
         var member = new GroupMembership("UNIT_A", "SFXEvent", new FileOrigin(TestUri, 2, 4));
         var callerDoc = new DocumentIndex(TestUri, 1,
@@ -338,7 +338,7 @@ public sealed class XmlReferencesHandlerTest
             GroupMemberships: ImmutableArray.Create(
                 new DocumentGroupMembership(callerMember, 1, 5, 10)));
 
-        // Only baseline has the group — workspace has only the cursor doc (no WorkspaceGroupMemberships entry)
+        // Only baseline has the group - workspace has only the cursor doc (no WorkspaceGroupMemberships entry)
         var index = new GameIndex(
             BaselineIndex.Empty with
             {
@@ -407,9 +407,11 @@ public sealed class XmlReferencesHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
+
         public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

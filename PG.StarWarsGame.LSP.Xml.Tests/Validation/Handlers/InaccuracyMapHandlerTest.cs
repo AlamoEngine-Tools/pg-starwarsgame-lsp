@@ -89,13 +89,30 @@ public sealed class InaccuracyMapHandlerTest
 
     private sealed class StubSchemaWithCategoryEnum(EnumDefinition enumDef) : ISchemaProvider
     {
-        public XmlTagDefinition? GetTag(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public GameObjectTypeDefinition? GetObjectType(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
+        public XmlTagDefinition? GetTag(string _)
+        {
+            return null;
+        }
 
-        public EnumDefinition? GetEnum(string name) =>
-            string.Equals(name, enumDef.Name, StringComparison.OrdinalIgnoreCase) ? enumDef : null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string name)
+        {
+            return string.Equals(name, enumDef.Name, StringComparison.OrdinalIgnoreCase) ? enumDef : null;
+        }
 
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];

@@ -21,32 +21,6 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
         indexService.DynamicEnumChanged += index => _mergedValuesByEnum = BuildCache(index);
     }
 
-    private static IReadOnlyDictionary<string, string[]> BuildCache(GameIndex index)
-    {
-        var enumNames = index.Baseline.DynamicEnumValues.Keys
-            .Concat(index.WorkspaceDynamicEnumValues.Keys)
-            .Distinct(StringComparer.OrdinalIgnoreCase);
-
-        var cache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
-        foreach (var enumName in enumNames)
-        {
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var merged = new List<string>();
-
-            if (index.Baseline.DynamicEnumValues.TryGetValue(enumName, out var baselineVals))
-                foreach (var v in baselineVals)
-                    if (seen.Add(v)) merged.Add(v);
-
-            if (index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspaceVals))
-                foreach (var v in workspaceVals)
-                    if (seen.Add(v)) merged.Add(v);
-
-            cache[enumName] = [.. merged];
-        }
-
-        return cache;
-    }
-
     public XmlValueType ValueType => XmlValueType.DynamicEnumValue;
 
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue)
@@ -87,6 +61,34 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
                 Detail = v.Description.GetValueOrDefault("en")
             })
             .ToList();
+    }
+
+    private static IReadOnlyDictionary<string, string[]> BuildCache(GameIndex index)
+    {
+        var enumNames = index.Baseline.DynamicEnumValues.Keys
+            .Concat(index.WorkspaceDynamicEnumValues.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        var cache = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+        foreach (var enumName in enumNames)
+        {
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var merged = new List<string>();
+
+            if (index.Baseline.DynamicEnumValues.TryGetValue(enumName, out var baselineVals))
+                foreach (var v in baselineVals)
+                    if (seen.Add(v))
+                        merged.Add(v);
+
+            if (index.WorkspaceDynamicEnumValues.TryGetValue(enumName, out var workspaceVals))
+                foreach (var v in workspaceVals)
+                    if (seen.Add(v))
+                        merged.Add(v);
+
+            cache[enumName] = [.. merged];
+        }
+
+        return cache;
     }
 
     private IReadOnlyList<ValueProposal> GetDynamicProposals(

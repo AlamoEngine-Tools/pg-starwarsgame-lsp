@@ -264,7 +264,7 @@ public sealed class EawSchemaA2TagTest
 
         Assert.Equal("CollisionClassType", tag.Enum?.Name);
         Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
-        // Engine collision classes contain spaces — must survive schema loading intact.
+        // Engine collision classes contain spaces - must survive schema loading intact.
         Assert.Contains(tag.Enum!.Values, v => v.Name == "Landing Transport");
     }
 
@@ -350,7 +350,7 @@ public sealed class EawSchemaA2TagTest
     {
         var root = FindSchemaRoot()
                    ?? throw new InvalidOperationException(
-                       "schema/eaw/ not found — ensure the schema submodule is checked out.");
+                       "schema/eaw/ not found - ensure the schema submodule is checked out.");
 
         var tagsByType = Directory
             .GetFiles(Path.Combine(root, "tags"), "*.yaml")

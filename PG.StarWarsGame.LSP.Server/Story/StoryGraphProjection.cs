@@ -76,7 +76,7 @@ internal static class StoryGraphProjection
         return new GetStoryGraphResult(keptNodes, edges);
     }
 
-    // Everything transitively downstream of the given node — "show me what this event leads to".
+    // Everything transitively downstream of the given node - "show me what this event leads to".
     private static HashSet<string> ForwardClosure(StoryGraph graph, string fromId)
     {
         var byFrom = graph.Edges.ToLookup(e => e.FromId, StringComparer.Ordinal);

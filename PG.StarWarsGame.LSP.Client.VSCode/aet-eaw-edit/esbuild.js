@@ -15,7 +15,7 @@ const production = process.argv.includes('--production');
 const watch = process.argv.includes('--watch');
 
 /**
- * Webview assets referenced at runtime must live under out/ — the VSIX is packaged with
+ * Webview assets referenced at runtime must live under out/ - the VSIX is packaged with
  * `vsce package --no-dependencies`, so anything addressed via node_modules 404s in the
  * published extension (it only works in dev because the folder happens to exist locally).
  */
@@ -29,7 +29,7 @@ function copyCodicons() {
 }
 
 /**
- * @param {boolean} emitSentinels whether to print the watch sentinels — only the extension
+ * @param {boolean} emitSentinels whether to print the watch sentinels - only the extension
  *   context does, so the problem matcher sees exactly one started/finished pair per build.
  * @returns {import('esbuild').Plugin}
  */

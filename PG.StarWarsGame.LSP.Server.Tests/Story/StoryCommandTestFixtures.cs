@@ -18,6 +18,7 @@ using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Xml;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
@@ -28,21 +29,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 /// </summary>
 internal static class StoryCommandTestFixtures
 {
-    public static readonly string XmlDir = Path.Combine(Rooted("ws"), "data", "xml");
-    public static readonly string DepXmlDir = Path.Combine(Rooted("dep"), "data", "xml");
-
-    public static readonly string ThreadUri;
-    public static readonly string DepThreadUri;
-    public static readonly string ManifestUri;
-
-    static StoryCommandTestFixtures()
-    {
-        var fh = new FileHelper(new MockFileSystem());
-        ThreadUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_main.xml"));
-        DepThreadUri = fh.NormalizeUri(Path.Combine(DepXmlDir, "story_dep.xml"));
-        ManifestUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_plots_r.xml"));
-    }
-
     public const string ThreadText =
         "<Story>\n" +
         "\t<Event Name=\"Start\">\n" +
@@ -65,6 +51,21 @@ internal static class StoryCommandTestFixtures
         "\t\t<Rebel_Story_Name>story_plots_r.xml</Rebel_Story_Name>\n" +
         "\t</Campaign>\n" +
         "</Campaigns>\n";
+
+    public static readonly string XmlDir = Path.Combine(Rooted("ws"), "data", "xml");
+    public static readonly string DepXmlDir = Path.Combine(Rooted("dep"), "data", "xml");
+
+    public static readonly string ThreadUri;
+    public static readonly string DepThreadUri;
+    public static readonly string ManifestUri;
+
+    static StoryCommandTestFixtures()
+    {
+        var fh = new FileHelper(new MockFileSystem());
+        ThreadUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_main.xml"));
+        DepThreadUri = fh.NormalizeUri(Path.Combine(DepXmlDir, "story_dep.xml"));
+        ManifestUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_plots_r.xml"));
+    }
 
     private static string Rooted(string sub)
     {
@@ -92,11 +93,11 @@ internal static class StoryCommandTestFixtures
         return new DocumentTextSource(new FakeHost(), fileHelper, NullLogger<DocumentTextSource>.Instance);
     }
 
-    public static ILspConfigurationProvider Config(bool storyEditor = true)
+    public static ILspConfigurationProvider Config(bool storyEditor = true, bool storyEditing = true)
     {
         return FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
         {
-            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor },
+            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor, StoryEditing = storyEditing },
             Story = new StoryFeatureFlags { Discovery = true }
         });
     }
@@ -123,7 +124,7 @@ internal static class StoryCommandTestFixtures
         IReadOnlyList<string>? tokens = null, string? eventType = null)
     {
         return new StoryCommandDto(kind, threadUri ?? ThreadUri, eventName, newName,
-            EventType: eventType, Value: value, Flag: flag, GroupIndex: groupIndex, Token: token,
+            eventType, Value: value, Flag: flag, GroupIndex: groupIndex, Token: token,
             Tokens: tokens, File: file, Faction: faction);
     }
 
@@ -157,7 +158,7 @@ internal static class StoryCommandTestFixtures
                 {
                     Severity = DiagnosticSeverity.Error,
                     Message = $"marker '{marker}'",
-                    Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+                    Range = new Range(
                         line, col, line, col + marker.Length)
                 });
             }
@@ -169,15 +170,6 @@ internal static class StoryCommandTestFixtures
     public sealed class StubModelService(bool duplicateThreads = false) : IStoryModelService
     {
         private readonly StoryCampaignModel _model = BuildModel(duplicateThreads);
-
-        private static StoryCampaignModel BuildModel(bool duplicateThreads)
-        {
-            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
-            IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
-            return new StoryCampaignModel("GC", threads,
-                new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new StoryTestSchema()).Build([thread]));
-        }
 
         public IReadOnlyList<string> GetCampaignNames()
         {
@@ -213,6 +205,15 @@ internal static class StoryCommandTestFixtures
         public IReadOnlyList<string> GetInvalidatedCampaigns()
         {
             return [];
+        }
+
+        private static StoryCampaignModel BuildModel(bool duplicateThreads)
+        {
+            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
+            IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
+            return new StoryCampaignModel("GC", threads,
+                new HashSet<string>(StringComparer.Ordinal),
+                new StoryGraphBuilder(new StoryTestSchema()).Build([thread]));
         }
     }
 

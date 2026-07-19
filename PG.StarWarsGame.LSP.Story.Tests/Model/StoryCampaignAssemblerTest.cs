@@ -46,8 +46,12 @@ public sealed class StoryCampaignAssemblerTest
     public void Assemble_CollectsThreadsAcrossFactionManifests()
     {
         var chain = Chain(
-            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M_R.xml"),
-                new StoryFactionManifest("Empire", "M_E.xml")])],
+            [
+                new StoryCampaignChain("GC", [
+                    new StoryFactionManifest("Rebel", "M_R.xml"),
+                    new StoryFactionManifest("Empire", "M_E.xml")
+                ])
+            ],
             [
                 new StoryManifestContents("M_R.xml", ["T_R.xml"], [], []),
                 new StoryManifestContents("M_E.xml", ["T_E.xml"], [], [])
@@ -76,8 +80,12 @@ public sealed class StoryCampaignAssemblerTest
     public void Assemble_ThreadActiveInOneManifest_IsNotSuspended()
     {
         var chain = Chain(
-            [new StoryCampaignChain("GC", [new StoryFactionManifest("Rebel", "M1.xml"),
-                new StoryFactionManifest("Empire", "M2.xml")])],
+            [
+                new StoryCampaignChain("GC", [
+                    new StoryFactionManifest("Rebel", "M1.xml"),
+                    new StoryFactionManifest("Empire", "M2.xml")
+                ])
+            ],
             [
                 new StoryManifestContents("M1.xml", [], ["T_Shared.xml"], []),
                 new StoryManifestContents("M2.xml", ["T_Shared.xml"], [], [])

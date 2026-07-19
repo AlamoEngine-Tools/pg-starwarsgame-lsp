@@ -1,2 +1,2 @@
-# Treat MessagePack index snapshots as binary — prevents diff noise if teams commit project caches
+# Treat MessagePack index snapshots as binary - prevents diff noise if teams commit project caches
 *.msgpack binary

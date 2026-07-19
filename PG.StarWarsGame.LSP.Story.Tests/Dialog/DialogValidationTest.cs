@@ -15,6 +15,25 @@ public sealed class DialogValidationTest
 {
     private const string Uri = "file:///dialog_test.txt";
 
+    private static readonly ISchemaProvider Schema = new StubSchemaProvider(new EnumDefinition
+    {
+        Name = "StoryDialogCommand",
+        Values =
+        [
+            Command("TEXT", parameters: Param(0, XmlValueType.NameReference, ReferenceKind.LocalisationKey)),
+            Command("TEXTCOLOR", parameters:
+            [
+                Param(0, XmlValueType.UInt), Param(1, XmlValueType.UInt),
+                Param(2, XmlValueType.UInt), Param(3, XmlValueType.UInt)
+            ]),
+            Command("DIALOG", parameters: Param(0, XmlValueType.NameReference, ReferenceKind.XmlObject, "SpeechEvent")),
+            Command("WAIT", parameters: Param(0, XmlValueType.UInt)),
+            Command("PAUSE", parameters: Param(0, XmlValueType.Boolean)),
+            Command("WAIT_SPEECH"),
+            Command("CLEAR_TEXT", true)
+        ]
+    });
+
     // ── Fixture: a hand-built StoryDialogCommand schema slice ────────────────
 
     private static EnumValueDefinition Command(string name, bool untested = false,
@@ -39,25 +58,6 @@ public sealed class DialogValidationTest
             ObjectType = objectType is null ? null : new GameObjectTypeDefinition { TypeName = objectType }
         };
     }
-
-    private static readonly ISchemaProvider Schema = new StubSchemaProvider(new EnumDefinition
-    {
-        Name = "StoryDialogCommand",
-        Values =
-        [
-            Command("TEXT", parameters: Param(0, XmlValueType.NameReference, ReferenceKind.LocalisationKey)),
-            Command("TEXTCOLOR", parameters:
-            [
-                Param(0, XmlValueType.UInt), Param(1, XmlValueType.UInt),
-                Param(2, XmlValueType.UInt), Param(3, XmlValueType.UInt)
-            ]),
-            Command("DIALOG", parameters: Param(0, XmlValueType.NameReference, ReferenceKind.XmlObject, "SpeechEvent")),
-            Command("WAIT", parameters: Param(0, XmlValueType.UInt)),
-            Command("PAUSE", parameters: Param(0, XmlValueType.Boolean)),
-            Command("WAIT_SPEECH"),
-            Command("CLEAR_TEXT", untested: true)
-        ]
-    });
 
     private static IReadOnlyList<DialogDiagnostic> Validate(string text, GameIndex? index = null)
     {

@@ -13,7 +13,8 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 public sealed class ApplyStoryCommandBatchHandlerTest
 {
     private static ApplyStoryCommandBatchHandler Handler(
-        CapturingApplier applier, bool storyEditor = true, GameIndex? index = null)
+        CapturingApplier applier, bool storyEditor = true, GameIndex? index = null,
+        bool storyEditing = true)
     {
         var fs = NewFileSystem();
         var fileHelper = FileHelperFor(fs);
@@ -25,7 +26,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
             fileHelper,
             Reload(),
             applier,
-            Config(storyEditor),
+            Config(storyEditor, storyEditing),
             NullLogger<ApplyStoryCommandBatchHandler>.Instance);
     }
 
@@ -34,7 +35,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
         return new ApplyStoryCommandBatchParams("GC", commands);
     }
 
-    /// <summary>Final text per URI — each changed file is a whole-document replacement (one edit).</summary>
+    /// <summary>Final text per URI - each changed file is a whole-document replacement (one edit).</summary>
     private static Dictionary<string, string> FinalTexts(WorkspaceEdit edit)
     {
         return edit.DocumentChanges!
@@ -47,11 +48,28 @@ public sealed class ApplyStoryCommandBatchHandlerTest
     [Fact]
     public async Task StoryEditorOff_ReturnsDisabledMessage()
     {
-        var result = await Handler(new CapturingApplier(), storyEditor: false)
+        var result = await Handler(new CapturingApplier(), false)
             .Handle(Batch(Cmd("setPerpetual", eventName: "Start", flag: true)), CancellationToken.None);
 
         Assert.False(result.Success);
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+    }
+
+    /// <summary>
+    ///     The one that actually writes to disk - with Edit mode off it must refuse and, critically,
+    ///     hand nothing to the applier.
+    /// </summary>
+    [Fact]
+    public async Task StoryEditingOff_ReturnsDisabledMessage_AndAppliesNothing()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier, storyEditing: false)
+            .Handle(Batch(Cmd("setPerpetual", eventName: "Start", flag: true)), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(StoryEditingFeature.DisabledMessage, result.Error);
+        Assert.Null(applier.Edit);
     }
 
     [Fact]
@@ -69,7 +87,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
     public async Task CreateThenModify_SecondCommandSeesTheFirst_InOneEdit()
     {
         // setPerpetual can only locate "Fresh" if createEvent's insert was composed into the working
-        // text first — this is the composition guarantee the batch endpoint exists to provide.
+        // text first - this is the composition guarantee the batch endpoint exists to provide.
         var applier = new CapturingApplier();
 
         var result = await Handler(applier).Handle(Batch(
@@ -89,8 +107,8 @@ public sealed class ApplyStoryCommandBatchHandlerTest
         var applier = new CapturingApplier();
 
         var result = await Handler(applier).Handle(Batch(
-            Cmd("setPerpetual", eventName: "Start", flag: true), // valid
-            Cmd("deleteEvent", eventName: "Ghost")), // invalid → aborts the batch
+                Cmd("setPerpetual", eventName: "Start", flag: true), // valid
+                Cmd("deleteEvent", eventName: "Ghost")), // invalid → aborts the batch
             CancellationToken.None);
 
         Assert.False(result.Success);
@@ -119,7 +137,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
     public async Task RenameOfIndexedStorySymbol_ComposesViaModelPath_DoesNotBlockTheBatch()
     {
         // "Start" is indexed as a StoryEvent symbol, so the single-command handler would take the
-        // opaque symbol-index rename path. In a batch that path can't compose — this must instead
+        // opaque symbol-index rename path. In a batch that path can't compose - this must instead
         // fall back to the model rename (re-parses the working text) and succeed.
         var startSymbol = new GameSymbol("Start", GameSymbolKind.XmlObject, "StoryEvent",
             new FileOrigin(ThreadUri, 1, 13), null);

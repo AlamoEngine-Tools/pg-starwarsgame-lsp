@@ -50,9 +50,9 @@ public abstract class LocalisationKeyHandlerBase : XmlDiagnosticsHandler<XmlTagV
 
         return new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
             $"Localisation key '{key}' was not found in the loaded translation databases.",
-            OverrideLine: position?.Line,
-            OverrideColumn: position?.Col,
-            OverrideLength: position is null ? null : key.Length,
+            position?.Line,
+            position?.Col,
+            position is null ? null : key.Length,
             CreateLocalisationKey: key);
     }
 }

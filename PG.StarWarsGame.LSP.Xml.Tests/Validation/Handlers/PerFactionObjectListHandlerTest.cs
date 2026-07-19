@@ -28,11 +28,18 @@ public sealed class PerFactionObjectListHandlerTest
         return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
     }
 
-    private static GameSymbol Faction(string name) =>
-        new(name, GameSymbolKind.XmlObject, "Faction", new FileOrigin("file:///factions.xml", 0, null), null);
+    private static GameSymbol Faction(string name)
+    {
+        return new GameSymbol(name, GameSymbolKind.XmlObject, "Faction",
+            new FileOrigin("file:///factions.xml", 0, null), null);
+    }
 
-    private static GameSymbol Obj(string name) =>
-        new(name, GameSymbolKind.XmlObject, "GroundBuildable", new FileOrigin("file:///units.xml", 0, null), null);
+    private static GameSymbol Obj(string name)
+    {
+        return new GameSymbol(name, GameSymbolKind.XmlObject, "GroundBuildable",
+            new FileOrigin("file:///units.xml", 0, null),
+            null);
+    }
 
     [Theory]
     [InlineData("REBEL, X_Wing")]
@@ -97,7 +104,8 @@ public sealed class PerFactionObjectListHandlerTest
     public void Multi_faction_map_all_known_returns_no_diagnostics()
     {
         var ctx = CtxWithIndex(Faction("Rebel"), Faction("Empire"), Obj("X_Wing"), Obj("TIE_Fighter"));
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Rebel, X_Wing, Empire, TIE_Fighter"), ctx).ToList();
+        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Rebel, X_Wing, Empire, TIE_Fighter"), ctx)
+            .ToList();
         Assert.Empty(results);
     }
 

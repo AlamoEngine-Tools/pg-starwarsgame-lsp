@@ -169,7 +169,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
     [Fact]
     public void Analyze_TwoMissingGlobalsFromDifferentSharedFiles_TwoWarnings()
     {
-        // Both LibUri (library by path) and OtherUri (dependency — required by a third file)
+        // Both LibUri (library by path) and OtherUri (dependency - required by a third file)
         // are shared files. Globals from both should trigger missing-require warnings.
         const string requirer = "file:///scripts/ai/plan_x.lua";
         const string text = """
@@ -1046,7 +1046,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
     [Fact]
     public void Analyze_LibraryGlobalUsedByStandalone_NotRequired_EmitsWarning()
     {
-        // Library files (Tier 1) are always shared — their globals ARE visible and trigger warnings.
+        // Library files (Tier 1) are always shared - their globals ARE visible and trigger warnings.
         const string text = "LibHelper()";
         var index = AddCurrentDoc(IndexWithLibGlobal("LibHelper"));
 
@@ -1060,7 +1060,7 @@ public sealed class LuaGlobalScopeAnalyzerTest
     [Fact]
     public void Analyze_DependencyGlobalUsedByStandalone_NotRequired_EmitsWarning()
     {
-        // Dependency files (Tier 2: required by some other file) are shared — their globals trigger warnings.
+        // Dependency files (Tier 2: required by some other file) are shared - their globals trigger warnings.
         const string depUri = "file:///scripts/pgstatemachine.lua";
         const string requirer = "file:///scripts/ai/plan_x.lua";
         const string text = "StateMachineInit()";

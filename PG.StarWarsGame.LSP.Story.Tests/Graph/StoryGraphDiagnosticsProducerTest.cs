@@ -76,7 +76,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
     public void UnreachableEvents_AreNotFlaggedInSuspendedThreads()
     {
         var model = Model([(UriA, "<Event Name=\"B\"><Prereq>Ghost</Prereq></Event>")],
-            suspendedUris: [UriA]);
+            [UriA]);
 
         Assert.DoesNotContain(Produce(model), d => d.Message.Contains("can never fire"));
     }
@@ -87,7 +87,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
         var model = Model([
             (UriA, "<Event Name=\"B\"/>"),
             (UriB, "<Event Name=\"Main\"/>")
-        ], suspendedUris: [UriA]);
+        ], [UriA]);
 
         var diag = Assert.Single(Produce(model), d => d.Message.Contains("suspended"));
         Assert.Equal(XmlDiagnosticSeverity.Information, diag.Severity);
@@ -101,7 +101,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
             (UriA, "<Event Name=\"B\"/>"),
             (UriB, "<Event Name=\"Main\"><Reward_Type>STORY_ELEMENT</Reward_Type>" +
                    "<Reward_Param1>story_a</Reward_Param1></Event>")
-        ], suspendedUris: [UriA]);
+        ], [UriA]);
 
         Assert.DoesNotContain(Produce(model), d => d.Message.Contains("suspended"));
     }
@@ -110,7 +110,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
     public void SuspendedThread_DrivenByAttachedLuaScript_NoDiagnostic()
     {
         var model = Model([(UriA, "<Event Name=\"B\"/>")],
-            suspendedUris: [UriA], luaScripts: ["Story_A"]);
+            [UriA], ["Story_A"]);
 
         Assert.DoesNotContain(Produce(model), d => d.Message.Contains("suspended"));
     }
@@ -118,9 +118,11 @@ public sealed class StoryGraphDiagnosticsProducerTest
     [Fact]
     public void TagOrder_RewardBeforeEventType_Warns()
     {
-        var model = Model([(UriA,
-            "<Event Name=\"E\"><Reward_Type>STORY_ELEMENT</Reward_Type>" +
-            "<Event_Type>STORY_TRIGGER</Event_Type></Event>")]);
+        var model = Model([
+            (UriA,
+                "<Event Name=\"E\"><Reward_Type>STORY_ELEMENT</Reward_Type>" +
+                "<Event_Type>STORY_TRIGGER</Event_Type></Event>")
+        ]);
 
         var warning = Assert.Single(Produce(model), d => d.Message.Contains("tag order"));
         Assert.Contains("'Event_Type'", warning.Message);
@@ -130,10 +132,12 @@ public sealed class StoryGraphDiagnosticsProducerTest
     [Fact]
     public void TagOrder_DocumentedOrder_NoDiagnostic()
     {
-        var model = Model([(UriA,
-            "<Event Name=\"E\"><Event_Type>STORY_TRIGGER</Event_Type>" +
-            "<Reward_Type>STORY_ELEMENT</Reward_Type><Reward_Param1>x</Reward_Param1>" +
-            "<Prereq>E</Prereq><Branch>B1</Branch><Perpetual>true</Perpetual></Event>")]);
+        var model = Model([
+            (UriA,
+                "<Event Name=\"E\"><Event_Type>STORY_TRIGGER</Event_Type>" +
+                "<Reward_Type>STORY_ELEMENT</Reward_Type><Reward_Param1>x</Reward_Param1>" +
+                "<Prereq>E</Prereq><Branch>B1</Branch><Perpetual>true</Perpetual></Event>")
+        ]);
 
         Assert.DoesNotContain(Produce(model), d => d.Message.Contains("tag order"));
     }
@@ -142,9 +146,11 @@ public sealed class StoryGraphDiagnosticsProducerTest
     public void FlagName_LongerThan31Characters_Errors()
     {
         var longFlag = new string('F', 32);
-        var model = Model([(UriA,
-            $"<Event Name=\"E\"><Reward_Type>SET_FLAG</Reward_Type>" +
-            $"<Reward_Param1>{longFlag}</Reward_Param1></Event>")]);
+        var model = Model([
+            (UriA,
+                $"<Event Name=\"E\"><Reward_Type>SET_FLAG</Reward_Type>" +
+                $"<Reward_Param1>{longFlag}</Reward_Param1></Event>")
+        ]);
 
         var error = Assert.Single(Produce(model), d => d.Message.Contains("31"));
         Assert.Equal(XmlDiagnosticSeverity.Error, error.Severity);
@@ -173,7 +179,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
             (UriB, "<Event Name=\"B\"><Prereq>Ghost</Prereq></Event>")
         ]);
 
-        Assert.Empty(Produce(model, UriA));
+        Assert.Empty(Produce(model));
     }
 }
 

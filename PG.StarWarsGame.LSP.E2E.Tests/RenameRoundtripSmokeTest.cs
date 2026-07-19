@@ -55,7 +55,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
     {
         RequireEawWorkspace();
         await WaitForFullScanAsync();
-        // Only Interdictor.lua open — all other affected files remain closed (on disk).
+        // Only Interdictor.lua open - all other affected files remain closed (on disk).
         await RunRenameRoundtripAsync(InterdictorRel, true, []);
     }
 
@@ -74,7 +74,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
     {
         RequireEawWorkspace();
         await WaitForFullScanAsync();
-        // Only Spaceunitscorvettes.xml open — all Lua files remain closed.
+        // Only Spaceunitscorvettes.xml open - all Lua files remain closed.
         await RunRenameRoundtripAsync(CorvettesXmlRel, false, []);
     }
 
@@ -97,7 +97,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
         var entryPath = Path.Combine(workspace, entryRel);
         var entryUri = DocumentUri.FromFileSystemPath(entryPath);
 
-        // In-memory content and version numbers (OrdinalIgnoreCase — URIs are normalised).
+        // In-memory content and version numbers (OrdinalIgnoreCase - URIs are normalised).
         var inMemory = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var versions = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
@@ -200,7 +200,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             // Old name must not appear in diagnostics (proves no stale references in corvettes.xml).
             Assert.False(
                 diagMessages.Any(m => m.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)),
-                $"Old name '{OriginalName}' still appears in corvettes.xml diagnostics after rename — stale diagnostics?");
+                $"Old name '{OriginalName}' still appears in corvettes.xml diagnostics after rename - stale diagnostics?");
 
             // ── Locate "Rename_Test" in updated entry file for rename-back ─────
             var updatedLines = inMemory[entryUri.ToString()].Split('\n');
@@ -209,7 +209,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
                 : FindXmlNameAttributeValuePosition(updatedLines, "SpaceUnit", "Name", NewName);
 
             Assert.True(backLine >= 0,
-                $"Could not find '{NewName}' in updated {entryRel} — entry file was not updated");
+                $"Could not find '{NewName}' in updated {entryRel} - entry file was not updated");
 
             // ── PrepareRename back ─────────────────────────────────────────────
             using var cts3 = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -263,7 +263,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             Assert.False(
                 backMessages.Any(m =>
                     m.Contains(NewName, StringComparison.OrdinalIgnoreCase)),
-                $"'{NewName}' still appears in corvettes.xml diagnostics after rename-back — stale?");
+                $"'{NewName}' still appears in corvettes.xml diagnostics after rename-back - stale?");
         }
         finally
         {
@@ -418,7 +418,7 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
     {
         if (LspTestEnvironment.EawWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
             throw new Exception(
-                "$XunitDynamicSkip$eaw/ workspace or schema/eaw/ not found — cannot run rename roundtrip tests.");
+                "$XunitDynamicSkip$eaw/ workspace or schema/eaw/ not found - cannot run rename roundtrip tests.");
     }
 
     private async Task WaitForFullScanAsync()

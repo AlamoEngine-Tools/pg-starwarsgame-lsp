@@ -35,21 +35,15 @@ internal static class StoryDocumentSymbolCollector
 
             foreach (var child in eventNode.ChildNodes.Where(c => c.NodeType == HtmlNodeType.Element))
                 if (child.Name.Equals("Prereq", StringComparison.OrdinalIgnoreCase))
-                {
                     foreach (var (token, line, column) in Tokens(parsed, child))
                         references.Add(new GameReference(token, GameSymbolKind.XmlObject,
                             StoryReferenceTypes.EventSymbol, documentUri, line, column, token.Length));
-                }
                 else if (TryParamPosition(child.Name, "Event_Param", out var eventPos) && eventType is not null)
-                {
                     CollectParam(parsed, documentUri, child, eventType, eventPos, eventParamTypes,
-                        isReward: false, schema, symbols, references);
-                }
+                        false, schema, symbols, references);
                 else if (TryParamPosition(child.Name, "Reward_Param", out var rewardPos) && rewardType is not null)
-                {
                     CollectParam(parsed, documentUri, child, rewardType, rewardPos, rewardParamTypes,
-                        isReward: true, schema, symbols, references);
-                }
+                        true, schema, symbols, references);
         }
     }
 

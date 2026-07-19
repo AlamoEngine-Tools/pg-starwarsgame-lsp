@@ -13,7 +13,7 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 /// </summary>
 /// <param name="Tags">
 ///     The object's child tags, captured for the baseline tag tree (variant inheritance support).
-///     Null/empty when tags were not captured — the object then contributes no <c>ObjectTags</c> entry.
+///     Null/empty when tags were not captured - the object then contributes no <c>ObjectTags</c> entry.
 /// </param>
 public readonly record struct ProjectableEntry(
     string Name,

@@ -107,7 +107,7 @@ public sealed class LuaStorySymbolCollectionTest
     public async Task SymbolsFlagOff_EmitsNoStorySymbols()
     {
         var index = await ParseAsync(
-            "StoryModeEvents = { E = S }\nStory_Event(\"Ping\")", symbolsFlag: false);
+            "StoryModeEvents = { E = S }\nStory_Event(\"Ping\")", false);
 
         Assert.DoesNotContain(index.Symbols, s => s.TypeName == "StoryNotification");
         Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "StoryEvent");

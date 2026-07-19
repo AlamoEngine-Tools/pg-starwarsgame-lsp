@@ -17,7 +17,7 @@ public interface IGameIndexService
     ///     Indexes a freshly opened document (didOpen). Unlike <see cref="UpdateDocumentAsync" />,
     ///     the committed version never suppresses this update: LSP client versions restart at 1 for
     ///     every open session, while the committed version deliberately survives a didClose
-    ///     re-index — so a didOpen starts a new version epoch. An unchanged-content open skips the
+    ///     re-index - so a didOpen starts a new version epoch. An unchanged-content open skips the
     ///     re-parse but still re-stamps the stored version, so the new session's subsequent
     ///     didChanges are not dropped as stale.
     ///     Default implementation delegates to <see cref="UpdateDocumentAsync" /> so existing test
@@ -43,6 +43,7 @@ public interface IGameIndexService
     void ApplyAssetFiles(IAssetFileIndex index);
     void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones);
     void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values);
+
     void ApplyWorkspaceEnumValueDefinitions(
         ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions);
 
@@ -58,14 +59,14 @@ public interface IGameIndexService
     // inline; queue a background diagnostics publish instead.
     event Action<GameIndex>? IndexChanged;
 
-    // Fires only on ApplyLocalisation — never on document/asset/enum/baseline updates. Lets
+    // Fires only on ApplyLocalisation - never on document/asset/enum/baseline updates. Lets
     // subscribers that only care about localisation (e.g. the client-facing
     // aet/localisationIndexUpdated notification) avoid reacting to unrelated workspace churn.
     // Not suppressed by BeginBulkUpdate: localisation applies are coarse-grained (once per
     // reload), so the O(N²) concern that suppression exists for doesn't apply here.
     event Action<ILocalisationIndex>? LocalisationChanged;
 
-    // Fires only on ApplyBaseline and ApplyWorkspaceDynamicEnumValues — the two calls that can
+    // Fires only on ApplyBaseline and ApplyWorkspaceDynamicEnumValues - the two calls that can
     // change the merged dynamic-enum value set. Lets subscribers that cache dynamic-enum
     // completion candidates (see DynamicEnumValueProposalProvider) invalidate precisely instead
     // of on every unrelated document edit via IndexChanged. Not suppressed by BeginBulkUpdate:

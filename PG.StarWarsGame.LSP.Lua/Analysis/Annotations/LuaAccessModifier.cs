@@ -3,4 +3,10 @@
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
-public enum LuaAccessModifier { Public, Protected, Private, Package }
+public enum LuaAccessModifier
+{
+    Public,
+    Protected,
+    Private,
+    Package
+}

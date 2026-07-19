@@ -3,7 +3,7 @@
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
-// Targeted row/element-level edits to an existing CSV/XML/.properties localisation file — never a
+// Targeted row/element-level edits to an existing CSV/XML/.properties localisation file - never a
 // full re-parse-and-re-export, so an edit to one key doesn't reformat or reorder the rest of the
 // file. Shared by the create-key quick-fix and the live editor grid's per-cell writes.
 public interface ILocalisationEntryWriter

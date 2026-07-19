@@ -44,7 +44,7 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
             // Cross-type shadow: same Id defined with a different TypeName anywhere in the workspace.
             // Story symbols are exempt from both sides: every story event is indexed twice by design
             // (generic StoryParser object symbol + StoryEvent symbol for the same element), and
-            // SET_FLAG names double as Lua globals — mirrors the duplicate/unresolved exemptions
+            // SET_FLAG names double as Lua globals - mirrors the duplicate/unresolved exemptions
             // in XmlIndexFactProducer.
             if (sym.TypeName is null) continue;
             if (StoryReferenceTypes.IsStorySymbolType(sym.TypeName)) continue;

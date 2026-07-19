@@ -25,7 +25,7 @@ public interface IStoryModelService
 
     /// <summary>
     ///     Campaign names whose cached model no longer matches the current index (or every
-    ///     campaign when the chain itself went stale) — without rebuilding anything. Feeds the
+    ///     campaign when the chain itself went stale) - without rebuilding anything. Feeds the
     ///     <c>aet/storyGraphChanged</c> notification.
     /// </summary>
     IReadOnlyList<string> GetInvalidatedCampaigns();
@@ -34,23 +34,23 @@ public interface IStoryModelService
 /// <summary>
 ///     Lazily builds and caches per-campaign story models. Validation is on-access: a cached
 ///     chain or model is reused only while every contributing document's <see cref="GameIndex" />
-///     version is unchanged — an edit to a campaign, manifest, or thread invalidates exactly the
+///     version is unchanged - an edit to a campaign, manifest, or thread invalidates exactly the
 ///     models it feeds. Content is read open-buffer-first (via <see cref="IDocumentTextSource" />)
 ///     so unsaved edits shape the model; layer precedence comes from searching the xml roots
 ///     highest-rank-first, mirroring the discovery scan.
 /// </summary>
 public sealed class StoryModelService : IStoryModelService
 {
-    private readonly IDocumentTextSource _textSource;
     private readonly IFileHelper _fileHelper;
-    private readonly IGameIndexService _indexService;
-    private readonly ILogger<StoryModelService> _logger;
-    private readonly IModProjectReloadService _reloadService;
-    private readonly ISchemaProvider _schema;
 
     private readonly object _gate = new();
-    private ChainCache? _chain;
+    private readonly IGameIndexService _indexService;
+    private readonly ILogger<StoryModelService> _logger;
     private readonly Dictionary<string, ModelCache> _models = new(StringComparer.OrdinalIgnoreCase);
+    private readonly IModProjectReloadService _reloadService;
+    private readonly ISchemaProvider _schema;
+    private readonly IDocumentTextSource _textSource;
+    private ChainCache? _chain;
 
     // True after a request was answered from a scan that read no documents (startup window:
     // workspace config/schema not yet published). Such an answer was served to a client, so
@@ -140,7 +140,7 @@ public sealed class StoryModelService : IStoryModelService
             invalidated = _chain?.Result.Campaigns.Select(c => c.Name).ToList() ?? [];
         }
 
-        // The chain is stale — or a client was answered from an incomplete startup-window scan.
+        // The chain is stale - or a client was answered from an incomplete startup-window scan.
         // Rescanning here is cheap (a handful of registry/manifest reads) and lets the change
         // notification name campaigns that only became resolvable after startup finished. The
         // old names stay included so clients holding a since-renamed campaign refresh too.
@@ -173,7 +173,7 @@ public sealed class StoryModelService : IStoryModelService
         // A scan that read nothing must not be cached: an empty version map matches every
         // future index state, which would pin the empty result forever. This happens inside
         // the startup window (workspace config / schema not yet published) and in workspaces
-        // without story data — in both cases the next access simply rescans (cheap: nothing
+        // without story data - in both cases the next access simply rescans (cheap: nothing
         // was readable).
         if (resolver.Versions.Count == 0)
         {
@@ -219,7 +219,7 @@ public sealed class StoryModelService : IStoryModelService
     {
         var documents = _indexService.Current.Documents;
         foreach (var (uri, version) in recorded)
-            if ((documents.TryGetValue(uri, out var doc) ? doc.Version : (int?)null) != version)
+            if ((documents.TryGetValue(uri, out var doc) ? doc.Version : null) != version)
                 return false;
         return true;
     }

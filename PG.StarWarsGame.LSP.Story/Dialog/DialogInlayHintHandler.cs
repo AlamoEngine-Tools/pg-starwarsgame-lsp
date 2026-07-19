@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 
 /// <summary>
 ///     End-of-line translated text for localisation-key arguments (TEXT/TITLE) in story-dialog
-///     scripts — the same <c>"…"</c> / <c>KEY: MISSING</c> format the XML side shows for
+///     scripts - the same <c>"…"</c> / <c>KEY: MISSING</c> format the XML side shows for
 ///     localisation references. Scope-gated like the dialog diagnostics: .txt files outside the
 ///     pgproj storyDialog directories get nothing.
 /// </summary>

@@ -8,7 +8,9 @@ namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis.Annotations;
 public sealed class EmmyLuaAnnotationParserTest
 {
     private static EmmyLuaAnnotations Parse(params string[] lines)
-        => EmmyLuaAnnotationParser.Parse(lines);
+    {
+        return EmmyLuaAnnotationParser.Parse(lines);
+    }
 
     // ── empty / prose-only ────────────────────────────────────────────────────
 
@@ -182,7 +184,7 @@ public sealed class EmmyLuaAnnotationParserTest
         var result = Parse("@alias Color string");
         Assert.NotNull(result.AliasDef);
         Assert.Equal("Color", result.AliasDef!.Name);
-        // Inline single-type alias — variants parsed from the rest of the line
+        // Inline single-type alias - variants parsed from the rest of the line
         Assert.Equal("string", Assert.Single(result.AliasDef.Variants).Raw);
     }
 
@@ -333,7 +335,7 @@ public sealed class EmmyLuaAnnotationParserTest
         Assert.Equal("Moves the unit to the given position.", result.Description);
         Assert.True(result.IsDeprecated);
         Assert.Equal(2, result.Params.Length);
-        Assert.Equal("unit",    result.Params[0].Name);
+        Assert.Equal("unit", result.Params[0].Name);
         Assert.Equal("userdata", result.Params[0].Type.Raw);
         Assert.Equal("the unit", result.Params[0].Description);
         Assert.Equal("boolean", result.Returns[0].Type.Raw);
@@ -349,7 +351,7 @@ public sealed class EmmyLuaAnnotationParserTest
 
         Assert.Equal("GameObjectWrapper", result.ClassDef!.Name);
         Assert.Equal(2, result.ClassDef.Fields.Length);
-        Assert.Equal("Name",   result.ClassDef.Fields[0].Name);
+        Assert.Equal("Name", result.ClassDef.Fields[0].Name);
         Assert.Equal("Health", result.ClassDef.Fields[1].Name);
         Assert.Null(result.Description);
     }

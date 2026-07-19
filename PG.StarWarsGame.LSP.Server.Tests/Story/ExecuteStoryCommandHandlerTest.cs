@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -21,26 +22,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
 public sealed class ExecuteStoryCommandHandlerTest
 {
-    private static string Rooted(string sub)
-    {
-        return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
-    }
-
-    private static readonly string XmlDir = Path.Combine(Rooted("ws"), "data", "xml");
-    private static readonly string DepXmlDir = Path.Combine(Rooted("dep"), "data", "xml");
-
-    private static readonly string ThreadUri;
-    private static readonly string DepThreadUri;
-    private static readonly string ManifestUri;
-
-    static ExecuteStoryCommandHandlerTest()
-    {
-        var fh = new FileHelper(new MockFileSystem());
-        ThreadUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_main.xml"));
-        DepThreadUri = fh.NormalizeUri(Path.Combine(DepXmlDir, "story_dep.xml"));
-        ManifestUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_plots_r.xml"));
-    }
-
     private const string ThreadText =
         "<Story>\n" +
         "\t<Event Name=\"Start\">\n" +
@@ -64,22 +45,29 @@ public sealed class ExecuteStoryCommandHandlerTest
         "\t</Campaign>\n" +
         "</Campaigns>\n";
 
-    private sealed class CapturingApplier(bool result = true) : IWorkspaceEditApplier
-    {
-        public WorkspaceEdit? Edit { get; private set; }
-        public string? Label { get; private set; }
+    private static readonly string XmlDir = Path.Combine(Rooted("ws"), "data", "xml");
+    private static readonly string DepXmlDir = Path.Combine(Rooted("dep"), "data", "xml");
 
-        public Task<bool> ApplyAsync(WorkspaceEdit edit, string label, CancellationToken ct)
-        {
-            Edit = edit;
-            Label = label;
-            return Task.FromResult(result);
-        }
+    private static readonly string ThreadUri;
+    private static readonly string DepThreadUri;
+    private static readonly string ManifestUri;
+
+    static ExecuteStoryCommandHandlerTest()
+    {
+        var fh = new FileHelper(new MockFileSystem());
+        ThreadUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_main.xml"));
+        DepThreadUri = fh.NormalizeUri(Path.Combine(DepXmlDir, "story_dep.xml"));
+        ManifestUri = fh.NormalizeUri(Path.Combine(XmlDir, "story_plots_r.xml"));
+    }
+
+    private static string Rooted(string sub)
+    {
+        return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
     }
 
     private static ExecuteStoryCommandHandler Handler(
         CapturingApplier applier, bool storyEditor = true, GameIndex? index = null,
-        IStoryModelService? modelService = null)
+        IStoryModelService? modelService = null, bool storyEditing = true)
     {
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
@@ -91,7 +79,7 @@ public sealed class ExecuteStoryCommandHandlerTest
         var fileHelper = new FileHelper(fs);
         var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags
         {
-            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor },
+            Tools = new ToolsFeatureFlags { StoryEditor = storyEditor, StoryEditing = storyEditing },
             Story = new StoryFeatureFlags { Discovery = true }
         });
         return new ExecuteStoryCommandHandler(
@@ -138,10 +126,26 @@ public sealed class ExecuteStoryCommandHandlerTest
     [Fact]
     public async Task StoryEditorOff_ReturnsDisabledMessage()
     {
-        var result = await Handler(new CapturingApplier(), storyEditor: false)
+        var result = await Handler(new CapturingApplier(), false)
             .Handle(Command("deleteEvent", eventName: "Start"), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
+    }
+
+    /// <summary>
+    ///     The legacy single-command mutation path is authoring too - Edit mode off must refuse it
+    ///     even though the panel itself is enabled for viewing.
+    /// </summary>
+    [Fact]
+    public async Task StoryEditingOff_ReturnsDisabledMessage_AndAppliesNothing()
+    {
+        var applier = new CapturingApplier();
+
+        var result = await Handler(applier, storyEditing: false)
+            .Handle(Command("deleteEvent", eventName: "Start"), CancellationToken.None);
+
+        Assert.Equal(StoryEditingFeature.DisabledMessage, result.Error);
+        Assert.Null(applier.Edit);
     }
 
     [Fact]
@@ -207,7 +211,7 @@ public sealed class ExecuteStoryCommandHandlerTest
         // The applyEdit round-trip is detached from the request: awaiting it would let the
         // edit's own didChange cancel this request with ContentModified. Rejections are rare
         // and logged, not surfaced.
-        var applier = new CapturingApplier(result: false);
+        var applier = new CapturingApplier(false);
 
         var result = await Handler(applier)
             .Handle(Command("setEventType", eventName: "Start", value: "STORY_FLAG"), CancellationToken.None);
@@ -278,7 +282,7 @@ public sealed class ExecuteStoryCommandHandlerTest
                 EventType = "STORY_FLAG",
                 RewardType = "SET_FLAG",
                 EventParams = [new StoryParamValueEditDto(0, "MyFlag")],
-                RewardParams = [new StoryParamValueEditDto(0, "OtherFlag")],
+                RewardParams = [new StoryParamValueEditDto(0, "OtherFlag")]
             }, CancellationToken.None);
 
         Assert.True(result.Success);
@@ -488,7 +492,7 @@ public sealed class ExecuteStoryCommandHandlerTest
     public async Task RenameEvent_NotIndexedButInModel_RenamesViaModel()
     {
         // Symbol indexing off (default): the event isn't an indexed symbol, so rename falls back
-        // to the campaign model — the freshly-created-event case. "Start" is defined in the model
+        // to the campaign model - the freshly-created-event case. "Start" is defined in the model
         // thread and referenced by "Next"'s <Prereq>Start</Prereq>, so both spots get rewritten.
         var applier = new CapturingApplier();
 
@@ -496,13 +500,13 @@ public sealed class ExecuteStoryCommandHandlerTest
             .Handle(Command("renameEvent", eventName: "Start", newName: "Renamed"), CancellationToken.None);
 
         Assert.True(result.Success);
-        // The model rename uses the `changes` map (not documentChanges) — the versioned form is
+        // The model rename uses the `changes` map (not documentChanges) - the versioned form is
         // rejected by the client for untracked thread files.
         Assert.Null(applier.Edit!.DocumentChanges);
         var edits = applier.Edit!.Changes!.Single().Value.ToList();
         Assert.Equal(2, edits.Count); // the Name attribute + the prereq reference
 
-        // APPLYING the edits must yield valid XML — a count check alone would miss an off-by-one
+        // APPLYING the edits must yield valid XML - a count check alone would miss an off-by-one
         // in the model's NameRange/token ranges that corrupts the file (and makes rename "not work").
         var renamed = ApplyLspEdits(ThreadText, edits);
         Assert.Contains("<Event Name=\"Renamed\">", renamed);
@@ -517,7 +521,11 @@ public sealed class ExecuteStoryCommandHandlerTest
         for (var i = 0; i < text.Length; i++)
             if (text[i] == '\n')
                 lineStarts.Add(i + 1);
-        int Offset(Position p) => Math.Min(lineStarts[p.Line] + p.Character, text.Length);
+
+        int Offset(Position p)
+        {
+            return Math.Min(lineStarts[p.Line] + p.Character, text.Length);
+        }
 
         var result = text;
         foreach (var edit in edits.OrderByDescending(e => Offset(e.Range.Start)))
@@ -529,10 +537,10 @@ public sealed class ExecuteStoryCommandHandlerTest
     public async Task RenameEvent_ThreadIncludedTwice_EmitsEachEditOnce()
     {
         // The same thread referenced by two manifests must not produce duplicate (overlapping)
-        // text edits — the client rejects the whole applyEdit if a document has overlapping edits.
+        // text edits - the client rejects the whole applyEdit if a document has overlapping edits.
         var applier = new CapturingApplier();
 
-        var result = await Handler(applier, modelService: new StubModelService(duplicateThreads: true))
+        var result = await Handler(applier, modelService: new StubModelService(true))
             .Handle(Command("renameEvent", eventName: "Start", newName: "Renamed"), CancellationToken.None);
 
         Assert.True(result.Success);
@@ -582,22 +590,24 @@ public sealed class ExecuteStoryCommandHandlerTest
         Assert.Contains("2 story events", result.Error);
     }
 
+    private sealed class CapturingApplier(bool result = true) : IWorkspaceEditApplier
+    {
+        public WorkspaceEdit? Edit { get; private set; }
+        public string? Label { get; private set; }
+
+        public Task<bool> ApplyAsync(WorkspaceEdit edit, string label, CancellationToken ct)
+        {
+            Edit = edit;
+            Label = label;
+            return Task.FromResult(result);
+        }
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class StubModelService(bool duplicateThreads = false) : IStoryModelService
     {
         private readonly StoryCampaignModel _model = BuildModel(duplicateThreads);
-
-        private static StoryCampaignModel BuildModel(bool duplicateThreads)
-        {
-            // When duplicateThreads is set the SAME thread appears twice, mimicking a file
-            // referenced by two faction manifests — the rename must still emit each edit once.
-            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
-            IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
-            return new StoryCampaignModel("GC", threads,
-                new HashSet<string>(StringComparer.Ordinal),
-                new StoryGraphBuilder(new EmptySchema()).Build([thread]));
-        }
 
         public IReadOnlyList<string> GetCampaignNames()
         {
@@ -631,6 +641,17 @@ public sealed class ExecuteStoryCommandHandlerTest
         public IReadOnlyList<string> GetInvalidatedCampaigns()
         {
             return [];
+        }
+
+        private static StoryCampaignModel BuildModel(bool duplicateThreads)
+        {
+            // When duplicateThreads is set the SAME thread appears twice, mimicking a file
+            // referenced by two faction manifests - the rename must still emit each edit once.
+            var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
+            IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
+            return new StoryCampaignModel("GC", threads,
+                new HashSet<string>(StringComparer.Ordinal),
+                new StoryGraphBuilder(new EmptySchema()).Build([thread]));
         }
     }
 
@@ -723,7 +744,7 @@ public sealed class ExecuteStoryCommandHandlerTest
         {
         }
 
-        public void ApplyAssetFiles(Core.Assets.IAssetFileIndex index)
+        public void ApplyAssetFiles(IAssetFileIndex index)
         {
         }
 

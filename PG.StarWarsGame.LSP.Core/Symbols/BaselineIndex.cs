@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 /// <param name="BuiltAt">UTC timestamp when the baseline was generated.</param>
 /// <param name="SourceManifestHash">
 ///     SHA-256 of <c>StarWarsG.exe</c> + <c>PerceptionFunctionG.dll</c> at baseline build time.
-///     Informational only — not validated at LSP runtime. Intended for future version-mismatch
+///     Informational only - not validated at LSP runtime. Intended for future version-mismatch
 ///     tooling once a game-install-path config exists.
 /// </param>
 /// <param name="DynamicEnumValues">

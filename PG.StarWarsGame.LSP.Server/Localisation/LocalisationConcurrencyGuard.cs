@@ -16,7 +16,7 @@ public static class LocalisationConcurrencyGuard
     {
         if (string.IsNullOrWhiteSpace(expectedContentHash))
             return LocalisationWriteResult.Fail(
-                "No content hash provided — fetch the current entries before writing.");
+                "No content hash provided - fetch the current entries before writing.");
 
         var currentContent = await fs.File.ReadAllTextAsync(filePath, ct);
         var currentHash = LocalisationContentHash.Compute(currentContent);

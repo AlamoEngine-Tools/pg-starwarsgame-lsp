@@ -18,12 +18,12 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 ///     Two source formats are supported, encoded in <see cref="EnumDefinition.SourceFile" />:
 ///     <list type="bullet">
 ///         <item>
-///             <c>path$Element</c> (e.g. <c>data/xml/gameconstants.xml$Damage_Types</c>) — text content of a
+///             <c>path$Element</c> (e.g. <c>data/xml/gameconstants.xml$Damage_Types</c>) - text content of a
 ///             named element inside the file; supports the "ABOVE this point" boundary comment that separates
 ///             mod-extensible values from engine-hardcoded ones.
 ///         </item>
 ///         <item>
-///             <c>path</c> only (e.g. <c>data/xml/enum/aigoalcategorytype.xml</c>) — an
+///             <c>path</c> only (e.g. <c>data/xml/enum/aigoalcategorytype.xml</c>) - an
 ///             <c>&lt;EnumDefinition&gt;</c> document whose child element names are the enum values.
 ///         </item>
 ///     </list>
@@ -100,8 +100,14 @@ public static class DynamicEnumExtractor
         if (string.IsNullOrEmpty(xml)) return [];
 
         XDocument doc;
-        try { doc = XDocument.Parse(xml, LoadOptions.SetLineInfo); }
-        catch (XmlException) { return []; }
+        try
+        {
+            doc = XDocument.Parse(xml, LoadOptions.SetLineInfo);
+        }
+        catch (XmlException)
+        {
+            return [];
+        }
 
         var el = doc.Descendants(elementName).FirstOrDefault();
         if (el is null) return [];
@@ -167,10 +173,15 @@ public static class DynamicEnumExtractor
     {
         int line = startLine, col = startCol;
         for (var i = 0; i < offset && i < text.Length; i++)
-        {
-            if (text[i] == '\n') { line++; col = 0; }
-            else if (text[i] != '\r') { col++; }
-        }
+            if (text[i] == '\n')
+            {
+                line++;
+                col = 0;
+            }
+            else if (text[i] != '\r')
+            {
+                col++;
+            }
 
         return (line, col);
     }
@@ -188,7 +199,10 @@ public static class DynamicEnumExtractor
         }
     }
 
-    private static bool IsTokenSeparator(char c) => c is ' ' or '\t' or '\r' or '\n' or ',';
+    private static bool IsTokenSeparator(char c)
+    {
+        return c is ' ' or '\t' or '\r' or '\n' or ',';
+    }
 
     /// <summary>
     ///     Parses an <c>&lt;EnumDefinition&gt;</c> XML document and returns the child element names as enum values.

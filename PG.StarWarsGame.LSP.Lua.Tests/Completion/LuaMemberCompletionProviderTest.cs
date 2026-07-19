@@ -145,7 +145,7 @@ public sealed class LuaMemberCompletionProviderTest
         // Local variable "myUnit" annotated with @type PGUnit
         var scope = new List<ScopeEntry>
         {
-            new("myUnit", ScopeEntryKind.LocalVariable, null, TypeName: "PGUnit")
+            new("myUnit", ScopeEntryKind.LocalVariable, null, "PGUnit")
         };
 
         var items = Provide("myUnit", false, scope, repo.Current).ToList();
@@ -168,7 +168,7 @@ public sealed class LuaMemberCompletionProviderTest
 
         var scope = new List<ScopeEntry>
         {
-            new("myUnit", ScopeEntryKind.LocalVariable, null, TypeName: "PGUnit")
+            new("myUnit", ScopeEntryKind.LocalVariable, null, "PGUnit")
         };
 
         // IsMethodCall=true → workspace class fields should not appear (they are dot-access only)

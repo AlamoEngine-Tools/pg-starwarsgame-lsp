@@ -6,7 +6,7 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 /// <summary>
 ///     Thrown when a <c>.pgproj</c> file cannot be loaded. Carries a human-readable message
 ///     (file name, source location, and a corrective hint) suitable for showing directly to the
-///     user as an editor notification — never a raw <see cref="System.Text.Json.JsonException" />.
+///     user as an editor notification - never a raw <see cref="System.Text.Json.JsonException" />.
 /// </summary>
 public sealed class ModProjectLoadException : Exception
 {

@@ -6,7 +6,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -26,7 +25,7 @@ public static class XmlObjectRenameBuilder
 
         var changes = new Dictionary<DocumentUri, List<TextEdit>>();
 
-        // XML definition edits — locate the name-attribute value in the definition file. Symbols
+        // XML definition edits - locate the name-attribute value in the definition file. Symbols
         // whose TypeName is not a schema object type (story events/flags/notifications) carry an
         // exact value column in their origin instead; the definition edit spans the id there.
         if (index.WorkspaceDefinitions.TryGetValue(id, out var defs))
@@ -54,7 +53,7 @@ public static class XmlObjectRenameBuilder
                 }
             }
 
-        // Reference edits — use precise positions from the index (covers both XML and Lua files).
+        // Reference edits - use precise positions from the index (covers both XML and Lua files).
         if (index.WorkspaceReferences.TryGetValue(id, out var refs))
             foreach (var r in refs)
                 AddEdit(changes, r.DocumentUri, new TextEdit
@@ -108,7 +107,7 @@ public static class XmlObjectRenameBuilder
             changes[key] = list = [];
         // Skip a duplicate span. A story event is indexed BOTH as a StoryEvent symbol (matched by
         // the column path above) AND as a StoryParser object (matched by the Name= nameTag path),
-        // so its definition would be emitted twice at the same range — and the client rejects the
+        // so its definition would be emitted twice at the same range - and the client rejects the
         // whole applyEdit when a document carries overlapping/duplicate text edits.
         if (list.Any(e => SameRange(e.Range, edit.Range)))
             return;
@@ -118,6 +117,6 @@ public static class XmlObjectRenameBuilder
     private static bool SameRange(LspRange a, LspRange b)
     {
         return a.Start.Line == b.Start.Line && a.Start.Character == b.Start.Character
-               && a.End.Line == b.End.Line && a.End.Character == b.End.Character;
+                                            && a.End.Line == b.End.Line && a.End.Character == b.End.Character;
     }
 }

@@ -3,7 +3,6 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -13,12 +12,12 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
 public sealed class StoryLayoutStoreTest
 {
+    private static readonly string PgprojPath = Path.Combine(Rooted("ws"), "mod.pgproj");
+
     private static string Rooted(string sub)
     {
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
     }
-
-    private static readonly string PgprojPath = Path.Combine(Rooted("ws"), "mod.pgproj");
 
     private static (StoryLayoutStore Store, MockFileSystem Fs) Build(bool withProject = true)
     {
@@ -93,7 +92,7 @@ public sealed class StoryLayoutStoreTest
     [Fact]
     public void NoProject_DegradesToInMemory()
     {
-        var (store, fs) = Build(withProject: false);
+        var (store, fs) = Build(false);
 
         store.Set("GC", [new StoryLayoutEntry("story_main.xml", "Start", 3, 4)]);
 

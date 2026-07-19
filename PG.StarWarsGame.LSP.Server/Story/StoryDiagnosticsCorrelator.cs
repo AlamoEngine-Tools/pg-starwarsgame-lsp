@@ -10,7 +10,7 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     Maps XML diagnostics for one thread onto graph nodes and param slots. Shared by
 ///     <see cref="GetStoryDiagnosticsHandler" /> (over committed buffer text, node ids from the
 ///     model graph) and <see cref="ValidateStoryCommandBatchHandler" /> (over the staged working
-///     text, node ids computed by name) — the range-containment correlation is identical either way.
+///     text, node ids computed by name) - the range-containment correlation is identical either way.
 /// </summary>
 internal static class StoryDiagnosticsCorrelator
 {

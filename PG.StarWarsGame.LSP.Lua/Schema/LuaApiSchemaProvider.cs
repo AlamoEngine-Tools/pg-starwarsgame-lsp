@@ -72,7 +72,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
         // @xmlref applies to the IMMEDIATELY PRECEDING @param, so we track the
         // current param index as we encounter @param lines.
         var xmlRefPairs = new List<(int ParamIndex, string RawToken)>();
-        var paramCount  = 0;
+        var paramCount = 0;
 
         foreach (var rawLine in content.Split('\n'))
         {
@@ -88,12 +88,13 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                 // Pair with the most-recently-seen @param (paramCount - 1, 0-indexed)
                 if (paramCount > 0)
                 {
-                    var token    = line[3..].Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+                    var token = line[3..].Trim().Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
                     var rawToken = token.Length > 1 ? token[1].Trim() : "";
                     var commentI = rawToken.IndexOf("--", StringComparison.Ordinal);
                     if (commentI >= 0) rawToken = rawToken[..commentI].Trim();
                     xmlRefPairs.Add((paramCount - 1, rawToken));
                 }
+
                 // Feed to parser as-is so it silently skips @xmlref (Tier 3)
                 commentLines.Add(line[3..].TrimStart(' ', '\t'));
             }
@@ -112,15 +113,16 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                 var memberMatch = MemberFunctionDeclRegex().Match(line);
                 if (memberMatch.Success)
                 {
-                    var typeName   = memberMatch.Groups["type"].Value;
+                    var typeName = memberMatch.Groups["type"].Value;
                     var methodName = memberMatch.Groups["method"].Value;
-                    var isMethod   = memberMatch.Groups["sep"].Value == ":";
+                    var isMethod = memberMatch.Groups["sep"].Value == ":";
 
                     if (!typeMembers.TryGetValue(typeName, out var memberList))
                         typeMembers[typeName] = memberList = [];
 
                     var retType = annotations.Returns.IsDefaultOrEmpty
-                        ? null : annotations.Returns[0].Type.Raw;
+                        ? null
+                        : annotations.Returns[0].Type.Raw;
                     memberList.Add(new LuaTypeMember(methodName, isMethod, annotations.Description, retType));
                 }
                 else
@@ -128,10 +130,11 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                     var match = FunctionDeclRegex().Match(line);
                     if (match.Success)
                     {
-                        var name    = match.Groups["name"].Value;
+                        var name = match.Groups["name"].Value;
                         var xmlRefs = BuildXmlRefs(xmlRefPairs);
                         var retType = annotations.Returns.IsDefaultOrEmpty
-                            ? null : annotations.Returns[0].Type.Raw;
+                            ? null
+                            : annotations.Returns[0].Type.Raw;
                         var @params = annotations.Params.IsDefaultOrEmpty
                             ? (IReadOnlyList<LuaParamAnnotation>)[]
                             : [.. annotations.Params];
@@ -173,6 +176,7 @@ public sealed partial class LuaApiSchemaProvider : ILuaApiSchemaProvider
                 typeConstraint = rawToken[(colonI + 1)..].Trim();
             result.Add(new XmlRefEntry(paramIdx, typeConstraint?.Length == 0 ? null : typeConstraint));
         }
+
         return result;
     }
 

@@ -55,7 +55,7 @@ public sealed class SchemaHttpCache
 
             if (manifest.BaselineHash is not null)
             {
-                // Fast path: the manifest carries a pre-computed hash — compare directly.
+                // Fast path: the manifest carries a pre-computed hash - compare directly.
                 if (!string.Equals(stored, manifest.BaselineHash, StringComparison.OrdinalIgnoreCase))
                     return false;
             }
@@ -161,7 +161,7 @@ public sealed class SchemaHttpCache
         _fileHelper.FileSystem.File.WriteAllText(fullPath, content);
     }
 
-    // Hashes each YAML file's content in manifest order — indexJson is excluded so
+    // Hashes each YAML file's content in manifest order - indexJson is excluded so
     // the formula is compatible with the pre-computed baselineHash in _index.json.
     private static string ComputeYamlHash(IEnumerable<string> fileContents)
     {

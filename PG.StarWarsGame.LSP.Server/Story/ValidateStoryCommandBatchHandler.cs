@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -17,7 +18,7 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 /// <summary>
 ///     The on-demand Validate action for edit mode. Applies the staged command batch to an in-memory
 ///     working copy (via <see cref="StoryCommandExecutor" /> over a <see cref="WorkingTextSet" />) —
-///     nothing is written — then runs the XML diagnostics collector over the composed texts and
+///     nothing is written - then runs the XML diagnostics collector over the composed texts and
 ///     correlates the results to graph nodes by name, so the problems reflect exactly the pending
 ///     state the user is about to save. A staged command that fails to validate short-circuits with
 ///     that error (the pending graph is internally inconsistent and can't be composed).
@@ -36,6 +37,10 @@ public sealed class ValidateStoryCommandBatchHandler(
     public Task<GetStoryDiagnosticsResult> Handle(
         ValidateStoryCommandBatchParams request, CancellationToken ct)
     {
+        // Gated on the READ surface, not on editing: validation writes nothing, and the panel's
+        // Validate button is available in every mode (it is the only source of story diagnostics
+        // there). In View mode the batch is empty, so this is simply "diagnose the committed
+        // campaign" - gating it behind Edit mode would leave read-only users with no diagnostics.
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryDiagnosticsResult([], rejection));
 
@@ -46,7 +51,7 @@ public sealed class ValidateStoryCommandBatchHandler(
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService,
-            Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance);
+            NullLogger.Instance);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, composeError) = executor.Compose(
@@ -72,7 +77,7 @@ public sealed class ValidateStoryCommandBatchHandler(
             if (text is null) continue;
 
             var thread = StoryThreadParser.Parse(text, uri);
-            // Skip changed non-thread files (manifests, campaign sets) — they carry no events, so
+            // Skip changed non-thread files (manifests, campaign sets) - they carry no events, so
             // there is nothing to pin to the story graph.
             if (!modelThreadUris.Contains(uri) && thread.Events.Count == 0) continue;
 

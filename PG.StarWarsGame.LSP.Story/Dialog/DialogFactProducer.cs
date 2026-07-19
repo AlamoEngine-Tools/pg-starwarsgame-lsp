@@ -7,7 +7,7 @@ namespace PG.StarWarsGame.LSP.Story.Dialog;
 
 /// <summary>
 ///     Pairs every parsed dialog command with its <c>StoryDialogCommand</c> schema definition so
-///     the handlers stay schema-driven — no hardcoded command table in C#.
+///     the handlers stay schema-driven - no hardcoded command table in C#.
 /// </summary>
 public sealed class DialogFactProducer(ISchemaProvider schema)
 {

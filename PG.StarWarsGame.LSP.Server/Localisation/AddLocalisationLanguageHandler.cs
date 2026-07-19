@@ -12,11 +12,11 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed class AddLocalisationLanguageHandler
     : IJsonRpcRequestHandler<AddLocalisationLanguageParams, LocalisationWriteResult>
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationEntryWriter _entryWriter;
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<AddLocalisationLanguageHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
-    private readonly ILspConfigurationProvider _config;
 
     public AddLocalisationLanguageHandler(
         ILocalisationEntryWriter entryWriter,
@@ -55,7 +55,7 @@ public sealed class AddLocalisationLanguageHandler
                 "aet/addLocalisationLanguage: could not add '{Language}' to '{Path}'.",
                 request.Language, request.ProjectFilePath);
             return LocalisationWriteResult.Fail(
-                $"Could not add language '{request.Language}' — it may already be present, or this file's " +
+                $"Could not add language '{request.Language}' - it may already be present, or this file's " +
                 "format doesn't support multiple languages.");
         }
 

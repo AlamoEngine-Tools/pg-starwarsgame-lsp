@@ -172,7 +172,7 @@ public sealed class GameWorkspaceHostTest
     public void AddOrUpdate_WithPublishDiagnosticsFalse_StoresFlag()
     {
         var host = Build();
-        host.AddOrUpdate("file:///a.xml", "<Root/>", 1, publishDiagnostics: false);
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 1, false);
 
         Assert.True(host.TryGet("file:///a.xml", out var doc));
         Assert.False(doc.PublishDiagnostics);
@@ -182,8 +182,8 @@ public sealed class GameWorkspaceHostTest
     public void AddOrUpdate_UpgradesPublishDiagnosticsFalseToTrue()
     {
         var host = Build();
-        host.AddOrUpdate("file:///a.xml", "<Root/>", 1, publishDiagnostics: false);
-        host.AddOrUpdate("file:///a.xml", "<Root/>", 2, publishDiagnostics: true);
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 1, false);
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 2, true);
 
         Assert.True(host.TryGet("file:///a.xml", out var doc));
         Assert.True(doc.PublishDiagnostics);

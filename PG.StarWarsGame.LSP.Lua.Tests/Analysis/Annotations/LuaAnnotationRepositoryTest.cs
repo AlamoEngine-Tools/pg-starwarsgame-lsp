@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis.Annotations;
@@ -12,14 +11,21 @@ public sealed class LuaAnnotationRepositoryTest
     private const string UriA = "file:///a.lua";
     private const string UriB = "file:///b.lua";
 
-    private static LuaClassDefinition Class(string name) =>
-        new(name, false, ImmutableArray<string>.Empty, ImmutableArray<LuaFieldDefinition>.Empty, null);
+    private static LuaClassDefinition Class(string name)
+    {
+        return new LuaClassDefinition(name, false, ImmutableArray<string>.Empty,
+            ImmutableArray<LuaFieldDefinition>.Empty, null);
+    }
 
-    private static LuaAliasDefinition Alias(string name) =>
-        new(name, ImmutableArray<LuaTypeRef>.Empty);
+    private static LuaAliasDefinition Alias(string name)
+    {
+        return new LuaAliasDefinition(name, ImmutableArray<LuaTypeRef>.Empty);
+    }
 
-    private static LuaEnumDefinition Enum(string name) =>
-        new(name, false);
+    private static LuaEnumDefinition Enum(string name)
+    {
+        return new LuaEnumDefinition(name, false);
+    }
 
     [Fact]
     public void Update_AddsAnnotations_AllContainsUri()
@@ -226,7 +232,7 @@ public sealed class LuaAnnotationRepositoryTest
         repo.UpdateFunctionAnnotations(UriA, [("Foo", baseAnn)]);
         repo.UpdateFunctionAnnotations(UriB, [("Foo", overrideAnn)]);
 
-        // Both are non-empty — either is valid; just verify one is returned.
+        // Both are non-empty - either is valid; just verify one is returned.
         var result = repo.GetFunctionAnnotation("Foo");
         Assert.NotNull(result);
         Assert.NotNull(result!.Description);

@@ -5,7 +5,7 @@ using System.Collections.Immutable;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
-// Raw type reference — kept as the original string from the annotation.
+// Raw type reference - kept as the original string from the annotation.
 public sealed record LuaTypeRef(string Raw)
 {
     public static readonly LuaTypeRef Unknown = new("unknown");

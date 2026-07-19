@@ -9,10 +9,10 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 
 /// <summary>
 ///     The story editor's mutation envelope: one request, dispatched on <see cref="Kind" />.
-///     Fields are a flat union — each kind reads the subset it needs and the handler validates
+///     Fields are a flat union - each kind reads the subset it needs and the handler validates
 ///     the rest. Kinds (Issue 7): node ops <c>createEvent</c>, <c>deleteEvent</c>,
 ///     <c>setEventType</c>, <c>setRewardType</c>, <c>clearEventType</c>, <c>clearRewardType</c>
-///     (type + its params + Event_Filter, atomically — the immutable-type UI rule),
+///     (type + its params + Event_Filter, atomically - the immutable-type UI rule),
 ///     <c>setParams</c>, <c>setPerpetual</c>, <c>setDialog</c>; edge ops <c>addPrereq</c>, <c>addPrereqGroup</c>,
 ///     <c>addPrereqAlternatives</c>, <c>removePrereq</c>, <c>setBranch</c>,
 ///     <c>retargetControlEdge</c>; <c>renameEvent</c> (delegates to the cross-language rename);
@@ -81,13 +81,13 @@ public sealed record StoryCommandDto(
     }
 }
 
-// ── aet/applyStoryCommandBatch — commit a staged edit-mode batch ──────────────
+// ── aet/applyStoryCommandBatch - commit a staged edit-mode batch ──────────────
 
 /// <summary>
 ///     Commits an edit-mode session: the client stages command envelopes locally (instant
 ///     optimistic feedback) and flushes the whole batch here on Save. The server composes them over
 ///     one in-memory working copy and, if every command validates, writes them as a single
-///     <c>workspace/applyEdit</c>. The first command that fails aborts the batch — nothing is
+///     <c>workspace/applyEdit</c>. The first command that fails aborts the batch - nothing is
 ///     written and <see cref="ApplyStoryCommandBatchResult.FailedIndex" /> names it.
 /// </summary>
 [Method("aet/applyStoryCommandBatch", Direction.ClientToServer)]
@@ -97,9 +97,11 @@ public sealed record ApplyStoryCommandBatchParams(
 
 /// <param name="FailedIndex">0-based index of the command that failed, when <c>Success</c> is false.</param>
 public sealed record ApplyStoryCommandBatchResult(
-    bool Success, int? FailedIndex = null, string? Error = null);
+    bool Success,
+    int? FailedIndex = null,
+    string? Error = null);
 
-// ── aet/validateStoryCommandBatch — dry-run diagnostics for the staged batch ──
+// ── aet/validateStoryCommandBatch - dry-run diagnostics for the staged batch ──
 
 /// <summary>
 ///     Runs the on-demand Validate action: applies the staged batch to an in-memory working copy
@@ -111,10 +113,10 @@ public sealed record ValidateStoryCommandBatchParams(
     string Campaign,
     IReadOnlyList<StoryCommandDto> Commands) : IRequest<GetStoryDiagnosticsResult>;
 
-// ── aet/previewStoryGraph — the graph as it would look with the staged batch applied ─────────────
+// ── aet/previewStoryGraph - the graph as it would look with the staged batch applied ─────────────
 
 /// <summary>
-///     Builds the campaign graph as it would look after the staged batch — the commands are composed
+///     Builds the campaign graph as it would look after the staged batch - the commands are composed
 ///     onto an in-memory working copy (no file write) and the model is assembled from that. Lets the
 ///     webview show structural edits (create/delete/rename/edges) without writing to disk before Save
 ///     and without re-implementing the graph build client-side. Same filters and result shape as

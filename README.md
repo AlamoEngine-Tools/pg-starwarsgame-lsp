@@ -1,16 +1,16 @@
-# Alamo Engine Tools — Empire at War Edit
+# Alamo Engine Tools - Empire at War Edit
 
 A Visual Studio Code extension that adds editor intelligence for **Star Wars: Empire at War** and **Forces of Corruption** mod development.
 
-> **Preview release** — This is early-access software. Not all planned features are complete, and behavior may change between versions. Windows x64 only for binary releases. Report issues at [AlamoEngine-Tools/pg-starwarsgame-lsp/issues](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues).
+> **Preview release** - This is early-access software. Not all planned features are complete, and behavior may change between versions. Windows x64 only for binary releases. Report issues at [AlamoEngine-Tools/pg-starwarsgame-lsp/issues](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues).
 
 ---
 
 ## Prerequisites
 
 - **Visual Studio Code** 1.107 or later
-- **Windows 11 (x64)** for the pre-built server binary — Windows 10 reached End of Life in October 2025 and is not supported
-- **.NET 10 SDK** ([download](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)) — only needed if building from source; the released `.exe` is self-contained
+- **Windows 11 (x64)** for the pre-built server binary - Windows 10 reached End of Life in October 2025 and is not supported
+- **.NET 10 SDK** ([download](https://dotnet.microsoft.com/en-us/download/dotnet/10.0)) - only needed if building from source; the released `.exe` is self-contained
 
 ---
 
@@ -20,8 +20,8 @@ A Visual Studio Code extension that adds editor intelligence for **Star Wars: Em
 
 From the [Releases](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases) page, download:
 
-- `aet-eaw-edit-x.x.x.vsix` — the VS Code extension
-- `PG.StarWarsGame.LSP.Server-x.x.x.zip` — the language server
+- `aet-eaw-edit-x.x.x.vsix` - the VS Code extension
+- `PG.StarWarsGame.LSP.Server-x.x.x.zip` - the language server
 
 ### 2. Install the extension
 
@@ -73,16 +73,16 @@ All paths are relative to the `.pgproj` file. `projectReferences` can list other
 
 ## XML features
 
-The extension understands the full EaW/FoC XML data format — every game object type, tag, enum value, and cross-file reference.
+The extension understands the full EaW/FoC XML data format - every game object type, tag, enum value, and cross-file reference.
 
-- **Completions** — tag values auto-complete from enum definitions and named objects declared anywhere in the workspace
-- **Hover** — hover over a tag or value to see its description and expected type
-- **Diagnostics** — errors and warnings for unknown references, type mismatches, duplicate declarations, bad value formats, and deprecated fields
-- **Go to definition** — `F12` or `Ctrl+Click` on any object reference jumps to its declaration, even across files
-- **Find all references** — `Shift+F12` on a symbol lists every place it is used across the workspace
-- **Rename** — `F2` on a symbol renames it consistently in every XML file in the workspace
-- **Code actions** — quick-fix lightbulbs for common problems, including creating a missing localisation key directly from the editor
-- **Code lens** — inline reference counts above every named object
+- **Completions** - tag values auto-complete from enum definitions and named objects declared anywhere in the workspace
+- **Hover** - hover over a tag or value to see its description and expected type
+- **Diagnostics** - errors and warnings for unknown references, type mismatches, duplicate declarations, bad value formats, and deprecated fields
+- **Go to definition** - `F12` or `Ctrl+Click` on any object reference jumps to its declaration, even across files
+- **Find all references** - `Shift+F12` on a symbol lists every place it is used across the workspace
+- **Rename** - `F2` on a symbol renames it consistently in every XML file in the workspace
+- **Code actions** - quick-fix lightbulbs for common problems, including creating a missing localisation key directly from the editor
+- **Code lens** - inline reference counts above every named object
 
 ---
 
@@ -96,13 +96,13 @@ Lua script files inside the declared `scripts` directories are indexed and check
 
 An activity bar panel (the **AET Localisation** icon) provides a Key × Language table editor for `.csv`, `.xml`, and `.properties` localisation files.
 
-- **Project picker** — switch between localisation files declared in the `.pgproj`
-- **Inline editing** — edit translation values directly in the grid; changes are written back to disk immediately
-- **Add Language** — adds a language column from the game's official language list; only languages not already present in the file are offered
-- **Inherited baseline** — the "Inherited" toggle overlays all base-game EaW + FoC keys as read-only rows for reference
-- **Search** — filters visible rows by key name or any translation value
-- **Sortable columns** — click any column header to sort ascending, click again for descending, click a third time to restore original order
-- **Initialise from baseline** — the **+ New** button creates a fresh localisation file pre-populated with all EaW + FoC baseline keys; choose CSV, XML, or NLS (Properties) format
+- **Project picker** - switch between localisation files declared in the `.pgproj`
+- **Inline editing** - edit translation values directly in the grid; changes are written back to disk immediately
+- **Add Language** - adds a language column from the game's official language list; only languages not already present in the file are offered
+- **Inherited baseline** - the "Inherited" toggle overlays all base-game EaW + FoC keys as read-only rows for reference
+- **Search** - filters visible rows by key name or any translation value
+- **Sortable columns** - click any column header to sort ascending, click again for descending, click a third time to restore original order
+- **Initialise from baseline** - the **+ New** button creates a fresh localisation file pre-populated with all EaW + FoC baseline keys; choose CSV, XML, or NLS (Properties) format
 
 ---
 

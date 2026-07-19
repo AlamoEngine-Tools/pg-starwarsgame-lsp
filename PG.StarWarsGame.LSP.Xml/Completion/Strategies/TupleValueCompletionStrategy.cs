@@ -9,7 +9,7 @@ namespace PG.StarWarsGame.LSP.Xml.Completion;
 
 /// <summary>
 ///     Positional completion for comma-separated tuple value types (e.g. <c>HardPointSfxMap</c>,
-///     <c>UnitSpawnTable</c>). Every such type has a fixed, hardcoded shape — which slot holds an
+///     <c>UnitSpawnTable</c>). Every such type has a fixed, hardcoded shape - which slot holds an
 ///     enum, a hardcoded set, an object reference, or a free-form value with no completion source —
 ///     so this strategy looks up that shape per (ValueType, <see cref="TagValueCompletionContext.TupleSlotIndex" />)
 ///     and queries the same registries <see cref="StandardValueCompletionStrategy" /> uses, via a

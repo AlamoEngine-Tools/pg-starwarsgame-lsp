@@ -428,7 +428,7 @@ public sealed class BaselineSerializerTest
     public void Deserialize_DefaultSchemaVersion_TreatedAsPreVersioningFormat_ReturnsNull()
     {
         // A dto built without ever touching SchemaVersion simulates a baseline written by code that
-        // predates the field's existence — MessagePack defaults an unset trailing key to 0 on read,
+        // predates the field's existence - MessagePack defaults an unset trailing key to 0 on read,
         // which must never equal CurrentSchemaVersion (bumped to a nonzero value for exactly this).
         var dto = new SerializedBaseline();
         var bytes = SerializeRawDto(dto);
@@ -476,7 +476,10 @@ public sealed class BaselineSerializerTest
         var msgpack = MessagePackSerializer.Serialize(dto);
         using var ms = new MemoryStream();
         using (var gz = new GZipStream(ms, CompressionLevel.Optimal))
+        {
             gz.Write(msgpack);
+        }
+
         return ms.ToArray();
     }
 }

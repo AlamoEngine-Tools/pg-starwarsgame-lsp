@@ -50,7 +50,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     [Fact]
     public async Task XmlGoTo_SecondTokenOfPipeSeparatedCategoryMask_ReturnsEnumDefinition()
     {
-        // <CategoryMask> Corvette | AntiFighter | AntiBomber </CategoryMask> — dynamic-enum list,
+        // <CategoryMask> Corvette | AntiFighter | AntiBomber </CategoryMask> - dynamic-enum list,
         // pipe-separated; the second token must navigate to the workspace enum definition file.
         await RunGoToAsync(null, "AntiFighter", "Gameobjectcategorytype");
     }
@@ -61,7 +61,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         // Exact user-reported scenario (2026-07-05): from an open Spaceunitsfighters.xml,
         // <Encyclopedia_Good_Against> Calamari_Cruiser Alliance_Assault_Frigate Nebulon_B_Frigate …
         // (space-separated list) must navigate to Spaceunitsfrigates.xml even though that file
-        // was never opened in the editor — its symbols come purely from the workspace scan.
+        // was never opened in the editor - its symbols come purely from the workspace scan.
         await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
     }
 
@@ -80,7 +80,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     {
         // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML
         // didClose notifications and queued an index REMOVAL that raced the XML handler's
-        // async re-add — when the removal landed last, the closed file's symbols were silently
+        // async re-add - when the removal landed last, the closed file's symbols were silently
         // deleted and every reference into it fell back to the non-navigable baseline. VS Code
         // preview tabs make open+close cycles constant, so navigating files progressively
         // destroyed the index. Cycle the target file a few times, then go-to must still work.

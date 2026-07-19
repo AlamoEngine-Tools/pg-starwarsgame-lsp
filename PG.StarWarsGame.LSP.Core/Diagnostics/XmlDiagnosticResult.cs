@@ -8,7 +8,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     <see cref="XmlFact" />; override fields are used only when a handler must report at a different
 ///     location than the fact (e.g. each occurrence in a duplicate-tag set).
 ///     <see cref="OverrideEndLine" />/<see cref="OverrideEndColumn" /> mirror
-///     <see cref="XmlFact.EndLine" />/<see cref="XmlFact.EndColumn" /> — set them when a handler needs
+///     <see cref="XmlFact.EndLine" />/<see cref="XmlFact.EndColumn" /> - set them when a handler needs
 ///     a cross-line range different from what the fact itself carries; otherwise the fact's own
 ///     EndLine/EndColumn (if any) are used.
 /// </summary>

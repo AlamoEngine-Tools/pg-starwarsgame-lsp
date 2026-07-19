@@ -48,7 +48,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     {
         // Workspace-wide reactions (project reload, asset re-glob, enum re-scan, localisation
         // reload) are batched: the loop only sets flags and each reaction runs at most once per
-        // notification — a git checkout can deliver hundreds of changes in a single request.
+        // notification - a git checkout can deliver hundreds of changes in a single request.
         // Per-document updates/removals stay per-change inside one bulk scope.
         var projectChanged = false;
         var assetsChanged = false;
@@ -75,7 +75,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 var path = _fileHelper.FileUriToPath(uri);
 
                 // A changed/created/deleted file under any project layer's text root (csv/properties/
-                // loc-xml) needs a scoped localisation reload, never document indexing — no
+                // loc-xml) needs a scoped localisation reload, never document indexing - no
                 // IGameDocumentParser understands those formats, so routing them through the generic
                 // path below is always a silent no-op.
                 if (path is not null && IsUnderTextRoot(path))
@@ -110,7 +110,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                     continue;
                 }
 
-                // Opened documents are kept in sync by didOpen/didChange — skip them.
+                // Opened documents are kept in sync by didOpen/didChange - skip them.
                 if (_workspaceHost.TryGet(uri, out _)) continue;
 
                 if (!_fileHelper.FileSystem.File.Exists(path)) continue;
@@ -133,7 +133,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         if (projectChanged)
         {
             // The full reload re-resolves the configuration and re-runs every catalog (assets,
-            // dynamic enums, model bones, localisation) — the scoped reloads below would be
+            // dynamic enums, model bones, localisation) - the scoped reloads below would be
             // redundant work against the outdated configuration.
             await _reloadService.ReloadAsync(ct);
             return Unit.Value;

@@ -20,7 +20,7 @@ public interface IStorySimulationService
 
 /// <summary>
 ///     One simulation session per campaign, pinned to the campaign model that existed at
-///     <see cref="Start" /> — edits during a run don't mutate a running story; restart to pick
+///     <see cref="Start" /> - edits during a run don't mutate a running story; restart to pick
 ///     them up. Every state change invokes the notify delegate (aet/storySimChanged) so all
 ///     panels re-fetch. The Lua notification catalogue is collected from the workspace index's
 ///     StoryNotification symbols, filtered to the campaign's attached scripts.
@@ -31,9 +31,6 @@ public sealed class StorySimulationService(
     ISchemaProvider schema,
     Action<string> notifyChanged) : IStorySimulationService
 {
-    private sealed record Session(
-        StorySimulator Simulator, StorySimSnapshot Snapshot, IReadOnlyList<string> LuaNotifications);
-
     private readonly object _gate = new();
     private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
 
@@ -51,7 +48,7 @@ public sealed class StorySimulationService(
         }
 
         notifyChanged(campaign);
-        return (ToDto(session, running: true), null);
+        return (ToDto(session, true), null);
     }
 
     public (StorySimStateDto? State, string? Error) Stop(string campaign)
@@ -70,7 +67,7 @@ public sealed class StorySimulationService(
         lock (_gate)
         {
             if (_sessions.TryGetValue(campaign, out var session))
-                return (ToDto(session, running: true), null);
+                return (ToDto(session, true), null);
         }
 
         return (new StorySimStateDto(false, 0, [], [], [], [], []), null);
@@ -109,7 +106,7 @@ public sealed class StorySimulationService(
         }
 
         notifyChanged(campaign);
-        return (ToDto(next, running: true), null);
+        return (ToDto(next, true), null);
     }
 
     private static StorySimStateDto ToDto(Session session, bool running)
@@ -136,7 +133,8 @@ public sealed class StorySimulationService(
     {
         if (luaScripts.Count == 0) return [];
         var suffixes = luaScripts
-            .Select(s => "/" + s.ToLowerInvariant() + (s.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) ? "" : ".lua"))
+            .Select(s =>
+                "/" + s.ToLowerInvariant() + (s.EndsWith(".lua", StringComparison.OrdinalIgnoreCase) ? "" : ".lua"))
             .ToList();
 
         var ids = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -151,4 +149,9 @@ public sealed class StorySimulationService(
 
         return ids.ToList();
     }
+
+    private sealed record Session(
+        StorySimulator Simulator,
+        StorySimSnapshot Snapshot,
+        IReadOnlyList<string> LuaNotifications);
 }

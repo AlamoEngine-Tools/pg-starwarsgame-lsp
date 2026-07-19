@@ -282,10 +282,13 @@ public sealed class XmlRenameHandlerTest
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
                 .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
         var index = BuildIndex(
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
-                .Add("enum:ArmorType/Armor_Structure", [enumRef])
-        ) with { WorkspaceEnumValueDefinitions = defs };
+                ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc),
+                refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                    .Add("enum:ArmorType/Armor_Structure", [enumRef])
+            ) with
+            {
+                WorkspaceEnumValueDefinitions = defs
+            };
 
         var result = MakeHandler(host).HandleRename(XmlUri, RenameAt(0, 12, "Armor_Renamed"), index);
 
@@ -305,7 +308,10 @@ public sealed class XmlRenameHandlerTest
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
                 .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
         var index = BuildIndex(ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, doc))
-            with { WorkspaceEnumValueDefinitions = defs };
+            with
+            {
+                WorkspaceEnumValueDefinitions = defs
+            };
 
         var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
 
@@ -316,7 +322,7 @@ public sealed class XmlRenameHandlerTest
     [Fact]
     public void HandlePrepare_CursorOnEnumValueReference_BaselineOnlyValue_ReturnsNull()
     {
-        // No WorkspaceEnumValueDefinitions entry — the value is baseline-only (vanilla), not
+        // No WorkspaceEnumValueDefinitions entry - the value is baseline-only (vanilla), not
         // renameable.
         var enumRef = new GameReference("enum:ArmorType/Armor_Normal", null, null, XmlUri, 0, 10, 12);
         var doc = XmlDoc(XmlUri, r: enumRef);
@@ -340,8 +346,11 @@ public sealed class XmlRenameHandlerTest
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
                 .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
         var index = BuildIndex(
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, leafDoc).Add(defUri, depDoc))
-            with { WorkspaceEnumValueDefinitions = defs };
+                ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, leafDoc).Add(defUri, depDoc))
+            with
+            {
+                WorkspaceEnumValueDefinitions = defs
+            };
 
         var result = MakeHandler().HandlePrepare(XmlUri, 0, 12, index);
 
@@ -364,10 +373,13 @@ public sealed class XmlRenameHandlerTest
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
                 .Add("Armor_Structure", new FileOrigin(defUri, 0, 29)));
         var index = BuildIndex(
-            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, leafDoc).Add(defUri, depDoc),
-            refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
-                .Add("enum:ArmorType/Armor_Structure", [enumRef]))
-            with { WorkspaceEnumValueDefinitions = defs };
+                ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, leafDoc).Add(defUri, depDoc),
+                refs: ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                    .Add("enum:ArmorType/Armor_Structure", [enumRef]))
+            with
+            {
+                WorkspaceEnumValueDefinitions = defs
+            };
 
         var result = MakeHandler(host).HandleRename(XmlUri, RenameAt(0, 12, "Armor_Renamed"), index);
 
@@ -443,7 +455,7 @@ public sealed class XmlRenameHandlerTest
     public void HandlePrepare_SymbolFromDependencyLayer_ReturnsNull()
     {
         // Symbol exists as FileOrigin but lives in a dependency-layer doc (rank 0);
-        // the leaf doc (rank 1) only has a reference to it — prepare-rename must return null.
+        // the leaf doc (rank 1) only has a reference to it - prepare-rename must return null.
         var depSym = XmlSymbolAt("UNIT_DEP", "file:///dep/units.xml", 5);
         var depDoc = new DocumentIndex("file:///dep/units.xml", 1, [depSym],
             ImmutableArray<GameReference>.Empty, LayerRank: 0);

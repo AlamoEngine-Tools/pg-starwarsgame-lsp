@@ -51,7 +51,6 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
         {
             var valid = GetValidValues(enumDef, ctx);
             if (valid is not null)
-            {
                 foreach (var seg in trimmed.Split(ValueSeparators,
                              StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
                     if (!valid.Contains(seg))
@@ -60,7 +59,6 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                                 $"'{seg}' is not a known value for enum '{enumDef.Name}' on <{fact.Tag.Tag}>.")
                         ];
-            }
         }
 
         // DynamicXml: defined in data files — unknown value is a Warning (baseline may be incomplete).
@@ -68,7 +66,6 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
         {
             var valid = GetValidValues(enumDef, ctx);
             if (valid is not null)
-            {
                 foreach (var seg in trimmed.Split(ValueSeparators,
                              StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
                     if (!valid.Contains(seg))
@@ -77,7 +74,6 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                                 $"'{seg}' is not a known {enumDef.Name} value.")
                         ];
-            }
         }
 
         return [];

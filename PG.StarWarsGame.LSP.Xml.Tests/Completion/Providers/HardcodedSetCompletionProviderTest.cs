@@ -60,7 +60,7 @@ public sealed class HardcodedSetCompletionProviderTest
         Assert.False(Provider.CanHandle(tag));
     }
 
-    // ── GetProposals — no ValueGroup ──────────────────────────────────────────
+    // ── GetProposals - no ValueGroup ──────────────────────────────────────────
 
     [Fact]
     public void GetProposals_NoValueGroup_ReturnsAllValues()
@@ -74,7 +74,7 @@ public sealed class HardcodedSetCompletionProviderTest
         Assert.Contains(result, p => p.Label == "C");
     }
 
-    // ── GetProposals — ValueGroup filtering ───────────────────────────────────
+    // ── GetProposals - ValueGroup filtering ───────────────────────────────────
 
     [Fact]
     public void GetProposals_ValueGroup_FiltersToGroup()
@@ -105,7 +105,7 @@ public sealed class HardcodedSetCompletionProviderTest
         Assert.Single(result);
     }
 
-    // ── GetProposals — multiple ValueGroups ──────────────────────────────────
+    // ── GetProposals - multiple ValueGroups ──────────────────────────────────
 
     [Fact]
     public void GetProposals_MultipleValueGroups_MatchesValuesInAnyGroup()
@@ -133,7 +133,7 @@ public sealed class HardcodedSetCompletionProviderTest
         Assert.Equal(3, result.Count);
         Assert.Equal("LandUnit", result[0].Label); // matches first group "land"
         Assert.Equal("SpaceUnit", result[1].Label); // matches second group "space"
-        Assert.Equal("Universal", result[2].Label); // empty groups — always last
+        Assert.Equal("Universal", result[2].Label); // empty groups - always last
     }
 
     [Fact]
@@ -150,7 +150,7 @@ public sealed class HardcodedSetCompletionProviderTest
         Assert.Equal("Universal", result[1].Label);
     }
 
-    // ── GetProposals — partialValue filtering ─────────────────────────────────
+    // ── GetProposals - partialValue filtering ─────────────────────────────────
 
     [Fact]
     public void GetProposals_FiltersByPartialValue()

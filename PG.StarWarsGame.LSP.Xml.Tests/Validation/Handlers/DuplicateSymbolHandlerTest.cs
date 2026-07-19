@@ -66,7 +66,7 @@ public sealed class DuplicateSymbolHandlerTest
     public void Duplicate_emits_related_location_for_other_definition()
     {
         // The other definition's exact position must ride along as a related location so the
-        // editor renders it as a clickable link — "also defined in <file>" alone forces the user
+        // editor renders it as a clickable link - "also defined in <file>" alone forces the user
         // to hunt for the line manually.
         var sym1 = MakeSymbol("X1", "file:///a.xml", 2);
         var sym2 = MakeSymbol("X1", "file:///b.xml", 5);
@@ -84,7 +84,7 @@ public sealed class DuplicateSymbolHandlerTest
     [Fact]
     public void NonNavigableOtherDefinition_ProducesNoRelatedLocation()
     {
-        // Baseline symbols carry game-relative paths the editor cannot open — a related location
+        // Baseline symbols carry game-relative paths the editor cannot open - a related location
         // would render as a dead link.
         var sym1 = MakeSymbol("X1", "file:///a.xml", 2);
         var sym2 = MakeSymbol("X1", "DATA\\XML\\UNITS.XML", 5);

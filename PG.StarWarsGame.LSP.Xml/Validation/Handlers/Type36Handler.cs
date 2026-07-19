@@ -5,7 +5,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
-/// <summary>Validates <c>Weather_SFXEvent_Intermittent</c> — a non-empty SFX event reference.</summary>
+/// <summary>Validates <c>Weather_SFXEvent_Intermittent</c> - a non-empty SFX event reference.</summary>
 public sealed class Type36Handler : NonEmptyReferenceHandlerBase
 {
     protected override XmlValueType TargetType => XmlValueType.Type36;

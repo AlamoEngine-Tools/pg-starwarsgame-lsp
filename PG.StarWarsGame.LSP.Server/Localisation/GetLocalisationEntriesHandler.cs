@@ -14,7 +14,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
-// The webview's sole source of parsed data — replaces the client's own hand-rolled CSV/XML/NLS
+// The webview's sole source of parsed data - replaces the client's own hand-rolled CSV/XML/NLS
 // parsing (localisationEditorViewProvider.ts's parseCsv/parseXml/parseNls) with the same
 // importers the rest of the server already uses, so the editor can never drift from what the
 // LocalisationLoader/ExportLocalisationToDatHandler actually understand.
@@ -22,6 +22,7 @@ public sealed class GetLocalisationEntriesHandler
     : IJsonRpcRequestHandler<GetLocalisationEntriesParams, GetLocalisationEntriesResult>
 {
     private const string XmlNs = "urn:alamoenginetools:localisation:v1";
+    private readonly ILspConfigurationProvider _config;
 
     private readonly ICsvTranslationImporter _csvImporter;
     private readonly ITranslationDatabaseFactory _factory;
@@ -30,7 +31,6 @@ public sealed class GetLocalisationEntriesHandler
     private readonly ILogger<GetLocalisationEntriesHandler> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
     private readonly IXmlTranslationImporter _xmlImporter;
-    private readonly ILspConfigurationProvider _config;
 
     public GetLocalisationEntriesHandler(
         ICsvTranslationImporter csvImporter,
@@ -116,7 +116,7 @@ public sealed class GetLocalisationEntriesHandler
     }
 
     // Languages come from the file's actual structure (header row / declared attributes), never
-    // from "does any row have a non-empty value" — that heuristic is what silently dropped a
+    // from "does any row have a non-empty value" - that heuristic is what silently dropped a
     // freshly-added, still-empty language column on the client before this chunk.
     private static IReadOnlyList<string> DiscoverCsvLanguages(string content)
     {

@@ -127,7 +127,8 @@ public abstract class DiagnosticsPublisherBase
                                     || !ReferenceEquals(last.Localisation, index.Localisation)
                                     || !ReferenceEquals(last.AssetFiles, index.AssetFiles)
                                     || !ReferenceEquals(last.ModelBones, index.ModelBones)
-                                    || !ReferenceEquals(last.WorkspaceDynamicEnumValues, index.WorkspaceDynamicEnumValues)
+                                    || !ReferenceEquals(last.WorkspaceDynamicEnumValues,
+                                        index.WorkspaceDynamicEnumValues)
                                     || !ReferenceEquals(last.WorkspaceEnumValueDefinitions,
                                         index.WorkspaceEnumValueDefinitions);
 
@@ -135,7 +136,8 @@ public abstract class DiagnosticsPublisherBase
         {
             if (!crossDocInputsChanged
                 && _lastPublishedUris.Contains(doc.Uri)
-                && ReferenceEquals(last!.Documents.GetValueOrDefault(doc.Uri), index.Documents.GetValueOrDefault(doc.Uri)))
+                && ReferenceEquals(last!.Documents.GetValueOrDefault(doc.Uri),
+                    index.Documents.GetValueOrDefault(doc.Uri)))
                 continue;
 
             try
@@ -144,7 +146,8 @@ public abstract class DiagnosticsPublisherBase
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Unhandled exception publishing diagnostics for {Uri}; sending empty diagnostics", doc.Uri);
+                _logger.LogError(ex, "Unhandled exception publishing diagnostics for {Uri}; sending empty diagnostics",
+                    doc.Uri);
                 _publish(EmptyParams(doc.Uri));
             }
         }

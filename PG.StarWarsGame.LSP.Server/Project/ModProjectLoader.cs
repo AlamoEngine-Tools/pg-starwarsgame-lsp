@@ -26,6 +26,9 @@ public sealed class ModProjectLoader
         AllowTrailingCommas = true
     };
 
+    private static readonly HashSet<string> ValidLocalisationTypes =
+        new(StringComparer.OrdinalIgnoreCase) { "CSV", "DAT", "XML", "NLS" };
+
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ModProjectLoader> _logger;
 
@@ -107,9 +110,6 @@ public sealed class ModProjectLoader
         return new ModProjectFile(name, modinfo, directories, references, localisation);
     }
 
-    private static readonly HashSet<string> ValidLocalisationTypes =
-        new(StringComparer.OrdinalIgnoreCase) { "CSV", "DAT", "XML", "NLS" };
-
     private LocalisationProjectSettings? ParseLocalisation(LocalisationDto? dto, string fileName)
     {
         if (dto is null) return null;
@@ -130,7 +130,7 @@ public sealed class ModProjectLoader
     // Clean break: directories.text/textResourceType were removed in 0.2.0 in favour of the
     // top-level "localisation" node. System.Text.Json silently ignores unknown properties, so
     // without this check an un-migrated .pgproj would load "successfully" with its localisation
-    // quietly unconfigured — no error, no hint why. Hard-fail instead, per feedback_strict_validation_clear_errors.
+    // quietly unconfigured - no error, no hint why. Hard-fail instead, per feedback_strict_validation_clear_errors.
     private static void ThrowIfLegacyLocalisationShape(string text, string fileName)
     {
         using var document = JsonDocument.Parse(text, DocumentOptions);
@@ -184,7 +184,7 @@ public sealed class ModProjectLoader
 
         var hint = ex.Path is { } jsonPath
                    && jsonPath.Contains("projectReferences", StringComparison.OrdinalIgnoreCase)
-            ? "'projectReferences' must be an array of references — either path strings or " +
+            ? "'projectReferences' must be an array of references - either path strings or " +
               "{ \"path\": \"...\" } objects, e.g. [ { \"path\": \"../core/core.pgproj\" } ]."
             : "the file is not valid JSON or does not match the .pgproj schema.";
 

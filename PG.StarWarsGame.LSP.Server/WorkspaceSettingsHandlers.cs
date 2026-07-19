@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server;
 [Method("aet/getWorkspaceSettings", Direction.ClientToServer)]
 public sealed record GetWorkspaceSettingsParams : IRequest<WorkspaceSettingsDto>;
 
-/// <summary>Partial update — only the non-null fields are applied (the rest keep their value).</summary>
+/// <summary>Partial update - only the non-null fields are applied (the rest keep their value).</summary>
 [Method("aet/setWorkspaceSettings", Direction.ClientToServer)]
 public sealed record SetWorkspaceSettingsParams(
     bool? SkipStoryDeleteConfirmation = null,
@@ -19,7 +19,9 @@ public sealed record SetWorkspaceSettingsParams(
     bool? ShowChapterLanes = null) : IRequest<WorkspaceSettingsDto>;
 
 public sealed record WorkspaceSettingsDto(
-    bool SkipStoryDeleteConfirmation, bool ShowThreadLanes, bool ShowChapterLanes);
+    bool SkipStoryDeleteConfirmation,
+    bool ShowThreadLanes,
+    bool ShowChapterLanes);
 
 public sealed class GetWorkspaceSettingsHandler(IWorkspaceSettingsStore store)
     : IJsonRpcRequestHandler<GetWorkspaceSettingsParams, WorkspaceSettingsDto>
@@ -42,7 +44,7 @@ public sealed class SetWorkspaceSettingsHandler(IWorkspaceSettingsStore store)
         {
             SkipStoryDeleteConfirmation = request.SkipStoryDeleteConfirmation ?? current.SkipStoryDeleteConfirmation,
             ShowThreadLanes = request.ShowThreadLanes ?? current.ShowThreadLanes,
-            ShowChapterLanes = request.ShowChapterLanes ?? current.ShowChapterLanes,
+            ShowChapterLanes = request.ShowChapterLanes ?? current.ShowChapterLanes
         };
         store.Set(updated);
         return Task.FromResult(new WorkspaceSettingsDto(

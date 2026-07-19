@@ -6,7 +6,7 @@ using System.Collections.Immutable;
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
 /// <summary>
-/// Aggregate output of parsing a single EmmyLua doc-comment block.
+///     Aggregate output of parsing a single EmmyLua doc-comment block.
 /// </summary>
 public sealed record EmmyLuaAnnotations(
     /// <summary>Accumulated prose lines (non-@ comment text), joined with \n.</summary>

@@ -74,7 +74,7 @@ public sealed class LuaUpvalueAnalyzerTest
     [Fact]
     public void LocalFunctionDeclaration_NoDiagnosticForName()
     {
-        // A local function is itself locally bound — not a file-level local
+        // A local function is itself locally bound - not a file-level local
         const string text = """
                             local function Helper() end
                             function Foo()
@@ -205,7 +205,7 @@ public sealed class LuaUpvalueAnalyzerTest
     {
         // "local x = 1" on line 0
         // "function Foo()" on line 1
-        // "    return x" on line 2 — 'x' starts at column 11 (after 4-space indent + "return ")
+        // "    return x" on line 2 - 'x' starts at column 11 (after 4-space indent + "return ")
         const string text = "local x = 1\nfunction Foo()\n    return x\nend";
         var result = Analyze(text);
         var diag = Assert.Single(result);

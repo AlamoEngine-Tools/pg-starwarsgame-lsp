@@ -8,11 +8,11 @@ using PG.StarWarsGame.LSP.Server.Project;
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
 /// <summary>
-///     The single, linear startup sequence. Every stage is awaited in a fixed order — no
+///     The single, linear startup sequence. Every stage is awaited in a fixed order - no
 ///     fire-and-forget, no readiness events, no re-entrance. Launched once from
 ///     <c>OnInitialized</c> on a background task; while it runs, the <see cref="IStartupGate" />
 ///     buffers inbound client notifications, which the final stage drains. The whole body is
-///     guarded so the gate always opens, even if a stage fails — a degraded server still edits.
+///     guarded so the gate always opens, even if a stage fails - a degraded server still edits.
 ///     Workspace indexing (including the no-pgproj case) is delegated to
 ///     <see cref="IModProjectReloadService" />, the one index path shared with reload and pgproj-watch.
 /// </summary>

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
 using System.Text;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
@@ -322,7 +323,7 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
     }
 
     private static async Task SaveXmlAsync(
-        System.IO.Abstractions.IFileSystem fs, string filePath, XDocument xdoc, CancellationToken ct)
+        IFileSystem fs, string filePath, XDocument xdoc, CancellationToken ct)
     {
         var sb = new StringBuilder();
         await using (var writer = new StringWriter(sb))
@@ -336,7 +337,7 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
     // ── shared line helpers ──────────────────────────────────────────────────
 
     // Normalizes to \n, splits into logical lines, and drops the single trailing empty entry
-    // produced when the file ends with a newline — so callers never have to special-case it.
+    // produced when the file ends with a newline - so callers never have to special-case it.
     private static List<string> SplitLines(string text)
     {
         var normalized = text.Replace("\r\n", "\n");

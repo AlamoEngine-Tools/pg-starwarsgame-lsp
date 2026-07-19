@@ -41,7 +41,7 @@ public sealed class MegAssetCatalogBuilderTest
         Assert.Equal(expected, MegAssetCatalogBuilder.IsAssetExtension(ext));
     }
 
-    // ── Build — asset file collection ────────────────────────────────────────
+    // ── Build - asset file collection ────────────────────────────────────────
 
     [Fact]
     public void Build_EmptyMegsAndNoLooseFiles_ReturnsEmpty()
@@ -111,7 +111,7 @@ public sealed class MegAssetCatalogBuilderTest
         Assert.Single(assets, a => a == "data/art/textures/shared.tga");
     }
 
-    // ── Build — model bone extraction ─────────────────────────────────────────
+    // ── Build - model bone extraction ─────────────────────────────────────────
 
     [Fact]
     public void Build_AloEntryWithBones_ExtractsBonesForNormalizedPath()

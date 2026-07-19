@@ -22,7 +22,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private readonly ISchemaProvider _schema;
 
     // parseCache is optional so minimal test setups can omit it; production wires the shared
-    // cache so the indexing parse seeds it — the diagnostics publish and the first hover/inlay
+    // cache so the indexing parse seeds it - the diagnostics publish and the first hover/inlay
     // request after an edit then reuse this parse instead of re-parsing. A null configProvider
     // (test convenience) means every feature flag reads as enabled.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
@@ -92,7 +92,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             var id = GetNameAttribute(node, typeDef.NameTag);
             if (string.IsNullOrEmpty(id))
             {
-                _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute — skipped",
+                _logger.LogDebug("Type '{Type}' element at line {Line} has no Name attribute - skipped",
                     typeDef.TypeName, node.Line);
             }
             else
@@ -112,7 +112,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     ///     Detects a <c>Variant_Of_Existing_Type</c> child (a tag with
     ///     <see cref="TagSemanticType.VariantParent" />) on an object node and returns its base id plus
     ///     a typed <see cref="GameReference" /> to that base. <paramref name="enclosingTypeName" /> is the
-    ///     variant object's own type, so the base must be of the same type — this lets the existing
+    ///     variant object's own type, so the base must be of the same type - this lets the existing
     ///     unresolved-reference and type-mismatch handlers validate the inheritance link for free.
     /// </summary>
     private (string? BaseId, GameReference? Reference) ResolveVariant(
@@ -132,7 +132,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             var absPos = child.InnerStartIndex + tokenOffset;
             var (line, column) = lineIndex.GetPosition(absPos);
 
-            // The base id/reference must live in the same id-space as objectNode's own id — for
+            // The base id/reference must live in the same id-space as objectNode's own id - for
             // top-level objects that's the bare name (ownerPrefix is null); for abilities it's
             // owner-scoped ("{ownerId}$Name", see CollectSubObjectListSymbols) to avoid coincidentally
             // resolving to an unrelated object's same-named ability.
@@ -174,7 +174,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
-                // Presence_Induced_Animations: "AnimationStateId, ObjectName, ..." — the first
+                // Presence_Induced_Animations: "AnimationStateId, ObjectName, ..." - the first
                 // token is an engine animation state (not indexable), the rest are game objects
                 // whose presence triggers it. Record those as object references so
                 // go-to-definition and unresolved-reference validation cover them.
@@ -202,7 +202,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 if (tagDef.SemanticType == TagSemanticType.VariantParent) continue;
                 // A reference value is leaf text. An element that itself contains child elements is an
                 // object definition whose tag name collides with a reference tag (e.g. the
-                // <Faction Name="X">…</Faction> container vs. a <Faction>X</Faction> reference) — using
+                // <Faction Name="X">…</Faction> container vs. a <Faction>X</Faction> reference) - using
                 // its InnerText would capture the whole object as one bogus reference.
                 if (HasChildElement(child)) continue;
 
@@ -243,7 +243,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         {
             if (first)
             {
-                first = false; // the animation state id — not a game object
+                first = false; // the animation state id - not a game object
                 continue;
             }
 
@@ -357,7 +357,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     // Walks up from node to find the nearest ancestor that identifies a game object, then returns
     // that ancestor's name-attribute value. Used for owner-scoped ability symbols and
     // OwnerScopedReference tags. An ancestor qualifies when its element name is a registered
-    // object type (whose NameTag then applies) OR when it simply carries a Name attribute — real
+    // object type (whose NameTag then applies) OR when it simply carries a Name attribute - real
     // game files use concrete element names (<SpaceUnit>, <SpecialStructure>, …) that are NOT
     // schema object types (the schema models one umbrella GameObjectType), so without the
     // Name-attribute fallback every owner lookup fails and ability ids collide across objects.

@@ -3,8 +3,6 @@
 
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
-using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Variants;
@@ -12,8 +10,8 @@ namespace PG.StarWarsGame.LSP.Xml.Variants;
 /// <summary>
 ///     <see cref="IVariantTagSource" /> backed by the game index. Resolves an object's direct child
 ///     tags by locating its winning workspace definition (highest project layer, same precedence as
-///     <see cref="GameIndex.Resolve(string)" />), loading that single document's text — the open
-///     editor buffer when available, the file on disk otherwise — and parsing just that document.
+///     <see cref="GameIndex.Resolve(string)" />), loading that single document's text - the open
+///     editor buffer when available, the file on disk otherwise - and parsing just that document.
 ///     Tags read here shadow shipped-game baseline tags.
 /// </summary>
 /// <remarks>
@@ -43,7 +41,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
         if (!index.WorkspaceDefinitions.TryGetValue(objectId, out var defs) || defs.Length == 0)
             return null;
 
-        // Highest project layer wins — the same precedence GameIndex.Resolve applies.
+        // Highest project layer wins - the same precedence GameIndex.Resolve applies.
         var winner = defs.Length == 1 ? defs[0] : defs.OrderByDescending(index.LayerRankOf).First();
         if (winner.Origin is not FileOrigin origin)
             return null;
@@ -142,5 +140,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
     }
 
     private sealed record CacheEntry(
-        int Version, long ContentHash, Dictionary<string, IReadOnlyList<VariantTag>> TagsById);
+        int Version,
+        long ContentHash,
+        Dictionary<string, IReadOnlyList<VariantTag>> TagsById);
 }

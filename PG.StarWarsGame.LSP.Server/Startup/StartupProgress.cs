@@ -12,7 +12,7 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 ///     Reports linear startup progress over a single client <c>window/workDoneProgress</c> token.
 ///     Best-effort: the token is created lazily and asynchronously (some clients delay or never
 ///     grant it), so <see cref="Report" /> simply logs until the observer is available. The progress
-///     token's async creation is the one contained piece of asynchrony here — it is never on the
+///     token's async creation is the one contained piece of asynchrony here - it is never on the
 ///     deterministic indexing path.
 /// </summary>
 public sealed class StartupProgress : IStartupProgress
@@ -64,7 +64,7 @@ public sealed class StartupProgress : IStartupProgress
         var createTask = _workDone!.Create(
             new WorkDoneProgressBegin
             {
-                Title = "Star Wars LSP — starting",
+                Title = "Star Wars LSP - starting",
                 Message = "Initialising…",
                 Cancellable = false,
                 Percentage = 0

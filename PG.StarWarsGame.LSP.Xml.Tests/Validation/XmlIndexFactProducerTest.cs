@@ -92,7 +92,7 @@ public sealed class XmlIndexFactProducerTest
     [Fact]
     public void StoryParserSymbols_SameNameAcrossCampaignThreads_EmitsNoDuplicateFact()
     {
-        // Story campaigns are sandboxed per faction — the same event name in the Empire and the
+        // Story campaigns are sandboxed per faction - the same event name in the Empire and the
         // Rebel campaign threads is legal and common in vanilla. Per-thread duplicates and
         // campaign-wide ambiguity are the story graph diagnostics' business.
         var empire = MakeSym("Set_Act_Counter", "file:///story_campaign_empire.xml", 3, "StoryParser");
@@ -122,7 +122,7 @@ public sealed class XmlIndexFactProducerTest
     public void CrossLayerOverride_DoesNotEmitDuplicateFact()
     {
         // A same-id definition in a different project layer is a valid override (surfaced as a code
-        // lens), not a duplicate — so no XmlSymbolFact is produced for it.
+        // lens), not a duplicate - so no XmlSymbolFact is produced for it.
         var core = MakeSym("UNIT_A", "file:///core/u.xml", 0);
         var rev = MakeSym("UNIT_A", "file:///rev/u.xml", 0);
 
@@ -212,7 +212,7 @@ public sealed class XmlIndexFactProducerTest
     {
         // "enum:{EnumName}/{Value}" is a synthetic id recorded by CollectEnumReferences for
         // go-to-definition/rename only. The object index can never resolve it, so producing a
-        // fact here made UnresolvedReferenceHandler flag EVERY dynamic-enum tag value — valid or
+        // fact here made UnresolvedReferenceHandler flag EVERY dynamic-enum tag value - valid or
         // not. Enum membership is validated separately by NamedEnumValueHandlerBase.
         var reference = new GameReference("enum:GameObjectCategoryType/Corvette", null, null,
             "file:///a.xml", 3, 0, 8);
@@ -246,7 +246,7 @@ public sealed class XmlIndexFactProducerTest
     public void EnginePlaceholderReference_ProducesNoReferenceFact(string placeholder)
     {
         // The game accepts "null"/"Default"/"None" as a valid "no object" value in any reference
-        // position (e.g. <Land_Damage_SFX>null,SFX_A,…) — flagging them as unresolved or
+        // position (e.g. <Land_Damage_SFX>null,SFX_A,…) - flagging them as unresolved or
         // type-mismatched is always a false positive.
         var reference = new GameReference(placeholder, GameSymbolKind.XmlObject, "SFXEvent",
             "file:///a.xml", 3, 0, placeholder.Length);

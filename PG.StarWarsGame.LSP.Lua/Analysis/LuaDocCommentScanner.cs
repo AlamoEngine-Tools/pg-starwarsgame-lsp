@@ -31,7 +31,7 @@ internal static class LuaDocCommentScanner
                 continue;
             }
 
-            if (string.IsNullOrWhiteSpace(text)) continue; // indentation — skip
+            if (string.IsNullOrWhiteSpace(text)) continue; // indentation - skip
 
             var trimmed = text.TrimStart();
             if (!trimmed.StartsWith("---", StringComparison.Ordinal)) break; // bare `--` → stop

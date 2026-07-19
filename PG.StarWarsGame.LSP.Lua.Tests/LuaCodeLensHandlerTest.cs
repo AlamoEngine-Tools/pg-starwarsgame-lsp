@@ -52,7 +52,7 @@ public sealed class LuaCodeLensHandlerTest
     [Fact]
     public async Task Handle_LuaCodeLensFlagOff_ReturnsNull()
     {
-        // Same arrange as Handle_GlobalWithZeroReferences — only the flag differs.
+        // Same arrange as Handle_GlobalWithZeroReferences - only the flag differs.
         var sym = GlobalAt("MyFunc", LuaUri, 3);
         var doc = new DocumentIndex(LuaUri, 1,
             ImmutableArray.Create(sym), ImmutableArray<GameReference>.Empty);
@@ -312,6 +312,7 @@ public sealed class LuaCodeLensHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

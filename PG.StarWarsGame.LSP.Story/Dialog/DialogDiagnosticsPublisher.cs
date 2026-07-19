@@ -28,7 +28,7 @@ public interface IDialogDiagnosticsRevalidator
 
 /// <summary>
 ///     Diagnostics for story-dialog .txt scripts. Only documents inside the
-///     <see cref="IStoryDialogScope" /> registry scope produce diagnostics — anything else
+///     <see cref="IStoryDialogScope" /> registry scope produce diagnostics - anything else
 ///     publishes empty. Index changes (localisation, symbols) re-run open dialog documents via
 ///     the shared base; the sync handler drives open/change revalidation directly because dialog
 ///     files never enter the GameIndex.

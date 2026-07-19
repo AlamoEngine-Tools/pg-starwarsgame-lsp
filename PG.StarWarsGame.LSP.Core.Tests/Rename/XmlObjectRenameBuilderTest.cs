@@ -80,7 +80,7 @@ public sealed class XmlObjectRenameBuilderTest
         var defEdit = Assert.Single(edits);
         Assert.Equal("UNIT_B", defEdit.NewText);
         Assert.Equal(0, defEdit.Range.Start.Line);
-        // "<Unit Name=\"UNIT_A\"/>" — Name="UNIT_A" — value starts at col 12
+        // "<Unit Name=\"UNIT_A\"/>" - Name="UNIT_A" - value starts at col 12
         Assert.Equal(12, defEdit.Range.Start.Character);
         Assert.Equal(18, defEdit.Range.End.Character);
     }
@@ -115,7 +115,7 @@ public sealed class XmlObjectRenameBuilderTest
     {
         // A story event is indexed BOTH as a StoryEvent symbol (matched by the column path) and as
         // a StoryParser object (matched by the Name= nameTag path) at the SAME span. The rename must
-        // emit that definition edit once — the client rejects the whole applyEdit if a document has
+        // emit that definition edit once - the client rejects the whole applyEdit if a document has
         // overlapping/duplicate text edits (the real "rename does nothing" bug).
         var storyEvent = new GameSymbol("Story_Ev", GameSymbolKind.XmlObject, "StoryEvent",
             new FileOrigin(XmlUri, 0, 13), null);

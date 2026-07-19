@@ -23,6 +23,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     public const string CommandName = "aet-eaw-edit.lsp.initLocalisationProject";
 
     private readonly IBaselineTranslationProvider _baselineProvider;
+    private readonly ILspConfigurationProvider _config;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly IModProjectFileWriter _fileWriter;
@@ -30,7 +31,6 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     private readonly ILogger<InitLocalisationProjectCommandHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
     private readonly ILocalisationSeedFileWriter _seedWriter;
-    private readonly ILspConfigurationProvider _config;
 
     public InitLocalisationProjectCommandHandler(
         IBaselineTranslationProvider baselineProvider,
@@ -72,7 +72,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
         if (rootLayer is { TextResourceType: { } rootType, TextRoots.Count: > 0 })
         {
-            // The root .pgproj already declares a localisation node — it wins over any
+            // The root .pgproj already declares a localisation node - it wins over any
             // client-supplied format/directory, which are ignored entirely.
             format = rootType;
             targetDir = rootLayer.TextRoots[0];

@@ -15,10 +15,10 @@ namespace PG.StarWarsGame.LSP.Lua;
 
 public sealed class LuaCodeLensHandler : CodeLensHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<LuaCodeLensHandler> _logger;
-    private readonly ILspConfigurationProvider _config;
 
     public LuaCodeLensHandler(
         IGameIndexService indexService,

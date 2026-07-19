@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Text;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Writer;
@@ -34,16 +35,19 @@ public static class StoryXmlWriter
             ? IndentAt(text, lastEvent.Range.StartLine, lastEvent.Range.StartColumn)
             : "\t";
         var childIndent = lastEvent is not null && lastEvent.Tags.Count > 0
-            ? IndentAt(text, lastEvent.Tags[0].ValueRange.StartLine, LineIndentLength(text, lastEvent.Tags[0].ValueRange.StartLine))
+            ? IndentAt(text, lastEvent.Tags[0].ValueRange.StartLine,
+                LineIndentLength(text, lastEvent.Tags[0].ValueRange.StartLine))
             : indent + "\t";
 
-        var block = new System.Text.StringBuilder();
+        var block = new StringBuilder();
         block.Append(eol);
         block.Append(indent).Append("<Event Name=\"").Append(Escape(name)).Append("\">").Append(eol);
         if (eventType is not null)
-            block.Append(childIndent).Append("<Event_Type>").Append(Escape(eventType)).Append("</Event_Type>").Append(eol);
+            block.Append(childIndent).Append("<Event_Type>").Append(Escape(eventType)).Append("</Event_Type>")
+                .Append(eol);
         if (rewardType is not null)
-            block.Append(childIndent).Append("<Reward_Type>").Append(Escape(rewardType)).Append("</Reward_Type>").Append(eol);
+            block.Append(childIndent).Append("<Reward_Type>").Append(Escape(rewardType)).Append("</Reward_Type>")
+                .Append(eol);
         foreach (var (tag, value) in extraTags ?? [])
             block.Append(childIndent).Append('<').Append(tag).Append('>').Append(Escape(value))
                 .Append("</").Append(tag).Append('>').Append(eol);
@@ -58,8 +62,11 @@ public static class StoryXmlWriter
     /// <summary>Removes the event block's full lines.</summary>
     public static IReadOnlyList<StoryTextEdit> DeleteEvent(string text, StoryEvent storyEvent)
     {
-        return [new StoryTextEdit(
-            new StorySourceRange(storyEvent.Range.StartLine, 0, storyEvent.Range.EndLine + 1, 0), "")];
+        return
+        [
+            new StoryTextEdit(
+                new StorySourceRange(storyEvent.Range.StartLine, 0, storyEvent.Range.EndLine + 1, 0), "")
+        ];
     }
 
     // ── Single-value tags ────────────────────────────────────────────────────
@@ -195,8 +202,11 @@ public static class StoryXmlWriter
         {
             var eol = DetectEol(text);
             var indent = IndentAt(text, lastGroup.Range.StartLine, LineIndentLength(text, lastGroup.Range.StartLine));
-            return [Insert(lastGroup.Range.EndLine + 1, 0,
-                indent + "<Prereq>" + Escape(rawValue) + "</Prereq>" + eol)];
+            return
+            [
+                Insert(lastGroup.Range.EndLine + 1, 0,
+                    indent + "<Prereq>" + Escape(rawValue) + "</Prereq>" + eol)
+            ];
         }
 
         return [InsertTagLine(text, storyEvent, "Prereq", rawValue)];

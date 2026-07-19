@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Server;
 /// <summary>
 ///     Serves the story graph diagnostics for a document by running the producer over every
 ///     campaign model containing it. A thread shared by several campaigns (universal triggers)
-///     would repeat identical findings — they are de-duplicated; campaign-specific findings
+///     would repeat identical findings - they are de-duplicated; campaign-specific findings
 ///     (e.g. ambiguity that exists in only one campaign) survive. Gated by
 ///     <c>features.story.graphDiagnostics</c>.
 /// </summary>

@@ -23,17 +23,18 @@ using PG.StarWarsGame.LSP.Server.Project;
 namespace PG.StarWarsGame.LSP.Server.Commands;
 
 // One-time migration action: adopts a directory of *existing* translation files (CSV/XML/NLS)
-// into the .pgproj's "localisation" node — either by pure registration (source and target format
+// into the .pgproj's "localisation" node - either by pure registration (source and target format
 // match, files untouched) or by converting the source files into a new target format/directory.
 // Complements InitLocalisationProjectCommandHandler, which only ever creates a fresh
 // baseline-seeded file and has no path for adopting content that already exists.
 public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHandlerBase
 {
     public const string CommandName = "aet-eaw-edit.lsp.importLocalisationProject";
+    private readonly ILspConfigurationProvider _config;
 
     private readonly ICsvTranslationImporter _csvImporter;
-    private readonly IDatTranslationImporter _datImporter;
     private readonly IDatFileService _datFileService;
+    private readonly IDatTranslationImporter _datImporter;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly IModProjectFileWriter _fileWriter;
@@ -43,7 +44,6 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     private readonly IModProjectReloadService _reloadService;
     private readonly ILocalisationSeedFileWriter _seedWriter;
     private readonly IXmlTranslationImporter _xmlImporter;
-    private readonly ILspConfigurationProvider _config;
 
     public ImportLocalisationProjectCommandHandler(
         ICsvTranslationImporter csvImporter,
@@ -137,7 +137,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         string relativeDirectory;
         if (sameFormat)
         {
-            // Pure registration — the user's existing files are left untouched.
+            // Pure registration - the user's existing files are left untouched.
             var relative = fs.Path.GetRelativePath(pgprojDir, sourceDirectory);
             if (fs.Path.IsPathRooted(relative))
             {
@@ -212,7 +212,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     private async Task ImportFileAsync(
         string path, string format, IKeyedTranslationDatabase db, CancellationToken ct)
     {
-        // DAT is binary — never goes through the text-read path below. It's also one file per
+        // DAT is binary - never goes through the text-read path below. It's also one file per
         // language with no self-describing language tag, so the language comes from the file name.
         if (string.Equals(format, "dat", StringComparison.OrdinalIgnoreCase))
         {

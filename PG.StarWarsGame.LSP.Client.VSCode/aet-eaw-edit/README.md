@@ -123,6 +123,21 @@ Lua script files inside the declared `scripts` directories are indexed and check
 
 ---
 
+## Story mode
+
+Campaign story plots are followed from `CampaignFiles.xml` through the plot manifests to the individual `Story_*.xml` thread files, so the whole campaign is understood as one graph rather than a pile of unrelated files. Every part of this is opt-in and still in development - see the story flags in the [feature flags](#feature-flags) reference.
+
+- **Story navigator** - an *EaWEdit: Story* activity bar view lists every campaign, faction, plot thread, and attached Lua script; suspended threads are marked, and clicking one opens the file
+- **Story graph panel** - an auto-laid-out view of the campaign's event flow with AND/OR junctions, cross-file portals, and tactical plots. Node colours track lifecycle (inactive, waiting, armed, fired, disabled), unreachable events are dimmed, and schema-untested types get dashed borders. Filter by name, branch, lifecycle, or what is reachable from a given event
+- **Editing in the graph** - in Edit mode, drag a connection between two events to add a prerequisite, drop event and reward types onto a node from the palette, and edit names, params, branch, perpetual, and dialog in place. Changes are staged and applied together on save as a normal `workspace/applyEdit`, so undo and open-editor sync work as usual. Edits are minimal - comments and formatting outside the touched lines survive byte for byte - and inserted tags follow the engine's documented order
+- **Campaign diagnostics** - prerequisites that dangle or form a cycle, duplicate event names, ambiguous campaign-global targets, events that can never fire, and suspended plots nothing ever activates
+- **Cross-language symbols** - story event names, flags, and AI-notification ids are indexed across XML and Lua. Go to definition works from a `Prereq` token to the event block, and from a `STORY_AI_NOTIFICATION` id to the Lua `Story_Event("...")` call that fires it. `F2` renames a story symbol across every thread and script at once
+- **Dialog scripts** - `.txt` dialog scripts declared in the `.pgproj` get their own diagnostics, inlay hints showing the localisation text behind each `TEXT` and `TITLE` line, and go to definition on speech, movie, and sound arguments
+
+Files that come from a dependency or the base game are read-only; the editor tells you to copy them into your project first. Node positions you arrange by hand persist per campaign in `.aetswg/story-layout.json`.
+
+---
+
 ## Localisation editor
 
 An activity bar panel provides a key-by-language table editor for `.csv`, `.xml`, and `.properties` localisation files.
@@ -150,6 +165,8 @@ Available from the Command Palette (`Ctrl+Shift+P`):
 | EaWEdit: Initialise Localisation Project from Baseline | Creates a starter localisation file from the game baseline. Requires `aet-eaw-edit.features.tools.localisation` |
 | EaWEdit: Import Existing Localisation Files | Adopts existing CSV, XML, Properties, or DAT translation files into the `.pgproj`. Requires `aet-eaw-edit.features.tools.localisation` |
 | EaWEdit: Show Effective Object (Variant Inheritance) | Opens a read-only view of the fully resolved XML for a variant object. Requires `aet-eaw-edit.features.tools.variants` |
+| EaWEdit: Open Story Graph | Opens the story graph panel for a campaign. Requires `aet-eaw-edit.features.tools.storyEditor` and `aet-eaw-edit.features.story.discovery` |
+| EaWEdit: Refresh Story Navigator | Re-reads the campaign story chain and rebuilds the navigator tree. Requires `aet-eaw-edit.features.tools.storyEditor` and `aet-eaw-edit.features.story.discovery` |
 
 ---
 
@@ -220,14 +237,37 @@ Lua:
 | `aet-eaw-edit.features.lua.inlayHints` | `true` | Inlay hints |
 | `aet-eaw-edit.features.lua.codeActions` | `true` | Code actions (quick fixes) |
 
+Story mode:
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.features.story.discovery` | `false` | Follows the campaign story chain (campaigns to plot manifests to thread files) and types those files, activating story parameter validation and completion. Every other story flag builds on this one _(work in progress)_ |
+| `aet-eaw-edit.features.story.graphDiagnostics` | `false` | Whole-campaign story analysis: dangling and cyclic prerequisites, duplicate event names, ambiguous campaign-global targets, events that can never fire, suspended plots nothing activates, tag-order deviations, and over-long flag names _(work in progress)_ |
+| `aet-eaw-edit.features.story.symbols` | `false` | Indexes story event names, flags, and AI-notification ids across XML and Lua, enabling hover, go to definition, and find all references on them _(work in progress)_ |
+| `aet-eaw-edit.features.story.rename` | `false` | Cross-language rename of story events, flags, and notification ids in one workspace edit. Builds on story symbols _(work in progress)_ |
+
+Story dialog:
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.features.dialog.diagnostics` | `false` | Diagnostics for dialog `.txt` scripts: unknown commands, argument count and type errors, untested-command warnings, and reference checks for localisation keys, speech events, movies, and sound events _(work in progress)_ |
+| `aet-eaw-edit.features.dialog.inlayHints` | `false` | Shows the referenced localisation text at the end of `TEXT` and `TITLE` lines, or a MISSING marker for unknown keys _(work in progress)_ |
+| `aet-eaw-edit.features.dialog.goToDefinition` | `false` | Go to definition from `DIALOG`, `MOVIE`/`MOVIE_ONCE`, and `SFX` arguments to the defining XML object _(work in progress)_ |
+
+> Dialog flags apply only to `.txt` files under the folders declared in the `.pgproj` `directories.storyDialog` node - filename conventions play no part.
+
 Cross-language tools:
 
 | Setting | Default | Description |
 |---|---|---|
 | `aet-eaw-edit.features.tools.localisation` | `false` | Localisation tooling: the localisation editor's data source, the initialise/import commands, and the create-key code action _(work in progress)_ |
+| `aet-eaw-edit.features.tools.storyEditor` | `false` | The story navigator and the story graph panel, in read-only View mode. Builds on `aet-eaw-edit.features.story.discovery` _(work in progress)_ |
+| `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph panel: staging, previewing, validating, and writing story changes. Without it the panel is read-only and Edit is not offered by the mode switch. Builds on `aet-eaw-edit.features.tools.storyEditor` _(work in progress)_ |
 | `aet-eaw-edit.features.tools.variants` | `true` | Variant-inheritance tooling: the Show Effective Object command and its code lens |
 
 > The localisation panel needs both `aet-eaw-edit.localisation.editorEnabled` and `aet-eaw-edit.features.tools.localisation` set to `true` - the first shows the panel, the second makes it functional.
+
+> The story graph panel's Simulation mode is still unfinished and is deliberately absent from this list and from the settings UI. It is reachable by adding `"aet-eaw-edit.features.tools.storySimulator": true` to `settings.json` by hand; the mode switch then offers it.
 
 ---
 

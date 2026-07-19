@@ -58,7 +58,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
     public async Task DidOpen_Triggers_Index_Open()
     {
         // didOpen must route through OpenDocumentAsync (version-epoch reset), not
-        // UpdateDocumentAsync — a fresh session's client versions restart at 1 and would
+        // UpdateDocumentAsync - a fresh session's client versions restart at 1 and would
         // otherwise be dropped as stale against the previous session's committed version.
         var (handler, _, index) = Build();
 
@@ -149,7 +149,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
     public async Task DidClose_WhenFileExistsOnDisk_ReindexesWithoutRemoval()
     {
         // Mirrors XmlTextDocumentSyncHandler: the index entry must never be removed for a file
-        // that still exists — a queued removal racing the async re-add can otherwise strip the
+        // that still exists - a queued removal racing the async re-add can otherwise strip the
         // document's symbols permanently (the 2026-07-05 go-to-definition bug).
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [DiskPath] = new(DiskContent) });
@@ -184,7 +184,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
     [Fact]
     public async Task DidClose_WhenFileExistsOnDisk_DoesNotRetainHostEntry()
     {
-        // The host tracks only open documents — after close the text lives on disk and every
+        // The host tracks only open documents - after close the text lives on disk and every
         // closed-file consumer reads it from there on demand.
         var fs = new MockFileSystem(new Dictionary<string, MockFileData>
             { [DiskPath] = new(DiskContent) });
@@ -378,6 +378,7 @@ public sealed class LuaTextDocumentSyncHandlerTest
             ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
+
         public void ApplyWorkspaceEnumValueDefinitions(
             ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
         {

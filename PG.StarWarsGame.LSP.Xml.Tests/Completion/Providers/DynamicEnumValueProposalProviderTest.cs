@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -49,7 +48,9 @@ public sealed class DynamicEnumValueProposalProviderTest
     }
 
     private static DynamicEnumValueProposalProvider Sut(GameIndex? index = null)
-        => new(new FakeIndexService(index));
+    {
+        return new DynamicEnumValueProposalProvider(new FakeIndexService(index));
+    }
 
     [Fact]
     public void ValueType_is_DynamicEnumValue()
@@ -144,7 +145,7 @@ public sealed class DynamicEnumValueProposalProviderTest
         Assert.Equal("STORY_ACCUMULATE", proposals[0].Label);
     }
 
-    // ── DynamicXml enum — runtime index values ────────────────────────────────
+    // ── DynamicXml enum - runtime index values ────────────────────────────────
 
     [Fact]
     public void DynamicXml_ReturnsWorkspaceValues()
@@ -153,7 +154,8 @@ public sealed class DynamicEnumValueProposalProviderTest
             .Add("DamageType", ["EXPLOSIVE", "ENERGY"]);
         var index = GameIndex.Empty with { WorkspaceDynamicEnumValues = workspaceValues };
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
 
         var proposals = Sut(index).GetProposals(tag, "");
 
@@ -170,7 +172,8 @@ public sealed class DynamicEnumValueProposalProviderTest
         var baseline = BaselineIndex.Empty with { DynamicEnumValues = baselineEnums };
         var index = GameIndex.Empty with { Baseline = baseline };
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
 
         var proposals = Sut(index).GetProposals(tag, "");
 
@@ -187,11 +190,12 @@ public sealed class DynamicEnumValueProposalProviderTest
             .Add("DamageType", ["MOD_DMG", "EXPLOSIVE"]); // EXPLOSIVE already in baseline
         var index = GameIndex.Empty with { Baseline = baseline, WorkspaceDynamicEnumValues = workspaceValues };
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
 
         var proposals = Sut(index).GetProposals(tag, "");
 
-        Assert.Equal(3, proposals.Count); // LASER, EXPLOSIVE, MOD_DMG — no duplicate
+        Assert.Equal(3, proposals.Count); // LASER, EXPLOSIVE, MOD_DMG - no duplicate
         Assert.Contains(proposals, p => p.Label == "LASER");
         Assert.Contains(proposals, p => p.Label == "EXPLOSIVE");
         Assert.Contains(proposals, p => p.Label == "MOD_DMG");
@@ -204,7 +208,8 @@ public sealed class DynamicEnumValueProposalProviderTest
             .Add("DamageType", ["EXPLOSIVE", "ENERGY", "GRENADE"]);
         var index = GameIndex.Empty with { WorkspaceDynamicEnumValues = workspaceValues };
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
 
         var proposals = Sut(index).GetProposals(tag, "E");
 
@@ -217,7 +222,8 @@ public sealed class DynamicEnumValueProposalProviderTest
     public void DynamicXml_NoIndexValues_ReturnsEmpty()
     {
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
 
         var proposals = Sut().GetProposals(tag, "");
 
@@ -230,7 +236,8 @@ public sealed class DynamicEnumValueProposalProviderTest
     public void DynamicEnumChanged_Fired_RebuildsCacheFromNewIndex()
     {
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
         var service = new FakeIndexService();
         var sut = new DynamicEnumValueProposalProvider(service);
 
@@ -249,10 +256,11 @@ public sealed class DynamicEnumValueProposalProviderTest
     public void DynamicEnumChanged_NotFired_DoesNotSeeIndexMutation()
     {
         // GetDynamicProposals reads a cache built once at construction, not _indexService.Current
-        // live — this is the point of caching, and confirms the cache genuinely isn't recomputed
+        // live - this is the point of caching, and confirms the cache genuinely isn't recomputed
         // per request.
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
-        var tag = new XmlTagDefinition { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
+        var tag = new XmlTagDefinition
+            { Tag = "Damage_Type", ValueType = XmlValueType.DynamicEnumValue, Enum = enumDef };
         var index = GameIndex.Empty with
         {
             WorkspaceDynamicEnumValues = ImmutableDictionary<string, ImmutableArray<string>>.Empty
@@ -284,26 +292,60 @@ file sealed class FakeIndexService(GameIndex? current = null) : IGameIndexServic
 
     public event Action<GameIndex>? DynamicEnumChanged;
 
-    public void RaiseDynamicEnumChanged(GameIndex index) => DynamicEnumChanged?.Invoke(index);
-
     public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        => Task.CompletedTask;
+    {
+        return Task.CompletedTask;
+    }
 
-    public void InjectDocument(DocumentIndex document) { }
-    public void RemoveDocument(string uri) { }
-    public void ApplyBaseline(BaselineIndex baseline) { }
-    public void ApplyLocalisation(ILocalisationIndex index) { }
-    public void ApplyAssetFiles(IAssetFileIndex index) { }
-    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones) { }
-    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values) { }
+    public void InjectDocument(DocumentIndex document)
+    {
+    }
+
+    public void RemoveDocument(string uri)
+    {
+    }
+
+    public void ApplyBaseline(BaselineIndex baseline)
+    {
+    }
+
+    public void ApplyLocalisation(ILocalisationIndex index)
+    {
+    }
+
+    public void ApplyAssetFiles(IAssetFileIndex index)
+    {
+    }
+
+    public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
+    {
+    }
+
+    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+    {
+    }
+
     public void ApplyWorkspaceEnumValueDefinitions(
-        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions) { }
+        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+    {
+    }
 
-    public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+    public IDisposable BeginBulkUpdate()
+    {
+        return NullDisposable.Instance;
+    }
+
+    public void RaiseDynamicEnumChanged(GameIndex index)
+    {
+        DynamicEnumChanged?.Invoke(index);
+    }
 
     private sealed class NullDisposable : IDisposable
     {
         public static readonly NullDisposable Instance = new();
-        public void Dispose() { }
+
+        public void Dispose()
+        {
+        }
     }
 }

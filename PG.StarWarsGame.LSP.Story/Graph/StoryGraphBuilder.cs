@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Story.Graph;
 ///     schema-driven: which param slots produce which edges comes from the <c>referenceType</c>
 ///     annotations on the <c>StoryEventType</c>/<c>StoryRewardType</c> enums
 ///     (<c>StoryEventName</c> → control, <c>StoryFlag</c> → flag, <c>StoryPlotFile</c> →
-///     tactical, <c>StoryBranch</c> → control to every branch member) — no hardcoded per-type
+///     tactical, <c>StoryBranch</c> → control to every branch member) - no hardcoded per-type
 ///     switch. Event names resolve campaign-wide (<c>TRIGGER_EVENT</c> is campaign-global);
 ///     ambiguity is tracked, not guessed away.
 /// </summary>
@@ -24,8 +24,8 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
 
     /// <param name="threads">Every thread assembled into the campaign (main plots and tactical plots alike).</param>
     /// <param name="tacticalManifestThreads">
-    ///     Manifest file (chain-scanner-canonical, e.g. <see cref="StoryReferenceTypes.NormalizeRelativePath"/>)
-    ///     → the document URIs of the threads it includes. Drives the <see cref="StoryEdgeKind.TacticalEntry"/>
+    ///     Manifest file (chain-scanner-canonical, e.g. <see cref="StoryReferenceTypes.NormalizeRelativePath" />)
+    ///     → the document URIs of the threads it includes. Drives the <see cref="StoryEdgeKind.TacticalEntry" />
     ///     pass linking each tactical stub to its battle's own root events.
     /// </param>
     public StoryGraph Build(IReadOnlyList<StoryThread> threads,
@@ -82,7 +82,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
             state.AddEdge(new StoryEdge(writerId, readerId, StoryEdgeKind.Flag, display));
         }
 
-        // Pass 4: tactical entry edges — root events (no incoming Prereq/Control) of a tactical
+        // Pass 4: tactical entry edges - root events (no incoming Prereq/Control) of a tactical
         // manifest's own threads get an edge from that manifest's stub node, so "reachable from
         // here" can jump straight into the battle's story.
         if (tacticalManifestThreads is { Count: > 0 })
@@ -201,7 +201,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
     }
 
     // Campaign-wide, case-insensitive event-name resolution. Zero matches records the given
-    // problem; multiple matches record an ambiguity AND yield every match — the graph shows all
+    // problem; multiple matches record an ambiguity AND yield every match - the graph shows all
     // candidates instead of guessing.
     private static IReadOnlyList<StoryNode> ResolveEventName(BuildState state, StoryThread thread,
         string name, StorySourceRange range, StoryGraphProblemKind unresolvedKind, string unresolvedMessage)
@@ -216,13 +216,13 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         if (matches.Count > 1)
             state.Problems.Add(new StoryGraphProblem(StoryGraphProblemKind.AmbiguousTarget,
                 thread.DocumentUri, range, name,
-                $"'{name}' matches {matches.Count} events in this campaign — the engine's pick is undefined."));
+                $"'{name}' matches {matches.Count} events in this campaign - the engine's pick is undefined."));
 
         return matches;
     }
 
     /// <summary>
-    ///     The canonical graph-node id for an event — deterministic from its thread URI and name, so
+    ///     The canonical graph-node id for an event - deterministic from its thread URI and name, so
     ///     the client and the diagnostics correlator can compute the same id for an event the model
     ///     has not been rebuilt from yet (e.g. one just created in a staged edit-mode batch).
     /// </summary>
@@ -240,9 +240,9 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         Dictionary<(string, int), string> eventParamRefTypes,
         Dictionary<(string, int), string> rewardParamRefTypes)
     {
+        private readonly HashSet<(string, string, StoryEdgeKind, string?)> _edgeSet = [];
         private readonly Dictionary<string, StoryNode> _portals = new(StringComparer.Ordinal);
         private readonly Dictionary<string, StoryNode> _tacticalNodes = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<(string, string, StoryEdgeKind, string?)> _edgeSet = [];
 
         public Dictionary<(string, int), string> EventParamRefTypes { get; } = eventParamRefTypes;
         public Dictionary<(string, int), string> RewardParamRefTypes { get; } = rewardParamRefTypes;

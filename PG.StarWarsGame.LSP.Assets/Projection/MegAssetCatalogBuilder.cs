@@ -54,7 +54,7 @@ public static class MegAssetCatalogBuilder
             Func<Stream, IEnumerable<string>>? extractMtdIcons,
             ILogger logger)
     {
-        // Track source MEG for each normalised path — used for collision detection.
+        // Track source MEG for each normalised path - used for collision detection.
         var pathSource = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var assetBuilder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
         var bonesBuilder = new Dictionary<string, ImmutableArray<string>>(StringComparer.OrdinalIgnoreCase);
@@ -146,7 +146,7 @@ public static class MegAssetCatalogBuilder
             megName.Contains("sfx", StringComparison.OrdinalIgnoreCase))
             normalizedPath = "data/audio/sfx/" + normalizedPath;
 
-        // Strip _eng suffix from audio file stems — XML references sounds without language suffix.
+        // Strip _eng suffix from audio file stems - XML references sounds without language suffix.
         var ext = Path.GetExtension(normalizedPath);
         if (ext.Equals(".wav", StringComparison.OrdinalIgnoreCase) ||
             ext.Equals(".mp3", StringComparison.OrdinalIgnoreCase))
@@ -218,7 +218,7 @@ public static class MegAssetCatalogBuilder
         }
         catch
         {
-            // Silently skip models that fail to load — corrupt/unsupported files should not abort the build.
+            // Silently skip models that fail to load - corrupt/unsupported files should not abort the build.
         }
     }
 }

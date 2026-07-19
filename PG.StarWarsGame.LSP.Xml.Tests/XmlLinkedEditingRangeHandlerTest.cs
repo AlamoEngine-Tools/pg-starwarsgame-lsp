@@ -36,7 +36,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     [Fact]
     public async Task Handle_LinkedEditingFlagOff_ReturnsNull()
     {
-        // Same arrange as Handle_CursorOnOpeningTagName — only the flag differs.
+        // Same arrange as Handle_CursorOnOpeningTagName - only the flag differs.
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Xml = new XmlFeatureFlags { LinkedEditing = false } });
         var handler = Build("<Foo>\nbar\n</Foo>", config);
@@ -52,8 +52,8 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     public async Task Handle_CursorOnOpeningTagName_ReturnsTwoLinkedRanges()
     {
         // "<Foo>\nbar\n</Foo>"
-        // line 0: <Foo> — 'F' at col 1
-        // line 2: </Foo> — 'F' at col 2
+        // line 0: <Foo> - 'F' at col 1
+        // line 2: </Foo> - 'F' at col 2
         var handler = Build("<Foo>\nbar\n</Foo>");
         var result = await handler.Handle(At(0, 1), CancellationToken.None);
 
@@ -98,7 +98,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
         Assert.Equal(2, result!.Ranges.Count());
     }
 
-    // ── cursor on content/attribute — returns null ───────────────────────────
+    // ── cursor on content/attribute - returns null ───────────────────────────
 
     [Fact]
     public async Task Handle_CursorOnContent_ReturnsNull()
@@ -122,7 +122,7 @@ public sealed class XmlLinkedEditingRangeHandlerTest
     [Fact]
     public async Task Handle_SelfClosingTag_ReturnsNull()
     {
-        // Self-closing tags have no paired close tag — cannot do linked editing
+        // Self-closing tags have no paired close tag - cannot do linked editing
         var handler = Build("<Root>\n<Foo/>\n</Root>");
         var result = await handler.Handle(At(1, 1), CancellationToken.None);
 

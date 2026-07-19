@@ -89,7 +89,7 @@
           "items": {
             "type": "string"
           },
-          "description": "Reserved — currently excluded from XML parsing."
+          "description": "Reserved - currently excluded from XML parsing."
         },
         "storyDialog": {
           "type": "array",

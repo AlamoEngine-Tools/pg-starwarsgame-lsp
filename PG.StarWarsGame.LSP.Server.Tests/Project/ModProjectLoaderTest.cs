@@ -437,7 +437,7 @@ public sealed class ModProjectLoaderTest
         // Clean break: the old directories.text/textResourceType shape was removed in favour of
         // the top-level "localisation" node. Silently ignoring it (System.Text.Json's default
         // behaviour for unknown properties) would leave the mod's localisation quietly
-        // unconfigured with no indication why — so this must hard-fail with a migration hint
+        // unconfigured with no indication why - so this must hard-fail with a migration hint
         // instead of loading successfully.
         const string json = """
                             {

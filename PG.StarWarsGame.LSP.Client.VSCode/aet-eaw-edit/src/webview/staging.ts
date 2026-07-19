@@ -12,7 +12,7 @@ const PROPERTY_KINDS = [
 ] as const;
 
 // Structural gestures whose effect on the graph (new/removed/renamed nodes, prereq edges and their
-// junctions) is too involved to materialise locally — after staging one, the webview asks the server
+// junctions) is too involved to materialise locally - after staging one, the webview asks the server
 // for a preview graph built from the composed working copy (aet/previewStoryGraph, no file write).
 export const PREVIEW_KINDS = new Set<string>([
     'createEvent', 'deleteEvent', 'renameEvent', 'createTacticalAttachment',
@@ -22,7 +22,7 @@ export const PREVIEW_KINDS = new Set<string>([
 /** Every command kind staged locally in Edit mode (nothing is written to disk until Save). */
 export const STAGED_KINDS = new Set<string>([...PROPERTY_KINDS, ...PREVIEW_KINDS]);
 
-/** The dto fields an optimistic edit can touch — a structural subset of the graph node dto. */
+/** The dto fields an optimistic edit can touch - a structural subset of the graph node dto. */
 export interface PatchableEventNode {
     branch?: string | null;
     perpetual?: boolean;
@@ -39,7 +39,7 @@ export interface OptimisticEdit {
     apply: <T extends PatchableEventNode>(dto: T) => T;
 }
 
-/** The canonical graph-node id for an event — must match the server's StoryGraphBuilder.EventNodeId. */
+/** The canonical graph-node id for an event - must match the server's StoryGraphBuilder.EventNodeId. */
 export function eventNodeId(threadUri: string | null | undefined, eventName: string): string {
     return `${threadUri ?? ''}#${eventName.toLowerCase()}`;
 }

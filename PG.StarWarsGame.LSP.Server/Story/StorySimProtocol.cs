@@ -7,7 +7,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
-/// <summary>Gating for the <c>aet/storySim*</c> endpoints — same pattern as <see cref="StoryEditorFeature" />.</summary>
+/// <summary>Gating for the <c>aet/storySim*</c> endpoints - same pattern as <see cref="StoryEditorFeature" />.</summary>
 public static class StorySimFeature
 {
     public const string DisabledMessage =
@@ -21,7 +21,7 @@ public static class StorySimFeature
     }
 }
 
-// One flat state document per response — the graphs are small, deltas aren't worth the
+// One flat state document per response - the graphs are small, deltas aren't worth the
 // bookkeeping. No dictionaries in the DTOs: OmniSharp's serializer camelCases dictionary string
 // keys, which would corrupt flag names and node ids.
 
@@ -39,7 +39,11 @@ public sealed record StorySimFlagDto(string Name, int Value);
 public sealed record StorySimNodeStateDto(string NodeId, string Lifecycle);
 
 public sealed record StorySimInterventionDto(
-    string Kind, string NodeId, string EventName, string? EventType, IReadOnlyList<string> Options);
+    string Kind,
+    string NodeId,
+    string EventName,
+    string? EventType,
+    IReadOnlyList<string> Options);
 
 public sealed record StorySimStateResult(StorySimStateDto? State, string? Error = null);
 

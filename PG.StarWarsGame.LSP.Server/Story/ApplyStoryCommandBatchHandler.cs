@@ -22,7 +22,7 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     commands before it. The first failure aborts the batch: nothing is written and the failing
 ///     command's index is returned. On full success the composed working texts are written as a
 ///     single <c>workspace/applyEdit</c> (one whole-document replacement per changed file, plus a
-///     create for any new thread/manifest) — undo/redo and open-editor sync come free, and the
+///     create for any new thread/manifest) - undo/redo and open-editor sync come free, and the
 ///     following <c>aet/storyGraphChanged</c> reconciles the client to committed truth.
 /// </summary>
 public sealed class ApplyStoryCommandBatchHandler(
@@ -40,7 +40,7 @@ public sealed class ApplyStoryCommandBatchHandler(
     public Task<ApplyStoryCommandBatchResult> Handle(
         ApplyStoryCommandBatchParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
+        if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false, Error: rejection));
 
         var model = modelService.GetCampaignModel(request.Campaign);

@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     name must resolve to a script under the pgproj storyDialog directories (registry-scoped —
 ///     filename conventions play no part), and a <c>Story_Chapter</c> must exist in that script.
 ///     Inactive while the dialog language is off or no storyDialog directories are declared. The
-///     scope is optional because it is implemented server-side — an Xml-only composition (tests,
+///     scope is optional because it is implemented server-side - an Xml-only composition (tests,
 ///     other hosts) has none, and the handler is then inert.
 /// </summary>
 public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)

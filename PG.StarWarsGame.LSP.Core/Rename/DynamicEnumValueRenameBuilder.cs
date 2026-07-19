@@ -5,7 +5,6 @@ using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -46,7 +45,7 @@ public static class DynamicEnumValueRenameBuilder
         if (origin.Column is { } col)
         {
             // path$Element format (e.g. gameconstants.xml's <Armor_Types>...</Armor_Types> text
-            // list) — the value is a plain text token at an exact (line, column).
+            // list) - the value is a plain text token at an exact (line, column).
             AddEdit(changes, origin.Uri, new TextEdit
             {
                 NewText = newName,
@@ -55,7 +54,7 @@ public static class DynamicEnumValueRenameBuilder
         }
         else
         {
-            // Bare <EnumDefinition> format (e.g. gameobjectcategorytype.xml) — the value IS the XML
+            // Bare <EnumDefinition> format (e.g. gameobjectcategorytype.xml) - the value IS the XML
             // element name, appearing in both its opening and closing tag on this line. No column is
             // recorded for this format (see DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations),
             // so the tag name is located by text search, same approach as
@@ -72,7 +71,7 @@ public static class DynamicEnumValueRenameBuilder
                 AddEdit(changes, origin.Uri, edit);
         }
 
-        // Reference edits — every occurrence recorded as a GameReference with the synthetic
+        // Reference edits - every occurrence recorded as a GameReference with the synthetic
         // "enum:{EnumName}/{ValueName}" target id (see XmlGameDocumentParser.CollectEnumReferences).
         var id = $"enum:{enumName}/{valueName}";
         if (index.WorkspaceReferences.TryGetValue(id, out var refs))

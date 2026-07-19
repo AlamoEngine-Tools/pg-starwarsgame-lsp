@@ -8,6 +8,7 @@ public static class MegArchiveOriginHoverText
     public static string Describe(MegArchiveOrigin origin)
     {
         var archiveName = Path.GetFileName(origin.ArchivePath);
-        return $"📦 Packed in `{archiveName}` → `{origin.InternalPath}` — read-only, cannot be renamed or navigated to.";
+        return
+            $"📦 Packed in `{archiveName}` → `{origin.InternalPath}` - read-only, cannot be renamed or navigated to.";
     }
 }

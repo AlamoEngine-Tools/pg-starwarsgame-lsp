@@ -15,10 +15,10 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlLinkedEditingRangeHandler : LinkedEditingRangeHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IXmlParseCache _parseCache;
-    private readonly ILspConfigurationProvider _config;
 
     public XmlLinkedEditingRangeHandler(IXmlParseCache parseCache, IEaWXmlContext eaWXmlContext,
         IFileHelper fileHelper, ILspConfigurationProvider config)

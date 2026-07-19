@@ -28,7 +28,30 @@ public static class StoryEditorFeature
     }
 }
 
-// ── aet/getStoryPlots — campaign navigator feed ──────────────────────────────
+/// <summary>
+///     Gating for the authoring endpoints behind Edit mode - the staged-batch preview and the writes
+///     themselves. Layered on top of <see cref="StoryEditorFeature" />: the panel must be on before
+///     editing within it means anything, and whichever flag is missing is the one named.
+///     <para>
+///         Note that <c>aet/validateStoryCommandBatch</c> is deliberately NOT here: validating
+///         writes nothing and the Validate button is available in every mode, so it belongs to the
+///         read surface.
+///     </para>
+/// </summary>
+public static class StoryEditingFeature
+{
+    public const string DisabledMessage =
+        "Story editing is disabled. Enable 'aet-eaw-edit.features.tools.storyEditing' in the editor settings.";
+
+    public static string? Rejection(ILspConfigurationProvider config)
+    {
+        if (StoryEditorFeature.Rejection(config) is { } rejection) return rejection;
+        if (!config.Current.Features.Tools.StoryEditing) return DisabledMessage;
+        return null;
+    }
+}
+
+// ── aet/getStoryPlots - campaign navigator feed ──────────────────────────────
 
 [Method("aet/getStoryPlots", Direction.ClientToServer)]
 public sealed record GetStoryPlotsParams : IRequest<GetStoryPlotsResult>;
@@ -54,12 +77,12 @@ public sealed record StoryLuaScriptDto(string Name, string? Uri = null);
 /// <param name="Uri">
 ///     Resolved canonical document URI, or null when the chain is broken. Manifest entries and
 ///     on-disk names differ in casing throughout vanilla data (the engine resolves files
-///     case-insensitively) — clients must open this URI instead of searching for
+///     case-insensitively) - clients must open this URI instead of searching for
 ///     <paramref name="File" />.
 /// </param>
 public sealed record StoryPlotThreadDto(string File, bool Suspended, string? Uri = null);
 
-// ── aet/getStoryGraph — filtered campaign graph ──────────────────────────────
+// ── aet/getStoryGraph - filtered campaign graph ──────────────────────────────
 
 [Method("aet/getStoryGraph", Direction.ClientToServer)]
 public sealed record GetStoryGraphParams(
@@ -93,7 +116,7 @@ public sealed record StoryGraphNodeDto(
 
 public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, string? Label);
 
-// ── aet/getStoryNodeDetail — full event payload for the property view ────────
+// ── aet/getStoryNodeDetail - full event payload for the property view ────────
 
 [Method("aet/getStoryNodeDetail", Direction.ClientToServer)]
 public sealed record GetStoryNodeDetailParams(string Campaign, string NodeId)
@@ -122,7 +145,7 @@ public sealed record StoryParamValueDto(int Position, string Value);
 
 public sealed record StoryTagDto(string Name, string Value);
 
-// ── aet/getStorySchema — the client hardcodes nothing ────────────────────────
+// ── aet/getStorySchema - the client hardcodes nothing ────────────────────────
 
 [Method("aet/getStorySchema", Direction.ClientToServer)]
 public sealed record GetStorySchemaParams : IRequest<GetStorySchemaResult>;
@@ -149,7 +172,7 @@ public sealed record StoryParamSchemaDto(
     // round trip. Null for non-enum params.
     IReadOnlyList<string>? EnumValues = null);
 
-// ── aet/getStoryParamOptions — completion candidates for one param slot ──────
+// ── aet/getStoryParamOptions - completion candidates for one param slot ──────
 
 /// <param name="Side"><c>event</c> or <c>reward</c>.</param>
 /// <param name="TypeName">The event/reward type whose param schema applies.</param>
@@ -164,26 +187,31 @@ public sealed record GetStoryParamOptionsParams(
     int? Limit = null) : IRequest<GetStoryParamOptionsResult>;
 
 public sealed record GetStoryParamOptionsResult(
-    IReadOnlyList<StoryParamOptionDto> Options, string? Error = null);
+    IReadOnlyList<StoryParamOptionDto> Options,
+    string? Error = null);
 
 public sealed record StoryParamOptionDto(string Value, string? Detail = null);
 
-// ── aet/resolveStoryReference — go-to for a reference-typed param value ──────
+// ── aet/resolveStoryReference - go-to for a reference-typed param value ──────
 
 [Method("aet/resolveStoryReference", Direction.ClientToServer)]
 public sealed record ResolveStoryReferenceParams(string Value, string? ReferenceType = null)
     : IRequest<ResolveStoryReferenceResult>;
 
 public sealed record ResolveStoryReferenceResult(
-    string? Uri = null, int Line = 0, int Column = 0, string? Error = null);
+    string? Uri = null,
+    int Line = 0,
+    int Column = 0,
+    string? Error = null);
 
-// ── aet/getStoryDiagnostics — validation results correlated to graph nodes ───
+// ── aet/getStoryDiagnostics - validation results correlated to graph nodes ───
 
 [Method("aet/getStoryDiagnostics", Direction.ClientToServer)]
 public sealed record GetStoryDiagnosticsParams(string Campaign) : IRequest<GetStoryDiagnosticsResult>;
 
 public sealed record GetStoryDiagnosticsResult(
-    IReadOnlyList<StoryDiagnosticDto> Diagnostics, string? Error = null);
+    IReadOnlyList<StoryDiagnosticDto> Diagnostics,
+    string? Error = null);
 
 /// <param name="NodeId">The graph node the diagnostic belongs to; null for file-level problems.</param>
 /// <param name="Side"><c>event</c>/<c>reward</c> when the range falls inside a param slot.</param>
@@ -198,7 +226,7 @@ public sealed record StoryDiagnosticDto(
     int Line,
     int Column);
 
-// ── aet/getStoryLayout / aet/setStoryLayout — node position sidecar ──────────
+// ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 
 [Method("aet/getStoryLayout", Direction.ClientToServer)]
 public sealed record GetStoryLayoutParams(string Campaign) : IRequest<GetStoryLayoutResult>;
@@ -213,7 +241,7 @@ public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
 
 public sealed record StoryLayoutEntryDto(string File, string EventName, double X, double Y);
 
-// ── aet/storyGraphChanged — server push after model invalidation ─────────────
+// ── aet/storyGraphChanged - server push after model invalidation ─────────────
 
 [Method("aet/storyGraphChanged", Direction.ServerToClient)]
 public sealed record StoryGraphChangedParams(IReadOnlyList<string> Campaigns) : IRequest;

@@ -24,7 +24,7 @@ public sealed class StartupGate : IStartupGate
     {
         lock (_lock)
         {
-            // While buffering — and while draining (_open is still false) — enqueue rather than run,
+            // While buffering - and while draining (_open is still false) - enqueue rather than run,
             // so live events never overtake the buffered ones mid-drain.
             if (!_open)
             {

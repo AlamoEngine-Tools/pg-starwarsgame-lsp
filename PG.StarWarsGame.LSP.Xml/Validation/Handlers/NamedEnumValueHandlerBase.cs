@@ -18,9 +18,9 @@ public abstract class NamedEnumValueHandlerBase : SingleValueTypeHandlerBase
     ///     Returns the valid value set for <paramref name="enumDef" />, or <c>null</c> when
     ///     validation should be skipped (no enum definition, empty baseline, or open-world kind).
     ///     <list type="bullet">
-    ///         <item><see cref="EnumKind.SchemaFixed" /> — returns schema-defined values (always non-null when values exist).</item>
-    ///         <item><see cref="EnumKind.DynamicXml" /> — returns baseline values only when the baseline is non-empty.</item>
-    ///         <item>Other / null — returns <c>null</c> (skip).</item>
+    ///         <item><see cref="EnumKind.SchemaFixed" /> - returns schema-defined values (always non-null when values exist).</item>
+    ///         <item><see cref="EnumKind.DynamicXml" /> - returns baseline values only when the baseline is non-empty.</item>
+    ///         <item>Other / null - returns <c>null</c> (skip).</item>
     ///     </list>
     /// </summary>
     protected static HashSet<string>? GetValidValues(EnumDefinition? enumDef, DiagnosticsContext ctx)

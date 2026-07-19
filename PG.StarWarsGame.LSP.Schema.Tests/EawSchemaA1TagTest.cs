@@ -106,7 +106,7 @@ public sealed class EawSchemaA1TagTest
     {
         var root = FindSchemaRoot()
                    ?? throw new InvalidOperationException(
-                       "schema/eaw/ not found — ensure the schema submodule is checked out.");
+                       "schema/eaw/ not found - ensure the schema submodule is checked out.");
 
         var tagsByType = Directory
             .GetFiles(Path.Combine(root, "tags"), "*.yaml")

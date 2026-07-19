@@ -36,7 +36,7 @@ const REQUIRED_SERVER_VERSION = '0.2.0';
  */
 class ForceStaticCapabilitiesFeature implements StaticFeature {
 	// Every textDocument client-capability that exposes a `dynamicRegistration` flag and that this
-	// server actually provides. `synchronization` MUST be included — it is what replays `didOpen`.
+	// server actually provides. `synchronization` MUST be included - it is what replays `didOpen`.
 	private static readonly capabilityKeys = [
 		'synchronization',
 		'completion',
@@ -144,7 +144,7 @@ function logLine(msg: string): void {
 
 /**
  * vscode-languageclient v10 types `traceOutputChannel` as `LogOutputChannel` and writes protocol
- * trace via its `trace()` method — which a real `LogOutputChannel` hides unless its (user-controlled)
+ * trace via its `trace()` method - which a real `LogOutputChannel` hides unless its (user-controlled)
  * log level is set to Trace, and which prefixes every line with a level/timestamp. That breaks the
  * LSP trace view, where the `traceServer` setting (via `setTrace`) is meant to control visibility and
  * the JSON should appear verbatim. Adapt a plain `OutputChannel` to the `LogOutputChannel` shape so
@@ -173,8 +173,10 @@ function cfg(section: string) {
  * Builds the complete resolved feature-flag object sent to the server via initializationOptions.
  * The server's FeatureFlags record (Core\Configuration\FeatureFlags.cs) defaults everything to
  * true; the user-facing off-defaults (lua.hover, lua.diagnostics, tools.localisation,
- * story.discovery) live in package.json, so the fallbacks here must mirror package.json. Flags are restart-based: the
- * config listener in activate() restarts the server when any `aet-eaw-edit.features` value changes.
+ * story.discovery) live in package.json, so the fallbacks here must mirror package.json. The one
+ * exception is tools.storySimulator, which is intentionally not contributed at all - its fallback
+ * below is the only default it has. Flags are restart-based: the config listener in activate()
+ * restarts the server when any `aet-eaw-edit.features` value changes.
  */
 function resolveFeatureFlags() {
 	const features = cfg('features');
@@ -205,6 +207,11 @@ function resolveFeatureFlags() {
 		tools: {
 			localisation:   flag('tools.localisation', false),
 			storyEditor:    flag('tools.storyEditor', false),
+			storyEditing:   flag('tools.storyEditing', false),
+			// Deliberately NOT contributed in package.json: Simulation mode is unfinished, so it is
+			// kept out of the settings UI. Writing the key into settings.json by hand still works
+			// (VS Code returns undeclared values, and the features-wide restart listener still
+			// fires) - that is the escape hatch for trying it out.
 			storySimulator: flag('tools.storySimulator', false),
 			variants:       flag('tools.variants', true),
 		},
@@ -291,7 +298,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		serverArgs = waitForDebugger
 			? ['run', '--project', projectPath, '--', '--wait-for-debugger']
 			: ['run', '--project', projectPath];
-		logLine(`Dev mode: starting from source — ${serverExe} ${serverArgs.join(' ')}`);
+		logLine(`Dev mode: starting from source - ${serverExe} ${serverArgs.join(' ')}`);
 	} else {
 		const serverPath = cfg('lsp').get<string>('executable')!;
 		// .dll → framework-dependent: launch via `dotnet <path>`.
@@ -420,8 +427,8 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
 		// vscode-languageclient's hookConfigurationChanged reads aet.pg.swg.lsp.trace.server
 		// (the CLIENT_ID namespace), which is not in settings, so it resets trace to Off on
-		// every VS Code config change. Register our own listener — after hookConfigurationChanged's
-		// listener, so it fires last and wins — to re-apply the user's actual setting.
+		// every VS Code config change. Register our own listener - after hookConfigurationChanged's
+		// listener, so it fires last and wins - to re-apply the user's actual setting.
 		context.subscriptions.push(
 			vscode.workspace.onDidChangeConfiguration(() => {
 				const level = cfg('lsp.debug').get<string>('traceServer', 'off');
@@ -453,17 +460,17 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			statusItem.text = '$(check) EaWEdit LSP';
 		}
 		// The navigator may have rendered before the server was up (or mid-scan) and shown an
-		// empty/error state — refetch now that the workspace is fully indexed.
+		// empty/error state - refetch now that the workspace is fully indexed.
 		storyNavigatorProvider?.refresh();
 	});
 
 	lspClient.onNotification('aet/localisationIndexUpdated', async () => {
-		logLine('Localisation index updated — refreshing editor panel.');
+		logLine('Localisation index updated - refreshing editor panel.');
 		await localisationEditorProvider?.refresh();
 	});
 
 	lspClient.onNotification('aet/storyGraphChanged', (params: { campaigns: string[] }) => {
-		logLine(`Story graph changed: ${params.campaigns.join(', ')} — refreshing story views.`);
+		logLine(`Story graph changed: ${params.campaigns.join(', ')} - refreshing story views.`);
 		storyNavigatorProvider?.refresh();
 		StoryGraphPanel.refreshInvalidated(params.campaigns ?? []);
 	});
@@ -538,7 +545,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					await vscode.window.showTextDocument(doc, { preview: true });
 					return;
 				} catch {
-					// e.g. stale URI after files changed on disk — fall through to the name search.
+					// e.g. stale URI after files changed on disk - fall through to the name search.
 				}
 			}
 			if (!fileName) { return; }
@@ -589,8 +596,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				logLine('Starting LSP server after configuration change.');
 				await startLspClient(context);
 			} else if (lspClient && e.affectsConfiguration('aet-eaw-edit.features')) {
-				// Feature flags travel once via initializationOptions — restart to apply them.
-				logLine('Feature flags changed — restarting LSP server.');
+				// Feature flags travel once via initializationOptions - restart to apply them.
+				logLine('Feature flags changed - restarting LSP server.');
 				await restartServer();
 			} else {
 				validateConfiguration();
@@ -670,7 +677,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				return;
 			}
 
-			// The .pgproj already declares a localisation node — it wins outright, no picker.
+			// The .pgproj already declares a localisation node - it wins outright, no picker.
 			if (rootConfig.configured) {
 				const confirmed = await vscode.window.showInformationMessage(
 					`Initialise the localisation project (${rootConfig.type} in "${rootConfig.directory}")?`,
@@ -685,7 +692,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				return;
 			}
 
-			// Not configured — the VS Code setting only pre-fills the picker here, as a last resort.
+			// Not configured - the VS Code setting only pre-fills the picker here, as a last resort.
 			const formatOptions = [
 				{ label: 'CSV', description: 'Comma-separated values (.csv)' },
 				{ label: 'XML', description: 'eaw-translation v1 XML (.xml)' },
@@ -735,7 +742,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			if (!sourceFormatItem) { return; }
 			const isDatSource = sourceFormatItem.label === 'DAT';
 
-			// DAT is one binary file per language (MasterTextFile_<LANGUAGE>.dat) — the user picks
+			// DAT is one binary file per language (MasterTextFile_<LANGUAGE>.dat) - the user picks
 			// one file, the server discovers its siblings in the same folder. Every other format
 			// stores all languages in one file, so the user picks the containing folder directly.
 			let sourceDirectory: string;
@@ -746,7 +753,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					defaultUri,
 					filters: { 'DAT files': ['dat'] },
 					openLabel: 'Select a MasterTextFile_<LANGUAGE>.dat file',
-					title: 'Select one DAT file — its siblings in the same folder are imported too',
+					title: 'Select one DAT file - its siblings in the same folder are imported too',
 				});
 				if (!sourceFiles?.length) { return; }
 				sourceDirectory = vscode.Uri.joinPath(sourceFiles[0], '..').fsPath;
@@ -761,11 +768,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				sourceDirectory = sourceFolders[0].fsPath;
 			}
 
-			// Pre-fill the target format to match the source — the common case is "just register
+			// Pre-fill the target format to match the source - the common case is "just register
 			// what I already have," not a conversion. DAT is never a conversion target (no DAT
-			// generator wired into this wizard — use the existing "Export DAT" action for that), so
+			// generator wired into this wizard - use the existing "Export DAT" action for that), so
 			// it only appears as a target choice when the source is DAT itself, with no pre-selection
-			// (DAT is never git-friendly for collaborative editing — force an explicit choice).
+			// (DAT is never git-friendly for collaborative editing - force an explicit choice).
 			let targetFormatItem: { label: string; description: string } | undefined;
 			if (isDatSource) {
 				targetFormatItem = await vscode.window.showQuickPick([...convertibleFormats, datFormat], {
@@ -787,7 +794,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				targetDirectory = await vscode.window.showInputBox({
 					title: 'Target directory (relative to the .pgproj)',
 					value: 'data/text',
-					prompt: `Converting ${sourceFormatItem.label} → ${targetFormatItem.label} — where should the new file go?`,
+					prompt: `Converting ${sourceFormatItem.label} → ${targetFormatItem.label} - where should the new file go?`,
 					validateInput: v => (v?.trim() ? null : 'A directory is required'),
 				});
 				if (!targetDirectory) { return; }
@@ -856,7 +863,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	if (cfg('lsp').get<boolean>('enabled') === true && validateConfiguration()) {
-		logLine('LSP enabled — starting server.');
+		logLine('LSP enabled - starting server.');
 		void startLspClient(context);
 	} else if (cfg('lsp').get<boolean>('enabled') !== true) {
 		logLine('LSP disabled (aet-eaw-edit.lsp.enabled is false). Use the restart command or enable it in settings.');

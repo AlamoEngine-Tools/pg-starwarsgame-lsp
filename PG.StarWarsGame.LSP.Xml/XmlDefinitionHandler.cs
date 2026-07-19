@@ -14,11 +14,11 @@ namespace PG.StarWarsGame.LSP.Xml;
 
 public sealed class XmlDefinitionHandler : DefinitionHandlerBase
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<XmlDefinitionHandler> _logger;
-    private readonly ILspConfigurationProvider _config;
 
     public XmlDefinitionHandler(IGameIndexService indexService, IFileHelper fileHelper,
         ILogger<XmlDefinitionHandler> logger, IEaWXmlContext eaWXmlContext,
@@ -48,11 +48,11 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         if (hit is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
-        // Enum value references: "enum:{EnumName}/{ValueName}" — look up in WorkspaceEnumValueDefinitions.
+        // Enum value references: "enum:{EnumName}/{ValueName}" - look up in WorkspaceEnumValueDefinitions.
         if (hit.Value.Id.StartsWith("enum:", StringComparison.Ordinal))
             return Task.FromResult(ResolveEnumDefinition(hit.Value.Id, index));
 
-        // Group keys have no canonical single definition — they link co-members, not a target symbol.
+        // Group keys have no canonical single definition - they link co-members, not a target symbol.
         if (index.AllGroupMemberships.ContainsKey(hit.Value.Id))
             return Task.FromResult<LocationOrLocationLinks?>(null);
 

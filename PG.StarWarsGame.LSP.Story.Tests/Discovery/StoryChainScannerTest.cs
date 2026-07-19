@@ -19,36 +19,6 @@ public sealed class StoryChainScannerTest
                "</Campaign_Files>";
     }
 
-    private sealed class FakeResolver : IStoryChainFileResolver
-    {
-        private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
-        private readonly HashSet<string> _baselineKnown = new(StringComparer.OrdinalIgnoreCase);
-
-        public FakeResolver Add(string relPath, string content)
-        {
-            _files[relPath] = content;
-            return this;
-        }
-
-        public FakeResolver BaselineKnown(string relPath)
-        {
-            _baselineKnown.Add(relPath);
-            return this;
-        }
-
-        public StoryChainFile? ReadFile(string xmlRelativePath)
-        {
-            return _files.TryGetValue(xmlRelativePath, out var content)
-                ? new StoryChainFile(content, "file:///xml/" + xmlRelativePath.ToLowerInvariant())
-                : null;
-        }
-
-        public bool IsKnownToBaseline(string xmlRelativePath)
-        {
-            return _baselineKnown.Contains(xmlRelativePath);
-        }
-    }
-
     private static StoryChainScanResult Scan(FakeResolver resolver)
     {
         return new StoryChainScanner(resolver).Scan(Registry);
@@ -454,5 +424,35 @@ public sealed class StoryChainScannerTest
         var result = Scan(resolver);
 
         Assert.Equal(["Story_Plots_Rebel.xml"], result.ManifestFiles);
+    }
+
+    private sealed class FakeResolver : IStoryChainFileResolver
+    {
+        private readonly HashSet<string> _baselineKnown = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _files = new(StringComparer.OrdinalIgnoreCase);
+
+        public StoryChainFile? ReadFile(string xmlRelativePath)
+        {
+            return _files.TryGetValue(xmlRelativePath, out var content)
+                ? new StoryChainFile(content, "file:///xml/" + xmlRelativePath.ToLowerInvariant())
+                : null;
+        }
+
+        public bool IsKnownToBaseline(string xmlRelativePath)
+        {
+            return _baselineKnown.Contains(xmlRelativePath);
+        }
+
+        public FakeResolver Add(string relPath, string content)
+        {
+            _files[relPath] = content;
+            return this;
+        }
+
+        public FakeResolver BaselineKnown(string relPath)
+        {
+            _baselineKnown.Add(relPath);
+            return this;
+        }
     }
 }

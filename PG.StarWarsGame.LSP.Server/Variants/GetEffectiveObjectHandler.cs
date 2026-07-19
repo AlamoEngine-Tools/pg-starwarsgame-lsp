@@ -16,10 +16,10 @@ namespace PG.StarWarsGame.LSP.Server.Variants;
 public sealed class GetEffectiveObjectHandler
     : IJsonRpcRequestHandler<GetEffectiveObjectParams, GetEffectiveObjectResult>
 {
+    private readonly ILspConfigurationProvider _config;
     private readonly IGameIndexService _indexService;
     private readonly ISchemaProvider _schema;
     private readonly IVariantTagSource _tagSource;
-    private readonly ILspConfigurationProvider _config;
 
     public GetEffectiveObjectHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config)

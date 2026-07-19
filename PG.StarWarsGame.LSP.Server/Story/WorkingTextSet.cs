@@ -11,18 +11,19 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     <see cref="IDocumentTextSource" />. A batch of story commands composes over one set: each
 ///     command reads the current text (results of the commands before it), and its edits are
 ///     <see cref="Apply">applied</see> back into the set before the next command runs. Nothing is
-///     written to the workspace — <see cref="Changed" /> reports what a single applyEdit (or an
+///     written to the workspace - <see cref="Changed" /> reports what a single applyEdit (or an
 ///     in-memory validation run) would need to touch.
 /// </summary>
 internal sealed class WorkingTextSet(IDocumentTextSource textSource)
 {
+    private readonly Dictionary<string, string> _current = new(StringComparer.Ordinal);
+
     // Buffer text the set was seeded from, keyed by canonical URI. A null value records "the file
     // did not exist when first touched" (a created file diffs against nothing).
     private readonly Dictionary<string, string?> _original = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _current = new(StringComparer.Ordinal);
 
     /// <summary>
-    ///     The document's current text — the buffer text on first touch, or the composed result of
+    ///     The document's current text - the buffer text on first touch, or the composed result of
     ///     edits applied since. Null when the file is neither readable nor created.
     /// </summary>
     public string? GetText(string uri)
@@ -65,7 +66,7 @@ internal sealed class WorkingTextSet(IDocumentTextSource textSource)
 
     /// <summary>
     ///     Applies (0-based, end-exclusive) edits to text, last-edit-first so earlier offsets stay
-    ///     valid. Edits must be non-overlapping — compose them through
+    ///     valid. Edits must be non-overlapping - compose them through
     ///     <see cref="StoryCommandExecutor.SortedNonOverlapping" /> first.
     /// </summary>
     private static string ApplyToString(string text, IReadOnlyList<StoryTextEdit> edits)

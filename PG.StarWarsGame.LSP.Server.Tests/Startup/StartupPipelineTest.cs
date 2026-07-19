@@ -31,7 +31,7 @@ public sealed class StartupPipelineTest
 
         await pipeline.RunAsync(["/ws"], CancellationToken.None);
 
-        // Schema and baseline run in parallel — their relative order is non-deterministic.
+        // Schema and baseline run in parallel - their relative order is non-deterministic.
         // What IS guaranteed: both complete before indexing, and finalization preserves its chain.
         Assert.Contains("schema", log.Entries);
         Assert.Contains("baseline", log.Entries);
@@ -68,7 +68,7 @@ public sealed class StartupPipelineTest
         var first = await Task.WhenAny(pipelineTask, timeout);
 
         Assert.True(first == pipelineTask,
-            "Startup pipeline deadlocked — schema and baseline appear to be running sequentially");
+            "Startup pipeline deadlocked - schema and baseline appear to be running sequentially");
         Assert.Contains("baseline", log.Entries);
     }
 

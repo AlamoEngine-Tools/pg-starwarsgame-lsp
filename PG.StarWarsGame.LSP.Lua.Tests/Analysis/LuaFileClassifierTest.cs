@@ -87,7 +87,7 @@ public sealed class LuaFileClassifierTest
     [Fact]
     public void GetTier_FileRequiresOthersButIsNotItselfRequiredByAnyone_ReturnsStandalone()
     {
-        // Plan_A requires a library — but Plan_A itself is not required by anyone
+        // Plan_A requires a library - but Plan_A itself is not required by anyone
         var docs = MakeDocs(
             (LibraryUri, MakeDoc(LibraryUri)),
             (StandaloneA, MakeDoc(StandaloneA, "pgstatemachine")));

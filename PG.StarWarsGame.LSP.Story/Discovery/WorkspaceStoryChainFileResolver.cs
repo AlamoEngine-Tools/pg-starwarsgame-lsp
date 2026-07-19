@@ -24,7 +24,7 @@ public sealed class WorkspaceStoryChainFileResolver(
     {
         foreach (var root in _rootsHighestRankFirst)
         {
-            // Case-insensitive per-part lookup — the engine ignores casing, the host OS may not.
+            // Case-insensitive per-part lookup - the engine ignores casing, the host OS may not.
             var path = fileHelper.FindInWorkspace([root], xmlRelativePath);
             if (path is null) continue;
 

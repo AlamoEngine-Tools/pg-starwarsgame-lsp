@@ -22,7 +22,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
     private static readonly Regex ParamTagPattern =
         new(@"^(Event|Reward)_Param(\d+)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // Every validator for these types splits on the FIRST comma only — completions therefore only
+    // Every validator for these types splits on the FIRST comma only - completions therefore only
     // ever need to distinguish "before the first comma" (slot 0) from "after it" (slot 1), regardless
     // of how many further commas appear within slot 1's own value.
     private static readonly HashSet<XmlValueType> TupleValueTypes =
@@ -32,15 +32,16 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         XmlValueType.InaccuracyMap
     ];
 
+    private readonly ILspConfigurationProvider _config;
+
     private readonly IEaWXmlContext _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly IGameIndexService _indexService;
+    private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
     private readonly IXmlTagNameCompletionStrategyRegistry _tagNameRegistry;
     private readonly IXmlTagValueCompletionStrategyRegistry _tagValueRegistry;
-    private readonly IXmlParseCache _parseCache;
-    private readonly ILspConfigurationProvider _config;
 
     public XmlCompletionHandler(
         IXmlParseCache parseCache,
@@ -118,7 +119,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         if (enclosingTag is null)
             return Task.FromResult(new CompletionList());
 
-        // Depth 1 = cursor directly inside the file-level container — never a field tag.
+        // Depth 1 = cursor directly inside the file-level container - never a field tag.
         if (enclosingDepth == 1)
             return Task.FromResult(new CompletionList());
 
@@ -142,9 +143,9 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         }
 
         // Three-tier type-aware tag lookup (mirrors XmlDocumentFactProducer.ResolveTag):
-        //   Tier 1 — ability sub-object context (Type56/57): use the ability schema type
-        //   Tier 2 — registered file types: use GetTagsForType for each registered type
-        //   Tier 3 — flat fallback
+        //   Tier 1 - ability sub-object context (Type56/57): use the ability schema type
+        //   Tier 2 - registered file types: use GetTagsForType for each registered type
+        //   Tier 3 - flat fallback
         // Only resolved when not in story-param context (which ignores tagDef entirely).
         XmlTagDefinition? tagDef = null;
         if (storyParamSide is null)

@@ -91,10 +91,11 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_SpecialAbilityExpected_ConcreteAbilitySubtype_ReturnsNull()
     {
-        // ProximityMinesAbility is a concrete SpecialAbility subtype — GUI_Activated_Ability_Name
+        // ProximityMinesAbility is a concrete SpecialAbility subtype - GUI_Activated_Ability_Name
         // (referenceType: SpecialAbility) must accept it, not just literal "SpecialAbility".
         var result = ReferenceResolutionEvaluator.Evaluate(
-            "Bacara_Proximity_Mines_AV", "SpecialAbility", Symbol("Bacara_Proximity_Mines_AV", "ProximityMinesAbility"));
+            "Bacara_Proximity_Mines_AV", "SpecialAbility",
+            Symbol("Bacara_Proximity_Mines_AV", "ProximityMinesAbility"));
         Assert.Null(result);
     }
 
@@ -126,7 +127,7 @@ public sealed class ReferenceResolutionEvaluatorTest
     [Fact]
     public void Evaluate_NonSpecialAbilityExpected_AbilitySubtype_StillEnforcesExactMatch()
     {
-        // The allowlist relaxation is scoped to expectedTypeName == SpecialAbility only — an
+        // The allowlist relaxation is scoped to expectedTypeName == SpecialAbility only - an
         // unrelated expected type must still require an exact match.
         var result = ReferenceResolutionEvaluator.Evaluate(
             "X", "UnitAbility", Symbol("X", "ProximityMinesAbility"));

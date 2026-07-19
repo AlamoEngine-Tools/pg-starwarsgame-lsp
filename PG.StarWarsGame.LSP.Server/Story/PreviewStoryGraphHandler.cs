@@ -17,8 +17,8 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 ///     Returns the campaign graph as it would look with the staged edit-mode batch applied, WITHOUT
 ///     writing to disk: the commands are composed onto an in-memory <see cref="WorkingTextSet" /> and
 ///     the campaign model is re-assembled reading each thread from that working copy (unchanged
-///     threads fall back to buffer text). This lets the webview show structural edits — new/deleted/
-///     renamed events, new prereq edges and their junctions — with the server doing the graph build,
+///     threads fall back to buffer text). This lets the webview show structural edits - new/deleted/
+///     renamed events, new prereq edges and their junctions - with the server doing the graph build,
 ///     so the client never re-implements it and the XML files stay untouched until Save.
 /// </summary>
 public sealed class PreviewStoryGraphHandler(
@@ -33,7 +33,7 @@ public sealed class PreviewStoryGraphHandler(
 {
     public Task<GetStoryGraphResult> Handle(PreviewStoryGraphParams request, CancellationToken ct)
     {
-        if (StoryEditorFeature.Rejection(config) is { } rejection)
+        if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryGraphResult([], [], rejection));
 
         var baseModel = modelService.GetCampaignModel(request.Campaign);

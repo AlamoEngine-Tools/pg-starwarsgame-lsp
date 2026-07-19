@@ -6,7 +6,6 @@ using System.Collections.Immutable;
 using System.Xml.Linq;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Assets.Projection;
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -25,7 +24,7 @@ namespace PG.StarWarsGame.LSP.Server;
 ///     The pure, pgproj-driven indexing work split out of the old <c>WorkspaceScanner</c>:
 ///     registers file types from metafiles, bulk-indexes the project's declared XML and script
 ///     directories, and publishes the asset and model-bone catalogs. Contains no waiting, no
-///     events, no buffering, and no heuristic fallback — the <see cref="StartupPipeline" />
+///     events, no buffering, and no heuristic fallback - the <see cref="StartupPipeline" />
 ///     drives each step in a fixed order.
 /// </summary>
 public sealed class WorkspaceIndexer : IWorkspaceIndexer
@@ -99,8 +98,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 continue;
             }
 
-            // A metafile (or DirectContent file) may be shipped by any layer — the mod or a
-            // dependency — so look under the workspace roots AND every declared xml root, and use
+            // A metafile (or DirectContent file) may be shipped by any layer - the mod or a
+            // dependency - so look under the workspace roots AND every declared xml root, and use
             // every copy found. Only fall back to the baseline when no copy exists anywhere.
             var copies = LocateInLayers(def.Path, roots, xmlRoots);
             if (copies.Count == 0)
@@ -121,71 +120,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         // Replace-all also clears stale problems when a rescan (or a disabled flag) yields none.
         _storyChainProblems.Replace(storyProblems);
-    }
-
-    /// <summary>
-    ///     Follows a <see cref="MetafileType.Special" /> definition (campaignfiles.xml) through the
-    ///     campaign → plot manifest → story thread chain and types every discovered file
-    ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) under every xml root. Chain problems are
-    ///     collected for the diagnostics pipeline. Gated by <c>features.story.discovery</c>.
-    /// </summary>
-    private void ScanStoryChain(MetafileDefinition def, IReadOnlyList<string> roots,
-        IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems)
-    {
-        if (!_configProvider.Current.Features.Story.Discovery)
-        {
-            _logger.LogInformation(
-                "Story discovery is disabled (features.story.discovery); skipping '{Path}'", def.Path);
-            return;
-        }
-
-        var copies = LocateInLayers(def.Path, roots, xmlRoots);
-        if (copies.Count == 0)
-        {
-            // No campaign registry anywhere — same degradation as file registries: the shipped
-            // baseline's typed story files are projected onto the workspace's xml roots.
-            FallbackFromBaseline(baseline, def, xmlRoots);
-            return;
-        }
-
-        var registryCopies = new List<StoryChainFile>();
-        foreach (var path in copies)
-            try
-            {
-                registryCopies.Add(new StoryChainFile(
-                    _fileHelper.FileSystem.File.ReadAllText(path), _fileHelper.NormalizeUri(path)));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Could not read campaign registry '{Path}': {Message}", path, ex.Message);
-            }
-
-        var resolver = new WorkspaceStoryChainFileResolver(_fileHelper, xmlRoots, baseline);
-        var result = new StoryChainScanner(resolver).Scan(registryCopies);
-
-        RegisterStoryFiles(result.ManifestFiles, StoryPlotManifestTypes, xmlRoots);
-        RegisterStoryFiles(result.ThreadFiles, StoryParserTypes, xmlRoots);
-        problems.AddRange(result.Problems);
-
-        _logger.LogInformation(
-            "Story chain: {Manifests} manifest(s), {Threads} thread file(s), {Lua} Lua script(s), {Problems} problem(s)",
-            result.ManifestFiles.Count, result.ThreadFiles.Count, result.LuaScripts.Count,
-            result.Problems.Count);
-    }
-
-    // Chain files are xml-dir-relative; like file-registry entries they are registered under
-    // EVERY xml root so a file shipped by any layer resolves to the same types.
-    private void RegisterStoryFiles(IReadOnlyList<string> relPaths, ImmutableArray<string> types,
-        IReadOnlyList<string> xmlRoots)
-    {
-        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
-        foreach (var rel in relPaths)
-        {
-            var relPath = rel.Replace('/', sep);
-            foreach (var xmlRoot in xmlRoots)
-                _fileTypeRegistry.RegisterFile(
-                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, relPath)), types);
-        }
     }
 
     /// <summary>
@@ -264,259 +198,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             workspaceCount, baseline.Count);
 
         _indexService.ApplyModelBones(merged.ToImmutable());
-    }
-
-    // Locates every existing copy of a metafile/content file (identified by its game-relative
-    // <paramref name="defPath" />) across the workspace roots and every declared xml root, so a
-    // metafile shipped by a dependency is found rather than silently missed.
-    private IReadOnlyList<string> LocateInLayers(
-        string defPath, IReadOnlyList<string> roots, IReadOnlyList<string> xmlRoots)
-    {
-        var found = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-
-        void TryAdd(string? path)
-        {
-            if (string.IsNullOrEmpty(path) || !_fileHelper.FileSystem.File.Exists(path)) return;
-            if (seen.Add(_fileHelper.NormalizeUri(path)))
-                found.Add(path);
-        }
-
-        TryAdd(_fileHelper.FindInWorkspace(roots.ToList(), defPath));
-
-        // Metafiles live directly in the xml directory, keyed by the def's filename.
-        var fileName = _fileHelper.FileSystem.Path.GetFileName(defPath);
-        foreach (var xmlRoot in xmlRoots)
-            TryAdd(_fileHelper.FileSystem.Path.Combine(xmlRoot, fileName));
-
-        return found;
-    }
-
-    // Original flat scan used when there is no pgproj dependency graph.
-    private async Task<int> IndexFlatAsync(WorkspaceConfiguration config, CancellationToken ct,
-        Action<int, int>? progress)
-    {
-        var files = CollectFiles(config.XmlDirectories, config.ScriptRoots);
-        _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (flat scan)", files.Count);
-
-        var indexed = 0;
-        var options = new ParallelOptions
-            { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
-        using (_indexService.BeginBulkUpdate())
-        {
-            await Parallel.ForEachAsync(files, options, async (file, token) =>
-            {
-                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
-                var uri = _fileHelper.PathToFileUri(file);
-                await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                var done = Interlocked.Increment(ref indexed);
-                progress?.Invoke(done, files.Count);
-            });
-        }
-
-        _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
-        return indexed;
-    }
-
-    // Per-layer scan with project index cache support.
-    private async Task<int> IndexByLayerAsync(WorkspaceConfiguration config, CancellationToken ct,
-        Action<int, int>? progress)
-    {
-        // Build per-layer file lists (dependencies first — ordered by rank).
-        var layerFileLists = config.Layers
-            .OrderBy(l => l.Rank)
-            .Select(l => (Layer: l, Files: CollectFiles(l.XmlDirectories, l.ScriptRoots)))
-            .ToList();
-
-        var totalFiles = layerFileLists.Sum(l => l.Files.Count);
-        _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
-
-        var indexed = 0;
-        var options = new ParallelOptions
-            { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
-
-        // The schema drives what the parser emits (which tags produce references, which files
-        // carry types), so snapshots built under a different schema are stale even when every
-        // file's content hash matches. Computed once per scan. Flags that change INDEX CONTENT
-        // (story symbol emission) fold into the same fingerprint — flags are restart-based, so
-        // this is the only place a flip can invalidate cached parses.
-        var schemaFingerprint = SchemaFingerprint.Compute(_schema);
-        if (!_configProvider.Current.Features.Story.Symbols)
-            schemaFingerprint += ";story-symbols-off";
-
-        // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
-        var layerOverallHashes = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        // (pgprojPath → OverallHash) of snapshots that survived dependency validation — when the
-        // recomputed hash matches, the snapshot on disk is already current and is not re-saved.
-        var validSnapshotHashes = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        // Collect per-layer results for snapshot writing after the bulk update.
-        var layerResults = new List<(ProjectLayer Layer, List<(string RelPath, string AbsUri, string Hash)> Entries)>();
-
-        using (_indexService.BeginBulkUpdate())
-        {
-            foreach (var (layer, files) in layerFileLists)
-            {
-                // Normalize the pgproj path (production always normalizes via ProjectDependencyGraph,
-                // but defensive normalization ensures robustness in tests and edge cases).
-                var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
-
-                var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath) : null;
-
-                // Snapshot built under a different (or pre-fingerprint) schema — discard it.
-                if (snapshot is not null && snapshot.SchemaFingerprint != schemaFingerprint)
-                {
-                    _logger.LogInformation(
-                        "Schema changed since layer '{Layer}' was cached; discarding its snapshot",
-                        layer.Name);
-                    snapshot = null;
-                }
-
-                // A dependency changed since this snapshot was built. Cached parses are not
-                // content-pure — symbol extraction depends on cross-layer inputs (file-type
-                // registrations from dependency metafiles) — so the layer's own file hashes cannot
-                // catch this; discard the whole snapshot and re-parse the layer.
-                if (snapshot is not null)
-                    foreach (var dep in snapshot.DependencyHashes)
-                        if (!layerOverallHashes.TryGetValue(dep.ProjectPath, out var currentHash)
-                            || currentHash != dep.OverallHash)
-                        {
-                            _logger.LogInformation(
-                                "Dependency '{Dep}' changed since layer '{Layer}' was cached; discarding its snapshot",
-                                dep.ProjectPath, layer.Name);
-                            snapshot = null;
-                            break;
-                        }
-
-                // Overall hash of the validated snapshot, for skipping the redundant re-save below.
-                if (snapshot is not null && pgprojPath is not null)
-                    validSnapshotHashes[pgprojPath] = snapshot.OverallHash;
-
-                // Build lookup from relPath → cached entry.
-                var projectDir = pgprojPath is not null ? GetDirectory(pgprojPath) : null;
-                var cacheHits = snapshot?.Files.ToDictionary(e => e.RelativePath, StringComparer.Ordinal);
-
-                var layerEntries = new ConcurrentBag<(string RelPath, string AbsUri, string Hash)>();
-
-                await Parallel.ForEachAsync(files, options, async (file, token) =>
-                {
-                    var uri = _fileHelper.PathToFileUri(file);
-                    var relPath = projectDir is not null
-                        ? NormalizePath(_fileHelper.FileSystem.Path.GetRelativePath(projectDir, file))
-                        : file;
-
-                    var (hash, text) = ProjectFileHasher.ReadAndHash(file, _fileHelper.FileSystem);
-                    layerEntries.Add((relPath, uri, hash));
-
-                    if (cacheHits is not null
-                        && cacheHits.TryGetValue(relPath, out var cachedEntry)
-                        && cachedEntry.ContentHash == hash)
-                    {
-                        _indexService.InjectDocument(ProjectIndexSerializer.FromEntry(cachedEntry, uri));
-                    }
-                    else
-                    {
-                        await _indexService.UpdateDocumentAsync(uri, text, 0, token);
-                    }
-
-                    var done = Interlocked.Increment(ref indexed);
-                    progress?.Invoke(done, totalFiles);
-                });
-
-                // Compute this layer's overall hash and record it for later layers' dep-hash tracking.
-                if (pgprojPath is not null)
-                {
-                    var overallHash = ProjectFileHasher.ComputeProjectHash(
-                        layerEntries.Select(e => (e.RelPath, e.Hash)));
-                    layerOverallHashes[pgprojPath] = overallHash;
-                }
-
-                layerResults.Add((layer, layerEntries.ToList()));
-            }
-        } // fires one IndexChanged with the complete final state
-
-        // Write snapshots after the bulk update so Current.Documents is fully populated.
-        foreach (var (layer, entries) in layerResults)
-        {
-            var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
-            if (pgprojPath is null) continue;
-
-            var overallHash = layerOverallHashes.GetValueOrDefault(pgprojPath, string.Empty);
-
-            // Nothing changed since the snapshot on disk was written — skip the re-serialization.
-            if (validSnapshotHashes.TryGetValue(pgprojPath, out var priorHash) && priorHash == overallHash)
-            {
-                _logger.LogDebug("Layer snapshot '{Pgproj}' unchanged; skipping save", pgprojPath);
-                continue;
-            }
-
-            var depHashes = config.Layers
-                .Select(l => (NormalizedPath: l.ProjectPath?.Replace('\\', '/'), Layer: l))
-                .Where(t => t.Layer.Rank < layer.Rank && t.NormalizedPath is not null
-                                                      && layerOverallHashes.ContainsKey(t.NormalizedPath!))
-                .Select(t => new SerializedDependencyHash
-                    { ProjectPath = t.NormalizedPath!, OverallHash = layerOverallHashes[t.NormalizedPath!] })
-                .ToArray();
-
-            var snapshotFiles = entries
-                .Select(e =>
-                {
-                    if (_indexService.Current.Documents.TryGetValue(e.AbsUri, out var doc))
-                        return ProjectIndexSerializer.ToEntry(e.RelPath, e.Hash, doc);
-                    return null;
-                })
-                .Where(f => f is not null)
-                .Cast<ProjectFileEntry>()
-                .ToArray();
-
-            var newSnapshot = new ProjectIndexSnapshot
-            {
-                SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
-                OverallHash = overallHash,
-                DependencyHashes = depHashes,
-                Files = snapshotFiles,
-                SchemaFingerprint = schemaFingerprint
-            };
-            _cache.Save(pgprojPath, newSnapshot);
-            _cache.EnsureGitHygiene(pgprojPath);
-        }
-
-        _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
-        return indexed;
-    }
-
-    // Collects files from xml directories (EaW-gated) and script roots (extension-gated).
-    private List<string> CollectFiles(IEnumerable<string> xmlDirectories, IEnumerable<string> scriptRoots)
-    {
-        return EnumerateFiles(xmlDirectories)
-            .Where(f =>
-            {
-                var ext = _fileHelper.FileSystem.Path.GetExtension(f);
-                if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
-                if (!_parsers.Any(p => p.CanParse(ext))) return false;
-                return _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
-            })
-            .Concat(EnumerateFiles(scriptRoots)
-                .Where(f =>
-                {
-                    var ext = _fileHelper.FileSystem.Path.GetExtension(f);
-                    if (ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
-                    return _parsers.Any(p => p.CanParse(ext));
-                }))
-            .Distinct()
-            .ToList();
-    }
-
-    private static string NormalizePath(string path)
-    {
-        return path.Replace('\\', '/').ToLowerInvariant();
-    }
-
-    private static string GetDirectory(string normalizedPath)
-    {
-        var idx = normalizedPath.LastIndexOf('/');
-        return idx < 0 ? string.Empty : normalizedPath[..idx];
     }
 
     /// <summary>
@@ -609,7 +290,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
             var fileUri = _fileHelper.PathToFileUri(resolved.DiskPath);
 
-            IReadOnlyList<(string Name, FileOrigin Origin)> locations = anchorIdx >= 0
+            var locations = anchorIdx >= 0
                 ? DynamicEnumExtractor.ParseElementTextWithLocations(
                     resolved.Content, sourceFile[(anchorIdx + 1)..], fileUri)
                 : DynamicEnumExtractor.ParseEnumDefinitionFileWithLocations(
@@ -631,6 +312,320 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
         _indexService.ApplyWorkspaceDynamicEnumValues(workspace);
         _indexService.ApplyWorkspaceEnumValueDefinitions(defsBuilder.ToImmutable());
+    }
+
+    /// <summary>
+    ///     Follows a <see cref="MetafileType.Special" /> definition (campaignfiles.xml) through the
+    ///     campaign → plot manifest → story thread chain and types every discovered file
+    ///     (<c>StoryPlotManifest</c> / <c>StoryParser</c>) under every xml root. Chain problems are
+    ///     collected for the diagnostics pipeline. Gated by <c>features.story.discovery</c>.
+    /// </summary>
+    private void ScanStoryChain(MetafileDefinition def, IReadOnlyList<string> roots,
+        IReadOnlyList<string> xmlRoots, BaselineIndex baseline, List<StoryChainProblem> problems)
+    {
+        if (!_configProvider.Current.Features.Story.Discovery)
+        {
+            _logger.LogInformation(
+                "Story discovery is disabled (features.story.discovery); skipping '{Path}'", def.Path);
+            return;
+        }
+
+        var copies = LocateInLayers(def.Path, roots, xmlRoots);
+        if (copies.Count == 0)
+        {
+            // No campaign registry anywhere - same degradation as file registries: the shipped
+            // baseline's typed story files are projected onto the workspace's xml roots.
+            FallbackFromBaseline(baseline, def, xmlRoots);
+            return;
+        }
+
+        var registryCopies = new List<StoryChainFile>();
+        foreach (var path in copies)
+            try
+            {
+                registryCopies.Add(new StoryChainFile(
+                    _fileHelper.FileSystem.File.ReadAllText(path), _fileHelper.NormalizeUri(path)));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not read campaign registry '{Path}': {Message}", path, ex.Message);
+            }
+
+        var resolver = new WorkspaceStoryChainFileResolver(_fileHelper, xmlRoots, baseline);
+        var result = new StoryChainScanner(resolver).Scan(registryCopies);
+
+        RegisterStoryFiles(result.ManifestFiles, StoryPlotManifestTypes, xmlRoots);
+        RegisterStoryFiles(result.ThreadFiles, StoryParserTypes, xmlRoots);
+        problems.AddRange(result.Problems);
+
+        _logger.LogInformation(
+            "Story chain: {Manifests} manifest(s), {Threads} thread file(s), {Lua} Lua script(s), {Problems} problem(s)",
+            result.ManifestFiles.Count, result.ThreadFiles.Count, result.LuaScripts.Count,
+            result.Problems.Count);
+    }
+
+    // Chain files are xml-dir-relative; like file-registry entries they are registered under
+    // EVERY xml root so a file shipped by any layer resolves to the same types.
+    private void RegisterStoryFiles(IReadOnlyList<string> relPaths, ImmutableArray<string> types,
+        IReadOnlyList<string> xmlRoots)
+    {
+        var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
+        foreach (var rel in relPaths)
+        {
+            var relPath = rel.Replace('/', sep);
+            foreach (var xmlRoot in xmlRoots)
+                _fileTypeRegistry.RegisterFile(
+                    _fileHelper.PathToFileUri(_fileHelper.FileSystem.Path.Combine(xmlRoot, relPath)), types);
+        }
+    }
+
+    // Locates every existing copy of a metafile/content file (identified by its game-relative
+    // <paramref name="defPath" />) across the workspace roots and every declared xml root, so a
+    // metafile shipped by a dependency is found rather than silently missed.
+    private IReadOnlyList<string> LocateInLayers(
+        string defPath, IReadOnlyList<string> roots, IReadOnlyList<string> xmlRoots)
+    {
+        var found = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        void TryAdd(string? path)
+        {
+            if (string.IsNullOrEmpty(path) || !_fileHelper.FileSystem.File.Exists(path)) return;
+            if (seen.Add(_fileHelper.NormalizeUri(path)))
+                found.Add(path);
+        }
+
+        TryAdd(_fileHelper.FindInWorkspace(roots.ToList(), defPath));
+
+        // Metafiles live directly in the xml directory, keyed by the def's filename.
+        var fileName = _fileHelper.FileSystem.Path.GetFileName(defPath);
+        foreach (var xmlRoot in xmlRoots)
+            TryAdd(_fileHelper.FileSystem.Path.Combine(xmlRoot, fileName));
+
+        return found;
+    }
+
+    // Original flat scan used when there is no pgproj dependency graph.
+    private async Task<int> IndexFlatAsync(WorkspaceConfiguration config, CancellationToken ct,
+        Action<int, int>? progress)
+    {
+        var files = CollectFiles(config.XmlDirectories, config.ScriptRoots);
+        _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (flat scan)", files.Count);
+
+        var indexed = 0;
+        var options = new ParallelOptions
+            { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
+        using (_indexService.BeginBulkUpdate())
+        {
+            await Parallel.ForEachAsync(files, options, async (file, token) =>
+            {
+                var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(file, token);
+                var uri = _fileHelper.PathToFileUri(file);
+                await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+                var done = Interlocked.Increment(ref indexed);
+                progress?.Invoke(done, files.Count);
+            });
+        }
+
+        _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
+        return indexed;
+    }
+
+    // Per-layer scan with project index cache support.
+    private async Task<int> IndexByLayerAsync(WorkspaceConfiguration config, CancellationToken ct,
+        Action<int, int>? progress)
+    {
+        // Build per-layer file lists (dependencies first - ordered by rank).
+        var layerFileLists = config.Layers
+            .OrderBy(l => l.Rank)
+            .Select(l => (Layer: l, Files: CollectFiles(l.XmlDirectories, l.ScriptRoots)))
+            .ToList();
+
+        var totalFiles = layerFileLists.Sum(l => l.Files.Count);
+        _logger.LogInformation("WorkspaceIndexer: {Count} parseable file(s) found (layered scan)", totalFiles);
+
+        var indexed = 0;
+        var options = new ParallelOptions
+            { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct };
+
+        // The schema drives what the parser emits (which tags produce references, which files
+        // carry types), so snapshots built under a different schema are stale even when every
+        // file's content hash matches. Computed once per scan. Flags that change INDEX CONTENT
+        // (story symbol emission) fold into the same fingerprint - flags are restart-based, so
+        // this is the only place a flip can invalidate cached parses.
+        var schemaFingerprint = SchemaFingerprint.Compute(_schema);
+        if (!_configProvider.Current.Features.Story.Symbols)
+            schemaFingerprint += ";story-symbols-off";
+
+        // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
+        var layerOverallHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // (pgprojPath → OverallHash) of snapshots that survived dependency validation - when the
+        // recomputed hash matches, the snapshot on disk is already current and is not re-saved.
+        var validSnapshotHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        // Collect per-layer results for snapshot writing after the bulk update.
+        var layerResults = new List<(ProjectLayer Layer, List<(string RelPath, string AbsUri, string Hash)> Entries)>();
+
+        using (_indexService.BeginBulkUpdate())
+        {
+            foreach (var (layer, files) in layerFileLists)
+            {
+                // Normalize the pgproj path (production always normalizes via ProjectDependencyGraph,
+                // but defensive normalization ensures robustness in tests and edge cases).
+                var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
+
+                var snapshot = pgprojPath is not null ? _cache.TryLoad(pgprojPath) : null;
+
+                // Snapshot built under a different (or pre-fingerprint) schema - discard it.
+                if (snapshot is not null && snapshot.SchemaFingerprint != schemaFingerprint)
+                {
+                    _logger.LogInformation(
+                        "Schema changed since layer '{Layer}' was cached; discarding its snapshot",
+                        layer.Name);
+                    snapshot = null;
+                }
+
+                // A dependency changed since this snapshot was built. Cached parses are not
+                // content-pure - symbol extraction depends on cross-layer inputs (file-type
+                // registrations from dependency metafiles) - so the layer's own file hashes cannot
+                // catch this; discard the whole snapshot and re-parse the layer.
+                if (snapshot is not null)
+                    foreach (var dep in snapshot.DependencyHashes)
+                        if (!layerOverallHashes.TryGetValue(dep.ProjectPath, out var currentHash)
+                            || currentHash != dep.OverallHash)
+                        {
+                            _logger.LogInformation(
+                                "Dependency '{Dep}' changed since layer '{Layer}' was cached; discarding its snapshot",
+                                dep.ProjectPath, layer.Name);
+                            snapshot = null;
+                            break;
+                        }
+
+                // Overall hash of the validated snapshot, for skipping the redundant re-save below.
+                if (snapshot is not null && pgprojPath is not null)
+                    validSnapshotHashes[pgprojPath] = snapshot.OverallHash;
+
+                // Build lookup from relPath → cached entry.
+                var projectDir = pgprojPath is not null ? GetDirectory(pgprojPath) : null;
+                var cacheHits = snapshot?.Files.ToDictionary(e => e.RelativePath, StringComparer.Ordinal);
+
+                var layerEntries = new ConcurrentBag<(string RelPath, string AbsUri, string Hash)>();
+
+                await Parallel.ForEachAsync(files, options, async (file, token) =>
+                {
+                    var uri = _fileHelper.PathToFileUri(file);
+                    var relPath = projectDir is not null
+                        ? NormalizePath(_fileHelper.FileSystem.Path.GetRelativePath(projectDir, file))
+                        : file;
+
+                    var (hash, text) = ProjectFileHasher.ReadAndHash(file, _fileHelper.FileSystem);
+                    layerEntries.Add((relPath, uri, hash));
+
+                    if (cacheHits is not null
+                        && cacheHits.TryGetValue(relPath, out var cachedEntry)
+                        && cachedEntry.ContentHash == hash)
+                        _indexService.InjectDocument(ProjectIndexSerializer.FromEntry(cachedEntry, uri));
+                    else
+                        await _indexService.UpdateDocumentAsync(uri, text, 0, token);
+
+                    var done = Interlocked.Increment(ref indexed);
+                    progress?.Invoke(done, totalFiles);
+                });
+
+                // Compute this layer's overall hash and record it for later layers' dep-hash tracking.
+                if (pgprojPath is not null)
+                {
+                    var overallHash = ProjectFileHasher.ComputeProjectHash(
+                        layerEntries.Select(e => (e.RelPath, e.Hash)));
+                    layerOverallHashes[pgprojPath] = overallHash;
+                }
+
+                layerResults.Add((layer, layerEntries.ToList()));
+            }
+        } // fires one IndexChanged with the complete final state
+
+        // Write snapshots after the bulk update so Current.Documents is fully populated.
+        foreach (var (layer, entries) in layerResults)
+        {
+            var pgprojPath = layer.ProjectPath?.Replace('\\', '/');
+            if (pgprojPath is null) continue;
+
+            var overallHash = layerOverallHashes.GetValueOrDefault(pgprojPath, string.Empty);
+
+            // Nothing changed since the snapshot on disk was written - skip the re-serialization.
+            if (validSnapshotHashes.TryGetValue(pgprojPath, out var priorHash) && priorHash == overallHash)
+            {
+                _logger.LogDebug("Layer snapshot '{Pgproj}' unchanged; skipping save", pgprojPath);
+                continue;
+            }
+
+            var depHashes = config.Layers
+                .Select(l => (NormalizedPath: l.ProjectPath?.Replace('\\', '/'), Layer: l))
+                .Where(t => t.Layer.Rank < layer.Rank && t.NormalizedPath is not null
+                                                      && layerOverallHashes.ContainsKey(t.NormalizedPath!))
+                .Select(t => new SerializedDependencyHash
+                    { ProjectPath = t.NormalizedPath!, OverallHash = layerOverallHashes[t.NormalizedPath!] })
+                .ToArray();
+
+            var snapshotFiles = entries
+                .Select(e =>
+                {
+                    if (_indexService.Current.Documents.TryGetValue(e.AbsUri, out var doc))
+                        return ProjectIndexSerializer.ToEntry(e.RelPath, e.Hash, doc);
+                    return null;
+                })
+                .Where(f => f is not null)
+                .Cast<ProjectFileEntry>()
+                .ToArray();
+
+            var newSnapshot = new ProjectIndexSnapshot
+            {
+                SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+                OverallHash = overallHash,
+                DependencyHashes = depHashes,
+                Files = snapshotFiles,
+                SchemaFingerprint = schemaFingerprint
+            };
+            _cache.Save(pgprojPath, newSnapshot);
+            _cache.EnsureGitHygiene(pgprojPath);
+        }
+
+        _logger.LogInformation("WorkspaceIndexer: bulk-index complete, {Indexed} file(s)", indexed);
+        return indexed;
+    }
+
+    // Collects files from xml directories (EaW-gated) and script roots (extension-gated).
+    private List<string> CollectFiles(IEnumerable<string> xmlDirectories, IEnumerable<string> scriptRoots)
+    {
+        return EnumerateFiles(xmlDirectories)
+            .Where(f =>
+            {
+                var ext = _fileHelper.FileSystem.Path.GetExtension(f);
+                if (!ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
+                if (!_parsers.Any(p => p.CanParse(ext))) return false;
+                return _eaWXmlContext.IsEaWXmlFile(_fileHelper.PathToFileUri(f));
+            })
+            .Concat(EnumerateFiles(scriptRoots)
+                .Where(f =>
+                {
+                    var ext = _fileHelper.FileSystem.Path.GetExtension(f);
+                    if (ext.Equals(".xml", StringComparison.OrdinalIgnoreCase)) return false;
+                    return _parsers.Any(p => p.CanParse(ext));
+                }))
+            .Distinct()
+            .ToList();
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/').ToLowerInvariant();
+    }
+
+    private static string GetDirectory(string normalizedPath)
+    {
+        var idx = normalizedPath.LastIndexOf('/');
+        return idx < 0 ? string.Empty : normalizedPath[..idx];
     }
 
     public static bool IsAssetFile(string path)

@@ -212,7 +212,7 @@ public class LspServerFixture : IAsyncLifetime
 
     /// <summary>
     ///     Builds the <c>initializationOptions</c> object sent to the server on connect. Override to
-    ///     add a <c>features</c> node (see <see cref="FeatureFlagsServerFixture" />) — a well-behaved
+    ///     add a <c>features</c> node (see <see cref="FeatureFlagsServerFixture" />) - a well-behaved
     ///     client always sends the fully-resolved object, but tests only need to override the leaves
     ///     under test; missing leaves keep the server's all-true defaults.
     /// </summary>

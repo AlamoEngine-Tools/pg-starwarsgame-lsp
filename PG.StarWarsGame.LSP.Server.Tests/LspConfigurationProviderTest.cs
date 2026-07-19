@@ -326,6 +326,20 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.True(provider.Current.Features.Tools.StoryEditor);
     }
 
+    /// <summary>
+    ///     Edit mode is gated independently of the panel: turning authoring off must leave the
+    ///     read-only story editor (View mode) enabled.
+    /// </summary>
+    [Fact]
+    public void LoadFrom_StoryEditingDisabled_LeavesStoryEditorEnabled()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { features = new { tools = new { storyEditing = false } } }));
+
+        Assert.False(provider.Current.Features.Tools.StoryEditing);
+        Assert.True(provider.Current.Features.Tools.StoryEditor);
+    }
+
     [Fact]
     public void LoadFrom_FeaturesCamelCaseKeys_MapToPascalCaseProperties()
     {

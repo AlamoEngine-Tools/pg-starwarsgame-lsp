@@ -8,9 +8,9 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 public static class WorkspaceHostExtensions
 {
     /// <summary>
-    ///     Returns the open document from the workspace host, or — when the client never sent a
+    ///     Returns the open document from the workspace host, or - when the client never sent a
     ///     <c>didOpen</c> for it (e.g. the vscode-languageclient restored-document race, where the
-    ///     editor restored the tab before the language client subscribed) — falls back to the
+    ///     editor restored the tab before the language client subscribed) - falls back to the
     ///     on-disk version so request handlers (hover, inlay hints, completion, …) work regardless
     ///     of client document sync. Unsaved editor edits are only reflected once the client actually
     ///     syncs the document via <c>didOpen</c>/<c>didChange</c>; until then the saved file is used.

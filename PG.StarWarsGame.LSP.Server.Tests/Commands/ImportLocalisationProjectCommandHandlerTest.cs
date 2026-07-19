@@ -55,7 +55,8 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     [InlineData(null, "/mod/data/text", "Csv")]
     [InlineData("Csv", null, "Csv")]
     [InlineData("Csv", "/mod/data/text", null)]
-    public async Task Handle_MissingRequiredArguments_NoOp(string? sourceFormat, string? sourceDirectory, string? targetFormat)
+    public async Task Handle_MissingRequiredArguments_NoOp(string? sourceFormat, string? sourceDirectory,
+        string? targetFormat)
     {
         var (handler, reload, writer) = BuildHandler();
 
@@ -94,7 +95,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/readme.txt"] = new("not a csv")
         });
-        var (handler, reload, writer) = BuildHandler(fs: mockFs);
+        var (handler, reload, writer) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -112,7 +113,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new(original)
         });
-        var (handler, _, _) = BuildHandler(fs: mockFs);
+        var (handler, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -127,7 +128,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, _, writer) = BuildHandler(fs: mockFs);
+        var (handler, _, writer) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -144,7 +145,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, reload, _) = BuildHandler(fs: mockFs);
+        var (handler, reload, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -158,7 +159,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/elsewhere/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, _, writer) = BuildHandler(fs: mockFs);
+        var (handler, _, writer) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/elsewhere/text", "Csv"), CancellationToken.None);
 
@@ -175,7 +176,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_CONVERTED,Hello World\n")
         });
-        var (handler, _, _) = BuildHandler(fs: mockFs);
+        var (handler, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -193,7 +194,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new(original)
         });
-        var (handler, _, _) = BuildHandler(fs: mockFs);
+        var (handler, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -208,7 +209,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, _, writer) = BuildHandler(fs: mockFs);
+        var (handler, _, writer) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -225,7 +226,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, reload, writer) = BuildHandler(fs: mockFs);
+        var (handler, reload, writer) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Xml"), CancellationToken.None);
 
@@ -241,7 +242,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
             ["/mod/data/text2/MasterTextFile.xml"] = new("EXISTING")
         });
-        var (handler, reload, writer) = BuildHandler(fs: mockFs);
+        var (handler, reload, writer) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -258,7 +259,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, reload, writer) = BuildHandler(fs: mockFs);
+        var (handler, reload, writer) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Dat", "data/text2"), CancellationToken.None);
@@ -276,7 +277,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             ["/mod/data/text/a.csv"] = new("key,ENGLISH\nTEXT_A,From A\n"),
             ["/mod/data/text/b.csv"] = new("key,ENGLISH\nTEXT_B,From B\n")
         });
-        var (handler, _, _) = BuildHandler(fs: mockFs);
+        var (handler, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -298,7 +299,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile_ENGLISH.dat"] = new(new byte[] { 1, 2, 3 })
         });
-        var (handler, _, writer) = BuildHandler(fs: mockFs);
+        var (handler, _, writer) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Dat", "/mod/data/text", "Dat"), CancellationToken.None);
 
@@ -316,7 +317,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         WriteDatFixture(mockFs, sp, "/mod/data/text/MasterTextFile_ENGLISH.dat", english,
             "TEXT_FROM_DAT", "Hello From DAT");
 
-        var (handler, _, _) = BuildHandler(fs: mockFs);
+        var (handler, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Dat", "/mod/data/text", "Csv", "data/text2"), CancellationToken.None);
@@ -334,10 +335,10 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         var english = sp.GetRequiredService<ILanguageService>().Default;
         WriteDatFixture(mockFs, sp, "/mod/data/text/MasterTextFile_ENGLISH.dat", english,
             "TEXT_GOOD", "Good Value");
-        // No language matches this suffix — must be skipped, not fatal to the whole import.
+        // No language matches this suffix - must be skipped, not fatal to the whole import.
         mockFs.AddFile("/mod/data/text/MasterTextFile_NOTALANGUAGE.dat", new MockFileData(new byte[] { 9, 9, 9 }));
 
-        var (handler, reload, _) = BuildHandler(fs: mockFs);
+        var (handler, reload, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Dat", "/mod/data/text", "Csv", "data/text2"), CancellationToken.None);

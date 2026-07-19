@@ -24,7 +24,7 @@ public sealed class EaWXmlContext : IEaWXmlContext
         var normalized = _fileHelper.NormalizeUri(fileUri);
         if (!normalized.StartsWith("file:///", StringComparison.Ordinal)) return false;
 
-        // TODO: implement proper AI XML parsing — AI files use a different format that
+        // TODO: implement proper AI XML parsing - AI files use a different format that
         //       requires a dedicated parser; exclude them until that parser exists.
         if (normalized.Contains("/ai/", StringComparison.Ordinal)) return false;
 

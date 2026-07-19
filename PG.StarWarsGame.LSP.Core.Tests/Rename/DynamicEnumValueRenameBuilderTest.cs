@@ -68,7 +68,8 @@ public sealed class DynamicEnumValueRenameBuilderTest
         // path$Element format (e.g. gameconstants.xml's <Armor_Types>...</Armor_Types> text list) —
         // the value is a plain text token at an exact (line, column).
         var host = new FakeWorkspaceHost();
-        host.AddOrUpdate(DefUri, "<GameConstants><Armor_Types>Armor_Structure Armor_Wall</Armor_Types></GameConstants>", 1);
+        host.AddOrUpdate(DefUri, "<GameConstants><Armor_Types>Armor_Structure Armor_Wall</Armor_Types></GameConstants>",
+            1);
         var defs = ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>>.Empty
             .Add("ArmorType", ImmutableDictionary<string, FileOrigin>.Empty
                 .Add("Armor_Structure", new FileOrigin(DefUri, 0, 29)));

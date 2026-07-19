@@ -22,14 +22,14 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
                 continue;
 
             // Story symbols repeat legally across threads and campaigns (event names are only
-            // unique per thread; flags per campaign) — campaign-scoped duplicate detection lives
+            // unique per thread; flags per campaign) - campaign-scoped duplicate detection lives
             // in the story graph diagnostics, not the index-wide check.
             if (StoryReferenceTypes.IsStorySymbolType(sym.TypeName))
                 continue;
 
             // The generic pass also indexes every <Event> block as a StoryParser object. Story
             // campaigns are sandboxed per faction, so the same event name in another campaign's
-            // thread is legal — same reasoning, same campaign-scoped diagnostics ownership.
+            // thread is legal - same reasoning, same campaign-scoped diagnostics ownership.
             if (string.Equals(sym.TypeName, StoryReferenceTypes.ThreadFileTypeName,
                     StringComparison.OrdinalIgnoreCase))
                 continue;
@@ -61,7 +61,7 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
                 continue;
 
             // Engine placeholders ("null"/"Default"/"None") are a valid "no object" value in any
-            // reference position — never unresolved, never a type mismatch.
+            // reference position - never unresolved, never a type mismatch.
             if (EnginePlaceholders.IsPlaceholder(reference.TargetId))
                 continue;
 

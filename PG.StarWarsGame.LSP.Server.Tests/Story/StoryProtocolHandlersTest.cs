@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -13,6 +15,8 @@ using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Xml;
+using PG.StarWarsGame.LSP.Xml.Completion;
+using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
@@ -77,7 +81,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryPlots_ResolvesThreadUrisCaseInsensitively()
     {
         // Manifest entries carry engine casing ("Story_Act_I.xml"); canonical thread URIs are
-        // lowercase. The client must receive the resolved URI — it cannot search case-insensitively.
+        // lowercase. The client must receive the resolved URI - it cannot search case-insensitively.
         var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
@@ -88,7 +92,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task GetStoryPlots_StoryEditorOff_ReturnsDisabledMessage()
     {
-        var result = await new GetStoryPlotsHandler(Models(), Index(), Config(storyEditor: false))
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config(false))
             .Handle(new GetStoryPlotsParams(), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
@@ -127,7 +131,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryGraph_NameFilter_KeepsMatchingEventsOnly()
     {
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("GC", NameFilter: "sta"), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("GC", "sta"), CancellationToken.None);
 
         Assert.Equal(["Start"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
     }
@@ -159,7 +163,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryGraph_EventNodes_CarryFullParamDataForInlineRendering()
     {
         // The graph fetch must be self-sufficient for the node body (no per-node detail round
-        // trip needed) — same fields aet/getStoryNodeDetail already projects for "Next".
+        // trip needed) - same fields aet/getStoryNodeDetail already projects for "Next".
         var result = await new GetStoryGraphHandler(Models(), Config())
             .Handle(new GetStoryGraphParams("GC"), CancellationToken.None);
 
@@ -242,7 +246,7 @@ public sealed class StoryProtocolHandlersTest
         FiringIndexService? index = null, bool storyEditor = true)
     {
         return new GetStoryParamOptionsHandler(Models(), index ?? Index(), new ProtocolSchemaProvider(),
-            new Xml.Completion.StoryParamValueProposalProvider(), Config(storyEditor: storyEditor));
+            new StoryParamValueProposalProvider(), Config(storyEditor));
     }
 
     private static FiringIndexService IndexWith(params (string Id, string TypeName)[] symbols)
@@ -271,7 +275,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryParamOptions_PrefixFiltersCampaignNames()
     {
         var result = await OptionsHandler()
-            .Handle(new GetStoryParamOptionsParams("GC", "reward", "TRIGGER_EVENT", 0, Prefix: "ne"),
+            .Handle(new GetStoryParamOptionsParams("GC", "reward", "TRIGGER_EVENT", 0, "ne"),
                 CancellationToken.None);
 
         Assert.Equal(["Next"], result.Options.Select(o => o.Value));
@@ -283,7 +287,7 @@ public sealed class StoryProtocolHandlersTest
         var index = IndexWith(("Coruscant", "Planet"), ("Tatooine", "Planet"), ("X_Wing", "SpaceUnit"));
 
         var result = await OptionsHandler(index)
-            .Handle(new GetStoryParamOptionsParams("GC", "event", "STORY_ENTER", 0, Prefix: "c"),
+            .Handle(new GetStoryParamOptionsParams("GC", "event", "STORY_ENTER", 0, "c"),
                 CancellationToken.None);
 
         Assert.Equal(["Coruscant"], result.Options.Select(o => o.Value));
@@ -319,33 +323,11 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
     }
 
-    // ── aet/getStoryDiagnostics ──────────────────────────────────────────────
-
-    private sealed class FakeCollector : IXmlDiagnosticsCollector
-    {
-        public List<(string Uri, Diagnostic Diagnostic)> Seed { get; } = [];
-
-        public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
-        {
-            return Seed.Where(s => s.Uri == uri).Select(s => s.Diagnostic).ToList();
-        }
-    }
-
-    private sealed class FakeTextSource : IDocumentTextSource
-    {
-        public Dictionary<string, string> Texts { get; } = new(StringComparer.Ordinal);
-
-        public DocumentText? GetText(string canonicalUri)
-        {
-            return Texts.TryGetValue(canonicalUri, out var text) ? new DocumentText(text, 0, false) : null;
-        }
-    }
-
     private static Diagnostic Diag(int line, int character, DiagnosticSeverity severity, string message)
     {
         return new Diagnostic
         {
-            Range = new OmniSharp.Extensions.LanguageServer.Protocol.Models.Range(
+            Range = new Range(
                 line, character, line, character + 4),
             Severity = severity,
             Message = message
@@ -356,7 +338,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var collector = new FakeCollector();
         var textSource = new FakeTextSource();
-        // The stub model's threads were parsed from these exact strings — ranges line up.
+        // The stub model's threads were parsed from these exact strings - ranges line up.
         textSource.Texts[ThreadUri] =
             "<Story><Event Name=\"Start\"><Event_Type>STORY_ELAPSED</Event_Type></Event>" +
             "<Event Name=\"Next\"><Event_Type>STORY_TRIGGER</Event_Type>" +
@@ -372,7 +354,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var (handler, collector) = DiagnosticsHandler();
         // The stub thread is a single line; "STORY_ELAPSED" (Start's Event_Param-free type) sits
-        // inside Start's event range. Aim at the Event_Type VALUE — event-level, no param slot.
+        // inside Start's event range. Aim at the Event_Type VALUE - event-level, no param slot.
         collector.Seed.Add((ThreadUri, Diag(0, 40, DiagnosticSeverity.Error, "bad value")));
 
         var result = await handler.Handle(new GetStoryDiagnosticsParams("GC"), CancellationToken.None);
@@ -403,7 +385,7 @@ public sealed class StoryProtocolHandlersTest
     {
         var collector = new FakeCollector();
         var handler = new GetStoryDiagnosticsHandler(
-            Models(), Index(), collector, new FakeTextSource(), Config(storyEditor: false));
+            Models(), Index(), collector, new FakeTextSource(), Config(false));
 
         var result = await handler.Handle(new GetStoryDiagnosticsParams("GC"), CancellationToken.None);
 
@@ -416,7 +398,7 @@ public sealed class StoryProtocolHandlersTest
         FiringIndexService index, bool storyEditor = true)
     {
         return new ResolveStoryReferenceHandler(index, new ProtocolSchemaProvider(),
-            Config(storyEditor: storyEditor));
+            Config(storyEditor));
     }
 
     [Fact]
@@ -436,7 +418,7 @@ public sealed class StoryProtocolHandlersTest
     [Fact]
     public async Task ResolveStoryReference_TypedPreference_PicksTheMatchingType()
     {
-        // Same id defined as a StoryEvent and a SpaceUnit — a StoryEventName reference must land
+        // Same id defined as a StoryEvent and a SpaceUnit - a StoryEventName reference must land
         // on the StoryEvent definition, not whichever layer ranks higher.
         var definitions = GameIndex.Empty.WorkspaceDefinitions.Add("Start", [
             new GameSymbol("Start", GameSymbolKind.XmlObject, "SpaceUnit",
@@ -503,8 +485,8 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, Models(invalidated: ["GC"]), Config(),
-            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, debounceMs: 0);
+        _ = new StoryGraphChangeNotifier(index, Models(["GC"]), Config(),
+            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
 
@@ -517,7 +499,7 @@ public sealed class StoryProtocolHandlersTest
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
         _ = new StoryGraphChangeNotifier(index, Models(), Config(),
-            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, debounceMs: 0);
+            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
 
@@ -529,8 +511,8 @@ public sealed class StoryProtocolHandlersTest
     {
         var index = new FiringIndexService();
         var sent = new List<StoryGraphChangedParams>();
-        _ = new StoryGraphChangeNotifier(index, Models(invalidated: ["GC"]), Config(storyEditor: false),
-            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, debounceMs: 0);
+        _ = new StoryGraphChangeNotifier(index, Models(["GC"]), Config(false),
+            sent.Add, NullLogger<StoryGraphChangeNotifier>.Instance, 0);
 
         index.Fire();
 
@@ -542,27 +524,35 @@ public sealed class StoryProtocolHandlersTest
         return new StubModelService { Invalidated = invalidated ?? [] };
     }
 
+    // ── aet/getStoryDiagnostics ──────────────────────────────────────────────
+
+    private sealed class FakeCollector : IXmlDiagnosticsCollector
+    {
+        public List<(string Uri, Diagnostic Diagnostic)> Seed { get; } = [];
+
+        public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
+        {
+            return Seed.Where(s => s.Uri == uri).Select(s => s.Diagnostic).ToList();
+        }
+    }
+
+    private sealed class FakeTextSource : IDocumentTextSource
+    {
+        public Dictionary<string, string> Texts { get; } = new(StringComparer.Ordinal);
+
+        public DocumentText? GetText(string canonicalUri)
+        {
+            return Texts.TryGetValue(canonicalUri, out var text) ? new DocumentText(text, 0, false) : null;
+        }
+    }
+
     // ── fakes ────────────────────────────────────────────────────────────────
 
     private sealed class StubModelService : IStoryModelService
     {
-        public IReadOnlyList<string> Invalidated { get; init; } = [];
-
         // Active thread: Start → (prereq) Next[Branch=Act1]; suspended thread: Later.
         private static readonly StoryCampaignModel Model = BuildModel();
-
-        private static StoryCampaignModel BuildModel()
-        {
-            var active = StoryThreadParser.Parse(
-                "<Story><Event Name=\"Start\"><Event_Type>STORY_ELAPSED</Event_Type></Event>" +
-                "<Event Name=\"Next\"><Event_Type>STORY_TRIGGER</Event_Type>" +
-                "<Prereq>Start</Prereq><Branch>Act1</Branch></Event></Story>", ThreadUri);
-            var suspended = StoryThreadParser.Parse(
-                "<Story><Event Name=\"Later\"/></Story>", SuspendedUri);
-            return new StoryCampaignModel("GC", [active, suspended],
-                new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
-                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended]));
-        }
+        public IReadOnlyList<string> Invalidated { get; init; } = [];
 
         public IReadOnlyList<string> GetCampaignNames()
         {
@@ -595,6 +585,19 @@ public sealed class StoryProtocolHandlersTest
         {
             return Invalidated;
         }
+
+        private static StoryCampaignModel BuildModel()
+        {
+            var active = StoryThreadParser.Parse(
+                "<Story><Event Name=\"Start\"><Event_Type>STORY_ELAPSED</Event_Type></Event>" +
+                "<Event Name=\"Next\"><Event_Type>STORY_TRIGGER</Event_Type>" +
+                "<Prereq>Start</Prereq><Branch>Act1</Branch></Event></Story>", ThreadUri);
+            var suspended = StoryThreadParser.Parse(
+                "<Story><Event Name=\"Later\"/></Story>", SuspendedUri);
+            return new StoryCampaignModel("GC", [active, suspended],
+                new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
+                new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended]));
+        }
     }
 
     private sealed class FiringIndexService : IGameIndexService
@@ -612,11 +615,6 @@ public sealed class StoryProtocolHandlersTest
         {
             add { }
             remove { }
-        }
-
-        public void Fire()
-        {
-            IndexChanged?.Invoke(GameIndex.Empty);
         }
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
@@ -645,29 +643,34 @@ public sealed class StoryProtocolHandlersTest
         {
         }
 
-        public void ApplyAssetFiles(Core.Assets.IAssetFileIndex index)
+        public void ApplyAssetFiles(IAssetFileIndex index)
         {
         }
 
         public void ApplyModelBones(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> bones)
+            ImmutableDictionary<string, ImmutableArray<string>> bones)
         {
         }
 
         public void ApplyWorkspaceDynamicEnumValues(
-            System.Collections.Immutable.ImmutableDictionary<string, System.Collections.Immutable.ImmutableArray<string>> values)
+            ImmutableDictionary<string, ImmutableArray<string>> values)
         {
         }
 
         public void ApplyWorkspaceEnumValueDefinitions(
-            System.Collections.Immutable.ImmutableDictionary<string,
-                System.Collections.Immutable.ImmutableDictionary<string, FileOrigin>> definitions)
+            ImmutableDictionary<string,
+                ImmutableDictionary<string, FileOrigin>> definitions)
         {
         }
 
         public IDisposable BeginBulkUpdate()
         {
             return new Noop();
+        }
+
+        public void Fire()
+        {
+            IndexChanged?.Invoke(GameIndex.Empty);
         }
 
         private sealed class Noop : IDisposable

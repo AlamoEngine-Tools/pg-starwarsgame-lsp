@@ -16,13 +16,13 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 
 public sealed class StoryModelServiceTest
 {
+    private static readonly string XmlDir = Path.Combine(Root("ws"), "data", "xml");
+    private static readonly string DepXmlDir = Path.Combine(Root("dep"), "data", "xml");
+
     private static string Root(string sub)
     {
         return Path.Combine(Path.GetPathRoot(Path.GetFullPath("."))!, sub);
     }
-
-    private static readonly string XmlDir = Path.Combine(Root("ws"), "data", "xml");
-    private static readonly string DepXmlDir = Path.Combine(Root("dep"), "data", "xml");
 
     private static Dictionary<string, MockFileData> Fixture()
     {
@@ -161,7 +161,7 @@ public sealed class StoryModelServiceTest
     public void GetChainResult_ScanBeforeWorkspaceConfigLoads_IsNotCached()
     {
         // Startup window: a client request arrives before the pipeline has published the
-        // workspace config. The scan reads nothing — that empty result must not stick.
+        // workspace config. The scan reads nothing - that empty result must not stick.
         var (service, _, _, _, _, reload) = Build(configured: false);
 
         Assert.Empty(service.GetChainResult().Campaigns);
@@ -252,13 +252,6 @@ public sealed class StoryModelServiceTest
             remove { }
         }
 
-        public void SetDocumentVersion(string uri, int version)
-        {
-            var doc = new DocumentIndex(uri, version,
-                ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
-            Current = Current with { Documents = Current.Documents.SetItem(uri, doc) };
-        }
-
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {
             return Task.CompletedTask;
@@ -305,6 +298,13 @@ public sealed class StoryModelServiceTest
         public IDisposable BeginBulkUpdate()
         {
             return new Noop();
+        }
+
+        public void SetDocumentVersion(string uri, int version)
+        {
+            var doc = new DocumentIndex(uri, version,
+                ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty);
+            Current = Current with { Documents = Current.Documents.SetItem(uri, doc) };
         }
 
         private sealed class Noop : IDisposable

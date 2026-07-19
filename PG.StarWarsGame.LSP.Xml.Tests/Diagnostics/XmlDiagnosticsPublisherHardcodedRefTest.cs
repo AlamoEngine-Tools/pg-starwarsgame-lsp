@@ -178,7 +178,7 @@ public sealed class XmlDiagnosticsPublisherHardcodedRefTest
     {
         var schema = new StubHardcodedSchemaProvider(
             BehaviorTag("SpaceBehavior", "space"),
-            BehaviorModuleSet(Value("GenericTransport" /* no groups — valid everywhere */)));
+            BehaviorModuleSet(Value("GenericTransport" /* no groups - valid everywhere */)));
         var publisher = BuildPublisher(schema);
 
         const string xml =
@@ -403,13 +403,15 @@ file sealed class StubIndexService : IGameIndexService
         ImmutableDictionary<string, ImmutableArray<string>> bones)
     {
     }
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
+
+    public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
+    {
+    }
+
+    public void ApplyWorkspaceEnumValueDefinitions(
+        ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
+    {
+    }
 
     public IDisposable BeginBulkUpdate()
     {

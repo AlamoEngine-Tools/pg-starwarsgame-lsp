@@ -33,7 +33,7 @@ public static class StoryThreadParser
             if (string.IsNullOrEmpty(name))
             {
                 problems.Add(new StoryParseProblem(RangeAt(document, node.StreamPosition, "<Event".Length),
-                    "Event without a Name attribute — the block is not addressable and was skipped."));
+                    "Event without a Name attribute - the block is not addressable and was skipped."));
                 continue;
             }
 
@@ -119,7 +119,7 @@ public static class StoryThreadParser
     }
 
     // "Event_Param3" → position 2. "Reward_Param_List" deliberately fails the numeric parse and
-    // stays a plain tag — it is not a positional slot.
+    // stays a plain tag - it is not a positional slot.
     private static bool TryParamPosition(string tagName, string prefix, out int position)
     {
         position = -1;
@@ -135,7 +135,7 @@ public static class StoryThreadParser
         var tokens = new List<StoryToken>();
 
         // Token spans are only exact when the inner content is plain text; mixed content
-        // (comments inside a Prereq line — unseen in vanilla) degrades to the group range.
+        // (comments inside a Prereq line - unseen in vanilla) degrades to the group range.
         if (child.ChildNodes.All(c => c.NodeType == HtmlNodeType.Text))
         {
             var innerStart = child.InnerStartIndex;
