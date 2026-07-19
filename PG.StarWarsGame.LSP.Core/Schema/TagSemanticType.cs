@@ -46,5 +46,27 @@ public enum TagSemanticType
     ///     game object's <c>Abilities</c> list without colliding with same-named abilities in other units.
     ///     Display layers strip the owner prefix when showing the value to the user.
     /// </summary>
-    OwnerScopedReference
+    OwnerScopedReference,
+
+    /// <summary>
+    ///     The mirror image of <see cref="OwnerScopedReference" />: the tag names an owner-scoped symbol
+    ///     (an ability) by its bare name, and the engine accepts any ability with that name regardless of
+    ///     which object defines it. Used by the galactic ability lists in GameConstants
+    ///     (<c>Activated_Sabotage_Ability_Names</c> and friends) and <c>BlackMarketItem.Ability_Names</c>.
+    ///     Because abilities are indexed as <c>{ownerId}$Name</c>, a bare name resolves against nothing,
+    ///     so the parser records these references with the
+    ///     <see cref="PG.StarWarsGame.LSP.Core.Symbols.OwnerAgnosticReferenceId" /> marker and resolution
+    ///     goes through <see cref="PG.StarWarsGame.LSP.Core.Symbols.GameIndex.ResolveOwnerAgnostic" />.
+    /// </summary>
+    OwnerAgnosticReference,
+
+    /// <summary>
+    ///     The list holds repeated (object, battle mode) pairs flattened into one comma-separated
+    ///     value, e.g. <c>Fondor, land, Geonosis, land, Jabiim, space</c>: every even slot names an
+    ///     object (<c>referenceType</c>), every odd slot the <c>StoryBattleMode</c> it applies in.
+    ///     Used by <c>Campaign.Autoresolve_Exclusion_Locations</c>. Refines the canonical
+    ///     <see cref="XmlValueType.TypeReferenceList" /> rather than being a value type of its own -
+    ///     the engine has no such type, only a list whose tokens alternate in meaning.
+    /// </summary>
+    PlanetModePairList
 }

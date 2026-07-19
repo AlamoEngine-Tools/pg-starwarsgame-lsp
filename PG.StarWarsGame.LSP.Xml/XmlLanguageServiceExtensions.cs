@@ -103,6 +103,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, FloatTupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IntFloatTupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, InaccuracyMapHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, PlanetModeExclusionListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageToArmorModHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, RgbaValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ShaderVersionHexHandler>();

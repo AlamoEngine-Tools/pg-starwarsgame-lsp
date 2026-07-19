@@ -60,7 +60,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // the generic reference pipeline since the collector emits GameReferences for them.
         // 99 → 100: VariantAdditiveMergeHandler added - reports that an additive tag set on both a
         // variant and its base accumulates rather than replaces (#63).
-        const int expectedHandlerCount = 100;
+        // 100 → 101: PlanetModeExclusionListHandler added - validates the mode half and the pairing
+        // of Autoresolve_Exclusion_Locations.
+        const int expectedHandlerCount = 101;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

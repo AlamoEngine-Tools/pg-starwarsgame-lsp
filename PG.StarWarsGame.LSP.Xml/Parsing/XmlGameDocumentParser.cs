@@ -195,6 +195,16 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // Repeated (planet, mode) pairs flattened into one list. Only the even slots name an
+                // object; the odd ones are battle modes, and indexing those as objects would make
+                // every "land"/"space" token an unresolved reference.
+                if (tagDef.SemanticType == TagSemanticType.PlanetModePairList)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectPlanetModePairReferences(child, tagDef, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 // (key, SFXEvent) tuples: slot 0 is an enum / hardcoded ability code / unit type and
                 // slot 1 is the SFXEvent name. These tags carry no referenceKind - the pair is
                 // validated by the *SfxMap handlers - so without this the SFXEvent half is invisible
@@ -224,11 +234,21 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     ? FindEnclosingObjectId(node)
                     : null;
 
+                // The mirror case: the value names an ability without saying which object owns it, so
+                // the bare name cannot match the owner-scoped id it was indexed under. Marking the
+                // reference lets resolution search across owners without every other bare reference
+                // gaining that fallback (and losing its unresolved-reference diagnostic with it).
+                var ownerAgnostic = tagDef.SemanticType == TagSemanticType.OwnerAgnosticReference;
+
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
                     var absPos = child.InnerStartIndex + tokenOffset;
                     var (line, column) = lineIndex.GetPosition(absPos);
-                    var targetId = ownerPrefix is not null ? $"{ownerPrefix}${name}" : name;
+                    var targetId = ownerPrefix is not null
+                        ? $"{ownerPrefix}{GameIndex.OwnerScopeSeparator}{name}"
+                        : ownerAgnostic
+                            ? OwnerAgnosticReferenceId.Create(name)
+                            : name;
 
                     references.Add(new GameReference(
                         targetId,
@@ -295,6 +315,33 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             line,
             column,
             token.Length));
+    }
+
+    /// <summary>
+    ///     The planet half of each (planet, mode) pair, as an object reference. Slots alternate, so
+    ///     every even token is a planet and every odd one a battle mode; a trailing planet with no
+    ///     mode is still indexed, leaving the malformed pair to the diagnostics handler.
+    /// </summary>
+    private static void CollectPlanetModePairReferences(HtmlNode child, XmlTagDefinition tagDef,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var slot = 0;
+        foreach (var (token, offset) in XmlUtility.SplitListWithOffsets(innerText))
+        {
+            if (slot++ % 2 != 0) continue; // odd slot: battle mode, validated not indexed
+
+            var absPos = child.InnerStartIndex + offset;
+            var (line, column) = lineIndex.GetPosition(absPos);
+            references.Add(new GameReference(
+                token,
+                GameSymbolKind.XmlObject,
+                tagDef.ObjectType?.TypeName,
+                documentUri,
+                line,
+                column,
+                token.Length));
+        }
     }
 
     // Slot 1 of a (key, SFXEvent) tuple, as an SFXEvent object reference. Vanilla data never uses

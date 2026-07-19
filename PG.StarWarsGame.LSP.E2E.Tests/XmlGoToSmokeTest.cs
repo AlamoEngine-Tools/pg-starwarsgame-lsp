@@ -99,6 +99,18 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     }
 
     [Fact]
+    public async Task XmlGoTo_OwnerAgnosticAbilityName_ResolvesAcrossOwners()
+    {
+        // Abilities are indexed owner-scoped as {ownerId}$Name, but the galactic ability lists in
+        // GameConstants name them bare - the engine accepts any object's ability of that name. The
+        // bare name therefore matches no indexed id, and before ownerAgnosticReference these tags
+        // had neither go-to nor unresolved-reference validation.
+        // <Activated_Slice_Ability_Names> Tani_Slicer,R2D2_Slicer </…> resolves to the
+        // <..._Ability Name="R2D2_Slicer"> defined on R2-D2 in Namedherounits.xml.
+        await RunGoToAsync(null, "R2D2_Slicer", "Namedherounits", "Data/Xml/Gameconstants.xml");
+    }
+
+    [Fact]
     public async Task XmlGoTo_AfterOpenCloseCyclesOfTargetFile_StillResolvesWorkspaceDefinition()
     {
         // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML

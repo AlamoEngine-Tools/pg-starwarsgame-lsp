@@ -8,6 +8,104 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Symbols;
 
 public sealed class GameIndexTest
 {
+    // ── owner-agnostic resolution ───────────────────────────────────────────
+
+    [Fact]
+    public void ResolveOwnerAgnostic_FindsAnOwnerScopedSymbolByItsBareName()
+    {
+        // Abilities are indexed as {ownerId}$Name; the galactic ability lists name them bare.
+        var index = WithWorkspace(Symbol("Tyber_Zann$Tyber_Zann_Black_Market", "BlackMarketAbility"));
+
+        var resolved = index.ResolveOwnerAgnostic("Tyber_Zann_Black_Market");
+
+        Assert.NotNull(resolved);
+        Assert.Equal("Tyber_Zann$Tyber_Zann_Black_Market", resolved!.Id);
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_IsCaseInsensitive()
+    {
+        var index = WithWorkspace(Symbol("Owner$Some_Ability"));
+
+        Assert.NotNull(index.ResolveOwnerAgnostic("some_ability"));
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_SameAbilityOnSeveralOwners_ResolvesToOneOfThem()
+    {
+        // The engine treats same-named abilities as interchangeable here, so any owner is a valid
+        // navigation target - what must not happen is failing to resolve at all.
+        var index = WithWorkspace(
+            Symbol("Unit_A$Shared_Ability"),
+            Symbol("Unit_B$Shared_Ability"));
+
+        var resolved = index.ResolveOwnerAgnostic("Shared_Ability");
+
+        Assert.NotNull(resolved);
+        Assert.EndsWith("$Shared_Ability", resolved!.Id);
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_UnscopedSymbolOfThatName_IsNotAMatch()
+    {
+        // A top-level object is not an ability; only owner-scoped ids participate, otherwise this
+        // would quietly resolve references that the plain index already failed to resolve.
+        var index = WithWorkspace(Symbol("Plain_Object"));
+
+        Assert.Null(index.ResolveOwnerAgnostic("Plain_Object"));
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_FallsBackToTheBaseline()
+    {
+        // Shipped-game abilities live in the baseline, not WorkspaceDefinitions. Searching only the
+        // workspace would report every reference to a stock ability as unresolved.
+        var index = GameIndex.Empty with { Baseline = Baseline(Symbol("Stock_Unit$Stock_Ability")) };
+
+        var resolved = index.ResolveOwnerAgnostic("Stock_Ability");
+
+        Assert.NotNull(resolved);
+        Assert.Equal("Stock_Unit$Stock_Ability", resolved!.Id);
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_WorkspaceWinsOverBaseline()
+    {
+        // Same precedence as Resolve: a mod's own definition shadows the shipped one.
+        var index = WithWorkspace(Symbol("Mod_Unit$Shared_Ability")) with
+        {
+            Baseline = Baseline(Symbol("Stock_Unit$Shared_Ability"))
+        };
+
+        Assert.Equal("Mod_Unit$Shared_Ability", index.ResolveOwnerAgnostic("Shared_Ability")!.Id);
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_NoMatch_ReturnsNull()
+    {
+        var index = WithWorkspace(Symbol("Owner$Real_Ability"));
+
+        Assert.Null(index.ResolveOwnerAgnostic("Missing_Ability"));
+    }
+
+    [Fact]
+    public void ResolveOwnerAgnostic_AfterWithMutation_ReflectsTheNewSymbols()
+    {
+        // The lookup is memoized; a `with` copy must recompute rather than serve the original's.
+        var index = WithWorkspace(Symbol("Owner$First_Ability"));
+        Assert.NotNull(index.ResolveOwnerAgnostic("First_Ability"));
+
+        var mutated = index with
+        {
+            WorkspaceDefinitions = ImmutableDictionary
+                .Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Owner$Second_Ability", [Symbol("Owner$Second_Ability")])
+        };
+
+        Assert.Null(mutated.ResolveOwnerAgnostic("First_Ability"));
+        Assert.NotNull(mutated.ResolveOwnerAgnostic("Second_Ability"));
+    }
+
     // ── helpers ─────────────────────────────────────────────────────────────
 
     private static GameSymbol Symbol(string id, string typeName = "Unit")

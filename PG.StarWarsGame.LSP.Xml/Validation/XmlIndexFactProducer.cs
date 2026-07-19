@@ -70,6 +70,22 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             if (StoryReferenceTypes.IsStorySymbolType(reference.ExpectedTypeName))
                 continue;
 
+            // An owner-agnostic reference names an ability that is indexed as {ownerId}$Name, so it
+            // has to be matched across owners. The fact carries the bare name, not the marker, so
+            // diagnostics read the way the value is actually written in the file.
+            if (OwnerAgnosticReferenceId.TryGetBareName(reference.TargetId, out var bareName))
+            {
+                facts.Add(new XmlReferenceFact(
+                    documentUri,
+                    reference.Line,
+                    reference.Column,
+                    reference.Length,
+                    bareName,
+                    index.ResolveOwnerAgnostic(bareName),
+                    reference.ExpectedTypeName));
+                continue;
+            }
+
             var resolved = index.Resolve(reference.TargetId, reference.ExpectedTypeName);
             facts.Add(new XmlReferenceFact(
                 documentUri,
