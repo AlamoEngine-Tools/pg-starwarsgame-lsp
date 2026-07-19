@@ -76,6 +76,17 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     }
 
     [Fact]
+    public async Task XmlGoTo_SkirmishDefaultForcesListToken_ReturnsSquadronsDefinition()
+    {
+        // Regression for #77: <Space_Skirmish_AI_Default_Forces> was declared TypeReferenceList
+        // in the schema but carried no referenceKind, so XmlGameDocumentParser emitted no
+        // GameReference for its tokens at all - go-to silently did nothing AND no unresolved
+        // reference diagnostic appeared. The neighbouring <Skirmish_Land_Bomber> worked because
+        // it declares referenceKind: xmlObject, which is what made the two look inconsistent.
+        await RunGoToAsync(null, "Rebel_X-Wing_Squadron", "Squadrons", FactionsXmlRel);
+    }
+
+    [Fact]
     public async Task XmlGoTo_AfterOpenCloseCyclesOfTargetFile_StillResolvesWorkspaceDefinition()
     {
         // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML
