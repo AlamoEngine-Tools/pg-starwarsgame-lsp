@@ -76,6 +76,41 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     }
 
     [Fact]
+    public async Task XmlGoTo_SkirmishDefaultForcesListToken_ReturnsSquadronsDefinition()
+    {
+        // Regression for #77: <Space_Skirmish_AI_Default_Forces> was declared TypeReferenceList
+        // in the schema but carried no referenceKind, so XmlGameDocumentParser emitted no
+        // GameReference for its tokens at all - go-to silently did nothing AND no unresolved
+        // reference diagnostic appeared. The neighbouring <Skirmish_Land_Bomber> worked because
+        // it declares referenceKind: xmlObject, which is what made the two look inconsistent.
+        await RunGoToAsync(null, "Rebel_X-Wing_Squadron", "Squadrons", FactionsXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_SfxEventInsideTupleTag_ReturnsSfxEventDefinition()
+    {
+        // #78: tuple-valued SFX tags (HardPointSfxMap / AbilitySfxMap / ConditionalSfxEvent) get
+        // positional completion and pair validation, but XmlGameDocumentParser emits no
+        // GameReference for their elements - so go-to on the SFXEvent half silently does nothing
+        // while the very same event name navigates fine from a plain SFXEventReference tag.
+        // <SFXEvent_Hardpoint_Destroyed> HARD_POINT_WEAPON_LASER, Unit_Lost_Laser_Calamari </…>
+        await RunGoToAsync(null, "Unit_Lost_Laser_Calamari", "Sfxeventsunitscapital",
+            "Data/Xml/Spaceunitscapital.xml");
+    }
+
+    [Fact]
+    public async Task XmlGoTo_OwnerAgnosticAbilityName_ResolvesAcrossOwners()
+    {
+        // Abilities are indexed owner-scoped as {ownerId}$Name, but the galactic ability lists in
+        // GameConstants name them bare - the engine accepts any object's ability of that name. The
+        // bare name therefore matches no indexed id, and before ownerAgnosticReference these tags
+        // had neither go-to nor unresolved-reference validation.
+        // <Activated_Slice_Ability_Names> Tani_Slicer,R2D2_Slicer </…> resolves to the
+        // <..._Ability Name="R2D2_Slicer"> defined on R2-D2 in Namedherounits.xml.
+        await RunGoToAsync(null, "R2D2_Slicer", "Namedherounits", "Data/Xml/Gameconstants.xml");
+    }
+
+    [Fact]
     public async Task XmlGoTo_AfterOpenCloseCyclesOfTargetFile_StillResolvesWorkspaceDefinition()
     {
         // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML

@@ -54,7 +54,9 @@ public sealed class XmlInlayHintProviderRegistrationTest
     public void Registered_provider_count_is_locked()
     {
         // Update deliberately whenever a provider is added or removed.
-        const int expectedProviderCount = 3;
+        // 3 → 4: VariantOverrideInlayHintProvider added - clickable "overrides"/"merges" marker
+        // navigating to the displaced tag (#73).
+        const int expectedProviderCount = 4;
 
         Assert.Equal(expectedProviderCount, RegisteredProviderTypes().Count);
     }

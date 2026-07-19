@@ -16,13 +16,23 @@ public sealed class EawSchemaA1TagTest
 
     // ── BlackMarketItem:Name ─────────────────────────────────────────────────
 
+    /// <summary>
+    ///     A BlackMarketItem's Name is its own identifier - the Name attribute on
+    ///     <c>&lt;Item Name="..."&gt;</c> - declared once via types.yaml's nameTag, exactly like every
+    ///     other object type (SFXEvent, BinkMovie, ...). It is a symbol definition, not a reference,
+    ///     and never occurs as a child element, so tags/BlackMarketItem.yaml must not declare it.
+    ///     Re-adding it - especially as an xmlObject reference, which would make the item's own id
+    ///     resolve as a pointer to some other object - is the mistake this guards.
+    /// </summary>
     [Fact]
-    public void BlackMarketItem_Name_ReferenceKindIsNotXmlObject()
+    public void BlackMarketItem_Name_IsAnIdentifierNotAReferenceTag()
     {
-        var tag = Schema.GetTagsForType("BlackMarketItem")
-            .First(t => string.Equals(t.Tag, "Name", StringComparison.OrdinalIgnoreCase));
+        var type = Schema.GetObjectType("BlackMarketItem");
+        Assert.NotNull(type);
+        Assert.Equal("Name", type!.NameTag);
 
-        Assert.NotEqual(ReferenceKind.XmlObject, tag.ReferenceKind);
+        Assert.DoesNotContain(Schema.GetTagsForType("BlackMarketItem"),
+            t => string.Equals(t.Tag, "Name", StringComparison.OrdinalIgnoreCase));
     }
 
     // ── GameObjectType:Planet_Ability_Name ───────────────────────────────────

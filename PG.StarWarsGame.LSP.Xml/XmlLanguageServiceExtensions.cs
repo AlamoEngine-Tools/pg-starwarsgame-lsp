@@ -103,6 +103,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, FloatTupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IntFloatTupleListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, InaccuracyMapHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, PlanetModeExclusionListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageToArmorModHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, RgbaValueHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ShaderVersionHexHandler>();
@@ -217,6 +218,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeySingleValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, VariantOverrideInlayHintProvider>();
 
         // Variant inheritance (Variant_Of_Existing_Type) - workspace tag source feeds the
         // EffectiveObjectResolver; shadows shipped-game baseline tags.
@@ -225,6 +227,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantAdditiveMergeHandler>();
 
         // Layer-shadow and cross-type shadow warnings
         services.AddSingleton<IXmlLayerShadowFactProducer, XmlLayerShadowFactProducer>();

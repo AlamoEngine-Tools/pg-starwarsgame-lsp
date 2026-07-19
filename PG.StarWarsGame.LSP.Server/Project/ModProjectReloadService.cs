@@ -20,22 +20,26 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
+    private readonly IClientRefreshNotifier? _refresh;
     private readonly IProjectConfigurationResolver _resolver;
 
     private List<string>? _lastRoots;
 
+    // refresh is optional so the many minimal test setups can omit it; production always wires it.
     public ModProjectReloadService(
         IProjectConfigurationResolver resolver,
         IWorkspaceIndexer indexer,
         ILocalisationLoader localisation,
         IProjectLayerMap layerMap,
-        ILogger<ModProjectReloadService> logger)
+        ILogger<ModProjectReloadService> logger,
+        IClientRefreshNotifier? refresh = null)
     {
         _resolver = resolver;
         _indexer = indexer;
         _localisation = localisation;
         _layerMap = layerMap;
         _logger = logger;
+        _refresh = refresh;
     }
 
     public IReadOnlyList<string>? LastAssetRoots { get; private set; }
@@ -109,6 +113,12 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Localisation-only reload failed.");
+            return;
         }
+
+        // Loca-key inlay hints and code lenses were computed against the previous translation data
+        // and nothing about the open documents changed, so the client has no reason to re-request
+        // them on its own (#45). Ask it to.
+        _refresh?.RefreshDerivedState();
     }
 }

@@ -18,6 +18,12 @@ public sealed record GameIndex(
     // the engine resolves case-insensitively. Use OrdinalIgnoreCase so "X-wing" and
     // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI
     // (already lowercased by IFileHelper.NormalizeUri) and stays ordinal.
+    /// <summary>
+    ///     Separates the owning object's id from the symbol's own name in an owner-scoped symbol id
+    ///     (<c>MY_UNIT$Medic_Healing</c>), as written by the ability symbol pass.
+    /// </summary>
+    public const char OwnerScopeSeparator = '$';
+
     public static readonly GameIndex Empty = new(
         BaselineIndex.Empty,
         ImmutableDictionary<string, DocumentIndex>.Empty,
@@ -29,6 +35,7 @@ public sealed record GameIndex(
     // (possibly changed) dictionaries. -1 marks LeafLayerRank as not-yet-computed (ranks are >= 0).
     private ImmutableDictionary<string, ImmutableArray<GroupMembership>>? _allGroupMemberships;
     private int _leafLayerRank = -1;
+    private ImmutableDictionary<string, ImmutableArray<GameSymbol>>? _ownerScopedByBareName;
 
     // Replaces the compiler-synthesised copy constructor used by `with` expressions. Every
     // property must be copied here - add new properties to this list when extending the record.
@@ -38,6 +45,7 @@ public sealed record GameIndex(
     private GameIndex(GameIndex original)
     {
         _leafLayerRank = -1;
+        _ownerScopedByBareName = null;
         Baseline = original.Baseline;
         Documents = original.Documents;
         WorkspaceDefinitions = original.WorkspaceDefinitions;
@@ -132,6 +140,62 @@ public sealed record GameIndex(
                 ? result.SetItem(key, ws.AddRange(baselineMembers))
                 : result.Add(key, baselineMembers);
         return result;
+    }
+
+    /// <summary>
+    ///     Resolves an owner-scoped symbol (an ability, indexed as <c>{ownerId}$Name</c>) by its bare
+    ///     name, for the tags whose values name abilities without saying which object defines them -
+    ///     see <see cref="Schema.TagSemanticType.OwnerAgnosticReference" />. When several objects define
+    ///     an ability of that name the engine treats them as interchangeable, so any one of them is a
+    ///     valid answer; the highest project layer wins, matching <see cref="Resolve(string)" />.
+    ///     <para>
+    ///         Deliberately separate from <see cref="Resolve(string)" /> rather than a fallback inside it:
+    ///         a global fallback would let an unrelated misspelled reference resolve against a
+    ///         coincidentally-named ability and silently lose its unresolved-reference diagnostic.
+    ///     </para>
+    /// </summary>
+    public GameSymbol? ResolveOwnerAgnostic(string bareName)
+    {
+        var lookup = _ownerScopedByBareName ??= ComputeOwnerScopedByBareName();
+        if (!lookup.TryGetValue(bareName, out var matches) || matches.Length == 0)
+            return null;
+
+        // Workspace definitions shadow shipped ones, and among workspace definitions the highest
+        // project layer wins - the same precedence Resolve applies.
+        if (matches.Length == 1) return matches[0];
+
+        var workspace = matches.Where(m => m.Origin is FileOrigin { IsNavigable: true }).ToList();
+        var candidates = workspace.Count > 0 ? workspace : matches.ToList();
+        return candidates.Count == 1 ? candidates[0] : candidates.OrderByDescending(LayerRankOf).First();
+    }
+
+    /// <summary>
+    ///     Every owner-scoped symbol keyed by the name after the <see cref="OwnerScopeSeparator" />.
+    ///     Covers the baseline as well as the workspace: stock abilities live only in the baseline, and
+    ///     omitting them would report every reference to one as unresolved.
+    /// </summary>
+    private ImmutableDictionary<string, ImmutableArray<GameSymbol>> ComputeOwnerScopedByBareName()
+    {
+        var builder = new Dictionary<string, List<GameSymbol>>(StringComparer.OrdinalIgnoreCase);
+
+        void Add(string id, IEnumerable<GameSymbol> symbols)
+        {
+            var separator = id.IndexOf(OwnerScopeSeparator);
+            if (separator < 0 || separator == id.Length - 1) return;
+
+            var bare = id[(separator + 1)..];
+            if (!builder.TryGetValue(bare, out var list))
+                builder[bare] = list = [];
+            list.AddRange(symbols);
+        }
+
+        foreach (var (id, symbols) in WorkspaceDefinitions)
+            Add(id, symbols);
+        foreach (var (id, symbol) in Baseline.Symbols)
+            Add(id, [symbol]);
+
+        return builder.ToImmutableDictionary(kv => kv.Key, kv => kv.Value.ToImmutableArray(),
+            StringComparer.OrdinalIgnoreCase);
     }
 
     public GameSymbol? Resolve(string id)

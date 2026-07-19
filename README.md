@@ -83,6 +83,7 @@ The extension understands the full EaW/FoC XML data format - every game object t
 - **Rename** - `F2` on a symbol renames it consistently in every XML file in the workspace
 - **Code actions** - quick-fix lightbulbs for common problems, including creating a missing localisation key directly from the editor
 - **Code lens** - inline reference counts above every named object
+- **Variant inheritance** - objects using `Variant_Of_Existing_Type` show what they inherit, override and add; *Show effective object* opens the fully merged result with each tag annotated with where its value came from, and tags the engine accumulates rather than replaces are flagged where they are set
 
 ---
 

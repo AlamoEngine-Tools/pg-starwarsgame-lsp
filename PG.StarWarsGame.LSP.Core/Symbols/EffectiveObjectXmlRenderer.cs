@@ -48,10 +48,28 @@ public static class EffectiveObjectXmlRenderer
         return tag.Provenance switch
         {
             VariantProvenance.Inherited => $"inherited from {tag.OriginObjectId}",
-            VariantProvenance.Overridden => "overrides base",
-            VariantProvenance.Merged => "merged with base",
+            VariantProvenance.Overridden => tag.BaseValue is null
+                ? "overrides base"
+                : $"overrides base - was {Describe(tag.BaseValue)}",
+            VariantProvenance.Merged => tag.BaseValue is null
+                ? "merged with base"
+                : $"merged with base - base contributes {Describe(tag.BaseValue)}",
             VariantProvenance.Added => "added by variant",
             _ => null
         };
+    }
+
+    /// <summary>
+    ///     The replaced value, rendered for an XML comment. Reported in full - this document is the
+    ///     place to read the whole value, so truncating here would leave it nowhere to be seen. Only
+    ///     the two transforms XML comments require are applied: collapse to a single line (a
+    ///     multi-line value would run past the <c>--&gt;</c> and corrupt every following line) and
+    ///     neutralise <c>--</c>, which terminates a comment early.
+    /// </summary>
+    private static string Describe(string value)
+    {
+        var collapsed = string.Join(' ',
+            value.Split([' ', '\t', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries));
+        return collapsed.Replace("--", "- -", StringComparison.Ordinal);
     }
 }

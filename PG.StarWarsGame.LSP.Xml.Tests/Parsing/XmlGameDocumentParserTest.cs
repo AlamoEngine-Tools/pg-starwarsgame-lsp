@@ -211,6 +211,154 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal("file:///f.xml", reference.DocumentUri);
     }
 
+    // ── (planet, mode) exclusion pairs ────────────────────────────────────────
+
+    // The canonical engine type stays TypeReferenceList; the alternating-slot meaning is a schema
+    // refinement via SemanticType, not a value type of its own.
+    private static XmlTagDefinition ExclusionTag()
+    {
+        return new XmlTagDefinition
+        {
+            Tag = "Autoresolve_Exclusion_Locations",
+            ValueType = XmlValueType.TypeReferenceList,
+            SemanticType = TagSemanticType.PlanetModePairList,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
+        };
+    }
+
+    [Fact]
+    public async Task ParseAsync_PlanetModeExclusionList_EmitsReferencesForPlanetsOnly()
+    {
+        // "Fondor, land, Geonosis, land" is two (planet, mode) pairs flattened into one list, not
+        // four object references - treating the mode tokens as objects would report every one of
+        // them as an unresolved reference.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(ExclusionTag());
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Autoresolve_Exclusion_Locations>Fondor, land, Geonosis, space</Autoresolve_Exclusion_Locations></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Fondor", "Geonosis"], result.References.Select(r => r.TargetId));
+        Assert.All(result.References, r => Assert.Equal("GameObjectType", r.ExpectedTypeName));
+    }
+
+    [Fact]
+    public async Task ParseAsync_PlanetModeExclusionList_ReferenceRangeCoversOnlyThePlanetToken()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(ExclusionTag());
+
+        const string xml =
+            """<Campaign Name="C"><Autoresolve_Exclusion_Locations>Fondor, land</Autoresolve_Exclusion_Locations></Campaign>""";
+        var result = await Build(schema).ParseAsync("file:///c.xml", xml, 1,
+            TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        var lineText = xml.Split('\n')[reference.Line];
+        Assert.Equal("Fondor", lineText.Substring(reference.Column, reference.Length));
+    }
+
+    [Fact]
+    public async Task ParseAsync_PlanetModeExclusionList_TrailingPlanetWithoutMode_StillEmitsIt()
+    {
+        // An odd token count is a malformed pair, reported by the diagnostics handler. The parser
+        // must still index the planet so go-to keeps working while the author fixes the mode.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(ExclusionTag());
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Autoresolve_Exclusion_Locations>Fondor, land, Geonosis</Autoresolve_Exclusion_Locations></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["Fondor", "Geonosis"], result.References.Select(r => r.TargetId));
+    }
+
+    [Fact]
+    public async Task ParseAsync_PlanetModeExclusionList_Empty_EmitsNoReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(ExclusionTag());
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Autoresolve_Exclusion_Locations>   </Autoresolve_Exclusion_Locations></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
+    }
+
+    // ── (key, SFXEvent) tuple tags - #78 ──────────────────────────────────────
+
+    private static XmlTagDefinition TupleSfxTag(string tag, XmlValueType valueType)
+    {
+        // Deliberately no ReferenceKind: these tags carry none in the real schema, which is why
+        // their SFXEvent slot used to be invisible to go-to-definition.
+        return new XmlTagDefinition { Tag = tag, ValueType = valueType };
+    }
+
+    [Theory]
+    [InlineData(XmlValueType.HardPointSfxMap)]
+    [InlineData(XmlValueType.AbilitySfxMap)]
+    [InlineData(XmlValueType.ConditionalSfxEvent)]
+    public async Task ParseAsync_TupleSfxTag_EmitsSfxEventReferenceForSecondSlot(XmlValueType valueType)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(TupleSfxTag("SFXEvent_Hardpoint_Destroyed", valueType));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            """<Unit Name="UNIT_A"><SFXEvent_Hardpoint_Destroyed> HARD_POINT_WEAPON_LASER, Unit_Lost_Laser </SFXEvent_Hardpoint_Destroyed></Unit>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Unit_Lost_Laser", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Equal("SFXEvent", reference.ExpectedTypeName);
+        Assert.Equal("Unit_Lost_Laser".Length, reference.Length);
+    }
+
+    [Theory]
+    // The SFXEvent half is legitimately absent in ~424 vanilla occurrences; neither form may
+    // produce a reference, or every one of them would raise a bogus unresolved-reference warning.
+    [InlineData("DEFEND, ")]
+    [InlineData("DEFEND")]
+    [InlineData("")]
+    public async Task ParseAsync_TupleSfxTag_MissingSecondSlot_EmitsNoReference(string value)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(TupleSfxTag("SFXEvent_GUI_Toggle_Non_Hero_Ability_On", XmlValueType.AbilitySfxMap));
+
+        var result = await Build(schema).ParseAsync("file:///f.xml",
+            $"""<Unit Name="UNIT_A"><SFXEvent_GUI_Toggle_Non_Hero_Ability_On>{value}</SFXEvent_GUI_Toggle_Non_Hero_Ability_On></Unit>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
+    }
+
+    [Fact]
+    public async Task ParseAsync_TupleSfxTag_ReferenceRangeCoversOnlyTheSfxToken()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Unit"));
+        schema.AddTag(TupleSfxTag("SFXEvent_Attack_Hardpoint", XmlValueType.HardPointSfxMap));
+
+        const string xml =
+            """<Unit Name="UNIT_A"><SFXEvent_Attack_Hardpoint>HARD_POINT_WEAPON_LASER, Unit_HP_LASER</SFXEvent_Attack_Hardpoint></Unit>""";
+        var result = await Build(schema).ParseAsync("file:///f.xml", xml, 1,
+            TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        var lineText = xml.Split('\n')[reference.Line];
+        Assert.Equal("Unit_HP_LASER",
+            lineText.Substring(reference.Column, reference.Length));
+    }
+
     [Fact]
     public async Task ParseAsync_ContainerSharingReferenceTagName_DoesNotEmitWholeObjectAsReference()
     {

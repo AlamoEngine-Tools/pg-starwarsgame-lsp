@@ -47,6 +47,53 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
             && l.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
     }
 
+    /// <summary>
+    ///     Regression guard for #60: multiple &lt;Prereq&gt; lines on one event are an OR of
+    ///     AND-groups, not a mistake. Before <c>multipleAllowed: true</c> was set on the
+    ///     StoryParser <c>Prereq</c> tag, every OR-chained event drew a spurious duplicate-tag
+    ///     warning. Vanilla <c>Story_campaign_underworld.xml</c> contains several such events
+    ///     (e.g. <c>Unlock_Corruption_Shola</c> with three).
+    /// </summary>
+    [Fact]
+    public async Task MultiplePrereqLines_DoNotEmitDuplicateTagDiagnostics()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+
+        var xmlPath = Path.Combine(LspTestEnvironment.WorkspacePath!, ThreadXmlRel);
+        var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
+        var lines = await File.ReadAllLinesAsync(xmlPath);
+
+        var received = _fixture.WaitForDiagnosticsAsync(xmlUri, TimeSpan.FromSeconds(20));
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+            {
+                Uri = xmlUri, LanguageId = "xml", Version = 1,
+                Text = string.Join(Environment.NewLine, lines)
+            }
+        });
+
+        try
+        {
+            var diagnostics = await received;
+            var prereqDuplicates = diagnostics.Diagnostics
+                .Where(d => d.Message.Contains("Duplicate tag 'Prereq'", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            Assert.True(prereqDuplicates.Count == 0,
+                "Multiple <Prereq> lines are an OR condition and must not be reported as duplicates. Got: "
+                + string.Join(" | ", prereqDuplicates.Select(d => $"line {d.Range.Start.Line + 1}: {d.Message}")));
+        }
+        finally
+        {
+            _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = xmlUri }
+            });
+        }
+    }
+
     private async Task<IReadOnlyList<Location>> RequestDefinitionAsync(string tagOpen, string value)
     {
         RequireWorkspace();

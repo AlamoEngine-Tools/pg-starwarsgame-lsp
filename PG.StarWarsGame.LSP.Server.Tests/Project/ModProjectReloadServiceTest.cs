@@ -114,6 +114,48 @@ public sealed class ModProjectReloadServiceTest
     }
 
     [Fact]
+    public async Task ReloadLocalisationAsync_AfterLoad_AsksClientToRefreshDerivedState()
+    {
+        // #45: localisation-backed inlay hints (loca-key annotations) and code lenses are computed
+        // once, when the client asks. A localisation-only reload changes their content without any
+        // document edit, so unless the server pushes a refresh the client keeps rendering the stale
+        // set until something else makes it re-request - e.g. opening another file.
+        var refresh = new RecordingClientRefreshNotifier();
+        var service = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
+            new RecordingLayerMap(), new ListLogger(), refresh);
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+        var before = refresh.CallCount;
+
+        await service.ReloadLocalisationAsync(CancellationToken.None);
+
+        Assert.Equal(before + 1, refresh.CallCount);
+    }
+
+    [Fact]
+    public async Task ReloadLocalisationAsync_BeforeLoadAsync_DoesNotRefreshClient()
+    {
+        var refresh = new RecordingClientRefreshNotifier();
+        var service = new ModProjectReloadService(
+            new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
+            new RecordingLayerMap(), new ListLogger(), refresh);
+
+        await service.ReloadLocalisationAsync(CancellationToken.None);
+
+        Assert.Equal(0, refresh.CallCount);
+    }
+
+    private sealed class RecordingClientRefreshNotifier : IClientRefreshNotifier
+    {
+        public int CallCount { get; private set; }
+
+        public void RefreshDerivedState()
+        {
+            CallCount++;
+        }
+    }
+
+    [Fact]
     public async Task LoadAsync_PublishesConfigLayersToLayerMapBeforeIndexing()
     {
         var layerMap = new RecordingLayerMap();

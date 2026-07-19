@@ -47,6 +47,87 @@ public sealed class XmlVariantFactProducerTest
         Assert.Empty(facts);
     }
 
+    // ── additive (merge-mode) tags - #63 ─────────────────────────────────────
+
+    [Fact]
+    public void Produce_MergeTagAlsoSetOnBase_EmitsAdditiveMergeFact()
+    {
+        // The Victory_I_Star_Destroyer case: the hero variant looks like it replaces the base's
+        // Death_Clone, but merge mode unions them, so the hero keeps the base's grey-plated clone
+        // as well as its own black-plated one.
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Death_Clone>Hero_Clone</Death_Clone></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type")
+            .Mode("Death_Clone", VariantMode.Merge);
+        // WorkspaceVariantTagSource indexes every named object in a document, so in production the
+        // variant's own tags are available too - the merged result is computed from both sides.
+        var source = new FakeTagSource()
+            .With("V", new VariantTag("Variant_Of_Existing_Type", "B", "", 0),
+                new VariantTag("Death_Clone", "Hero_Clone", "<Death_Clone>Hero_Clone</Death_Clone>", 0))
+            .With("B", new VariantTag("Death_Clone", "Base_Clone", "<Death_Clone>Base_Clone</Death_Clone>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        var fact = Assert.Single(facts.OfType<VariantAdditiveMergeFact>());
+        Assert.Equal("Death_Clone", fact.TagName);
+        Assert.Equal("Base_Clone", fact.BaseValue);
+        Assert.Equal("Base_Clone, Hero_Clone", fact.MergedValue);
+    }
+
+    [Fact]
+    public void Produce_MergeTagRepeatedOnVariant_ReportsItOnlyOnce()
+    {
+        // Additive tags are multipleAllowed, so vanilla objects routinely carry several; the merge
+        // outcome belongs to the object, and one entry per occurrence floods the Problems panel.
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Death_Clone>C1</Death_Clone><Death_Clone>C2</Death_Clone><Death_Clone>C3</Death_Clone></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type")
+            .Mode("Death_Clone", VariantMode.Merge);
+        var source = new FakeTagSource()
+            .With("V", new VariantTag("Variant_Of_Existing_Type", "B", "", 0),
+                new VariantTag("Death_Clone", "C1", "<Death_Clone>C1</Death_Clone>", 0),
+                new VariantTag("Death_Clone", "C2", "<Death_Clone>C2</Death_Clone>", 0),
+                new VariantTag("Death_Clone", "C3", "<Death_Clone>C3</Death_Clone>", 0))
+            .With("B", new VariantTag("Death_Clone", "Base_Clone", "<Death_Clone>Base_Clone</Death_Clone>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        Assert.Single(facts.OfType<VariantAdditiveMergeFact>());
+    }
+
+    [Fact]
+    public void Produce_MergeTagNotSetOnBase_EmitsNoAdditiveMergeFact()
+    {
+        // Nothing to merge with - the variant simply introduces the tag, so there is no surprise.
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Death_Clone>Hero_Clone</Death_Clone></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type")
+            .Mode("Death_Clone", VariantMode.Merge);
+        var source = new FakeTagSource()
+            .With("V", new VariantTag("Variant_Of_Existing_Type", "B", "", 0),
+                new VariantTag("Death_Clone", "Hero_Clone", "<Death_Clone>Hero_Clone</Death_Clone>", 0))
+            .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        Assert.Empty(facts.OfType<VariantAdditiveMergeFact>());
+    }
+
+    [Fact]
+    public void Produce_ReplaceModeTagSetOnBoth_EmitsNoAdditiveMergeFact()
+    {
+        // A plain override really does replace; only merge-mode tags accumulate.
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type><Max_Health>250</Max_Health></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+        var source = new FakeTagSource()
+            .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0));
+
+        var facts = Produce(text, source, schema, Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        Assert.Empty(facts.OfType<VariantAdditiveMergeFact>());
+    }
+
     [Fact]
     public void Produce_IgnoredTagOnVariant_EmitsIgnoredOverrideFact()
     {

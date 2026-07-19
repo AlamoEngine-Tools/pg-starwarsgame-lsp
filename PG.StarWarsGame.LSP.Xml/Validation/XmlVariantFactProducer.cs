@@ -44,15 +44,20 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             }
 
             var baseValues = BaseValues(resolver, variant.VariantBaseId);
-            CollectTagFacts(node, documentUri, text, baseValues, facts);
+            CollectTagFacts(node, documentUri, text, baseValues, effective, facts);
         }
 
         return facts;
     }
 
     private void CollectTagFacts(HtmlNode objectNode, string documentUri, string text,
-        IReadOnlyDictionary<string, string> baseValues, List<XmlFact> facts)
+        IReadOnlyDictionary<string, string> baseValues, EffectiveObject effective, List<XmlFact> facts)
     {
+        // An additive tag is usually multipleAllowed, so one object commonly carries several
+        // occurrences. The merge outcome is a property of the object, not of each occurrence -
+        // reporting it once keeps the Problems panel readable.
+        var reportedMerges = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
         foreach (var child in objectNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {
             var tagDef = schema.GetTag(child.Name);
@@ -68,6 +73,19 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
             if (mode == VariantMode.Ignored)
             {
                 facts.Add(new VariantIgnoredOverrideFact(documentUri, line, col, len, name));
+                continue;
+            }
+
+            if (mode == VariantMode.Merge)
+            {
+                // Take the union from the resolver rather than recomputing it here, so the reported
+                // result cannot drift from the one the effective-object view and hints show.
+                var mergedTag = effective.Tags.FirstOrDefault(t =>
+                    t.Provenance == VariantProvenance.Merged &&
+                    t.TagName.Equals(child.Name, StringComparison.OrdinalIgnoreCase));
+                if (mergedTag?.BaseValue is not null && reportedMerges.Add(child.Name))
+                    facts.Add(new VariantAdditiveMergeFact(documentUri, line, col, len, name,
+                        mergedTag.BaseValue, mergedTag.Value));
                 continue;
             }
 
