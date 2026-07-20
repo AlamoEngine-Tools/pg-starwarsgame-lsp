@@ -398,28 +398,28 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             if (token.Length == 0) continue;
             if (!validNames.TryGetValue(token, out var deprecated))
             {
-                var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = lineIndex.GetPosition(absPos);
+                var (line0, col0, len0) =
+                    XmlUtility.GetInnerOffsetValuePosition(child, tokenStart, token.Length, lineIndex);
 
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
                     Message =
                         $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
-                    Range = SafeRange(line0, col0, token.Length),
+                    Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId
                 });
             }
             else if (deprecated)
             {
-                var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = lineIndex.GetPosition(absPos);
+                var (line0, col0, len0) =
+                    XmlUtility.GetInnerOffsetValuePosition(child, tokenStart, token.Length, lineIndex);
 
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Warning,
                     Message = $"'{token}' is deprecated.",
-                    Range = SafeRange(line0, col0, token.Length),
+                    Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId
                 });
             }

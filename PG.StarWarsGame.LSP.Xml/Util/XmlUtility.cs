@@ -296,6 +296,38 @@ public static class XmlUtility
     }
 
     /// <summary>
+    ///     Position and length of an element's whole trimmed inner-text value - the "highlight the
+    ///     value, not the tag" anchor a diagnostic points at when a leaf value is wrong. The start skips
+    ///     whitespace inside the element and the length is the trimmed value's source span. Always
+    ///     compute value ranges through this (or <see cref="GetInnerOffsetValuePosition" /> for one item
+    ///     of a list value): both use the document <paramref name="lineIndex" /> and the element's
+    ///     native <c>InnerStartIndex</c>, not HAP's per-node line/column, which is unreliable for nested
+    ///     elements and yields invalid ranges the client silently drops. Returns a zero-length span at
+    ///     the end of the inner content when the element has no non-whitespace value.
+    /// </summary>
+    public static (int Line, int Column, int Length) GetValuePosition(HtmlNode node, LineOffsetIndex lineIndex)
+    {
+        var innerHtml = node.InnerHtml;
+        var leading = innerHtml.Length - innerHtml.TrimStart().Length;
+        return GetInnerOffsetValuePosition(node, leading, innerHtml.Trim().Length, lineIndex);
+    }
+
+    /// <summary>
+    ///     Position of a single value token at <paramref name="innerOffset" /> characters into an
+    ///     element's inner content, with the given <paramref name="length" />. The list-valued companion
+    ///     to <see cref="GetValuePosition" />: for a space/comma-separated tag, the offset and length of
+    ///     each item come from <see cref="SplitListWithOffsets" />, so each item is highlighted
+    ///     individually rather than the whole tag. Shares the same <c>InnerStartIndex</c> +
+    ///     <paramref name="lineIndex" /> basis, so list-item and whole-value ranges can never drift apart.
+    /// </summary>
+    public static (int Line, int Column, int Length) GetInnerOffsetValuePosition(
+        HtmlNode node, int innerOffset, int length, LineOffsetIndex lineIndex)
+    {
+        var (line, column) = lineIndex.GetPosition(node.InnerStartIndex + innerOffset);
+        return (line, column, length);
+    }
+
+    /// <summary>
     ///     Walks <paramref name="text" /> from its own start up to <paramref name="offset" />,
     ///     advancing (<paramref name="startLine" />, <paramref name="startCol" />) by each character
     ///     crossed. Used to locate a sub-token within a fact's <c>RawValue</c> (which may itself span

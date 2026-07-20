@@ -157,10 +157,8 @@ public sealed class XmlDocumentFactProducer(
             var rawValue = child.InnerText.Trim();
             if (!string.IsNullOrEmpty(rawValue))
             {
-                var innerHtml = child.InnerHtml;
-                var leadingWs = innerHtml.Length - innerHtml.TrimStart().Length;
-                var (valLine, valCol) = lineIndex.GetPosition(child.InnerStartIndex + leadingWs);
-                facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, rawValue.Length, tagDef, rawValue));
+                var (valLine, valCol, valLen) = XmlUtility.GetValuePosition(child, lineIndex);
+                facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue));
             }
 
             WalkNodes(child, facts, lineIndex, false, documentUri, context, text);

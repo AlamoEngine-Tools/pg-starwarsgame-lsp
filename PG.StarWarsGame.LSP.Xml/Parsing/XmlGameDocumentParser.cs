@@ -128,9 +128,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             var trimmed = innerText.Trim();
             if (trimmed.Length == 0) return (null, null);
 
-            var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
-            var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) = XmlUtility.GetValuePosition(child, lineIndex);
 
             // The base id/reference must live in the same id-space as objectNode's own id - for
             // top-level objects that's the bare name (ownerPrefix is null); for abilities it's
@@ -138,7 +136,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             // resolving to an unrelated object's same-named ability.
             var baseId = ownerPrefix is not null ? $"{ownerPrefix}${trimmed}" : trimmed;
             var reference = new GameReference(baseId, GameSymbolKind.XmlObject,
-                enclosingTypeName, documentUri, line, column, trimmed.Length);
+                enclosingTypeName, documentUri, line, column, length);
             return (baseId, reference);
         }
 
@@ -242,8 +240,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
-                    var absPos = child.InnerStartIndex + tokenOffset;
-                    var (line, column) = lineIndex.GetPosition(absPos);
+                    var (line, column, length) =
+                        XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, name.Length, lineIndex);
                     var targetId = ownerPrefix is not null
                         ? $"{ownerPrefix}{GameIndex.OwnerScopeSeparator}{name}"
                         : ownerAgnostic
@@ -257,7 +255,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                         documentUri,
                         line,
                         column,
-                        name.Length));
+                        length));
                 }
             }
         }
@@ -280,8 +278,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 continue;
             }
 
-            var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
             references.Add(new GameReference(
                 token,
                 GameSymbolKind.XmlObject,
@@ -289,7 +287,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                token.Length));
+                length));
         }
     }
 
@@ -305,8 +303,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         if (token.Length == 0) return;
 
         var tokenOffset = slot.IndexOf(token, StringComparison.Ordinal);
-        var absPos = child.InnerStartIndex + tokenOffset;
-        var (line, column) = lineIndex.GetPosition(absPos);
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
         references.Add(new GameReference(
             $"enum:GameObjectCategoryType/{token}",
             null,
@@ -314,7 +312,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri,
             line,
             column,
-            token.Length));
+            length));
     }
 
     /// <summary>
@@ -331,8 +329,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         {
             if (slot++ % 2 != 0) continue; // odd slot: battle mode, validated not indexed
 
-            var absPos = child.InnerStartIndex + offset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);
             references.Add(new GameReference(
                 token,
                 GameSymbolKind.XmlObject,
@@ -340,7 +338,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                token.Length));
+                length));
         }
     }
 
@@ -359,8 +357,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         if (token.Length == 0) return;
 
         var tokenOffset = comma + 1 + slot.IndexOf(token, StringComparison.Ordinal);
-        var absPos = child.InnerStartIndex + tokenOffset;
-        var (line, column) = lineIndex.GetPosition(absPos);
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
         references.Add(new GameReference(
             token,
             GameSymbolKind.XmlObject,
@@ -368,7 +366,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri,
             line,
             column,
-            token.Length));
+            length));
     }
 
     private static void CollectEnumReferences(HtmlNode child, string enumName,
@@ -377,8 +375,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var innerText = child.InnerText;
         foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
         {
-            var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
             references.Add(new GameReference(
                 $"enum:{enumName}/{token}",
                 null,
@@ -386,7 +384,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                token.Length));
+                length));
         }
     }
 

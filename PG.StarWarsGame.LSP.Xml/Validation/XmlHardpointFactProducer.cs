@@ -32,6 +32,13 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     // the mounting object's model.
     private static readonly string[] FireBoneTags = ["Fire_Bone_A", "Fire_Bone_B"];
 
+    // Hardpoints attach to the object's TACTICAL battle model only. Galactic-map, GUI, event,
+    // waypoint, destroyed-galactic and *_Override models are also referenceKind=modelFile but carry
+    // no hardpoint bones - validating an attachment bone against them is a false positive (e.g. a
+    // starbase's low-detail Galactic_Model_Name legitimately lacks HP01_COM_BONE).
+    private static readonly string[] MountingObjectModelTags =
+        ["Space_Model_Name", "Land_Model_Name", "Model_Name"];
+
     private static readonly char[] ListSeparators = [',', ' ', '\t', '\r', '\n'];
 
     public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
@@ -70,7 +77,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     private static void CheckHardpoint(string hardpointId, HtmlNode hardpointNode, Pass pass)
     {
-        var bones = CollectBoneTags(hardpointNode);
+        var bones = CollectBoneTags(hardpointNode, pass);
         if (bones.Count == 0) return;
 
         var isTurret = IsTurret(hardpointNode);
@@ -193,7 +200,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         }
     }
 
-    private static List<BoneReference> CollectBoneTags(HtmlNode hardpointNode)
+    private static List<BoneReference> CollectBoneTags(HtmlNode hardpointNode, Pass pass)
     {
         var result = new List<BoneReference>();
         foreach (var child in hardpointNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
@@ -203,9 +210,11 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             var value = child.InnerText.Trim();
             if (value.Length == 0) continue;
 
-            var line = XmlUtility.GetLine(child);
-            result.Add(new BoneReference(child.Name, value,
-                new Position(line, XmlUtility.GetOpeningTagStartColumn(child), child.Name.Length)));
+            // Anchor on the bone-name value, not the tag name: the squiggle belongs on the thing that
+            // is wrong. Uses the document line index (HAP's per-node LinePosition is unreliable for some
+            // nested elements, which produced invalid ranges the client silently dropped).
+            var (line, column, length) = XmlUtility.GetValuePosition(child, pass.LineIndex);
+            result.Add(new BoneReference(child.Name, value, new Position(line, column, length)));
         }
 
         return result;
@@ -266,13 +275,11 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         private readonly Dictionary<string, IReadOnlyList<string?>> _modelsByOwner =
             new(StringComparer.OrdinalIgnoreCase);
         private readonly EffectiveObjectResolver _resolver;
-        private readonly ISchemaProvider _schema;
 
         public Pass(ParsedXmlDocument document, GameIndex index, string documentUri,
             ISchemaProvider schema, IVariantTagSource tagSource)
         {
             _document = document;
-            _schema = schema;
             Index = index;
             DocumentUri = documentUri;
             TagSource = tagSource;
@@ -306,7 +313,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             var models = !effective.Found || effective.Cyclic
                 ? []
                 : effective.Tags
-                    .Where(t => _schema.GetTag(t.TagName)?.ReferenceKind == ReferenceKind.ModelFile)
+                    .Where(t => MountingObjectModelTags.Contains(t.TagName, StringComparer.OrdinalIgnoreCase))
                     .Select(t => t.Value.Trim())
                     .Where(v => v.Length > 0)
                     .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -374,6 +381,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             }
         }
 
+        /// <summary>The document's memoised line index, for value/token range computation.</summary>
+        public LineOffsetIndex LineIndex => _document.LineIndex;
+
         /// <summary>
         ///     Position of one token inside a list element. Uses the document's memoised line index -
         ///     building a fresh <see cref="LineOffsetIndex" /> here re-scanned the whole file per token.
@@ -382,7 +392,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         {
             var (line, column) = _document.LineIndex.GetPosition(listNode.InnerStartIndex + offset);
             return new Position(line, column, token.Length);
-        }
+        } 
 
         private static Dictionary<string, HtmlNode> BuildNodeIndex(HtmlDocument doc)
         {
