@@ -99,6 +99,7 @@ public static class ServerConfigurator
             .WithHandler<XmlCodeActionHandler>()
             .WithHandler<XmlCodeLensHandler>()
             .WithHandler<XmlLinkedEditingRangeHandler>()
+            .WithHandler<XmlOnTypeFormattingHandler>()
             .WithHandler<XmlInlayHintHandler>()
             .WithHandler<LuaInlayHintHandler>()
             .WithHandler<RevalidateWorkspaceCommandHandler>()

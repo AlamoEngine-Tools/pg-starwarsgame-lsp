@@ -56,6 +56,7 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 		'foldingRange',
 		'selectionRange',
 		'linkedEditingRange',
+		'onTypeFormatting',
 		'inlayHint',
 	] as const;
 
@@ -193,6 +194,7 @@ function resolveFeatureFlags() {
 			inlayHints:     flag('xml.inlayHints', true),
 			codeActions:    flag('xml.codeActions', true),
 			linkedEditing:  flag('xml.linkedEditing', true),
+			autoCloseTag:   flag('xml.autoCloseTag', true),
 		},
 		lua: {
 			completion:     flag('lua.completion', true),

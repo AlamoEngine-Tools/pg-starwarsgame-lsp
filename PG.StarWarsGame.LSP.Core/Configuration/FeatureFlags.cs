@@ -34,6 +34,7 @@ public record XmlFeatureFlags
     public bool InlayHints { get; init; } = true;
     public bool CodeActions { get; init; } = true;
     public bool LinkedEditing { get; init; } = true;
+    public bool AutoCloseTag { get; init; } = true;
 }
 
 /// <summary>Flags for Lua language capabilities.</summary>

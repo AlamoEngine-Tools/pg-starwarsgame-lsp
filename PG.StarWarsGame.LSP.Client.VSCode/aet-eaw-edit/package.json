@@ -401,7 +401,13 @@
             "order": 1000,
             "type": "boolean",
             "default": true,
-            "markdownDescription": "Enables linked editing of matching XML tag pairs.\n\nChanging this setting automatically restarts the LSP server."
+            "markdownDescription": "Enables linked editing of matching XML tag pairs: renaming an opening tag renames its closing tag simultaneously.\n\nRequires VS Code's `#editor.linkedEditing#` setting to be enabled to take effect.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.xml.autoCloseTag": {
+            "order": 1050,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Automatically inserts the matching closing tag when you type the `>` that ends an XML opening tag.\n\nRequires VS Code's `#editor.formatOnType#` setting to be enabled to take effect.\n\nChanging this setting automatically restarts the LSP server."
           },
           "aet-eaw-edit.features.lua.completion": {
             "order": 1100,
