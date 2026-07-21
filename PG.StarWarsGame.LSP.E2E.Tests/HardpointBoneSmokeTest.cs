@@ -80,6 +80,43 @@ public sealed class HardpointBoneSmokeTest : IClassFixture<LspServerFixture>, IA
             + string.Join("\n", falsePositives));
     }
 
+    [Fact]
+    public async Task MeshOnlyDamageDecal_NotFlaggedAgainstStationModel()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+
+        var filePath = Path.Combine(XmlDir, "Hardpoints_underworld.xml");
+        var uri = DocumentUri.FromFileSystemPath(filePath);
+        var received = _fixture.WaitForDiagnosticsAsync(uri, TimeSpan.FromSeconds(20));
+        _openedUris.Add(uri);
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+            {
+                Uri = uri, LanguageId = "xml", Version = 1,
+                Text = await File.ReadAllTextAsync(filePath)
+            }
+        });
+
+        var diags = await received;
+
+        // HP_Underworld_Station_L2_LC_01 declares Damage_Decal HP02_LC_BLAST, which the L2-L5 station
+        // models carry only as a MESH (never a skeleton bone). The engine synthesises a bone at the mesh
+        // origin, so this is a valid reference: validating bones ∪ mesh names must not flag it. Before the
+        // union it was a false positive on every station that mounts the L2 hardpoint.
+        var falsePositives = diags.Diagnostics
+            .Where(d => d.Message.Contains("HP02_LC_BLAST", StringComparison.OrdinalIgnoreCase)
+                        && d.Message.Contains("does not exist", StringComparison.OrdinalIgnoreCase))
+            .Select(d => d.Message)
+            .ToList();
+
+        Assert.True(falsePositives.Count == 0,
+            "Damage decal HP02_LC_BLAST was flagged as missing, but it exists as a mesh on the station "
+            + "models and the engine resolves it as a bone at the mesh origin. Offending diagnostics:\n"
+            + string.Join("\n", falsePositives));
+    }
+
     private static void RequireWorkspace()
     {
         if (LspTestEnvironment.WorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)

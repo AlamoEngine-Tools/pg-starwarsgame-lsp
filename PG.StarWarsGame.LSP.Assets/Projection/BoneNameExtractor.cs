@@ -16,9 +16,12 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 ///     <see cref="Core.Symbols.BaselineIndex.ModelBones" /> and by the workspace scanner for mod models.
 /// </summary>
 /// <remarks>
-///     Bone names are read via the engine's <see cref="IAloFileService" /> ALO model loader
-///     (<c>AlamoModel.Bones</c>). Any model that fails to load (corrupt, unsupported version, or not a
-///     model ALO) is skipped silently - extraction never throws for a single bad file.
+///     Names are the union of the model's skeleton bones (read via the engine's
+///     <see cref="IAloFileService" /> loader, <c>AlamoModel.Bones</c>) and its mesh names, because the
+///     engine synthesises a bone at every mesh origin so a bone reference resolves against either. The
+///     union is produced by <see cref="ModelNameCatalog" />. Any model that fails to load (corrupt,
+///     unsupported version, or not a model ALO) is skipped silently - extraction never throws for a
+///     single bad file.
 /// </remarks>
 public static class BoneNameExtractor
 {
@@ -81,11 +84,20 @@ public static class BoneNameExtractor
         var provider = services.BuildServiceProvider();
         var aloService = provider.GetRequiredService<IAloFileService>();
 
+        // Buffer once so the union seam can read bones (via the loader) and mesh names (via the shim)
+        // from the same bytes; a bone reference resolves against either. See ModelNameCatalog.
         return file =>
         {
-            using var stream = fileSystem.File.OpenRead(file);
-            using var model = aloService.LoadModel(stream);
-            return model.Content.Bones;
+            var bytes = fileSystem.File.ReadAllBytes(file);
+            var names = ModelNameCatalog.ReadBoneReferenceTargets(bytes, LoadBones);
+            return names.ToList();
         };
+
+        IReadOnlyList<string> LoadBones(byte[] bytes)
+        {
+            using var stream = new MemoryStream(bytes, false);
+            using var model = aloService.LoadModel(stream);
+            return model.Content.Bones as IReadOnlyList<string> ?? [.. model.Content.Bones];
+        }
     }
 }

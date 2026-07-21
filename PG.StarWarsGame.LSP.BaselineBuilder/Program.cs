@@ -418,10 +418,20 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     var looseFileSystem = engine.GameRepository.PGFileSystem.UnderlyingFileSystem;
 
+    // A bone reference resolves against the model's bones OR its mesh names (the engine synthesises a
+    // bone at each mesh origin), so the catalog stores the union. Buffer the entry once so both the ALO
+    // loader and the mesh-name shim read the same bytes. See ModelNameCatalog.
     Func<Stream, IReadOnlyList<string>> getBones = stream =>
     {
-        using var model = aloFileService.LoadModel(stream);
-        return model.Content.Bones.ToList();
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        var bytes = buffer.ToArray();
+        return ModelNameCatalog.ReadBoneReferenceTargets(bytes, b =>
+        {
+            using var modelStream = new MemoryStream(b, false);
+            using var model = aloFileService.LoadModel(modelStream);
+            return model.Content.Bones as IReadOnlyList<string> ?? [.. model.Content.Bones];
+        });
     };
 
     Func<Stream, IEnumerable<string>> getMtdIcons = stream =>
