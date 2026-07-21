@@ -216,6 +216,19 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // (unit type, int count) tuples e.g. "StarViper_Squadron, 2": slot 0 names a game
+                // object. These tags carry no referenceKind - the pair is validated by
+                // UnitSpawnTableHandler - so without this the unit half is invisible to
+                // go-to-definition/rename. Slot 0 is recorded as a wildcard-typed object reference so
+                // the generic unresolved-reference pipeline owns its existence check (the handler then
+                // validates only the tuple shape and the count).
+                if (tagDef.ValueType == XmlValueType.UnitSpawnTable)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectUnitSpawnUnitReference(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
                 // Variant base references are emitted by the symbol passes with the enclosing
@@ -289,6 +302,32 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 column,
                 length));
         }
+    }
+
+    // Slot 0 of a UnitSpawnTable tuple ("StarViper_Squadron, 2") as a wildcard-typed game object
+    // reference. Only the unit half is an object; the count is validated by UnitSpawnTableHandler.
+    // ExpectedTypeName stays null so resolution is by name across any object type, matching the
+    // untyped lookup the handler used to perform.
+    private static void CollectUnitSpawnUnitReference(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var comma = innerText.IndexOf(',');
+        var slot = comma < 0 ? innerText : innerText[..comma];
+        var token = slot.Trim();
+        if (token.Length == 0) return;
+
+        var tokenOffset = slot.IndexOf(token, StringComparison.Ordinal);
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
+        references.Add(new GameReference(
+            token,
+            GameSymbolKind.XmlObject,
+            null,
+            documentUri,
+            line,
+            column,
+            length));
     }
 
     // Slot 0 of an InaccuracyMap tuple ("Bomber, 15.0") as an enum: reference, mirroring

@@ -359,6 +359,86 @@ public sealed class XmlGameDocumentParserTest
             lineText.Substring(reference.Column, reference.Length));
     }
 
+    // ── (unit, count) UnitSpawnTable tuple tags ───────────────────────────────
+
+    private static XmlTagDefinition UnitSpawnTag(string tag)
+    {
+        // Mirrors the real schema: Starting/Reserve_Spawned_Units_Tech_* carry ValueType
+        // UnitSpawnTable and NO ReferenceKind, which is why slot 0's unit used to be invisible to
+        // go-to-definition. ExpectedTypeName stays null so resolution is by-name (any object type),
+        // matching the untyped lookup the UnitSpawnTableHandler previously did.
+        return new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.UnitSpawnTable };
+    }
+
+    [Fact]
+    public async Task ParseAsync_UnitSpawnTable_EmitsGameObjectReferenceForFirstSlot()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceStructure"));
+        schema.AddTag(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
+
+        var result = await Build(schema).ParseAsync("file:///s.xml",
+            """<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>StarViper_Squadron, 2</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("StarViper_Squadron", reference.TargetId);
+        Assert.Equal(GameSymbolKind.XmlObject, reference.ExpectedKind);
+        Assert.Null(reference.ExpectedTypeName);
+        Assert.Equal("StarViper_Squadron".Length, reference.Length);
+    }
+
+    [Fact]
+    public async Task ParseAsync_UnitSpawnTable_ReferenceRangeCoversOnlyTheUnitToken()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceStructure"));
+        schema.AddTag(UnitSpawnTag("Reserve_Spawned_Units_Tech_3"));
+
+        const string xml =
+            """<SpaceStructure Name="STARBASE"><Reserve_Spawned_Units_Tech_3>Skipray_Squadron, -1</Reserve_Spawned_Units_Tech_3></SpaceStructure>""";
+        var result = await Build(schema).ParseAsync("file:///s.xml", xml, 1,
+            TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        var lineText = xml.Split('\n')[reference.Line];
+        Assert.Equal("Skipray_Squadron", lineText.Substring(reference.Column, reference.Length));
+    }
+
+    [Fact]
+    public async Task ParseAsync_UnitSpawnTable_NoComma_StillEmitsUnitReference()
+    {
+        // A missing count is a malformed tuple, flagged by UnitSpawnTableHandler. The parser must
+        // still index the unit so go-to keeps working while the author adds the count.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceStructure"));
+        schema.AddTag(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
+
+        var result = await Build(schema).ParseAsync("file:///s.xml",
+            """<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>StarViper_Squadron</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("StarViper_Squadron", reference.TargetId);
+    }
+
+    [Theory]
+    [InlineData(", 2")]
+    [InlineData("   ")]
+    [InlineData("")]
+    public async Task ParseAsync_UnitSpawnTable_EmptyUnitSlot_EmitsNoReference(string value)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceStructure"));
+        schema.AddTag(UnitSpawnTag("Starting_Spawned_Units_Tech_0"));
+
+        var result = await Build(schema).ParseAsync("file:///s.xml",
+            $"""<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>{value}</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
+    }
+
     [Fact]
     public async Task ParseAsync_ContainerSharingReferenceTagName_DoesNotEmitWholeObjectAsReference()
     {

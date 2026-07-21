@@ -21,17 +21,19 @@ public sealed class UnitSpawnTableHandler : CommaSeparatedPairHandlerBase
                     $"'{fact.RawValue.Trim()}' is not a valid unit spawn entry for <{fact.Tag.Tag}>. Expected: UnitTypeName, Integer >= -1.")
             ];
 
-        var results = new List<XmlDiagnosticResult>();
-        if (wasFloat)
-            // Consistent int-slot policy: floats are accepted (the game truncates) but warned.
-            results.Add(AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+        // The unit (slot 0) is indexed as an object reference by XmlGameDocumentParser and its
+        // existence is validated by the generic unresolved-reference pipeline (which also powers
+        // go-to-definition/rename on it). This handler owns only the tuple shape and the count.
+        if (!wasFloat)
+            return [];
+
+        // Consistent int-slot policy: floats are accepted (the game truncates) but warned.
+        return
+        [
+            AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"'{parts[1].Trim()}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {count}?",
                     SuggestedFix: count.ToString()),
-                fact, 1));
-
-        var d = TryValidateGameObjectName(parts[0].Trim(), fact.Tag.Tag, ctx.Index);
-        if (d is not null)
-            results.Add(AtPairSlot(d, fact, 0));
-        return results;
+                fact, 1)
+        ];
     }
 }
