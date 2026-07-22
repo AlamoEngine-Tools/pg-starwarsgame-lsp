@@ -49,68 +49,28 @@ public sealed class UnitSpawnTableHandlerTest
         Assert.Empty(results);
     }
 
-    // ── Game object name validation ───────────────────────────────────────────
+    // Note: the unit-name (slot 0) is now indexed as an object reference by XmlGameDocumentParser and
+    // its existence is validated by the generic unresolved-reference pipeline (so go-to-definition,
+    // rename and find-references work on it). This handler owns only the tuple shape and the count -
+    // see ParseAsync_UnitSpawnTable_* in XmlGameDocumentParserTest for the reference behaviour.
 
-    private static GameIndex IndexWithObject(string id)
+    [Fact]
+    public void Unknown_unit_name_alone_is_not_flagged_by_this_handler()
     {
-        var sym = new GameSymbol(id, GameSymbolKind.XmlObject, "GameObjectType", new UnknownOrigin("test"), null);
-        var defs = ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
-            .Add(id, ImmutableArray.Create(sym));
-        return new GameIndex(BaselineIndex.Empty,
-            ImmutableDictionary<string, DocumentIndex>.Empty,
-            defs,
+        // Even with a populated index, an unresolvable unit produces NO handler diagnostic - that is
+        // the reference pipeline's job now. A well-formed tuple with a valid count is clean here.
+        var sym = new GameSymbol("X_Wing", GameSymbolKind.XmlObject, "GameObjectType",
+            new UnknownOrigin("test"), null);
+        var defs = ImmutableDictionary
+            .Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase)
+            .Add("X_Wing", ImmutableArray.Create(sym));
+        var index = new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty, defs,
             ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty);
-    }
+        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
 
-    [Fact]
-    public void Known_unit_name_returns_no_diagnostics()
-    {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithObject("X_Wing"),
-            "file:///test.xml", "en");
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "X_Wing, 3"), ctx).ToList();
-        Assert.Empty(results);
-    }
-
-    [Fact]
-    public void Unknown_unit_name_returns_error()
-    {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithObject("X_Wing"),
-            "file:///test.xml", "en");
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Missing_Unit, 3"), ctx).ToList();
-        var d = Assert.Single(results);
-        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
-        Assert.Contains("Missing_Unit", d.Message);
-    }
-
-    [Fact]
-    public void Unknown_unit_name_HighlightsOnlyTheNameToken()
-    {
-        // A broken token must highlight only itself, not the whole tuple value
-        // (fact position is line 0, column 0 via MakeFact).
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithObject("X_Wing"),
-            "file:///test.xml", "en");
         var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Missing_Unit, 3"), ctx).ToList();
 
-        var d = Assert.Single(results);
-        Assert.Equal(0, d.OverrideLine);
-        Assert.Equal(0, d.OverrideColumn);
-        Assert.Equal("Missing_Unit".Length, d.OverrideLength);
-    }
-
-    [Fact]
-    public void Empty_index_skips_name_validation()
-    {
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "Missing_Unit, 3"),
-            XmlHandlerTestFixtures.EmptyCtx).ToList();
-        Assert.Empty(results);
-    }
-
-    [Fact]
-    public void Name_lookup_is_case_insensitive()
-    {
-        var ctx = new DiagnosticsContext(new EmptySchemaProvider(), IndexWithObject("X_Wing"),
-            "file:///test.xml", "en");
-        var results = Sut.Handle(XmlHandlerTestFixtures.MakeFact(Tag, "x_wing, 3"), ctx).ToList();
         Assert.Empty(results);
     }
 

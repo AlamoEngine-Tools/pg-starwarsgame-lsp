@@ -11,14 +11,17 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 
 /// <summary>
 ///     Extracts the animation-bone names exposed by each loose <c>.alo</c> model file under a game
-///     repository root. The result is keyed by the model's path normalised relative to that root
-///     (lowercase, forward-slash). Used by the BaselineBuilder to populate
+///     repository root. The result is keyed by the model's bare lowercased filename
+///     (<see cref="Core.Symbols.ModelBoneKey" />). Used by the BaselineBuilder to populate
 ///     <see cref="Core.Symbols.BaselineIndex.ModelBones" /> and by the workspace scanner for mod models.
 /// </summary>
 /// <remarks>
-///     Bone names are read via the engine's <see cref="IAloFileService" /> ALO model loader
-///     (<c>AlamoModel.Bones</c>). Any model that fails to load (corrupt, unsupported version, or not a
-///     model ALO) is skipped silently - extraction never throws for a single bad file.
+///     Names are the union of the model's skeleton bones (read via the engine's
+///     <see cref="IAloFileService" /> loader, <c>AlamoModel.Bones</c>) and its mesh names, because the
+///     engine synthesises a bone at every mesh origin so a bone reference resolves against either. The
+///     union is produced by <see cref="ModelNameCatalog" />. Any model that fails to load (corrupt,
+///     unsupported version, or not a model ALO) is skipped silently - extraction never throws for a
+///     single bad file.
 /// </remarks>
 public static class BoneNameExtractor
 {
@@ -64,8 +67,9 @@ public static class BoneNameExtractor
             if (bones is null || bones.Count == 0)
                 continue;
 
-            var relative = fileSystem.Path.GetRelativePath(root, file);
-            result[Normalize(relative)] = bones.ToArray();
+            // Keyed by bare filename (ModelBoneKey), matching the MEG baseline catalog and how XML
+            // references models. A loose workspace model overrides a shipped one of the same name.
+            result[Core.Symbols.ModelBoneKey.From(file)] = bones.ToArray();
         }
 
         return result;
@@ -80,16 +84,37 @@ public static class BoneNameExtractor
         var provider = services.BuildServiceProvider();
         var aloService = provider.GetRequiredService<IAloFileService>();
 
-        return file =>
+        return CreateBoneLoader(fileSystem, stream =>
         {
-            using var stream = fileSystem.File.OpenRead(file);
             using var model = aloService.LoadModel(stream);
-            return model.Content.Bones;
-        };
+            return model.Content.Bones as IReadOnlyList<string> ?? [.. model.Content.Bones];
+        });
     }
 
-    private static string Normalize(string relativePath)
+    /// <summary>
+    ///     Builds the per-file bone loader over an arbitrary skeleton reader. The loader unions the
+    ///     model's mesh names (recovered from the raw bytes by the shim) with the skeleton bones from
+    ///     <paramref name="readSkeletonBones" />.
+    ///     <para>
+    ///         The skeleton reader is handed a <em>file-backed</em> <see cref="FileSystemStream" />, never
+    ///         a <see cref="MemoryStream" />: the ALO loader derives the model's directory from the
+    ///         stream's path to resolve it, and throws "Unable to get file path from Stream" on a pathless
+    ///         stream - which the swallowing scan turned into a silently empty catalog. Kept internal so
+    ///         that contract is regression-tested without the real ALO parser or a binary fixture.
+    ///     </para>
+    /// </summary>
+    internal static Func<string, IList<string>?> CreateBoneLoader(
+        IFileSystem fileSystem, Func<Stream, IReadOnlyList<string>> readSkeletonBones)
     {
-        return relativePath.Replace('\\', '/').ToLowerInvariant().TrimStart('/');
+        return file =>
+        {
+            var bytes = fileSystem.File.ReadAllBytes(file);
+            var names = ModelNameCatalog.ReadBoneReferenceTargets(bytes, _ =>
+            {
+                using var stream = fileSystem.File.OpenRead(file);
+                return readSkeletonBones(stream);
+            });
+            return names.ToList();
+        };
     }
 }

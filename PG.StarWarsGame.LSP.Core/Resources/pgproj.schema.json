@@ -4,6 +4,9 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "$schema": {
+      "type": "string"
+    },
     "name": {
       "description": "Project display name and identity. When omitted, the server falls back to the .pgproj file name (without extension).",
       "type": "string",

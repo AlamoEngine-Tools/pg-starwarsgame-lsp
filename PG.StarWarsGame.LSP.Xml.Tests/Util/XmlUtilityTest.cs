@@ -205,6 +205,66 @@ public sealed class XmlUtilityTest
         Assert.False(XmlUtility.TryFindNodeByClosingLine(doc, 1, out _));
     }
 
+    // ── GetValuePosition (highlight the value, not the tag) ───────────────────
+
+    [Fact]
+    public void GetValuePosition_SingleLineWithSurroundingWhitespace_AnchorsOnTrimmedValue()
+    {
+        const string text = "<Root>\n<Foo>  bar  </Foo>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col, len) = XmlUtility.GetValuePosition(node!, new LineOffsetIndex(text));
+
+        Assert.Equal(1, line);
+        Assert.Equal(text.Split('\n')[1].IndexOf("bar", StringComparison.Ordinal), col); // past '<Foo>' and spaces
+        Assert.Equal(3, len);
+    }
+
+    [Fact]
+    public void GetValuePosition_MultilineElement_AnchorsOnValueLine()
+    {
+        const string text = "<Root>\n<Foo>\nbar\n</Foo>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col, len) = XmlUtility.GetValuePosition(node!, new LineOffsetIndex(text));
+
+        Assert.Equal(2, line); // "bar" is on line 2, not the <Foo> tag line
+        Assert.Equal(0, col);
+        Assert.Equal(3, len);
+    }
+
+    [Fact]
+    public void GetInnerOffsetValuePosition_ListItemAtOffset_AnchorsOnThatItem()
+    {
+        // <Foo>aa, bb</Foo>: the second item "bb" is at inner offset 4 (past "aa, ").
+        const string text = "<Root>\n<Foo>aa, bb</Foo>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+
+        var (line, col, len) = XmlUtility.GetInnerOffsetValuePosition(node!, 4, 2, new LineOffsetIndex(text));
+
+        Assert.Equal(1, line);
+        Assert.Equal(text.Split('\n')[1].IndexOf("bb", StringComparison.Ordinal), col);
+        Assert.Equal(2, len);
+    }
+
+    [Fact]
+    public void GetValuePosition_MatchesInnerOffsetCompanion_ForWholeValue()
+    {
+        // The whole-value helper must agree with the offset primitive it delegates to.
+        const string text = "<Root>\n<Foo>  bar  </Foo>\n</Root>";
+        var doc = XmlUtility.CreateHtmlDocument(text);
+        XmlUtility.TryFindNode(doc, 1, out var node);
+        var lineIndex = new LineOffsetIndex(text);
+
+        var whole = XmlUtility.GetValuePosition(node!, lineIndex);
+        var viaOffset = XmlUtility.GetInnerOffsetValuePosition(node!, 2, 3, lineIndex); // "  " leading, "bar"
+
+        Assert.Equal(viaOffset, whole);
+    }
+
     // ── FindEnclosingElement ──────────────────────────────────────────────────
 
     [Fact]

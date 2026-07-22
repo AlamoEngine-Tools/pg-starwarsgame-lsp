@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Story.Dialog;
 
@@ -84,9 +85,12 @@ public sealed class DialogDefinitionHandler : DefinitionHandlerBase
                     return Task.FromResult<LocationOrLocationLinks?>(null);
                 }
 
+                var originSelectionRange = new LspRange(
+                    new Position(fact.Command.Line, arg.Column),
+                    new Position(fact.Command.Line, arg.Column + arg.Text.Length));
                 _logger.LogDebug("Dialog go-to-def: '{Id}' → {Uri}:{Line}", arg.Text, origin.Uri, origin.Line);
                 return Task.FromResult<LocationOrLocationLinks?>(
-                    new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocation())));
+                    new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocationLink(originSelectionRange))));
             }
         }
 

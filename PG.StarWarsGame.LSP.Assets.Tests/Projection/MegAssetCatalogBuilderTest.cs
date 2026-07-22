@@ -114,7 +114,7 @@ public sealed class MegAssetCatalogBuilderTest
     // ── Build - model bone extraction ─────────────────────────────────────────
 
     [Fact]
-    public void Build_AloEntryWithBones_ExtractsBonesForNormalizedPath()
+    public void Build_AloEntryWithBones_ExtractsBonesKeyedByFilename()
     {
         var megs = OneMeg("test.meg", [@"DATA\ART\MODELS\UNIT_AT_AT.ALO"]);
         var fs = new MockFileSystem();
@@ -132,8 +132,10 @@ public sealed class MegAssetCatalogBuilderTest
             null,
             NullLogger.Instance);
 
-        Assert.True(modelBones.ContainsKey("data/art/models/unit_at_at.alo"));
-        Assert.Equal<IEnumerable<string>>(bones, modelBones["data/art/models/unit_at_at.alo"]);
+        // Bones are keyed by bare filename: XML references models by name, never by path, and the
+        // engine resolves them the same way. See ModelBoneKey.
+        Assert.True(modelBones.ContainsKey("unit_at_at.alo"));
+        Assert.Equal<IEnumerable<string>>(bones, modelBones["unit_at_at.alo"]);
     }
 
     [Fact]

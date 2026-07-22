@@ -43,6 +43,24 @@ public static class XmlUtility
     }
 
     /// <summary>
+    ///     Value of an object's identifier attribute, trimmed, or null when absent or blank.
+    ///     HtmlAgilityPack lowercases attribute names, so the match is case-insensitive.
+    /// </summary>
+    /// <param name="node">The object element.</param>
+    /// <param name="nameTag">
+    ///     The identifier attribute, from the object type's <c>nameTag</c>. Defaults to <c>Name</c>,
+    ///     which every currently registered type uses - pass the schema's value where it is known
+    ///     rather than relying on that.
+    /// </param>
+    public static string? GetNameAttributeValue(HtmlNode node, string nameTag = "Name")
+    {
+        var attr = node.Attributes.FirstOrDefault(a =>
+            a.Name.Equals(nameTag, StringComparison.OrdinalIgnoreCase));
+        var value = attr?.Value?.Trim();
+        return string.IsNullOrEmpty(value) ? null : value;
+    }
+
+    /// <summary>
     ///     Recovers the original (case-preserving) tag name for <paramref name="node" /> from the
     ///     source <paramref name="text" />. HtmlAgilityPack lowercases <see cref="HtmlNode.Name" />,
     ///     which is wrong for user-facing messages on the case-sensitive EaW/FoC XML format.
@@ -275,6 +293,38 @@ public static class XmlUtility
         var closeBracket = text.IndexOf('>', searchStart);
         var endOffset = closeBracket >= 0 ? closeBracket + 1 : text.Length;
         return OffsetToPosition(text, endOffset);
+    }
+
+    /// <summary>
+    ///     Position and length of an element's whole trimmed inner-text value - the "highlight the
+    ///     value, not the tag" anchor a diagnostic points at when a leaf value is wrong. The start skips
+    ///     whitespace inside the element and the length is the trimmed value's source span. Always
+    ///     compute value ranges through this (or <see cref="GetInnerOffsetValuePosition" /> for one item
+    ///     of a list value): both use the document <paramref name="lineIndex" /> and the element's
+    ///     native <c>InnerStartIndex</c>, not HAP's per-node line/column, which is unreliable for nested
+    ///     elements and yields invalid ranges the client silently drops. Returns a zero-length span at
+    ///     the end of the inner content when the element has no non-whitespace value.
+    /// </summary>
+    public static (int Line, int Column, int Length) GetValuePosition(HtmlNode node, LineOffsetIndex lineIndex)
+    {
+        var innerHtml = node.InnerHtml;
+        var leading = innerHtml.Length - innerHtml.TrimStart().Length;
+        return GetInnerOffsetValuePosition(node, leading, innerHtml.Trim().Length, lineIndex);
+    }
+
+    /// <summary>
+    ///     Position of a single value token at <paramref name="innerOffset" /> characters into an
+    ///     element's inner content, with the given <paramref name="length" />. The list-valued companion
+    ///     to <see cref="GetValuePosition" />: for a space/comma-separated tag, the offset and length of
+    ///     each item come from <see cref="SplitListWithOffsets" />, so each item is highlighted
+    ///     individually rather than the whole tag. Shares the same <c>InnerStartIndex</c> +
+    ///     <paramref name="lineIndex" /> basis, so list-item and whole-value ranges can never drift apart.
+    /// </summary>
+    public static (int Line, int Column, int Length) GetInnerOffsetValuePosition(
+        HtmlNode node, int innerOffset, int length, LineOffsetIndex lineIndex)
+    {
+        var (line, column) = lineIndex.GetPosition(node.InnerStartIndex + innerOffset);
+        return (line, column, length);
     }
 
     /// <summary>

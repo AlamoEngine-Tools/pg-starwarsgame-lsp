@@ -119,7 +119,8 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
     {
         return doc.DocumentNode.Descendants()
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element &&
-                                 string.Equals(GetNameAttribute(n), objectId, StringComparison.OrdinalIgnoreCase));
+                                 string.Equals(XmlUtility.GetNameAttributeValue(n, NameAttribute),
+                                     objectId, StringComparison.OrdinalIgnoreCase));
     }
 
     private HtmlNode? FindVariantChild(HtmlNode objectNode)
@@ -127,13 +128,5 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
         return objectNode.ChildNodes.FirstOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             schema.GetTag(n.Name)?.SemanticType == TagSemanticType.VariantParent);
-    }
-
-    private static string? GetNameAttribute(HtmlNode node)
-    {
-        var attr = node.Attributes.FirstOrDefault(a =>
-            a.Name.Equals(NameAttribute, StringComparison.OrdinalIgnoreCase));
-        var value = attr?.Value?.Trim();
-        return string.IsNullOrEmpty(value) ? null : value;
     }
 }

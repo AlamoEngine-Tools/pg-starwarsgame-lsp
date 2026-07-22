@@ -179,9 +179,33 @@ public sealed class XmlDefinitionHandlerTest
 
         Assert.NotNull(result);
         var link = Assert.Single(result!);
-        Assert.True(link.IsLocation);
-        Assert.Equal(TargetUri, link.Location!.Uri.ToString());
-        Assert.Equal(5, link.Location.Range.Start.Line);
+        Assert.True(link.IsLocationLink);
+        Assert.Equal(TargetUri, link.LocationLink!.TargetUri.ToString());
+        Assert.Equal(5, link.LocationLink.TargetRange.Start.Line);
+    }
+
+    [Fact]
+    public async Task Handle_CursorOnReference_CarriesReferenceSpanAsOriginSelectionRange()
+    {
+        // Without an originSelectionRange the client falls back to word-at-position guessing to
+        // decide the clickable span, so the Ctrl-hover underline/pointer only appears when the
+        // reference happens to match the editor's word pattern. Emitting the exact reference span
+        // makes the link decoration deterministic.
+        var doc = DocWithRef(TestUri, "UNIT_REBEL", 0, 4, 10);
+        var symbol = SymbolAt("UNIT_REBEL", TargetUri, 5);
+        var index = IndexWith(doc, symbol);
+        var handler = BuildHandler(index);
+
+        var result = await handler.Handle(At(0, 7), CancellationToken.None);
+
+        var link = Assert.Single(result!);
+        Assert.True(link.IsLocationLink);
+        var origin = link.LocationLink!.OriginSelectionRange;
+        Assert.NotNull(origin);
+        Assert.Equal(0, origin!.Start.Line);
+        Assert.Equal(4, origin.Start.Character);
+        Assert.Equal(0, origin.End.Line);
+        Assert.Equal(14, origin.End.Character);
     }
 
     [Fact]
@@ -197,9 +221,9 @@ public sealed class XmlDefinitionHandlerTest
 
         Assert.NotNull(result);
         var link = Assert.Single(result!);
-        Assert.True(link.IsLocation);
-        Assert.Equal(TestUri, link.Location!.Uri.ToString());
-        Assert.Equal(3, link.Location.Range.Start.Line);
+        Assert.True(link.IsLocationLink);
+        Assert.Equal(TestUri, link.LocationLink!.TargetUri.ToString());
+        Assert.Equal(3, link.LocationLink.TargetRange.Start.Line);
     }
 
     // ── URI normalization ─────────────────────────────────────────────────────
@@ -220,7 +244,7 @@ public sealed class XmlDefinitionHandlerTest
 
         Assert.NotNull(result);
         var link = Assert.Single(result!);
-        Assert.Equal(lowercaseUri, link.Location!.Uri.ToString());
+        Assert.Equal(lowercaseUri, link.LocationLink!.TargetUri.ToString());
     }
 
     // ── group key - no canonical definition ──────────────────────────────────
@@ -293,9 +317,12 @@ public sealed class XmlDefinitionHandlerTest
 
         Assert.NotNull(result);
         var link = Assert.Single(result!);
-        Assert.True(link.IsLocation);
-        Assert.Equal(enumFilePath, link.Location!.Uri.ToString());
-        Assert.Equal(2, link.Location.Range.Start.Line);
+        Assert.True(link.IsLocationLink);
+        Assert.Equal(enumFilePath, link.LocationLink!.TargetUri.ToString());
+        Assert.Equal(2, link.LocationLink.TargetRange.Start.Line);
+        // Reference span at line 0, chars [4..17) drives the Ctrl-hover link decoration.
+        Assert.Equal(4, link.LocationLink.OriginSelectionRange!.Start.Character);
+        Assert.Equal(17, link.LocationLink.OriginSelectionRange.End.Character);
     }
 
     [Fact]

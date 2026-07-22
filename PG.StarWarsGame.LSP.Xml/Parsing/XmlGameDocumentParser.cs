@@ -128,9 +128,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             var trimmed = innerText.Trim();
             if (trimmed.Length == 0) return (null, null);
 
-            var tokenOffset = innerText.IndexOf(trimmed, StringComparison.Ordinal);
-            var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) = XmlUtility.GetValuePosition(child, lineIndex);
 
             // The base id/reference must live in the same id-space as objectNode's own id - for
             // top-level objects that's the bare name (ownerPrefix is null); for abilities it's
@@ -138,7 +136,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             // resolving to an unrelated object's same-named ability.
             var baseId = ownerPrefix is not null ? $"{ownerPrefix}${trimmed}" : trimmed;
             var reference = new GameReference(baseId, GameSymbolKind.XmlObject,
-                enclosingTypeName, documentUri, line, column, trimmed.Length);
+                enclosingTypeName, documentUri, line, column, length);
             return (baseId, reference);
         }
 
@@ -218,6 +216,19 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // (unit type, int count) tuples e.g. "StarViper_Squadron, 2": slot 0 names a game
+                // object. These tags carry no referenceKind - the pair is validated by
+                // UnitSpawnTableHandler - so without this the unit half is invisible to
+                // go-to-definition/rename. Slot 0 is recorded as a wildcard-typed object reference so
+                // the generic unresolved-reference pipeline owns its existence check (the handler then
+                // validates only the tuple shape and the count).
+                if (tagDef.ValueType == XmlValueType.UnitSpawnTable)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectUnitSpawnUnitReference(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
                 // Variant base references are emitted by the symbol passes with the enclosing
@@ -242,8 +253,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
 
                 foreach (var (name, tokenOffset) in SplitReferenceNames(tagDef, innerText))
                 {
-                    var absPos = child.InnerStartIndex + tokenOffset;
-                    var (line, column) = lineIndex.GetPosition(absPos);
+                    var (line, column, length) =
+                        XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, name.Length, lineIndex);
                     var targetId = ownerPrefix is not null
                         ? $"{ownerPrefix}{GameIndex.OwnerScopeSeparator}{name}"
                         : ownerAgnostic
@@ -257,7 +268,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                         documentUri,
                         line,
                         column,
-                        name.Length));
+                        length));
                 }
             }
         }
@@ -280,8 +291,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 continue;
             }
 
-            var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
             references.Add(new GameReference(
                 token,
                 GameSymbolKind.XmlObject,
@@ -289,8 +300,34 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                token.Length));
+                length));
         }
+    }
+
+    // Slot 0 of a UnitSpawnTable tuple ("StarViper_Squadron, 2") as a wildcard-typed game object
+    // reference. Only the unit half is an object; the count is validated by UnitSpawnTableHandler.
+    // ExpectedTypeName stays null so resolution is by name across any object type, matching the
+    // untyped lookup the handler used to perform.
+    private static void CollectUnitSpawnUnitReference(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var comma = innerText.IndexOf(',');
+        var slot = comma < 0 ? innerText : innerText[..comma];
+        var token = slot.Trim();
+        if (token.Length == 0) return;
+
+        var tokenOffset = slot.IndexOf(token, StringComparison.Ordinal);
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
+        references.Add(new GameReference(
+            token,
+            GameSymbolKind.XmlObject,
+            null,
+            documentUri,
+            line,
+            column,
+            length));
     }
 
     // Slot 0 of an InaccuracyMap tuple ("Bomber, 15.0") as an enum: reference, mirroring
@@ -305,8 +342,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         if (token.Length == 0) return;
 
         var tokenOffset = slot.IndexOf(token, StringComparison.Ordinal);
-        var absPos = child.InnerStartIndex + tokenOffset;
-        var (line, column) = lineIndex.GetPosition(absPos);
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
         references.Add(new GameReference(
             $"enum:GameObjectCategoryType/{token}",
             null,
@@ -314,7 +351,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri,
             line,
             column,
-            token.Length));
+            length));
     }
 
     /// <summary>
@@ -331,8 +368,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         {
             if (slot++ % 2 != 0) continue; // odd slot: battle mode, validated not indexed
 
-            var absPos = child.InnerStartIndex + offset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);
             references.Add(new GameReference(
                 token,
                 GameSymbolKind.XmlObject,
@@ -340,7 +377,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                token.Length));
+                length));
         }
     }
 
@@ -359,8 +396,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         if (token.Length == 0) return;
 
         var tokenOffset = comma + 1 + slot.IndexOf(token, StringComparison.Ordinal);
-        var absPos = child.InnerStartIndex + tokenOffset;
-        var (line, column) = lineIndex.GetPosition(absPos);
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
         references.Add(new GameReference(
             token,
             GameSymbolKind.XmlObject,
@@ -368,7 +405,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri,
             line,
             column,
-            token.Length));
+            length));
     }
 
     private static void CollectEnumReferences(HtmlNode child, string enumName,
@@ -377,8 +414,8 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var innerText = child.InnerText;
         foreach (var (token, tokenOffset) in XmlUtility.SplitListWithOffsets(innerText))
         {
-            var absPos = child.InnerStartIndex + tokenOffset;
-            var (line, column) = lineIndex.GetPosition(absPos);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
             references.Add(new GameReference(
                 $"enum:{enumName}/{token}",
                 null,
@@ -386,7 +423,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 documentUri,
                 line,
                 column,
-                token.Length));
+                length));
         }
     }
 

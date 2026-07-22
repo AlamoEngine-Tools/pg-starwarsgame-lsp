@@ -111,6 +111,20 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     }
 
     [Fact]
+    public async Task XmlGoTo_HardpointSpecialAbilityName_ResolvesToTheAbilityDefinition()
+    {
+        // Special_Ability_Name was typed referenceKind: unknown - deliberately unindexed, because
+        // abilities are owner-scoped ({owner}$Name) and a bare name matched nothing, so indexing it
+        // would only have produced false "missing object" diagnostics. Owner-agnostic resolution
+        // removed that blocker, so the value navigates now.
+        // R_Supply_Dock_Income_Bonus is declared by exactly one object, so the target is
+        // unambiguous - unlike R_Comm_Array_Enable_Radar, which two objects declare and where any
+        // owner is a legitimate answer.
+        await RunGoToAsync(null, "R_Supply_Dock_Income_Bonus", "Starbases",
+            "Data/Xml/Hardpoints.xml");
+    }
+
+    [Fact]
     public async Task XmlGoTo_AfterOpenCloseCyclesOfTargetFile_StillResolvesWorkspaceDefinition()
     {
         // Regression for the 2026-07-05 didClose bug: the Lua sync handler also received XML
@@ -183,10 +197,14 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
                 }, cts.Token);
 
             Assert.NotNull(result);
-            var locations = result!.Select(l => l.Location!).ToList();
-            Assert.NotEmpty(locations);
-            Assert.Contains(locations, l =>
-                l.Uri.ToString().Contains(expectedDefinitionFile, StringComparison.OrdinalIgnoreCase));
+            // Definitions are returned as LocationLinks (with an originSelectionRange for the Ctrl-hover
+            // decoration); tolerate the plain-Location shape too in case the client downgrades.
+            var targetUris = result!
+                .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri)
+                .ToList();
+            Assert.NotEmpty(targetUris);
+            Assert.Contains(targetUris, u =>
+                u.ToString().Contains(expectedDefinitionFile, StringComparison.OrdinalIgnoreCase));
         }
         finally
         {

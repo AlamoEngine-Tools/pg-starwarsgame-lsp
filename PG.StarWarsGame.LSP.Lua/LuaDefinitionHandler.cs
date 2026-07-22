@@ -13,7 +13,6 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 using PG.StarWarsGame.LSP.Lua.Parsing;
 using PG.StarWarsGame.LSP.Lua.Util;
-using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -70,7 +69,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 
                 _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
                 return Task.FromResult<LocationOrLocationLinks?>(
-                    new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocation())));
+                    new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range))));
             }
         }
 
@@ -84,24 +83,35 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
         if (resolved is null)
             return Task.FromResult<LocationOrLocationLinks?>(null);
 
-        var targetLocation = new Location
+        var zeroRange = new LspRange(new Position(0, 0), new Position(0, 0));
+        var targetLink = new LocationLink
         {
-            Uri = resolved,
-            Range = new LspRange(new Position(0, 0), new Position(0, 0))
+            TargetUri = resolved.Value.Target,
+            TargetRange = zeroRange,
+            TargetSelectionRange = zeroRange,
+            OriginSelectionRange = resolved.Value.Origin
         };
-        _logger.LogDebug("Go-to-def (require): → {Uri}", resolved);
+        _logger.LogDebug("Go-to-def (require): → {Uri}", resolved.Value.Target);
         return Task.FromResult<LocationOrLocationLinks?>(
-            new LocationOrLocationLinks(new LocationOrLocationLink(targetLocation)));
+            new LocationOrLocationLinks(new LocationOrLocationLink(targetLink)));
     }
 
-    private static string? TryResolveRequireAtPosition(
+    private static (string Target, LspRange Origin)? TryResolveRequireAtPosition(
         SyntaxNode root, int line, int character,
         IReadOnlyDictionary<string, DocumentIndex> documents, IFileHelper fileHelper, string callerUri)
     {
         var found = LuaRequireCallLocator.TryFindAt(root, line, character);
-        return found is null
-            ? null
-            : LuaRequireResolver.Resolve(found.Value.ArgText, documents, fileHelper, callerUri);
+        if (found is null)
+            return null;
+
+        var target = LuaRequireResolver.Resolve(found.Value.ArgText, documents, fileHelper, callerUri);
+        if (target is null)
+            return null;
+
+        var origin = new LspRange(
+            new Position(found.Value.StartLine, found.Value.StartChar),
+            new Position(found.Value.EndLine, found.Value.EndChar));
+        return (target, origin);
     }
 
     protected override DefinitionRegistrationOptions CreateRegistrationOptions(

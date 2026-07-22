@@ -47,7 +47,7 @@ public sealed class XmlCompletionHandlerTest
         var proposals = new FakeProposalRegistry();
         var indexService = new FakeIndexService(index);
         var storyProposals = new StoryParamValueProposalProvider();
-        var boneHelper = new BoneNameCompletionHelper(schema);
+        var boneHelper = new BoneNameCompletionHelper(schema, new EmptyVariantTagSource());
         var fileTypeReg = registry ?? new FakeFileTypeRegistry();
 
         var tagNameRegistry = new XmlTagNameCompletionStrategyRegistry([
@@ -1568,5 +1568,10 @@ public sealed class XmlCompletionHandlerTest
         {
             _map["file:///" + key] = types;
         }
+    }
+
+    private sealed class EmptyVariantTagSource : IVariantTagSource
+    {
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => null;
     }
 }

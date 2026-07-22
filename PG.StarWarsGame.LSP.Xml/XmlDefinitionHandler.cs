@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -50,7 +51,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
 
         // Enum value references: "enum:{EnumName}/{ValueName}" - look up in WorkspaceEnumValueDefinitions.
         if (hit.Value.Id.StartsWith("enum:", StringComparison.Ordinal))
-            return Task.FromResult(ResolveEnumDefinition(hit.Value.Id, index));
+            return Task.FromResult(ResolveEnumDefinition(hit.Value.Id, hit.Value.Range, index));
 
         // Group keys have no canonical single definition - they link co-members, not a target symbol.
         if (index.AllGroupMemberships.ContainsKey(hit.Value.Id))
@@ -71,10 +72,10 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
 
         _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
         return Task.FromResult<LocationOrLocationLinks?>(
-            new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocation())));
+            new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range))));
     }
 
-    private LocationOrLocationLinks? ResolveEnumDefinition(string id, GameIndex index)
+    private LocationOrLocationLinks? ResolveEnumDefinition(string id, LspRange originSelectionRange, GameIndex index)
     {
         // id format: "enum:{EnumName}/{ValueName}"
         var slash = id.IndexOf('/', "enum:".Length);
@@ -89,7 +90,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
             return null;
 
         _logger.LogDebug("Go-to-def (enum): {Id} → {Uri}:{Line}", id, origin.Uri, origin.Line);
-        return new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocation()));
+        return new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocationLink(originSelectionRange)));
     }
 
     protected override DefinitionRegistrationOptions CreateRegistrationOptions(

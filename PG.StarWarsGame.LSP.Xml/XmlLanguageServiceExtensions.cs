@@ -149,6 +149,10 @@ public static class XmlLanguageServiceExtensions
 
         // Cross-tag validation handler
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();
 
         // Shared parse source: one HAP parse per (document, content) reused by indexing,
         // diagnostics, and every request handler. Capacity from ServerOptions.ParseCacheCapacity.
@@ -160,6 +164,7 @@ public static class XmlLanguageServiceExtensions
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
         services.AddSingleton<IXmlCrossTagRule, SquadronOffsetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
@@ -219,11 +224,13 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantOverrideInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, BoneModelInlayHintProvider>();
 
         // Variant inheritance (Variant_Of_Existing_Type) - workspace tag source feeds the
         // EffectiveObjectResolver; shadows shipped-game baseline tags.
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
         services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
+        services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();

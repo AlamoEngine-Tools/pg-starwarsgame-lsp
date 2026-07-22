@@ -113,6 +113,8 @@ The extension indexes the full EaW/FoC object graph across your workspace and us
 - **Rename** - `F2` on a symbol renames it consistently across every XML file in the workspace
 - **Code actions** - quick-fix lightbulbs for common problems, including creating a missing localisation key from within the editor
 - **Code lens** - inline reference counts shown above every named object
+- **Auto-close tags** - typing the `>` that ends an opening tag inserts the matching `</Tag>` and puts the cursor between them (requires VS Code's `editor.formatOnType` to be enabled)
+- **Linked editing** - renaming an opening tag renames its closing tag at the same time (requires VS Code's `editor.linkedEditing` to be enabled)
 - **Variant inheritance** - the Show Effective Object command opens a read-only view of the fully merged XML for any `Variant_Of_Existing_Type` object
 
 ---
@@ -222,7 +224,8 @@ XML:
 | `aet-eaw-edit.features.xml.codeLens` | `true` | Code lenses (reference counts, variant links) |
 | `aet-eaw-edit.features.xml.inlayHints` | `true` | Inlay hints |
 | `aet-eaw-edit.features.xml.codeActions` | `true` | Code actions (quick fixes) |
-| `aet-eaw-edit.features.xml.linkedEditing` | `true` | Linked editing of matching tag pairs |
+| `aet-eaw-edit.features.xml.linkedEditing` | `true` | Linked editing of matching tag pairs (needs `editor.linkedEditing`) |
+| `aet-eaw-edit.features.xml.autoCloseTag` | `true` | Auto-insert the closing tag when typing `>` (needs `editor.formatOnType`) |
 
 Lua:
 

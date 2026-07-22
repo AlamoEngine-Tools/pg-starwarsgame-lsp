@@ -51,6 +51,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ILogger<XmlDiagnosticsPublisher> _logger;
     private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
+    private readonly IXmlHardpointFactProducer? _hardpointProducer;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IStoryChainProblemStore? _storyChainProblems;
     private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
@@ -78,13 +79,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         ILspConfigurationProvider configProvider,
         IStoryChainProblemStore storyChainProblems,
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
+        IXmlHardpointFactProducer hardpointProducer,
         ServerOptions? options = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics)
+            storyGraphDiagnostics, hardpointProducer)
     {
     }
 
@@ -107,9 +109,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IXmlParseCache? parseCache = null,
         ILspConfigurationProvider? configProvider = null,
         IStoryChainProblemStore? storyChainProblems = null,
-        IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null)
+        IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
+        IXmlHardpointFactProducer? hardpointProducer = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger)
     {
+        _hardpointProducer = hardpointProducer;
         _configProvider = configProvider;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
@@ -156,6 +160,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             facts.AddRange(_variantProducer.Produce(canonicalUri, parsed, index));
         if (_shadowProducer is not null)
             facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
+        if (_hardpointProducer is not null)
+            facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index));
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(parsed, uri));
 
@@ -392,28 +398,28 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             if (token.Length == 0) continue;
             if (!validNames.TryGetValue(token, out var deprecated))
             {
-                var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = lineIndex.GetPosition(absPos);
+                var (line0, col0, len0) =
+                    XmlUtility.GetInnerOffsetValuePosition(child, tokenStart, token.Length, lineIndex);
 
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Error,
                     Message =
                         $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
-                    Range = SafeRange(line0, col0, token.Length),
+                    Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId
                 });
             }
             else if (deprecated)
             {
-                var absPos = child.InnerStartIndex + tokenStart;
-                var (line0, col0) = lineIndex.GetPosition(absPos);
+                var (line0, col0, len0) =
+                    XmlUtility.GetInnerOffsetValuePosition(child, tokenStart, token.Length, lineIndex);
 
                 diagnostics.Add(new Diagnostic
                 {
                     Severity = DiagnosticSeverity.Warning,
                     Message = $"'{token}' is deprecated.",
-                    Range = SafeRange(line0, col0, token.Length),
+                    Range = SafeRange(line0, col0, len0),
                     Source = AppProperties.LspServerId
                 });
             }

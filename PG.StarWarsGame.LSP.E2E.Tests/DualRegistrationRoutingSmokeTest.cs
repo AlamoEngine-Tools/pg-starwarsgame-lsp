@@ -169,12 +169,13 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                 }, luaCts.Token);
 
             Assert.NotNull(luaResult);
-            var luaLocations = luaResult!.Select(l => l.Location!).ToList();
+            var luaLocations = luaResult!
+                .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
             Assert.NotEmpty(luaLocations);
-            Assert.Contains(luaLocations, l =>
-                l.Uri.ToString().Contains("Spaceunitscorvettes", StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(luaLocations, l =>
-                l.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(luaLocations, u =>
+                u.ToString().Contains("Spaceunitscorvettes", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(luaLocations, u =>
+                u.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
 
             // ── Xml → Xml (cross-file): <Armor_Type> Armor_Tartan </Armor_Type> ─
             var (xmlLine, xmlCol) = FindXmlTagBodyValuePosition(xmlLines, "Armor_Type", "Armor_Tartan");
@@ -190,13 +191,14 @@ public sealed class DualRegistrationRoutingSmokeTest : IClassFixture<EawLspServe
                 }, xmlCts.Token);
 
             Assert.NotNull(xmlResult);
-            var xmlLocations = xmlResult!.Select(l => l.Location!).ToList();
+            var xmlLocations = xmlResult!
+                .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
             Assert.NotEmpty(xmlLocations);
-            Assert.Contains(xmlLocations, l =>
-                l.Uri.ToString().Contains(GameconstantsXmlRel.Split('/')[^1],
+            Assert.Contains(xmlLocations, u =>
+                u.ToString().Contains(GameconstantsXmlRel.Split('/')[^1],
                     StringComparison.OrdinalIgnoreCase));
-            Assert.DoesNotContain(xmlLocations, l =>
-                l.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+            Assert.DoesNotContain(xmlLocations, u =>
+                u.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
