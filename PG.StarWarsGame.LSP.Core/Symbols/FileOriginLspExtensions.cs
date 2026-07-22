@@ -18,4 +18,22 @@ public static class FileOriginLspExtensions
             Range = new LspRange(new Position(origin.Line, col), new Position(origin.Line, col))
         };
     }
+
+    /// <summary>
+    ///     Builds an LSP <see cref="LocationLink" /> pointing at this origin, tagging the source span
+    ///     (<paramref name="originSelectionRange" />) that the client should treat as the clickable link.
+    ///     Supplying it makes the Ctrl-hover underline/pointer deterministic instead of leaving the client
+    ///     to guess the span from its word pattern.
+    /// </summary>
+    public static LocationLink ToLspLocationLink(this FileOrigin origin, LspRange originSelectionRange)
+    {
+        var location = origin.ToLspLocation();
+        return new LocationLink
+        {
+            TargetUri = location.Uri,
+            TargetRange = location.Range,
+            TargetSelectionRange = location.Range,
+            OriginSelectionRange = originSelectionRange
+        };
+    }
 }

@@ -30,8 +30,8 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
         // <Prereq>Underworld_Campaign_Begin</Prereq> → <Event Name="Underworld_Campaign_Begin">
         var locations = await RequestDefinitionAsync("<Prereq>", "Underworld_Campaign_Begin");
 
-        Assert.Contains(locations, l =>
-            l.Uri.ToString().Contains("story_campaign_underworld.xml", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(locations, u =>
+            u.ToString().Contains("story_campaign_underworld.xml", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -42,9 +42,9 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
         // definition target.
         var locations = await RequestDefinitionAsync("<Event_Param2>", "START_MISSION_7");
 
-        Assert.Contains(locations, l =>
-            l.Uri.ToString().Contains("story_campaign_underworld", StringComparison.OrdinalIgnoreCase)
-            && l.Uri.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(locations, u =>
+            u.ToString().Contains("story_campaign_underworld", StringComparison.OrdinalIgnoreCase)
+            && u.ToString().EndsWith(".lua", StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -94,7 +94,7 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
         }
     }
 
-    private async Task<IReadOnlyList<Location>> RequestDefinitionAsync(string tagOpen, string value)
+    private async Task<IReadOnlyList<DocumentUri>> RequestDefinitionAsync(string tagOpen, string value)
     {
         RequireWorkspace();
         await WaitForScanAsync();
@@ -127,9 +127,13 @@ public sealed class StorySymbolSmokeTest : IClassFixture<LspServerFixture>
                 }, cts.Token);
 
             Assert.NotNull(result);
-            var locations = result!.Select(l => l.Location!).ToList();
-            Assert.NotEmpty(locations);
-            return locations;
+            // Definitions come back as LocationLinks (carrying an originSelectionRange); tolerate the
+            // plain-Location shape too. Callers only assert on the target URI.
+            var targetUris = result!
+                .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri)
+                .ToList();
+            Assert.NotEmpty(targetUris);
+            return targetUris;
         }
         finally
         {

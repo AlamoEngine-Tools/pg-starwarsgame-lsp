@@ -80,10 +80,11 @@ public sealed class FeatureFlagSmokeTest : IClassFixture<FeatureFlagsServerFixtu
                 }, cts.Token);
 
             Assert.NotNull(result);
-            var locations = result!.Select(l => l.Location!).ToList();
+            var locations = result!
+                .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
             Assert.NotEmpty(locations);
-            Assert.Contains(locations, l =>
-                l.Uri.ToString().Contains("Sfxeventsunitscorvettes", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(locations, u =>
+                u.ToString().Contains("Sfxeventsunitscorvettes", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {

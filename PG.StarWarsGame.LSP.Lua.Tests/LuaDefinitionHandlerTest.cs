@@ -101,10 +101,10 @@ public sealed class LuaDefinitionHandlerTest
 
         var result = await BuildHandler(index).Handle(RequestAt(0, 1), CancellationToken.None);
 
-        var loc = Assert.Single(result!.Select(l => l.Location!));
-        Assert.Equal(LibUri, loc.Uri.ToString());
-        Assert.Equal(5, loc.Range.Start.Line);
-        Assert.Equal(9, loc.Range.Start.Character);
+        var loc = Assert.Single(result!.Select(l => l.LocationLink!));
+        Assert.Equal(LibUri, loc.TargetUri.ToString());
+        Assert.Equal(5, loc.TargetRange.Start.Line);
+        Assert.Equal(9, loc.TargetRange.Start.Character);
     }
 
     [Fact]
@@ -119,10 +119,10 @@ public sealed class LuaDefinitionHandlerTest
 
         var result = await BuildHandler(index).Handle(RequestAt(2, 9, LibUri), CancellationToken.None);
 
-        var loc = Assert.Single(result!.Select(l => l.Location!));
-        Assert.Equal(LibUri, loc.Uri.ToString());
-        Assert.Equal(2, loc.Range.Start.Line);
-        Assert.Equal(9, loc.Range.Start.Character);
+        var loc = Assert.Single(result!.Select(l => l.LocationLink!));
+        Assert.Equal(LibUri, loc.TargetUri.ToString());
+        Assert.Equal(2, loc.TargetRange.Start.Line);
+        Assert.Equal(9, loc.TargetRange.Start.Character);
     }
 
     [Fact]
@@ -160,10 +160,10 @@ public sealed class LuaDefinitionHandlerTest
         var result = await BuildHandler(index).Handle(RequestAt(0, 12), CancellationToken.None);
 
         // Cursor at (0, 12) is inside [10, 16) - must resolve to the XML file.
-        var loc = Assert.Single(result!.Select(l => l.Location!));
-        Assert.Equal(xmlUri, loc.Uri.ToString());
-        Assert.Equal(5, loc.Range.Start.Line);
-        Assert.Equal(0, loc.Range.Start.Character);
+        var loc = Assert.Single(result!.Select(l => l.LocationLink!));
+        Assert.Equal(xmlUri, loc.TargetUri.ToString());
+        Assert.Equal(5, loc.TargetRange.Start.Line);
+        Assert.Equal(0, loc.TargetRange.Start.Character);
     }
 
     [Fact]
@@ -211,10 +211,13 @@ public sealed class LuaDefinitionHandlerTest
 
         var result = await BuildHandler(index, host).Handle(RequestAt(0, 10), CancellationToken.None);
 
-        var loc = Assert.Single(result!.Select(l => l.Location!));
-        Assert.Equal(fooBarUri, loc.Uri.ToString());
-        Assert.Equal(0, loc.Range.Start.Line);
-        Assert.Equal(0, loc.Range.Start.Character);
+        var loc = Assert.Single(result!.Select(l => l.LocationLink!));
+        Assert.Equal(fooBarUri, loc.TargetUri.ToString());
+        Assert.Equal(0, loc.TargetRange.Start.Line);
+        Assert.Equal(0, loc.TargetRange.Start.Character);
+        // The require-string span drives the Ctrl-hover link decoration.
+        Assert.NotNull(loc.OriginSelectionRange);
+        Assert.Equal(0, loc.OriginSelectionRange!.Start.Line);
     }
 
     [Fact]
@@ -280,8 +283,8 @@ public sealed class LuaDefinitionHandlerTest
             },
             CancellationToken.None);
 
-        var loc = Assert.Single(result!.Select(l => l.Location!));
-        Assert.Equal(targetUri, loc.Uri.ToString());
+        var loc = Assert.Single(result!.Select(l => l.LocationLink!));
+        Assert.Equal(targetUri, loc.TargetUri.ToString());
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

@@ -99,6 +99,25 @@ interface GetEffectiveObjectResult {
 const EFFECTIVE_SCHEME = 'aet-effective';
 
 /**
+ * A leading XML comment banner clarifying that the document is a generated, read-only preview of the
+ * fully-merged object - reinforcing what the tab title already says, for when only the body is visible.
+ * ASCII only by house rule.
+ */
+function effectiveObjectBanner(objectId: string): string {
+	return [
+		'<!--',
+		'  ============================================================',
+		'  GENERATED READ-ONLY PREVIEW',
+		`  Effective (fully-merged) form of variant object '${objectId}'.`,
+		'  This is not an editable source file - edits are discarded, and',
+		'  go-to-definition is not available here.',
+		'  ============================================================',
+		'-->',
+		'',
+	].join('\n');
+}
+
+/**
  * Serves the merged "effective" form of a variant GameObject as a read-only virtual XML document.
  * The object id is carried in the URI query; content is fetched from the server via
  * `aet/getEffectiveObject`. Read-only is implicit for TextDocumentContentProvider documents.
@@ -123,7 +142,7 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 			if (!result.found) {
 				return `<!-- EaWEdit: no object named '${objectId}' was found in the workspace. -->`;
 			}
-			return result.xml;
+			return effectiveObjectBanner(objectId) + result.xml;
 		} catch (e) {
 			return `<!-- EaWEdit: failed to resolve effective object '${objectId}': ${e} -->`;
 		}
@@ -857,10 +876,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			if (!objectId?.trim()) { return; }
 			objectId = objectId.trim();
 
-			const uri = vscode.Uri.from({ scheme: EFFECTIVE_SCHEME, path: `/${objectId}.xml`, query: objectId });
+			// The tab label is derived from the URI's path basename, so bake the intent into it: this is a
+			// generated, read-only preview of the fully-merged object, not an editable source file. The real
+			// object id travels in the query, so the decorative basename doesn't affect content resolution.
+			const uri = vscode.Uri.from({
+				scheme: EFFECTIVE_SCHEME,
+				path: `/${objectId} (effective preview, read-only).xml`,
+				query: objectId,
+			});
 			effectiveObjectProvider?.refresh(uri);
 			const doc = await vscode.workspace.openTextDocument(uri);
-			await vscode.window.showTextDocument(doc, { preview: true });
+			// Open beside the active editor so the preview sits next to the source it was generated from.
+			await vscode.window.showTextDocument(doc, {
+				preview: true,
+				viewColumn: vscode.ViewColumn.Beside,
+			});
 		})
 	);
 

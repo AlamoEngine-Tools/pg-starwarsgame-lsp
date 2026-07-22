@@ -55,10 +55,11 @@ public sealed class LuaGoToSmokeTest : IClassFixture<EawLspServerFixture>
             }, cts.Token);
 
         Assert.NotNull(result);
-        var locations = result!.Select(l => l.Location!).ToList();
+        var locations = result!
+            .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri).ToList();
         Assert.NotEmpty(locations);
-        Assert.Contains(locations, l =>
-            l.Uri.ToString().Contains("Spaceunitscorvettes", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(locations, u =>
+            u.ToString().Contains("Spaceunitscorvettes", StringComparison.OrdinalIgnoreCase));
 
         _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
         {

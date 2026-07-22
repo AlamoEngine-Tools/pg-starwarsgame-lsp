@@ -179,9 +179,14 @@ public sealed class DialogNavigationTest
         // Position inside "Speech_Intro" (line 1, arg starts at column 7).
         var result = await handler.Handle(At(1, 10), CancellationToken.None);
 
-        var location = Assert.Single(result!).Location!;
-        Assert.Equal(SpeechXmlUri, location.Uri.ToString());
-        Assert.Equal(7, location.Range.Start.Line);
+        var link = Assert.Single(result!).LocationLink!;
+        Assert.Equal(SpeechXmlUri, link.TargetUri.ToString());
+        Assert.Equal(7, link.TargetRange.Start.Line);
+        // The argument span drives the Ctrl-hover link decoration: "Speech_Intro" at line 1, cols [7..19).
+        Assert.NotNull(link.OriginSelectionRange);
+        Assert.Equal(1, link.OriginSelectionRange!.Start.Line);
+        Assert.Equal(7, link.OriginSelectionRange.Start.Character);
+        Assert.Equal(19, link.OriginSelectionRange.End.Character);
     }
 
     [Fact]

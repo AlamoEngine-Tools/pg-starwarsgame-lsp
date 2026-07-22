@@ -197,10 +197,14 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
                 }, cts.Token);
 
             Assert.NotNull(result);
-            var locations = result!.Select(l => l.Location!).ToList();
-            Assert.NotEmpty(locations);
-            Assert.Contains(locations, l =>
-                l.Uri.ToString().Contains(expectedDefinitionFile, StringComparison.OrdinalIgnoreCase));
+            // Definitions are returned as LocationLinks (with an originSelectionRange for the Ctrl-hover
+            // decoration); tolerate the plain-Location shape too in case the client downgrades.
+            var targetUris = result!
+                .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri : l.Location!.Uri)
+                .ToList();
+            Assert.NotEmpty(targetUris);
+            Assert.Contains(targetUris, u =>
+                u.ToString().Contains(expectedDefinitionFile, StringComparison.OrdinalIgnoreCase));
         }
         finally
         {
