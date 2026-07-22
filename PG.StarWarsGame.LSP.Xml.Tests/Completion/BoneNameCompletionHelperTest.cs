@@ -35,12 +35,24 @@ public sealed class BoneNameCompletionHelperTest
         return schema;
     }
 
+    // These cases are all inline object bones (no HardPoint parent), so the hardpoint resolver is never
+    // consulted and the tag source is irrelevant.
+    private static BoneNameCompletionHelper MakeHelper(ISchemaProvider schema)
+    {
+        return new BoneNameCompletionHelper(schema, new EmptyTagSource());
+    }
+
+    private sealed class EmptyTagSource : IVariantTagSource
+    {
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => null;
+    }
+
     // ── empty cases ───────────────────────────────────────────────────────────
 
     [Fact]
     public void GetProposals_EmptyIndex_ReturnsEmpty()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name"));
         var bone = Node(
             "<SpaceUnit><Space_Model_Name>unit.alo</Space_Model_Name><Barrel_Bone_Name></Barrel_Bone_Name></SpaceUnit>",
             "//barrel_bone_name");
@@ -53,7 +65,7 @@ public sealed class BoneNameCompletionHelperTest
     [Fact]
     public void GetProposals_NoModelSibling_ReturnsEmpty()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name"));
         var bone = Node(
             "<SpaceUnit><Barrel_Bone_Name></Barrel_Bone_Name></SpaceUnit>",
             "//barrel_bone_name");
@@ -69,7 +81,7 @@ public sealed class BoneNameCompletionHelperTest
     [Fact]
     public void GetProposals_SiblingModelTagAtDirectParent_ReturnsBones()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name"));
         var bone = Node(
             "<SpaceUnit><Space_Model_Name>unit.alo</Space_Model_Name><Barrel_Bone_Name></Barrel_Bone_Name></SpaceUnit>",
             "//barrel_bone_name");
@@ -87,11 +99,13 @@ public sealed class BoneNameCompletionHelperTest
     [Fact]
     public void GetProposals_SiblingModelTagTwoLevelsUp_ReturnsBones()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name"));
+        // A bone tag nested one level below the object that declares the model - the ancestor walk must
+        // climb to it. (Not a HardPoint container: a bone inside a HardPoint resolves by role instead.)
         const string xml =
             "<GameObjectType>" +
             "<Space_Model_Name>capital.alo</Space_Model_Name>" +
-            "<HardPoint><Fire_Bone_Name></Fire_Bone_Name></HardPoint>" +
+            "<SubObject><Fire_Bone_Name></Fire_Bone_Name></SubObject>" +
             "</GameObjectType>";
         var bone = Node(xml, "//fire_bone_name");
         var index = IndexWithBones(("capital.alo", ["hp_01", "hp_02"]));
@@ -108,7 +122,7 @@ public sealed class BoneNameCompletionHelperTest
     [Fact]
     public void GetProposals_PartialPrefix_FiltersCaseInsensitive()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name"));
         var bone = Node(
             "<SpaceUnit><Space_Model_Name>unit.alo</Space_Model_Name><Barrel_Bone_Name></Barrel_Bone_Name></SpaceUnit>",
             "//barrel_bone_name");
@@ -127,7 +141,7 @@ public sealed class BoneNameCompletionHelperTest
     [Fact]
     public void GetProposals_MultipleModelTags_UnionsBones()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name", "Land_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name", "Land_Model_Name"));
         const string xml =
             "<GameObjectType>" +
             "<Space_Model_Name>space.alo</Space_Model_Name>" +
@@ -149,7 +163,7 @@ public sealed class BoneNameCompletionHelperTest
     [Fact]
     public void GetProposals_ModelPathWithBackslashesAndCase_NormalisedForLookup()
     {
-        var helper = new BoneNameCompletionHelper(SchemaWithModelTags("Space_Model_Name"));
+        var helper = MakeHelper(SchemaWithModelTags("Space_Model_Name"));
         var bone = Node(
             "<SpaceUnit><Space_Model_Name>Data\\Art\\Models\\Unit.ALO</Space_Model_Name><Bone_Name></Bone_Name></SpaceUnit>",
             "//bone_name");

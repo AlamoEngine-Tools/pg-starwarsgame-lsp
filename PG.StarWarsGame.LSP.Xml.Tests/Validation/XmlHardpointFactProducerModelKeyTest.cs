@@ -116,6 +116,61 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     }
 
     [Fact]
+    public void CollisionMesh_OnModelToAttach_NotOnHull_NotFlagged()
+    {
+        // Cross-check finding: a hardpoint's Collision_Mesh commonly lives on the attached weapon model
+        // (Model_To_Attach), not the mounting hull - e.g. every Star Destroyer / Nebulon weapon. It must
+        // validate against hull UNION Model_To_Attach, so a mesh present on the attached model is valid
+        // even though the hull lacks it.
+        const string objUri = "file:///object.xml";
+        const string hpText =
+            """<X><HardPoint Name="HP_A"><Model_To_Attach>weapon.alo</Model_To_Attach>""" +
+            """<Attachment_Bone>HP_Bone</Attachment_Bone><Collision_Mesh>HP_Coll</Collision_Mesh></HardPoint></X>""";
+
+        var schema = new ModelSchema("Land_Model_Name");
+        var source = new HardpointTagSource()
+            .With("PALACE", new VariantTag("Land_Model_Name", "hull.alo", "", 0),
+                new VariantTag("HardPoints", "HP_A", "", 0))
+            .With("HP_A", new VariantTag("Model_To_Attach", "weapon.alo", "", 0),
+                new VariantTag("Attachment_Bone", "HP_Bone", "", 0),
+                new VariantTag("Collision_Mesh", "HP_Coll", "", 0));
+
+        var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("hull.alo", ["HP_Bone", "Root"]) // hull has the attachment bone but NOT the collision mesh
+            .Add("weapon.alo", ["HP_Coll"]); // collision mesh lives on the attached weapon model
+
+        var facts = HardpointFileOpen(hpText, schema, source, bones);
+
+        Assert.DoesNotContain(facts, f => f is HardpointBoneNotOnModelFact { BoneName: "HP_Coll" });
+        Assert.DoesNotContain(facts, f => f is HardpointBoneNotOnModelFact { BoneName: "HP_Bone" });
+    }
+
+    [Fact]
+    public void CollisionMesh_OnNeitherHullNorModelToAttach_StillFlagged()
+    {
+        // The union must not blanket-suppress: a genuine typo absent from both models is still flagged.
+        const string objUri = "file:///object.xml";
+        const string hpText =
+            """<X><HardPoint Name="HP_A"><Model_To_Attach>weapon.alo</Model_To_Attach>""" +
+            """<Collision_Mesh>HP_Typo_Coll</Collision_Mesh></HardPoint></X>""";
+
+        var schema = new ModelSchema("Land_Model_Name");
+        var source = new HardpointTagSource()
+            .With("PALACE", new VariantTag("Land_Model_Name", "hull.alo", "", 0),
+                new VariantTag("HardPoints", "HP_A", "", 0))
+            .With("HP_A", new VariantTag("Model_To_Attach", "weapon.alo", "", 0),
+                new VariantTag("Collision_Mesh", "HP_Typo_Coll", "", 0));
+
+        var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("hull.alo", ["Root"])
+            .Add("weapon.alo", ["HP_Coll"]); // the correct spelling, not HP_Typo_Coll
+
+        var facts = HardpointFileOpen(hpText, schema, source, bones);
+
+        Assert.Contains(facts, f => f is HardpointBoneNotOnModelFact { BoneName: "HP_Typo_Coll" });
+    }
+
+    [Fact]
     public void HardpointFileOpen_MultipleBadParentBones_AllFlagged()
     {
         // Collision_Mesh and Damage_Decal are identical in schema and code (both parent boneName tags).
@@ -219,6 +274,32 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         Assert.Equal(hpText.IndexOf("HP_Blast", StringComparison.Ordinal), fact.Column);
         Assert.Equal("HP_Blast".Length, fact.Length);
+    }
+
+    // Direction 1: the hardpoint file (Uri) is open; a single mounting object "PALACE" lives in a
+    // separate document reachable through the workspace reference index. The hardpoint is "HP_A".
+    private static IReadOnlyList<XmlFact> HardpointFileOpen(string hpText, ISchemaProvider schema,
+        IVariantTagSource source, ImmutableDictionary<string, ImmutableArray<string>> bones)
+    {
+        const string objUri = "file:///object.xml";
+        var hpSym = Sym("HP_A", "HardPoint");
+        var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
+            new FileOrigin(objUri, 0, 0), null, null);
+
+        var index = GameIndex.Empty with
+        {
+            Documents = ImmutableDictionary<string, DocumentIndex>.Empty
+                .Add(Uri, new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty))
+                .Add(objUri, new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty)),
+            WorkspaceDefinitions = new[] { hpSym, objSym }
+                .ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase),
+            WorkspaceReferences = ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty
+                .Add("HP_A", [new GameReference("HP_A", GameSymbolKind.XmlObject, "HardPoint", objUri, 0, 0, 0)]),
+            ModelBones = bones
+        };
+
+        return new XmlHardpointFactProducer(schema, source)
+            .Produce(Uri, ParsedXmlDocument.Parse(hpText), index);
     }
 
     private static IReadOnlyList<XmlFact> Produce(string text, ISchemaProvider schema,

@@ -19,27 +19,8 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private const string IsTurretTag = "Is_Turret";
     private const string SpecialAbilityNameTag = "Special_Ability_Name";
 
-    // Bones that always live on the model of the object mounting the hardpoint.
-    private static readonly string[] ParentModelBoneTags =
-        ["Attachment_Bone", "Collision_Mesh", "Damage_Decal", "Damage_Particles", "Engine_Particles"];
-
-    // Bones that always live on the hardpoint's own attached model. Turret_* tags only apply to a
-    // turret at all; Turret_Bone_Name and Barrel_Bone_Name are where rotation and elevation are
-    // applied, so they must exist on the turret model itself.
-    private static readonly string[] TurretModelBoneTags = ["Turret_Bone_Name", "Barrel_Bone_Name"];
-
-    // Fire bones switch sides: on a turret they belong to the attached turret model, otherwise to
-    // the mounting object's model.
-    private static readonly string[] FireBoneTags = ["Fire_Bone_A", "Fire_Bone_B"];
-
-    // Hardpoints attach to the object's TACTICAL battle model only. Galactic-map, GUI, event,
-    // waypoint, destroyed-galactic and *_Override models are also referenceKind=modelFile but carry
-    // no hardpoint bones - validating an attachment bone against them is a false positive (e.g. a
-    // starbase's low-detail Galactic_Model_Name legitimately lacks HP01_COM_BONE).
-    private static readonly string[] MountingObjectModelTags =
-        ["Space_Model_Name", "Land_Model_Name", "Model_Name"];
-
-    private static readonly char[] ListSeparators = [',', ' ', '\t', '\r', '\n'];
+    // Bone-tag classification and cross-file mounting/model resolution are shared with the bone-model
+    // inlay hint through HardpointBoneModelResolver, so the two can never disagree on a bone's target.
 
     public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
     {
@@ -88,8 +69,14 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         foreach (var bone in bones.Where(b => TargetsTurretModel(b.Tag, isTurret)))
             CheckBoneAgainstModels(bone, [turretModel], hardpointId, hardpointId, pass);
 
-        // Parent-side bones and the special ability both need the mounting objects.
-        var parentBones = bones.Where(b => !TargetsTurretModel(b.Tag, isTurret)).ToList();
+        // Parent-side bones and the special ability both need the mounting objects. A Collision_Mesh
+        // that lives on the attached weapon model is already satisfied (hull UNION Model_To_Attach), so
+        // drop it before the per-hull check rather than flag it against every mounting hull.
+        var parentBones = bones
+            .Where(b => !TargetsTurretModel(b.Tag, isTurret))
+            .Where(b => !(HardpointBoneModelResolver.MayResolveAgainstAttachedModel(b.Tag)
+                          && HardpointBoneModelResolver.ModelHasBone(pass.Index, turretModel, b.Value)))
+            .ToList();
         var abilityNode = hardpointNode.ChildNodes.LastOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             n.Name.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase));
@@ -148,6 +135,8 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
             var isTurret = IsTurretFromTags(hardpointTags);
             var position = pass.TokenPosition(hardpointsNode, offset, hardpointId);
+            var attachedModel = hardpointTags.LastOrDefault(t =>
+                t.TagName.Equals(ModelToAttachTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
 
             // The same ability check from this side: the squiggle lands on the hardpoint token in
             // this object's HardPoints list, which is where the pairing is declared.
@@ -161,6 +150,11 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
                 if (!IsBoneTag(tag.TagName) || TargetsTurretModel(tag.TagName, isTurret)) continue;
                 var bone = tag.Value.Trim();
                 if (bone.Length == 0) continue;
+
+                // Collision_Mesh on the attached weapon model is valid (hull UNION Model_To_Attach).
+                if (HardpointBoneModelResolver.MayResolveAgainstAttachedModel(tag.TagName)
+                    && HardpointBoneModelResolver.ModelHasBone(pass.Index, attachedModel, bone))
+                    continue;
 
                 CheckBoneAgainstModels(new BoneReference(tag.TagName, bone, position),
                     models, hardpointId, ownerId, pass);
@@ -222,20 +216,17 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     private static bool IsBoneTag(string tagName)
     {
-        return ParentModelBoneTags.Contains(tagName, StringComparer.OrdinalIgnoreCase)
-               || TurretModelBoneTags.Contains(tagName, StringComparer.OrdinalIgnoreCase)
-               || FireBoneTags.Contains(tagName, StringComparer.OrdinalIgnoreCase);
+        return HardpointBoneModelResolver.IsHardpointBoneTag(tagName);
     }
 
     private static bool TargetsTurretModel(string tagName, bool isTurret)
     {
-        if (TurretModelBoneTags.Contains(tagName, StringComparer.OrdinalIgnoreCase)) return true;
-        return isTurret && FireBoneTags.Contains(tagName, StringComparer.OrdinalIgnoreCase);
+        return HardpointBoneModelResolver.TargetsTurretModel(tagName, isTurret);
     }
 
     private static bool IsTurret(HtmlNode hardpointNode)
     {
-        return EngineBoolean.IsTrue(SingleValue(hardpointNode, IsTurretTag));
+        return HardpointBoneModelResolver.IsTurret(hardpointNode);
     }
 
     private static bool IsTurretFromTags(IReadOnlyList<VariantTag> tags)
@@ -272,8 +263,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         private readonly Dictionary<string, IReadOnlyList<string>> _chainByOwner =
             new(StringComparer.OrdinalIgnoreCase);
 
-        private readonly Dictionary<string, IReadOnlyList<string?>> _modelsByOwner =
-            new(StringComparer.OrdinalIgnoreCase);
+        private readonly HardpointBoneModelResolver _models;
         private readonly EffectiveObjectResolver _resolver;
 
         public Pass(ParsedXmlDocument document, GameIndex index, string documentUri,
@@ -284,6 +274,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             DocumentUri = documentUri;
             TagSource = tagSource;
             _resolver = new EffectiveObjectResolver(index, schema, tagSource);
+            _models = new HardpointBoneModelResolver(index, schema, tagSource);
             NodesById = BuildNodeIndex(document.Html);
         }
 
@@ -301,26 +292,12 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         public Dictionary<string, HtmlNode> NodesById { get; }
 
         /// <summary>
-        ///     Models the object declares, resolved through variant inheritance so a variant that
-        ///     inherits its model is still checked. Memoised: the same owner is reached once per
-        ///     hardpoint it mounts, and each miss walks and merges the whole variant chain.
+        ///     Models the object declares, resolved through variant inheritance. Delegated to the shared
+        ///     <see cref="HardpointBoneModelResolver" /> so validation and the inlay hint agree.
         /// </summary>
         public IReadOnlyList<string?> DeclaredModels(string ownerId)
         {
-            if (_modelsByOwner.TryGetValue(ownerId, out var cached)) return cached;
-
-            var effective = _resolver.Resolve(ownerId);
-            var models = !effective.Found || effective.Cyclic
-                ? []
-                : effective.Tags
-                    .Where(t => MountingObjectModelTags.Contains(t.TagName, StringComparer.OrdinalIgnoreCase))
-                    .Select(t => t.Value.Trim())
-                    .Where(v => v.Length > 0)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .Cast<string?>()
-                    .ToList();
-
-            return _modelsByOwner[ownerId] = models;
+            return _models.DeclaredModels(ownerId);
         }
 
         /// <summary>
@@ -352,33 +329,12 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         }
 
         /// <summary>
-        ///     Objects whose <c>HardPoints</c> list mounts <paramref name="hardpointId" />. Reached
-        ///     through the reference index, so only documents that actually mention it are inspected.
+        ///     Objects whose <c>HardPoints</c> list mounts <paramref name="hardpointId" />. Delegated to
+        ///     the shared <see cref="HardpointBoneModelResolver" />.
         /// </summary>
         public IEnumerable<GameSymbol> FindMountingObjects(string hardpointId)
         {
-            if (!Index.WorkspaceReferences.TryGetValue(hardpointId, out var references))
-                yield break;
-
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var uri in references.Select(r => r.DocumentUri).Distinct(StringComparer.Ordinal))
-            {
-                if (!Index.Documents.TryGetValue(uri, out var doc)) continue;
-
-                foreach (var symbol in doc.Symbols)
-                {
-                    if (!seen.Add(symbol.Id)) continue;
-
-                    var tags = TagSource.TryGetTags(symbol.Id);
-                    if (tags is null) continue;
-
-                    var mounts = tags.Any(t =>
-                        t.TagName.Equals(HardpointsTag, StringComparison.OrdinalIgnoreCase) &&
-                        t.Value.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)
-                            .Any(v => v.Equals(hardpointId, StringComparison.OrdinalIgnoreCase)));
-                    if (mounts) yield return symbol;
-                }
-            }
+            return _models.FindMountingObjects(hardpointId);
         }
 
         /// <summary>The document's memoised line index, for value/token range computation.</summary>

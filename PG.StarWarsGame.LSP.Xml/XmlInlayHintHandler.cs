@@ -77,7 +77,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
                 continue;
 
             var ctx = new InlayHintContext(uri, index, _schema, hapDoc, node, tagDef, line,
-                LineEndCharacter(parsed, line));
+                LineEndCharacter(parsed, line), parsed.LineIndex);
             foreach (var hint in _registry.Dispatch(ctx))
             {
                 _logger.LogDebug("InlayHint at line {Line}", line);

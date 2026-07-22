@@ -419,17 +419,21 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
     var looseFileSystem = engine.GameRepository.PGFileSystem.UnderlyingFileSystem;
 
     // A bone reference resolves against the model's bones OR its mesh names (the engine synthesises a
-    // bone at each mesh origin), so the catalog stores the union. Buffer the entry once so both the ALO
-    // loader and the mesh-name shim read the same bytes. See ModelNameCatalog.
+    // bone at each mesh origin), so the catalog stores the union. The mesh-name shim reads the buffered
+    // bytes, but the ALO loader must get the ORIGINAL entry stream: it resolves the model's path via
+    // StreamExtensions.GetFilePath, which only understands FileStream / FileSystemStream / IMegFileDataStream
+    // - a MemoryStream throws "Unable to get file path from Stream", which the swallowing scan turned into a
+    // silently empty baseline. openMegEntry hands us an IMegFileDataStream, so rewind and reuse it; do not
+    // dispose it here (TryExtractBones owns it).
     Func<Stream, IReadOnlyList<string>> getBones = stream =>
     {
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
         var bytes = buffer.ToArray();
-        return ModelNameCatalog.ReadBoneReferenceTargets(bytes, b =>
+        return ModelNameCatalog.ReadBoneReferenceTargets(bytes, _ =>
         {
-            using var modelStream = new MemoryStream(b, false);
-            using var model = aloFileService.LoadModel(modelStream);
+            stream.Seek(0, SeekOrigin.Begin);
+            using var model = aloFileService.LoadModel(stream);
             return model.Content.Bones as IReadOnlyList<string> ?? [.. model.Content.Bones];
         });
     };

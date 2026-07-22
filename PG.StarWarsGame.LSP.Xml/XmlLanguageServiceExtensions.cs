@@ -224,6 +224,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlInlayHintProvider, LocalisationKeyMultiValueInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantInlayHintProvider>();
         services.AddSingleton<IXmlInlayHintProvider, VariantOverrideInlayHintProvider>();
+        services.AddSingleton<IXmlInlayHintProvider, BoneModelInlayHintProvider>();
 
         // Variant inheritance (Variant_Of_Existing_Type) - workspace tag source feeds the
         // EffectiveObjectResolver; shadows shipped-game baseline tags.

@@ -84,20 +84,37 @@ public static class BoneNameExtractor
         var provider = services.BuildServiceProvider();
         var aloService = provider.GetRequiredService<IAloFileService>();
 
-        // Buffer once so the union seam can read bones (via the loader) and mesh names (via the shim)
-        // from the same bytes; a bone reference resolves against either. See ModelNameCatalog.
+        return CreateBoneLoader(fileSystem, stream =>
+        {
+            using var model = aloService.LoadModel(stream);
+            return model.Content.Bones as IReadOnlyList<string> ?? [.. model.Content.Bones];
+        });
+    }
+
+    /// <summary>
+    ///     Builds the per-file bone loader over an arbitrary skeleton reader. The loader unions the
+    ///     model's mesh names (recovered from the raw bytes by the shim) with the skeleton bones from
+    ///     <paramref name="readSkeletonBones" />.
+    ///     <para>
+    ///         The skeleton reader is handed a <em>file-backed</em> <see cref="FileSystemStream" />, never
+    ///         a <see cref="MemoryStream" />: the ALO loader derives the model's directory from the
+    ///         stream's path to resolve it, and throws "Unable to get file path from Stream" on a pathless
+    ///         stream - which the swallowing scan turned into a silently empty catalog. Kept internal so
+    ///         that contract is regression-tested without the real ALO parser or a binary fixture.
+    ///     </para>
+    /// </summary>
+    internal static Func<string, IList<string>?> CreateBoneLoader(
+        IFileSystem fileSystem, Func<Stream, IReadOnlyList<string>> readSkeletonBones)
+    {
         return file =>
         {
             var bytes = fileSystem.File.ReadAllBytes(file);
-            var names = ModelNameCatalog.ReadBoneReferenceTargets(bytes, LoadBones);
+            var names = ModelNameCatalog.ReadBoneReferenceTargets(bytes, _ =>
+            {
+                using var stream = fileSystem.File.OpenRead(file);
+                return readSkeletonBones(stream);
+            });
             return names.ToList();
         };
-
-        IReadOnlyList<string> LoadBones(byte[] bytes)
-        {
-            using var stream = new MemoryStream(bytes, false);
-            using var model = aloService.LoadModel(stream);
-            return model.Content.Bones as IReadOnlyList<string> ?? [.. model.Content.Bones];
-        }
     }
 }

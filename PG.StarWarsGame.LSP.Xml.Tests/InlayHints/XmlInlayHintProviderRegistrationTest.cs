@@ -56,7 +56,8 @@ public sealed class XmlInlayHintProviderRegistrationTest
         // Update deliberately whenever a provider is added or removed.
         // 3 → 4: VariantOverrideInlayHintProvider added - clickable "overrides"/"merges" marker
         // navigating to the displaced tag (#73).
-        const int expectedProviderCount = 4;
+        // 4 → 5: BoneModelInlayHintProvider added - "model.alo::" prefix on bone/mesh references.
+        const int expectedProviderCount = 5;
 
         Assert.Equal(expectedProviderCount, RegisteredProviderTypes().Count);
     }
