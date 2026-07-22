@@ -159,6 +159,31 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
     }
 
+    [Fact]
+    public async Task XmlGoTo_CampaignStoryName_NavigatesToPlotManifestFile()
+    {
+        // <Empire_Story_Name>Story_Plots_Campaign_Empire.xml</…> is a workspaceFile reference;
+        // go-to resolves it to the plot-manifest file it names.
+        await RunGoToAsync("Empire_Story_Name", "Story_Plots_Campaign_Empire.xml",
+            "Story_plots_campaign_empire.xml", "Data/Xml/Campaigns_Alpha.xml");
+    }
+
+    [Fact]
+    public async Task XmlGoTo_ManifestActivePlot_NavigatesToStoryThreadFile()
+    {
+        await RunGoToAsync("Active_Plot", "Story_Campaign_Empire_Act_I.xml",
+            "Story_campaign_empire_act_i.xml", "Data/Xml/Story_plots_campaign_empire.xml");
+    }
+
+    [Fact]
+    public async Task XmlGoTo_ManifestLuaScript_NavigatesToScriptFile()
+    {
+        // A <Lua_Script> names an extensionless script; go-to resolves across layers to the
+        // .lua file's workspace-file symbol emitted by the Lua parser.
+        await RunGoToAsync("Lua_Script", "Story_Campaign_Empire_Act_I",
+            "Story_campaign_empire_act_i.lua", "Data/Xml/Story_plots_campaign_empire.xml");
+    }
+
     private async Task RunGoToAsync(string? tagName, string value, string expectedDefinitionFile,
         string sourceFileRel = CorvettesXmlRel)
     {

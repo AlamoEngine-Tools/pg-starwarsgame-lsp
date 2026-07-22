@@ -14,6 +14,15 @@ public enum ReferenceKind
     /// </summary>
     XmlObject,
 
+    /// <summary>
+    ///     A reference to a workspace file registered in the file-type registry (or resolved by the
+    ///     owning language layer). The tag's <c>referenceType</c> names the target file-type (e.g.
+    ///     <c>StoryPlotManifest</c>, <c>StoryParser</c>, <c>LuaScript</c>). Drives go-to /
+    ///     find-references / rename to the referenced file; the value is a file path (or, for
+    ///     scripts, an extensionless name), not an object name.
+    /// </summary>
+    WorkspaceFile,
+
     /// <summary>.alo 3D model asset filename.</summary>
     ModelFile,
 

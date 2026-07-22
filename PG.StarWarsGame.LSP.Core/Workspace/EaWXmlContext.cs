@@ -37,6 +37,21 @@ public sealed class EaWXmlContext : IEaWXmlContext
         return _leafDirectories.Any(dir => normalized.StartsWith(dir, StringComparison.Ordinal));
     }
 
+    public string? TryGetXmlRelativePath(string fileUri)
+    {
+        var normalized = _fileHelper.NormalizeUri(fileUri);
+
+        // Longest matching directory wins, so a file under a nested xml root is made relative to
+        // that root rather than an ancestor (directories are stored with a trailing '/').
+        var root = _directories
+            .Where(dir => normalized.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(dir => dir.Length)
+            .FirstOrDefault();
+        if (root is null) return null;
+
+        return Uri.UnescapeDataString(normalized[root.Length..]);
+    }
+
     public void AddDirectory(string absolutePath)
     {
         var uri = absolutePath.StartsWith("file://", StringComparison.OrdinalIgnoreCase)

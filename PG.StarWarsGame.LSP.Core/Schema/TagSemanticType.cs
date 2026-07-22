@@ -68,5 +68,15 @@ public enum TagSemanticType
     ///     <see cref="XmlValueType.TypeReferenceList" /> rather than being a value type of its own -
     ///     the engine has no such type, only a list whose tokens alternate in meaning.
     /// </summary>
-    PlanetModePairList
+    PlanetModePairList,
+
+    /// <summary>
+    ///     A <see cref="ReferenceKind.WorkspaceFile" /> tag whose value is an additive, flat
+    ///     comma-separated <c>Faction, PlotFile[, Faction, PlotFile ...]</c> tuple list: every even
+    ///     slot names a faction (not a file), every odd slot is a plot-manifest file reference.
+    ///     Used by <c>Campaign.Story_Name</c> (the engine's <c>Get_Faction_Story_Name</c>). Unlike
+    ///     the space-normalising list split, this splits on commas ONLY, so file paths with
+    ///     <c>\</c> or <c>/</c> separators stay intact.
+    /// </summary>
+    FactionPlotFilePairList
 }

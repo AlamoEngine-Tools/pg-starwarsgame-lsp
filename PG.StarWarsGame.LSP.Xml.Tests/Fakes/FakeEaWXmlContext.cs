@@ -19,6 +19,11 @@ internal sealed class AllowAllEaWContext : IEaWXmlContext
         return true;
     }
 
+    public string? TryGetXmlRelativePath(string fileUri)
+    {
+        return null;
+    }
+
     public void AddDirectory(string absolutePath)
     {
     }
@@ -44,6 +49,11 @@ internal sealed class DenyAllEaWContext : IEaWXmlContext
     public bool IsLeafFile(string fileUri)
     {
         return false;
+    }
+
+    public string? TryGetXmlRelativePath(string fileUri)
+    {
+        return null;
     }
 
     public void AddDirectory(string absolutePath)

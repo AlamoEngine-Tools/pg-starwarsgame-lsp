@@ -60,6 +60,19 @@ public sealed class XmlGameDocumentParserTest
         return new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.Float };
     }
 
+    private static XmlTagDefinition WorkspaceFileTag(string tag, string referenceType,
+        TagSemanticType semanticType = TagSemanticType.Default)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = tag,
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.WorkspaceFile,
+            ReferenceTypeName = referenceType,
+            SemanticType = semanticType
+        };
+    }
+
     private static XmlTagDefinition VariantTag()
     {
         return new XmlTagDefinition
@@ -70,6 +83,73 @@ public sealed class XmlGameDocumentParserTest
             SemanticType = TagSemanticType.VariantParent,
             ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
         };
+    }
+
+    // ── workspaceFile references (plot manifests / threads / lua scripts) ────
+
+    [Fact]
+    public async Task WorkspaceFileTag_SingleValue_EmitsReferenceKeyedByReferenceType()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Empire_Story_Name", "StoryPlotManifest"));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaigns><Campaign Name=\"T\">\n" +
+            "<Empire_Story_Name>Story_Plots_Campaign_Empire.xml</Empire_Story_Name>\n" +
+            "</Campaign></Campaigns>", 1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyplotmanifest:story_plots_campaign_empire.xml", reference.TargetId);
+        Assert.Equal("StoryPlotManifest", reference.ExpectedTypeName);
+        Assert.Equal(1, reference.Line);
+        Assert.Equal("<Empire_Story_Name>".Length, reference.Column);
+        Assert.Equal("Story_Plots_Campaign_Empire.xml".Length, reference.Length);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_SubdirPath_IsNotSplitOnSeparators()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Active_Plot", "StoryParser"));
+
+        var index = await Build(schema).ParseAsync("file:///m.xml",
+            "<Story_Mode_Plots><Active_Plot>Conquests\\Loader\\Story_Plots_Loader.xml</Active_Plot></Story_Mode_Plots>",
+            1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyparser:conquests/loader/story_plots_loader.xml", reference.TargetId);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_LeadingTrailingSpace_RangeCoversTrimmedValue()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Rebel_Story_Name> Story_Plots_Rebel.xml </Rebel_Story_Name>\n</Campaign>", 1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyplotmanifest:story_plots_rebel.xml", reference.TargetId);
+        Assert.Equal("<Rebel_Story_Name> ".Length, reference.Column);
+        Assert.Equal("Story_Plots_Rebel.xml".Length, reference.Length);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_FactionPlotFilePairList_EmitsOnlyPlotFileTokens()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
+            TagSemanticType.FactionPlotFilePairList));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>",
+            1, default);
+
+        var refs = index.References.Where(r => r.ExpectedKind == GameSymbolKind.WorkspaceFile).ToList();
+        Assert.Equal(
+            ["storyplotmanifest:story_plots_r.xml", "storyplotmanifest:conquests/e.xml"],
+            refs.Select(r => r.TargetId));
     }
 
     private static XmlTagDefinition GroupRefTag(string tag, string referenceType)

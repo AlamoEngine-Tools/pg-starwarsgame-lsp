@@ -106,6 +106,7 @@ public sealed class SchemaIndex
             Tag = raw.Tag,
             ValueType = raw.ValueType,
             ReferenceKind = raw.ReferenceKind,
+            ReferenceTypeName = raw.ReferenceType,
             ObjectType = raw.ReferenceKind == ReferenceKind.XmlObject && raw.ReferenceType is not null
                 ? _types.GetValueOrDefault(raw.ReferenceType)
                 : null,

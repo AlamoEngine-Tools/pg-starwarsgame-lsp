@@ -361,6 +361,60 @@ public sealed class StoryChainScannerTest
     }
 
     [Fact]
+    public void Scan_GenericStoryNameTag_DiscoversCampaignAndFactionManifest()
+    {
+        // EaWX Rev (and any mod using the engine's generic story tag) writes the plot as
+        // <Story_Name>Faction, PlotFile</Story_Name> rather than <Rebel_Story_Name>PlotFile</...>.
+        // The engine reads it via Get_Faction_Story_Name; the faction lives in the value, not the
+        // tag name. A trailing comma (as the real data ships) must not spawn an empty token.
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Progressive.xml"))
+            .Add("Campaigns_Progressive.xml",
+                "<Campaigns><Campaign Name=\"Known_Galaxy_Medium_Republic\">" +
+                "<Story_Name>Independent_Forces, Conquests\\Loader\\Story_Plots_Loader.xml,</Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Conquests/Loader/Story_Plots_Loader.xml", "<Story_Mode_Plots/>");
+
+        var result = Scan(resolver);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal("Known_Galaxy_Medium_Republic", campaign.Name);
+        Assert.Equal([("Independent_Forces", "Conquests/Loader/Story_Plots_Loader.xml")],
+            campaign.FactionManifests.Select(f => (f.Faction, f.ManifestFile)));
+        Assert.Equal(["Conquests/Loader/Story_Plots_Loader.xml"], result.ManifestFiles);
+        Assert.Empty(result.Problems);
+    }
+
+    [Fact]
+    public void Scan_GenericStoryNameTag_MultiPairTupleList_DiscoversEveryFactionManifest()
+    {
+        // Story_Name is additive: the engine merges every occurrence - and every pair within a
+        // single occurrence - into one (faction, plot) list. A flat tuple list in one tag must
+        // yield all its pairs, not just the first.
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                "<Campaigns><Campaign Name=\"GC\">" +
+                "<Story_Name>Rebel, Story_Plots_R.xml, Empire, Story_Plots_E.xml,</Story_Name>" +
+                "<Story_Name>Underworld, Story_Plots_U.xml</Story_Name>" +
+                "</Campaign></Campaigns>")
+            .Add("Story_Plots_R.xml", "<Story_Mode_Plots/>")
+            .Add("Story_Plots_E.xml", "<Story_Mode_Plots/>")
+            .Add("Story_Plots_U.xml", "<Story_Mode_Plots/>");
+
+        var result = Scan(resolver);
+
+        var campaign = Assert.Single(result.Campaigns);
+        Assert.Equal(
+            [("Rebel", "Story_Plots_R.xml"), ("Empire", "Story_Plots_E.xml"),
+                ("Underworld", "Story_Plots_U.xml")],
+            campaign.FactionManifests.Select(f => (f.Faction, f.ManifestFile)));
+        Assert.Equal(["Story_Plots_R.xml", "Story_Plots_E.xml", "Story_Plots_U.xml"],
+            result.ManifestFiles);
+        Assert.Empty(result.Problems);
+    }
+
+    [Fact]
     public void Scan_RecordsManifestContents_ThreadsAndLuaScripts()
     {
         var resolver = new FakeResolver()

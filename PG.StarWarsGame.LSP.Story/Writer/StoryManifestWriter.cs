@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using HtmlAgilityPack;
+using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -79,8 +80,10 @@ public static class StoryManifestWriter
     }
 
     /// <summary>
-    ///     Adds a faction story-name tag (<c>{Faction}_Story_Name</c>) inside the named
-    ///     <c>&lt;Campaign&gt;</c> element of a campaign set file.
+    ///     Attaches a plot to a faction inside the named <c>&lt;Campaign&gt;</c> element. Major
+    ///     factions (Rebel/Empire/Underworld) get their dedicated <c>{Faction}_Story_Name</c> tag;
+    ///     every other faction can only attach through the generic
+    ///     <c>&lt;Story_Name&gt;Faction, PlotFile&lt;/Story_Name&gt;</c> tag.
     /// </summary>
     public static IReadOnlyList<StoryTextEdit> AddCampaignStoryName(
         string text, string campaignName, string faction, string manifestFile)
@@ -89,11 +92,10 @@ public static class StoryManifestWriter
         var campaign = FindCampaign(document, campaignName);
         if (campaign is null) return [];
 
-        // Anchor after the last existing *_Story_Name (grouped where the engine reads them),
-        // falling back to right below the campaign open tag.
+        // Anchor after the last existing story-name tag (either form, grouped where the engine
+        // reads them), falling back to right below the campaign open tag.
         var storyNames = campaign.ChildNodes
-            .Where(n => n.NodeType == HtmlNodeType.Element &&
-                        n.Name.EndsWith("_Story_Name", StringComparison.OrdinalIgnoreCase))
+            .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTagSyntax.IsStoryNameTag(n.Name))
             .ToList();
         var campaignLine = LineOf(document, campaign.StreamPosition);
         int anchorLine;
@@ -110,28 +112,56 @@ public static class StoryManifestWriter
             indent = LeadingWhitespace(text, campaignLine) + "\t";
         }
 
-        return
-        [
-            Insert(anchorLine + 1, 0,
-                indent + "<" + faction + "_Story_Name>" + manifestFile + "</" + faction + "_Story_Name>" +
-                DetectEol(text))
-        ];
+        var newTag = StoryNameTagSyntax.IsMajorFaction(faction)
+            ? "<" + StoryNameTagSyntax.FactionTagFor(faction) + ">" + manifestFile +
+              "</" + StoryNameTagSyntax.FactionTagFor(faction) + ">"
+            : "<" + StoryNameTagSyntax.GenericTag + ">" + faction + ", " + manifestFile +
+              "</" + StoryNameTagSyntax.GenericTag + ">";
+
+        return [Insert(anchorLine + 1, 0, indent + newTag + DetectEol(text))];
     }
 
-    /// <summary>Removes a faction story-name entry from the named campaign.</summary>
+    /// <summary>
+    ///     Detaches a plot manifest from the named campaign, regardless of which authoring form
+    ///     attached it. A faction-specific tag or a sole-pair generic tag is removed outright; a
+    ///     generic tuple list keeps its other pairs, with only the matched pair snipped out.
+    ///     The manifest reference is matched normalized, so separator/prefix differences between
+    ///     the model's canonical path and the raw tag text do not defeat the match.
+    /// </summary>
     public static IReadOnlyList<StoryTextEdit> RemoveCampaignStoryName(
         string text, string campaignName, string manifestFile)
     {
         var document = ParsedXmlDocument.Parse(text);
         var campaign = FindCampaign(document, campaignName);
-        var entry = campaign?.ChildNodes.FirstOrDefault(n =>
-            n.NodeType == HtmlNodeType.Element &&
-            n.Name.EndsWith("_Story_Name", StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(n.InnerText.Trim(), manifestFile, StringComparison.OrdinalIgnoreCase));
-        if (entry is null) return [];
+        if (campaign is null) return [];
 
-        var line = LineOf(document, entry.StreamPosition);
-        return [new StoryTextEdit(new StorySourceRange(line, 0, line + CountLines(entry.OuterHtml) + 1, 0), "")];
+        var target = StoryReferenceTypes.NormalizeRelativePath(manifestFile);
+        foreach (var node in campaign.ChildNodes.Where(n =>
+                     n.NodeType == HtmlNodeType.Element && StoryNameTagSyntax.IsStoryNameTag(n.Name)))
+        {
+            var pairs = StoryNameTagSyntax.ReadPairs(node).ToList();
+            var index = pairs.FindIndex(p => string.Equals(
+                StoryReferenceTypes.NormalizeRelativePath(p.PlotFile), target,
+                StringComparison.OrdinalIgnoreCase));
+            if (index < 0) continue;
+
+            var line = LineOf(document, node.StreamPosition);
+            var range = new StorySourceRange(line, 0, line + CountLines(node.OuterHtml) + 1, 0);
+
+            // Sole attachment on this tag → drop the whole tag; otherwise rewrite it without the
+            // matched pair (only the generic tuple list can hold more than one pair).
+            if (pairs.Count == 1)
+                return [new StoryTextEdit(range, "")];
+
+            var remaining = string.Join(", ",
+                pairs.Where((_, i) => i != index).Select(p => p.Faction + ", " + p.PlotFile));
+            var rebuilt = LeadingWhitespace(text, line) +
+                          "<" + StoryNameTagSyntax.GenericTag + ">" + remaining +
+                          "</" + StoryNameTagSyntax.GenericTag + ">" + DetectEol(text);
+            return [new StoryTextEdit(range, rebuilt)];
+        }
+
+        return [];
     }
 
     // ── Mechanics ────────────────────────────────────────────────────────────

@@ -8,13 +8,21 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Parsing;
 
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
+    // Registered file-types that are referenced as workspace files by workspaceFile tags (campaign
+    // *_Story_Name → StoryPlotManifest; manifest Active_Plot/Suspended_Plot → StoryParser). A doc
+    // typed one of these is indexed as a navigable file-symbol so those references resolve to it.
+    private static readonly string[] WorkspaceFileTypes =
+        [StoryReferenceTypes.PlotManifestFileTypeName, StoryReferenceTypes.ThreadFileTypeName];
+
     private readonly ILspConfigurationProvider? _configProvider;
+    private readonly IEaWXmlContext? _eaWXmlContext;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
     private readonly ILogger<XmlGameDocumentParser> _logger;
@@ -24,10 +32,12 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     // parseCache is optional so minimal test setups can omit it; production wires the shared
     // cache so the indexing parse seeds it - the diagnostics publish and the first hover/inlay
     // request after an edit then reuse this parse instead of re-parsing. A null configProvider
-    // (test convenience) means every feature flag reads as enabled.
+    // (test convenience) means every feature flag reads as enabled. eaWXmlContext is optional too;
+    // without it a doc's xml-relative path is unknown, so workspace-file symbols are skipped.
     public XmlGameDocumentParser(IFileHelper fileHelper, ISchemaProvider schema,
         IFileTypeRegistry fileTypeRegistry, ILogger<XmlGameDocumentParser> logger,
-        IXmlParseCache? parseCache = null, ILspConfigurationProvider? configProvider = null)
+        IXmlParseCache? parseCache = null, ILspConfigurationProvider? configProvider = null,
+        IEaWXmlContext? eaWXmlContext = null)
     {
         _fileHelper = fileHelper;
         _schema = schema;
@@ -35,6 +45,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         _logger = logger;
         _parseCache = parseCache;
         _configProvider = configProvider;
+        _eaWXmlContext = eaWXmlContext;
     }
 
     public bool CanParse(string fileExtension)
@@ -57,6 +68,7 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         var references = CollectReferences(doc, canonicalUri, lineIndex, ct);
         var symbols = CollectSymbolsFromRegistry(doc, canonicalUri, lineIndex, registeredTypes, references, ct);
         symbols.AddRange(CollectSubObjectListSymbols(doc, canonicalUri, lineIndex, references, ct));
+        symbols.AddRange(CollectWorkspaceFileSymbols(canonicalUri, registeredTypes));
 
         if ((_configProvider?.Current.Features.Story.Symbols ?? true) &&
             registeredTypes.Contains(StoryReferenceTypes.ThreadFileTypeName, StringComparer.OrdinalIgnoreCase))
@@ -69,6 +81,33 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             symbols.ToImmutableArray(),
             references.ToImmutableArray(),
             GroupMemberships: groupMemberships.ToImmutableArray()));
+    }
+
+    // A story plot-manifest / thread file is indexed as a navigable file-symbol keyed by its
+    // xml-relative path, so workspaceFile references (campaign *_Story_Name, manifest Active_Plot/
+    // Suspended_Plot) resolve to it for go-to / find-references / rename. Needs the xml roots to
+    // make the path relative; without eaWXmlContext (minimal test setups) it is skipped.
+    private List<GameSymbol> CollectWorkspaceFileSymbols(
+        string documentUri, ImmutableArray<string> registeredTypes)
+    {
+        if (_eaWXmlContext is null) return [];
+
+        var fileType = WorkspaceFileTypes.FirstOrDefault(t =>
+            registeredTypes.Contains(t, StringComparer.OrdinalIgnoreCase));
+        if (fileType is null) return [];
+
+        var relativePath = _eaWXmlContext.TryGetXmlRelativePath(documentUri);
+        if (string.IsNullOrEmpty(relativePath)) return [];
+
+        return
+        [
+            new GameSymbol(
+                WorkspaceFileKey.Create(fileType, relativePath),
+                GameSymbolKind.WorkspaceFile,
+                fileType,
+                new FileOrigin(documentUri, 0, 0),
+                null)
+        ];
     }
 
     private List<GameSymbol> CollectSymbolsFromRegistry(HtmlDocument doc, string documentUri,
@@ -229,6 +268,17 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // File references (campaign *_Story_Name / Story_Name, manifest Active_Plot /
+                // Suspended_Plot / Lua_Script). Emitted so go-to / find-references / rename resolve
+                // to the file-symbol; existence is owned by the campaign story chain, so these are
+                // exempt from the generic unresolved-reference diagnostic (XmlIndexFactProducer).
+                if (tagDef.ReferenceKind == ReferenceKind.WorkspaceFile)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectWorkspaceFileReferences(child, tagDef, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 if (tagDef.ReferenceKind != ReferenceKind.XmlObject) continue;
                 if (tagDef.SemanticType == TagSemanticType.ReferenceGroup) continue;
                 // Variant base references are emitted by the symbol passes with the enclosing
@@ -359,6 +409,59 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     ///     every even token is a planet and every odd one a battle mode; a trailing planet with no
     ///     mode is still indexed, leaving the malformed pair to the diagnostics handler.
     /// </summary>
+    // A workspaceFile tag references a file by path/name. The generic list split normalises '/'
+    // and '\' to separators, which would shred a file path, so single-value tags take the whole
+    // trimmed value and the Story_Name pair list splits on commas ONLY (odd slot = plot file).
+    private static void CollectWorkspaceFileReferences(HtmlNode child, XmlTagDefinition tagDef,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var referenceType = tagDef.ReferenceTypeName;
+        if (referenceType is null) return;
+
+        var innerText = child.InnerText;
+
+        if (tagDef.SemanticType == TagSemanticType.FactionPlotFilePairList)
+        {
+            var slot = 0;
+            foreach (var (token, offset) in SplitCommaWithOffsets(innerText))
+                if (slot++ % 2 == 1) // odd slot: the plot file (even slot: faction, skipped)
+                    AddWorkspaceFileReference(child, referenceType, token, offset, lineIndex,
+                        documentUri, references);
+            return;
+        }
+
+        var value = innerText.Trim();
+        if (value.Length == 0) return;
+        AddWorkspaceFileReference(child, referenceType, value,
+            innerText.IndexOf(value, StringComparison.Ordinal), lineIndex, documentUri, references);
+    }
+
+    private static void AddWorkspaceFileReference(HtmlNode child, string referenceType, string token,
+        int offset, LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);
+        references.Add(new GameReference(
+            WorkspaceFileKey.Create(referenceType, token),
+            GameSymbolKind.WorkspaceFile,
+            referenceType,
+            documentUri, line, column, length));
+    }
+
+    // Comma-only split (path separators preserved), yielding each non-empty trimmed token with its
+    // offset in the original text so the reference range highlights exactly that token.
+    private static IEnumerable<(string Token, int Offset)> SplitCommaWithOffsets(string input)
+    {
+        var pos = 0;
+        foreach (var part in input.Split(','))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.Length > 0)
+                yield return (trimmed, pos + part.IndexOf(trimmed, StringComparison.Ordinal));
+            pos += part.Length + 1; // +1 for the consumed comma
+        }
+    }
+
     private static void CollectPlanetModePairReferences(HtmlNode child, XmlTagDefinition tagDef,
         LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {

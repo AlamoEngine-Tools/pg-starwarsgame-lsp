@@ -14,6 +14,13 @@ public record XmlTagDefinition
     /// <summary>Non-null when ReferenceKind is XmlObject - the resolved target type (e.g. Faction, SFXEvent).</summary>
     public GameObjectTypeDefinition? ObjectType { get; init; }
 
+    /// <summary>
+    ///     The raw <c>referenceType</c> string from the schema. For <see cref="ReferenceKind.WorkspaceFile" />
+    ///     this names the target file-type (e.g. <c>StoryPlotManifest</c>, <c>StoryParser</c>,
+    ///     <c>LuaScript</c>) used to build the <see cref="WorkspaceFileKey" />. Null when unset.
+    /// </summary>
+    public string? ReferenceTypeName { get; init; }
+
     /// <summary>Non-null when ReferenceKind is HardcodedSet - the resolved hardcoded reference set.</summary>
     public HardcodedReferenceSet? HardcodedSet { get; init; }
 

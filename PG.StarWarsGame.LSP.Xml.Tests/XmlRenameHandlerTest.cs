@@ -590,6 +590,11 @@ public sealed class XmlRenameHandlerTest
             return true;
         }
 
+        public string? TryGetXmlRelativePath(string fileUri)
+        {
+            return null;
+        }
+
         public void AddDirectory(string absolutePath)
         {
         }
@@ -615,6 +620,11 @@ public sealed class XmlRenameHandlerTest
         public bool IsLeafFile(string fileUri)
         {
             return false;
+        }
+
+        public string? TryGetXmlRelativePath(string fileUri)
+        {
+            return null;
         }
 
         public void AddDirectory(string absolutePath)

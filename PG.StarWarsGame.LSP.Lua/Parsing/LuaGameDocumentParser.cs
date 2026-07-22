@@ -61,6 +61,15 @@ public sealed class LuaGameDocumentParser : IGameDocumentParser
         var references = CollectReferences(root, canonicalUri, tree);
         var requireArgs = CollectRequireArgs(root);
 
+        // Index the script as a navigable file-symbol keyed by its extensionless name, so a
+        // manifest <Lua_Script> (a workspaceFile reference) resolves to it for go-to / rename.
+        symbols.Add(new GameSymbol(
+            WorkspaceFileKey.Create(WorkspaceFileKey.LuaScriptType, canonicalUri),
+            GameSymbolKind.WorkspaceFile,
+            WorkspaceFileKey.LuaScriptType,
+            new FileOrigin(canonicalUri, 0, 0),
+            null));
+
         if (_configProvider?.Current.Features.Story.Symbols ?? true)
             LuaStorySymbolCollector.Collect(root, canonicalUri, symbols, references);
 

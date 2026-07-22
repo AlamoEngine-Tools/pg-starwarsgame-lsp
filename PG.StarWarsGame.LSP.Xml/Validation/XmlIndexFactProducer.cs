@@ -21,6 +21,11 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             if (sym.Origin is not FileOrigin fo)
                 continue;
 
+            // Workspace-file symbols are keyed by file path/name for navigation only; the same
+            // file across layers is a valid override (shadowed), never a duplicate to flag.
+            if (sym.Kind == GameSymbolKind.WorkspaceFile)
+                continue;
+
             // Story symbols repeat legally across threads and campaigns (event names are only
             // unique per thread; flags per campaign) - campaign-scoped duplicate detection lives
             // in the story graph diagnostics, not the index-wide check.
@@ -58,6 +63,12 @@ public sealed class XmlIndexFactProducer : IXmlIndexFactProducer
             // UnresolvedReferenceHandler flag every dynamic-enum tag value regardless of
             // validity. Enum membership is validated by NamedEnumValueHandlerBase instead.
             if (reference.TargetId.StartsWith("enum:", StringComparison.Ordinal))
+                continue;
+
+            // Workspace-file references (plot manifests, story threads, Lua scripts) exist for
+            // navigation and rename; their existence is validated by the campaign story chain, not
+            // the index-wide reference check - so no unresolved-reference fact is produced.
+            if (reference.ExpectedKind == GameSymbolKind.WorkspaceFile)
                 continue;
 
             // Engine placeholders ("null"/"Default"/"None") are a valid "no object" value in any
