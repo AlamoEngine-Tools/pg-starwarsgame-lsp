@@ -22,7 +22,7 @@ import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewP
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
 const RELEASES_URL = 'https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/releases';
-const REQUIRED_SERVER_VERSION = '0.2.0';
+const REQUIRED_SERVER_VERSION = '0.3.0';
 
 /**
  * Forces every language-feature capability to be advertised STATICALLY (in the initialize response)
