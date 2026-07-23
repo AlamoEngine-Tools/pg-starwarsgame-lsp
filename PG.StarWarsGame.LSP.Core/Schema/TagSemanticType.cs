@@ -78,5 +78,14 @@ public enum TagSemanticType
     ///     the space-normalising list split, this splits on commas ONLY, so file paths with
     ///     <c>\</c> or <c>/</c> separators stay intact.
     /// </summary>
-    FactionPlotFilePairList
+    FactionPlotFilePairList,
+
+    /// <summary>
+    ///     A <c>Faction, MarkupFile</c> pair where only the leading faction is an indexable object.
+    ///     Used by <c>Campaign.Markup_Filename</c>: slot 0 names a <c>Faction</c>; slot 1 names a GUI
+    ///     hint-markup file that is not part of the XML object/workspace-file index (loaded by the
+    ///     engine from the GUI markup set, not shipped as a navigable workspace object), so it is left
+    ///     unresolved rather than reported as a missing reference. Refines <see cref="XmlValueType.NameReferenceList" />.
+    /// </summary>
+    FactionMarkupPairList
 }

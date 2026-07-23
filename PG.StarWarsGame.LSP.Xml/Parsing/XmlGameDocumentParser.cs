@@ -268,6 +268,31 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // Campaign per-faction / force-deployment tuples with fixed-meaning comma slots
+                // (Home_Location "Faction, Planet"; Starting_Credits/Tech_Level/Max_Tech_Level
+                // "Faction, Number"; Starting_Forces/Special_Case_Production "Faction, Planet,
+                // Unit"). They carry no referenceKind - the shape/number is validated by the
+                // Per*Handler/ForceDeploymentListHandler - so without this the faction and object
+                // tokens are invisible to go-to-definition. Faction slots resolve against the
+                // Faction pool, planet/unit slots against GameObjectType; numeric slots carry no
+                // type and are left to the handler.
+                if (FactionTupleSlotTypes(tagDef.ValueType) is { Count: > 0 } slotTypes)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectFactionTupleReferences(child, slotTypes, lineIndex, documentUri, references);
+                    continue;
+                }
+
+                // Campaign Markup_Filename "Faction, MarkupFile": only the leading faction is an
+                // indexable object; the GUI hint-markup file is not a workspace object, so slot 1 is
+                // intentionally left unmodelled (a reference to it would only be a false unresolved).
+                if (tagDef.SemanticType == TagSemanticType.FactionMarkupPairList)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectFactionTupleReferences(child, FactionOnlySlotTypes, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 // File references (campaign *_Story_Name / Story_Name, manifest Active_Plot /
                 // Suspended_Plot / Lua_Script). Emitted so go-to / find-references / rename resolve
                 // to the file-symbol; existence is owned by the campaign story chain, so these are
@@ -378,6 +403,64 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             line,
             column,
             length));
+    }
+
+    // Fixed-meaning slot types per Campaign tuple ValueType, indexed by comma slot. A null entry
+    // marks a slot that is not an object reference (the per-faction numeric value) and is left to
+    // the shape handler; an absent index (slot beyond the array) is likewise not emitted.
+    private static readonly string?[] PerFactionPlanetSlotTypes = ["Faction", "GameObjectType"];
+    private static readonly string?[] PerFactionValueSlotTypes = ["Faction"];
+    private static readonly string?[] ForceDeploymentSlotTypes = ["Faction", "GameObjectType", "GameObjectType"];
+
+    // Markup_Filename: slot 0 is a Faction, slot 1 (the markup file) is not indexable and not emitted.
+    private static readonly string?[] FactionOnlySlotTypes = ["Faction"];
+
+    private static IReadOnlyList<string?> FactionTupleSlotTypes(XmlValueType valueType)
+    {
+        return valueType switch
+        {
+            XmlValueType.PerFactionPlanet => PerFactionPlanetSlotTypes,
+            XmlValueType.PerFactionValue => PerFactionValueSlotTypes,
+            XmlValueType.ForceDeploymentList => ForceDeploymentSlotTypes,
+            _ => []
+        };
+    }
+
+    // Each comma slot of a fixed-meaning Campaign tuple, emitted as a typed object reference when
+    // that slot position carries a target type. Empty slots yield nothing; a slot beyond the
+    // declared arity (e.g. a stray extra token) is ignored, leaving the tuple shape to the handler.
+    private static void CollectFactionTupleReferences(HtmlNode child, IReadOnlyList<string?> slotTypes,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        foreach (var (index, token, offset) in CommaSlotsWithOffsets(child.InnerText))
+        {
+            if (index >= slotTypes.Count) break;
+            var typeName = slotTypes[index];
+            if (typeName is null) continue;
+
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);
+            references.Add(new GameReference(
+                token, GameSymbolKind.XmlObject, typeName, documentUri, line, column, length));
+        }
+    }
+
+    // Positional comma split: yields (slot index, trimmed token, offset) for every non-empty slot,
+    // preserving the slot index across empty slots so fixed-meaning positions stay aligned. Splits
+    // on commas ONLY - faction/object names never contain a comma, and a positional split must not
+    // also break on the spaces the authors write around tokens.
+    private static IEnumerable<(int Index, string Token, int Offset)> CommaSlotsWithOffsets(string input)
+    {
+        var pos = 0;
+        var index = 0;
+        foreach (var part in input.Split(','))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.Length > 0)
+                yield return (index, trimmed, pos + part.IndexOf(trimmed, StringComparison.Ordinal));
+            pos += part.Length + 1; // +1 for the consumed comma
+            index++;
+        }
     }
 
     // Slot 0 of an InaccuracyMap tuple ("Bomber, 15.0") as an enum: reference, mirroring

@@ -53,9 +53,19 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         if (hit.Value.Id.StartsWith("enum:", StringComparison.Ordinal))
             return Task.FromResult(ResolveEnumDefinition(hit.Value.Id, hit.Value.Range, index));
 
-        // Group keys have no canonical single definition - they link co-members, not a target symbol.
-        if (index.AllGroupMemberships.ContainsKey(hit.Value.Id))
-            return Task.FromResult<LocationOrLocationLinks?>(null);
+        // Group keys have no single definition - they link co-members. Go-to surfaces the whole set
+        // (a peek list) so the otherwise-invisible grouping is discoverable from F12, mirroring what
+        // find-references returns; each link keeps the group-key token as its origin selection range.
+        if (index.AllGroupMemberships.TryGetValue(hit.Value.Id, out var members) && members.Length > 0)
+        {
+            var links = new List<LocationOrLocationLink>();
+            foreach (var m in members)
+                if (m.MemberOrigin is FileOrigin { IsNavigable: true } memberOrigin)
+                    links.Add(new LocationOrLocationLink(memberOrigin.ToLspLocationLink(hit.Value.Range)));
+
+            return Task.FromResult<LocationOrLocationLinks?>(
+                links.Count > 0 ? new LocationOrLocationLinks(links) : null);
+        }
 
         // Ability names written without an owner: search across owners rather than against the
         // owner-scoped id the ability was indexed under.

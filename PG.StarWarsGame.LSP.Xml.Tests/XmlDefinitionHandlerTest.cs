@@ -247,25 +247,25 @@ public sealed class XmlDefinitionHandlerTest
         Assert.Equal(lowercaseUri, link.LocationLink!.TargetUri.ToString());
     }
 
-    // ── group key - no canonical definition ──────────────────────────────────
+    // ── group key - go-to surfaces the co-members ─────────────────────────────
 
     [Fact]
-    public async Task Handle_CursorOnGroupKey_ReturnsNull_EvenWhenSymbolWithSameIdExists()
+    public async Task Handle_CursorOnGroupKey_ReturnsCoMembers_NotACollidingSymbol()
     {
-        // A symbol "Unit_AT_AT" exists in the workspace, but the cursor is on a
-        // group-membership tag value (not on a reference to that symbol). The definition
-        // handler must return null - group keys have no canonical single definition.
-        var groupMembership = new DocumentGroupMembership(
-            new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin(TestUri, 2, 4)),
-            1, 5, 10);
+        // The cursor is on a group-membership tag value. A symbol with the same id also exists, but
+        // the group path wins: go-to surfaces the co-members (the set), not the colliding symbol.
+        var memberA = new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin(TestUri, 2, 4));
+        var memberB = new GroupMembership("Unit_AT_AT", "SFXEvent", new FileOrigin(TargetUri, 7, 4));
+        var groupMembership = new DocumentGroupMembership(memberA, 1, 5, 10);
 
         var callerDoc = new DocumentIndex(TestUri, 1,
             ImmutableArray<GameSymbol>.Empty,
             ImmutableArray<GameReference>.Empty,
             GroupMemberships: ImmutableArray.Create(groupMembership));
 
-        // Also put a real symbol with the same id in the index - collision scenario.
-        var collidingSymbol = SymbolAt("Unit_AT_AT", TargetUri, 10);
+        // A real symbol with the same id in a different file - must NOT be the go-to target.
+        const string otherUri = "file:///other.xml";
+        var collidingSymbol = SymbolAt("Unit_AT_AT", otherUri, 10);
         var defs = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
             .Add("Unit_AT_AT", ImmutableArray.Create(collidingSymbol));
 
@@ -276,14 +276,21 @@ public sealed class XmlDefinitionHandlerTest
         {
             WorkspaceGroupMemberships =
                 ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
-                    .Add("Unit_AT_AT", ImmutableArray.Create(groupMembership.Membership))
+                    .Add("Unit_AT_AT", ImmutableArray.Create(memberA, memberB))
         };
 
         var handler = BuildHandler(index);
         // Cursor lands on the tag value span (line 1, col 7 - within [5..15))
         var result = await handler.Handle(At(1, 7), CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.NotNull(result);
+        var targetUris = result!
+            .Select(l => l.IsLocationLink ? l.LocationLink!.TargetUri.ToString() : l.Location!.Uri.ToString())
+            .ToList();
+        Assert.Equal(2, targetUris.Count);
+        Assert.Contains(TestUri, targetUris);
+        Assert.Contains(TargetUri, targetUris);
+        Assert.DoesNotContain(otherUri, targetUris); // the colliding symbol is not the target
     }
 
     // ── enum reference go-to-definition ──────────────────────────────────────

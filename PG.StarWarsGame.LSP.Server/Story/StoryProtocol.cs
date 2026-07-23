@@ -58,7 +58,10 @@ public sealed record GetStoryPlotsParams : IRequest<GetStoryPlotsResult>;
 
 public sealed record GetStoryPlotsResult(IReadOnlyList<StoryCampaignDto> Campaigns, string? Error = null);
 
-public sealed record StoryCampaignDto(string Name, IReadOnlyList<StoryFactionDto> Factions);
+// Set is the Campaign_Set grouping value (a referenceGroup key) this campaign belongs to, sourced
+// from the workspace group index; null when the campaign declares no Campaign_Set. The navigator
+// groups campaigns by it (set-less campaigns fall under an "Ungrouped" node).
+public sealed record StoryCampaignDto(string Name, IReadOnlyList<StoryFactionDto> Factions, string? Set = null);
 
 public sealed record StoryFactionDto(
     string Faction,

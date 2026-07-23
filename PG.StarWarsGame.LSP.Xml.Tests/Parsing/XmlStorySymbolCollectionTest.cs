@@ -58,6 +58,22 @@ public sealed class XmlStorySymbolCollectionTest
     // ── References ───────────────────────────────────────────────────────────
 
     [Fact]
+    public async Task TacticalPlotFileParam_EmitsWorkspaceFileReference()
+    {
+        // STORY_SPACE_TACTICAL Event_Param1 references a tactical plot manifest file; it must
+        // navigate/rename like the campaign and manifest plot tags (same storyplotmanifest: key).
+        var index = await ParseAsync(
+            "<Story>\n<Event Name=\"E\">\n<Event_Type>STORY_SPACE_TACTICAL</Event_Type>\n" +
+            "<Event_Param1>Story_Plots_M1_Space.xml</Event_Param1>\n</Event>\n</Story>");
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyplotmanifest:story_plots_m1_space.xml", reference.TargetId);
+        Assert.Equal("StoryPlotManifest", reference.ExpectedTypeName);
+        Assert.Equal(3, reference.Line);
+        Assert.Equal("<Event_Param1>".Length, reference.Column);
+    }
+
+    [Fact]
     public async Task TriggerEventParam_EmitsStoryEventReference()
     {
         var index = await ParseAsync(
@@ -186,7 +202,8 @@ public sealed class XmlStorySymbolCollectionTest
             Values =
             [
                 new EnumValueDefinition { Name = "STORY_AI_NOTIFICATION", Params = [Param(1, "StoryNotification")] },
-                new EnumValueDefinition { Name = "STORY_FLAG", Params = [Param(0, "StoryFlag")] }
+                new EnumValueDefinition { Name = "STORY_FLAG", Params = [Param(0, "StoryFlag")] },
+                new EnumValueDefinition { Name = "STORY_SPACE_TACTICAL", Params = [Param(0, "StoryPlotFile")] }
             ]
         };
 

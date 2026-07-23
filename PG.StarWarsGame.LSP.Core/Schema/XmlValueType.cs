@@ -187,7 +187,12 @@ public enum XmlValueType
     [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
     Type68 = 68,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
+    /// <summary>
+    ///     A list of Galactic-Conquest victory-condition enum values (e.g.
+    ///     <c>Galactic_All_Planets_Controlled</c>). Used by <c>Campaign</c>'s
+    ///     <c>Good_/Evil_/Human_/AI_Victory_Conditions</c> and <c>TargetingPrioritySet</c>. The engine
+    ///     type number is 69; the value set is enum-driven via <c>enumName</c> in YAML.
+    /// </summary>
     Type69 = 69,
 
     /// <summary>

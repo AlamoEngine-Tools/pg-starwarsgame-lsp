@@ -149,6 +149,36 @@ public sealed class XmlCodeLensHandlerTest
     }
 
     [Fact]
+    public async Task Handle_GroupKeyTag_EmitsMemberCountLensOnTheTagLine()
+    {
+        // Two campaigns share the set "Story_Set"; the Campaign_Set tag in this doc gets a lens
+        // stating the member count and pointing at the co-members - grouping keys are not symbols,
+        // so the per-symbol registry never sees them.
+        var memberA = new GroupMembership("Story_Set", "Campaign", new FileOrigin(TestUri, 1, 4));
+        var memberB = new GroupMembership("Story_Set", "Campaign", new FileOrigin(OtherUri, 1, 4));
+        var doc = new DocumentIndex(TestUri, 1,
+            ImmutableArray<GameSymbol>.Empty, ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(
+                new DocumentGroupMembership(memberA, 2, 14, "Story_Set".Length)));
+
+        var index = BuildIndex(doc) with
+        {
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Story_Set", ImmutableArray.Create(memberA, memberB))
+        };
+
+        var handler = BuildHandler(index);
+        var result = await handler.Handle(ForDoc(), CancellationToken.None);
+
+        var lens = Assert.Single(result!);
+        Assert.Equal(2, lens.Range.Start.Line); // the Campaign_Set tag line
+        Assert.Contains("2", lens.Command!.Title);
+        Assert.Contains("Campaign", lens.Command.Title);
+        Assert.Equal("aet-eaw-edit.lsp.showReferences", lens.Command.Name);
+    }
+
+    [Fact]
     public async Task Handle_MultipleSymbols_ReturnsOneLensPerSymbol()
     {
         var doc = new DocumentIndex(TestUri, 1,

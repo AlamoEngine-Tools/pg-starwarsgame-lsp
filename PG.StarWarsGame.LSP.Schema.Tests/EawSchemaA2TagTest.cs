@@ -351,6 +351,52 @@ public sealed class EawSchemaA2TagTest
         Assert.Equal("UnitAbility", tag.ObjectType?.TypeName);
     }
 
+    // ── Campaign:Campaign_Set → referenceGroup grouping key (Campaign) ───────
+
+    // Campaign_Set is a workspace-global grouping key, not a reference to a declared object: every
+    // <Campaign> sharing the value belongs to the same set. Wiring it as referenceGroup suppresses
+    // the unresolved-reference diagnostic and populates the group index (set -> its campaigns),
+    // which drives find-references and the story-navigator set grouping.
+    [Fact]
+    public void Campaign_CampaignSet_IsReferenceGroupOfCampaign()
+    {
+        var tag = Schema.GetTagsForType("Campaign")
+            .First(t => string.Equals(t.Tag, "Campaign_Set", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(TagSemanticType.ReferenceGroup, tag.SemanticType);
+        Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
+        Assert.Equal("Campaign", tag.ObjectType?.TypeName);
+    }
+
+    // ── Campaign:Markup_Filename → Faction/markup pair (only faction navigable) ─
+
+    [Fact]
+    public void Campaign_MarkupFilename_IsFactionMarkupPairList()
+    {
+        var tag = Schema.GetTagsForType("Campaign")
+            .First(t => string.Equals(t.Tag, "Markup_Filename", StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(TagSemanticType.FactionMarkupPairList, tag.SemanticType);
+    }
+
+    // ── Campaign victory conditions → GalacticVictoryCondition enum (Type69) ──
+
+    [Theory]
+    [InlineData("Good_Victory_Conditions")]
+    [InlineData("Evil_Victory_Conditions")]
+    [InlineData("Human_Victory_Conditions")]
+    [InlineData("AI_Victory_Conditions")]
+    public void Campaign_VictoryConditions_AreGalacticVictoryConditionEnumLists(string tagName)
+    {
+        var tag = Schema.GetTagsForType("Campaign")
+            .First(t => string.Equals(t.Tag, tagName, StringComparison.OrdinalIgnoreCase));
+
+        Assert.Equal(ReferenceKind.Enum, tag.ReferenceKind);
+        Assert.Equal("GalacticVictoryCondition", tag.Enum?.Name);
+        Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
+        Assert.Contains(tag.Enum!.Values, v => v.Name == "Galactic_All_Planets_Controlled");
+    }
+
     // ── schema loader (shared with EawSchemaA1TagTest) ────────────────────────
 
     private static SchemaIndex LoadEawSchemaIndex()

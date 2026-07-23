@@ -68,7 +68,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // hardpoint bones cross-checked against the models of the objects mounting them (#53).
         // 104 → 105: HardpointAbilityNotOnOwnerHandler added - Special_Ability_Name must name an
         // ability the mounting object actually has (#53).
-        const int expectedHandlerCount = 105;
+        // 105 → 106: VictoryConditionListHandler added - validates the Campaign victory-condition
+        // lists (Type69) against the GalacticVictoryCondition enum (A5).
+        const int expectedHandlerCount = 106;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

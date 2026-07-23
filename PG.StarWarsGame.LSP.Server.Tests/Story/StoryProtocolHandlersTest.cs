@@ -90,6 +90,39 @@ public sealed class StoryProtocolHandlersTest
     }
 
     [Fact]
+    public async Task GetStoryPlots_PopulatesCampaignSetFromGroupIndex()
+    {
+        // The GC campaign object is indexed at an origin that a Campaign_Set group "Story_Set" also
+        // records a member at; the handler correlates the two so the navigator can group by set.
+        const string campUri = "file:///ws/data/xml/campaigns.xml";
+        var origin = new FileOrigin(campUri, 5, 4);
+        var campaignSym = new GameSymbol("GC", GameSymbolKind.XmlObject, "Campaign", origin, null);
+        var member = new GroupMembership("Story_Set", "Campaign", origin);
+
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym]),
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add("Story_Set", [member])
+        };
+
+        var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index }, Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        Assert.Equal("Story_Set", Assert.Single(result.Campaigns).Set);
+    }
+
+    [Fact]
+    public async Task GetStoryPlots_CampaignWithoutSet_HasNullSet()
+    {
+        var result = await new GetStoryPlotsHandler(Models(), Index(), Config())
+            .Handle(new GetStoryPlotsParams(), CancellationToken.None);
+
+        Assert.Null(Assert.Single(result.Campaigns).Set);
+    }
+
+    [Fact]
     public async Task GetStoryPlots_StoryEditorOff_ReturnsDisabledMessage()
     {
         var result = await new GetStoryPlotsHandler(Models(), Index(), Config(false))

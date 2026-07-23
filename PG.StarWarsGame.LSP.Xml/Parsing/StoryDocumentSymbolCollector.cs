@@ -74,7 +74,22 @@ internal static class StoryDocumentSymbolCollector
         };
         if (symbolType is null)
         {
-            // Plot files and branches are not index symbols — nothing to navigate to.
+            // A StoryPlotFile param (tactical STORY_*_TACTICAL Event_Param1, LINK_TACTICAL
+            // Reward_Param7) references a plot manifest file - emit a workspaceFile reference so it
+            // navigates / renames like the campaign and manifest plot tags, keyed to the same
+            // storyplotmanifest: file-symbol. Existence stays owned by the campaign story chain.
+            if (string.Equals(refType, StoryReferenceTypes.PlotFile, StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (var (token, line, column) in Tokens(parsed, paramNode))
+                    references.Add(new GameReference(
+                        WorkspaceFileKey.Create(StoryReferenceTypes.PlotManifestFileTypeName, token),
+                        GameSymbolKind.WorkspaceFile,
+                        StoryReferenceTypes.PlotManifestFileTypeName,
+                        documentUri, line, column, token.Length));
+                return;
+            }
+
+            // Other story-scoped refs (branches) are not index symbols — nothing to navigate to.
             if (StoryReferenceTypes.IsStoryScoped(refType)) return;
 
             // Object-typed params (Planet, Faction, GameObjectType, …) navigate and validate

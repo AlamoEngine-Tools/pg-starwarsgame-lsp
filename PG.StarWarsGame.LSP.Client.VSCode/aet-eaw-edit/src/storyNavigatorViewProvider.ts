@@ -9,10 +9,10 @@ interface StoryLuaScriptDto { name: string; uri?: string | null; }
 interface StoryFactionDto {
     faction: string; manifestFile: string; threads: StoryPlotThreadDto[]; luaScripts: StoryLuaScriptDto[];
 }
-interface StoryCampaignDto { name: string; factions: StoryFactionDto[]; }
+interface StoryCampaignDto { name: string; factions: StoryFactionDto[]; set?: string | null; }
 interface GetStoryPlotsResult { campaigns: StoryCampaignDto[]; error?: string | null; }
 
-type StoryNodeKind = 'campaign' | 'faction' | 'thread' | 'lua' | 'info';
+type StoryNodeKind = 'set' | 'campaign' | 'faction' | 'thread' | 'lua' | 'info';
 
 export class StoryTreeItem extends vscode.TreeItem {
     constructor(
@@ -21,16 +21,20 @@ export class StoryTreeItem extends vscode.TreeItem {
         public readonly kind: StoryNodeKind,
         public readonly campaignName?: string,
         public readonly factionName?: string,
-        public readonly fileName?: string
+        public readonly fileName?: string,
+        // The Campaign_Set value a 'set' node represents; undefined on the "Ungrouped" set node.
+        public readonly setName?: string
     ) {
         super(label, collapsibleState);
     }
 }
 
 /**
- * Campaign navigator: campaign → faction (plot manifest) → story threads + attached Lua scripts,
- * fed by `aet/getStoryPlots`. The tree re-fetches on every expand of the root, so a plain
- * `refresh()` after `aet/storyGraphChanged` is enough to stay current.
+ * Campaign navigator: set (Campaign_Set) → campaign → faction (plot manifest) → story threads +
+ * attached Lua scripts, fed by `aet/getStoryPlots`. Campaigns are always grouped by their
+ * Campaign_Set; every set is shown (even a single-campaign set), and campaigns that declare no
+ * Campaign_Set fall under an "Ungrouped" node. The tree re-fetches on every expand of the root, so
+ * a plain `refresh()` after `aet/storyGraphChanged` is enough to stay current.
  */
 export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<StoryTreeItem> {
     public static readonly viewId = 'aet-eaw-edit.lsp.storyNavigator';
@@ -53,6 +57,13 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
     async getChildren(element?: StoryTreeItem): Promise<StoryTreeItem[]> {
         if (!element) {
             return this._loadRoot();
+        }
+        if (element.kind === 'set') {
+            // A named set lists the campaigns carrying that Campaign_Set; the "Ungrouped" node
+            // (setName undefined) lists the campaigns that declare none.
+            const inSet = this._campaigns.filter(c =>
+                element.setName !== undefined ? c.set === element.setName : !c.set);
+            return inSet.map(c => this._campaignItem(c));
         }
         if (element.kind === 'campaign') {
             const campaign = this._campaigns.find(c => c.name === element.campaignName);
@@ -88,7 +99,42 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
         if (!this._campaigns.length) {
             return [this._infoItem('No story campaigns found in this workspace.')];
         }
-        return this._campaigns.map(c => this._campaignItem(c));
+        return this._setItems();
+    }
+
+    // Root level: one node per Campaign_Set (sorted), then an "Ungrouped" node for campaigns with
+    // no set. Every set is shown even when it holds a single campaign.
+    private _setItems(): StoryTreeItem[] {
+        const ungrouped: StoryCampaignDto[] = [];
+        const bySet = new Map<string, StoryCampaignDto[]>();
+        for (const c of this._campaigns) {
+            if (!c.set) { ungrouped.push(c); continue; }
+            const list = bySet.get(c.set);
+            if (list) { list.push(c); } else { bySet.set(c.set, [c]); }
+        }
+
+        const items = [...bySet.keys()]
+            .sort((a, b) => a.localeCompare(b))
+            .map(setName => this._setItem(setName, bySet.get(setName)!.length));
+        if (ungrouped.length) {
+            items.push(this._setItem(undefined, ungrouped.length));
+        }
+        return items;
+    }
+
+    // setName undefined => the "Ungrouped" bucket.
+    private _setItem(setName: string | undefined, count: number): StoryTreeItem {
+        const label = setName ?? 'Ungrouped';
+        const item = new StoryTreeItem(
+            label, vscode.TreeItemCollapsibleState.Collapsed, 'set',
+            undefined, undefined, undefined, setName);
+        item.iconPath = new vscode.ThemeIcon(setName ? 'folder-library' : 'folder');
+        item.description = count === 1 ? '1 campaign' : `${count} campaigns`;
+        item.tooltip = setName
+            ? `Campaign set "${setName}" - ${count} campaign(s)`
+            : 'Campaigns with no Campaign_Set';
+        item.contextValue = setName ? 'aetCampaignSet' : 'aetCampaignSetUngrouped';
+        return item;
     }
 
     private _campaignItem(campaign: StoryCampaignDto): StoryTreeItem {

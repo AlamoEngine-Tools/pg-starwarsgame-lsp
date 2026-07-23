@@ -19,7 +19,6 @@ import {
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
-import { createPortal } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -422,16 +421,21 @@ interface EditorHandle {
     };
     /** Pans the viewport so (graphX, graphY) sits at the centre - the minimap's click-to-navigate. */
     panTo(graphX: number, graphY: number): void;
-    /** The area transform (k = zoom, x/y = pan), so overlays can place themselves over the nodes. */
-    /**
-     * The in-holder element the swimlane overlay portals into. Being inside rete's transformed
-     * content holder is what keeps the lanes pinned to the nodes during pan/zoom.
-     */
-    getSwimlaneLayer(): HTMLElement;
+    /** Whether the graph is in windowed/LOD mode (big graph): the LOD overview is drawn and only the
+     * visible window mounts into rete. The overview stays up at all zoom levels so edges (and off-
+     * window nodes) remain visible; real nodes overlay the window when zoomed in. */
+    isWindowed(): boolean;
+    /** Paints the LOD overview (all nodes as coloured rects + all edges as lines) into a screen-space
+     * canvas sized to the viewport, using the current pan/zoom transform. No-op clear when not
+     * windowed (a small graph is fully mounted, so the real nodes are the view). */
+    drawLodTo(canvas: HTMLCanvasElement): void;
     /** Bounding boxes (graph coords) of Event nodes grouped by thread or chapter - the swimlanes. */
     getGroupBounds(by: 'thread' | 'chapter'): {
         key: string; title: string; x: number; y: number; w: number; h: number;
     }[];
+    /** Paints the enabled swimlanes (thread solid, chapter dashed) into a screen-space canvas behind
+     * the nodes, using the current pan/zoom transform. */
+    drawSwimlanesTo(canvas: HTMLCanvasElement, showThread: boolean, showChapter: boolean): void;
     /**
      * Drops a local-only staging AND/OR-junction at the given position - no server round trip.
      * The user wires Event outputs into its input to accumulate prereq sources, then drags its
@@ -624,6 +628,45 @@ const ARRANGE_OPTIONS = {
     'elk.layered.spacing.nodeNodeBetweenLayers': '90',
 };
 
+// Below this zoom level a large graph shows the cheap LOD overview (LodOverview) instead of mounting
+// real rete nodes. Small graphs fit-to-screen at a higher zoom and never hit it, so they mount
+// normally. Zooming past it mounts the visible window as real nodes. Tuned so real nodes appear
+// while they're still ~90px wide on screen (EVENT_NODE_WIDTH 280 × 0.32); raise/lower to switch
+// later/earlier.
+const K_DETAIL = 0.32;
+// LOD stages: below K_LABEL the overview is coloured rects only; from K_LABEL up the event title is
+// drawn inside each rect (a cheap mid-detail stage, no rete mount); from K_DETAIL up the visible
+// window mounts as real interactive nodes.
+const K_LABEL = 0.12;
+
+// Overview colour for a node (canvas needs a concrete colour, not a CSS var): events by lifecycle
+// (matching the node border + legend), junctions purple.
+function lodColor(dto: StoryGraphNodeDto): string {
+    if (dto.kind !== 'Event') { return '#b180d7'; }
+    switch (dto.lifecycle) {
+        case 'Waiting': return '#3794ff';
+        case 'Armed': return '#89d185';
+        case 'Fired': return '#b180d7';
+        case 'Disabled': return '#f14c4c';
+        default: return '#888888';
+    }
+}
+
+// Hex forms of the branch chart palette, SAME order/hash as branchColor + BRANCH_CHART_VARS, so an
+// overview node's colour matches the branch glow the real node gets (canvas can't use CSS vars).
+const BRANCH_CHART_HEX = ['#3794ff', '#89d185', '#d18616', '#b180d7', '#f14c4c', '#cca700'];
+function branchColorHex(branch: string): string {
+    let hash = 0;
+    for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }
+    return BRANCH_CHART_HEX[Math.abs(hash) % BRANCH_CHART_HEX.length];
+}
+
+/** Overview colour for a node: its branch colour (matching the real node's glow) if it has a branch,
+ * otherwise the lifecycle colour. */
+function overviewColor(dto: StoryGraphNodeDto, branch: string | null): string {
+    return branch ? branchColorHex(branch) : lodColor(dto);
+}
+
 async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const editor = new NodeEditor<Schemes>();
     const area = new AreaPlugin<Schemes, AreaExtra>(container);
@@ -660,9 +703,6 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // screen positions in JS one rAF later, which is exactly what made the lanes visibly trail the
     // graph while dragging. Depth is handled by `.swimlane-layer`'s z-index, not by this position —
     // rete re-orders the holder's children as the graph changes.
-    const swimlaneLayer = document.createElement('div');
-    swimlaneLayer.className = 'swimlane-layer';
-    (area.area.content.holder as HTMLElement).prepend(swimlaneLayer);
 
     // Sankey-style branch glow: a node's own branch (events) or its owner event's (AND/OR
     // junctions inherit it, so the coloured strand stays unbroken across them). Resolved from the
@@ -868,17 +908,70 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         return context;
     });
 
+    // GraphModel: authoritative geometry for EVERY node, independent of which nodes rete currently
+    // has mounted. Minimap, swimlanes and save-layout read this (not area.nodeViews) so they stay
+    // whole once node mounting is windowed. Synced by rebuildModel() after each full build/patch and
+    // upserted per node on drag (the 'nodetranslated' pipe below).
+    interface ModelNode { dto: StoryGraphNodeDto; x: number; y: number; w: number; h: number; color: string; }
+    const graphModel = new Map<string, ModelNode>();
+
+    const rebuildModel = (): void => {
+        graphModel.clear();
+        for (const node of editor.getNodes()) {
+            const view = area.nodeViews.get(node.id);
+            graphModel.set(node.id, {
+                dto: node.dto, w: node.width, h: node.height,
+                x: view?.position.x ?? 0, y: view?.position.y ?? 0,
+                color: overviewColor(node.dto, node.branchGlow),
+            });
+        }
+    };
+
+    // Bounding boxes (graph coords) of Event nodes grouped by thread or chapter - the swimlanes.
+    // Reads the model, so it's complete even when only part of the graph is mounted.
+    const computeGroupBounds = (
+        by: 'thread' | 'chapter'
+    ): { key: string; title: string; x: number; y: number; w: number; h: number }[] => {
+        const groups = new Map<string, { title: string; minX: number; minY: number; maxX: number; maxY: number }>();
+        for (const m of graphModel.values()) {
+            if (m.dto.kind !== 'Event') { continue; }
+            let key: string;
+            let title: string;
+            if (by === 'thread') {
+                if (!m.dto.threadUri) { continue; }
+                key = m.dto.threadUri;
+                title = baseName(m.dto.threadUri);
+            } else {
+                if (typeof m.dto.storyChapter !== 'number') { continue; }
+                key = String(m.dto.storyChapter);
+                title = `Chapter ${m.dto.storyChapter}`;
+            }
+            const x0 = m.x, y0 = m.y, x1 = m.x + m.w, y1 = m.y + m.h;
+            const g = groups.get(key);
+            if (g) {
+                g.minX = Math.min(g.minX, x0); g.minY = Math.min(g.minY, y0);
+                g.maxX = Math.max(g.maxX, x1); g.maxY = Math.max(g.maxY, y1);
+            } else {
+                groups.set(key, { title, minX: x0, minY: y0, maxX: x1, maxY: y1 });
+            }
+        }
+        const pad = 24;
+        return [...groups.entries()].map(([key, g]) => ({
+            key, title: g.title,
+            x: g.minX - pad, y: g.minY - pad,
+            w: g.maxX - g.minX + pad * 2, h: g.maxY - g.minY + pad * 2,
+        }));
+    };
+
     const saveAllPositions = (): void => {
         const entries: StoryLayoutEntry[] = [];
-        for (const node of editor.getNodes()) {
-            if (node.dto.kind !== 'Event') { continue; }
-            const view = area.nodeViews.get(node.id);
-            if (!view) { continue; }
+        for (const m of graphModel.values()) {
+            if (m.dto.kind !== 'Event') { continue; }
             entries.push({
-                file: baseName(node.dto.threadUri),
-                eventName: node.dto.label,
-                x: view.position.x,
-                y: view.position.y,
+                file: baseName(m.dto.threadUri),
+                eventName: m.dto.label,
+                x: m.x,
+                y: m.y,
             });
         }
         if (entries.length) { vscode.postMessage({ type: 'saveLayout', entries }); }
@@ -897,8 +990,24 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             || context.type === 'nodetranslated') {
             scheduleAreaChanged();
         }
+        // In windowed (big-graph) mode, pan/zoom reconciles which nodes are mounted to the viewport:
+        // zoomed out shows the cheap overview, zoomed in mounts just the visible screenful.
+        if ((context.type === 'zoomed' || context.type === 'translated') && windowed) {
+            scheduleReconcile();
+        }
         // Swimlane bounds only depend on where the nodes are, not on the viewport.
         if (context.type === 'nodetranslated') {
+            // Keep the model's position for this node current (drags, and build-time translates).
+            const id = (context.data as { id: string }).id;
+            const node = editor.getNode(id);
+            const view = area.nodeViews.get(id);
+            if (node && view) {
+                graphModel.set(id, {
+                    dto: node.dto, w: node.width, h: node.height,
+                    x: view.position.x, y: view.position.y,
+                    color: overviewColor(node.dto, node.branchGlow),
+                });
+            }
             scheduleGeometryChanged();
         }
         return context;
@@ -960,39 +1069,339 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         return { x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k };
     };
 
+    // ── Level-of-detail (LOD) virtualization ──────────────────────────────────────────────────────
+    // A large graph is not mounted into rete on open; the cheap LodOverview (drawn from graphModel)
+    // stands in until the user zooms in past K_DETAIL, at which point the nodes mount.
+    let windowed = false;   // big graph → LOD overview + viewport windowing (only visible nodes mount)
+    let lodActive = false;  // currently showing the overview (zoomed out, k < K_DETAIL)
+    let lastEdges: StoryGraphEdgeDto[] = [];
+    // Which model nodes / edges are currently mounted into rete (the visible window). Only meaningful
+    // while `windowed`; the minimap always reads the full graphModel, not this.
+    const mountedIds = new Set<string>();
+    const mountedConnKeys = new Set<string>();
+
+    // A node's rete size, computed without mounting it (mirrors StoryNode.applyDto).
+    const modelSizeFor = (dto: StoryGraphNodeDto): { w: number; h: number } => {
+        if (dto.kind === 'AndJunction' || dto.kind === 'OrJunction'
+            || dto.kind === 'StagingAnd' || dto.kind === 'StagingOr') { return { w: 48, h: 48 }; }
+        if (dto.kind === 'Event') { return { w: EVENT_NODE_WIDTH, h: estimateEventNodeHeight(dto) }; }
+        return { w: Math.max(140, Math.min(dto.label.length, 30) * 6.5 + 32), h: 40 };
+    };
+
+    // placeNewNode's midpoint logic, but reading positions from graphModel (nodes aren't mounted).
+    // Returns null when none of this node's neighbours are placed yet, so the caller can try again in
+    // a later pass instead of dumping it at (0,0).
+    const modelPlaceNode = (dto: StoryGraphNodeDto, edges: StoryGraphEdgeDto[]): { x: number; y: number } | null => {
+        const sources: { x: number; y: number }[] = [];
+        const targets: { x: number; y: number }[] = [];
+        for (const edge of edges) {
+            if (edge.toId === dto.id) { const m = graphModel.get(edge.fromId); if (m) { sources.push({ x: m.x, y: m.y }); } }
+            else if (edge.fromId === dto.id) { const m = graphModel.get(edge.toId); if (m) { targets.push({ x: m.x, y: m.y }); } }
+        }
+        if (sources.length && targets.length) { const s = average(sources); const t = average(targets); return { x: (s.x + t.x) / 2, y: (s.y + t.y) / 2 }; }
+        if (sources.length) { const s = average(sources); return { x: s.x + 220, y: s.y }; }
+        if (targets.length) { const t = average(targets); return { x: t.x - 220, y: t.y }; }
+        return null;
+    };
+
+    // Populate graphModel from stored positions without mounting anything. Returns false (→ slow
+    // elk path) when any event lacks a saved position (first-ever open of this campaign).
+    const buildModelFromLayout = (
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+    ): boolean => {
+        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const events = nodes.filter(n => n.kind === 'Event');
+        if (events.length === 0 || !events.every(n => stored.has(layoutKey(n)))) { return false; }
+        graphModel.clear();
+        const branchByEvent = branchIndex(nodes);
+        const colorFor = (dto: StoryGraphNodeDto): string => overviewColor(dto, branchOfNodeId(dto.id, branchByEvent));
+        for (const dto of nodes) {
+            if (dto.kind !== 'Event') { continue; }
+            const e = stored.get(layoutKey(dto))!;
+            const { w, h } = modelSizeFor(dto);
+            graphModel.set(dto.id, { dto, x: e.x, y: e.y, w, h, color: colorFor(dto) });
+        }
+        // Junctions sit at the midpoint of their event neighbours. Some connect only to OTHER
+        // junctions, so iterate until those chains resolve; anything still unplaced (a cycle or an
+        // orphan) lands at the graph centre - never (0,0), which would stretch the minimap's extent
+        // and leave an empty region you can accidentally pan to.
+        const junctions = nodes.filter(n => n.kind !== 'Event');
+        for (let pass = 0; pass < 6; pass++) {
+            let changed = false;
+            for (const dto of junctions) {
+                if (graphModel.has(dto.id)) { continue; }
+                const pos = modelPlaceNode(dto, edges);
+                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), color: colorFor(dto) }); changed = true; }
+            }
+            if (!changed) { break; }
+        }
+        if (junctions.some(dto => !graphModel.has(dto.id))) {
+            let cx = 0, cy = 0, n = 0;
+            for (const m of graphModel.values()) { cx += m.x + m.w / 2; cy += m.y + m.h / 2; n += 1; }
+            cx = n ? cx / n : 0; cy = n ? cy / n : 0;
+            for (const dto of junctions) {
+                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), color: colorFor(dto) }); }
+            }
+        }
+        return true;
+    };
+
+    // Visible graph-coordinate rectangle, expanded by `margin` × its size so nodes just off-screen
+    // are already mounted before they scroll in.
+    const viewportRect = (margin: number): { minX: number; minY: number; maxX: number; maxY: number } => {
+        const { k, x, y } = area.area.transform;
+        const w = container.clientWidth, h = container.clientHeight;
+        const minX = -x / k, minY = -y / k, maxX = (w - x) / k, maxY = (h - y) / k;
+        const mx = (maxX - minX) * margin, my = (maxY - minY) * margin;
+        return { minX: minX - mx, minY: minY - my, maxX: maxX + mx, maxY: maxY + my };
+    };
+
+    const inWindow = (m: ModelNode, r: { minX: number; minY: number; maxX: number; maxY: number }): boolean =>
+        m.x <= r.maxX && m.x + m.w >= r.minX && m.y <= r.maxY && m.y + m.h >= r.minY;
+
+    // Mount a set of model nodes into rete (+ any edge whose BOTH endpoints are now mounted). Runs
+    // under applyingServerGraph so the View-mode drag-freeze and the connection-staging pipe are
+    // bypassed - this is view culling, not user editing.
+    const mountNodes = async (ids: Iterable<string>): Promise<void> => {
+        const fresh = [...ids].filter(id => !mountedIds.has(id) && graphModel.has(id));
+        if (fresh.length === 0) { return; }
+        const wasApplying = applyingServerGraph;
+        applyingServerGraph = true;
+        try {
+            const branches = branchIndex([...graphModel.values()].map(m => m.dto));
+            const hasIn = new Set(lastEdges.map(e => e.toId));
+            const hasOut = new Set(lastEdges.map(e => e.fromId));
+            const created = fresh.map(id => {
+                const m = graphModel.get(id)!;
+                const node = new StoryNode(m.dto, hasIn.has(id), hasOut.has(id));
+                node.branchGlow = branchOfNodeId(id, branches);
+                mountedIds.add(id);
+                return node;
+            });
+            await Promise.all(created.map(n => editor.addNode(n)));
+            await Promise.all(created.map(n => area.translate(n.id, {
+                x: graphModel.get(n.id)!.x, y: graphModel.get(n.id)!.y,
+            })));
+            // Real rete connections only for the small-graph full mount (windowed=false), where every
+            // endpoint is present. In windowed mode the LOD canvas draws ALL edges (socket-anchored
+            // beziers) consistently, so there's no per-window connection churn or mixed edge styles.
+            if (!windowed) {
+                const conns: StoryConnection[] = [];
+                for (const edge of lastEdges) {
+                    if (!mountedIds.has(edge.fromId) || !mountedIds.has(edge.toId)) { continue; }
+                    const key = connectionKey(edge.fromId, edge.toId, edge.kind);
+                    if (mountedConnKeys.has(key)) { continue; }
+                    const s = editor.getNode(edge.fromId), t = editor.getNode(edge.toId);
+                    if (!s || !t) { continue; }
+                    mountedConnKeys.add(key);
+                    conns.push(new StoryConnection(s, t, edge.kind,
+                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches)));
+                }
+                await Promise.all(conns.map(c => editor.addConnection(c)));
+            }
+        } finally {
+            applyingServerGraph = wasApplying;
+        }
+    };
+
+    const unmountNodes = async (ids: Iterable<string>): Promise<void> => {
+        const present = [...ids].filter(id => mountedIds.has(id));
+        if (present.length === 0) { return; }
+        const wasApplying = applyingServerGraph;
+        applyingServerGraph = true;
+        try {
+            for (const id of present) {
+                for (const edge of lastEdges) {
+                    if (edge.fromId === id || edge.toId === id) {
+                        mountedConnKeys.delete(connectionKey(edge.fromId, edge.toId, edge.kind));
+                    }
+                }
+                await removeNodeWithConnections(id);
+                mountedIds.delete(id);
+            }
+        } finally {
+            applyingServerGraph = wasApplying;
+        }
+    };
+
+    const mountAllFromModel = async (): Promise<void> => { await mountNodes(graphModel.keys()); };
+
+    // Reconcile the mounted set to the current viewport (windowed mode only): zoomed out past
+    // K_DETAIL → unmount everything and show the overview; zoomed in → mount just the visible
+    // screenful (+margin) and unmount what scrolled away. Coalesced via scheduleReconcile.
+    let reconciling = false;
+    let reconcilePending = false;
+    const reconcileWindow = async (): Promise<void> => {
+        if (!windowed) { return; }
+        if (reconciling) { reconcilePending = true; return; }
+        reconciling = true;
+        try {
+            do {
+                reconcilePending = false;
+                if (area.area.transform.k < K_DETAIL) {
+                    if (mountedIds.size > 0) { await unmountNodes([...mountedIds]); }
+                    // Toggle the overview on. It re-renders on geometryChange, so fire that ONLY on the
+                    // transition, never per frame - otherwise zooming rebuilds the whole SVG each frame.
+                    if (!lodActive) { lodActive = true; scheduleGeometryChanged(); }
+                } else {
+                    if (lodActive) { lodActive = false; scheduleGeometryChanged(); }
+                    const r = viewportRect(0.5);
+                    const want = new Set<string>();
+                    for (const [id, m] of graphModel) { if (inWindow(m, r)) { want.add(id); } }
+                    await unmountNodes([...mountedIds].filter(id => !want.has(id)));
+                    await mountNodes([...want].filter(id => !mountedIds.has(id)));
+                }
+            } while (reconcilePending);
+        } finally {
+            reconciling = false;
+            scheduleAreaChanged(); // redraw the LOD canvas against the updated mounted set
+        }
+    };
+
+    let reconcileScheduled = false;
+    const scheduleReconcile = (): void => {
+        if (reconcileScheduled) { return; }
+        reconcileScheduled = true;
+        requestAnimationFrame(() => { reconcileScheduled = false; void reconcileWindow(); });
+    };
+
+    // Fit the viewport to the whole model (mirrors AreaExtensions.zoomAt, which needs mounted nodes).
+    const fitModel = async (): Promise<void> => {
+        if (graphModel.size === 0) { return; }
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const m of graphModel.values()) {
+            minX = Math.min(minX, m.x); minY = Math.min(minY, m.y);
+            maxX = Math.max(maxX, m.x + m.w); maxY = Math.max(maxY, m.y + m.h);
+        }
+        const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+        const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+        const w = container.clientWidth, h = container.clientHeight;
+        const k = Math.min((h / bh) * 0.9, (w / bw) * 0.9, 1);
+        area.area.transform.x = w / 2 - cx * k;
+        area.area.transform.y = h / 2 - cy * k;
+        await area.area.zoom(k, 0, 0);
+    };
+
+    // Rebuild the model from a fresh server graph WITHOUT refitting: existing nodes keep their
+    // position, new nodes are placed (stored/drop position, else midpoint of neighbours). Used for a
+    // windowed update (preview / push) so editing a big graph never has to mount the whole thing.
+    const rebuildModelFromGraph = (
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+    ): void => {
+        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const oldPos = new Map<string, { x: number; y: number }>();
+        for (const [id, m] of graphModel) { oldPos.set(id, { x: m.x, y: m.y }); }
+        graphModel.clear();
+        const branchByEvent = branchIndex(nodes);
+        const colorFor = (dto: StoryGraphNodeDto): string => overviewColor(dto, branchOfNodeId(dto.id, branchByEvent));
+        const rest: StoryGraphNodeDto[] = [];
+        let placedFromDrop = false;
+        for (const dto of nodes) {
+            const old = oldPos.get(dto.id);
+            const key = dto.kind === 'Event' ? layoutKey(dto) : null;
+            const s = key ? stored.get(key) : undefined;
+            const drop = key ? pendingDropPositions.get(key) : undefined;
+            // A junction born from a staging-node commit lands where the staging node stood.
+            const owner = dto.kind === 'AndJunction' ? andJunctionId.exec(dto.id)?.[1]
+                : dto.kind === 'OrJunction' && dto.id.endsWith('#or') ? dto.id.slice(0, -'#or'.length)
+                : undefined;
+            const je = owner ? pendingJunctionPositions.get(owner) : undefined;
+            const jpos = je?.kind === dto.kind ? { x: je.x, y: je.y } : undefined;
+            const pos = old ?? drop ?? jpos ?? (s ? { x: s.x, y: s.y } : null);
+            if (pos) {
+                graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), color: colorFor(dto) });
+                if (drop && key) { pendingDropPositions.delete(key); placedFromDrop = true; }
+                if (jpos && owner) { pendingJunctionPositions.delete(owner); }
+            } else { rest.push(dto); } // new node with no known spot - placed below from its neighbours
+        }
+        for (let pass = 0; pass < 6; pass++) {
+            let changed = false;
+            for (const dto of rest) {
+                if (graphModel.has(dto.id)) { continue; }
+                const pos = modelPlaceNode(dto, edges);
+                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), color: colorFor(dto) }); changed = true; }
+            }
+            if (!changed) { break; }
+        }
+        if (rest.some(dto => !graphModel.has(dto.id))) {
+            let cx = 0, cy = 0, n = 0;
+            for (const m of graphModel.values()) { cx += m.x + m.w / 2; cy += m.y + m.h / 2; n += 1; }
+            cx = n ? cx / n : 0; cy = n ? cy / n : 0;
+            for (const dto of rest) {
+                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), color: colorFor(dto) }); }
+            }
+        }
+        if (placedFromDrop) { saveAllPositions(); } // persist the drop, like patch() does
+    };
+
+    const windowedUpdate = async (
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+    ): Promise<void> => {
+        rebuildModelFromGraph(nodes, edges, layout);
+        lastEdges = edges;
+        await reconcileWindow(); // mounts/unmounts to the viewport; drops nodes no longer in the model
+        reapplyStagedCommands(); // keep optimistic Edit-mode edits, exactly as patch() does
+        scheduleGeometryChanged();
+        scheduleAreaChanged();
+    };
+
     const buildFull = async (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
     ): Promise<void> => {
         await editor.clear();
+        graphModel.clear();
+        mountedIds.clear();
+        mountedConnKeys.clear();
         pendingJunctionPositions.clear();
-        const byId = new Map<string, StoryNode>();
+        lastEdges = edges;
+
+        if (buildModelFromLayout(nodes, edges, layout)) {
+            // Stored layout exists → no elk, no full mount. Fit the model; if the whole graph fits at
+            // a readable zoom (small graph) mount it all, otherwise window it behind the LOD overview.
+            await fitModel();
+            if (area.area.transform.k >= K_DETAIL) {
+                windowed = false;
+                lodActive = false;
+                await mountAllFromModel();
+                rebuildModel();
+            } else {
+                windowed = true; // big graph → cheap overview; the window mounts as the user zooms in
+                lodActive = true;
+            }
+            scheduleGeometryChanged();
+            scheduleAreaChanged();
+            return;
+        }
+
+        // First-ever open (no stored layout): mount everything and run elk once, then persist so
+        // every later open takes the fast/LOD path above.
+        windowed = false;
+        lodActive = false;
         const branches = branchIndex(nodes);
         const hasIn = new Set(edges.map(e => e.toId));
         const hasOut = new Set(edges.map(e => e.fromId));
-        for (const dto of nodes) {
+        const byId = new Map<string, StoryNode>();
+        const created = nodes.map(dto => {
             const node = new StoryNode(dto, hasIn.has(dto.id), hasOut.has(dto.id));
             node.branchGlow = branchOfNodeId(dto.id, branches);
             byId.set(dto.id, node);
-            await editor.addNode(node);
-        }
-        for (const edge of edges) {
-            const source = byId.get(edge.fromId);
-            const target = byId.get(edge.toId);
-            if (source && target) {
-                await editor.addConnection(new StoryConnection(source, target, edge.kind,
-                    edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches)));
-            }
-        }
+            return node;
+        });
+        await Promise.all(created.map(n => editor.addNode(n)));
+        const conns = edges
+            .map(edge => {
+                const source = byId.get(edge.fromId);
+                const target = byId.get(edge.toId);
+                return source && target
+                    ? new StoryConnection(source, target, edge.kind,
+                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches))
+                    : null;
+            })
+            .filter((c): c is StoryConnection => c !== null);
+        await Promise.all(conns.map(c => editor.addConnection(c)));
         await arrange.layout({ options: ARRANGE_OPTIONS });
-
-        // Stored positions win over auto-layout for the events that have them.
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
-        for (const node of editor.getNodes()) {
-            if (node.dto.kind !== 'Event') { continue; }
-            const entry = stored.get(layoutKey(node.dto));
-            if (entry) { await area.translate(node.id, { x: entry.x, y: entry.y }); }
-        }
-
+        rebuildModel();
+        saveAllPositions(); // persist so the next open takes the fast path
         void AreaExtensions.zoomAt(area, editor.getNodes());
     };
 
@@ -1083,6 +1492,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         // Junctions inherit their owner event's branch; an event's branch may have just changed,
         // so re-stamp every junction glow (events already synced via applyDto).
         stampBranchGlow(branches);
+        rebuildModel();
     };
 
     return {
@@ -1095,8 +1505,13 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 for (const dto of nodes) { staticLifecycles.set(dto.id, dto.lifecycle); }
                 applyingServerGraph = true;
                 try {
+                    // patch() reconciles the FULL server graph against the mounted nodes - it assumes
+                    // everything is mounted, so it must never run while windowed. A windowed update
+                    // rebuilds the model and reconciles the visible window instead (no refit).
                     if (full || editor.getNodes().length === 0) {
                         await buildFull(nodes, edges, layout);
+                    } else if (windowed) {
+                        await windowedUpdate(nodes, edges, layout);
                     } else {
                         await patch(nodes, edges, layout);
                     }
@@ -1126,20 +1541,39 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
         },
         fit(): void {
-            void AreaExtensions.zoomAt(area, editor.getNodes());
+            // Windowed: fit the whole MODEL (only a subset is mounted); else fit the mounted nodes.
+            if (windowed) { void fitModel(); }
+            else { void AreaExtensions.zoomAt(area, editor.getNodes()); }
         },
         autoArrange(): Promise<void> {
             const run = async (): Promise<void> => {
                 // nodetranslate is frozen outside Edit mode for USER gestures - the arrange
                 // plugin's translations must pass, same as during setGraph.
                 applyingServerGraph = true;
+                const wasWindowed = windowed;
                 try {
+                    if (wasWindowed) {
+                        // elk lays out MOUNTED nodes + their connections, so mount the whole graph
+                        // first (windowed=false makes mountNodes add real connections).
+                        windowed = false;
+                        await mountNodes(graphModel.keys());
+                    }
                     await arrange.layout({ options: ARRANGE_OPTIONS });
+                    rebuildModel();      // capture the recomputed layout into the model
+                    saveAllPositions();  // ...and persist it (replaces the saved one)
                 } finally {
                     applyingServerGraph = false;
                 }
-                void AreaExtensions.zoomAt(area, editor.getNodes());
-                saveAllPositions(); // the recomputed layout replaces the saved one
+                if (wasWindowed) {
+                    // Back to windowed: drop the full mount and re-window to the re-fit viewport.
+                    windowed = true;
+                    await unmountNodes([...mountedIds]);
+                    mountedConnKeys.clear();
+                    await fitModel();
+                    await reconcileWindow();
+                } else {
+                    void AreaExtensions.zoomAt(area, editor.getNodes());
+                }
             };
             // Same serialization as setGraph - arranging mid-patch would interleave mutations.
             const result = graphQueue.then(run, run);
@@ -1174,19 +1608,35 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             };
         },
         centerNode(nodeId: string): void {
-            const node = editor.getNode(nodeId);
-            if (!node) { return; }
-            void AreaExtensions.zoomAt(area, [node]);
             // Flash the node so it's findable in a large graph. Toggle a class on the node's DOM
             // wrapper (a forced reflow restarts the animation if the same node is re-jumped); the
             // keyframes' box-shadow transiently overrides the branch-glow inline box-shadow.
-            const element = area.nodeViews.get(nodeId)?.element as HTMLElement | undefined;
-            if (element) {
-                element.classList.remove('story-flash');
-                void element.offsetWidth;
-                element.classList.add('story-flash');
-                window.setTimeout(() => element.classList.remove('story-flash'), 1600);
+            const flash = (): void => {
+                const element = area.nodeViews.get(nodeId)?.element as HTMLElement | undefined;
+                if (element) {
+                    element.classList.remove('story-flash');
+                    void element.offsetWidth;
+                    element.classList.add('story-flash');
+                    window.setTimeout(() => element.classList.remove('story-flash'), 1600);
+                }
+            };
+            if (!windowed) {
+                const node = editor.getNode(nodeId);
+                if (!node) { return; }
+                void AreaExtensions.zoomAt(area, [node]);
+                flash();
+                return;
             }
+            // Windowed: the target may not be mounted. Centre the viewport on its model position at a
+            // zoom past K_DETAIL so the windowing reconcile mounts it, then flash once it exists.
+            const m = graphModel.get(nodeId);
+            if (!m) { return; }
+            const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+            const w = container.clientWidth, h = container.clientHeight;
+            const k = Math.max(area.area.transform.k, K_DETAIL + 0.15);
+            area.area.transform.x = w / 2 - cx * k;
+            area.area.transform.y = h / 2 - cy * k;
+            void area.area.zoom(k, 0, 0).then(() => reconcileWindow()).then(() => flash());
         },
         nearestEventThread(position: { x: number; y: number }, threads: string[]): string | null {
             let best: string | null = null;
@@ -1211,10 +1661,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return { x: (rect.width / 2 - x) / k, y: (rect.height / 2 - y) / k };
         },
         getMinimap() {
-            const nodes = editor.getNodes().map(n => {
-                const view = area.nodeViews.get(n.id);
-                return { x: view?.position.x ?? 0, y: view?.position.y ?? 0, w: n.width, h: n.height };
-            });
+            const nodes = [...graphModel.values()].map(m => ({ x: m.x, y: m.y, w: m.w, h: m.h }));
             const { k, x, y } = area.area.transform;
             const rect = container.getBoundingClientRect();
             // Visible canvas mapped back into graph coordinates (screen (0,0) → graph (-x/k, -y/k)).
@@ -1226,43 +1673,107 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const rect = container.getBoundingClientRect();
             void area.area.translate(rect.width / 2 - graphX * k, rect.height / 2 - graphY * k);
         },
-        getSwimlaneLayer(): HTMLElement {
-            return swimlaneLayer;
-        },
-        getGroupBounds(by: 'thread' | 'chapter') {
-            const groups = new Map<string,
-                { title: string; minX: number; minY: number; maxX: number; maxY: number }>();
-            for (const node of editor.getNodes()) {
-                if (node.dto.kind !== 'Event') { continue; }
-                let key: string;
-                let title: string;
-                if (by === 'thread') {
-                    if (!node.dto.threadUri) { continue; }
-                    key = node.dto.threadUri;
-                    title = baseName(node.dto.threadUri);
+        isWindowed(): boolean { return windowed; },
+        drawLodTo(canvas: HTMLCanvasElement): void {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { return; }
+            const w = container.clientWidth, h = container.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            if (!windowed) { return; } // small graph: fully mounted, the real nodes are the view
+            const { k, x, y } = area.area.transform;
+            // Edges: culled to the viewport, and cheap straight lines when zoomed out but socket-
+            // anchored beziers once zoomed in (where the curve actually reads). Both go output (right)
+            // → input (left) to match the left-to-right layout. Drawn for ALL edges (windowed mode
+            // mounts no rete connections), so connections are consistent regardless of what's on screen.
+            const bezier = k >= K_LABEL;
+            ctx.globalAlpha = 0.4;
+            ctx.strokeStyle = '#999999';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (const e of lastEdges) {
+                const a = graphModel.get(e.fromId), b = graphModel.get(e.toId);
+                if (!a || !b) { continue; }
+                const x1 = (a.x + a.w) * k + x, y1 = (a.y + a.h / 2) * k + y;
+                const x2 = b.x * k + x, y2 = (b.y + b.h / 2) * k + y;
+                if ((x1 < 0 && x2 < 0) || (x1 > w && x2 > w)
+                    || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) { continue; } // fully off one side
+                ctx.moveTo(x1, y1);
+                if (bezier) {
+                    const dx = Math.max(20, Math.abs(x2 - x1) * 0.4);
+                    ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
                 } else {
-                    if (typeof node.dto.storyChapter !== 'number') { continue; }
-                    key = String(node.dto.storyChapter);
-                    title = `Chapter ${node.dto.storyChapter}`;
-                }
-                const view = area.nodeViews.get(node.id);
-                if (!view) { continue; }
-                const x0 = view.position.x, y0 = view.position.y;
-                const x1 = x0 + node.width, y1 = y0 + node.height;
-                const g = groups.get(key);
-                if (g) {
-                    g.minX = Math.min(g.minX, x0); g.minY = Math.min(g.minY, y0);
-                    g.maxX = Math.max(g.maxX, x1); g.maxY = Math.max(g.maxY, y1);
-                } else {
-                    groups.set(key, { title, minX: x0, minY: y0, maxX: x1, maxY: y1 });
+                    ctx.lineTo(x2, y2);
                 }
             }
-            const pad = 24;
-            return [...groups.entries()].map(([key, g]) => ({
-                key, title: g.title,
-                x: g.minX - pad, y: g.minY - pad,
-                w: g.maxX - g.minX + pad * 2, h: g.maxY - g.minY + pad * 2,
-            }));
+            ctx.stroke();
+            // Nodes: coloured rects; from K_LABEL up the event title is drawn inside too (mid stage).
+            // Off-screen nodes skipped. Font/colour set once, labels truncated (no per-node clip).
+            const showLabels = k >= K_LABEL;
+            let fontPx = 11;
+            let labelColor = '#cccccc';
+            if (showLabels) {
+                labelColor = getComputedStyle(container).getPropertyValue('--vscode-editor-foreground').trim() || '#cccccc';
+                fontPx = Math.min(13, Math.max(8, Math.round(k * 55)));
+                ctx.font = `${fontPx}px sans-serif`;
+                ctx.textBaseline = 'middle';
+            }
+            for (const m of graphModel.values()) {
+                const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
+                if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
+                const color = m.color;
+                ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
+                ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(sx, sy, sw, sh);
+                if (showLabels && m.dto.kind === 'Event' && sw > 30) {
+                    ctx.globalAlpha = 1;
+                    ctx.fillStyle = labelColor;
+                    const maxChars = Math.max(1, Math.floor((sw - 8) / (fontPx * 0.55)));
+                    const text = m.dto.label.length > maxChars ? m.dto.label.slice(0, maxChars) : m.dto.label;
+                    ctx.fillText(text, sx + 4, sy + sh / 2);
+                }
+            }
+            ctx.globalAlpha = 1;
+        },
+        getGroupBounds(by: 'thread' | 'chapter') { return computeGroupBounds(by); },
+        drawSwimlanesTo(canvas: HTMLCanvasElement, showThread: boolean, showChapter: boolean): void {
+            const ctx = canvas.getContext('2d');
+            if (!ctx) { return; }
+            const w = container.clientWidth, h = container.clientHeight;
+            const dpr = window.devicePixelRatio || 1;
+            if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+                canvas.width = Math.round(w * dpr);
+                canvas.height = Math.round(h * dpr);
+            }
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, w, h);
+            const { k, x, y } = area.area.transform;
+            const drawLanes = (by: 'thread' | 'chapter', dashed: boolean): void => {
+                ctx.font = 'bold 11px sans-serif';
+                ctx.textBaseline = 'top';
+                for (const g of computeGroupBounds(by)) {
+                    const sx = g.x * k + x, sy = g.y * k + y, sw = g.w * k, sh = g.h * k;
+                    if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
+                    const color = laneColorFor(by + ':' + g.key);
+                    ctx.globalAlpha = 0.07; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
+                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+                    ctx.setLineDash(dashed ? [8, 4] : []);
+                    ctx.strokeRect(sx, sy, sw, sh);
+                    ctx.setLineDash([]);
+                    ctx.globalAlpha = 0.85; ctx.fillStyle = color;
+                    ctx.textAlign = dashed ? 'right' : 'left'; // chapter labels on the right, thread on the left
+                    ctx.fillText(g.title, dashed ? sx + sw - 5 : sx + 6, sy + 4);
+                }
+                ctx.textAlign = 'left';
+            };
+            if (showThread) { drawLanes('thread', false); }
+            if (showChapter) { drawLanes('chapter', true); }
+            ctx.globalAlpha = 1;
+            ctx.setLineDash([]);
         },
         createStagingJunction(position: { x: number; y: number }, kind: 'and' | 'or'): void {
             stagingCounter += 1;
@@ -1292,9 +1803,19 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         },
         patchEventNode(nodeId: string, update: (dto: StoryGraphNodeDto) => StoryGraphNodeDto): void {
             const node = editor.getNode(nodeId);
-            if (!node || node.dto.kind !== 'Event') { return; }
-            node.applyDto(update(node.dto));
-            void remeasure(node);
+            let newDto: StoryGraphNodeDto | undefined;
+            if (node && node.dto.kind === 'Event') {
+                newDto = update(node.dto);
+                node.applyDto(newDto);
+                void remeasure(node);
+            }
+            // Mirror into the model so an unmounted (windowed) node keeps the staged edit + overview
+            // colour, and re-mounts with it applied.
+            const m = graphModel.get(nodeId);
+            if (m && m.dto.kind === 'Event') {
+                m.dto = newDto ?? update(m.dto);
+                m.color = overviewColor(m.dto, m.dto.branch ?? null);
+            }
         },
         repaintNodes(nodeIds: Iterable<string>): void {
             for (const id of nodeIds) {
@@ -1958,8 +2479,19 @@ function TypeRow(props: {
                     <Drag.NoDrag>
                         <span
                             className="type-chip"
+                            style={{
+                                background: fadedBg(stepColor(props.kind, props.typeName)),
+                                borderColor: stepColor(props.kind, props.typeName),
+                                color: 'var(--vscode-editor-foreground)',
+                            }}
                             title={`${props.typeName} - remove it (✕) to attach a different type`}
-                        >{props.typeName}</span>
+                        >
+                            <span
+                                className={`codicon ${props.kind === 'trigger' ? 'codicon-zap' : 'codicon-gift'}`}
+                                aria-hidden="true"
+                            />
+                            <span className="type-chip-name">{props.typeName}</span>
+                        </span>
                     </Drag.NoDrag>
                     {props.readOnly ? null : (
                         <Drag.NoDrag>
@@ -1993,6 +2525,42 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
         dto.reachable ? '' : 'unreachable',
         untested ? 'untested' : '',
     ].filter(c => c).join(' ');
+    return (
+        <EventBody
+            className={classes}
+            selected={props.data.selected}
+            $w={props.data.width}
+            $h={props.data.height}
+            style={branchGlowStyle(props.data.branchGlow, false)}
+            data-testid="node"
+            data-node-id={dto.id}
+            data-branch={props.data.branchGlow ?? undefined}
+        >
+            <EventForm dto={dto} readOnly={readOnly} />
+            {input ? (
+                <RefSocket
+                    name="input-socket" side="input" socketKey="in"
+                    nodeId={props.data.id} emit={props.emit} payload={input.socket}
+                />
+            ) : null}
+            {output ? (
+                <RefSocket
+                    name="output-socket" side="output" socketKey="out"
+                    nodeId={props.data.id} emit={props.emit} payload={output.socket}
+                />
+            ) : null}
+        </EventBody>
+    );
+}
+
+/**
+ * The editable body of an Event - header actions plus the General/Trigger/Reward sections. Node
+ * chrome (the EventBody wrapper, lifecycle border, sockets) stays with EventNodeView; this is just
+ * the form, so the node modal can mount the very same UI for a single event.
+ */
+function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.Element {
+    const dto = props.dto;
+    const readOnly = props.readOnly;
 
     // Editing is SEEDED from the module-scoped draft so a re-mount (graph refresh rebuilding this
     // node's view) restores the open rename box. The input itself is UNCONTROLLED and reads/writes
@@ -2049,16 +2617,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
     const rewardSchema = rewardTypeParams.get(dto.rewardType ?? '') ?? [];
 
     return (
-        <EventBody
-            className={classes}
-            selected={props.data.selected}
-            $w={props.data.width}
-            $h={props.data.height}
-            style={branchGlowStyle(props.data.branchGlow, false)}
-            data-testid="node"
-            data-node-id={dto.id}
-            data-branch={props.data.branchGlow ?? undefined}
-        >
+        <>
             <div className="header">
                 {editingTitle && !readOnly ? (
                     <>
@@ -2204,20 +2763,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
                     />
                 </>
             )}
-
-            {input ? (
-                <RefSocket
-                    name="input-socket" side="input" socketKey="in"
-                    nodeId={props.data.id} emit={props.emit} payload={input.socket}
-                />
-            ) : null}
-            {output ? (
-                <RefSocket
-                    name="output-socket" side="output" socketKey="out"
-                    nodeId={props.data.id} emit={props.emit} payload={output.socket}
-                />
-            ) : null}
-        </EventBody>
+        </>
     );
 }
 
@@ -2373,8 +2919,14 @@ const GlobalStyle = createGlobalStyle`
     .diag-badge.diag-error { color: var(--vscode-errorForeground, #f44); }
     .diag-badge.diag-warning { color: var(--vscode-charts-yellow, #cca700); }
 
-    /* Immutable-type chips - used in node bodies and the toolbar's create form. */
+    /* Immutable-type chips - used in node bodies and the toolbar's create form. In a node body the
+       chip is tinted by its trigger/reward family colour (stepColor/fadedBg, set inline) and leads
+       with a codicon; the create form leaves the default badge colours. */
     .type-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        min-width: 0;
         padding: 1px 6px;
         border: 1px solid var(--vscode-panel-border);
         border-radius: 3px;
@@ -2382,10 +2934,9 @@ const GlobalStyle = createGlobalStyle`
         /* Pair the text with the badge background - without this the chip inherited the dark
            editor foreground and read as near-black on the theme's (often blue) badge colour. */
         color: var(--vscode-badge-foreground, var(--vscode-editor-foreground));
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
     }
+    .type-chip .codicon { font-size: 12px; flex-shrink: 0; }
+    .type-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .type-empty {
         padding: 1px 6px;
         border: 1px dashed var(--vscode-panel-border);
@@ -2467,14 +3018,12 @@ const Shell = styled.div`
        connections ahead of a merely-prepended element, which left the lanes painting over the
        edges. The holder's will-change:transform makes it a stacking context, so the negative
        index stays contained here. */
-    .swimlane-layer { position: absolute; top: 0; left: 0; width: 0; height: 0; pointer-events: none; z-index: -1; }
-    .swimlane { position: absolute; border: 1.5px solid; border-radius: 10px; box-sizing: border-box; }
-    .swimlane-chapter { border-style: dashed; }
-    .swimlane-title {
-        position: absolute; top: 3px; left: 10px;
-        font-size: 11px; font-weight: bold; opacity: 0.85; white-space: nowrap;
-    }
-    .swimlane-chapter .swimlane-title { left: auto; right: 10px; }
+    /* Swimlanes: a screen-space canvas behind the nodes and behind the LOD canvas (see SwimlaneCanvas). */
+    .swimlane-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
+
+    /* LOD overview: a screen-space canvas behind the nodes (z-index below .canvas), redrawn on
+       pan/zoom. See the LodOverview component. */
+    .lod-canvas { position: absolute; inset: 0; z-index: 0; pointer-events: none; }
     .status {
         position: absolute;
         inset: 0;
@@ -3261,9 +3810,12 @@ function App(): JSX.Element {
             ) : null}
             <div className="body">
                 <div className="canvas-area">
-                    {/* These render into rete's content holder via a portal, not here. */}
-                    {showThreadLanes ? <SwimlaneOverlay getHandle={() => editorRef.current} by="thread" /> : null}
-                    {showChapterLanes ? <SwimlaneOverlay getHandle={() => editorRef.current} by="chapter" /> : null}
+                    {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
+                    <SwimlaneCanvas
+                        getHandle={() => editorRef.current}
+                        showThread={showThreadLanes} showChapter={showChapterLanes}
+                    />
+                    <LodOverview getHandle={() => editorRef.current} />
                     <div
                         className="canvas" ref={containerRef}
                         onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
@@ -3316,7 +3868,11 @@ function App(): JSX.Element {
                                         const handle = editorRef.current;
                                         if (!handle) { return; }
                                         setLayouting(true);
-                                        void handle.autoArrange().finally(() => setLayouting(false));
+                                        // Let the overlay paint before the (heavy, synchronous) arrange
+                                        // starts, so a big graph's multi-second freeze is covered by it.
+                                        requestAnimationFrame(() => requestAnimationFrame(() => {
+                                            void handle.autoArrange().finally(() => setLayouting(false));
+                                        }));
                                     }}
                                     title="Arrange - recompute the automatic layout"
                                 ><span className="codicon codicon-type-hierarchy" /></button>
@@ -3715,40 +4271,62 @@ function laneColorFor(key: string): string {
 }
 
 /**
- * Tinted grouping rectangles drawn behind the nodes - one per thread or per chapter. Rendered
- * through a portal into rete's transformed content holder, so the boxes are positioned in raw
- * GRAPH coordinates and rete's own pan/zoom transform carries them along with the nodes; there is
- * deliberately no per-frame screen-space math here. Toggled independently; thread lanes are solid,
- * chapter lanes dashed, so the two can overlap legibly.
+ * The zoomed-out overview: one cheap SVG (no per-node React roots) drawing every node as a coloured
+ * rect and every edge as a line, straight from graphModel, portalled into rete's transformed content
+ * holder so pan/zoom carries it exactly like the nodes it stands in for. Shown only while the graph
+ * is in LOD mode (large + zoomed out); zooming past K_DETAIL mounts the real nodes and this returns
+ * null. This is what makes opening a large campaign instant - nothing is mounted into rete.
  */
-function SwimlaneOverlay(props: {
-    getHandle: () => EditorHandle | null; by: 'thread' | 'chapter';
-}): JSX.Element | null {
-    const [, force] = useReducer((x: number) => x + 1, 0);
-    useEffect(() => subscribeGeometryChange(() => force()), []);
-    const handle = props.getHandle();
-    if (!handle) { return null; }
-    return createPortal(
-        <>
-            {handle.getGroupBounds(props.by).map(g => {
-                const color = laneColorFor(props.by + ':' + g.key);
-                return (
-                    <div
-                        key={g.key}
-                        className={'swimlane swimlane-' + props.by}
-                        style={{
-                            left: g.x, top: g.y, width: g.w, height: g.h,
-                            borderColor: color,
-                            background: `color-mix(in srgb, ${color} 7%, transparent)`,
-                        }}
-                    >
-                        <span className="swimlane-title" style={{ color }}>{g.title}</span>
-                    </div>
-                );
-            })}
-        </>,
-        handle.getSwimlaneLayer()
-    );
+function LodOverview(props: { getHandle: () => EditorHandle | null }): JSX.Element {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    // A screen-space canvas sitting behind the nodes (z-index below .canvas). Redrawing a few
+    // thousand rects/lines imperatively is ~1-2ms, so pan/zoom stays smooth - unlike an SVG in the
+    // transformed holder, which re-rasterised every element on each zoom frame. Always mounted; the
+    // draw is a cheap clear when the graph is small (not windowed).
+    useEffect(() => {
+        let raf = 0;
+        const draw = (): void => {
+            if (raf) { return; }
+            raf = requestAnimationFrame(() => {
+                raf = 0;
+                const c = canvasRef.current;
+                if (c) { props.getHandle()?.drawLodTo(c); }
+            });
+        };
+        draw();
+        const unA = subscribeAreaChange(draw);
+        const unG = subscribeGeometryChange(draw);
+        return () => { if (raf) { cancelAnimationFrame(raf); } unA(); unG(); };
+    }, [props]);
+    return <canvas ref={canvasRef} className="lod-canvas" />;
+}
+
+/**
+ * Tinted grouping rectangles behind the nodes - one per thread (solid) or chapter (dashed), drawn on
+ * a screen-space canvas and redrawn on pan/zoom. Like the LOD overview, this avoids the transformed-
+ * holder divs the swimlanes used to be, which re-rasterised (and stuttered) on every zoom frame.
+ */
+function SwimlaneCanvas(props: {
+    getHandle: () => EditorHandle | null; showThread: boolean; showChapter: boolean;
+}): JSX.Element {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const { showThread, showChapter } = props;
+    useEffect(() => {
+        let raf = 0;
+        const draw = (): void => {
+            if (raf) { return; }
+            raf = requestAnimationFrame(() => {
+                raf = 0;
+                const c = canvasRef.current;
+                if (c) { props.getHandle()?.drawSwimlanesTo(c, showThread, showChapter); }
+            });
+        };
+        draw();
+        const unA = subscribeAreaChange(draw);
+        const unG = subscribeGeometryChange(draw);
+        return () => { if (raf) { cancelAnimationFrame(raf); } unA(); unG(); };
+    }, [props, showThread, showChapter]);
+    return <canvas ref={canvasRef} className="swimlane-canvas" />;
 }
 
 /** Wires the palette's Tactical category to `createTacticalAttachment` - no other UI reaches it. */
@@ -3818,6 +4396,11 @@ function stepColor(category: string, name: string | null): string {
     return category === 'reward' ? 'var(--vscode-charts-green, #89d185)' : 'var(--vscode-charts-blue, #3794ff)';
 }
 
+/** A tile/badge background: its family colour washed into the widget background (matches the palette). */
+function fadedBg(color: string): string {
+    return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
+}
+
 function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JSX.Element {
     const [search, setSearch] = useState('');
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
@@ -3839,9 +4422,6 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
 
     // The whole tile is washed in its family colour - no glyph (they were all identical). Structural
     // tiles (New/AND/OR) keep a distinguishing glyph since their shapes actually differ.
-    const fadedBg = (color: string): string =>
-        `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
-
     const tile = (
         key: string, glyph: JSX.Element | null, label: string, drag: PaletteDrag, hint: string
     ): JSX.Element => {
