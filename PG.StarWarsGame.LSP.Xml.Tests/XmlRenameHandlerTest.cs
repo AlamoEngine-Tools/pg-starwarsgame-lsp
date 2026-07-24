@@ -386,6 +386,61 @@ public sealed class XmlRenameHandlerTest
         Assert.Null(result);
     }
 
+    // ── grouping keys (Campaign_Set / Overlap_Test) ──────────────────────────
+
+    // Two members share the group key "Story_Set": one in XmlUri (tag value at line 2, cols 14..),
+    // one in OtherXmlUri (line 3). AllGroupMemberships (via WorkspaceGroupMemberships) makes the
+    // handler take the group-rename path; the value is rewritten in place at each tag span.
+    private static GameIndex GroupIndex(string key = "Story_Set")
+    {
+        var memberA = new GroupMembership(key, "Campaign", new FileOrigin(XmlUri, 1, 4));
+        var memberB = new GroupMembership(key, "Campaign", new FileOrigin(OtherXmlUri, 1, 4));
+
+        var docA = new DocumentIndex(XmlUri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(new DocumentGroupMembership(memberA, 2, 14, key.Length)));
+        var docB = new DocumentIndex(OtherXmlUri, 1, ImmutableArray<GameSymbol>.Empty,
+            ImmutableArray<GameReference>.Empty,
+            GroupMemberships: ImmutableArray.Create(new DocumentGroupMembership(memberB, 3, 14, key.Length)));
+
+        return new GameIndex(BaselineIndex.Empty,
+            ImmutableDictionary<string, DocumentIndex>.Empty.Add(XmlUri, docA).Add(OtherXmlUri, docB),
+            ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty,
+            ImmutableDictionary<string, ImmutableArray<GameReference>>.Empty)
+        {
+            WorkspaceGroupMemberships =
+                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                    .Add(key, ImmutableArray.Create(memberA, memberB))
+        };
+    }
+
+    [Fact]
+    public void HandleRename_CursorOnGroupKey_RewritesValueAcrossAllMembers()
+    {
+        var result = MakeHandler().HandleRename(XmlUri, RenameAt(2, 16, "Story_Set2"), GroupIndex());
+
+        Assert.NotNull(result);
+        var edits = result!.DocumentChanges!
+            .Where(c => c.IsTextDocumentEdit)
+            .Select(c => c.TextDocumentEdit!)
+            .ToList();
+        Assert.Equal(2, edits.Count);
+        Assert.All(edits, e => Assert.Equal("Story_Set2", e.Edits.First().NewText));
+        Assert.Contains(edits, e => e.TextDocument.Uri.ToString() == XmlUri);
+        Assert.Contains(edits, e => e.TextDocument.Uri.ToString() == OtherXmlUri);
+    }
+
+    [Fact]
+    public void HandlePrepare_CursorOnGroupKey_OffersTagValueRange()
+    {
+        var result = MakeHandler().HandlePrepare(XmlUri, 2, 16, GroupIndex());
+
+        Assert.NotNull(result!.Range);
+        Assert.Equal(2, result.Range!.Start.Line);
+        Assert.Equal(14, result.Range.Start.Character);
+        Assert.Equal(14 + "Story_Set".Length, result.Range.End.Character);
+    }
+
     // ── HandlePrepare ─────────────────────────────────────────────────────────
 
     [Fact]
@@ -590,6 +645,11 @@ public sealed class XmlRenameHandlerTest
             return true;
         }
 
+        public string? TryGetXmlRelativePath(string fileUri)
+        {
+            return null;
+        }
+
         public void AddDirectory(string absolutePath)
         {
         }
@@ -615,6 +675,11 @@ public sealed class XmlRenameHandlerTest
         public bool IsLeafFile(string fileUri)
         {
             return false;
+        }
+
+        public string? TryGetXmlRelativePath(string fileUri)
+        {
+            return null;
         }
 
         public void AddDirectory(string absolutePath)

@@ -19,6 +19,7 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
     private const string CorvettesXmlRel = "Data/Xml/Spaceunitscorvettes.xml";
     private const string FightersXmlRel = "Data/Xml/Spaceunitsfighters.xml";
     private const string FactionsXmlRel = "Data/Xml/Factions.xml";
+    private const string CampaignsXmlRel = "Data/Xml/Campaigns_Alpha.xml";
 
     private readonly EawLspServerFixture _fixture;
 
@@ -157,6 +158,192 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
         }
 
         await RunGoToAsync(null, "Nebulon_B_Frigate", "Spaceunitsfrigates", FightersXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_CampaignStoryName_NavigatesToPlotManifestFile()
+    {
+        // <Empire_Story_Name>Story_Plots_Campaign_Empire.xml</…> is a workspaceFile reference;
+        // go-to resolves it to the plot-manifest file it names.
+        await RunGoToAsync("Empire_Story_Name", "Story_Plots_Campaign_Empire.xml",
+            "Story_plots_campaign_empire.xml", "Data/Xml/Campaigns_Alpha.xml");
+    }
+
+    [Fact]
+    public async Task XmlGoTo_ManifestActivePlot_NavigatesToStoryThreadFile()
+    {
+        await RunGoToAsync("Active_Plot", "Story_Campaign_Empire_Act_I.xml",
+            "Story_campaign_empire_act_i.xml", "Data/Xml/Story_plots_campaign_empire.xml");
+    }
+
+    [Fact]
+    public async Task XmlGoTo_ManifestLuaScript_NavigatesToScriptFile()
+    {
+        // A <Lua_Script> names an extensionless script; go-to resolves across layers to the
+        // .lua file's workspace-file symbol emitted by the Lua parser.
+        await RunGoToAsync("Lua_Script", "Story_Campaign_Empire_Act_I",
+            "Story_campaign_empire_act_i.lua", "Data/Xml/Story_plots_campaign_empire.xml");
+    }
+
+    [Fact]
+    public async Task XmlGoTo_TacticalEventParam_NavigatesToTacticalPlotManifest()
+    {
+        // STORY_LAND_TACTICAL Event_Param1 references a tactical plot manifest reached through the
+        // story chain; go-to resolves it to the same storyplotmanifest: file-symbol.
+        await RunGoToAsync("Event_Param1", "Story_Plots_Empire_ActI_M02_Fondor_LAND.XML",
+            "story_plots_empire_acti_m02_fondor_land.xml", "Data/Xml/Story_campaign_empire_act_i.xml");
+    }
+
+    // ── Campaign per-faction / force-deployment tuple slots (A1-A3) ───────────
+
+    [Fact]
+    public async Task XmlGoTo_HomeLocationFactionSlot_NavigatesToFactionsDefinition()
+    {
+        // A1: <Home_Location> Rebel, Dantooine </Home_Location> - the faction slot resolves against
+        // the Faction pool (registered via factionfiles.xml) and navigates to Factions.xml.
+        await RunGoToAsync("Home_Location", "Rebel", "Factions", CampaignsXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_HomeLocationPlanetSlot_NavigatesToPlanetsDefinition()
+    {
+        // A1: the planet slot of the same pair resolves against GameObjectType and navigates to the
+        // <Planet Name="Dantooine"> definition in Planets.xml.
+        await RunGoToAsync("Home_Location", "Dantooine", "Planets", CampaignsXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_StartingCreditsFactionSlot_NavigatesToFactionsDefinition()
+    {
+        // A2: <Starting_Credits> Rebel, 0 </Starting_Credits> - only the faction slot is a
+        // reference; the number is left to PerFactionValueHandler.
+        await RunGoToAsync("Starting_Credits", "Rebel", "Factions", CampaignsXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_StartingForcesPlanetSlot_NavigatesToPlanetsDefinition()
+    {
+        // A3: <Starting_Forces> Empire, Anaxes, Empire_Star_Base_1 </Starting_Forces> - the middle
+        // (planet) slot of the triple navigates to Planets.xml.
+        await RunGoToAsync("Starting_Forces", "Anaxes", "Planets", CampaignsXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_StartingForcesUnitSlot_NavigatesToUnitDefinition()
+    {
+        // A3: the third (unit) slot of the same triple navigates to the object definition -
+        // Empire_Star_Base_1 lives in Starbases.xml.
+        await RunGoToAsync("Starting_Forces", "Empire_Star_Base_1", "Starbases", CampaignsXmlRel);
+    }
+
+    [Fact]
+    public async Task XmlGoTo_MarkupFilenameFactionSlot_NavigatesToFactionsDefinition()
+    {
+        // A4: <Markup_Filename>Empire, DefaultGalacticHints</Markup_Filename> - only the faction slot
+        // is indexable; it navigates to Factions.xml. The markup file half is intentionally inert.
+        await RunGoToAsync("Markup_Filename", "Empire", "Factions", CampaignsXmlRel);
+    }
+
+    // ── Campaign_Set grouping key (B) ─────────────────────────────────────────
+
+    [Fact]
+    public async Task XmlGoTo_CampaignSetGroupKey_NavigatesToTheCoMemberCampaigns()
+    {
+        // <Campaign_Set> Multiplayer_Campaign_Set </Campaign_Set> is a referenceGroup key shared by
+        // seven campaigns in the same file; go-to surfaces the co-members (peek), all defined in
+        // Campaigns_multiplayer.xml.
+        await RunGoToAsync("Campaign_Set", "Multiplayer_Campaign_Set", "Campaigns_multiplayer",
+            "Data/Xml/Campaigns_multiplayer.xml");
+    }
+
+    [Fact]
+    public async Task XmlFindReferences_OnCampaignSetGroupKey_ReturnsAllCampaignsInTheSet()
+    {
+        RequireEawWorkspace();
+        await WaitForFullScanAsync();
+
+        var workspace = LspTestEnvironment.EawWorkspacePath!;
+        var xmlPath = Path.Combine(workspace, "Data/Xml/Campaigns_multiplayer.xml");
+        var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
+        var lines = await File.ReadAllLinesAsync(xmlPath);
+
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+                { Uri = xmlUri, LanguageId = "xml", Version = 1, Text = string.Join(Environment.NewLine, lines) }
+        });
+        await Task.Delay(300);
+
+        try
+        {
+            var (line, col) = FindXmlTagBodyValuePosition(lines, "Campaign_Set", "Multiplayer_Campaign_Set");
+            Assert.True(line >= 0, "Could not find the Campaign_Set value in Campaigns_multiplayer.xml");
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var result = await _fixture.Client.RequestReferences(new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = xmlUri },
+                Position = new Position(line, col),
+                Context = new ReferenceContext { IncludeDeclaration = true }
+            }, cts.Token);
+
+            Assert.NotNull(result);
+            // The multiplayer set groups multiple campaigns - find-references lists them all.
+            Assert.True(result!.Count() >= 2,
+                $"Expected multiple campaigns in the set, got {result!.Count()}");
+        }
+        finally
+        {
+            _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = xmlUri }
+            });
+        }
+    }
+
+    [Fact]
+    public async Task XmlFindReferences_OnPlotReference_IncludesTheReferencedFile()
+    {
+        RequireEawWorkspace();
+        await WaitForFullScanAsync();
+
+        var workspace = LspTestEnvironment.EawWorkspacePath!;
+        var xmlPath = Path.Combine(workspace, "Data/Xml/Campaigns_Alpha.xml");
+        var xmlUri = DocumentUri.FromFileSystemPath(xmlPath);
+        var lines = await File.ReadAllLinesAsync(xmlPath);
+
+        _fixture.Client.DidOpenTextDocument(new DidOpenTextDocumentParams
+        {
+            TextDocument = new TextDocumentItem
+                { Uri = xmlUri, LanguageId = "xml", Version = 1, Text = string.Join(Environment.NewLine, lines) }
+        });
+        await Task.Delay(300);
+
+        try
+        {
+            var (line, col) = FindXmlTagBodyValuePosition(lines, "Empire_Story_Name",
+                "Story_Plots_Campaign_Empire.xml");
+            Assert.True(line >= 0, "Could not find the plot reference in Campaigns_Alpha.xml");
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var result = await _fixture.Client.RequestReferences(new ReferenceParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = xmlUri },
+                Position = new Position(line, col),
+                Context = new ReferenceContext { IncludeDeclaration = true }
+            }, cts.Token);
+
+            Assert.NotNull(result);
+            var uris = result!.Select(l => l.Uri.ToString()).ToList();
+            Assert.Contains(uris, u => u.Contains("story_plots_campaign_empire.xml", StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            _fixture.Client.DidCloseTextDocument(new DidCloseTextDocumentParams
+            {
+                TextDocument = new TextDocumentIdentifier { Uri = xmlUri }
+            });
+        }
     }
 
     private async Task RunGoToAsync(string? tagName, string value, string expectedDefinitionFile,

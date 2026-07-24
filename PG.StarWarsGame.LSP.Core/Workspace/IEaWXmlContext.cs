@@ -9,6 +9,13 @@ public interface IEaWXmlContext
     bool IsEaWXmlFile(string fileUri);
     bool IsLeafFile(string fileUri);
 
+    /// <summary>
+    ///     The file's path relative to the xml directory that contains it ('/'-separated, casing
+    ///     preserved), or null when the file is under no known xml directory. Used to key
+    ///     workspace-file symbols so they match references written xml-dir-relative.
+    /// </summary>
+    string? TryGetXmlRelativePath(string fileUri);
+
     void AddDirectory(string absolutePath);
 
     void SetDirectories(IEnumerable<string> absolutePaths);

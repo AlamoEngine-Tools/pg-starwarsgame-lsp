@@ -8,5 +8,12 @@ public enum GameSymbolKind
     XmlObject,
     Asset,
     LuaGlobal,
-    LocalisationKey
+    LocalisationKey,
+
+    /// <summary>
+    ///     A workspace file (story plot manifest, story thread, or Lua script) indexed as a
+    ///     navigable symbol keyed via <see cref="WorkspaceFileKey" />, so a
+    ///     <see cref="Schema.ReferenceKind.WorkspaceFile" /> reference resolves to the file.
+    /// </summary>
+    WorkspaceFile
 }

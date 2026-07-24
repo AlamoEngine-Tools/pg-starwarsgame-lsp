@@ -72,7 +72,7 @@ public sealed class LuaGameDocumentParserTest
             "function Definitions() end",
             1, default);
 
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Definitions", sym.Id);
         Assert.Equal(GameSymbolKind.LuaGlobal, sym.Kind);
         Assert.Null(sym.TypeName);
@@ -91,7 +91,7 @@ public sealed class LuaGameDocumentParserTest
             """,
             1, default);
 
-        Assert.Equal(3, result.Symbols.Length);
+        Assert.Equal(3, result.Symbols.Count(s => s.Kind == GameSymbolKind.LuaGlobal));
         Assert.Contains(result.Symbols, s => s.Id == "Definitions");
         Assert.Contains(result.Symbols, s => s.Id == "State_Init");
         Assert.Contains(result.Symbols, s => s.Id == "main");
@@ -105,7 +105,7 @@ public sealed class LuaGameDocumentParserTest
             "local function Helper() end",
             1, default);
 
-        Assert.Empty(result.Symbols);
+        Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class LuaGameDocumentParserTest
     {
         var result = await Build().ParseAsync("file:///s.lua", "", 1, default);
 
-        Assert.Empty(result.Symbols);
+        Assert.DoesNotContain(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Empty(result.References);
     }
 
@@ -127,7 +127,7 @@ public sealed class LuaGameDocumentParserTest
 
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
 
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         var origin = (FileOrigin)sym.Origin;
         Assert.Equal(1, origin.Line); // 0-based; function is on line index 1
     }
@@ -138,7 +138,7 @@ public sealed class LuaGameDocumentParserTest
         // "function Foo()" - 'F' is at column 9 ("function " = 9 chars)
         var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
 
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         var origin = (FileOrigin)sym.Origin;
         Assert.Equal(9, origin.Column); // after "function " prefix
     }
@@ -149,7 +149,7 @@ public sealed class LuaGameDocumentParserTest
         // "  function Bar() end" - 'B' is at column 11 ("  function " = 11 chars)
         var result = await Build().ParseAsync("file:///s.lua", "  function Bar() end", 1, default);
 
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         var origin = (FileOrigin)sym.Origin;
         Assert.Equal(11, origin.Column); // after "  function " prefix
     }
@@ -310,7 +310,7 @@ public sealed class LuaGameDocumentParserTest
                             function Foo() end
                             """;
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Does something useful.", sym.Description);
     }
 
@@ -323,7 +323,7 @@ public sealed class LuaGameDocumentParserTest
                             function Foo() end
                             """;
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Line one.\nLine two.", sym.Description);
     }
 
@@ -332,7 +332,7 @@ public sealed class LuaGameDocumentParserTest
     {
         const string text = "--- Separated.\n\nfunction Foo() end";
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
 
@@ -346,7 +346,7 @@ public sealed class LuaGameDocumentParserTest
                             function Foo() end
                             """;
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Equal("Does something.", sym.Description);
     }
 
@@ -358,7 +358,7 @@ public sealed class LuaGameDocumentParserTest
                             function Foo() end
                             """;
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
 
@@ -366,7 +366,7 @@ public sealed class LuaGameDocumentParserTest
     public async Task ParseAsync_NoDocComment_DescriptionIsNull()
     {
         var result = await Build().ParseAsync("file:///s.lua", "function Foo() end", 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
 
@@ -376,7 +376,7 @@ public sealed class LuaGameDocumentParserTest
         // Single-dash `--` comments are NOT doc comments; only `---` lines count.
         const string text = "-- not a doc comment\nfunction Foo() end";
         var result = await Build().ParseAsync("file:///s.lua", text, 1, default);
-        var sym = Assert.Single(result.Symbols);
+        var sym = Assert.Single(result.Symbols, s => s.Kind == GameSymbolKind.LuaGlobal);
         Assert.Null(sym.Description);
     }
 

@@ -46,6 +46,16 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
             return DynamicEnumValueRenameBuilder.Build(enumName, valueName, request.NewName, index, _textSource,
                 _logger);
 
+        // Grouping keys (Campaign_Set / SFXEvent Overlap_Test): the key has no single definition, so
+        // the rename rewrites the shared value in place across every member occurrence.
+        if (index.AllGroupMemberships.ContainsKey(hit.Value.Id))
+            return GroupValueRenameBuilder.Build(hit.Value.Id, request.NewName, index, _logger);
+
+        // Workspace-file references (plot manifests / threads / Lua scripts) rename the file on
+        // disk and rewrite every reference's base name.
+        if (index.Resolve(hit.Value.Id) is { Kind: GameSymbolKind.WorkspaceFile })
+            return FileReferenceRenameBuilder.Build(hit.Value.Id, request.NewName, index, _textSource, _logger);
+
         if (StoryRenameGuard.IsStorySymbol(hit.Value.Id, index))
         {
             if (!(_configProvider?.Current.Features.Story.Rename ?? true)) return null;
@@ -63,6 +73,22 @@ public sealed class XmlRenameHandler : IXmlRenameProvider
 
         var hit = XmlPositionResolver.FindAtPosition(docIndex, line, character);
         if (hit is null) return null;
+
+        // Grouping keys rename the shared value in place: offer the tag-value span as the range.
+        if (index.AllGroupMemberships.ContainsKey(hit.Value.Id))
+            return new RangeOrPlaceholderRange(hit.Value.Range);
+
+        // Workspace-file references rename only the base name (stem): offer just that sub-range,
+        // keeping each reference's directory prefix and extension out of the edit.
+        if (index.Resolve(hit.Value.Id) is { Kind: GameSymbolKind.WorkspaceFile })
+        {
+            if (!index.IsLeafOwned(hit.Value.Id)) return null;
+            var stem = FileReferenceRenameBuilder.StemRange(uri, hit.Value.Range.Start.Line,
+                hit.Value.Range.Start.Character,
+                hit.Value.Range.End.Character - hit.Value.Range.Start.Character,
+                WorkspaceFileKey.HasType(hit.Value.Id, WorkspaceFileKey.LuaScriptType), _textSource);
+            return stem is null ? null : new RangeOrPlaceholderRange(stem);
+        }
 
         if (StoryRenameGuard.IsStorySymbol(hit.Value.Id, index))
         {

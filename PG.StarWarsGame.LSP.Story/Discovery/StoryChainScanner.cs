@@ -10,7 +10,8 @@ namespace PG.StarWarsGame.LSP.Story.Discovery;
 
 /// <summary>
 ///     Walks the campaign story chain: campaign registry (campaignfiles.xml) → campaign documents
-///     (<c>*_Story_Name</c> tags) → plot manifests (<c>Active_Plot</c>/<c>Suspended_Plot</c>/
+///     (<c>*_Story_Name</c> tags, or the generic <c>Story_Name</c> tag whose value is
+///     <c>Faction, PlotFile</c>) → plot manifests (<c>Active_Plot</c>/<c>Suspended_Plot</c>/
 ///     <c>Lua_Script</c>) → story thread files, recursing into tactical plot manifests referenced
 ///     from thread events (STORY_LAND_TACTICAL / STORY_SPACE_TACTICAL event param 1, LINK_TACTICAL
 ///     reward param 7). Missing files that the shipped baseline knows are accepted silently
@@ -19,9 +20,6 @@ namespace PG.StarWarsGame.LSP.Story.Discovery;
 /// </summary>
 public sealed class StoryChainScanner
 {
-    private static readonly HashSet<string> StoryNameTags = new(StringComparer.OrdinalIgnoreCase)
-        { "Rebel_Story_Name", "Empire_Story_Name", "Underworld_Story_Name" };
-
     private static readonly HashSet<string> TacticalEventTypes = new(StringComparer.OrdinalIgnoreCase)
         { "STORY_LAND_TACTICAL", "STORY_SPACE_TACTICAL" };
 
@@ -98,19 +96,16 @@ public sealed class StoryChainScanner
             var factionManifests = new List<StoryFactionManifest>();
 
             foreach (var node in campaignNode.Descendants()
-                         .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTags.Contains(n.Name)))
+                         .Where(n => n.NodeType == HtmlNodeType.Element &&
+                                     StoryNameTagSyntax.IsStoryNameTag(n.Name)))
             {
                 processed.Add(node);
-                var value = node.InnerText.Trim();
-                if (value.Length == 0) continue;
-
-                AddManifest(value, source.At(node, value), StoryChainProblemKind.UnresolvedStoryName, state);
-
-                // "Rebel_Story_Name" → faction "Rebel".
-                var tagName = node.Name;
-                var faction = tagName[..tagName.IndexOf('_')];
-                faction = char.ToUpperInvariant(faction[0]) + faction[1..];
-                factionManifests.Add(new StoryFactionManifest(faction, ToXmlRelativePath(value)));
+                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node))
+                {
+                    AddManifest(plotFile, source.At(node, plotFile),
+                        StoryChainProblemKind.UnresolvedStoryName, state);
+                    factionManifests.Add(new StoryFactionManifest(faction, ToXmlRelativePath(plotFile)));
+                }
             }
 
             if (campaignName.Length > 0 && factionManifests.Count > 0)
@@ -123,13 +118,10 @@ public sealed class StoryChainScanner
         // Story-name tags outside a <Campaign> element (malformed nesting) still get their
         // manifests typed - only the campaign association is lost.
         foreach (var node in source.Doc.DocumentNode.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element && StoryNameTags.Contains(n.Name)
-                                                                    && !processed.Contains(n)))
-        {
-            var value = node.InnerText.Trim();
-            if (value.Length == 0) continue;
-            AddManifest(value, source.At(node, value), StoryChainProblemKind.UnresolvedStoryName, state);
-        }
+                     .Where(n => n.NodeType == HtmlNodeType.Element &&
+                                 StoryNameTagSyntax.IsStoryNameTag(n.Name) && !processed.Contains(n)))
+        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node))
+            AddManifest(plotFile, source.At(node, plotFile), StoryChainProblemKind.UnresolvedStoryName, state);
     }
 
     private void AddManifest(string rawReference, SourceLocation origin,

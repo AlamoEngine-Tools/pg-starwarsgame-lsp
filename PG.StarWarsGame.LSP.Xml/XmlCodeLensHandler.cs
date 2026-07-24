@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -11,6 +12,7 @@ using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Xml.CodeLens;
 using LspCodeLens = OmniSharp.Extensions.LanguageServer.Protocol.Models.CodeLens;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
 
@@ -66,7 +68,67 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
             }
         }
 
+        // Grouping-key tags (Campaign_Set / SFXEvent Overlap_Test) are not symbols, so the registry
+        // never sees them. Surface a lens on each group tag stating how many members share the value,
+        // clickable to peek them - making the otherwise-invisible grouping obvious in the editor.
+        foreach (var lens in GroupMembershipLenses(uri, docIndex, index))
+            lenses.Add(lens);
+
         return Task.FromResult<CodeLensContainer?>(new CodeLensContainer(lenses));
+    }
+
+    // One lens per group-key tag occurrence in this document: "{n} {MemberType}s in this group",
+    // clickable to peek the co-members. Members are resolved workspace-wide (baseline ∪ workspace)
+    // but only navigable origins are offered as peek targets.
+    private static IEnumerable<LspCodeLens> GroupMembershipLenses(
+        string uri, DocumentIndex docIndex, GameIndex index)
+    {
+        if (docIndex.GroupMemberships.IsDefaultOrEmpty) yield break;
+
+        foreach (var gm in docIndex.GroupMemberships)
+        {
+            if (!index.AllGroupMemberships.TryGetValue(gm.Membership.GroupKey, out var members))
+                continue;
+
+            var targets = members
+                .Where(m => m.MemberOrigin is FileOrigin { IsNavigable: true })
+                .Select(m => (FileOrigin)m.MemberOrigin)
+                .ToList();
+            if (targets.Count == 0) continue;
+
+            var member = gm.Membership.MemberTypeName ?? "member";
+            var title = targets.Count == 1
+                ? $"1 {member} in this group"
+                : $"{targets.Count} {member}s in this group";
+
+            var locations = targets.Select(fo => new
+            {
+                uri = fo.Uri,
+                range = new
+                {
+                    start = new { line = fo.Line, character = fo.Column ?? 0 },
+                    end = new { line = fo.Line, character = fo.Column ?? 0 }
+                }
+            });
+
+            yield return new LspCodeLens
+            {
+                Range = new LspRange(
+                    new Position(gm.TagLine, gm.TagColumn),
+                    new Position(gm.TagLine, gm.TagColumn + gm.TagLength)),
+                Command = new Command
+                {
+                    Title = title,
+                    Name = "aet-eaw-edit.lsp.showReferences",
+                    Arguments = JArray.FromObject(new object[]
+                    {
+                        uri,
+                        new { line = gm.TagLine, character = gm.TagColumn },
+                        locations.ToArray()
+                    })
+                }
+            };
+        }
     }
 
     public override Task<LspCodeLens> Handle(LspCodeLens request, CancellationToken ct)

@@ -60,6 +60,19 @@ public sealed class XmlGameDocumentParserTest
         return new XmlTagDefinition { Tag = tag, ValueType = XmlValueType.Float };
     }
 
+    private static XmlTagDefinition WorkspaceFileTag(string tag, string referenceType,
+        TagSemanticType semanticType = TagSemanticType.Default)
+    {
+        return new XmlTagDefinition
+        {
+            Tag = tag,
+            ValueType = XmlValueType.NameReference,
+            ReferenceKind = ReferenceKind.WorkspaceFile,
+            ReferenceTypeName = referenceType,
+            SemanticType = semanticType
+        };
+    }
+
     private static XmlTagDefinition VariantTag()
     {
         return new XmlTagDefinition
@@ -70,6 +83,73 @@ public sealed class XmlGameDocumentParserTest
             SemanticType = TagSemanticType.VariantParent,
             ObjectType = new GameObjectTypeDefinition { TypeName = "GameObjectType" }
         };
+    }
+
+    // ── workspaceFile references (plot manifests / threads / lua scripts) ────
+
+    [Fact]
+    public async Task WorkspaceFileTag_SingleValue_EmitsReferenceKeyedByReferenceType()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Empire_Story_Name", "StoryPlotManifest"));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaigns><Campaign Name=\"T\">\n" +
+            "<Empire_Story_Name>Story_Plots_Campaign_Empire.xml</Empire_Story_Name>\n" +
+            "</Campaign></Campaigns>", 1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyplotmanifest:story_plots_campaign_empire.xml", reference.TargetId);
+        Assert.Equal("StoryPlotManifest", reference.ExpectedTypeName);
+        Assert.Equal(1, reference.Line);
+        Assert.Equal("<Empire_Story_Name>".Length, reference.Column);
+        Assert.Equal("Story_Plots_Campaign_Empire.xml".Length, reference.Length);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_SubdirPath_IsNotSplitOnSeparators()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Active_Plot", "StoryParser"));
+
+        var index = await Build(schema).ParseAsync("file:///m.xml",
+            "<Story_Mode_Plots><Active_Plot>Conquests\\Loader\\Story_Plots_Loader.xml</Active_Plot></Story_Mode_Plots>",
+            1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyparser:conquests/loader/story_plots_loader.xml", reference.TargetId);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_LeadingTrailingSpace_RangeCoversTrimmedValue()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Rebel_Story_Name> Story_Plots_Rebel.xml </Rebel_Story_Name>\n</Campaign>", 1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyplotmanifest:story_plots_rebel.xml", reference.TargetId);
+        Assert.Equal("<Rebel_Story_Name> ".Length, reference.Column);
+        Assert.Equal("Story_Plots_Rebel.xml".Length, reference.Length);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_FactionPlotFilePairList_EmitsOnlyPlotFileTokens()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
+            TagSemanticType.FactionPlotFilePairList));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>",
+            1, default);
+
+        var refs = index.References.Where(r => r.ExpectedKind == GameSymbolKind.WorkspaceFile).ToList();
+        Assert.Equal(
+            ["storyplotmanifest:story_plots_r.xml", "storyplotmanifest:conquests/e.xml"],
+            refs.Select(r => r.TargetId));
     }
 
     private static XmlTagDefinition GroupRefTag(string tag, string referenceType)
@@ -434,6 +514,139 @@ public sealed class XmlGameDocumentParserTest
 
         var result = await Build(schema).ParseAsync("file:///s.xml",
             $"""<SpaceStructure Name="STARBASE"><Starting_Spawned_Units_Tech_0>{value}</Starting_Spawned_Units_Tech_0></SpaceStructure>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Empty(result.References);
+    }
+
+    // ── Campaign per-faction / force-deployment tuples (A1-A3) ────────────────
+
+    // These tags carry a per-faction/force-deployment ValueType and NO ReferenceKind in the real
+    // schema, so their faction and object tokens used to be invisible to go-to-definition. Slots
+    // have fixed meaning: faction -> Faction, planet/unit -> GameObjectType, numeric -> not emitted.
+    private static XmlTagDefinition TupleTag(string tag, XmlValueType valueType)
+    {
+        return new XmlTagDefinition { Tag = tag, ValueType = valueType };
+    }
+
+    [Fact]
+    public async Task ParseAsync_PerFactionPlanet_EmitsFactionThenPlanetReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(TupleTag("Home_Location", XmlValueType.PerFactionPlanet));
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Home_Location>Rebel, Dantooine</Home_Location></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Collection(result.References,
+            r =>
+            {
+                Assert.Equal("Rebel", r.TargetId);
+                Assert.Equal(GameSymbolKind.XmlObject, r.ExpectedKind);
+                Assert.Equal("Faction", r.ExpectedTypeName);
+            },
+            r =>
+            {
+                Assert.Equal("Dantooine", r.TargetId);
+                Assert.Equal(GameSymbolKind.XmlObject, r.ExpectedKind);
+                Assert.Equal("GameObjectType", r.ExpectedTypeName);
+            });
+    }
+
+    [Fact]
+    public async Task ParseAsync_PerFactionPlanet_ReferenceRangesCoverOnlyTheirTokens()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(TupleTag("Home_Location", XmlValueType.PerFactionPlanet));
+
+        const string xml =
+            """<Campaign Name="C"><Home_Location> Rebel, Dantooine </Home_Location></Campaign>""";
+        var result = await Build(schema).ParseAsync("file:///c.xml", xml, 1,
+            TestContext.Current.CancellationToken);
+
+        Assert.All(result.References, r =>
+        {
+            var lineText = xml.Split('\n')[r.Line];
+            Assert.Equal(r.TargetId, lineText.Substring(r.Column, r.Length));
+        });
+    }
+
+    [Theory]
+    [InlineData("Starting_Credits")]
+    [InlineData("Starting_Tech_Level")]
+    [InlineData("Max_Tech_Level")]
+    public async Task ParseAsync_PerFactionValue_EmitsFactionReferenceOnly_NotTheNumber(string tag)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(TupleTag(tag, XmlValueType.PerFactionValue));
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            $"""<Campaign Name="C"><{tag}>Empire, 20000</{tag}></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Empire", reference.TargetId);
+        Assert.Equal("Faction", reference.ExpectedTypeName);
+    }
+
+    [Theory]
+    [InlineData("Starting_Forces")]
+    [InlineData("Special_Case_Production")]
+    public async Task ParseAsync_ForceDeployment_EmitsFactionPlanetUnitTriple(string tag)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(TupleTag(tag, XmlValueType.ForceDeploymentList));
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            $"""<Campaign Name="C"><{tag}>Empire, Anaxes, Empire_Star_Base_1</{tag}></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Collection(result.References,
+            r => Assert.Equal(("Empire", "Faction"), (r.TargetId, r.ExpectedTypeName)),
+            r => Assert.Equal(("Anaxes", "GameObjectType"), (r.TargetId, r.ExpectedTypeName)),
+            r => Assert.Equal(("Empire_Star_Base_1", "GameObjectType"), (r.TargetId, r.ExpectedTypeName)));
+    }
+
+    [Fact]
+    public async Task ParseAsync_MarkupFilename_EmitsFactionSlotOnly_NotTheMarkupFile()
+    {
+        // "Empire, DefaultGalacticHints": the faction navigates; the GUI markup file is not an
+        // indexable workspace object and must not be emitted (it would be a false unresolved ref).
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "Markup_Filename",
+            ValueType = XmlValueType.NameReferenceList,
+            SemanticType = TagSemanticType.FactionMarkupPairList
+        });
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Markup_Filename>Empire, DefaultGalacticHints</Markup_Filename></Campaign>""",
+            1, TestContext.Current.CancellationToken);
+
+        var reference = Assert.Single(result.References);
+        Assert.Equal("Empire", reference.TargetId);
+        Assert.Equal("Faction", reference.ExpectedTypeName);
+    }
+
+    [Theory]
+    [InlineData(XmlValueType.PerFactionPlanet)]
+    [InlineData(XmlValueType.PerFactionValue)]
+    [InlineData(XmlValueType.ForceDeploymentList)]
+    public async Task ParseAsync_FactionTuple_EmptyValue_EmitsNoReference(XmlValueType valueType)
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("Campaign"));
+        schema.AddTag(TupleTag("Home_Location", valueType));
+
+        var result = await Build(schema).ParseAsync("file:///c.xml",
+            """<Campaign Name="C"><Home_Location>   </Home_Location></Campaign>""",
             1, TestContext.Current.CancellationToken);
 
         Assert.Empty(result.References);

@@ -30,6 +30,19 @@ public sealed class GetStoryPlotsHandler(
         foreach (var manifest in chain.Manifests)
             manifestsByFile.TryAdd(manifest.ManifestFile, manifest);
 
+        var index = indexService.Current;
+        var setByCampaignOrigin = BuildSetByCampaignOrigin(index);
+
+        // The Campaign_Set a campaign belongs to: resolve the campaign object, then look up the set
+        // that records a member at its definition origin (the group index keys set -> members).
+        string? SetForCampaign(string campaignName)
+        {
+            return index.Resolve(campaignName, "Campaign") is { Origin: FileOrigin fo }
+                   && setByCampaignOrigin.TryGetValue((fo.Uri, fo.Line), out var set)
+                ? set
+                : null;
+        }
+
         var campaigns = new List<StoryCampaignDto>();
         foreach (var campaign in chain.Campaigns)
         {
@@ -63,10 +76,24 @@ public sealed class GetStoryPlotsHandler(
                     threads, luaScripts));
             }
 
-            campaigns.Add(new StoryCampaignDto(campaign.Name, factions));
+            campaigns.Add(new StoryCampaignDto(campaign.Name, factions, SetForCampaign(campaign.Name)));
         }
 
         return Task.FromResult(new GetStoryPlotsResult(campaigns));
+    }
+
+    // (campaign definition origin) -> Campaign_Set value, derived from the workspace group index
+    // (keyed set -> members). Only Campaign members are considered, so an SFXEvent Overlap_Test
+    // group sharing the mechanism never leaks into the campaign navigator.
+    private static Dictionary<(string Uri, int Line), string> BuildSetByCampaignOrigin(GameIndex index)
+    {
+        var map = new Dictionary<(string, int), string>();
+        foreach (var (set, members) in index.AllGroupMemberships)
+        foreach (var m in members)
+            if (string.Equals(m.MemberTypeName, "Campaign", StringComparison.OrdinalIgnoreCase)
+                && m.MemberOrigin is FileOrigin fo)
+                map[(fo.Uri, fo.Line)] = set;
+        return map;
     }
 
     // Manifest Lua_Script entries are extensionless engine-cased names; indexed lua documents

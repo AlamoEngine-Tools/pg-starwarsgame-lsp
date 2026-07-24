@@ -30,6 +30,9 @@ public static class StoryReferenceTypes
     /// </summary>
     public const string ThreadFileTypeName = "StoryParser";
 
+    /// <summary>The plot-manifest (<c>Story_Mode_Plots</c>) file type from the metafile registry.</summary>
+    public const string PlotManifestFileTypeName = "StoryPlotManifest";
+
     /// <summary>Whether the referenceType belongs to the story domain (campaign-scoped semantics).</summary>
     public static bool IsStoryScoped(string referenceTypeName)
     {

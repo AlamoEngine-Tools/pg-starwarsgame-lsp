@@ -96,6 +96,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, PerFactionIntMapHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PerFactionObjectListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ForceDeploymentListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VictoryConditionListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnitSpawnTableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnitSpawnProbabilityTableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TupleListHandler>();
@@ -173,6 +174,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlValueProposalRegistry, XmlValueProposalRegistry>();
         services.AddSingleton<IXmlValueProposalProvider, BooleanValueProposalProvider>();
         services.AddSingleton<IXmlValueProposalProvider, DynamicEnumValueProposalProvider>();
+        services.AddSingleton<IXmlValueProposalProvider, VictoryConditionProposalProvider>();
 
         services.AddSingleton<StoryParamValueProposalProvider>();
 

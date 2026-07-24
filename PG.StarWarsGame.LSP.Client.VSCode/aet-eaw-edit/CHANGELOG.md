@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.1
+
+### Improvements
+
+- The story graph panel opens and navigates very large campaigns smoothly. A campaign with well over a thousand events used to take several seconds to open and stuttered while panning and zooming; it now opens near-instantly and stays responsive throughout. When zoomed out the whole graph is drawn as a lightweight overview - nodes as branch-coloured tiles, with event titles fading in as you zoom - and the real, interactive nodes for the visible area take over once you zoom in close enough to work with them. The minimap, thread and chapter swimlanes, Fit, Arrange, and jump-to-node from the problems list all work against the overview, and Edit mode no longer has to render the whole graph to make a change.
+
+### Bug fixes
+
+- Campaign story chains attached through the generic, additive `Story_Name` tag are discovered, navigated and validated. This is the flat `Faction, PlotFile[, Faction, PlotFile ...]` tuple form that mods such as EaWX use to attach plots (and the only form that can attach a non-major faction); it is now handled alongside the faction-specific `Rebel_Story_Name` / `Empire_Story_Name` / `Underworld_Story_Name` tags, with every occurrence of both forms merged into one (faction, plot) list to match the engine.
+
 ## 0.3.0
 
 ### Features
