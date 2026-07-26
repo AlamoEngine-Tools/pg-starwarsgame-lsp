@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class MovieFrameTriggerHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.MovieFrameTrigger;
+
     protected override XmlValueType TargetType => XmlValueType.MovieFrameTrigger;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -27,7 +30,7 @@ public sealed class MovieFrameTriggerHandler : CommaSeparatedPairHandlerBase
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                         $"'{parts[1].Trim()}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {frame}?",
-                        SuggestedFix: frame.ToString()),
+                        SuggestedFix: frame.ToString(), Id: DiagnosticIds.MovieFrameTriggerFloatWhereIntExpected),
                     fact, 1)
             ];
 

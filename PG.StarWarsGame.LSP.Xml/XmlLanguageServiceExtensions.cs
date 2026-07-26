@@ -31,6 +31,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsRevalidator>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<IXmlFixCache>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<IXmlDiagnosticsCollector>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
+        services.AddSingleton<IDiagnosticsRepublisher>(sp => sp.GetRequiredService<XmlDiagnosticsPublisher>());
         services.AddSingleton<RevalidateWorkspaceCommandHandler>();
         services.AddSingleton<RevalidateDocumentCommandHandler>();
 
@@ -209,6 +210,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveEarlierDuplicatesCodeActionProvider>();
+        services.AddSingleton<IXmlCodeActionProvider, SuppressDiagnosticCodeActionProvider>();
 
         // Hover strategies - add IXmlHoverStrategy implementations here to register new strategies
         services.AddSingleton<IXmlHoverStrategyRegistry, XmlHoverStrategyRegistry>();

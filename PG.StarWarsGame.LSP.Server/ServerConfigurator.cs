@@ -28,6 +28,7 @@ using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Story;
+using PG.StarWarsGame.LSP.Server.Suppression;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -84,6 +85,7 @@ public static class ServerConfigurator
             .WithHandler<DialogTextDocumentSyncHandler>()
             .WithHandler<DialogInlayHintHandler>()
             .WithHandler<DialogDefinitionHandler>()
+            .WithHandler<DialogCodeActionHandler>()
             .WithHandler<LuaCompletionHandler>()
             .WithHandler<LuaCodeActionHandler>()
             .WithHandler<LuaDefinitionHandler>()
@@ -109,6 +111,7 @@ public static class ServerConfigurator
             .WithHandler<InitLocalisationProjectCommandHandler>()
             .WithHandler<ImportLocalisationProjectCommandHandler>()
             .WithHandler<CreateLocalisationKeyCommandHandler>()
+            .WithHandler<SuppressDiagnosticGloballyCommandHandler>()
             .WithHandler<GetLocalisationProjectsHandler>()
             .WithHandler<GetRootLocalisationConfigHandler>()
             .WithHandler<GetBaselineEntriesHandler>()
@@ -188,6 +191,9 @@ public static class ServerConfigurator
                 services.AddSingleton<IWorkspaceEditApplier>(sp =>
                     new FacadeWorkspaceEditApplier(() => sp.GetRequiredService<ILanguageServerFacade>()));
                 services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
+                services
+                    .AddSingleton<Core.Diagnostics.Suppression.IGlobalSuppressionStore,
+                        GlobalSuppressionStore>();
                 services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
                 services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
                     sp.GetRequiredService<IStoryModelService>(),
@@ -207,6 +213,8 @@ public static class ServerConfigurator
                 services.AddSingleton<DialogDiagnosticsHandlerRegistry>();
                 services.AddSingleton<DialogDiagnosticsPublisher>();
                 services.AddSingleton<IDialogDiagnosticsRevalidator>(sp =>
+                    sp.GetRequiredService<DialogDiagnosticsPublisher>());
+                services.AddSingleton<Core.Diagnostics.IDiagnosticsRepublisher>(sp =>
                     sp.GetRequiredService<DialogDiagnosticsPublisher>());
 
                 // The inbound event gate: buffers client notifications while the linear startup

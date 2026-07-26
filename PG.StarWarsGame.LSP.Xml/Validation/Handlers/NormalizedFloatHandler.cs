@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class NormalizedFloatHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.NormalizedFloat;
+
     protected override XmlValueType TargetType => XmlValueType.NormalizedFloat;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -28,7 +31,7 @@ public sealed class NormalizedFloatHandler : SingleValueTypeHandlerBase
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"Value {d} is out of range [0, 1] for <{fact.Tag.Tag}>. Did you mean {clamped}?",
-                    SuggestedFix: clamped)
+                    SuggestedFix: clamped, Id: DiagnosticIds.NormalizedFloatOutOfRange)
             ];
         }
 

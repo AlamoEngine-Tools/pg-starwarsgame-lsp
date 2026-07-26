@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class LocalisationKeyListExistenceHandler : LocalisationKeyHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.LocalisationKeyListExistence;
+
     // Encyclopedia_Text/MP_Encyclopedia_Text are declared as TypeReferenceList in schema even
     // though they're semantically a localisation-key list like any NameReferenceList tag - the
     // inlay-hint provider already treats both as equivalent (LocalisationKeyMultiValueInlayHintProvider).

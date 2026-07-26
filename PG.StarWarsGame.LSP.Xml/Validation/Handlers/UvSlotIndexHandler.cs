@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class UvSlotIndexHandler : NumberValueHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.UvSlotIndex;
+
     protected override XmlValueType TargetType => XmlValueType.UvSlotIndex;
 
     protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(

@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -44,11 +45,12 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILogger<LuaDiagnosticsPublisher> logger,
         ILuaParseCache parseCache,
         ILspConfigurationProvider configProvider,
-        ServerOptions? options = null)
+        ServerOptions? options = null,
+        IGlobalSuppressionStore? globalSuppressions = null)
         : this(p => server.TextDocument.PublishDiagnostics(p),
             indexService, workspaceHost, fileHelper, schemaProvider, logger,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
-            parseCache, configProvider)
+            parseCache, configProvider, globalSuppressions)
     {
     }
 
@@ -61,8 +63,9 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         ILogger<LuaDiagnosticsPublisher> logger,
         int debounceMs = 0,
         ILuaParseCache? parseCache = null,
-        ILspConfigurationProvider? configProvider = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger)
+        ILspConfigurationProvider? configProvider = null,
+        IGlobalSuppressionStore? globalSuppressions = null)
+        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
         _fileHelper = fileHelper;
         _schemaProvider = schemaProvider;
@@ -94,10 +97,17 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
         diagnostics.AddRange(LuaGlobalScopeAnalyzer.Analyze(uri, parsed.Tree, index, _schemaProvider, _fileHelper));
         diagnostics.AddRange(LuaUpvalueAnalyzer.Analyze(parsed.Tree, uri));
 
+        // Applied once, on the way out, so every analyzer above is covered without any of them
+        // having to know about scopes - and using the parse already in hand.
+        var scan = LuaSuppressionCommentParser.Parse(parsed.Tree);
+        diagnostics.AddRange(scan.ProblemDiagnostics(text.Split('\n')));
+
+        var kept = FilterSuppressed(diagnostics, scan.Ranges);
+
         Publish(new LspPublishParams
         {
             Uri = DocumentUri.From(uri),
-            Diagnostics = new LspDiagnosticContainer(diagnostics)
+            Diagnostics = new LspDiagnosticContainer(kept)
         });
     }
 
@@ -115,9 +125,14 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             var span = diag.Location.GetLineSpan();
             var start = span.StartLinePosition;
             var end = span.EndLinePosition;
+
+            // Loretta's own id where it maps, its raw id where it does not: an unmapped code is
+            // still worth showing, it just cannot be named by a suppression.
+            var code = LorettaDiagnosticIds.TryMap(diag.Id, out var mapped) ? mapped.ToString() : diag.Id;
+
             diagnostics.Add(new LspDiagnostic
             {
-                Code = new LspDiagnosticCode(diag.Id),
+                Code = new LspDiagnosticCode(code),
                 Severity = lspSeverity,
                 Message = diag.GetMessage(),
                 Range = new LspRange(
@@ -148,6 +163,9 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
 
             diagnostics.Add(new LspDiagnostic
             {
+                // Same id the XML side uses: an unresolved reference is the same kind of problem
+                // whichever language names the target.
+                Code = new LspDiagnosticCode(DiagnosticIds.UnresolvedReference.ToString()),
                 Severity = eval.Value.Severity.ToLsp(),
                 Message = eval.Value.Message,
                 Range = range,

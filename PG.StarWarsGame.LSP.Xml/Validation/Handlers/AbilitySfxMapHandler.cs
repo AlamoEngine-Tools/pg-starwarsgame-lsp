@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class AbilitySfxMapHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.AbilitySfxMap;
+
     protected override XmlValueType TargetType => XmlValueType.AbilitySfxMap;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -32,7 +35,7 @@ public sealed class AbilitySfxMapHandler : CommaSeparatedPairHandlerBase
             var known = abilityTypeSet.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (!known.Contains(abilityCode))
                 results.Add(AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{abilityCode}' is not a known AbilityType value for <{fact.Tag.Tag}>."), fact, 0));
+                    $"'{abilityCode}' is not a known AbilityType value for <{fact.Tag.Tag}>.", Id: DiagnosticIds.AbilitySfxMapUnknownAbilityType), fact, 0));
         }
 
         var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index);

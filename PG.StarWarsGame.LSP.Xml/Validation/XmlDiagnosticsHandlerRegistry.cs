@@ -44,10 +44,17 @@ public sealed class XmlDiagnosticsHandlerRegistry : IXmlDiagnosticsHandlerRegist
                 _ => defaultHandlers.Concat(customHandlers)
             };
 
-            return sequence.SelectMany(h => h.Handle(fact, ctx));
+            return sequence.SelectMany(Stamped);
         }
 
-        return _byFactType[fact.GetType()].SelectMany(h => h.Handle(fact, ctx));
+        return _byFactType[fact.GetType()].SelectMany(Stamped);
+
+        IEnumerable<XmlDiagnosticResult> Stamped(IXmlDiagnosticsHandler handler)
+        {
+            return handler.Handle(fact, ctx).Select(r => r.Id is null && handler.DefaultId is { } id
+                ? r with { Id = id }
+                : r);
+        }
     }
 
     public IEnumerable<XmlDiagnosticResult> DispatchAll(IEnumerable<XmlFact> facts, DiagnosticsContext ctx)

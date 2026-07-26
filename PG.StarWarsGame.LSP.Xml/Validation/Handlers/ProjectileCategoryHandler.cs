@@ -3,9 +3,14 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class ProjectileCategoryHandler : NamedEnumValueHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.ProjectileCategory;
+
     protected override XmlValueType TargetType => XmlValueType.ProjectileCategory;
 }

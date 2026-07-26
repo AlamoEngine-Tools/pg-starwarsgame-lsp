@@ -125,6 +125,90 @@ Lua script files inside the declared `scripts` directories are indexed and check
 
 ---
 
+## Suppressing diagnostics
+
+Every diagnostic the server reports carries an id of the form `aetswg-<group>-<number>`, for example `aetswg-004-0001`. The id is shown in the Code column of the Problems panel and is what you name when you want a diagnostic silenced. Ids are stable: they are never renumbered or reused, so a suppression you commit today keeps meaning the same thing.
+
+### Quick fixes
+
+Put the cursor on a reported problem and open the lightbulb (`Ctrl+.`). Every diagnostic offers the same four scopes, narrowest first, and the fix writes the comment for you:
+
+- **Suppress ... for this line**
+- **Suppress ... for this `<Unit>` / function / chapter** - only offered when there is one to attach it to
+- **Suppress ... in this file**
+- **Suppress ... across the project**
+
+None of them is marked as the preferred fix, so `Ctrl+.` followed by `Enter` never silences a problem by accident.
+
+### Writing directives by hand
+
+A directive is an ordinary comment in whichever language the file is:
+
+| Language | Comment form |
+|---|---|
+| XML | `<!-- aetswg:suppress aetswg-004-0001 -->` |
+| Lua | `-- aetswg:suppress aetswg-004-0001` |
+| Story dialog (`.txt`) | `# aetswg:suppress aetswg-004-0001` |
+
+Three keywords select the scope:
+
+| Keyword | Covers |
+|---|---|
+| `aetswg:suppress` | the next element (XML), statement (Lua), or command line (dialog) |
+| `aetswg:suppress-object` | the enclosing object element, function, or `[CHAPTER n]` section |
+| `aetswg:suppress-file` | the whole file, wherever in it the comment sits |
+
+A directive may sit inside a longer comment, so a note to your future self can share the line. If the thing a scope points at does not exist - an `-object` directive outside any object, or a trailing directive with nothing after it - it covers only its own line rather than silently spreading to the rest of the file.
+
+Project-wide suppressions are not comments. They live in `.aetswg/suppressions.json` at the project root, written by the **across the project** quick fix. Commit that file: it is part of the project, like the `.pgproj` itself.
+
+### Lists, wildcards, and reasons
+
+One directive can name several ids, separated by commas, and can carry a reason after `reason::`:
+
+```xml
+<!-- aetswg:suppress aetswg-010-0002, aetswg-010-0003 reason:: deliberate shadow, cleared with the art team -->
+```
+
+Everything after `reason::` is free text to the end of the comment, so commas in it are prose rather than more ids. The reason is for whoever reads the file next; the server does not act on it.
+
+A `*` in place of the number silences a whole group - `aetswg-004-*` turns off every asset-file check, which is the usual way to say "stop checking whether these files exist yet":
+
+| Group | Covers |
+|---|---|
+| `aetswg-001-*` | References that do not resolve |
+| `aetswg-002-*` | Enum values |
+| `aetswg-003-*` | Value format: numbers, booleans, tuples, arity |
+| `aetswg-004-*` | Asset files: models, textures, audio, maps |
+| `aetswg-005-*` | Localisation keys |
+| `aetswg-006-*` | Document structure |
+| `aetswg-007-*` | Cross-tag rules within one object |
+| `aetswg-008-*` | Variant inheritance |
+| `aetswg-009-*` | Story and campaigns |
+| `aetswg-010-*` | Symbols and layers: duplicates, shadowing |
+| `aetswg-011-*` | Engine constraints |
+| `aetswg-012-*` | Syntax errors |
+| `aetswg-013-*` | Suppression comments themselves |
+
+Groups describe the kind of problem, not the language it was found in, so `aetswg-001-*` covers unresolved references in XML and in Lua alike.
+
+### When a directive is wrong
+
+A directive that names something unreadable suppresses nothing, and the server says so rather than leaving you to wonder why the diagnostic is still there:
+
+- `aetswg-013-0001` - an entry that is not an id or a group wildcard (usually a typo, or an id written without its leading zeros: `aetswg-4-1` instead of `aetswg-004-0001`)
+- `aetswg-013-0002` - a directive that names no diagnostic at all
+
+Only the bad entry is rejected. In a list, the ids you got right still take effect. These warnings can themselves be silenced with `aetswg-013-*` if you would rather not see them.
+
+### `<Override>` is not a suppression
+
+The `<!-- <Override Name="..."/> -->` marker in XML is a different mechanism and is unaffected by any of the above. It declares that shadowing a lower layer is intended, in the spirit of Java's `@Override` - a claim the server checks, rather than a message it hides.
+
+Dialog quick fixes are gated by `aet-eaw-edit.features.dialog.codeActions`; every other part of suppression is always on.
+
+---
+
 ## Story mode
 
 Campaign story plots are followed from `CampaignFiles.xml` through the plot manifests to the individual `Story_*.xml` thread files, so the whole campaign is understood as one graph rather than a pile of unrelated files. Every part of this is opt-in and still in development - see the story flags in the [feature flags](#feature-flags) reference.

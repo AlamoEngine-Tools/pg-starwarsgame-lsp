@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<HardpointBoneNotOnModelFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.HardpointBoneNotOnModel;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         HardpointBoneNotOnModelFact fact, DiagnosticsContext ctx)
     {

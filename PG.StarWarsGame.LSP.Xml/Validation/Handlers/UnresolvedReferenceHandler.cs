@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class UnresolvedReferenceHandler : XmlDiagnosticsHandler<XmlReferenceFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.UnresolvedReference;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlReferenceFact fact, DiagnosticsContext ctx)
     {
         if (fact.Resolved is not null)

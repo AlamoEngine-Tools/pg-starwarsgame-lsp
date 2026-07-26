@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class DamageNonzeroHandler : XmlDiagnosticsHandler<XmlTagValueFact>, IXmlNamedDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.DamageNonzero;
+
     public string ValidationId => "damage-nonzero";
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)

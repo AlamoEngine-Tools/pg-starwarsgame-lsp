@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class TypeReferenceHandler : NonEmptyReferenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.TypeReference;
+
     protected override XmlValueType TargetType => XmlValueType.TypeReference;
     protected override string ReferenceNoun => "type reference";
 }

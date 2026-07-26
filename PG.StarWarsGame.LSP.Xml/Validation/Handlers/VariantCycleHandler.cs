@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class VariantCycleHandler : XmlDiagnosticsHandler<VariantCycleFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.VariantCycle;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(VariantCycleFact fact, DiagnosticsContext ctx)
     {
         return

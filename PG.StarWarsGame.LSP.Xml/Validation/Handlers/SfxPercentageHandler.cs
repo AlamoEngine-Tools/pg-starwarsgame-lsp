@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class SfxPercentageHandler : NumberValueHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.SfxPercentage;
+
     protected override XmlValueType TargetType => XmlValueType.SfxPercentage;
 
     protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(

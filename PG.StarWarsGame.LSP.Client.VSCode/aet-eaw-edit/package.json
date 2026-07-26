@@ -499,6 +499,12 @@
             "default": false,
             "markdownDescription": "Enables go-to-definition in story-dialog `.txt` scripts: `DIALOG`, `MOVIE`/`MOVIE_ONCE`, and `SFX` arguments jump to the defining XML object.\n\nOnly applies to files under the `.pgproj` `directories.storyDialog` folders.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.dialog.codeActions": {
+            "order": 1866,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables quick fixes in story-dialog `.txt` scripts: lightbulb actions that write a `# aetswg:suppress` comment for the diagnostic under the cursor, scoped to the line, the enclosing `[CHAPTER n]`, the file, or the whole project.\n\nOnly applies to files under the `.pgproj` `directories.storyDialog` folders.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.tools.localisation": {
             "order": 1900,
             "type": "boolean",

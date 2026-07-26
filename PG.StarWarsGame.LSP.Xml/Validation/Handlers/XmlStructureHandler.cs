@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class XmlStructureHandler : XmlDiagnosticsHandler<XmlStructureFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.XmlStructure;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlStructureFact fact, DiagnosticsContext ctx)
     {
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Error, fact.Reason)];

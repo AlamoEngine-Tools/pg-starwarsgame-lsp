@@ -14,6 +14,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class PresenceInducedAnimationsHandler : XmlDiagnosticsHandler<XmlTagValueFact>,
     IXmlNamedDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.PresenceInducedAnimations;
+
     public string ValidationId => "presence-induced-animations";
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)

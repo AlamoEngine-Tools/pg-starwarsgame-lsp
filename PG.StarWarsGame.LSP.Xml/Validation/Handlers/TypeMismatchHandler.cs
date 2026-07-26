@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class TypeMismatchHandler : XmlDiagnosticsHandler<XmlReferenceFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.TypeMismatch;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlReferenceFact fact, DiagnosticsContext ctx)
     {
         if (fact.Resolved is null || fact.ExpectedTypeName is null)

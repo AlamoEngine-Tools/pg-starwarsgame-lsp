@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
@@ -19,9 +20,11 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     the per-language diagnostics feature flags): while it returns false, index changes
 ///     publish nothing.
 /// </summary>
-public abstract class DiagnosticsPublisherBase
+public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 {
     private readonly int _debounceMs;
+    private readonly IGlobalSuppressionStore? _globalSuppressions;
+    private readonly IGameIndexService _indexService;
     private readonly ILogger _logger;
     private readonly Action<PublishDiagnosticsParams> _publish;
     private readonly object _publishLock = new();
@@ -39,13 +42,37 @@ public abstract class DiagnosticsPublisherBase
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
         int debounceMs = 100,
-        ILogger? logger = null)
+        ILogger? logger = null,
+        IGlobalSuppressionStore? globalSuppressions = null)
     {
         _publish = publish;
         _workspaceHost = workspaceHost;
         _debounceMs = debounceMs;
         _logger = logger ?? NullLogger.Instance;
+        _globalSuppressions = globalSuppressions;
+        _indexService = indexService;
         indexService.IndexChanged += OnIndexChanged;
+    }
+
+    /// <summary>
+    ///     Republishes every open document of this language against the current index.
+    ///     <para>
+    ///         The per-document skip that <see cref="RunPublish" /> applies is deliberately bypassed:
+    ///         it compares index references to decide what can have changed, and the reason for
+    ///         republishing here is something the index does not model at all.
+    ///     </para>
+    /// </summary>
+    public virtual Task RepublishAllAsync(CancellationToken ct)
+    {
+        if (!DiagnosticsEnabled) return Task.CompletedTask;
+
+        lock (_publishLock)
+        {
+            _lastRunIndex = null;
+            RunPublish(_indexService.Current);
+        }
+
+        return Task.CompletedTask;
     }
 
     protected abstract string FileExtension { get; }
@@ -55,9 +82,45 @@ public abstract class DiagnosticsPublisherBase
 
     protected abstract void PublishForDocument(string uri, string text, GameIndex index);
 
+    /// <summary>
+    ///     Drops every diagnostic silenced by <paramref name="ranges" /> or by a project-wide
+    ///     suppression. This is where "suppressed" is defined for all languages - the merge with the
+    ///     global store and the fail-safe on unnameable diagnostics live here, so a language decides
+    ///     only <em>where</em> in its pipeline to apply it, never <em>what it means</em>.
+    ///     <para>
+    ///         Callers apply it where they hold both the diagnostics and the parsed document the
+    ///         ranges come from, which every publisher already does when it builds them. Filtering
+    ///         at publish time instead would re-resolve the document for a second time, and would
+    ///         read the saved text rather than the staged text an on-demand caller passed in.
+    ///     </para>
+    /// </summary>
+    protected IReadOnlyList<Diagnostic> FilterSuppressed(
+        IReadOnlyList<Diagnostic> diagnostics, IReadOnlyList<SuppressionRange> ranges)
+    {
+        if (diagnostics.Count == 0) return diagnostics;
+
+        var global = _globalSuppressions?.GetAll() ?? [];
+        if (ranges.Count == 0 && global.Count == 0) return diagnostics;
+
+        var suppressions = new DocumentSuppressions(ranges, global);
+        return diagnostics.Where(d => !IsSuppressed(d, suppressions)).ToList();
+    }
+
     protected void Publish(PublishDiagnosticsParams p)
     {
         _publish(p);
+    }
+
+    /// <summary>
+    ///     A diagnostic with no parseable id cannot be named by a suppression, so it always
+    ///     survives. That is the safe direction: an unsuppressable diagnostic stays visible, and is
+    ///     never silently dropped for lacking a code.
+    /// </summary>
+    private static bool IsSuppressed(Diagnostic diagnostic, DocumentSuppressions suppressions)
+    {
+        return diagnostic.Code?.String is { } code
+               && DiagnosticId.TryParse(code, out var id)
+               && suppressions.IsSuppressed(id, diagnostic.Range.Start.Line);
     }
 
     protected void ClearAllPublished()

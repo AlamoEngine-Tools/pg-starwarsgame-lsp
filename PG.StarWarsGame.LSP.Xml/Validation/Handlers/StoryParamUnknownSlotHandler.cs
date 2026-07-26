@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class StoryParamUnknownSlotHandler : XmlDiagnosticsHandler<StoryParamFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.StoryParamUnknownSlot;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryParamFact fact, DiagnosticsContext ctx)
     {
         if (fact.Def is not null || fact.RawValue.Length == 0)

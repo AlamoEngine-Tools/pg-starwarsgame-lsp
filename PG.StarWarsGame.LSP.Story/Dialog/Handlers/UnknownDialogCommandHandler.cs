@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Story.Dialog.Handlers;
 
 public sealed class UnknownDialogCommandHandler : IDialogDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public DiagnosticId DefaultId => DiagnosticIds.DialogUnknownCommand;
+
     public IEnumerable<DialogDiagnostic> Handle(DialogCommandFact fact, GameIndex index)
     {
         if (fact.Def is not null) yield break;

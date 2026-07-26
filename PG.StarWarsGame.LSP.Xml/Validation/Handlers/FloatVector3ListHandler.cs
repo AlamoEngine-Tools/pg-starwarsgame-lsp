@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class FloatVector3ListHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.FloatVector3List;
+
     protected override XmlValueType TargetType => XmlValueType.FloatVector3List;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -18,7 +21,7 @@ public sealed partial class FloatVector3ListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid Float3 list for <{fact.Tag.Tag}>.")
+                    $"'' is not a valid Float3 list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.FloatVector3ListEmpty)
             ];
 
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();

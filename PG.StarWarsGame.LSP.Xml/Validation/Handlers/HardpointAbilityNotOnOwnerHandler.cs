@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class HardpointAbilityNotOnOwnerHandler
     : XmlDiagnosticsHandler<HardpointAbilityNotOnOwnerFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.HardpointAbilityNotOnOwner;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         HardpointAbilityNotOnOwnerFact fact, DiagnosticsContext ctx)
     {

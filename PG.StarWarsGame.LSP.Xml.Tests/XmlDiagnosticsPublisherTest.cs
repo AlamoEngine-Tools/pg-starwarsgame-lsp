@@ -478,7 +478,7 @@ public sealed class XmlDiagnosticsPublisherTest
         Assert.Contains(pub.Diagnostics!, d => d.Message.Contains("UNIT_A"));
     }
 
-    // ── lsp:suppress annotation ──────────────────────────────────────────────
+    // ── suppression directives ───────────────────────────────────────────────
 
     private static GameIndex IndexWithDuplicateAtLine(string id, string uri1, string uri2, int line)
     {
@@ -499,7 +499,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
         // Symbol is at line 1; suppression comment is at line 0.
-        const string xml = "<!-- lsp:suppress duplicate-symbol -->\n<Unit Name=\"Default\"/>";
+        const string xml = "<!-- aetswg:suppress aetswg-010-0001 -->\n<Unit Name=\"Default\"/>";
         workspaceHost.Set("file:///a.xml", xml);
         workspaceHost.Set("file:///b.xml", "<Unit Name=\"Default\"/>");
         var index = IndexWithDuplicateAtLine("Default", "file:///a.xml", "file:///b.xml", 1);
@@ -515,7 +515,7 @@ public sealed class XmlDiagnosticsPublisherTest
     public void OnIndexChanged_SuppressAnnotation_Only_Suppresses_That_File()
     {
         var (_, published, indexService, workspaceHost) = BuildSubscribed();
-        const string xmlA = "<!-- lsp:suppress duplicate-symbol -->\n<Unit Name=\"Default\"/>";
+        const string xmlA = "<!-- aetswg:suppress aetswg-010-0001 -->\n<Unit Name=\"Default\"/>";
         const string xmlB = "<Unit Name=\"Default\"/>";
         workspaceHost.Set("file:///a.xml", xmlA);
         workspaceHost.Set("file:///b.xml", xmlB);

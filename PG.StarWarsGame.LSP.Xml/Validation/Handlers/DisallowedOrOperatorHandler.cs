@@ -17,6 +17,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class DisallowedOrOperatorHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.DisallowedOrOperator;
+
     // Must mirror the "multiValue" set in XmlGameDocumentParser.SplitReferenceNames - these are
     // the value types whose reference splitter treats '|' as a plain separator instead of OR.
     private static readonly XmlValueType[] TargetTypes =

@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class AudioFileExistenceHandler : AssetFileExistenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.AudioFileExistence;
+
     protected override ReferenceKind TargetKind => ReferenceKind.AudioFile;
     protected override string AssetNoun => "Audio";
     protected override IReadOnlyList<string> AllowedExtensions => [".wav", ".mp3"];

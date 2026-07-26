@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class SFXEventReferenceHandler : NonEmptyReferenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.SFXEventReference;
+
     protected override XmlValueType TargetType => XmlValueType.SFXEventReference;
     protected override string ReferenceNoun => "SFX event reference";
 }

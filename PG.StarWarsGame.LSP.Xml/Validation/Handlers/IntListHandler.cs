@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class IntListHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.IntList;
+
     protected override XmlValueType TargetType => XmlValueType.IntList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -18,7 +21,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid integer list for <{fact.Tag.Tag}>.")
+                    $"'' is not a valid integer list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.IntListEmpty)
             ];
 
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();
@@ -48,7 +51,7 @@ public sealed partial class IntListHandler : SingleValueTypeHandlerBase
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                 $"'{trimmed}' contains float values but <{fact.Tag.Tag}> expects integers. Did you mean '{corrected}'?",
-                SuggestedFix: corrected)
+                SuggestedFix: corrected, Id: DiagnosticIds.IntListFloatWhereIntExpected)
         ];
     }
 

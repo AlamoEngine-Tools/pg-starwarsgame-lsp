@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class VariantAdditiveMergeHandler : XmlDiagnosticsHandler<VariantAdditiveMergeFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.VariantAdditiveMerge;
+
     // Additive tags hold comma-separated lists that routinely run to hundreds of characters; the
     // full merged value is what the effective-object view is for, not a Problems-panel entry.
     private const int MaxInlineEntries = 3;

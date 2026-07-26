@@ -17,7 +17,9 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Xml.Util;
+using PG.StarWarsGame.LSP.Xml.Validation.Suppression;
 using PG.StarWarsGame.LSP.Xml.Validation;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
@@ -110,8 +112,9 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         ILspConfigurationProvider? configProvider = null,
         IStoryChainProblemStore? storyChainProblems = null,
         IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
-        IXmlHardpointFactProducer? hardpointProducer = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger)
+        IXmlHardpointFactProducer? hardpointProducer = null,
+        IGlobalSuppressionStore? globalSuppressions = null)
+        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
         _hardpointProducer = hardpointProducer;
         _configProvider = configProvider;
@@ -165,15 +168,10 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(parsed, uri));
 
-        var lines = parsed.Lines;
         var allDiags = new List<Diagnostic>();
         foreach (var fact in facts)
-        {
-            if (fact is XmlSymbolFact symbolFact && IsDuplicateSymbolSuppressed(lines, symbolFact.Line))
-                continue;
-            foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
-                allDiags.Add(ToLspDiagnostic(fact, result));
-        }
+        foreach (var result in _handlerRegistry.Dispatch(fact, ctx))
+            allDiags.Add(ToLspDiagnostic(fact, result));
 
         allDiags.AddRange(CollectHardcodedRefDiagnostics(uri, parsed, index));
         allDiags.AddRange(CollectDamageTypeOrderDiagnostics(uri, parsed));
@@ -182,7 +180,41 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (_storyGraphDiagnostics is not null && IsStoryParserDocument(uri))
             allDiags.AddRange(_storyGraphDiagnostics.GetForDocument(canonicalUri).Select(ToLspDiagnostic));
 
-        return allDiags;
+        // Suppression is applied once, here, on the way out - after every producer, including the
+        // ones that build Diagnostics directly and the story chain/graph sources. Filtering earlier
+        // would mean teaching each producer about scopes, and would miss the direct ones entirely.
+        //
+        // It happens in Collect rather than at publish time because Collect is also the on-demand
+        // entry point (IXmlDiagnosticsCollector), and the story editor calls it with staged text
+        // that is not what a publish-time lookup would find.
+        var scan = SuppressionCommentParser.Parse(parsed.Html, IsObjectNode);
+
+        // Complaints about the directives go through the same filter as everything else, so a user
+        // who does not want them can suppress aetswg-013-* like any other group.
+        allDiags.AddRange(scan.ProblemDiagnostics(parsed.Lines));
+
+        return FilterSuppressed(allDiags, scan.Ranges);
+    }
+
+    /// <summary>
+    ///     Whether an element is an "object" for <c>aetswg:suppress-object</c> - the same test the
+    ///     fact producer uses to decide what a tag hangs off: its name resolves to a schema object
+    ///     type, in either the source or PascalCase spelling.
+    /// </summary>
+    private bool IsObjectNode(HtmlNode node)
+    {
+        return _schema.GetObjectType(node.Name) is not null
+               || _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name)) is not null;
+    }
+
+    /// <summary>
+    ///     XML publishes diagnostics for every indexed document, not only the open ones, so its
+    ///     republish has to cover the same set - refreshing open documents alone would leave stale
+    ///     problems in the panel for files the user has not opened.
+    /// </summary>
+    public override Task RepublishAllAsync(CancellationToken ct)
+    {
+        return RevalidateWorkspaceAsync(ct);
     }
 
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
@@ -311,7 +343,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                         $"<Damage_Types> has only {tokens.Count} value(s); it must end with the engine's " +
                         $"{RequiredDamageTypeTail.Length} hardcoded damage types, in order, or the game will crash.",
                     Range = SafeRange(line, col, len),
-                    Source = AppProperties.LspServerId
+                    Source = AppProperties.LspServerId,
+                    Code = DiagnosticIds.DamageTypesIncomplete.ToString()
                 }
             ];
         }
@@ -332,7 +365,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                     $"{RequiredDamageTypeTail.Length} entries of <Damage_Types> must exactly match the " +
                     "engine's hardcoded order or the game will crash.",
                 Range = SafeRange(line, col, tail[i].Token.Length),
-                Source = AppProperties.LspServerId
+                Source = AppProperties.LspServerId,
+                Code = DiagnosticIds.DamageTypesOutOfOrder.ToString()
             });
         }
 
@@ -407,7 +441,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                     Message =
                         $"'{token}' is not a known {tagDef.HardcodedSet?.Name}. Check the schema for valid names.",
                     Range = SafeRange(line0, col0, len0),
-                    Source = AppProperties.LspServerId
+                    Source = AppProperties.LspServerId,
+                    Code = DiagnosticIds.UnknownHardcodedSetValue.ToString()
                 });
             }
             else if (deprecated)
@@ -420,23 +455,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                     Severity = DiagnosticSeverity.Warning,
                     Message = $"'{token}' is deprecated.",
                     Range = SafeRange(line0, col0, len0),
-                    Source = AppProperties.LspServerId
+                    Source = AppProperties.LspServerId,
+                    Code = DiagnosticIds.DeprecatedHardcodedSetValue.ToString()
                 });
             }
         }
-    }
-
-    // Scans up to 5 lines before the symbol's line for a `<!-- lsp:suppress duplicate-symbol -->`
-    // annotation. Returns true when found, indicating the duplicate diagnostic should be suppressed.
-    private static bool IsDuplicateSymbolSuppressed(string[] lines, int symbolLine0)
-    {
-        var start = Math.Max(0, symbolLine0 - 5);
-        var end = Math.Min(symbolLine0, lines.Length - 1);
-        for (var i = start; i <= end; i++)
-            if (lines[i].Contains("lsp:suppress duplicate-symbol", StringComparison.OrdinalIgnoreCase))
-                return true;
-
-        return false;
     }
 
     private bool IsStoryParserDocument(string documentUri)
@@ -452,7 +475,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Message = problem.Message,
             Range = SafeRange(problem.Line, problem.Column, problem.EndLine, problem.EndColumn),
             Source = AppProperties.LspServerId,
-            Code = "story-chain"
+            Code = DiagnosticIds.StoryChain.ToString()
         };
     }
 
@@ -464,7 +487,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Message = diagnostic.Message,
             Range = SafeRange(diagnostic.Line, diagnostic.Column, diagnostic.EndLine, diagnostic.EndColumn),
             Source = AppProperties.LspServerId,
-            Code = "story-graph"
+            Code = DiagnosticIds.StoryGraph.ToString()
         };
     }
 
@@ -486,10 +509,17 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             Message = result.Message,
             Range = range,
             Source = AppProperties.LspServerId,
+            Code = result.Id is { } id ? (DiagnosticCode?)id.ToString() : null,
             Tags = MapTags(result.Tags),
             Data = BuildDiagnosticData(result),
             RelatedInformation = MapRelatedInformation(result.RelatedLocations)
         };
+    }
+
+    /// <summary>Test seam over the private mapping, so the id-to-code wiring can be pinned directly.</summary>
+    internal static Diagnostic ToLspDiagnosticForTest(XmlFact fact, XmlDiagnosticResult result)
+    {
+        return ToLspDiagnostic(fact, result);
     }
 
     private static Container<DiagnosticRelatedInformation>? MapRelatedInformation(

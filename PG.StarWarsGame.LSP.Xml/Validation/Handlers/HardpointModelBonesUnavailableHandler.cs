@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class HardpointModelBonesUnavailableHandler
     : XmlDiagnosticsHandler<HardpointModelBonesUnavailableFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.HardpointModelBonesUnavailable;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         HardpointModelBonesUnavailableFact fact, DiagnosticsContext ctx)
     {

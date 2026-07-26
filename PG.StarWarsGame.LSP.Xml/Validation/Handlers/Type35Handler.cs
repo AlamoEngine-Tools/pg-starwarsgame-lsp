@@ -3,11 +3,16 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>Validates <c>Weather_SFXEvent_Loop</c> - a non-empty SFX event reference.</summary>
 public sealed class Type35Handler : NonEmptyReferenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.Type35;
+
     protected override XmlValueType TargetType => XmlValueType.Type35;
     protected override string ReferenceNoun => "SFX event";
 }

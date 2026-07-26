@@ -6,9 +6,11 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Core.Tests.Diagnostics;
 
@@ -263,21 +265,125 @@ public sealed class DiagnosticsPublisherBaseTest
         Assert.Empty(forA!.Diagnostics);
     }
 
+    // ── suppression (applied in the base, so every language gets it) ──────────
+
+    private static Diagnostic Diag(string? code, int line)
+    {
+        return new Diagnostic
+        {
+            Range = new LspRange(new Position(line, 0), new Position(line, 5)),
+            Message = "problem",
+            Code = code is null ? null : code
+        };
+    }
+
+    private static (List<PublishDiagnosticsParams> published, FakeIndexService indexService)
+        BuildSuppressing(
+            IReadOnlyList<Diagnostic> diagnostics,
+            IReadOnlyList<SuppressionRange>? ranges = null,
+            IReadOnlyList<SuppressionMatcher>? global = null)
+    {
+        var published = new List<PublishDiagnosticsParams>();
+        var indexService = new FakeIndexService();
+        var workspaceHost = new FakeWorkspaceHost();
+        _ = new ConcretePublisher(p => published.Add(p), indexService, workspaceHost, ".xml",
+            0, true, diagnostics, ranges,
+            global is null ? null : new FakeGlobalSuppressionStore(global));
+        workspaceHost.Add("file:///a.xml", "content");
+        return (published, indexService);
+    }
+
+    private static IReadOnlyList<Diagnostic> PublishedDiagnostics(
+        IReadOnlyList<Diagnostic> diagnostics,
+        IReadOnlyList<SuppressionRange>? ranges = null,
+        IReadOnlyList<SuppressionMatcher>? global = null)
+    {
+        var (published, indexService) = BuildSuppressing(diagnostics, ranges, global);
+        indexService.Fire(IndexWithDoc("file:///a.xml"));
+        return published.Single().Diagnostics.ToList();
+    }
+
+    [Fact]
+    public void Publish_DropsADiagnosticCoveredByADocumentRange()
+    {
+        var range = new SuppressionRange(
+            SuppressionMatcher.ForId(new DiagnosticId(4, 1)), SuppressionScope.Node, 2, 4, 1);
+
+        var result = PublishedDiagnostics([Diag("aetswg-004-0001", 3)], [range]);
+
+        Assert.Empty(result);
+    }
+
+    // The range is a line window: the same id reported outside it is a different occurrence and
+    // must survive.
+    [Fact]
+    public void Publish_KeepsTheSameIdReportedOutsideTheRange()
+    {
+        var range = new SuppressionRange(
+            SuppressionMatcher.ForId(new DiagnosticId(4, 1)), SuppressionScope.Node, 2, 4, 1);
+
+        var result = PublishedDiagnostics([Diag("aetswg-004-0001", 9)], [range]);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void Publish_DropsADiagnosticMatchedByAGlobalSuppression()
+    {
+        var result = PublishedDiagnostics(
+            [Diag("aetswg-004-0001", 3)],
+            global: [SuppressionMatcher.ForGroup(DiagnosticGroup.Assets)]);
+
+        Assert.Empty(result);
+    }
+
+    // A diagnostic that cannot be named by a suppression must stay visible - never silently
+    // dropped because it happens to lack a parseable code.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("story-chain")]
+    [InlineData("not-an-id")]
+    public void Publish_KeepsDiagnosticsThatNoSuppressionCouldName(string? code)
+    {
+        var range = new SuppressionRange(
+            SuppressionMatcher.ForGroup(DiagnosticGroup.Assets), SuppressionScope.File, 0, int.MaxValue, 0);
+
+        var result = PublishedDiagnostics([Diag(code, 3)], [range]);
+
+        Assert.Single(result);
+    }
+
+    [Fact]
+    public void Publish_WithNoSuppressionsInForce_PassesEverythingThrough()
+    {
+        var result = PublishedDiagnostics([Diag("aetswg-004-0001", 3), Diag(null, 4)]);
+
+        Assert.Equal(2, result.Count);
+    }
+
     // ── fakes ─────────────────────────────────────────────────────────────────
 
     private sealed class ConcretePublisher : DiagnosticsPublisherBase
     {
+        private readonly IReadOnlyList<Diagnostic> _diagnostics;
+        private readonly IReadOnlyList<SuppressionRange> _ranges;
+
         public ConcretePublisher(
             Action<PublishDiagnosticsParams> publish,
             IGameIndexService indexService,
             IGameWorkspaceHost workspaceHost,
             string extension,
             int debounceMs = 0,
-            bool enabled = true)
-            : base(publish, indexService, workspaceHost, debounceMs)
+            bool enabled = true,
+            IReadOnlyList<Diagnostic>? diagnostics = null,
+            IReadOnlyList<SuppressionRange>? ranges = null,
+            IGlobalSuppressionStore? globalSuppressions = null)
+            : base(publish, indexService, workspaceHost, debounceMs, null, globalSuppressions)
         {
             FileExtension = extension;
             DiagnosticsEnabled = enabled;
+            _diagnostics = diagnostics ?? [];
+            _ranges = ranges ?? [];
         }
 
         protected override string FileExtension { get; }
@@ -286,11 +392,36 @@ public sealed class DiagnosticsPublisherBaseTest
 
         protected override void PublishForDocument(string uri, string text, GameIndex index)
         {
+            // Where a real publisher applies it: with the diagnostics and the parsed document it
+            // built them from both in hand.
             Publish(new PublishDiagnosticsParams
             {
                 Uri = DocumentUri.From(uri),
-                Diagnostics = new Container<Diagnostic>()
+                Diagnostics = new Container<Diagnostic>(FilterSuppressed(_diagnostics, _ranges))
             });
+        }
+    }
+
+    private sealed class FakeGlobalSuppressionStore : IGlobalSuppressionStore
+    {
+        private readonly IReadOnlyList<SuppressionMatcher> _matchers;
+
+        public FakeGlobalSuppressionStore(IReadOnlyList<SuppressionMatcher> matchers)
+        {
+            _matchers = matchers;
+        }
+
+        public IReadOnlyList<SuppressionMatcher> GetAll()
+        {
+            return _matchers;
+        }
+
+        public void Add(SuppressionMatcher matcher, string? reason = null)
+        {
+        }
+
+        public void Remove(SuppressionMatcher matcher)
+        {
         }
     }
 

@@ -12,6 +12,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class AbilityDefinitionSubObjectListHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.AbilityDefinitionSubObjectList;
+
     protected override XmlValueType TargetType => XmlValueType.AbilityDefinitionSubObjectList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)

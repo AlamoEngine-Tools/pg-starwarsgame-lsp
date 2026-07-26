@@ -11,6 +11,9 @@ namespace PG.StarWarsGame.LSP.Story.Dialog.Handlers;
 /// <summary>Value-type validation for numeric and boolean dialog command arguments.</summary>
 public sealed class DialogArgValueHandler : IDialogDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public DiagnosticId DefaultId => DiagnosticIds.DialogArgValue;
+
     public IEnumerable<DialogDiagnostic> Handle(DialogCommandFact fact, GameIndex index)
     {
         if (fact.Def?.Params is null) yield break;

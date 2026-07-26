@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class SquadronOffsetsMismatchHandler : XmlDiagnosticsHandler<SquadronOffsetsMismatchFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.SquadronOffsetsMismatch;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         SquadronOffsetsMismatchFact fact, DiagnosticsContext ctx)
     {

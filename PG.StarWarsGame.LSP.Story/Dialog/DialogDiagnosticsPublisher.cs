@@ -10,6 +10,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -52,10 +53,12 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
         ILogger<DialogDiagnosticsPublisher> logger,
-        ServerOptions? options = null)
+        ServerOptions? options = null,
+        IGlobalSuppressionStore? globalSuppressions = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost, scope,
             factProducer, registry, fileHelper, textSource,
-            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds, logger)
+            (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds, logger,
+            globalSuppressions)
     {
     }
 
@@ -69,8 +72,9 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         IFileHelper fileHelper,
         IDocumentTextSource? textSource = null,
         int debounceMs = 0,
-        ILogger<DialogDiagnosticsPublisher>? logger = null)
-        : base(publish, indexService, workspaceHost, debounceMs, logger)
+        ILogger<DialogDiagnosticsPublisher>? logger = null,
+        IGlobalSuppressionStore? globalSuppressions = null)
+        : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
         _indexService = indexService;
         _scope = scope;
@@ -118,16 +122,24 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
 
         foreach (var problem in document.Problems)
             diagnostics.Add(ToLspDiagnostic(new DialogDiagnostic(XmlDiagnosticSeverity.Error,
-                problem.Message, problem.Line, problem.Column, problem.EndColumn)));
+                problem.Message, problem.Line, problem.Column, problem.EndColumn,
+                DiagnosticIds.DialogParseError)));
 
         foreach (var fact in _factProducer.Produce(document, canonicalUri))
         foreach (var diagnostic in _registry.Dispatch(fact, index))
             diagnostics.Add(ToLspDiagnostic(diagnostic));
 
+        // Applied once, on the way out, using the parse already in hand - so every producer above
+        // is covered without any of them knowing about scopes.
+        var scan = DialogSuppressionCommentParser.Parse(text, document);
+        diagnostics.AddRange(scan.ProblemDiagnostics(text.Split('\n')));
+
+        var kept = FilterSuppressed(diagnostics, scan.Ranges);
+
         Publish(new PublishDiagnosticsParams
         {
             Uri = DocumentUri.From(canonicalUri),
-            Diagnostics = new Container<Diagnostic>(diagnostics)
+            Diagnostics = new Container<Diagnostic>(kept)
         });
     }
 
@@ -139,7 +151,10 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
             Message = diagnostic.Message,
             Range = new Range(diagnostic.Line, diagnostic.Column, diagnostic.Line, diagnostic.EndColumn),
             Source = AppProperties.LspServerId,
-            Code = "story-dialog"
+            // Always set in practice: the registry stamps each handler's DefaultId, and the
+            // parse-problem path above passes one explicitly. Null stays possible in the type, and
+            // an id-less diagnostic is simply unsuppressable rather than dropped.
+            Code = diagnostic.Id is { } id ? new DiagnosticCode(id.ToString()) : (DiagnosticCode?)null
         };
     }
 }

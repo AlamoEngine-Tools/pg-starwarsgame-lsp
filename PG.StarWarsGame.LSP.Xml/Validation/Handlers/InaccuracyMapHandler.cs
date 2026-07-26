@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class InaccuracyMapHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.InaccuracyMap;
+
     protected override XmlValueType TargetType => XmlValueType.InaccuracyMap;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -29,7 +32,7 @@ public sealed class InaccuracyMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{category}' is not a known GameObjectCategoryType value for <{fact.Tag.Tag}>."),
+                        $"'{category}' is not a known GameObjectCategoryType value for <{fact.Tag.Tag}>.", Id: DiagnosticIds.InaccuracyMapUnknownCategory),
                     fact, 0)
             ];
 

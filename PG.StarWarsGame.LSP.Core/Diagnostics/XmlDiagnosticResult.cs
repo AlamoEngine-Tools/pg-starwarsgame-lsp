@@ -31,7 +31,12 @@ public record XmlDiagnosticResult(
     IReadOnlyList<XmlRelatedLocation>? RelatedLocations = null,
     // Marks the diagnostic as eligible for the "remove earlier duplicate occurrences" quick fix
     // (duplicate singleton tags within one object; the game keeps the last occurrence).
-    bool OfferRemoveEarlierDuplicates = false);
+    bool OfferRemoveEarlierDuplicates = false,
+    // Stable identity of this KIND of diagnostic, published as the LSP diagnostic code and used to
+    // match suppressions. Always a member of DiagnosticIds - never constructed inline. Null only
+    // while a handler has not been given an id yet (#68); such a diagnostic cannot be suppressed
+    // by id, so the goal is that none remain.
+    DiagnosticId? Id = null);
 
 /// <summary>A navigable location referenced by a diagnostic (LSP related information).</summary>
 public sealed record XmlRelatedLocation(string Uri, int Line, int? Column, string Message);
