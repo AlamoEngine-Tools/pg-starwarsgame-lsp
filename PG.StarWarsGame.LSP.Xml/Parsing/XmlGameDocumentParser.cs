@@ -413,7 +413,9 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     private static readonly string?[] ForceDeploymentSlotTypes = ["Faction", "GameObjectType", "GameObjectType"];
 
     // Markup_Filename: slot 0 is a Faction, slot 1 (the markup file) is not indexable and not emitted.
-    private static readonly string?[] FactionOnlySlotTypes = ["Faction"];
+    private const string FactionTypeName = "Faction";
+
+    private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
     private static IReadOnlyList<string?> FactionTupleSlotTypes(XmlValueType valueType)
     {
@@ -494,7 +496,10 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
     /// </summary>
     // A workspaceFile tag references a file by path/name. The generic list split normalises '/'
     // and '\' to separators, which would shred a file path, so single-value tags take the whole
-    // trimmed value and the Story_Name pair list splits on commas ONLY (odd slot = plot file).
+    // trimmed value and the Story_Name pair list splits on commas ONLY. Both halves of that pair
+    // are indexed: the odd slot as the plot-manifest file, the even slot as the Faction object it
+    // names - without the latter a mistyped faction resolves to nothing, is never validated, and
+    // offers no go-to.
     private static void CollectWorkspaceFileReferences(HtmlNode child, XmlTagDefinition tagDef,
         LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {
@@ -506,10 +511,12 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
         if (tagDef.SemanticType == TagSemanticType.FactionPlotFilePairList)
         {
             var slot = 0;
-            foreach (var (token, offset) in SplitCommaWithOffsets(innerText))
-                if (slot++ % 2 == 1) // odd slot: the plot file (even slot: faction, skipped)
+            foreach (var (token, offset) in XmlUtility.SplitCommaWithOffsets(innerText))
+                if (slot++ % 2 == 1)
                     AddWorkspaceFileReference(child, referenceType, token, offset, lineIndex,
                         documentUri, references);
+                else
+                    AddFactionSlotReference(child, token, offset, lineIndex, documentUri, references);
             return;
         }
 
@@ -531,18 +538,13 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             documentUri, line, column, length));
     }
 
-    // Comma-only split (path separators preserved), yielding each non-empty trimmed token with its
-    // offset in the original text so the reference range highlights exactly that token.
-    private static IEnumerable<(string Token, int Offset)> SplitCommaWithOffsets(string input)
+    private static void AddFactionSlotReference(HtmlNode child, string token, int offset,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
     {
-        var pos = 0;
-        foreach (var part in input.Split(','))
-        {
-            var trimmed = part.Trim();
-            if (trimmed.Length > 0)
-                yield return (trimmed, pos + part.IndexOf(trimmed, StringComparison.Ordinal));
-            pos += part.Length + 1; // +1 for the consumed comma
-        }
+        var (line, column, length) =
+            XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);
+        references.Add(new GameReference(
+            token, GameSymbolKind.XmlObject, FactionTypeName, documentUri, line, column, length));
     }
 
     private static void CollectPlanetModePairReferences(HtmlNode child, XmlTagDefinition tagDef,

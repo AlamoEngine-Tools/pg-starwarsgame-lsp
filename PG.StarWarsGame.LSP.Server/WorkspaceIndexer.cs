@@ -99,8 +99,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             }
 
             // A metafile (or DirectContent file) may be shipped by any layer - the mod or a
-            // dependency - so look under the workspace roots AND every declared xml root, and use
-            // every copy found. Only fall back to the baseline when no copy exists anywhere.
+            // dependency - so look under every declared xml root AND the workspace roots. Only fall
+            // back to the baseline when no copy exists anywhere.
             var copies = LocateInLayers(def.Path, roots, xmlRoots);
             if (copies.Count == 0)
             {
@@ -108,14 +108,19 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 continue;
             }
 
+            // Every copy's directory holds EaW XML regardless of which registry wins - seeding the
+            // context is about recognising files, not typing them.
             foreach (var path in copies)
-            {
                 _eaWXmlContext.AddDirectory(_fileHelper.FileSystem.Path.GetDirectoryName(path)!);
-                if (def.MetafileType == MetafileType.FileRegistry)
-                    RegisterFromMetafile(path, def, xmlRoots);
-                else // DirectContent: the file itself carries the type
-                    _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(path), def.Types.ToImmutableArray());
-            }
+
+            // ...but only the highest layer's copy is read: the engine takes the first file it
+            // finds by name and ignores the rest, so a lower layer's entries are shadowed, not
+            // merged. Reading them too would type files the game never loads.
+            var winner = copies[0];
+            if (def.MetafileType == MetafileType.FileRegistry)
+                RegisterFromMetafile(winner, def, xmlRoots);
+            else // DirectContent: the file itself carries the type
+                _fileTypeRegistry.RegisterFile(_fileHelper.PathToFileUri(winner), def.Types.ToImmutableArray());
         }
 
         // Replace-all also clears stale problems when a rescan (or a disabled flag) yields none.
@@ -339,20 +344,24 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             return;
         }
 
-        var registryCopies = new List<StoryChainFile>();
-        foreach (var path in copies)
-            try
-            {
-                registryCopies.Add(new StoryChainFile(
-                    _fileHelper.FileSystem.File.ReadAllText(path), _fileHelper.NormalizeUri(path)));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("Could not read campaign registry '{Path}': {Message}", path, ex.Message);
-            }
+        // Highest layer only - the mod's campaignfiles.xml shadows a dependency's rather than
+        // extending it, exactly as any other metafile. The winning registry can still name files
+        // that live in a lower layer; the resolver searches every xml root for those.
+        var winner = copies[0];
+        StoryChainFile registry;
+        try
+        {
+            registry = new StoryChainFile(
+                _fileHelper.FileSystem.File.ReadAllText(winner), _fileHelper.NormalizeUri(winner));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Could not read campaign registry '{Path}': {Message}", winner, ex.Message);
+            return;
+        }
 
         var resolver = new WorkspaceStoryChainFileResolver(_fileHelper, xmlRoots, baseline);
-        var result = new StoryChainScanner(resolver).Scan(registryCopies);
+        var result = new StoryChainScanner(resolver).Scan(registry);
 
         RegisterStoryFiles(result.ManifestFiles, StoryPlotManifestTypes, xmlRoots);
         RegisterStoryFiles(result.ThreadFiles, StoryParserTypes, xmlRoots);
@@ -380,8 +389,14 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     }
 
     // Locates every existing copy of a metafile/content file (identified by its game-relative
-    // <paramref name="defPath" />) across the workspace roots and every declared xml root, so a
+    // <paramref name="defPath" />) across every declared xml root and the workspace roots, so a
     // metafile shipped by a dependency is found rather than silently missed.
+    //
+    // Ordered HIGHEST LAYER FIRST: the engine resolves a file by name, first-found-wins, and never
+    // merges two copies of a registry - so copies[0] is the one the game actually reads and the
+    // rest are shadowed. config.XmlDirectories arrives dependencies-first / root-project-last (see
+    // ModProjectResolver.Resolve), hence the reversed walk; the workspace-root probe comes last as
+    // a fallback for a metafile that sits outside every declared xml directory.
     private IReadOnlyList<string> LocateInLayers(
         string defPath, IReadOnlyList<string> roots, IReadOnlyList<string> xmlRoots)
     {
@@ -395,12 +410,12 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
                 found.Add(path);
         }
 
-        TryAdd(_fileHelper.FindInWorkspace(roots.ToList(), defPath));
-
         // Metafiles live directly in the xml directory, keyed by the def's filename.
         var fileName = _fileHelper.FileSystem.Path.GetFileName(defPath);
-        foreach (var xmlRoot in xmlRoots)
+        foreach (var xmlRoot in xmlRoots.AsEnumerable().Reverse())
             TryAdd(_fileHelper.FileSystem.Path.Combine(xmlRoot, fileName));
+
+        TryAdd(_fileHelper.FindInWorkspace(roots.ToList(), defPath));
 
         return found;
     }

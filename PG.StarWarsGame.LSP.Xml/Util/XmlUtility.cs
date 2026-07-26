@@ -141,6 +141,26 @@ public static class XmlUtility
             .ToList();
     }
 
+    /// <summary>
+    ///     Comma split with source offsets: yields (trimmed token, offset into
+    ///     <paramref name="input" />) for every non-empty slot, empty slots dropped. Splits on
+    ///     commas ONLY - unlike <see cref="SplitList" /> it does not treat '/' and '\' as
+    ///     separators, so file paths survive intact - and not on the spaces authors write around
+    ///     tokens. Dropping empties matches <c>StoryNameTagSyntax.ReadPairs</c>, so a repeating
+    ///     tuple list pairs up the same way wherever it is read.
+    /// </summary>
+    public static IEnumerable<(string Token, int Offset)> SplitCommaWithOffsets(string input)
+    {
+        var pos = 0;
+        foreach (var part in input.Split(','))
+        {
+            var trimmed = part.Trim();
+            if (trimmed.Length > 0)
+                yield return (trimmed, pos + part.IndexOf(trimmed, StringComparison.Ordinal));
+            pos += part.Length + 1; // +1 for the consumed comma
+        }
+    }
+
     public static IReadOnlyList<(string Token, int Offset)> SplitListWithOffsets(string input)
     {
         var tokens = SplitList(input);

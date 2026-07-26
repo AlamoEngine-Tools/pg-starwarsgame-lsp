@@ -2,8 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Schema.Yaml;
 
 namespace PG.StarWarsGame.LSP.Schema.Providers;
@@ -13,7 +15,7 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 ///     Expects YAML files matching the same layout as the remote schema repository:
 ///     <c>tags/*.yaml</c>, <c>types.yaml</c>, <c>enums/*.yaml</c>.
 /// </summary>
-public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
+public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaProvider, IDisposable
 {
     private readonly IFileSystem _fileSystem;
     private readonly ILogger<LocalFileSchemaProvider> _logger;
@@ -45,6 +47,9 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
     }
 
     public event EventHandler? SchemaRefreshed;
+
+    /// <inheritdoc />
+    public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
     public XmlTagDefinition? GetTag(string tagName)
     {
@@ -84,6 +89,19 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
     public void Load()
     {
         _logger.LogDebug("Loading schema from {Path}", _rootPath);
+
+        // Files come from the directory walk below, not from _index.json - but the manifest is
+        // still where the contract version lives, so read it for that alone. An incompatible
+        // schema leaves the previous index untouched rather than half-replacing it.
+        LastVersionCheck = ReadVersion();
+        if (!LastVersionCheck.CanLoad)
+        {
+            _logger.LogError("Schema rejected: {Message}", LastVersionCheck.Message);
+            return;
+        }
+
+        if (LastVersionCheck.Message.Length > 0)
+            _logger.LogWarning("{Message}", LastVersionCheck.Message);
 
         var tagsByType = new List<(string, IReadOnlyList<RawTagDefinition>)>();
         var types = new List<GameObjectTypeDefinition>();
@@ -126,6 +144,35 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IDisposable
             "Schema loaded: {TagCount} tags across {TypeCount} types, {EnumCount} enums, {HardcodedCount} hardcoded set(s) from {Path}",
             _current.AllTags.Count, _current.AllObjectTypes.Count, _current.AllEnums.Count,
             _current.AllHardcodedSets.Count, _rootPath);
+    }
+
+    /// <summary>
+    ///     Reads <c>_index.json</c> for its declared contract version. A schema directory with no
+    ///     manifest at all is a legitimate local layout (the walk finds the YAML regardless), so
+    ///     that reads as unversioned - but a manifest that is present and unreadable is refused,
+    ///     since treating corruption as "no version declared" would wave the schema through.
+    /// </summary>
+    private SchemaVersionCheck ReadVersion()
+    {
+        var manifestPath = _fileSystem.Path.Combine(_rootPath, "_index.json");
+        if (!_fileSystem.File.Exists(manifestPath))
+            return SchemaVersionGate.Check(null);
+
+        try
+        {
+            var manifest = JsonSerializer.Deserialize<SchemaManifest>(
+                _fileSystem.File.ReadAllText(manifestPath),
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            return SchemaVersionGate.Check(manifest?.SchemaVersion);
+        }
+        catch (JsonException ex)
+        {
+            _logger.LogError(ex, "Could not read schema manifest '{Path}'", manifestPath);
+            return new SchemaVersionCheck(
+                SchemaVersionCompatibility.Malformed, null, SchemaVersionGate.SupportedRange,
+                $"The game schema manifest at '{manifestPath}' could not be read, so the schema " +
+                "cannot be checked for compatibility. XML support is disabled.");
+        }
     }
 
     private void OnFileChanged(object _, FileSystemEventArgs __)

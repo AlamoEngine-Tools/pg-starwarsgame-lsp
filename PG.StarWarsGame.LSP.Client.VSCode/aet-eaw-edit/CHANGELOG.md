@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Improvements
+
+- The game schema now declares a version, and the extension checks it. The schema is published separately and updates on its own cadence, so it can get ahead of an installed extension. Until now that failed silently and, worse, sometimes loudly-wrong: a value shape the extension did not recognise was read as an ordinary value, which could report perfectly valid XML as broken. There is now a `schemaVersion` in the schema manifest, checked against the range each extension build understands. A schema whose major version is too new is refused outright with a message telling you to update, rather than half-loaded into wrong answers; an older schema is used as-is; a schema from before the field existed keeps working untouched. Independently of the version check, a tag whose value *shape* the extension cannot interpret now has its validation withheld instead of guessed at - so a newer schema costs you a feature on that tag, never a false error.
+
+### Bug fixes
+
+- Campaign story attachments are validated as you type. Pasting the generic tag's `Faction, PlotFile` tuple into a faction-specific tag - `<Rebel_Story_Name>test, Conquests\Story_Plots_GCMenu.xml</Rebel_Story_Name>` - is now an error that names `<Story_Name>` as the form that takes a tuple, and offers a quick fix that drops the stray faction token. Previously the whole string was taken as a filename, so the mistake could only ever surface as a misleading "file does not exist", and only after a restart or project reload.
+
+- Attaching one faction twice in the same campaign is reported. Naming the same plot manifest through both a `<Rebel_Story_Name>` tag and a `<Story_Name>` slot is a warning (the engine merges both, so one of them is dead weight); pointing them at *different* manifests is an error, because which one the faction ends up running can no longer be read off the file. Paths are compared in their normal form, so `Conquests\X.xml`, `Conquests/X.xml` and `DATA\XML\Conquests\X.xml` count as the same file. A campaign that uses both authoring forms for different factions gets an informational note rather than a warning - only the generic form can attach a non-major faction, so the split is often deliberate.
+
+- The faction half of a `<Story_Name>` tuple is a real reference: Ctrl+Click jumps to the faction definition, rename reaches it, and a faction no `<Faction>` defines is flagged. Only the plot-file half was ever indexed, so a typo in the faction slot resolved to nothing and was silently ignored.
+
+- Broken story-chain links are reported as you type. A `*_Story_Name`, `Active_Plot`, `Suspended_Plot` or tactical plot reference pointing at a missing file was only ever checked during the startup scan, which re-ran on a `.pgproj` change and nothing else - so a link broken after startup stayed silent until the next restart, and one that had since been *fixed* kept being reported. These diagnostics now come from the live campaign chain, which reads unsaved editor content and re-runs whenever any file it touched changes.
+
+- Metafiles shipped by several layers follow the engine's override rule instead of being merged. When a mod and one of its dependencies each ship a `GameObjectFiles.xml`, `CampaignFiles.xml` or any other registry, the game resolves the name to a single file and reads only that one - the mod's copy shadows the dependency's outright, which is why a mod that ships its own registry has to repeat the entries it wants to keep. The extension used to read every layer's copy and combine the results, so files the winning registry leaves out were still typed and indexed, and objects the game never loads still counted as defined. The winning registry can of course still name files that live in a dependency; those continue to resolve across all layers, as do individual campaign, manifest and thread files, which still take the highest-ranked copy.
+
+  Expect this to surface real problems that were previously masked: if your `GameObjectFiles.xml` (or any other registry) omits entries that a dependency's copy listed, references to the objects in those files will now be reported as unknown - which is what the game does too.
+
 ## 0.3.1
 
 ### Improvements

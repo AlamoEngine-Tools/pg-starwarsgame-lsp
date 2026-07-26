@@ -37,32 +37,30 @@ public sealed class StoryChainScanner
     public StoryChainScanResult Scan(string campaignRegistryRelativePath)
     {
         var registry = _resolver.ReadFile(ToXmlRelativePath(campaignRegistryRelativePath));
-        return registry is null ? StoryChainScanResult.Empty : Scan([registry]);
+        return registry is null ? StoryChainScanResult.Empty : Scan(registry);
     }
 
     /// <summary>
-    ///     Runs the chain scan over every copy of the campaign registry (a mod and its
-    ///     dependencies may each ship one); campaign lists are unioned, mirroring how
-    ///     file-registry metafiles are already merged across layers.
+    ///     Runs the chain scan over the campaign registry that wins layer resolution. A mod and its
+    ///     dependencies may each ship one, but the engine resolves the name to a single file - the
+    ///     highest layer's copy shadows the rest, it does not extend them - so exactly one copy is
+    ///     ever read. The campaigns it names may still live in any layer; that is the resolver's job.
     /// </summary>
-    public StoryChainScanResult Scan(IReadOnlyList<StoryChainFile> registryCopies)
+    public StoryChainScanResult Scan(StoryChainFile registry)
     {
         var state = new ScanState(_resolver);
 
         var campaignFiles = new List<string>();
         var campaignSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var copy in registryCopies)
+        var doc = XmlUtility.CreateHtmlDocument(registry.Content);
+        foreach (var fileNode in doc.DocumentNode.Descendants()
+                     .Where(n => n.NodeType == HtmlNodeType.Element &&
+                                 n.Name.Equals("File", StringComparison.OrdinalIgnoreCase)))
         {
-            var doc = XmlUtility.CreateHtmlDocument(copy.Content);
-            foreach (var fileNode in doc.DocumentNode.Descendants()
-                         .Where(n => n.NodeType == HtmlNodeType.Element &&
-                                     n.Name.Equals("File", StringComparison.OrdinalIgnoreCase)))
-            {
-                var value = fileNode.InnerText.Trim();
-                if (value.Length == 0) continue;
-                var rel = ToXmlRelativePath(value);
-                if (campaignSeen.Add(rel)) campaignFiles.Add(rel);
-            }
+            var value = fileNode.InnerText.Trim();
+            if (value.Length == 0) continue;
+            var rel = ToXmlRelativePath(value);
+            if (campaignSeen.Add(rel)) campaignFiles.Add(rel);
         }
 
         foreach (var campaignRel in campaignFiles)
@@ -100,7 +98,7 @@ public sealed class StoryChainScanner
                                      StoryNameTagSyntax.IsStoryNameTag(n.Name)))
             {
                 processed.Add(node);
-                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node))
+                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
                 {
                     AddManifest(plotFile, source.At(node, plotFile),
                         StoryChainProblemKind.UnresolvedStoryName, state);
@@ -120,7 +118,7 @@ public sealed class StoryChainScanner
         foreach (var node in source.Doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  StoryNameTagSyntax.IsStoryNameTag(n.Name) && !processed.Contains(n)))
-        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node))
+        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
             AddManifest(plotFile, source.At(node, plotFile), StoryChainProblemKind.UnresolvedStoryName, state);
     }
 

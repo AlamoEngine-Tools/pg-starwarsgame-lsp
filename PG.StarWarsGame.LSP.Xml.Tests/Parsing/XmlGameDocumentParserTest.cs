@@ -136,7 +136,7 @@ public sealed class XmlGameDocumentParserTest
     }
 
     [Fact]
-    public async Task WorkspaceFileTag_FactionPlotFilePairList_EmitsOnlyPlotFileTokens()
+    public async Task WorkspaceFileTag_FactionPlotFilePairList_EmitsOddSlotsAsPlotFiles()
     {
         var schema = new FakeSchemaProvider();
         schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
@@ -150,6 +150,43 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal(
             ["storyplotmanifest:story_plots_r.xml", "storyplotmanifest:conquests/e.xml"],
             refs.Select(r => r.TargetId));
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_FactionPlotFilePairList_EmitsEvenSlotsAsFactionReferences()
+    {
+        // Without these the faction half of the tuple is invisible: a typo there resolves to no
+        // object, is never validated, and offers no go-to. Only the plot half was ever indexed.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Story_Name", "StoryPlotManifest",
+            TagSemanticType.FactionPlotFilePairList));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Story_Name>Rebel, Story_Plots_R.xml, Empire, Conquests\\E.xml,</Story_Name>\n</Campaign>",
+            1, default);
+
+        var factions = index.References
+            .Where(r => r.ExpectedTypeName == "Faction")
+            .ToList();
+
+        Assert.Equal(["Rebel", "Empire"], factions.Select(r => r.TargetId));
+        Assert.All(factions, r => Assert.Equal(GameSymbolKind.XmlObject, r.ExpectedKind));
+        Assert.Equal("<Story_Name>".Length, factions[0].Column);
+        Assert.Equal("Rebel".Length, factions[0].Length);
+    }
+
+    [Fact]
+    public async Task WorkspaceFileTag_SingleValued_EmitsNoFactionReference()
+    {
+        // Rebel_Story_Name names its faction in the TAG, not in the value - the value is only ever
+        // the plot file.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Rebel_Story_Name", "StoryPlotManifest"));
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>\n</Campaign>", 1, default);
+
+        Assert.DoesNotContain(index.References, r => r.ExpectedTypeName == "Faction");
     }
 
     private static XmlTagDefinition GroupRefTag(string tag, string referenceType)

@@ -34,7 +34,8 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
-        string documentUri)
+        string documentUri,
+        LineOffsetIndex lineIndex)
     {
         // HAP lowercases element names.
         if (!objectNode.Name.Equals(HardpointElement, StringComparison.OrdinalIgnoreCase))

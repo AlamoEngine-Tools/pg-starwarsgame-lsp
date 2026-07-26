@@ -146,6 +146,25 @@ public sealed class StoryModelServiceTest
     }
 
     [Fact]
+    public void GetChainResult_LayeredRegistries_HighestLayerShadowsTheOthers()
+    {
+        // A mod and its dependencies may each ship campaignfiles.xml, but the engine resolves the
+        // name to a single file and never merges the two - so the mod's registry replaces the
+        // dependency's outright, and campaigns listed only by the shadowed copy do not exist.
+        // WorkspaceIndexer.ScanStoryChain (which types the discovered files) applies the same rule.
+        var files = Fixture();
+        files[Path.Combine(DepXmlDir, "campaignfiles.xml")] =
+            new MockFileData("<Campaign_Files><File>Campaigns_Dep.xml</File></Campaign_Files>");
+        files[Path.Combine(DepXmlDir, "Campaigns_Dep.xml")] = new MockFileData(
+            "<Campaigns><Campaign Name=\"GC_Dep\">" +
+            "<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>" +
+            "</Campaign></Campaigns>");
+        var (service, _, _, _, _, _) = Build(files, [DepXmlDir, XmlDir]);
+
+        Assert.Equal(["GC_One"], service.GetCampaignNames());
+    }
+
+    [Fact]
     public void GetModelsContaining_FindsCampaignsUsingTheThread()
     {
         var (service, _, _, _, fh, _) = Build();
