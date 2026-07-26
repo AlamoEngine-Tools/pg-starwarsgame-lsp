@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Lua.Schema;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
 
@@ -30,6 +31,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
     private readonly ILogger<LocalFileSchemaProvider> _localLogger;
     private readonly ILogger<SchemaBootstrapper> _logger;
     private readonly LuaApiSchemaProxy _luaProxy;
+    private readonly IUserNotifier _notifier;
     private readonly SchemaProviderProxy _proxy;
 
     public SchemaBootstrapper(
@@ -40,6 +42,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         IFileHelper fileHelper,
         IHttpClientFactory httpClientFactory,
         SchemaHttpCache cache,
+        IUserNotifier notifier,
         ILogger<SchemaBootstrapper> logger,
         ILogger<LocalFileSchemaProvider> localLogger,
         ILogger<HttpSchemaProvider> httpLogger)
@@ -51,6 +54,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
         _fileHelper = fileHelper;
         _httpClientFactory = httpClientFactory;
         _cache = cache;
+        _notifier = notifier;
         _logger = logger;
         _localLogger = localLogger;
         _httpLogger = httpLogger;
@@ -80,7 +84,24 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
                 LoadEaWSchemaAsync((HttpSchemaProvider)realProvider, ct),
                 LoadLuaSchemaFromHttpAsync(DeriveLuaHttpUrl(src.Url), ct));
 
+        ReportVersionIncompatibility(realProvider);
+
         _logger.LogInformation("Loading schema completed.");
+    }
+
+    /// <summary>
+    ///     Surfaces a refused schema to the user. Nothing works in that state - no hover,
+    ///     completion, navigation or validation - and a silent, wholly inert extension reads as a
+    ///     bug rather than as "your schema is newer than your extension", so the log alone is not
+    ///     enough. Only a refusal is reported: a merely older or unversioned schema still works.
+    /// </summary>
+    private void ReportVersionIncompatibility(ISchemaProvider provider)
+    {
+        if (provider is not IVersionedSchemaProvider { LastVersionCheck: { CanLoad: false } check })
+            return;
+
+        _logger.LogError("Schema version check failed: {Message}", check.Message);
+        _notifier.ShowError(check.Message);
     }
 
     private async Task LoadEaWSchemaAsync(HttpSchemaProvider provider, CancellationToken ct)

@@ -35,9 +35,72 @@ public sealed class SchemaBootstrapperTest
             "EaW schema and Lua schema downloads appear to run sequentially (barrier deadlocked)");
     }
 
+    // ── schema version gate ──────────────────────────────────────────────────
+
+    // A schema the server cannot support is the one failure the user must be told about: nothing
+    // works and the log is not where they will look.
+    [Fact]
+    public async Task LoadAsync_SchemaMajorNotSupported_TellsTheUserAndLoadsNothing()
+    {
+        var notifier = new RecordingUserNotifier();
+        var bootstrapper = Build(
+            new FakeHttpClientFactory(new ManifestHttpHandler("""{ "schemaVersion": "99.0.0" }""")),
+            notifier, out var proxy);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Empty(proxy.AllTags);
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains("99.0.0", message);
+        Assert.Contains("update", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Every schema published before schemaVersion existed omits it; warning about that would fire
+    // for every current user, so it must stay silent.
+    [Fact]
+    public async Task LoadAsync_UnversionedSchema_SaysNothingToTheUser()
+    {
+        var notifier = new RecordingUserNotifier();
+        var bootstrapper = Build(
+            new FakeHttpClientFactory(new ManifestHttpHandler("""{ "tags": [] }""")),
+            notifier, out _);
+
+        await bootstrapper.LoadAsync(CancellationToken.None);
+
+        Assert.Empty(notifier.Errors);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
 
+    /// <summary>Serves the given manifest for _index.json and 404s everything else.</summary>
+    private sealed class ManifestHttpHandler(string manifestJson) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(request.RequestUri!.AbsolutePath.EndsWith("_index.json")
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifestJson) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
+    private sealed class RecordingUserNotifier : IUserNotifier
+    {
+        public List<string> Errors { get; } = [];
+
+        public void ShowError(string message)
+        {
+            Errors.Add(message);
+        }
+    }
+
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
+    {
+        return Build(factory, new RecordingUserNotifier(), out _);
+    }
+
+    private static SchemaBootstrapper Build(
+        IHttpClientFactory factory, IUserNotifier notifier, out SchemaProviderProxy proxy)
     {
         var fs = new MockFileSystem();
         var fileHelper = new FileHelper(fs);
@@ -50,14 +113,16 @@ public sealed class SchemaBootstrapperTest
             }
         });
 
+        proxy = new SchemaProviderProxy();
         return new SchemaBootstrapper(
             config,
-            new SchemaProviderProxy(),
+            proxy,
             new LuaApiSchemaProxy(),
             fs,
             fileHelper,
             factory,
             new SchemaHttpCache(fileHelper, NullLogger<SchemaHttpCache>.Instance),
+            notifier,
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
             NullLogger<HttpSchemaProvider>.Instance);

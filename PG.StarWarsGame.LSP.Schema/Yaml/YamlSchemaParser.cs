@@ -35,8 +35,21 @@ internal static class YamlSchemaParser
 
             var st = TagSemanticType.Default;
             if (entry.SemanticType is not null && !Enum.TryParse(entry.SemanticType, true, out st))
-                logger?.LogWarning("Unknown semanticType '{SemanticType}' for tag '{Tag}' - defaulting to Default",
+            {
+                // Fail closed. semanticType describes the SHAPE of the value, so treating an
+                // unrecognised one as Default does not ignore it - it makes the server read the
+                // value the wrong way and report problems that are not there (a newer schema's
+                // "Faction, PlotFile" tuple read as a single filename, then flagged as missing).
+                // Dropping the reference kind leaves the tag in place - hover, completion and
+                // tag-name features still work - while withholding any claim about its value.
+                logger?.LogWarning(
+                    "Unknown semanticType '{SemanticType}' for tag '{Tag}' - the value shape is " +
+                    "unknown to this server, so its reference validation is disabled. Update the " +
+                    "extension if this schema is newer than it.",
                     entry.SemanticType, entry.Tag);
+                st = TagSemanticType.Default;
+                rk = ReferenceKind.None;
+            }
 
             var variantMode = VariantMode.Replace;
             if (entry.VariantMode is not null && !Enum.TryParse(entry.VariantMode, true, out variantMode))

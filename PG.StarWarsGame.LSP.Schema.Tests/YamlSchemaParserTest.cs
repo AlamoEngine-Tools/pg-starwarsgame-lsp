@@ -8,6 +8,68 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 
 public sealed class YamlSchemaParserTest
 {
+    // ── ParseTagFile: unknown semanticType fails closed ─────────────────────
+
+    // semanticType describes the SHAPE of a value, so falling back to Default when it is
+    // unrecognised makes the server misread the value rather than merely ignore it: a newer
+    // schema's "Faction, PlotFile" tuple would be read as one filename and reported missing.
+    // A shape we cannot interpret must therefore disable this tag's value handling outright -
+    // silence is correct, a confident wrong answer is not.
+    [Fact]
+    public void ParseTagFile_UnknownSemanticType_DropsReferenceKind()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Story_Name
+                                type: NameReference
+                                referenceKind: workspaceFile
+                                referenceType: StoryPlotManifest
+                                semanticType: someShapeFromAFutureSchema
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(ReferenceKind.None, tag.ReferenceKind);
+        Assert.Equal(TagSemanticType.Default, tag.SemanticType);
+    }
+
+    // The tag itself must survive - hover, completion and tag-name features still work off the
+    // type. Only the value interpretation is withheld.
+    [Fact]
+    public void ParseTagFile_UnknownSemanticType_KeepsTheTag()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Story_Name
+                                type: NameReference
+                                semanticType: someShapeFromAFutureSchema
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal("Story_Name", tag.Tag);
+        Assert.Equal(XmlValueType.NameReference, tag.ValueType);
+    }
+
+    // A known semanticType must not be affected.
+    [Fact]
+    public void ParseTagFile_KnownSemanticType_KeepsReferenceKind()
+    {
+        const string yaml = """
+                            tags:
+                              - tag: Campaign_Set
+                                type: NameReference
+                                referenceKind: xmlObject
+                                referenceType: Campaign
+                                semanticType: referenceGroup
+                            """;
+
+        var tag = Assert.Single(YamlSchemaParser.ParseTagFile(yaml));
+
+        Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
+        Assert.Equal(TagSemanticType.ReferenceGroup, tag.SemanticType);
+    }
+
     // ── ParseTagFile ────────────────────────────────────────────────────────
 
     [Fact]

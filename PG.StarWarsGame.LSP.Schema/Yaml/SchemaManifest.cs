@@ -6,6 +6,13 @@ namespace PG.StarWarsGame.LSP.Schema.Yaml;
 /// <summary>Deserialized form of _index.json from the schema repository.</summary>
 public sealed class SchemaManifest
 {
+    /// <summary>
+    ///     Semver version of the schema contract, checked by
+    ///     <see cref="Versioning.SchemaVersionGate" /> before anything is loaded. Null for a schema
+    ///     published before the field existed, which loads as unversioned.
+    /// </summary>
+    public string? SchemaVersion { get; set; }
+
     public List<string> Tags { get; set; } = [];
     public List<string> Types { get; set; } = [];
     public List<string> Enums { get; set; } = [];

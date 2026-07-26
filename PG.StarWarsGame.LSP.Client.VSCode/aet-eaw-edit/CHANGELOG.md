@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Improvements
+
+- The game schema now declares a version, and the extension checks it. The schema is published separately and updates on its own cadence, so it can get ahead of an installed extension. Until now that failed silently and, worse, sometimes loudly-wrong: a value shape the extension did not recognise was read as an ordinary value, which could report perfectly valid XML as broken. There is now a `schemaVersion` in the schema manifest, checked against the range each extension build understands. A schema whose major version is too new is refused outright with a message telling you to update, rather than half-loaded into wrong answers; an older schema is used as-is; a schema from before the field existed keeps working untouched. Independently of the version check, a tag whose value *shape* the extension cannot interpret now has its validation withheld instead of guessed at - so a newer schema costs you a feature on that tag, never a false error.
+
 ### Bug fixes
 
 - Campaign story attachments are validated as you type. Pasting the generic tag's `Faction, PlotFile` tuple into a faction-specific tag - `<Rebel_Story_Name>test, Conquests\Story_Plots_GCMenu.xml</Rebel_Story_Name>` - is now an error that names `<Story_Name>` as the form that takes a tuple, and offers a quick fix that drops the stray faction token. Previously the whole string was taken as a filename, so the mistake could only ever surface as a misleading "file does not exist", and only after a restart or project reload.

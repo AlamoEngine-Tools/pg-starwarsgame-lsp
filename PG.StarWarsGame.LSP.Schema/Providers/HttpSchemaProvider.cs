@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
+using PG.StarWarsGame.LSP.Schema.Versioning;
 using PG.StarWarsGame.LSP.Schema.Yaml;
 
 namespace PG.StarWarsGame.LSP.Schema.Providers;
@@ -16,7 +17,7 @@ namespace PG.StarWarsGame.LSP.Schema.Providers;
 ///     Downloaded files are persisted to a local cache; the cache is validated by a SHA-256
 ///     checksum of the manifest plus all downloaded YAML file contents.
 /// </summary>
-public sealed class HttpSchemaProvider : ISchemaProvider
+public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvider
 {
     private readonly string _baseUrl;
     private readonly SchemaHttpCache _cache;
@@ -43,6 +44,9 @@ public sealed class HttpSchemaProvider : ISchemaProvider
     }
 
     public event EventHandler? SchemaRefreshed;
+
+    /// <inheritdoc />
+    public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
     /// <inheritdoc />
     public Task ReadyAsync => _readyTcs.Task;
@@ -91,6 +95,19 @@ public sealed class HttpSchemaProvider : ISchemaProvider
             var manifest = JsonSerializer.Deserialize<SchemaManifest>(indexJson,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
             if (manifest is null) return;
+
+            // Gate on the manifest alone, before a single YAML file is fetched: an unusable schema
+            // costs one request instead of ~180, and nothing partially-loaded can reach the index.
+            LastVersionCheck = SchemaVersionGate.Check(manifest.SchemaVersion);
+            if (!LastVersionCheck.CanLoad)
+            {
+                _logger.LogError("Schema rejected: {Message}", LastVersionCheck.Message);
+                _readyTcs.TrySetResult();
+                return;
+            }
+
+            if (LastVersionCheck.Message.Length > 0)
+                _logger.LogWarning("{Message}", LastVersionCheck.Message);
 
             if (_cache.TryLoad(indexJson, manifest, out var cached))
             {
