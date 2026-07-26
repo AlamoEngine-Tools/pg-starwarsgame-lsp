@@ -139,6 +139,38 @@ public sealed class WorkspaceIndexerTest
     }
 
     [Fact]
+    public void PreScanMetafiles_MetafileShippedByBothLayers_OnlyTopmostCopyIsRead()
+    {
+        // The engine resolves a file by name, first-found-wins - it never merges two copies of
+        // GameObjectFiles.xml. When the mod (rev) ships its own, the dependency's (core) copy is
+        // shadowed entirely, which is why modders copy the base list into their own registry.
+        var revRoot = Root("rev");
+        var revXml = Path.Combine(revRoot, "data", "xml");
+        var coreXml = Path.Combine(Root("core"), "data", "xml");
+
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(coreXml, "gameobjectfiles.xml")] =
+                new("<Game_Object_Files><File>Core_Only.xml</File></Game_Object_Files>"),
+            [Path.Combine(revXml, "gameobjectfiles.xml")] =
+                new("<Game_Object_Files><File>Rev_Only.xml</File></Game_Object_Files>")
+        });
+        var registry = new FileTypeRegistry();
+        var schema = new FakeSchemaProvider(
+            new MetafileDefinition("data/xml/gameobjectfiles.xml", MetafileType.FileRegistry, ["GameObjectType"]));
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, schema);
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
+
+        var fh = new FileHelper(fs);
+        Assert.Equal(["GameObjectType"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Rev_Only.xml"))).ToArray());
+        // The shadowed registry's entry must not be typed under ANY root.
+        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Core_Only.xml"))));
+        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Core_Only.xml"))));
+    }
+
+    [Fact]
     public void PreScanMetafiles_SeedsXmlDirectories_IntoContext()
     {
         var root = Root("ws");
@@ -295,6 +327,44 @@ public sealed class WorkspaceIndexerTest
             registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Story_Plots_Core.xml"))).ToArray());
         Assert.Equal(["StoryParser"],
             registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Core_Act.xml"))).ToArray());
+    }
+
+    [Fact]
+    public void PreScanMetafiles_SpecialDef_RegistryShippedByBothLayers_OnlyTopmostCopyIsRead()
+    {
+        // Same override rule as any other metafile: the mod's campaignfiles.xml shadows the
+        // dependency's, so only the campaigns it lists exist. The winning registry may still point
+        // at files that live in the dependency - that is covered by ChainSpansXmlRoots above.
+        var revRoot = Root("rev");
+        var revXml = Path.Combine(revRoot, "data", "xml");
+        var coreXml = Path.Combine(Root("core"), "data", "xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(coreXml, "campaignfiles.xml")] =
+                new("<Campaign_Files><File>Campaigns_Core.xml</File></Campaign_Files>"),
+            [Path.Combine(coreXml, "Campaigns_Core.xml")] = new(
+                "<Campaigns><Campaign Name=\"C\">" +
+                "<Rebel_Story_Name>Story_Plots_Core.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>"),
+            [Path.Combine(coreXml, "Story_Plots_Core.xml")] = new("<Story_Mode_Plots/>"),
+
+            [Path.Combine(revXml, "campaignfiles.xml")] =
+                new("<Campaign_Files><File>Campaigns_Mod.xml</File></Campaign_Files>"),
+            [Path.Combine(revXml, "Campaigns_Mod.xml")] = new(
+                "<Campaigns><Campaign Name=\"M\">" +
+                "<Rebel_Story_Name>Story_Plots_Mod.xml</Rebel_Story_Name>" +
+                "</Campaign></Campaigns>"),
+            [Path.Combine(revXml, "Story_Plots_Mod.xml")] = new("<Story_Mode_Plots/>")
+        });
+        var registry = new FileTypeRegistry();
+        var (indexer, _) = Build(fs, new FakeIndexService(), registry, new FakeSchemaProvider(StorySpecialDef()));
+
+        indexer.PreScanMetafiles(new WorkspaceConfiguration([coreXml, revXml], [], [], [], null), [revRoot]);
+
+        var fh = new FileHelper(fs);
+        Assert.Equal(["StoryPlotManifest"],
+            registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(revXml, "Story_Plots_Mod.xml"))).ToArray());
+        Assert.Empty(registry.GetTypesForFile(fh.PathToFileUri(Path.Combine(coreXml, "Story_Plots_Core.xml"))));
     }
 
     [Fact]

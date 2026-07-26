@@ -162,15 +162,12 @@ public sealed class StoryModelService : IStoryModelService
         var result = StoryChainScanResult.Empty;
         foreach (var def in _schema.AllMetafiles.Where(d => d.MetafileType == MetafileType.Special))
         {
-            // A mod and its dependencies may each ship the campaign registry; their campaign lists
-            // are unioned, exactly as WorkspaceIndexer.ScanStoryChain does - that scan types the
-            // discovered files, and a campaign typed there but missing here would have no model and
-            // no chain diagnostics. Individual campaign/manifest/thread reads still resolve
-            // highest-layer-first through the resolver, so per-file overrides are unaffected.
-            var copies = ReadAllCopies(resolver, def.Path);
-            if (copies.Count == 0) continue;
-
-            var scan = new StoryChainScanner(resolver).Scan(copies);
+            // A mod and its dependencies may each ship the campaign registry, but the engine
+            // resolves the name to one file: the highest layer's copy shadows the rest rather than
+            // extending them. Scan(string) reads through the resolver, which searches xml roots
+            // highest-rank-first - the same rule WorkspaceIndexer.ScanStoryChain applies, so the
+            // set of campaigns typed there and modelled here stays identical.
+            var scan = new StoryChainScanner(resolver).Scan(def.Path);
             if (!ReferenceEquals(scan, StoryChainScanResult.Empty))
                 result = scan;
         }
@@ -206,31 +203,6 @@ public sealed class StoryModelService : IStoryModelService
     {
         var roots = _reloadService.LastWorkspaceConfig?.XmlDirectories ?? [];
         return roots.Reverse().ToList();
-    }
-
-    /// <summary>
-    ///     Every layer's copy of a metafile, highest rank first. Unlike
-    ///     <see cref="ReadXmlRelative" /> this does not stop at the winning copy: the campaign
-    ///     registry is merged across layers rather than overridden. Each copy is recorded for
-    ///     invalidation, so adding a campaign to any layer's registry rebuilds the chain.
-    /// </summary>
-    private List<StoryChainFile> ReadAllCopies(RecordingResolver resolver, string metafilePath)
-    {
-        var relativePath = StoryReferenceTypes.NormalizeRelativePath(metafilePath);
-        var copies = new List<StoryChainFile>();
-        foreach (var root in XmlRootsHighestFirst())
-        {
-            var path = _fileHelper.FindInWorkspace([root], relativePath);
-            if (path is null) continue;
-
-            var uri = _fileHelper.NormalizeUri(path);
-            if (_textSource.GetText(uri) is not { } text) continue;
-
-            resolver.Record(uri);
-            copies.Add(new StoryChainFile(text.Text, uri));
-        }
-
-        return copies;
     }
 
     private (string Uri, string Text)? ReadXmlRelative(string xmlRelativePath)
@@ -277,14 +249,8 @@ public sealed class StoryModelService : IStoryModelService
         {
             var read = service.ReadXmlRelative(xmlRelativePath);
             if (read is null) return null;
-            Record(read.Value.Uri);
+            Versions[read.Value.Uri] = service.CurrentVersionOf(read.Value.Uri);
             return new StoryChainFile(read.Value.Text, read.Value.Uri);
-        }
-
-        /// <summary>Pins a document read outside <see cref="ReadFile" /> (the registry copies).</summary>
-        public void Record(string uri)
-        {
-            Versions[uri] = service.CurrentVersionOf(uri);
         }
 
         public bool IsKnownToBaseline(string xmlRelativePath)
