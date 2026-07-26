@@ -12,7 +12,8 @@ public sealed class SquadronOffsetsRule : IXmlCrossTagRule
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
-        string documentUri)
+        string documentUri,
+        LineOffsetIndex lineIndex)
     {
         if (!childrenByName.TryGetValue("Squadron_Units", out var unitNodes) || unitNodes.Count == 0)
             return [];

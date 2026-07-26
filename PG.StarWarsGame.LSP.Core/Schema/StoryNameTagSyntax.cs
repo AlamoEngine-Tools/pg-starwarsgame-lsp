@@ -1,9 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using HtmlAgilityPack;
-
-namespace PG.StarWarsGame.LSP.Story;
+namespace PG.StarWarsGame.LSP.Core.Schema;
 
 /// <summary>
 ///     Shared knowledge of how a campaign attaches a plot to a faction. There are two authoring
@@ -21,6 +19,8 @@ namespace PG.StarWarsGame.LSP.Story;
 ///         </item>
 ///     </list>
 ///     Vanilla FoC uses only the faction-specific tags; mods (e.g. EaWX) use the generic tag.
+///     Lives in Core because both the story chain scanner (Story) and the campaign attachment
+///     diagnostics rule (Xml) need it, and the project dependency runs Story -> Xml.
 /// </summary>
 public static class StoryNameTagSyntax
 {
@@ -63,16 +63,27 @@ public static class StoryNameTagSyntax
     }
 
     /// <summary>
+    ///     The faction a faction-specific tag attaches, in the schema's casing
+    ///     (<c>"rebel_story_name"</c> -> <c>"Rebel"</c>). Null for any other tag.
+    /// </summary>
+    public static string? FactionOf(string tagName)
+    {
+        if (!IsFactionSpecificTag(tagName)) return null;
+        var prefix = tagName[..tagName.IndexOf('_')];
+        return char.ToUpperInvariant(prefix[0]) + prefix[1..].ToLowerInvariant();
+    }
+
+    /// <summary>
     ///     The (faction, plot file) pairs a story-name tag contributes, in document order. Values
     ///     are returned as written (no path normalization); a dangling token - the trailing comma
     ///     the real data ships, or an odd faction with no plot - is ignored.
     /// </summary>
-    public static IEnumerable<(string Faction, string PlotFile)> ReadPairs(HtmlNode node)
+    public static IEnumerable<(string Faction, string PlotFile)> ReadPairs(string tagName, string rawValue)
     {
-        var value = node.InnerText.Trim();
+        var value = rawValue.Trim();
         if (value.Length == 0) yield break;
 
-        if (IsGenericTag(node.Name))
+        if (IsGenericTag(tagName))
         {
             var tokens = value.Split(',',
                 StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
@@ -81,8 +92,7 @@ public static class StoryNameTagSyntax
             yield break;
         }
 
-        // "Rebel_Story_Name" → faction "Rebel"; the value is the plot file.
-        var prefix = node.Name[..node.Name.IndexOf('_')];
-        yield return (char.ToUpperInvariant(prefix[0]) + prefix[1..], value);
+        // "Rebel_Story_Name" -> faction "Rebel"; the value is the plot file.
+        if (FactionOf(tagName) is { } faction) yield return (faction, value);
     }
 }

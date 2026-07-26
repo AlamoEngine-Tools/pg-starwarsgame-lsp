@@ -150,6 +150,7 @@ public static class XmlLanguageServiceExtensions
 
         // Cross-tag validation handler
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, CampaignStoryAttachmentHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
@@ -166,6 +167,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
         services.AddSingleton<IXmlCrossTagRule, SquadronOffsetsRule>();
         services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
+        services.AddSingleton<IXmlCrossTagRule, CampaignStoryAttachmentRule>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();

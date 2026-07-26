@@ -146,6 +146,25 @@ public sealed class StoryModelServiceTest
     }
 
     [Fact]
+    public void GetChainResult_LayeredRegistries_AreUnioned()
+    {
+        // A mod and its dependencies may each ship campaignfiles.xml; their campaign lists are
+        // unioned, matching WorkspaceIndexer.ScanStoryChain - which is what types the discovered
+        // files. If the two disagreed, a campaign would be typed but carry no model, and (since
+        // the chain problems are served from this scan) its diagnostics would silently vanish.
+        var files = Fixture();
+        files[Path.Combine(DepXmlDir, "campaignfiles.xml")] =
+            new MockFileData("<Campaign_Files><File>Campaigns_Dep.xml</File></Campaign_Files>");
+        files[Path.Combine(DepXmlDir, "Campaigns_Dep.xml")] = new MockFileData(
+            "<Campaigns><Campaign Name=\"GC_Dep\">" +
+            "<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>" +
+            "</Campaign></Campaigns>");
+        var (service, _, _, _, _, _) = Build(files, [DepXmlDir, XmlDir]);
+
+        Assert.Equal(["GC_Dep", "GC_One"], service.GetCampaignNames().OrderBy(n => n));
+    }
+
+    [Fact]
     public void GetModelsContaining_FindsCampaignsUsingTheThread()
     {
         var (service, _, _, _, fh, _) = Build();

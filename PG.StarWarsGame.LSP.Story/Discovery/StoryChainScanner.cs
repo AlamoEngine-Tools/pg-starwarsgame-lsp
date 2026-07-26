@@ -100,7 +100,7 @@ public sealed class StoryChainScanner
                                      StoryNameTagSyntax.IsStoryNameTag(n.Name)))
             {
                 processed.Add(node);
-                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node))
+                foreach (var (faction, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
                 {
                     AddManifest(plotFile, source.At(node, plotFile),
                         StoryChainProblemKind.UnresolvedStoryName, state);
@@ -120,7 +120,7 @@ public sealed class StoryChainScanner
         foreach (var node in source.Doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element &&
                                  StoryNameTagSyntax.IsStoryNameTag(n.Name) && !processed.Contains(n)))
-        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node))
+        foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
             AddManifest(plotFile, source.At(node, plotFile), StoryChainProblemKind.UnresolvedStoryName, state);
     }
 

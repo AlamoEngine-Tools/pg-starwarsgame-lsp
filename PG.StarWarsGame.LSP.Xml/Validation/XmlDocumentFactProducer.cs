@@ -172,7 +172,7 @@ public sealed class XmlDocumentFactProducer(
                 kv => (IReadOnlyList<HtmlNode>)kv.Value,
                 StringComparer.OrdinalIgnoreCase);
             foreach (var rule in _crossTagRules)
-                facts.AddRange(rule.Evaluate(node, readOnly, documentUri));
+                facts.AddRange(rule.Evaluate(node, readOnly, documentUri, lineIndex));
         }
     }
 

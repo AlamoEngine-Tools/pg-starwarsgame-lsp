@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Bug fixes
+
+- Campaign story attachments are validated as you type. Pasting the generic tag's `Faction, PlotFile` tuple into a faction-specific tag - `<Rebel_Story_Name>test, Conquests\Story_Plots_GCMenu.xml</Rebel_Story_Name>` - is now an error that names `<Story_Name>` as the form that takes a tuple, and offers a quick fix that drops the stray faction token. Previously the whole string was taken as a filename, so the mistake could only ever surface as a misleading "file does not exist", and only after a restart or project reload.
+
+- Attaching one faction twice in the same campaign is reported. Naming the same plot manifest through both a `<Rebel_Story_Name>` tag and a `<Story_Name>` slot is a warning (the engine merges both, so one of them is dead weight); pointing them at *different* manifests is an error, because which one the faction ends up running can no longer be read off the file. Paths are compared in their normal form, so `Conquests\X.xml`, `Conquests/X.xml` and `DATA\XML\Conquests\X.xml` count as the same file. A campaign that uses both authoring forms for different factions gets an informational note rather than a warning - only the generic form can attach a non-major faction, so the split is often deliberate.
+
+- The faction half of a `<Story_Name>` tuple is a real reference: Ctrl+Click jumps to the faction definition, rename reaches it, and a faction no `<Faction>` defines is flagged. Only the plot-file half was ever indexed, so a typo in the faction slot resolved to nothing and was silently ignored.
+
+- Broken story-chain links are reported as you type. A `*_Story_Name`, `Active_Plot`, `Suspended_Plot` or tactical plot reference pointing at a missing file was only ever checked during the startup scan, which re-ran on a `.pgproj` change and nothing else - so a link broken after startup stayed silent until the next restart, and one that had since been *fixed* kept being reported. These diagnostics now come from the live campaign chain, which reads unsaved editor content and re-runs whenever any file it touched changes.
+
+- Campaigns contributed by a dependency are no longer lost from the story model. When a mod and its dependencies each ship a `CampaignFiles.xml`, their campaign lists are merged - the same way the file typing already merged them. Previously only the highest layer's registry was read when building campaign models, so a dependency's campaigns were typed but had no model, no graph, and no diagnostics. Per-file overrides are unaffected: an individual campaign, manifest or thread file shipped by several layers still resolves to the highest-ranked copy.
+
 ## 0.3.1
 
 ### Improvements

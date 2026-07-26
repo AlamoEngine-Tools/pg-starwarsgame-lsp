@@ -164,7 +164,12 @@ public static class ServerConfigurator
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
                 services.AddSingleton<IGameIndexService, GameIndexService>();
                 services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
-                services.AddSingleton<IStoryChainProblemStore, StoryChainProblemStore>();
+                // Live chain problems (open-buffer-first, invalidated per document version); the
+                // startup snapshot it also accepts only answers until the first real scan.
+                services.AddSingleton<IStoryChainProblemStore>(sp =>
+                    new LiveStoryChainProblemStore(
+                        sp.GetRequiredService<IStoryModelService>,
+                        sp.GetRequiredService<ILspConfigurationProvider>()));
 
                 // Story campaign models (per-campaign threads + graph) and their diagnostics.
                 services.AddSingleton<IStoryModelService, StoryModelService>();

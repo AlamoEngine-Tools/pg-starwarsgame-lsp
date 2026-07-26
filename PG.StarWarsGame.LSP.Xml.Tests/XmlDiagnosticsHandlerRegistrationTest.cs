@@ -70,7 +70,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // ability the mounting object actually has (#53).
         // 105 → 106: VictoryConditionListHandler added - validates the Campaign victory-condition
         // lists (Type69) against the GalacticVictoryCondition enum (A5).
-        const int expectedHandlerCount = 106;
+        // 106 → 107: CampaignStoryAttachmentHandler added - validates how a <Campaign> attaches plot
+        // manifests to factions across both *_Story_Name authoring forms.
+        const int expectedHandlerCount = 107;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

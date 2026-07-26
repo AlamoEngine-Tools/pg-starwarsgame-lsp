@@ -139,7 +139,7 @@ public static class StoryManifestWriter
         foreach (var node in campaign.ChildNodes.Where(n =>
                      n.NodeType == HtmlNodeType.Element && StoryNameTagSyntax.IsStoryNameTag(n.Name)))
         {
-            var pairs = StoryNameTagSyntax.ReadPairs(node).ToList();
+            var pairs = StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText).ToList();
             var index = pairs.FindIndex(p => string.Equals(
                 StoryReferenceTypes.NormalizeRelativePath(p.PlotFile), target,
                 StringComparison.OrdinalIgnoreCase));
