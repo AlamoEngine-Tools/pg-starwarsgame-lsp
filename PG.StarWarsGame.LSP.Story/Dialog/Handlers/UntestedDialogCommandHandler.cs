@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Story.Dialog.Handlers;
 
 public sealed class UntestedDialogCommandHandler : IDialogDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public DiagnosticId DefaultId => DiagnosticIds.DialogUntestedCommand;
+
     public IEnumerable<DialogDiagnostic> Handle(DialogCommandFact fact, GameIndex index)
     {
         if (fact.Def is not { Untested: true }) yield break;

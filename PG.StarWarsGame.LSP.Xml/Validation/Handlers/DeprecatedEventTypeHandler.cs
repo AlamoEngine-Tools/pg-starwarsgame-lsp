@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class DeprecatedEventTypeHandler : XmlDiagnosticsHandler<StoryEventFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.DeprecatedEventType;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryEventFact fact, DiagnosticsContext ctx)
     {
         if (fact.Def is null || !fact.Def.Deprecated)

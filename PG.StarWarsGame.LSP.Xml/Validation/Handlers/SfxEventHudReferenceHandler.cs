@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class SfxEventHudReferenceHandler : NonEmptyReferenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.SfxEventHudReference;
+
     protected override XmlValueType TargetType => XmlValueType.SfxEventHudReference;
     protected override string ReferenceNoun => "SFX HUD event reference";
 }

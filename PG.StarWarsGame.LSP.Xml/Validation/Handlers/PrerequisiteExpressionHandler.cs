@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed partial class PrerequisiteExpressionHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.PrerequisiteExpression;
+
     protected override XmlValueType TargetType => XmlValueType.GameObjectTypeReferenceList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -25,7 +28,7 @@ public sealed partial class PrerequisiteExpressionHandler : SingleValueTypeHandl
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"<{fact.Tag.Tag}> expects a prerequisite expression; value must not be empty.")
+                    $"<{fact.Tag.Tag}> expects a prerequisite expression; value must not be empty.", Id: DiagnosticIds.PrerequisiteExpressionEmpty)
             ];
 
         if (!ExpressionPattern().IsMatch(trimmed))

@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class DeathCloneSpecHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.DeathCloneSpec;
+
     protected override XmlValueType TargetType => XmlValueType.DeathCloneSpec;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)

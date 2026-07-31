@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class LocalisationToTextureMapHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.LocalisationToTextureMap;
+
     protected override XmlValueType TargetType => XmlValueType.LocalisationToTextureMap;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)

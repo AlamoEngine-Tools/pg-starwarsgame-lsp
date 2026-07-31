@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -150,6 +151,85 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Contains("no object with this name exists", diag.Message);
     }
 
+    // ── suppression, end to end ───────────────────────────────────────────────
+
+    [Fact]
+    public void OnIndexChanged_SuppressionDirective_SilencesTheDiagnostic()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri,
+            $"-- aetswg:suppress {DiagnosticIds.UnresolvedReference} reason:: spawned at runtime\n" +
+            """Find_First_Object("UNIT_MISSING")""");
+        var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
+
+        indexService.Fire(index);
+
+        Assert.Empty(Assert.Single(published).Diagnostics!);
+    }
+
+    // The directive names one id; everything else it does not name stays visible.
+    [Fact]
+    public void OnIndexChanged_SuppressionOfAnotherId_LeavesTheDiagnosticAlone()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri,
+            $"-- aetswg:suppress {DiagnosticIds.LuaEngineUpvalue}\n" +
+            """Find_First_Object("UNIT_MISSING")""");
+        var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
+
+        indexService.Fire(index);
+
+        Assert.Single(Assert.Single(published).Diagnostics!);
+    }
+
+    // The failure this prevents: a mistyped directive suppresses nothing and says nothing, so the
+    // diagnostic just sits there and the user has no way to learn their comment is the problem.
+    [Fact]
+    public void OnIndexChanged_MistypedDirective_WarnsAndLeavesTheDiagnosticVisible()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri,
+            "-- aetswg:suppress aetswg-1-21\n" +
+            """Find_First_Object("UNIT_MISSING")""");
+        var index = IndexWithLuaRef(LuaUri, "UNIT_MISSING");
+
+        indexService.Fire(index);
+
+        var diagnostics = Assert.Single(published).Diagnostics!.ToList();
+        var warning = Assert.Single(diagnostics,
+            d => d.Code?.String == DiagnosticIds.SuppressionUnknownRule.ToString());
+
+        Assert.Equal(DiagnosticSeverity.Warning, warning.Severity);
+        Assert.Equal(0, warning.Range.Start.Line);
+        Assert.Contains("aetswg-1-21", warning.Message);
+
+        // And the diagnostic the user was trying to silence is still there.
+        Assert.Contains(diagnostics, d => d.Message.Contains("UNIT_MISSING"));
+    }
+
+    // Suppression complaints go through the same filter as everything else, so a user who has
+    // decided they do not want them can turn them off like any other group.
+    [Fact]
+    public void OnIndexChanged_SuppressionGroupSuppressed_SilencesTheWarningItself()
+    {
+        var (_, published, indexService, workspaceHost) = Build();
+        workspaceHost.Set(LuaUri,
+            "-- aetswg:suppress-file aetswg-013-*\n" +
+            "-- aetswg:suppress aetswg-1-21\n" +
+            """Find_First_Object("UNIT_MISSING")""");
+
+        indexService.Fire(IndexWithLuaRef(LuaUri, "UNIT_MISSING"));
+
+        var diagnostics = Assert.Single(published).Diagnostics!.ToList();
+
+        Assert.DoesNotContain(diagnostics,
+            d => d.Code?.String == DiagnosticIds.SuppressionUnknownRule.ToString());
+
+        // Still only silencing what was asked for: the mistyped directive suppresses nothing, so
+        // the reference error it named remains.
+        Assert.Contains(diagnostics, d => d.Message.Contains("UNIT_MISSING"));
+    }
+
     [Fact]
     public void OnIndexChanged_ResolvedRef_NoDiagnostic()
     {
@@ -264,11 +344,12 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.Empty(Assert.Single(published).Diagnostics!);
     }
 
+    // Loretta's ids are surfaced through our own scheme rather than raw, so a syntax error can be
+    // named by a suppression like any other diagnostic. The number is preserved, so it still
+    // identifies the exact Loretta diagnostic to anyone looking it up.
     [Fact]
-    public void OnIndexChanged_LuaSyntaxError_DiagnosticCodeIsLorrettaId()
+    public void OnIndexChanged_LuaSyntaxError_DiagnosticCodeIsTheMappedDiagnosticId()
     {
-        // Loretta diagnostic IDs (e.g. "LUA1003") should be surfaced as the LSP Code field
-        // so users and editors can identify and look up the exact Loretta diagnostic.
         var (_, published, indexService, workspaceHost) = Build();
         workspaceHost.Set(LuaUri, "function Foo(");
         var index = new GameIndex(BaselineIndex.Empty,
@@ -283,8 +364,9 @@ public sealed class LuaDiagnosticsPublisherTest
         Assert.NotEmpty(errorDiags);
         Assert.All(errorDiags, d =>
         {
-            Assert.True(d.Code?.IsString == true, $"Code should be a string Loretta ID, was: {d.Code}");
-            Assert.StartsWith("LUA", d.Code?.String);
+            Assert.True(DiagnosticId.TryParse(d.Code?.String, out var id),
+                $"Code should be a diagnostic id, was: {d.Code}");
+            Assert.Equal((int)DiagnosticGroup.Syntax, id.Group);
         });
     }
 

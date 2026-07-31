@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class NameReferenceHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.NameReference;
+
     protected override XmlValueType TargetType => XmlValueType.NameReference;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -17,7 +20,7 @@ public sealed class NameReferenceHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid name reference for <{fact.Tag.Tag}>.")
+                    $"'' is not a valid name reference for <{fact.Tag.Tag}>.", Id: DiagnosticIds.NameReferenceEmpty)
             ];
 
         if (fact.Tag.ReferenceKind == ReferenceKind.HardcodedSet && fact.Tag.HardcodedSet is { } set)

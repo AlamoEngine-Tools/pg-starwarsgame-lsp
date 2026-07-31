@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Story.Dialog.Handlers;
 /// </summary>
 public sealed class DialogCommandArityHandler : IDialogDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public DiagnosticId DefaultId => DiagnosticIds.DialogCommandArity;
+
     public IEnumerable<DialogDiagnostic> Handle(DialogCommandFact fact, GameIndex index)
     {
         if (fact.Def is null) yield break;

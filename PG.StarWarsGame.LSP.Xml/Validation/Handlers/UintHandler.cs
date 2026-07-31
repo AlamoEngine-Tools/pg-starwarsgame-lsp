@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class UintHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.Uint;
+
     public override IEnumerable<XmlValueType> HandledValueTypes =>
         [XmlValueType.UInt, XmlValueType.HardwareUInt];
 
@@ -33,7 +36,7 @@ public sealed class UintHandler : XmlDiagnosticsHandler<XmlTagValueFact>
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                 $"'{trimmed}' is not a valid non-negative integer for <{fact.Tag.Tag}>. Did you mean {corrected}?",
-                SuggestedFix: corrected)
+                SuggestedFix: corrected, Id: DiagnosticIds.UintNegativeOrFractional)
         ];
     }
 }

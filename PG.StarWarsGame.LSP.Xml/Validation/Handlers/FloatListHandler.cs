@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class FloatListHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.FloatList;
+
     protected override XmlValueType TargetType => XmlValueType.FloatList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -18,7 +21,7 @@ public sealed partial class FloatListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid float list for <{fact.Tag.Tag}>.")
+                    $"'' is not a valid float list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.FloatListEmpty)
             ];
 
         var parts = Separator().Split(trimmed);

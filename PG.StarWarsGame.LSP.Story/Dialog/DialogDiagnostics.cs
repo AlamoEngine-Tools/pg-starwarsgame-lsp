@@ -17,16 +17,29 @@ public sealed record DialogCommandFact(
     EnumValueDefinition? Def);
 
 /// <summary>A dialog diagnostic with its 0-based single-line range.</summary>
+/// <param name="Id">
+///     Overrides the reporting handler's <see cref="IDialogDiagnosticsHandler.DefaultId" />, for a
+///     handler that reports more than one kind of problem. Null means "use the default", which is
+///     the common case.
+/// </param>
 public sealed record DialogDiagnostic(
     XmlDiagnosticSeverity Severity,
     string Message,
     int Line,
     int Column,
-    int EndColumn);
+    int EndColumn,
+    DiagnosticId? Id = null);
 
 /// <summary>One validation concern over dialog command facts (dispatcher pattern, like the XML handlers).</summary>
 public interface IDialogDiagnosticsHandler
 {
+    /// <summary>
+    ///     Id carried by this handler's diagnostics unless one overrides it. Required, so that no
+    ///     dialog diagnostic can reach the client unsuppressable - the same rule the XML handlers
+    ///     follow.
+    /// </summary>
+    DiagnosticId DefaultId { get; }
+
     IEnumerable<DialogDiagnostic> Handle(DialogCommandFact fact, GameIndex index);
 }
 
@@ -38,6 +51,6 @@ public sealed class DialogDiagnosticsHandlerRegistry(IEnumerable<IDialogDiagnost
     {
         foreach (var handler in _handlers)
         foreach (var diagnostic in handler.Handle(fact, index))
-            yield return diagnostic;
+            yield return diagnostic.Id is null ? diagnostic with { Id = handler.DefaultId } : diagnostic;
     }
 }

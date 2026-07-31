@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class MapFileExistenceHandler : AssetFileExistenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.MapFileExistence;
+
     protected override ReferenceKind TargetKind => ReferenceKind.MapFile;
     protected override string AssetNoun => "Map";
     protected override IReadOnlyList<string> AllowedExtensions => [".ted"];

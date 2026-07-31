@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.UnitSpawnProbabilityTable;
+
     protected override XmlValueType TargetType => XmlValueType.UnitSpawnProbabilityTable;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -30,7 +33,7 @@ public sealed class UnitSpawnProbabilityTableHandler : CommaSeparatedPairHandler
                 probability < 0.0f || probability > 1.0f)
             {
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{prob}' is not a valid spawn probability for <{fact.Tag.Tag}>. Expected a float in [0.0, 1.0]."),
+                        $"'{prob}' is not a valid spawn probability for <{fact.Tag.Tag}>. Expected a float in [0.0, 1.0].", Id: DiagnosticIds.UnitSpawnProbabilityInvalid),
                     fact, probOffset, prob.Length));
                 continue;
             }

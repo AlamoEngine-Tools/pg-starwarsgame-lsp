@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
@@ -50,7 +51,34 @@ public sealed class DialogDiagnosticsPublisherTest
 
         var diag = Assert.Single(Assert.Single(published).Diagnostics!);
         Assert.Contains("BOGUS_COMMAND", diag.Message);
-        Assert.Equal("story-dialog", diag.Code!.Value.String);
+        // A real id, not a single catch-all code: without one it could not be suppressed, nor told
+        // apart from any other dialog problem.
+        Assert.Equal(DiagnosticIds.DialogUnknownCommand.ToString(), diag.Code!.Value.String);
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_SuppressionDirective_SilencesTheDiagnostic()
+    {
+        var (publisher, published, host, _) = Build();
+        host.AddOrUpdate(InScopeUri,
+            $"[CHAPTER 0]\n# aetswg:suppress {DiagnosticIds.DialogUnknownCommand} reason:: engine accepts it\n" +
+            "BOGUS_COMMAND arg", 1);
+
+        await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
+
+        Assert.Empty(Assert.Single(published).Diagnostics!);
+    }
+
+    [Fact]
+    public async Task RevalidateDocument_SuppressionOfAnotherId_LeavesTheDiagnosticAlone()
+    {
+        var (publisher, published, host, _) = Build();
+        host.AddOrUpdate(InScopeUri,
+            $"[CHAPTER 0]\n# aetswg:suppress {DiagnosticIds.DialogCommandArity}\nBOGUS_COMMAND arg", 1);
+
+        await publisher.RevalidateDocumentAsync(InScopeUri, CancellationToken.None);
+
+        Assert.Single(Assert.Single(published).Diagnostics!);
     }
 
     [Fact]

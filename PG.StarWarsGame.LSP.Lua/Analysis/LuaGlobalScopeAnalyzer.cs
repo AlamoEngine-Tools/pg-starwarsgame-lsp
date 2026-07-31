@@ -1,12 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using Loretta.CodeAnalysis;
-using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis.Lua.Syntax;
-using PG.StarWarsGame.LSP.Core;
+using Loretta.CodeAnalysis.Lua;
+using Loretta.CodeAnalysis;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Lua.Schema;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
@@ -360,7 +361,7 @@ internal static class LuaGlobalScopeAnalyzer
 
             diagnostics.Add(new LspDiagnostic
             {
-                Code = new LspDiagnosticCode(LuaDiagnosticCodes.RedundantRequire),
+                Code = new LspDiagnosticCode(DiagnosticIds.LuaRedundantRequire.ToString()),
                 Severity = LspDiagnosticSeverity.Warning,
                 Message =
                     $"require(\"{arg}\") is redundant, it is already transitively included by require(\"{coveringArg}\").",
@@ -397,7 +398,7 @@ internal static class LuaGlobalScopeAnalyzer
 
             diagnostics.Add(new LspDiagnostic
             {
-                Code = new LspDiagnosticCode(LuaDiagnosticCodes.DuplicateRequire),
+                Code = new LspDiagnosticCode(DiagnosticIds.LuaDuplicateRequire.ToString()),
                 Severity = LspDiagnosticSeverity.Warning,
                 Message = $"require(\"{rc.Arg}\") is a duplicate; already required on line {firstLine}.",
                 Range = new LspRange(

@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class FloatTupleListHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.FloatTupleList;
+
     protected override XmlValueType TargetType => XmlValueType.FloatTupleList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -18,7 +21,7 @@ public sealed partial class FloatTupleListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid float tuple list for <{fact.Tag.Tag}>.")
+                    $"'' is not a valid float tuple list for <{fact.Tag.Tag}>.", Id: DiagnosticIds.FloatTupleListEmpty)
             ];
 
         var parts = Separator().Split(trimmed).Where(p => p.Length > 0).ToArray();

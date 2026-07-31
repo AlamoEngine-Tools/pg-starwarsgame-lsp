@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class AudioFileFormatHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.AudioFileFormat;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ReferenceKind != ReferenceKind.AudioFile)

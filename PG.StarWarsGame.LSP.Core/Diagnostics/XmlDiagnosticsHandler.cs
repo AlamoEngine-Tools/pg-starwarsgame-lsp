@@ -17,6 +17,9 @@ public abstract class XmlDiagnosticsHandler<TFact> : IXmlDiagnosticsHandler
 
     public virtual XmlValueType? HandledValueType => null;
 
+    /// <inheritdoc />
+    public virtual DiagnosticId? DefaultId => null;
+
     public virtual IEnumerable<XmlValueType> HandledValueTypes =>
         HandledValueType.HasValue ? [HandledValueType.Value] : [];
 

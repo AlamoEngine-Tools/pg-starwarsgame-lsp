@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class MusicEventReferenceHandler : NonEmptyReferenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.MusicEventReference;
+
     protected override XmlValueType TargetType => XmlValueType.MusicEventReference;
     protected override string ReferenceNoun => "music event reference";
 }

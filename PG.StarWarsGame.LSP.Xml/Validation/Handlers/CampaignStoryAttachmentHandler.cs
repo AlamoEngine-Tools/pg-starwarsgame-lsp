@@ -12,6 +12,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<CampaignStoryAttachmentFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.CampaignStoryAttachment;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         CampaignStoryAttachmentFact fact, DiagnosticsContext ctx)
     {
@@ -32,7 +35,7 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Warning,
             $"The {fact.Faction} faction is attached to '{fact.Value}' more than once{InCampaign(fact)}. " +
-            $"Only one attachment is needed.{AlsoAt(fact.OtherLines)}");
+            $"Only one attachment is needed.{AlsoAt(fact.OtherLines)}", Id: DiagnosticIds.CampaignStoryRedundantAttachment);
     }
 
     // Error: the engine merges both attachments, so which manifest the faction actually runs is
@@ -43,7 +46,7 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
             XmlDiagnosticSeverity.Error,
             $"The {fact.Faction} faction is attached to {fact.PlotFiles.Count} different plot manifests" +
             $"{InCampaign(fact)}: {string.Join(", ", fact.PlotFiles.Select(f => $"'{f}'"))}. " +
-            $"Keep one.{AlsoAt(fact.OtherLines)}");
+            $"Keep one.{AlsoAt(fact.OtherLines)}", Id: DiagnosticIds.CampaignStoryConflictingAttachment);
     }
 
     // Information: legal and sometimes unavoidable - only the generic tag can attach a non-major
@@ -54,7 +57,7 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
             XmlDiagnosticSeverity.Information,
             $"Campaign{Named(fact)} attaches plots through both the faction-specific " +
             $"<Faction_Story_Name> tags and the generic <{StoryNameTagSyntax.GenericTag}> tuple list. " +
-            "Both are read by the engine; only the generic form can attach a non-major faction.");
+            "Both are read by the engine; only the generic form can attach a non-major faction.", Id: DiagnosticIds.CampaignStoryMixedAuthoringForms);
     }
 
     private static string InCampaign(CampaignStoryAttachmentFact fact)
@@ -84,7 +87,7 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
             $"<{fact.TagName}> takes a single plot manifest file, not a 'Faction, PlotFile' tuple - " +
             $"the tag already names the faction. Use <{StoryNameTagSyntax.GenericTag}>{fact.Value}" +
             $"</{StoryNameTagSyntax.GenericTag}> for the generic form, or drop the leading token.",
-            SuggestedFix: SingleRemainingPlotFile(fact.Value));
+            SuggestedFix: SingleRemainingPlotFile(fact.Value), Id: DiagnosticIds.CampaignStoryTupleInFactionTag);
     }
 
     /// <summary>

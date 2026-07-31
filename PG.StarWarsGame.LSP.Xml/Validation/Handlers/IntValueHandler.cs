@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class IntValueHandler : NumberValueHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.IntValue;
+
     protected override XmlValueType TargetType => XmlValueType.Int;
 
     protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(
@@ -23,14 +26,14 @@ public sealed class IntValueHandler : NumberValueHandlerBase
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"'{trimmed}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {corrected}?",
-                    SuggestedFix: corrected)
+                    SuggestedFix: corrected, Id: DiagnosticIds.IntValueFloatWhereIntExpected)
             ];
         }
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a valid integer.")
+                $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a valid integer.", Id: DiagnosticIds.IntValueOutOfRange)
         ];
     }
 }

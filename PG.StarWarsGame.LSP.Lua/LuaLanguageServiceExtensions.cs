@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
@@ -29,6 +30,7 @@ public static class LuaLanguageServiceExtensions
             sp.GetRequiredService<ILogger<LuaParseCache>>()));
         services.AddSingleton<IGameDocumentParser, LuaGameDocumentParser>();
         services.AddSingleton<LuaDiagnosticsPublisher>();
+        services.AddSingleton<IDiagnosticsRepublisher>(sp => sp.GetRequiredService<LuaDiagnosticsPublisher>());
         return services;
     }
 }

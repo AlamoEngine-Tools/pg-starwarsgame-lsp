@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFact>, IXmlNamedDiagnosticsHandler
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.ContextNamePair;
+
     public string ValidationId => "context-name-pair";
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -33,7 +36,7 @@ public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFa
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{name}' could not be resolved as a music event for <{fact.Tag.Tag}>.")
+                    $"'{name}' could not be resolved as a music event for <{fact.Tag.Tag}>.", Id: DiagnosticIds.ContextNamePairUnresolvedMusicEvent)
             ];
 
         return [];

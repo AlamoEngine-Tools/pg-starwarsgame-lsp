@@ -17,6 +17,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
     : XmlDiagnosticsHandler<StoryDialogRefFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.StoryDialogReference;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryDialogRefFact fact, DiagnosticsContext ctx)
     {
         if (scope is not { Enabled: true }) yield break;
@@ -40,6 +43,6 @@ public sealed class StoryDialogReferenceHandler(IStoryDialogScope? scope = null)
             : "the file defines no chapters";
         yield return new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
             $"Chapter {chapter} is not defined in story dialog '{fact.DialogName}' ({defined}).",
-            fact.ChapterLine >= 0 ? fact.ChapterLine : null);
+            fact.ChapterLine >= 0 ? fact.ChapterLine : null, Id: DiagnosticIds.StoryDialogChapterNotDefined);
     }
 }

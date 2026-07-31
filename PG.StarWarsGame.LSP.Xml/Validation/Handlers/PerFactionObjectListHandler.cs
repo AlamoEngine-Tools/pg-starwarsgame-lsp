@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.PerFactionObjectList;
+
     protected override XmlValueType TargetType => XmlValueType.PerFactionObjectList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -19,7 +22,7 @@ public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid per-faction object list for <{fact.Tag.Tag}>. Expected: FactionName[, ObjectName, ...].")
+                    $"'' is not a valid per-faction object list for <{fact.Tag.Tag}>. Expected: FactionName[, ObjectName, ...].", Id: DiagnosticIds.PerFactionObjectListEmpty)
             ];
 
         // Baseline absent → index not yet loaded, skip semantic faction check.
@@ -39,7 +42,7 @@ public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
                 var (line, col) = TokenPosition(fact, factionOffset);
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'{factionToken}' is not a known faction for <{fact.Tag.Tag}>.",
-                    line, col, factionToken.Length));
+                    line, col, factionToken.Length, Id: DiagnosticIds.PerFactionObjectListUnknownFaction));
                 break;
             }
 

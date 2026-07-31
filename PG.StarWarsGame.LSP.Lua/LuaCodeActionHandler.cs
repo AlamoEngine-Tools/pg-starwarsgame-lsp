@@ -1,13 +1,17 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using OmniSharp.Extensions.LanguageServer.Protocol;
+using Loretta.CodeAnalysis.Lua.Syntax;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Lua.Parsing;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua;
@@ -61,19 +65,75 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
     private IEnumerable<CommandOrCodeAction?> BuildActionsForDiagnostic(
         DocumentUri docUri, Diagnostic d, Container<Diagnostic> allDiagnostics)
     {
-        switch (d.Code!.Value.String)
+        // if/else rather than a switch: diagnostic ids are values from the catalogue, not compile-
+        // time constants, which is the price of having one place that assigns them.
+        if (!DiagnosticId.TryParse(d.Code?.String, out var id)) yield break;
+
+        // Offered on everything with an id, including Loretta's syntax errors - anything reportable
+        // is something a user may have a reason to silence.
+        foreach (var a in BuildSuppressionActions(docUri, d, id))
+            yield return a;
+
+        if (id == DiagnosticIds.LuaRedundantRequire)
         {
-            case LuaDiagnosticCodes.RedundantRequire:
-                yield return BuildDeleteLineAction(docUri, d, "Remove redundant require");
-                break;
-            case LuaDiagnosticCodes.DuplicateRequire:
-                yield return BuildDeleteLineAction(docUri, d, "Remove duplicate require");
-                break;
-            case LuaDiagnosticCodes.EngineUpvalue:
-                foreach (var a in BuildUpvalueActions(docUri, d, allDiagnostics))
-                    yield return a;
-                break;
+            yield return BuildDeleteLineAction(docUri, d, "Remove redundant require");
         }
+        else if (id == DiagnosticIds.LuaDuplicateRequire)
+        {
+            yield return BuildDeleteLineAction(docUri, d, "Remove duplicate require");
+        }
+        else if (id == DiagnosticIds.LuaEngineUpvalue)
+        {
+            foreach (var a in BuildUpvalueActions(docUri, d, allDiagnostics))
+                yield return a;
+        }
+    }
+
+    /// <summary>
+    ///     The suppression scopes, anchored to Lua: the reported line, the function enclosing it,
+    ///     and the top of the file.
+    /// </summary>
+    private IEnumerable<CommandOrCodeAction> BuildSuppressionActions(
+        DocumentUri docUri, Diagnostic d, DiagnosticId id)
+    {
+        var uriString = _fileHelper.NormalizeUri(docUri.ToString());
+        if (!_workspaceHost.TryGetOrReadFromDisk(_fileHelper, uriString, out var doc))
+            return [];
+
+        var lines = doc.Text.Split('\n');
+        var line = d.Range.Start.Line;
+        var points = new List<SuppressionInsertionPoint> { new(SuppressionScope.Node, line) };
+
+        if (EnclosingFunctionLine(doc.Text, line) is { } functionLine)
+            points.Add(new SuppressionInsertionPoint(
+                SuppressionScope.Object, functionLine + 1, "function"));
+
+        points.Add(new SuppressionInsertionPoint(SuppressionScope.File, 0));
+
+        return SuppressionCodeActionBuilder.Build(
+            docUri, d, id, SuppressionCommentFormat.Lua, lines, points);
+    }
+
+    /// <summary>
+    ///     Declaration line of the innermost function containing <paramref name="line" />, or null
+    ///     when the diagnostic sits at file level and there is no function scope to offer.
+    /// </summary>
+    private static int? EnclosingFunctionLine(string text, int line)
+    {
+        var parsed = ParsedLuaDocument.Parse(text);
+        var sourceText = parsed.Tree.GetText();
+        if (line < 0 || line >= sourceText.Lines.Count) return null;
+
+        var position = sourceText.Lines[line].Start;
+        var token = parsed.Tree.GetRoot().FindToken(position, true);
+
+        for (var n = token.Parent; n is not null; n = n.Parent)
+            if (n is FunctionDeclarationStatementSyntax
+                or LocalFunctionDeclarationStatementSyntax
+                or AnonymousFunctionExpressionSyntax)
+                return sourceText.Lines.GetLinePosition(n.SpanStart).Line;
+
+        return null;
     }
 
     private IEnumerable<CommandOrCodeAction> BuildUpvalueActions(
@@ -98,8 +158,9 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
         yield return BuildSuppressUpvalueAction(docUri, d, declLine);
 
         // "Move local inside function" — only when exactly one function captures this local
+        var upvalueCode = DiagnosticIds.LuaEngineUpvalue.ToString();
         var sameDeclCount = allDiagnostics.Count(other =>
-            other.Code?.String == LuaDiagnosticCodes.EngineUpvalue &&
+            other.Code?.String == upvalueCode &&
             other.RelatedInformation is not null &&
             other.RelatedInformation.Any(r =>
                 r.Message.Contains("local", StringComparison.OrdinalIgnoreCase) &&

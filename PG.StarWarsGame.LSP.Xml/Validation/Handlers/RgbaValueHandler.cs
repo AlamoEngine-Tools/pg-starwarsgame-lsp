@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class RgbaValueHandler : SingleValueTypeHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.RgbaValue;
+
     protected override XmlValueType TargetType => XmlValueType.RGBA;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -39,7 +42,7 @@ public sealed partial class RgbaValueHandler : SingleValueTypeHandlerBase
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"'{trimmed}' contains float components but <{fact.Tag.Tag}> expects integers. Did you mean '{fix}'?",
-                    SuggestedFix: fix)
+                    SuggestedFix: fix, Id: DiagnosticIds.RgbaValueFloatWhereIntExpected)
             ];
         }
 

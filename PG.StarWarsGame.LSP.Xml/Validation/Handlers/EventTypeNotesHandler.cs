@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class EventTypeNotesHandler : XmlDiagnosticsHandler<StoryEventFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.EventTypeNotes;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryEventFact fact, DiagnosticsContext ctx)
     {
         if (fact.Def is null || !fact.Def.Notes.TryGetValue(ctx.Locale, out var note))

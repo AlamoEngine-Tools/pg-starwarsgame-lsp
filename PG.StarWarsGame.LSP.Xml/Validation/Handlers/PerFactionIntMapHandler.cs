@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class PerFactionIntMapHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.PerFactionIntMap;
+
     protected override XmlValueType TargetType => XmlValueType.PerFactionIntMap;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -27,7 +30,7 @@ public sealed class PerFactionIntMapHandler : CommaSeparatedPairHandlerBase
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                         $"'{parts[1].Trim()}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {value}?",
-                        SuggestedFix: value.ToString()),
+                        SuggestedFix: value.ToString(), Id: DiagnosticIds.PerFactionIntMapFloatWhereIntExpected),
                     fact, 1)
             ];
 

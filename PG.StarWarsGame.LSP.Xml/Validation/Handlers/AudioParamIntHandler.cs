@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class AudioParamIntHandler : NumberValueHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.AudioParamInt;
+
     protected override XmlValueType TargetType => XmlValueType.AudioParamInt;
 
     protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(

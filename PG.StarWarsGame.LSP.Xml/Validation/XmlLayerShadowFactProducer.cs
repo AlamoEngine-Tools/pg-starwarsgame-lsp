@@ -17,7 +17,7 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
         if (!index.Documents.TryGetValue(documentUri, out var doc))
             return [];
 
-        var suppressed = ParseSuppressionComments(document.Html);
+        var declaredOverrides = ParseOverrideDeclarations(document.Html);
         var facts = new List<XmlFact>();
 
         var leafLayerRank = index.LeafLayerRank;
@@ -28,7 +28,7 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
             if (sym.Origin is not FileOrigin fo) continue;
 
             // Cross-layer shadow: leaf defines same (Id, TypeName) as a dep-layer workspace doc
-            if (isLeafDoc && !suppressed.Contains(sym.Id))
+            if (isLeafDoc && !declaredOverrides.Contains(sym.Id))
             {
                 var pair = index.ResolveWithShadow(sym.Id);
                 if (pair is { Shadowed: { } shadowed }
@@ -67,7 +67,7 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            if (collidingTypes.Count == 0 || suppressed.Contains(sym.Id)) continue;
+            if (collidingTypes.Count == 0 || declaredOverrides.Contains(sym.Id)) continue;
 
             foreach (var colliding in collidingTypes)
                 facts.Add(new XmlCrossTypeShadowFact(
@@ -77,7 +77,18 @@ public sealed class XmlLayerShadowFactProducer : IXmlLayerShadowFactProducer
         return facts;
     }
 
-    private static HashSet<string> ParseSuppressionComments(HtmlDocument doc)
+    /// <summary>
+    ///     Symbols the document declares it deliberately overrides, via
+    ///     <c>&lt;!-- &lt;Override Name="X"/&gt; --&gt;</c>.
+    ///     <para>
+    ///         This is not suppression, and the two must not be conflated. It mirrors Java's
+    ///         <c>@Override</c>: an assertion about the code, checked against it, which happens to
+    ///         mean there is no problem left to report - hence no fact is produced at all. A
+    ///         suppression makes no claim and hides a problem that does exist, which is why it is
+    ///         applied far later, on the way out of the publisher.
+    ///     </para>
+    /// </summary>
+    private static HashSet<string> ParseOverrideDeclarations(HtmlDocument doc)
     {
         var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var node in doc.DocumentNode.DescendantsAndSelf())

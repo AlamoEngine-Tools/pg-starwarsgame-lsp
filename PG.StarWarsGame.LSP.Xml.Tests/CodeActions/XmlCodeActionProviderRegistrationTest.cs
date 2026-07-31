@@ -49,7 +49,9 @@ public sealed class XmlCodeActionProviderRegistrationTest
     [Fact]
     public void Registered_provider_count_is_locked()
     {
-        const int expectedProviderCount = 5;
+        // 5 → 6: SuppressDiagnosticCodeActionProvider added - offers the four suppression scopes
+        // from #66 on any diagnostic carrying an id.
+        const int expectedProviderCount = 6;
         Assert.Equal(expectedProviderCount, RegisteredProviderTypes().Count);
     }
 

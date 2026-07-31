@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class SfxCountHandler : NumberValueHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.SfxCount;
+
     protected override XmlValueType TargetType => XmlValueType.SfxCount;
 
     protected override IEnumerable<XmlDiagnosticResult> HandlePrecise(

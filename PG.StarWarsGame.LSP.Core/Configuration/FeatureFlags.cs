@@ -95,6 +95,9 @@ public record DialogFeatureFlags
 
     /// <summary>Gates go-to-definition on object-reference arguments (speech events, movies, SFX events).</summary>
     public bool GoToDefinition { get; init; } = true;
+
+    /// <summary>Gates the suppression quick fixes on dialog diagnostics.</summary>
+    public bool CodeActions { get; init; } = true;
 }
 
 /// <summary>Flags for cross-language tooling endpoints.</summary>

@@ -14,6 +14,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 public sealed class HardpointMissingAttachmentBoneHandler
     : XmlDiagnosticsHandler<HardpointMissingAttachmentBoneFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.HardpointMissingAttachmentBone;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         HardpointMissingAttachmentBoneFact fact, DiagnosticsContext ctx)
     {

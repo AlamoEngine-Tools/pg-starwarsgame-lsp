@@ -27,5 +27,13 @@ public interface IXmlDiagnosticsHandler
     /// </summary>
     IEnumerable<XmlValueType> HandledValueTypes => HandledValueType.HasValue ? [HandledValueType.Value] : [];
 
+    /// <summary>
+    ///     Id stamped onto every result this handler returns that does not carry one of its own.
+    ///     Most handlers report a single kind of problem and declare it here; a handler that reports
+    ///     several distinct kinds sets <see cref="XmlDiagnosticResult.Id" /> per result instead, and
+    ///     those always win. Null only while a handler has not been given an id yet (#68).
+    /// </summary>
+    DiagnosticId? DefaultId => null;
+
     IEnumerable<XmlDiagnosticResult> Handle(XmlFact fact, DiagnosticsContext ctx);
 }

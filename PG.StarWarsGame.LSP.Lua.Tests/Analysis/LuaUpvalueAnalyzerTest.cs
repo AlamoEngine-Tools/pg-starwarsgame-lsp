@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Lua.Analysis;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Analysis;
@@ -197,7 +198,7 @@ public sealed class LuaUpvalueAnalyzerTest
         var result = Analyze(text);
         var diag = Assert.Single(result);
         Assert.True(diag.Code?.IsString == true);
-        Assert.Equal(LuaDiagnosticCodes.EngineUpvalue, diag.Code?.String);
+        Assert.Equal(DiagnosticIds.LuaEngineUpvalue.ToString(), diag.Code?.String);
     }
 
     [Fact]

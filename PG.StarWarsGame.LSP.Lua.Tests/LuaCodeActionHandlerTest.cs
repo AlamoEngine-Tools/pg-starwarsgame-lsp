@@ -1,13 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.IO.Abstractions.TestingHelpers;
-using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using PG.StarWarsGame.LSP.Core;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core;
+using System.IO.Abstractions.TestingHelpers;
 using LspRange = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests;
@@ -53,7 +54,7 @@ public sealed class LuaCodeActionHandlerTest
     {
         return new Diagnostic
         {
-            Code = new DiagnosticCode(LuaDiagnosticCodes.DuplicateRequire),
+            Code = new DiagnosticCode(DiagnosticIds.LuaDuplicateRequire.ToString()),
             Range = new LspRange(new Position(line, startChar), new Position(line, endChar)),
             Severity = DiagnosticSeverity.Warning,
             Message = "require(\"x\") is a duplicate.",
@@ -65,12 +66,107 @@ public sealed class LuaCodeActionHandlerTest
     {
         return new Diagnostic
         {
-            Code = new DiagnosticCode(LuaDiagnosticCodes.RedundantRequire),
+            Code = new DiagnosticCode(DiagnosticIds.LuaRedundantRequire.ToString()),
             Range = new LspRange(new Position(line, startChar), new Position(line, endChar)),
             Severity = DiagnosticSeverity.Warning,
             Message = "require(\"x\") is redundant.",
             Source = AppProperties.LspServerId
         };
+    }
+
+    // ── suppression quick fixes ──────────────────────────────────────────────
+
+    private static (LuaCodeActionHandler Sut, FakeWorkspaceHost Host) SutWithDocument(string text)
+    {
+        var host = new FakeWorkspaceHost();
+        host.Set("file:///s.lua", text);
+        return (MakeSut(host), host);
+    }
+
+    private static async Task<IReadOnlyList<CodeAction>> SuppressionActions(string text, int line)
+    {
+        var (sut, _) = SutWithDocument(text);
+        var request = ParamsWithDiagnostics("file:///s.lua", RedundantRequireDiag(line, 0, 12));
+        var result = await sut.Handle(request, CancellationToken.None);
+
+        return result!
+            .Select(a => a.CodeAction!)
+            .Where(a => a.Title.StartsWith("Suppress aetswg-", StringComparison.Ordinal))
+            .ToList();
+    }
+
+    [Fact]
+    public async Task Handle_InsideAFunction_OffersAllFourScopes()
+    {
+        var titles = (await SuppressionActions("function Foo()\n  require(\"x\")\nend\n", 1))
+            .Select(a => a.Title).ToList();
+
+        Assert.Equal(4, titles.Count);
+        Assert.Contains(titles, t => t.Contains("this line"));
+        Assert.Contains(titles, t => t.Contains("this function"));
+        Assert.Contains(titles, t => t.Contains("this file"));
+        Assert.Contains(titles, t => t.Contains("across the project"));
+    }
+
+    // No enclosing function means no function scope to offer - three actions, not a bogus fourth.
+    [Fact]
+    public async Task Handle_AtFileLevel_OmitsTheFunctionScope()
+    {
+        var titles = (await SuppressionActions("require(\"x\")\n", 0)).Select(a => a.Title).ToList();
+
+        Assert.Equal(3, titles.Count);
+        Assert.DoesNotContain(titles, t => t.Contains("this function"));
+    }
+
+    [Fact]
+    public async Task Handle_LineScopedAction_InsertsALuaCommentAboveTheDiagnostic()
+    {
+        var action = (await SuppressionActions("function Foo()\n  require(\"x\")\nend\n", 1))
+            .First(a => a.Title.Contains("this line"));
+        var edit = action.Edit!.Changes![DocumentUri.From("file:///s.lua")].Single();
+
+        Assert.Equal(1, edit.Range.Start.Line);
+        // Indented to match the line it guards, and in Lua's comment syntax rather than XML's.
+        Assert.Equal($"  -- aetswg:suppress {DiagnosticIds.LuaRedundantRequire}\n", edit.NewText);
+    }
+
+    [Fact]
+    public async Task Handle_ProjectScopedAction_IsACommandCarryingTheId()
+    {
+        var action = (await SuppressionActions("require(\"x\")\n", 0))
+            .First(a => a.Title.Contains("across the project"));
+
+        Assert.Null(action.Edit);
+        Assert.Equal(DiagnosticIds.LuaRedundantRequire.ToString(),
+            action.Command!.Arguments!.Single().ToString());
+    }
+
+    // Silencing is never the fix to reach for by reflex.
+    [Fact]
+    public async Task Handle_NoSuppressionIsMarkedPreferred()
+    {
+        var actions = await SuppressionActions("function Foo()\n  require(\"x\")\nend\n", 1);
+
+        Assert.DoesNotContain(actions, a => a.IsPreferred);
+    }
+
+    // Loretta's parse errors carry ids too, so they get the same scopes as anything else.
+    [Fact]
+    public async Task Handle_ASyntaxErrorDiagnostic_AlsoOffersSuppression()
+    {
+        var (sut, _) = SutWithDocument("function Foo(\n");
+        var diag = new Diagnostic
+        {
+            Code = new DiagnosticCode(new DiagnosticId(DiagnosticGroup.Syntax, 1003).ToString()),
+            Range = new LspRange(new Position(0, 0), new Position(0, 5)),
+            Severity = DiagnosticSeverity.Error,
+            Message = "token expected",
+            Source = AppProperties.LspServerId
+        };
+
+        var result = await sut.Handle(ParamsWithDiagnostics("file:///s.lua", diag), CancellationToken.None);
+
+        Assert.Contains(result!, a => a.CodeAction!.Title.Contains("across the project"));
     }
 
     // ── basic dispatch ───────────────────────────────────────────────────────
@@ -239,7 +335,7 @@ public sealed class LuaCodeActionHandlerTest
     {
         return new Diagnostic
         {
-            Code = new DiagnosticCode(LuaDiagnosticCodes.EngineUpvalue),
+            Code = new DiagnosticCode(DiagnosticIds.LuaEngineUpvalue.ToString()),
             Range = new LspRange(new Position(useLine, useChar), new Position(useLine, useEnd)),
             Severity = DiagnosticSeverity.Warning,
             Message = "File-level local 'x' is captured as an upvalue by 'Foo'.",

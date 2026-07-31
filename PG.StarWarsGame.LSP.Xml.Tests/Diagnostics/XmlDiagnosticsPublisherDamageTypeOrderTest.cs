@@ -49,6 +49,59 @@ public sealed class XmlDiagnosticsPublisherDamageTypeOrderTest
         return $"<GameConstants><Damage_Types>{damageTypesInner}</Damage_Types></GameConstants>";
     }
 
+    // ── suppression (#66/#67) ────────────────────────────────────────────────
+
+    // These diagnostics are built directly by the publisher rather than by a handler, so they are
+    // the ones that prove suppression is applied on the way out of Collect rather than somewhere
+    // inside the handler pipeline - filtering there would miss them entirely.
+    private static string BadTailDocument(string comment = "")
+    {
+        var badTail = RequiredTail.Replace(
+            "Damage_Normal Damage_Force_Whirlwind", "Damage_Force_Whirlwind Damage_Normal");
+        return $"<GameConstants>\n{comment}\n<Damage_Types>{badTail}</Damage_Types>\n</GameConstants>";
+    }
+
+    [Fact]
+    public void PublisherBuiltDiagnostic_IsSuppressedByAFileScopedDirective()
+    {
+        var uri = "file:///gameconstants.xml";
+        var publisher = BuildPublisher();
+
+        var unsuppressed = publisher.Collect(uri, BadTailDocument(), GameIndex.Empty);
+        Assert.NotEmpty(unsuppressed);
+
+        var suppressed = publisher.Collect(
+            uri,
+            BadTailDocument("<!-- aetswg:suppress-file aetswg-011-0002 intentional in this mod -->"),
+            GameIndex.Empty);
+
+        Assert.Empty(suppressed);
+    }
+
+    [Fact]
+    public void GroupWildcard_SuppressesTheWholeEngineGroup()
+    {
+        var suppressed = BuildPublisher().Collect(
+            "file:///gameconstants.xml",
+            BadTailDocument("<!-- aetswg:suppress-file aetswg-011-* -->"),
+            GameIndex.Empty);
+
+        Assert.Empty(suppressed);
+    }
+
+    // A directive naming a different diagnostic must leave this one alone - the whole point of ids
+    // is that suppression is targeted.
+    [Fact]
+    public void DirectiveForAnotherId_LeavesTheDiagnosticInPlace()
+    {
+        var suppressed = BuildPublisher().Collect(
+            "file:///gameconstants.xml",
+            BadTailDocument("<!-- aetswg:suppress-file aetswg-011-0003 -->"),
+            GameIndex.Empty);
+
+        Assert.NotEmpty(suppressed);
+    }
+
     [Fact]
     public void ExactRequiredTail_EmitsNoDiagnostics()
     {

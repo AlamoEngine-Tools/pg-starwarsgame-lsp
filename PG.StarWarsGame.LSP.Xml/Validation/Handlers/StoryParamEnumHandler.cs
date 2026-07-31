@@ -8,6 +8,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class StoryParamEnumHandler : XmlDiagnosticsHandler<StoryParamFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.StoryParamEnum;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(StoryParamFact fact, DiagnosticsContext ctx)
     {
         if (fact.Def is null || fact.Def.ValueType != XmlValueType.DynamicEnumValue || fact.RawValue.Length == 0)

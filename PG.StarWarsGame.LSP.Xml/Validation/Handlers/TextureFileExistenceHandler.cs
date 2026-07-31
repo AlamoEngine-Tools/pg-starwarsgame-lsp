@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class TextureFileExistenceHandler : AssetFileExistenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.TextureFileExistence;
+
     protected override ReferenceKind TargetKind => ReferenceKind.TextureFile;
     protected override string AssetNoun => "Texture";
     protected override IReadOnlyList<string> AllowedExtensions => [".tga", ".dds"];

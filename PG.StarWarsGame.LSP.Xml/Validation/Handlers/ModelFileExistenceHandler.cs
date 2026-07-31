@@ -3,10 +3,15 @@
 
 using PG.StarWarsGame.LSP.Core.Schema;
 
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class ModelFileExistenceHandler : AssetFileExistenceHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.ModelFileExistence;
+
     protected override ReferenceKind TargetKind => ReferenceKind.ModelFile;
     protected override string AssetNoun => "Model";
     protected override IReadOnlyList<string> AllowedExtensions => [".alo"];

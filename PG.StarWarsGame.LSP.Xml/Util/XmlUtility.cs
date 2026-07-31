@@ -30,6 +30,25 @@ public static class XmlUtility
         return node.Line;
     }
 
+    /// <summary>
+    ///     0-based line the node's markup ends on - the same line as <see cref="GetLine" /> for a
+    ///     single-line element, the closing tag's line for one spanning several. HAP exposes no end
+    ///     position, so it is derived from the newline count of the node's own markup.
+    /// </summary>
+    public static int GetEndLine(HtmlNode? node)
+    {
+        if (node is null) return InvalidLineMarker;
+
+        var start = GetLine(node);
+        var markup = node.OuterHtml;
+        var newlines = 0;
+        foreach (var c in markup)
+            if (c == '\n')
+                newlines++;
+
+        return start + newlines;
+    }
+
     public static int GetOpeningTagStartColumn(HtmlNode? node)
     {
         if (node is null) return InvalidLineMarker;

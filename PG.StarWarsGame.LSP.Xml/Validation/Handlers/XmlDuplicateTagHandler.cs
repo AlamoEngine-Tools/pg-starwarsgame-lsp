@@ -7,6 +7,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class XmlDuplicateTagHandler : XmlDiagnosticsHandler<XmlDuplicateTagFact>
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.XmlDuplicateTag;
+
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlDuplicateTagFact fact, DiagnosticsContext ctx)
     {
         var othersText = fact.OtherLines.Count == 1

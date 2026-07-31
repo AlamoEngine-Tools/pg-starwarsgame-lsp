@@ -246,6 +246,7 @@ function resolveFeatureFlags() {
 			diagnostics:    flag('dialog.diagnostics', false),
 			inlayHints:     flag('dialog.inlayHints', false),
 			goToDefinition: flag('dialog.goToDefinition', false),
+			codeActions:    flag('dialog.codeActions', false),
 		},
 	};
 }

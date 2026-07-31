@@ -9,6 +9,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
 {
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.IntFloatTupleList;
+
     protected override XmlValueType TargetType => XmlValueType.IntFloatTupleList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -35,7 +38,7 @@ public sealed class IntFloatTupleListHandler : CommaSeparatedPairHandlerBase
                 var corrected = intValue.ToString();
                 results.Add(AtToken(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                         $"'{intToken}' is a float but <{fact.Tag.Tag}> expects an integer. Did you mean {corrected}?",
-                        SuggestedFix: corrected),
+                        SuggestedFix: corrected, Id: DiagnosticIds.IntFloatTupleListFloatWhereIntExpected),
                     fact, intOffset, intToken.Length));
             }
 
