@@ -99,9 +99,18 @@ public sealed class LocalisationLoader : ILocalisationLoader
                 var db = _factory.CreateKeyed([language!]);
                 foreach (var path in paths)
                 {
-                    await TryImportFileAsync(path, layerType, language!, db, ct);
-                    registryEntries.Add(
-                        new LocProjectInfo(Path.GetFileName(path), path, layerType, layer.Name, layer.Rank));
+                    var category = CreditsFileClassifier.Classify(path, layer.Credits);
+
+                    // Credits files are listed so the editor can offer them, but deliberately not
+                    // imported: their keys are consumed by the engine's crawl, never referenced from
+                    // XML, Lua or dialog. In the index they would make the unknown-key diagnostic
+                    // accept a typo colliding with a credits line, and duplicate keys would make
+                    // GetValue non-deterministic.
+                    if (category == LocCategory.Text)
+                        await TryImportFileAsync(path, layerType, language!, db, ct);
+
+                    registryEntries.Add(new LocProjectInfo(
+                        Path.GetFileName(path), path, layerType, layer.Name, layer.Rank, category));
                 }
 
                 layerDbs.Add(db);

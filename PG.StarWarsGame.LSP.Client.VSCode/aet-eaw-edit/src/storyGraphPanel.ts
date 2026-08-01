@@ -352,7 +352,7 @@ export class StoryGraphPanel {
             {
                 modal: true,
                 detail: 'References to this event - prereqs and event-name params (TRIGGER_EVENT, '
-                    + 'RESET_EVENT, …) in other events - are NOT removed and will become unresolved. '
+                    + 'RESET_EVENT, and so on) in other events - are NOT removed and will become unresolved. '
                     + 'Run Validate afterwards to find them. Nothing is written until you Save.',
             },
             'Delete', dontAskAgain);

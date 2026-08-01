@@ -1,0 +1,16 @@
+{
+	// Type-checks the webview unit tests. Separate from tsconfig.json purely so that `types: node`
+	// is scoped to the tests: the modules under test are pulled in as imports and are still checked
+	// against the browser lib, so this cannot be used to smuggle a Node API into webview code.
+	"extends": "./tsconfig.json",
+	"compilerOptions": {
+		"types": [
+			"node"
+		]
+	},
+	"include": [
+		"./**/*.test.ts",
+		"./**/*.test.tsx"
+	],
+	"exclude": []
+}

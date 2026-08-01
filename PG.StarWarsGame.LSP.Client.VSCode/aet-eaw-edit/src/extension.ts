@@ -15,7 +15,10 @@ import {
 	Trace,
 	TransportKind,
 } from 'vscode-languageclient/node';
-import { LocalisationEditorViewProvider } from './localisationEditorViewProvider';
+import { CreditsPreviewPanel } from './creditsPreviewPanel';
+import { LocalisationEditorPanel } from './localisationEditorPanel';
+import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
+import { LocProjectInfo } from './webview/localisationTreeModel';
 import { StoryGraphPanel } from './storyGraphPanel';
 import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
 
@@ -81,9 +84,9 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 	}
 }
 
-interface LocProjectInfo {
-	label: string; filePath: string; resourceType: string; projectName: string; rank: number;
-}
+// LocProjectInfo is imported from webview/localisationTreeModel - one definition of the server DTO
+// for the tree, the panel and the palette. The copy that used to live here had already drifted,
+// missing the 'category' field the server has been sending since credits classification landed.
 interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; }
 
 interface GetEffectiveObjectResult {
@@ -151,7 +154,7 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 
 let lspClient: LanguageClient | undefined;
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
-let localisationEditorProvider: LocalisationEditorViewProvider | undefined;
+let localisationNavigatorProvider: LocalisationNavigatorViewProvider | undefined;
 let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
 let traceChannel: vscode.LogOutputChannel | undefined;
@@ -486,9 +489,12 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		storyNavigatorProvider?.refresh();
 	});
 
-	lspClient.onNotification('aet/localisationIndexUpdated', async () => {
-		logLine('Localisation index updated - refreshing editor panel.');
-		await localisationEditorProvider?.refresh();
+	lspClient.onNotification('aet/localisationIndexUpdated', () => {
+		logLine('Localisation index updated - refreshing localisation views.');
+		localisationNavigatorProvider?.refresh();
+		// Open tabs decide for themselves whether to re-read: one with staged edits must not be
+		// reloaded out from under the user. The notification fires on our own saves too.
+		LocalisationEditorPanel.invalidateAll();
 	});
 
 	lspClient.onNotification('aet/storyGraphChanged', (params: { campaigns: string[] }) => {
@@ -512,12 +518,96 @@ async function stopLspClient(): Promise<void> {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 
-	localisationEditorProvider = new LocalisationEditorViewProvider(context.extensionUri, () => lspClient);
+	localisationNavigatorProvider = new LocalisationNavigatorViewProvider(() => lspClient);
 	context.subscriptions.push(
-		vscode.window.registerWebviewViewProvider(
-			LocalisationEditorViewProvider.viewId,
-			localisationEditorProvider
-		)
+		vscode.window.registerTreeDataProvider(
+			LocalisationNavigatorViewProvider.viewId, localisationNavigatorProvider),
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.refreshLocalisationNavigator',
+			() => localisationNavigatorProvider?.refresh()),
+		// Hosted here rather than in the tree so the palette can reach it too. Lifted out of the
+		// sidebar webview, which owned this quick pick before the tree existed.
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.newLocalisationProject', async () => {
+			const choice = await vscode.window.showQuickPick(
+				[
+					{ label: 'Initialise from the game baseline', command: 'aet-eaw-edit.lsp.initLocalisationProject' },
+					{ label: 'Import existing localisation files', command: 'aet-eaw-edit.lsp.importLocalisationProject' },
+				],
+				{ placeHolder: 'Create a localisation project' });
+			if (choice) { await vscode.commands.executeCommand(choice.command); }
+		}),
+		// Opens the localisation grid in its own tab. Invoked with the file tree item, or without
+		// arguments from the command palette (quick-picks a file, grouped by category).
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.openLocalisationEditor',
+			async (arg?: LocTreeItem) => {
+				if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+
+				let project = arg?.project;
+				if (!project) {
+					const result = await lspClient.sendRequest<{ projects: LocProjectInfo[]; error?: string | null }>(
+						'aet/getLocalisationProjects', {});
+					if (result.error || !result.projects?.length) {
+						vscode.window.showWarningMessage(
+							`EaWEdit: ${result.error ?? 'no localisation files found in this workspace.'}`);
+						return;
+					}
+
+					const picked = await vscode.window.showQuickPick(
+						result.projects
+							.slice()
+							.sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label))
+							.map(p => ({
+								label: p.label,
+								description: p.category === 'credits' ? 'Credits' : 'Text',
+								detail: p.filePath,
+								project: p,
+							})),
+						{ placeHolder: 'Open a localisation file' });
+					if (!picked) { return; }
+					project = picked.project;
+				}
+
+				LocalisationEditorPanel.show(
+					project.filePath, project.label, project.category,
+					context.extensionUri, () => lspClient);
+			}),
+		// The crawl lives in the editor title bar, where a preview belongs - the same place a
+		// Markdown or LaTeX editor puts one. Both are gated to the credits panel by its view type.
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.previewCreditsCrawl',
+			() => LocalisationEditorPanel.previewCrawl(false)),
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.previewCreditsCrawlFullScreen',
+			() => LocalisationEditorPanel.previewCrawl(true)),
+		// Export was only ever reachable from inside the old sidebar webview; the tree is the
+		// natural home for it, and a menu entry needs a real command behind it.
+		// Opening the raw file is a thing you do to a file, so it belongs on the file's own menu in
+		// the tree rather than inside the editor showing it.
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.openLocalisationAsText',
+			async (arg?: LocTreeItem) => {
+				const filePath = arg?.project?.filePath;
+				if (!filePath) {
+					vscode.window.showWarningMessage('EaWEdit: no localisation file selected.');
+					return;
+				}
+				await vscode.window.showTextDocument(
+					vscode.Uri.file(filePath), { viewColumn: vscode.ViewColumn.Beside });
+			}),
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.exportLocalisationToDat',
+			async (arg?: LocTreeItem) => {
+				const filePath = arg?.project?.filePath;
+				if (!lspClient || !filePath) {
+					vscode.window.showWarningMessage('EaWEdit: no localisation file selected.');
+					return;
+				}
+
+				const result = await lspClient.sendRequest<{ writtenFiles: string[]; error?: string | null }>(
+					'aet/exportLocalisationToDat', { projectFilePath: filePath });
+
+				if (result.error) {
+					vscode.window.showErrorMessage(`EaWEdit: DAT export failed - ${result.error}`);
+					return;
+				}
+				vscode.window.showInformationMessage(
+					`EaWEdit: exported ${result.writtenFiles.length} DAT file(s).`);
+			})
 	);
 
 	effectiveObjectProvider = new EffectiveObjectContentProvider();
@@ -907,5 +997,7 @@ export async function deactivate(): Promise<void> {
 	logLine('Extension deactivated.');
 	statusItem?.hide();
 	StoryGraphPanel.disposeAll();
+	LocalisationEditorPanel.disposeAll();
+	CreditsPreviewPanel.disposeAll();
 	await stopLspClient();
 }

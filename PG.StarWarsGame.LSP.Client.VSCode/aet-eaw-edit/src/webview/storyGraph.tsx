@@ -19,6 +19,7 @@ import {
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
+import { useEdgeResize } from './useEdgeResize';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -1980,7 +1981,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
                     <button
                         className="discard" title="Discard - nothing was saved"
                         onClick={() => editorHandleRef?.discardStagingJunction(dto.id)}
-                    >×</button>
+                    ><span className="codicon codicon-close" /></button>
                 </Drag.NoDrag>
             ) : null}
             {dto.kind === 'TacticalPlot' && output ? (
@@ -1988,7 +1989,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
                     <button
                         className="jump" title="Jump to this battle's own story"
                         onClick={() => onReachableFromRequested(dto.id)}
-                    >→</button>
+                    ><span className="codicon codicon-arrow-right" /></button>
                 </Drag.NoDrag>
             ) : null}
             {input ? (
@@ -2355,7 +2356,7 @@ function EventParamRows(props: {
                 const title = `${label} ${row.position + 1}`
                     + (schemaParam?.description ? ` - ${schemaParam.description}` : '')
                     + (row.missing ? ' (required)' : optionalUnset ? ' (optional)' : '')
-                    + (diagnostic ? `\n⚠ ${diagnostic.message}` : '');
+                    + (diagnostic ? `\nWarning: ${diagnostic.message}` : '');
                 // List params hold several tokens; go-to targets the first one.
                 const firstToken = row.value.split(/[\s,]+/).filter(t => t)[0] ?? '';
                 if (isBoolean) {
@@ -2420,7 +2421,7 @@ function EventParamRows(props: {
                                     onClick={() => vscode.postMessage({
                                         type: 'resolveRef', value: firstToken, referenceType,
                                     })}
-                                >↗</button>
+                                ><span className="codicon codicon-go-to-file" /></button>
                             </Drag.NoDrag>
                         ) : null}
                     </div>
@@ -2449,7 +2450,7 @@ function SectionHead(props: {
                     title={collapsed ? `Expand the ${label.toLowerCase()} section` : `Collapse the ${label.toLowerCase()} section`}
                     onClick={() => toggleSection(props.nodeId, props.section)}
                 >
-                    {collapsed ? '▸' : '▾'} {label}
+                    <span className={`codicon codicon-chevron-${collapsed ? 'right' : 'down'}`} /> {label}
                     {collapsed && props.summary ? ` - ${props.summary}` : ''}
                 </span>
             </Drag.NoDrag>
@@ -2484,7 +2485,7 @@ function TypeRow(props: {
                                 borderColor: stepColor(props.kind, props.typeName),
                                 color: 'var(--vscode-editor-foreground)',
                             }}
-                            title={`${props.typeName} - remove it (✕) to attach a different type`}
+                            title={`${props.typeName} - remove the type to attach a different one`}
                         >
                             <span
                                 className={`codicon ${props.kind === 'trigger' ? 'codicon-zap' : 'codicon-gift'}`}
@@ -2501,7 +2502,7 @@ function TypeRow(props: {
                                 onClick={() => sendCommand(
                                     { kind: clearKind, threadUri: props.threadUri, eventName: props.eventName },
                                     `Remove ${props.kind} '${props.typeName}' and its parameters from '${props.eventName}'?`)}
-                            >✕</button>
+                            ><span className="codicon codicon-close" /></button>
                         </Drag.NoDrag>
                     )}
                 </>
@@ -2641,13 +2642,13 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                             <button
                                 className="rename-ok" title="Apply rename (Enter)"
                                 onMouseDown={e => { e.preventDefault(); commitTitle(); }}
-                            >✓</button>
+                            ><span className="codicon codicon-check" /></button>
                         </Drag.NoDrag>
                         <Drag.NoDrag>
                             <button
                                 title="Cancel (Esc)"
                                 onMouseDown={e => { e.preventDefault(); cancelRename(); }}
-                            >✗</button>
+                            ><span className="codicon codicon-close" /></button>
                         </Drag.NoDrag>
                     </>
                 ) : (
@@ -2660,7 +2661,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                 )}
                 {readOnly || editingTitle ? null : (
                     <Drag.NoDrag>
-                        <button title="Rename this event" onClick={openRename}>✎</button>
+                        <button title="Rename this event" onClick={openRename}><span className="codicon codicon-edit" /></button>
                     </Drag.NoDrag>
                 )}
                 {(nodeDiagnostics.get(dto.id)?.length ?? 0) > 0 ? (
@@ -2668,19 +2669,19 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                         className={'diag-badge ' + (nodeDiagnostics.get(dto.id)!.some(d => d.severity === 'error')
                             ? 'diag-error' : 'diag-warning')}
                         title={nodeDiagnostics.get(dto.id)!.map(d => d.message).join('\n')}
-                    >⚠{nodeDiagnostics.get(dto.id)!.length}</span>
+                    ><span className="codicon codicon-warning" />{nodeDiagnostics.get(dto.id)!.length}</span>
                 ) : null}
                 <Drag.NoDrag>
                     <button
                         title="Open in XML"
                         onClick={() => vscode.postMessage({ type: 'openXml', threadUri: dto.threadUri, line: dto.line ?? 0 })}
-                    >↗</button>
+                    ><span className="codicon codicon-go-to-file" /></button>
                 </Drag.NoDrag>
                 <Drag.NoDrag>
                     <button
                         title="Show only what's reachable from here"
                         onClick={() => onReachableFromRequested(dto.id)}
-                    >⭑</button>
+                    ><span className="codicon codicon-filter" /></button>
                 </Drag.NoDrag>
                 {readOnly ? null : (
                     <Drag.NoDrag>
@@ -2689,7 +2690,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                             onClick={() => sendCommand(
                                 { kind: 'deleteEvent', threadUri: dto.threadUri, eventName: dto.label },
                                 `Delete story event '${dto.label}'?`)}
-                        >🗑</button>
+                        ><span className="codicon codicon-trash" /></button>
                     </Drag.NoDrag>
                 )}
             </div>
@@ -3353,6 +3354,19 @@ const Shell = styled.div`
         vertical-align: -1px;
         margin-right: 3px;
     }
+
+    /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
+       renders, so they are figures and not text - and the house rule keeps user-facing strings
+       ASCII, which a box-drawing character is not. */
+    .shape-circle, .shape-diamond {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border: 1.5px solid currentColor;
+        vertical-align: -1px;
+    }
+    .shape-circle { border-radius: 50%; }
+    .shape-diamond { transform: rotate(45deg); }
 `;
 
 const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
@@ -3372,7 +3386,7 @@ function App(): JSX.Element {
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
-    const [status, setStatus] = useState<string | null>('Loading story graph…');
+    const [status, setStatus] = useState<string | null>('Loading story graph...');
     // True while a full rebuild's auto-arrange is in flight, so the canvas stays covered instead
     // of flashing the pre-layout node stack (every node starts at the same spot) before it settles.
     const [layouting, setLayouting] = useState(false);
@@ -3726,7 +3740,7 @@ function App(): JSX.Element {
                     break;
                 }
                 case 'error':
-                    setStatus('⚠ ' + String(msg.message));
+                    setStatus('Warning: ' + String(msg.message));
                     break;
             }
         };
@@ -3820,7 +3834,7 @@ function App(): JSX.Element {
                         className="canvas" ref={containerRef}
                         onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
                     />
-                    {status || layouting ? <p className="status">{status ?? 'Arranging layout…'}</p> : null}
+                    {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
                 </div>
                 <div className="right-dock" style={{ width: dockWidth }}>
                     <div className="resize-handle-w" title="Drag to resize" {...dockResize} />
@@ -3845,14 +3859,14 @@ function App(): JSX.Element {
                             ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes} /> : null}
                         {mode === 'simulate' && simState?.running ? <SimControls state={simState} /> : null}
                         {mode === 'simulate' && !simState?.running
-                            ? <div className="dock-hint">Starting simulation…</div> : null}
+                            ? <div className="dock-hint">Starting simulation...</div> : null}
                         {mode === 'view'
                             ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
                                 or Simulation to run it forward.</div> : null}
                     </div>
                     <div className="dock-overview">
                         <input
-                            type="text" placeholder="Filter event names…" value={filters.nameFilter}
+                            type="text" placeholder="Filter event names..." value={filters.nameFilter}
                             onChange={e => setFilter({ nameFilter: e.target.value })}
                         />
                         <div className="overview-mid">
@@ -3922,8 +3936,10 @@ function App(): JSX.Element {
                     <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-green, #89d185)' }} />Armed</span>
                     <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-purple, #b180d7)' }} />Fired</span>
                     <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-red, #f14c4c)' }} />Disabled</span>
-                    <span>◇ OR</span><span>○ AND</span><span>dashed = portal / tactical / untested</span>
-                    <span>drag socket→socket = prereq</span>
+                    <span><span className="shape-diamond" /> OR</span>
+                    <span><span className="shape-circle" /> AND</span>
+                    <span>dashed = portal / tactical / untested</span>
+                    <span>drag socket to socket = prereq</span>
                 </div>
             </div>
         </Shell>
@@ -3940,35 +3956,6 @@ let simBarHeightMemo = 140;
  * left edge), 'n' = dragging up grows (a bottom bar's top edge). Plain pointer capture on the handle
  * - no window listeners to leak.
  */
-function useEdgeResize(
-    initial: number, min: number, max: number, axis: 'e' | 'w' | 'n', persist: (v: number) => void,
-): { size: number; handleProps: Record<string, unknown> } {
-    const [size, setSize] = useState(initial);
-    const drag = useRef<{ start: number; base: number } | null>(null);
-    const clamp = (v: number): number => Math.max(min, Math.min(max, v));
-    const horizontal = axis === 'e' || axis === 'w';
-    return {
-        size,
-        handleProps: {
-            onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
-                e.preventDefault();
-                e.currentTarget.setPointerCapture(e.pointerId);
-                drag.current = { start: horizontal ? e.clientX : e.clientY, base: size };
-            },
-            onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
-                if (!drag.current) { return; }
-                const delta = axis === 'e' ? e.clientX - drag.current.start
-                    : axis === 'w' ? drag.current.start - e.clientX
-                        : drag.current.start - e.clientY;
-                const next = clamp(drag.current.base + delta);
-                setSize(next);
-                persist(next);
-            },
-            onPointerUp: () => { drag.current = null; },
-        },
-    };
-}
-
 let problemsHeightMemo = 150;
 
 /**
@@ -3998,7 +3985,7 @@ function ProblemsBar(props: {
                     onClick={problem.nodeId ? () => props.onJump(problem.nodeId!) : undefined}
                 >
                     <span className={'diag-badge diag-' + (problem.severity === 'error' ? 'error' : 'warning')}>
-                        {problem.severity === 'error' ? '⛔' : '⚠'}
+                        <span className={'codicon codicon-' + (problem.severity === 'error' ? 'error' : 'warning')} />
                     </span>
                     <span className="problem-node" title={problem.nodeId ?? problem.uri}>
                         {problem.nodeId
@@ -4012,7 +3999,7 @@ function ProblemsBar(props: {
                             vscode.postMessage({ type: 'openXml', threadUri: problem.uri, line: problem.line });
                         }}
                         title="Open in XML"
-                    >↗</button>
+                    ><span className="codicon codicon-go-to-file" /></button>
                 </div>
             ))}
         </div>
@@ -4045,13 +4032,13 @@ function SimControls(props: { state: SimState }): JSX.Element {
                         <span className="sim-name" title={f.name}>{f.name}</span>
                         <button onClick={() => sendSim('setFlag', { flag: f.name, value: f.value !== 0 ? 0 : 1 })}
                             title={`Toggle ${f.name}`}>
-                            {f.value !== 0 ? '1 → 0' : '0 → 1'}
+                            {f.value !== 0 ? '1 to 0' : '0 to 1'}
                         </button>
                     </div>
                 ))}
                 <div className="sim-row">
                     <input
-                        type="text" placeholder="Set flag…" value={flagName}
+                        type="text" placeholder="Set flag..." value={flagName}
                         onChange={e => setFlagName(e.target.value)}
                         onKeyDown={e => {
                             if (e.key === 'Enter' && flagName.trim()) {
@@ -4085,7 +4072,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
                             title="Simulate a Lua Story_Event call"
                             onChange={e => { if (e.target.value) { sendSim('luaNotify', { id: e.target.value }); } }}
                         >
-                            <option value="">Lua Story_Event…</option>
+                            <option value="">Lua Story_Event...</option>
                             {state.luaNotifications.map(id => <option key={id} value={id}>{id}</option>)}
                         </select>
                     </div>
@@ -4357,7 +4344,7 @@ function TacticalCreateBar(props: {
                 <option value="space">Space</option>
             </select>
             <input
-                type="text" placeholder="Tactical plot manifest file…" value={file}
+                type="text" placeholder="Tactical plot manifest file..." value={file}
                 onChange={e => setFile(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { create(); } }}
             />
@@ -4461,7 +4448,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
                     onClick={() => setCollapsed(c => ({ ...c, [label]: !c[label] }))}
                     title={isCollapsed ? `Expand ${label}` : `Collapse ${label}`}
                 >
-                    {isCollapsed ? '▸' : '▾'} {label}
+                    <span className={`codicon codicon-chevron-${isCollapsed ? 'right' : 'down'}`} /> {label}
                     <span className="palette-count">{items.length}</span>
                 </div>
                 {isCollapsed ? null : [...families.entries()].map(([color, names]) => (
@@ -4478,7 +4465,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
     return (
         <div className="palette-scroll">
             <input
-                type="text" placeholder="Search node types…" value={search}
+                type="text" placeholder="Search node types..." value={search}
                 onChange={e => setSearch(e.target.value)}
             />
             {showBlank || showAndJunction || showOrJunction ? (
@@ -4487,10 +4474,10 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
                         {showBlank ? tile('blank', <span className="codicon codicon-add" />, 'New event',
                             { category: 'blank', type: null },
                             'Drag onto the canvas to create a new untyped event, then edit it in place') : null}
-                        {showAndJunction ? tile('and', <span className="junction-glyph">◯</span>, 'AND',
+                        {showAndJunction ? tile('and', <span className="junction-glyph shape-circle" />, 'AND',
                             { category: 'andJunction', type: null },
                             'Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together') : null}
-                        {showOrJunction ? tile('or', <span className="junction-glyph">◇</span>, 'OR',
+                        {showOrJunction ? tile('or', <span className="junction-glyph shape-diamond" />, 'OR',
                             { category: 'orJunction', type: null },
                             'Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm') : null}
                     </div>

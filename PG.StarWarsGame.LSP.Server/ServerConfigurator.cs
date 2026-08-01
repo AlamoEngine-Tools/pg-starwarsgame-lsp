@@ -25,6 +25,7 @@ using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
+using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Story;
@@ -117,10 +118,11 @@ public static class ServerConfigurator
             .WithHandler<GetBaselineEntriesHandler>()
             .WithHandler<GetLanguagesHandler>()
             .WithHandler<ExportLocalisationToDatHandler>()
-            .WithHandler<GetLocalisationEntriesHandler>()
-            .WithHandler<SetLocalisationEntryHandler>()
-            .WithHandler<DeleteLocalisationEntryHandler>()
-            .WithHandler<AddLocalisationLanguageHandler>()
+            .WithHandler<GetLocalisationRowsHandler>()
+            .WithHandler<ApplyTranslationBatchHandler>()
+            .WithHandler<ValidateTranslationBatchHandler>()
+            .WithHandler<ApplyCreditsBatchHandler>()
+            .WithHandler<ValidateCreditsBatchHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
             .WithHandler<GetStoryPlotsHandler>()
             .WithHandler<GetStoryGraphHandler>()
@@ -264,6 +266,8 @@ public static class ServerConfigurator
                 services.AddSingleton<ILocalisationLayerRegistry>(sp =>
                     sp.GetRequiredService<LocalisationLayerRegistry>());
                 services.AddSingleton<ILocalisationLoader, LocalisationLoader>();
+                services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
+                services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
                 services.AddSingleton<LocalisationIndexChangedNotifier>(sp =>
                     new LocalisationIndexChangedNotifier(
                         sp.GetRequiredService<IGameIndexService>(),

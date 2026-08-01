@@ -54,11 +54,9 @@
     "views": {
       "aet-localisation": [
         {
-          "icon": "resources/icons/localisation.svg",
-          "type": "webview",
-          "id": "aet-eaw-edit.lsp.localisationEditor",
-          "name": "Editor",
-          "when": "config.aet-eaw-edit.localisation.editorEnabled && config.aet-eaw-edit.features.tools.localisation"
+          "id": "aet-eaw-edit.lsp.localisationNavigator",
+          "name": "Files",
+          "when": "config.aet-eaw-edit.features.tools.localisation"
         }
       ],
       "aet-story": [
@@ -70,10 +68,32 @@
       ]
     },
     "menus": {
+      "editor/title": [
+        {
+          "command": "aet-eaw-edit.lsp.previewCreditsCrawl",
+          "when": "activeWebviewPanelId == aetCreditsEditor",
+          "group": "navigation@1"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.previewCreditsCrawlFullScreen",
+          "when": "activeWebviewPanelId == aetCreditsEditor",
+          "group": "navigation@2"
+        }
+      ],
       "view/title": [
         {
           "command": "aet-eaw-edit.lsp.refreshStoryNavigator",
           "when": "view == aet-eaw-edit.lsp.storyNavigator",
+          "group": "navigation"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.newLocalisationProject",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator",
+          "group": "navigation"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.refreshLocalisationNavigator",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator",
           "group": "navigation"
         }
       ],
@@ -82,6 +102,21 @@
           "command": "aet-eaw-edit.lsp.openStoryGraph",
           "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryCampaign",
           "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openLocalisationEditor",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator && viewItem =~ /^aetLocFile/",
+          "group": "inline"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.openLocalisationAsText",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator && viewItem =~ /^aetLocFile/",
+          "group": "aetLoc@1"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.exportLocalisationToDat",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator && viewItem =~ /^aetLocFile/",
+          "group": "aetLoc@2"
         }
       ]
     },
@@ -133,6 +168,46 @@
         "title": "EaWEdit: Refresh Story Navigator",
         "icon": "$(refresh)",
         "enablement": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openLocalisationEditor",
+        "title": "EaWEdit: Open Localisation Editor",
+        "icon": "$(table)",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.refreshLocalisationNavigator",
+        "title": "EaWEdit: Refresh Localisation Files",
+        "icon": "$(refresh)",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.newLocalisationProject",
+        "title": "EaWEdit: New Localisation Project",
+        "icon": "$(new-file)",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.exportLocalisationToDat",
+        "title": "EaWEdit: Export Localisation to DAT",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.openLocalisationAsText",
+        "title": "EaWEdit: Open Localisation File as Text",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.previewCreditsCrawl",
+        "title": "EaWEdit: Open Credits Preview to the Side",
+        "icon": "$(open-preview)",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.previewCreditsCrawlFullScreen",
+        "title": "EaWEdit: Play Credits Crawl Full Screen",
+        "icon": "$(screen-full)",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
       }
     ],
     "configuration": [
@@ -237,12 +312,6 @@
             "format": "uri-reference",
             "markdownDescription": "Path to the local EaW XML schema directory (`schema/eaw/`).\n\nOnly applies when `#aet-eaw-edit.lsp.schema.source#` is `local`.",
             "scope": "machine-overridable"
-          },
-          "aet-eaw-edit.localisation.editorEnabled": {
-            "order": 1100,
-            "type": "boolean",
-            "default": false,
-            "markdownDescription": "Enables the built-in localisation editor.\n\nThe editor panel also requires `#aet-eaw-edit.features.tools.localisation#` to be enabled."
           },
           "aet-eaw-edit.localisation.format": {
             "order": 1200,
@@ -537,9 +606,10 @@
     "vscode:prepublish": "npm run check-types && npm run bundle -- --production",
     "bundle": "node esbuild.js",
     "compile": "tsc -p ./",
-    "check-types": "tsc -p ./ --noEmit && tsc -p ./src/webview --noEmit",
+    "check-types": "tsc -p ./ --noEmit && tsc -p ./src/webview --noEmit && tsc -p ./src/webview/tsconfig.test.json --noEmit",
     "watch": "node esbuild.js --watch",
     "watch:tsc": "tsc -p ./ --noEmit --watch",
+    "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\"",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
     "test": "vscode-test",
@@ -561,6 +631,7 @@
     "typescript": "^6.0.0"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "^3.14.9",
     "@vscode/codicons": "^0.0.45",
     "elkjs": "^0.8.2",
     "react": "^18.3.1",

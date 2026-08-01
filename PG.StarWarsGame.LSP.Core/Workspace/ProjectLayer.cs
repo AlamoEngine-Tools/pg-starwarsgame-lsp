@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Project;
+
 namespace PG.StarWarsGame.LSP.Core.Workspace;
 
 /// <summary>
@@ -24,4 +26,11 @@ public sealed record ProjectLayer(
 {
     /// <summary>This layer's resolved story-dialog directories (registry scope for dialog .txt files).</summary>
     public IReadOnlyList<string> StoryDialogRoots { get; init; } = [];
+
+    /// <summary>
+    ///     This layer's credits-file classification, or null to use the naming convention. Per-layer
+    ///     for the same reason as <see cref="TextResourceType" />: a dependency's naming must not be
+    ///     reinterpreted by whatever the root project happens to declare.
+    /// </summary>
+    public LocalisationCreditsSettings? Credits { get; init; }
 }

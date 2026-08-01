@@ -29,6 +29,14 @@ public sealed class ModProjectLoader
     private static readonly HashSet<string> ValidLocalisationTypes =
         new(StringComparer.OrdinalIgnoreCase) { "CSV", "DAT", "XML", "NLS" };
 
+    private static readonly HashSet<string> ValidCreditsDetections =
+        new(StringComparer.Ordinal)
+        {
+            LocalisationCreditsSettings.Convention,
+            LocalisationCreditsSettings.Explicit,
+            LocalisationCreditsSettings.None
+        };
+
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ModProjectLoader> _logger;
 
@@ -124,7 +132,35 @@ public sealed class ModProjectLoader
                 $"Could not load mod project '{fileName}': 'localisation.directory' is required " +
                 "when 'localisation' is present.");
 
-        return new LocalisationProjectSettings(dto.Type.ToUpperInvariant(), NormalizePath(dto.Directory));
+        return new LocalisationProjectSettings(
+            dto.Type.ToUpperInvariant(), NormalizePath(dto.Directory), ParseCredits(dto.Credits, fileName));
+    }
+
+    private static LocalisationCreditsSettings? ParseCredits(CreditsDto? dto, string fileName)
+    {
+        if (dto is null) return null;
+
+        // Omitted detection means the default, so `"credits": { "files": [...] }` reads as "the
+        // convention, plus these" rather than being rejected for an absent field.
+        var detection = string.IsNullOrWhiteSpace(dto.Detection)
+            ? LocalisationCreditsSettings.Convention
+            : dto.Detection.Trim().ToLowerInvariant();
+
+        if (!ValidCreditsDetections.Contains(detection))
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': 'localisation.credits.detection' must be one of " +
+                $"convention, explicit, none (got '{dto.Detection}').");
+
+        var files = dto.Files ?? [];
+
+        // An explicit list that lists nothing classifies nothing - indistinguishable from "none",
+        // except that the author clearly meant to name something.
+        if (detection == LocalisationCreditsSettings.Explicit && files.Count == 0)
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': 'localisation.credits.files' must name at least " +
+                "one file when 'localisation.credits.detection' is 'explicit'.");
+
+        return new LocalisationCreditsSettings(detection, files);
     }
 
     // Clean break: directories.text/textResourceType were removed in 0.2.0 in favour of the
@@ -219,5 +255,12 @@ public sealed class ModProjectLoader
     {
         public string? Type { get; init; }
         public string? Directory { get; init; }
+        public CreditsDto? Credits { get; init; }
+    }
+
+    private sealed class CreditsDto
+    {
+        public string? Detection { get; init; }
+        public IReadOnlyList<string>? Files { get; init; }
     }
 }

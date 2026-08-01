@@ -6,6 +6,9 @@
 
     <ItemGroup Label="Production">
         <PackageVersion Include="AlamoEngineTools.Modinfo" Version="8.0.6"/>
+        <!-- Pinned to the version PG.StarWarsGame.Localisation uses, so the editor's own CSV reads
+             cannot diverge from the importers the rest of the server shares with it. -->
+        <PackageVersion Include="CsvHelper" Version="33.0.1"/>
         <PackageVersion Include="HtmlAgilityPack" Version="1.12.4"/>
         <PackageVersion Include="JsonSchema.Net" Version="9.2.2"/>
         <PackageVersion Include="Loretta.CodeAnalysis.Lua" Version="0.2.13"/>

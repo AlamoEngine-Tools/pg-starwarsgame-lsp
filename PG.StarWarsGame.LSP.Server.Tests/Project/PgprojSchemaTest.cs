@@ -35,6 +35,66 @@ public sealed class PgprojSchemaTest
         Assert.True(result.IsValid, DescribeErrors(relativePath, result));
     }
 
+    // ── localisation.credits ─────────────────────────────────────────────────
+
+    private static EvaluationResults Evaluate(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        return Schema.Evaluate(document.RootElement,
+            new EvaluationOptions { OutputFormat = OutputFormat.List });
+    }
+
+    [Theory]
+    [InlineData("""{ "detection": "convention" }""")]
+    [InlineData("""{ "detection": "explicit", "files": ["rolls.csv"] }""")]
+    [InlineData("""{ "detection": "none" }""")]
+    [InlineData("""{ "files": ["rolls.csv"] }""")]
+    [InlineData("""{ }""")]
+    public void CreditsNode_AcceptsTheDocumentedShapes(string credits)
+    {
+        var json = $$"""
+                     {
+                       "name": "Mod",
+                       "localisation": { "type": "CSV", "directory": "data/text", "credits": {{credits}} }
+                     }
+                     """;
+
+        Assert.True(Evaluate(json).IsValid, DescribeErrors("credits node", Evaluate(json)));
+    }
+
+    // The authoring schema is what gives a modder red squiggles in the editor before the server
+    // ever sees the file; if it accepted a bad value the only feedback would be a load failure.
+    [Theory]
+    [InlineData("""{ "detection": "guess" }""")]
+    [InlineData("""{ "detection": 1 }""")]
+    [InlineData("""{ "files": "rolls.csv" }""")]
+    [InlineData("""{ "unknown": true }""")]
+    public void CreditsNode_RejectsMalformedShapes(string credits)
+    {
+        var json = $$"""
+                     {
+                       "name": "Mod",
+                       "localisation": { "type": "CSV", "directory": "data/text", "credits": {{credits}} }
+                     }
+                     """;
+
+        Assert.False(Evaluate(json).IsValid, $"schema wrongly accepted credits: {credits}");
+    }
+
+    // Every existing project omits it; making it required would invalidate all of them.
+    [Fact]
+    public void CreditsNode_IsOptional()
+    {
+        const string json = """
+                            {
+                              "name": "Mod",
+                              "localisation": { "type": "CSV", "directory": "data/text" }
+                            }
+                            """;
+
+        Assert.True(Evaluate(json).IsValid);
+    }
+
     private static string DescribeErrors(string file, EvaluationResults result)
     {
         var lines = result.Details

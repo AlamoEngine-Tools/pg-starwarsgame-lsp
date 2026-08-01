@@ -6,8 +6,11 @@ logs/**
 .yarnrc
 vsc-extension-quickstart.md
 esbuild.js
+esbuild.test.js
 package-lock.json
 out/localisationEditorViewProvider.js
+out/test/**
+out/test-unit/**
 **/tsconfig.json
 **/eslint.config.mjs
 **/*.map

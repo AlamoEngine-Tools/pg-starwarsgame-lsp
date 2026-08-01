@@ -226,15 +226,52 @@ Files that come from a dependency or the base game are read-only; the editor tel
 
 ## Localisation editor
 
-An activity bar panel provides a key-by-language table editor for `.csv`, `.xml`, and `.properties` localisation files.
+Localisation files declared in the `.pgproj` are listed in the **EaWEdit: Localisation** activity
+bar view, grouped into **Text files** and **Credits files**. Opening one from the tree gives a Key
+by Language table in its own editor tab, so it can be split, moved to another column, or kept open
+beside the XML that references its keys. One tab per file; two files can sit side by side.
 
-- **Project picker** - switch between localisation files declared in the `.pgproj`
-- **Inline editing** - edit translation values directly in the grid; changes are saved to disk immediately
-- **Add Language** - adds a language column drawn from the game's official language list
-- **Inherited baseline** - the Inherited toggle overlays all base-game EaW and FoC keys as read-only rows for reference
-- **Search** - filter visible rows by key name or any translation value
-- **Sortable columns** - click a column header to sort ascending, click again for descending, click a third time to restore the original order
-- **Initialise from baseline** - creates a fresh localisation file pre-populated with all EaW and FoC keys, in CSV, XML, or Properties format
+- **Editing** - edit any cell in the grid. Changes are staged, shown as a count on the **Save**
+  button, and written only when you save
+- **Validate** - checks the staged changes without writing. Duplicate and empty keys are errors in
+  a text file and expected in a credits file, so they are not reported there
+- **Rows** - add, delete and reorder rows; reordering is offered on credits files, where position
+  carries meaning
+- **Add Language** - adds a language column from the game's official language list
+- **Filter** - the box in the right-hand dock filters rows by plain text, wildcard (`*`, `?`) or
+  regular expression, scoped to keys, one language, or everything
+- **Export DAT** - from the file's context menu in the tree
+- **New project** - creates a localisation file pre-populated from the EaW + FoC baseline, or
+  imports existing files
+
+A save rewrites only the rows you changed - untouched rows keep their original quoting, comments and
+line endings - and is refused if the file changed on disk since the tab loaded it.
+
+### Credits files
+
+A credits file is ordered and may repeat a key: it is the running list the end-credits crawl reads,
+not a lookup table. Rows are addressed by position rather than by key, so duplicates, blank spacer
+rows and order all survive editing. Credits files also get a **Preview crawl** button, which plays
+the staged rows as scrolling end credits.
+
+Files are recognised by the engine's naming - anything beginning with `credits`. A project that
+names them differently can say so:
+
+```jsonc
+"localisation": {
+  "type": "CSV",
+  "directory": "data/text",
+  "credits": {
+    // "convention" (default), "explicit" (only the files listed), or "none"
+    "detection": "convention",
+    "files": ["rolls.csv"]
+  }
+}
+```
+
+Use `none` when a project's ordinary text file happens to be named like a credits file. Each project
+reads one localisation format, so a CSV project's credits file is expected to be a `.csv`; compiled
+`.dat` files are an export target, not editable.
 
 ---
 
@@ -288,7 +325,6 @@ The baseline is a pre-built snapshot of all vanilla EaW and FoC game objects and
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.localisation.editorEnabled` | `false` | Show the localisation editor panel in the activity bar |
 | `aet-eaw-edit.localisation.format` | `format-dat` | Default format for new localisation projects (`format-dat`, `format-csv`, `format-xml`) |
 
 ### Feature flags
@@ -352,7 +388,7 @@ Cross-language tools:
 | `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph panel: staging, previewing, validating, and writing story changes. Without it the panel is read-only and Edit is not offered by the mode switch. Builds on `aet-eaw-edit.features.tools.storyEditor` _(work in progress)_ |
 | `aet-eaw-edit.features.tools.variants` | `true` | Variant-inheritance tooling: the Show Effective Object command and its code lens |
 
-> The localisation panel needs both `aet-eaw-edit.localisation.editorEnabled` and `aet-eaw-edit.features.tools.localisation` set to `true` - the first shows the panel, the second makes it functional.
+> The localisation views follow `aet-eaw-edit.features.tools.localisation` alone. Feature flags are read at startup, so restart the server after changing it.
 
 > The story graph panel's Simulation mode is still unfinished and is deliberately absent from this list and from the settings UI. It is reachable by adding `"aet-eaw-edit.features.tools.storySimulator": true` to `settings.json` by hand; the mode switch then offers it.
 
@@ -391,8 +427,8 @@ Only one `.pgproj` is supported per opened workspace root. Remove or relocate th
 **Notification: "'directories.text'/'directories.textResourceType' were removed"**
 Your `.pgproj` still uses the pre-0.2.0 localisation format. See [Upgrading from 0.1.x](#upgrading-from-01x) for the exact fields to change.
 
-**The localisation panel is not visible**
-Set both `aet-eaw-edit.localisation.editorEnabled` and `aet-eaw-edit.features.tools.localisation` to `true`, then reload the window (`Ctrl+Shift+P` > Developer: Reload Window). The localisation tooling is disabled by default while still in development.
+**The localisation views are not visible**
+Set `aet-eaw-edit.features.tools.localisation` to `true`, then restart the server (`Ctrl+Shift+P` > EaWEdit: Restart LSP Server) - feature flags are read at startup. The localisation tooling is disabled by default while still in development.
 
 **A command or code action doesn't appear ("Show Effective Object", "Initialise/Import Localisation Project", localisation quick-fixes)**
 These are gated behind feature flags. Confirm `aet-eaw-edit.features.tools.variants` (for variant inheritance) or `aet-eaw-edit.features.tools.localisation` (for localisation tooling) is `true`. Changing either setting restarts the language server automatically.

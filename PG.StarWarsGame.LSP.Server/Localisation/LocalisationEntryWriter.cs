@@ -57,48 +57,6 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         }
     }
 
-    public async Task<bool> DeleteAsync(string filePath, string key, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var ext = fs.Path.GetExtension(filePath).ToLowerInvariant();
-
-        switch (ext)
-        {
-            case ".csv":
-                return await DeleteCsvAsync(filePath, key, ct);
-            case ".xml":
-                return await DeleteXmlAsync(filePath, key, ct);
-            case ".properties":
-                return await DeleteNlsAsync(filePath, key, ct);
-            default:
-                _logger.LogWarning("Cannot delete '{Key}': unsupported file format '{Path}'.", key, filePath);
-                return false;
-        }
-    }
-
-    public async Task<bool> AddLanguageAsync(string filePath, string language, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var ext = fs.Path.GetExtension(filePath).ToLowerInvariant();
-
-        switch (ext)
-        {
-            case ".csv":
-                return await AddLanguageCsvAsync(filePath, language, ct);
-            case ".xml":
-                return await AddLanguageXmlAsync(filePath, language, ct);
-            case ".properties":
-                _logger.LogWarning(
-                    "Cannot add language '{Language}' to '{Path}': .properties files are single-language.",
-                    language, filePath);
-                return false;
-            default:
-                _logger.LogWarning("Cannot add language '{Language}': unsupported file format '{Path}'.",
-                    language, filePath);
-                return false;
-        }
-    }
-
     // ── CSV ──────────────────────────────────────────────────────────────────
 
     private async Task<bool> UpsertCsvAsync(
@@ -114,37 +72,6 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         var rowIndex = FindCsvRowIndex(lines, key);
         if (rowIndex >= 0) lines[rowIndex] = newRow;
         else lines.Add(newRow);
-
-        await fs.File.WriteAllTextAsync(filePath, JoinLines(lines), ct);
-        return true;
-    }
-
-    private async Task<bool> DeleteCsvAsync(string filePath, string key, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var lines = SplitLines(await fs.File.ReadAllTextAsync(filePath, ct));
-        var rowIndex = FindCsvRowIndex(lines, key);
-        if (rowIndex < 0) return false;
-
-        lines.RemoveAt(rowIndex);
-        await fs.File.WriteAllTextAsync(filePath, JoinLines(lines), ct);
-        return true;
-    }
-
-    private async Task<bool> AddLanguageCsvAsync(string filePath, string language, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var lines = SplitLines(await fs.File.ReadAllTextAsync(filePath, ct));
-        if (lines.Count == 0) return false;
-
-        var columns = lines[0].Split(',');
-        if (columns.Any(c => string.Equals(c, language, StringComparison.OrdinalIgnoreCase)))
-            return false;
-
-        lines[0] += "," + language;
-        for (var i = 1; i < lines.Count; i++)
-            if (lines[i].Length > 0)
-                lines[i] += ",";
 
         await fs.File.WriteAllTextAsync(filePath, JoinLines(lines), ct);
         return true;
@@ -204,18 +131,6 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         return true;
     }
 
-    private async Task<bool> DeleteNlsAsync(string filePath, string key, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var lines = SplitLines(await fs.File.ReadAllTextAsync(filePath, ct));
-        var index = FindNlsLineIndex(lines, key);
-        if (index < 0) return false;
-
-        lines.RemoveAt(index);
-        await fs.File.WriteAllTextAsync(filePath, JoinLines(lines), ct);
-        return true;
-    }
-
     private static int FindNlsLineIndex(List<string> lines, string key)
     {
         var prefix = key + "=";
@@ -249,52 +164,6 @@ public sealed class LocalisationEntryWriter : ILocalisationEntryWriter
         else
         {
             root.Add(new XElement(ns + "Localisation", new XAttribute("key", key), translationData));
-        }
-
-        await SaveXmlAsync(fs, filePath, xdoc, ct);
-        return true;
-    }
-
-    private async Task<bool> DeleteXmlAsync(string filePath, string key, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var content = await fs.File.ReadAllTextAsync(filePath, ct);
-        if (!TryParseXml(content, out var xdoc)) return false;
-
-        var element = FindXmlElement(xdoc!, key);
-        if (element is null) return false;
-
-        element.Remove();
-        await SaveXmlAsync(fs, filePath, xdoc!, ct);
-        return true;
-    }
-
-    private async Task<bool> AddLanguageXmlAsync(string filePath, string language, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var content = await fs.File.ReadAllTextAsync(filePath, ct);
-        if (!TryParseXml(content, out var xdoc)) return false;
-
-        var ns = XNamespace.Get(XmlNs);
-        var root = xdoc!.Root;
-        if (root is null) return false;
-
-        var alreadyPresent = root.Elements(ns + "Localisation")
-            .Elements(ns + "TranslationData")
-            .Elements(ns + "Translation")
-            .Any(e => string.Equals(e.Attribute("Language")?.Value, language, StringComparison.OrdinalIgnoreCase));
-        if (alreadyPresent) return false;
-
-        foreach (var localisation in root.Elements(ns + "Localisation"))
-        {
-            var translationData = localisation.Element(ns + "TranslationData");
-            if (translationData is null)
-            {
-                translationData = new XElement(ns + "TranslationData");
-                localisation.Add(translationData);
-            }
-
-            translationData.Add(new XElement(ns + "Translation", new XAttribute("Language", language), string.Empty));
         }
 
         await SaveXmlAsync(fs, filePath, xdoc, ct);
