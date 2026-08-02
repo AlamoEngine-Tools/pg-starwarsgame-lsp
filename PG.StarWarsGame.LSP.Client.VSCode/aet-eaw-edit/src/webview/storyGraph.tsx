@@ -1965,7 +1965,7 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
 
 const { RefSocket } = Presets.classic;
 
-function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): JSX.Element {
+function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     const dto = props.data.dto;
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
@@ -2026,7 +2026,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
     );
 }
 
-function StoryNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): JSX.Element {
+function StoryNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     return props.data.dto.kind === 'Event'
         ? <EventNodeView data={props.data} emit={props.emit} />
         : <VirtualNodeView data={props.data} emit={props.emit} />;
@@ -2215,7 +2215,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
 function BlurCommitInput(props: {
     value: string; disabled: boolean; onCommit: (v: string) => void;
     placeholder?: string; className?: string;
-}): JSX.Element {
+}): React.JSX.Element {
     const [value, setValue] = useState(props.value);
     const focused = useRef(false);
     useEffect(() => { if (!focused.current) { setValue(props.value); } }, [props.value]);
@@ -2245,7 +2245,7 @@ function RefValueInput(props: {
     fetchOptions: (prefix: string) => Promise<ParamOption[]>;
     onInput?: (v: string) => void;
     placeholder?: string; className?: string;
-}): JSX.Element {
+}): React.JSX.Element {
     const [value, setValue] = useState(props.value);
     const [options, setOptions] = useState<ParamOption[]>([]);
     const [open, setOpen] = useState(false);
@@ -2339,7 +2339,7 @@ function EventParamRows(props: {
     params: { position: number; value: string }[] | null | undefined;
     schema: StoryParamSchemaDto[];
     readOnly: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
     const rows = paramRowSpecs(props.params, props.schema);
     const label = props.kind === 'event' ? 'Param' : 'Reward';
     const schemaByPosition = new Map(props.schema.map(s => [s.position, s]));
@@ -2456,7 +2456,7 @@ function EventParamRows(props: {
  */
 function SectionHead(props: {
     nodeId: string; section: NodeSection; summary: string | null;
-}): JSX.Element {
+}): React.JSX.Element {
     const collapsed = isSectionCollapsed(props.nodeId, props.section);
     const label = props.section === 'general' ? 'General'
         : props.section === 'trigger' ? 'Trigger' : 'Reward';
@@ -2488,7 +2488,7 @@ function TypeRow(props: {
     threadUri: string | null | undefined;
     eventName: string;
     readOnly: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
     const clearKind = props.kind === 'trigger' ? 'clearEventType' : 'clearRewardType';
     return (
         <div className="row">
@@ -2533,7 +2533,7 @@ function TypeRow(props: {
     );
 }
 
-function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): JSX.Element {
+function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     const dto = props.data.dto;
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
@@ -2577,7 +2577,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
  * chrome (the EventBody wrapper, lifecycle border, sockets) stays with EventNodeView; this is just
  * the form, so the node modal can mount the very same UI for a single event.
  */
-function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.Element {
+function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.JSX.Element {
     const dto = props.dto;
     const readOnly = props.readOnly;
 
@@ -2813,7 +2813,7 @@ const ConnSvg = styled.svg`
     }
 `;
 
-function StoryConnectionView(props: { data: StoryConnection }): JSX.Element | null {
+function StoryConnectionView(props: { data: StoryConnection }): React.JSX.Element | null {
     const { path } = Presets.classic.useConnection();
     if (!path) { return null; }
     // Sankey-style branch glow: prereq edges feeding a branch carry its hue, so a branch's flow
@@ -2848,7 +2848,7 @@ const SocketDot = styled.div`
     &:hover { opacity: 1; }
 `;
 
-function StorySocketView(): JSX.Element {
+function StorySocketView(): React.JSX.Element {
     return <SocketDot data-testid="socket" />;
 }
 
@@ -3365,7 +3365,7 @@ const Shell = styled.div`
 
 const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
 
-function App(): JSX.Element {
+function App(): React.JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
     const filtersRef = useRef<GraphFilters>({ ...EMPTY_FILTERS });
@@ -3969,7 +3969,7 @@ function ProblemsBar(props: {
     problems: StoryDiagnosticDto[];
     onJump: (nodeId: string) => void;
     onClose: () => void;
-}): JSX.Element {
+}): React.JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
         problemsHeightMemo, 60, 420, 'n', v => { problemsHeightMemo = v; });
     return (
@@ -4010,7 +4010,7 @@ function ProblemsBar(props: {
 
 /** The running simulation: clock, flag inspector, intervention queue, and the step log. */
 /** The simulation driver controls - clock, flags, and pending interventions - stacked for the dock. */
-function SimControls(props: { state: SimState }): JSX.Element {
+function SimControls(props: { state: SimState }): React.JSX.Element {
     const state = props.state;
     const [advanceBy, setAdvanceBy] = useState('10');
     const [flagName, setFlagName] = useState('');
@@ -4085,7 +4085,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
 }
 
 /** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
-function SimLog(props: { state: SimState; onClose: () => void }): JSX.Element {
+function SimLog(props: { state: SimState; onClose: () => void }): React.JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
         simBarHeightMemo, 60, 320, 'n', v => { simBarHeightMemo = v; });
     return (
@@ -4124,7 +4124,7 @@ const ROTARY_MODES: { id: EditorMode; icon: string; label: string; angle: number
 function RotaryModeSwitch(props: {
     mode: EditorMode; onSelect: (m: EditorMode) => void;
     available: { edit: boolean; simulate: boolean };
-}): JSX.Element {
+}): React.JSX.Element {
     const enabled = ROTARY_MODES.filter(
         m => (m.id === 'edit' ? props.available.edit
             : m.id === 'simulate' ? props.available.simulate : true));
@@ -4172,7 +4172,7 @@ const MINIMAP_H = 118;
  * click/drag pans. Width is dynamic - measured from its flex slot - with a fixed height. Stays live
  * via the `onAreaChanged` bridge (pan/zoom/node-move) and re-reads node geometry on every render.
  */
-function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
+function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Element {
     const [, force] = useReducer((x: number) => x + 1, 0);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(150);
@@ -4191,7 +4191,7 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
     const handle = props.getHandle();
     const data = handle?.getMinimap();
 
-    let inner: JSX.Element;
+    let inner: React.JSX.Element;
     if (!data || data.nodes.length === 0) {
         inner = <div className="minimap minimap-empty">no nodes</div>;
     } else {
@@ -4266,7 +4266,7 @@ function laneColorFor(key: string): string {
  * is in LOD mode (large + zoomed out); zooming past K_DETAIL mounts the real nodes and this returns
  * null. This is what makes opening a large campaign instant - nothing is mounted into rete.
  */
-function LodOverview(props: { getHandle: () => EditorHandle | null }): JSX.Element {
+function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // A screen-space canvas sitting behind the nodes (z-index below .canvas). Redrawing a few
     // thousand rects/lines imperatively is ~1-2ms, so pan/zoom stays smooth - unlike an SVG in the
@@ -4297,7 +4297,7 @@ function LodOverview(props: { getHandle: () => EditorHandle | null }): JSX.Eleme
  */
 function SwimlaneCanvas(props: {
     getHandle: () => EditorHandle | null; showThread: boolean; showChapter: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { showThread, showChapter } = props;
     useEffect(() => {
@@ -4324,7 +4324,7 @@ function TacticalCreateBar(props: {
     initialType: string | null;
     onCreate(threadUri: string, newName: string, value: 'land' | 'space', file: string): void;
     onClose(): void;
-}): JSX.Element {
+}): React.JSX.Element {
     const [name, setName] = useState('New_Tactical_Link');
     const [thread, setThread] = useState(props.threads[0] ?? '');
     const [value, setValue] = useState<'land' | 'space'>(
@@ -4390,7 +4390,7 @@ function fadedBg(color: string): string {
     return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
 }
 
-function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JSX.Element {
+function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): React.JSX.Element {
     const [search, setSearch] = useState('');
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ Rewards: true });
@@ -4412,8 +4412,8 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
     // The whole tile is washed in its family colour - no glyph (they were all identical). Structural
     // tiles (New/AND/OR) keep a distinguishing glyph since their shapes actually differ.
     const tile = (
-        key: string, glyph: JSX.Element | null, label: string, drag: PaletteDrag, hint: string
-    ): JSX.Element => {
+        key: string, glyph: React.JSX.Element | null, label: string, drag: PaletteDrag, hint: string
+    ): React.JSX.Element => {
         const color = stepColor(drag.category, drag.type);
         return (
             <div
@@ -4434,7 +4434,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
      */
     const typeGroup = (
         label: string, category: 'trigger' | 'reward', items: string[], hint: string
-    ): JSX.Element | null => {
+    ): React.JSX.Element | null => {
         if (!items.length) { return null; }
         const isCollapsed = q === '' && collapsed[label];
         const families = new Map<string, string[]>();

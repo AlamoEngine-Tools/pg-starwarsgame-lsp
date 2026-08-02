@@ -61,18 +61,11 @@ export function compileMatcher(pattern: string, mode: FilterMode): CompiledMatch
 }
 
 /**
- * Compiles a pattern into a predicate. Prefer {@link buildRowFilter} when filtering a list.
- */
-export function buildMatcher(pattern: string, mode: FilterMode): (text: string) => boolean {
-    return compileMatcher(pattern, mode).test;
-}
-
-/**
  * Compiles the whole row test once, for reuse across every row.
  *
- * This is the shape to filter a list with. {@link matchesFilter} compiles the pattern on each call,
- * so filtering the 19,000-row MasterTextFile built 19,000 identical RegExp objects per keystroke -
- * which is what made typing in the filter box stall.
+ * The row test is the same for every row, so building it per row was waste - though measured waste:
+ * about a millisecond across 19,000 rows, since V8 caches the compilation of a repeated pattern.
+ * Worth doing, but it was never the cause of a stall.
  */
 export function buildRowFilter(
     pattern: string, mode: FilterMode, scope: FilterScope
@@ -95,16 +88,4 @@ export function buildRowFilter(
         test: row => match(row.key) || row.values.some(v => match(v.value)),
         error: matcher.error,
     };
-}
-
-/**
- * Whether a row survives the current filter.
- *
- * Compiles per call - fine for a one-off question about a single row, wrong for filtering a list.
- * Use {@link buildRowFilter} there.
- */
-export function matchesFilter(
-    row: FilterRow, pattern: string, mode: FilterMode, scope: FilterScope
-): boolean {
-    return buildRowFilter(pattern, mode, scope).test(row);
 }

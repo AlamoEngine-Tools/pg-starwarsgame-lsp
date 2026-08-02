@@ -41,8 +41,9 @@ export interface LocDockActionsProps {
      */
     onAddLanguage: (language: string, fillFromBaseline: boolean) => void;
     /**
-     * How many of this file's keys the game already translates into the given language, or
-     * undefined where there is no baseline to fill from (credits, which are not keyed at all).
+     * How many cells the game's own text could fill for a language, or undefined where there is no
+     * baseline to draw on. Answers for both dialogs - the one that adds a language and the one that
+     * fills an existing one - because it is the same question either way.
      */
     baselineFillCount?: (language: string) => number;
     /**
@@ -56,7 +57,6 @@ export interface LocDockActionsProps {
      * Fills a language from the game's own text. Absent where there is no baseline to draw on.
      */
     onFillFromBaseline?: (language: string) => void;
-    baselineFillCountFor?: (language: string) => number;
     onConvertFormat: (format: ConvertibleFormat) => void;
     onExportDat: () => void;
 }
@@ -85,7 +85,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
     const copyCount = copyTo === ''
         ? 0
         : fromGame
-            ? props.baselineFillCountFor?.(copyTo) ?? 0
+            ? props.baselineFillCount?.(copyTo) ?? 0
             : copyFrom === '' ? 0 : props.copyLanguageCount?.(copyFrom, copyTo) ?? 0;
 
     const addLanguage = (): void => {

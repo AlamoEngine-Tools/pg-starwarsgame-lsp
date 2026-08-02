@@ -355,7 +355,6 @@ function App(): React.JSX.Element {
                         stage({ kind: 'setValue', key: copied.key, language: to, value: copied.value });
                     }
                 }}
-                baselineFillCountFor={language => languageFillValues(language, rows, baseline).length}
                 onFillFromBaseline={language => {
                     const filled = languageFillValues(language, rows, baseline);
                     // Same reason as the add-language fill: these entries now match the layer below

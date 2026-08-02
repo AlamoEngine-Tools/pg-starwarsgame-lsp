@@ -395,9 +395,16 @@ function App(): React.JSX.Element {
                 canAddLanguage={canAddLanguage}
                 supportedLanguages={supportedLanguages}
                 rowCount={rows.length}
-                onAddLanguage={language => {
+                onAddLanguage={(language, fillFromBaseline) => {
                     stage({ kind: 'addLanguage', language });
                     setLanguages(current => [...current, language]);
+
+                    // Matched by text, since a credits key names a format and not an entry.
+                    if (fillFromBaseline) {
+                        for (const value of creditsBaselineValues(language, rows, baseline)) {
+                            stage({ kind: 'setCell', index: value.index, language, value: value.value });
+                        }
+                    }
                     setHiddenLanguages(current =>
                         new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current)));
                 }}
@@ -409,7 +416,7 @@ function App(): React.JSX.Element {
                         stage({ kind: 'setCell', index: copied.index, language: to, value: copied.value });
                     }
                 }}
-                baselineFillCountFor={language => creditsBaselineValues(language, rows, baseline).length}
+                baselineFillCount={language => creditsBaselineValues(language, rows, baseline).length}
                 onFillFromBaseline={language => {
                     for (const value of creditsBaselineValues(language, rows, baseline)) {
                         stage({ kind: 'setCell', index: value.index, language, value: value.value });
