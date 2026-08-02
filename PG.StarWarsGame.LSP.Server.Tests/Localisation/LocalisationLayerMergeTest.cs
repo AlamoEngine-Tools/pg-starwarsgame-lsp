@@ -98,6 +98,47 @@ public sealed class LocalisationLayerMergeTest
         Assert.Equal("From Near Dep", entry!.Translations[english]);
     }
 
+    // The failure this prevents: the library now throws when a write names a language the target
+    // database does not track, where it previously dropped the value. The source database is built
+    // from a different language list than the target, so a divergence would send an uncaught
+    // ArgumentException out of a JSON-RPC handler instead of returning an error in the result body.
+    [Fact]
+    public void MergeBaselineAndLowerLayers_SourceLanguageTheTargetDoesNotTrack_IsSkipped()
+    {
+        var (factory, langService) = BuildFactory();
+        var english = langService.Default;
+        var other = langService.OfficiallySupported().First(l => !l.Equals(english));
+
+        var source = factory.CreateKeyed([other]);
+        source.SetTranslation("TEXT_OTHER", other, "Other Value");
+
+        // Target tracks English only - the language the source carries is not one of them.
+        var target = factory.CreateKeyed([english]);
+
+        LocalisationLayerMerge.MergeBaselineAndLowerLayers(target, [source], [], null);
+
+        Assert.False(target.ContainsKey("TEXT_OTHER"));
+    }
+
+    [Fact]
+    public void MergeBaselineAndLowerLayers_MixedLanguages_KeepsTheTrackedOnes()
+    {
+        var (factory, langService) = BuildFactory();
+        var english = langService.Default;
+        var other = langService.OfficiallySupported().First(l => !l.Equals(english));
+
+        var source = factory.CreateKeyed([english, other]);
+        source.SetTranslation("TEXT_SHARED", english, "English Value");
+        source.SetTranslation("TEXT_SHARED", other, "Other Value");
+
+        var target = factory.CreateKeyed([english]);
+
+        LocalisationLayerMerge.MergeBaselineAndLowerLayers(target, [source], [], null);
+
+        Assert.True(target.TryGetEntry("TEXT_SHARED", out var entry));
+        Assert.Equal("English Value", entry!.Translations[english]);
+    }
+
     private static ProjectLayer Layer(int rank, string name)
     {
         return new ProjectLayer(rank, name, [], [], [], [], "Csv");

@@ -13,6 +13,7 @@ using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
@@ -456,6 +457,100 @@ public sealed class LocalisationLoaderTest
         Assert.True(depEntry.Database.ContainsKey("TEXT_DEP_KEY"));
         var rootEntry = Assert.Single(layerRegistry.Layers, e => e.Layer.Name == "Root");
         Assert.True(rootEntry.Database.ContainsKey("TEXT_ROOT_KEY"));
+    }
+
+    // ── credits classification ───────────────────────────────────────────────
+
+    private static (MockFileSystem Fs, LspConfiguration Config) CreditsFixture()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/rev/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_UNIT,X-Wing"),
+            ["/rev/text/creditstext.csv"] = new("key,ENGLISH\nCREDIT_LEAD,Lead Designer")
+        });
+        return (fs, new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Csv" } });
+    }
+
+    private static WorkspaceConfiguration CreditsWorkspace(LocalisationCreditsSettings? credits = null)
+    {
+        return WorkspaceConfiguration.Empty with
+        {
+            Layers = [new ProjectLayer(1, "Root", [], [], ["/rev/text"], [], "Csv") { Credits = credits }]
+        };
+    }
+
+    [Fact]
+    public async Task LoadAsync_ClassifiesEachFileIntoTheRegistry()
+    {
+        var (fs, config) = CreditsFixture();
+        var (loader, _, registry, _) = BuildLoader(fs, config);
+
+        await loader.LoadAsync(CreditsWorkspace(), CancellationToken.None);
+
+        Assert.Equal(LocCategory.Text,
+            Assert.Single(registry.Projects, p => p.Label == "MasterTextFile.csv").Category);
+        Assert.Equal(LocCategory.Credits,
+            Assert.Single(registry.Projects, p => p.Label == "creditstext.csv").Category);
+    }
+
+    // The layer's own settings decide, not the root's - a dependency that opts out must not have
+    // its naming reinterpreted by whatever the consuming project declares.
+    [Fact]
+    public async Task LoadAsync_HonoursThePerLayerCreditsSettings()
+    {
+        var (fs, config) = CreditsFixture();
+        var (loader, _, registry, _) = BuildLoader(fs, config);
+        var optedOut = new LocalisationCreditsSettings(LocalisationCreditsSettings.None, []);
+
+        await loader.LoadAsync(CreditsWorkspace(optedOut), CancellationToken.None);
+
+        Assert.Equal(LocCategory.Text,
+            Assert.Single(registry.Projects, p => p.Label == "creditstext.csv").Category);
+    }
+
+    // The failure this prevents: credits keys reaching the translation index would make the
+    // "unknown localisation key" diagnostic accept a typo that happens to collide with a credits
+    // line, and pollute key completion with hundreds of crawl strings.
+    [Fact]
+    public async Task LoadAsync_CreditsKeys_DoNotEnterTheTranslationIndex()
+    {
+        var (fs, config) = CreditsFixture();
+        var (loader, indexService, _, _) = BuildLoader(fs, config);
+
+        await loader.LoadAsync(CreditsWorkspace(), CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_UNIT"));
+        Assert.False(indexService.Current.Localisation.ContainsKey("CREDIT_LEAD"));
+    }
+
+    [Fact]
+    public async Task LoadAsync_CreditsKeys_EnterTheIndexWhenTheProjectOptsOut()
+    {
+        var (fs, config) = CreditsFixture();
+        var (loader, indexService, _, _) = BuildLoader(fs, config);
+        var optedOut = new LocalisationCreditsSettings(LocalisationCreditsSettings.None, []);
+
+        await loader.LoadAsync(CreditsWorkspace(optedOut), CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("CREDIT_LEAD"));
+    }
+
+    // A layer holding nothing but credits still contributes no database, but its file must still be
+    // listed - otherwise the tree could not show it.
+    [Fact]
+    public async Task LoadAsync_CreditsOnlyLayer_IsListedButContributesNoDatabase()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/rev/text/creditstext.csv"] = new("key,ENGLISH\nCREDIT_LEAD,Lead Designer")
+        });
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Csv" } };
+        var (loader, _, registry, layerRegistry) = BuildLoader(fs, config);
+
+        await loader.LoadAsync(CreditsWorkspace(), CancellationToken.None);
+
+        Assert.Single(registry.Projects, p => p.Label == "creditstext.csv");
+        Assert.DoesNotContain(layerRegistry.Layers, e => e.Database.ContainsKey("CREDIT_LEAD"));
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────

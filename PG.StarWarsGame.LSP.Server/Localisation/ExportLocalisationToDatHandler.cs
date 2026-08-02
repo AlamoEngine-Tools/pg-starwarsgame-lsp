@@ -15,6 +15,7 @@ using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -79,15 +80,32 @@ public sealed class ExportLocalisationToDatHandler
             return Task.FromResult(new ExportLocalisationToDatResult([], $"File not found: {request.ProjectFilePath}"));
 
         var languages = _langService.OfficiallySupported();
-        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
-        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
+        var isCredits = LocalisationCategoryResolver.Resolve(
+            _projectRegistry, _fileHelper, request.ProjectFilePath) == LocCategory.Credits;
 
-        // Seed with baseline + every dependency layer below the exported file's own layer, so a
-        // patch mod's export includes translations it inherits from a base-translation dependency,
-        // not just the shipped game text - then the selected file is imported on top below.
-        var merged = _factory.CreateKeyed(languages);
-        LocalisationLayerMerge.MergeBaselineAndLowerLayers(
-            merged, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
+        // A credits export is the file itself, in order: an ordered database (which makes
+        // DatTranslationExporter pick the credits builder over the CRC-sorted MasterText one), with
+        // no baseline or layer seeding. Inheritance is a keyed idea - prepending the game's
+        // MasterText to a crawl would be nonsense, and merging by key would collapse the duplicate
+        // keys the format is built on.
+        ITranslationDatabase merged;
+        if (isCredits)
+        {
+            merged = _factory.CreateOrdered(languages);
+        }
+        else
+        {
+            var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
+            var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
+
+            // Seed with baseline + every dependency layer below the exported file's own layer, so a
+            // patch mod's export includes translations it inherits from a base-translation dependency,
+            // not just the shipped game text - then the selected file is imported on top below.
+            var keyed = _factory.CreateKeyed(languages);
+            LocalisationLayerMerge.MergeBaselineAndLowerLayers(
+                keyed, [eawDb, focDb], _layerRegistry.Layers, ResolveBelowRank(request.ProjectFilePath));
+            merged = keyed;
+        }
 
         var ext = fs.Path.GetExtension(request.ProjectFilePath).ToLowerInvariant();
         try
@@ -133,7 +151,10 @@ public sealed class ExportLocalisationToDatHandler
         {
             var model = _datExporter.Export(merged, lang);
             if (model.Count == 0) continue;
-            var outPath = fs.Path.Combine(dir, $"MasterTextFile_{lang.LanguageIdentifier}.dat");
+            // The engine loads the crawl from creditstextfile_LANGUAGE.dat, so a credits export
+            // written as MasterTextFile_* would never be read.
+            var stem = isCredits ? "CreditsText" : "MasterTextFile";
+            var outPath = fs.Path.Combine(dir, $"{stem}_{lang.LanguageIdentifier}.dat");
             using var outStream = fs.File.Create(outPath);
             _datFileService.CreateDatFile(outStream, model, model.KeySortOrder);
             written.Add(outPath);

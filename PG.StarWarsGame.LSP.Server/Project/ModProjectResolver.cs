@@ -68,7 +68,11 @@ public sealed class ModProjectResolver
             // Per-layer TextResourceType is preserved so each project's localisation loads with its
             // own format (a dependency's .csv must not be skipped because the root uses another type).
             layers.Add(new ProjectLayer(rank, file.Name, layerXml, layerScripts, layerText, layerAssets,
-                file.Localisation?.Type, path) { StoryDialogRoots = layerStoryDialog });
+                file.Localisation?.Type, path)
+            {
+                StoryDialogRoots = layerStoryDialog,
+                Credits = file.Localisation?.Credits
+            });
         }
 
         return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType)

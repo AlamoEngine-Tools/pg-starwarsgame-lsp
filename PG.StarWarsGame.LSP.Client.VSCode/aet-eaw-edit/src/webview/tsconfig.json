@@ -15,5 +15,12 @@
 	},
 	"include": [
 		"./**/*"
+	],
+	// Tests are checked by tsconfig.test.json instead. They need Node's types, and this project
+	// must not have them: the webview runs in a browser, so a stray `process` or `fs` here has to
+	// stay a compile error rather than becoming a runtime failure in the published extension.
+	"exclude": [
+		"./**/*.test.ts",
+		"./**/*.test.tsx"
 	]
 }

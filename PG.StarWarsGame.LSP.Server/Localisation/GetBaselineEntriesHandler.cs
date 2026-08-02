@@ -7,6 +7,9 @@ using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Util;
+
+using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -16,6 +19,7 @@ public sealed class GetBaselineEntriesHandler
     private readonly IBaselineTranslationProvider _baselineProvider;
     private readonly ILspConfigurationProvider _config;
     private readonly ITranslationDatabaseFactory _factory;
+    private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
     private readonly ILocalisationLayerRegistry _layerRegistry;
     private readonly ILocalisationProjectRegistry _projectRegistry;
@@ -24,6 +28,7 @@ public sealed class GetBaselineEntriesHandler
         IBaselineTranslationProvider baselineProvider,
         ILanguageService langService,
         ITranslationDatabaseFactory factory,
+        IFileHelper fileHelper,
         ILocalisationProjectRegistry projectRegistry,
         ILocalisationLayerRegistry layerRegistry,
         ILspConfigurationProvider config)
@@ -31,6 +36,7 @@ public sealed class GetBaselineEntriesHandler
         _baselineProvider = baselineProvider;
         _langService = langService;
         _factory = factory;
+        _fileHelper = fileHelper;
         _projectRegistry = projectRegistry;
         _layerRegistry = layerRegistry;
         _config = config;
@@ -43,6 +49,31 @@ public sealed class GetBaselineEntriesHandler
             return Task.FromResult(GetBaselineEntriesResult.Empty);
 
         var languages = _langService.OfficiallySupported();
+
+        // A credits file gets the game's own credits, not its MasterText. The two share nothing: a
+        // credits "key" is a formatting directive repeated on hundreds of rows, so the caller
+        // matches these entries by their text rather than by key. Flattened as they come, with no
+        // layer merge - inheritance is a keyed idea and means nothing for an ordered list.
+        // The path is optional on this request - without one there is no file to classify, and the
+        // MasterText baseline is the only sensible answer.
+        if (!string.IsNullOrWhiteSpace(request.ProjectFilePath)
+            && LocalisationCategoryResolver.Resolve(
+                _projectRegistry, _fileHelper, request.ProjectFilePath) == LocCategory.Credits)
+        {
+            var credits = new List<BaselineEntry>();
+            foreach (var db in new[]
+                     {
+                         _baselineProvider.GetCreditsText(GameContext.EaW, languages),
+                         _baselineProvider.GetCreditsText(GameContext.FoC, languages),
+                     })
+            foreach (var entry in db)
+                credits.Add(new BaselineEntry(
+                    entry.Key,
+                    entry.Translations.ToDictionary(kv => kv.Key.LanguageIdentifier, kv => kv.Value)));
+
+            return Task.FromResult(new GetBaselineEntriesResult(credits));
+        }
+
         var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, languages);
         var focDb = _baselineProvider.GetMasterText(GameContext.FoC, languages);
 

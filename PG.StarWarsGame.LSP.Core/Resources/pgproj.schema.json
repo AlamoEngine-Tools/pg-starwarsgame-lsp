@@ -113,16 +113,36 @@
       "additionalProperties": false,
       "properties": {
         "type": {
+          "description": "Storage format of the translation files: CSV, DAT, XML or NLS. Matched case-insensitively, as the loader does - a pattern rather than an enum so that 'dat' and 'Dat' are accepted here exactly as they are when the project loads.",
           "type": "string",
-          "enum": [
-            "CSV",
-            "DAT",
-            "XML",
-            "NLS"
-          ]
+          "pattern": "^([cC][sS][vV]|[dD][aA][tT]|[xX][mM][lL]|[nN][lL][sS])$"
         },
         "directory": {
           "type": "string"
+        },
+        "credits": {
+          "description": "Which files in this directory are ordered credits files (duplicate keys allowed, row order significant) rather than keyed text files. Omit to use the engine naming convention.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "detection": {
+              "description": "convention: files whose name begins with 'credits' (the default). explicit: only the files listed below. none: nothing is a credits file.",
+              "type": "string",
+              "enum": [
+                "convention",
+                "explicit",
+                "none"
+              ],
+              "default": "convention"
+            },
+            "files": {
+              "description": "Filenames to treat as credits files, with or without extension. Required when detection is 'explicit'; additive when 'convention'; ignored when 'none'.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
         }
       }
     },

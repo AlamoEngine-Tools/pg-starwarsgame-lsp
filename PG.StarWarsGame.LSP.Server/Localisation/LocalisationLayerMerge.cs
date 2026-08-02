@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.Localisation.Data;
+using PG.StarWarsGame.Localisation.Languages;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
@@ -29,10 +30,17 @@ public static class LocalisationLayerMerge
             MergeInto(target, entry.Database);
     }
 
+    // Sources are built from their own language lists, which need not match the target's, and the
+    // library throws on a write naming a language the target does not track. Filtering keeps that a
+    // dropped value (the previous behaviour) rather than an uncaught ArgumentException escaping a
+    // JSON-RPC handler - these handlers report failures in the result body, never as a fault.
     private static void MergeInto(IKeyedTranslationDatabase target, IEnumerable<TranslationEntry> source)
     {
+        var tracked = new HashSet<IAlamoLanguageDefinition>(target.Languages);
+
         foreach (var entry in source)
         foreach (var kv in entry.Translations)
-            target.SetTranslation(entry.Key, kv.Key, kv.Value);
+            if (tracked.Contains(kv.Key))
+                target.SetTranslation(entry.Key, kv.Key, kv.Value);
     }
 }

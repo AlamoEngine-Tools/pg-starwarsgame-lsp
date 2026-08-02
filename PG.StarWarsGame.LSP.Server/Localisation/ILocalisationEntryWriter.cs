@@ -3,9 +3,12 @@
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
 
-// Targeted row/element-level edits to an existing CSV/XML/.properties localisation file - never a
-// full re-parse-and-re-export, so an edit to one key doesn't reformat or reorder the rest of the
-// file. Shared by the create-key quick-fix and the live editor grid's per-cell writes.
+// Targeted, key-addressed edits to an existing CSV/XML/.properties localisation file - never a
+// full re-parse-and-re-export, so adding one key doesn't reformat or reorder the rest of the file.
+//
+// Its only caller is the create-key quick fix, which genuinely is key-addressed ("add this key if
+// it is absent"). The editor goes through ILocalisationDocumentEditor instead: it addresses rows by
+// position, which a keyed writer cannot express, and commits a whole batch under one hash check.
 public interface ILocalisationEntryWriter
 {
     Task<bool> ExistsAsync(string filePath, string key, CancellationToken ct);
@@ -14,12 +17,4 @@ public interface ILocalisationEntryWriter
     // false only when the file's format has no writer (unrecognised extension).
     Task<bool> UpsertAsync(
         string filePath, string key, IReadOnlyDictionary<string, string>? translations, CancellationToken ct);
-
-    // Returns false when key was not found (nothing removed) or the format is unrecognised.
-    Task<bool> DeleteAsync(string filePath, string key, CancellationToken ct);
-
-    // Adds a new, empty language column/element across every existing entry. Returns false
-    // without modifying the file when the language is already present, or the format doesn't
-    // support multiple languages (.properties is inherently single-language).
-    Task<bool> AddLanguageAsync(string filePath, string language, CancellationToken ct);
 }

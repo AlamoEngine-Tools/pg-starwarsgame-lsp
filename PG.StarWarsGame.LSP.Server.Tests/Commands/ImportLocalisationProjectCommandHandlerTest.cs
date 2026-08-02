@@ -41,7 +41,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         });
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, reload, writer) = BuildHandler(mockFs, lspConfig: config);
+        var (handler, reload, writer, _) = BuildHandler(mockFs, lspConfig: config);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -58,7 +58,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     public async Task Handle_MissingRequiredArguments_NoOp(string? sourceFormat, string? sourceDirectory,
         string? targetFormat)
     {
-        var (handler, reload, writer) = BuildHandler();
+        var (handler, reload, writer, _) = BuildHandler();
 
         await handler.Handle(Request(sourceFormat, sourceDirectory, targetFormat), CancellationToken.None);
 
@@ -69,7 +69,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoPgproj_NoOp()
     {
-        var (handler, reload, writer) = BuildHandler(noPgproj: true);
+        var (handler, reload, writer, _) = BuildHandler(noPgproj: true);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -80,7 +80,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_SourceDirectoryDoesNotExist_NoOp()
     {
-        var (handler, reload, writer) = BuildHandler();
+        var (handler, reload, writer, _) = BuildHandler();
 
         await handler.Handle(Request("Csv", "/mod/does-not-exist", "Csv"), CancellationToken.None);
 
@@ -95,12 +95,153 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/readme.txt"] = new("not a csv")
         });
-        var (handler, reload, writer) = BuildHandler(mockFs);
+        var (handler, reload, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
         Assert.False(reload.FullyReloaded);
         Assert.Null(writer.LastCall);
+    }
+
+    // ── what the user is told ────────────────────────────────────────────────
+    //
+    // Every guard above returned silently while the client reported success regardless - it has no
+    // result to inspect. An import that found no files looked exactly like one that worked.
+
+    [Fact]
+    public async Task Handle_SameFormat_Success_TellsTheUserWhatWasRegistered()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+        });
+        var (handler, _, _, notifier) = BuildHandler(mockFs);
+
+        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
+
+        Assert.Empty(notifier.Errors);
+        Assert.Single(notifier.Infos);
+    }
+
+    [Fact]
+    public async Task Handle_Converting_Success_TellsTheUserWhereItWrote()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+        });
+        var (handler, _, _, notifier) = BuildHandler(mockFs);
+
+        await handler.Handle(
+            Request("Csv", "/mod/data/text", "Xml", "data/converted"), CancellationToken.None);
+
+        Assert.Empty(notifier.Errors);
+        Assert.Contains("MasterTextFile.xml", Assert.Single(notifier.Infos), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_TellsTheUserWhy()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, _, _, notifier) = BuildHandler(lspConfig: config);
+
+        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Single(notifier.Errors);
+    }
+
+    [Fact]
+    public async Task Handle_SourceDirectoryDoesNotExist_TellsTheUserWhichDirectory()
+    {
+        var (handler, _, _, notifier) = BuildHandler();
+
+        await handler.Handle(Request("Csv", "/mod/does-not-exist", "Csv"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Contains("does-not-exist", Assert.Single(notifier.Errors), StringComparison.Ordinal);
+    }
+
+    // The one most likely to be read as "the command does nothing": the user picks a folder, the
+    // format does not match what is in it, and every guard passes until the file scan comes up empty.
+    [Fact]
+    public async Task Handle_NoMatchingFiles_TellsTheUserWhatItLookedFor()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/readme.txt"] = new("not a csv")
+        });
+        var (handler, _, _, notifier) = BuildHandler(mockFs);
+
+        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains(".csv", message, StringComparison.Ordinal);
+        Assert.Contains("/mod/data/text", message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Handle_NoPgproj_TellsTheUser()
+    {
+        var (handler, _, _, notifier) = BuildHandler(noPgproj: true);
+
+        await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Contains("pgproj", Assert.Single(notifier.Errors), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_ConvertingWithoutTargetDirectory_TellsTheUser()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+        });
+        var (handler, _, _, notifier) = BuildHandler(mockFs);
+
+        await handler.Handle(Request("Csv", "/mod/data/text", "Xml"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Single(notifier.Errors);
+    }
+
+    [Fact]
+    public async Task Handle_ConvertTargetAlreadyExists_TellsTheUserItWasNotOverwritten()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
+            ["/mod/data/converted/MasterTextFile.xml"] = new("<EXISTING/>")
+        });
+        var (handler, _, _, notifier) = BuildHandler(mockFs);
+
+        await handler.Handle(
+            Request("Csv", "/mod/data/text", "Xml", "data/converted"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Contains("exists", Assert.Single(notifier.Errors), StringComparison.OrdinalIgnoreCase);
+        Assert.Equal("<EXISTING/>", mockFs.File.ReadAllText("/mod/data/converted/MasterTextFile.xml"));
+    }
+
+    // A per-file failure was logged and skipped, so an import could report success having read
+    // nothing at all - the resulting file would be silently empty.
+    [Fact]
+    public async Task Handle_SomeSourceFilesFailToImport_SaysHowManyWereSkipped()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/good.xml"] = new("<Translations/>"),
+            ["/mod/data/text/broken.xml"] = new("<not well formed")
+        });
+        var (handler, _, _, notifier) = BuildHandler(mockFs);
+
+        await handler.Handle(
+            Request("Xml", "/mod/data/text", "Csv", "data/converted"), CancellationToken.None);
+
+        Assert.Contains("1", Assert.Single(notifier.Errors), StringComparison.Ordinal);
     }
 
     // ── same format: pure registration ───────────────────────────────────────
@@ -113,7 +254,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new(original)
         });
-        var (handler, _, _) = BuildHandler(mockFs);
+        var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -128,7 +269,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, _, writer) = BuildHandler(mockFs);
+        var (handler, _, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -145,7 +286,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, reload, _) = BuildHandler(mockFs);
+        var (handler, reload, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
@@ -159,7 +300,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/elsewhere/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, _, writer) = BuildHandler(mockFs);
+        var (handler, _, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/elsewhere/text", "Csv"), CancellationToken.None);
 
@@ -176,7 +317,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_CONVERTED,Hello World\n")
         });
-        var (handler, _, _) = BuildHandler(mockFs);
+        var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -194,7 +335,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new(original)
         });
-        var (handler, _, _) = BuildHandler(mockFs);
+        var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -209,7 +350,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, _, writer) = BuildHandler(mockFs);
+        var (handler, _, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -226,7 +367,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, reload, writer) = BuildHandler(mockFs);
+        var (handler, reload, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Xml"), CancellationToken.None);
 
@@ -242,7 +383,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
             ["/mod/data/text2/MasterTextFile.xml"] = new("EXISTING")
         });
-        var (handler, reload, writer) = BuildHandler(mockFs);
+        var (handler, reload, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -259,7 +400,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
-        var (handler, reload, writer) = BuildHandler(mockFs);
+        var (handler, reload, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Dat", "data/text2"), CancellationToken.None);
@@ -277,7 +418,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             ["/mod/data/text/a.csv"] = new("key,ENGLISH\nTEXT_A,From A\n"),
             ["/mod/data/text/b.csv"] = new("key,ENGLISH\nTEXT_B,From B\n")
         });
-        var (handler, _, _) = BuildHandler(mockFs);
+        var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
@@ -299,7 +440,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile_ENGLISH.dat"] = new(new byte[] { 1, 2, 3 })
         });
-        var (handler, _, writer) = BuildHandler(mockFs);
+        var (handler, _, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Dat", "/mod/data/text", "Dat"), CancellationToken.None);
 
@@ -317,7 +458,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         WriteDatFixture(mockFs, sp, "/mod/data/text/MasterTextFile_ENGLISH.dat", english,
             "TEXT_FROM_DAT", "Hello From DAT");
 
-        var (handler, _, _) = BuildHandler(mockFs);
+        var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Dat", "/mod/data/text", "Csv", "data/text2"), CancellationToken.None);
@@ -338,7 +479,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         // No language matches this suffix - must be skipped, not fatal to the whole import.
         mockFs.AddFile("/mod/data/text/MasterTextFile_NOTALANGUAGE.dat", new MockFileData(new byte[] { 9, 9, 9 }));
 
-        var (handler, reload, _) = BuildHandler(mockFs);
+        var (handler, reload, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Dat", "/mod/data/text", "Csv", "data/text2"), CancellationToken.None);
@@ -396,7 +537,8 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         return new ProjectLayer(0, "Root", [], [], [], [], null, PgprojPath);
     }
 
-    private static (ImportLocalisationProjectCommandHandler handler, SpyReloadService reload, SpyFileWriter writer)
+    private static (ImportLocalisationProjectCommandHandler handler, SpyReloadService reload, SpyFileWriter writer,
+        RecordingUserNotifier notifier)
         BuildHandler(MockFileSystem? fs = null, bool noPgproj = false, ILspConfigurationProvider? lspConfig = null)
     {
         var mockFs = fs ?? new MockFileSystem();
@@ -411,6 +553,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 
         var reload = new SpyReloadService { LastWorkspaceConfig = config };
         var writer = new SpyFileWriter();
+        var notifier = new RecordingUserNotifier();
         var seedWriter = new LocalisationSeedFileWriter(
             sp.GetRequiredService<ICsvTranslationExporter>(),
             sp.GetRequiredService<IXmlTranslationExporter>(),
@@ -431,9 +574,10 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             reload,
             writer,
             NullLogger<ImportLocalisationProjectCommandHandler>.Instance,
-            lspConfig ?? new FakeLspConfigurationProvider());
+            lspConfig ?? new FakeLspConfigurationProvider(),
+            notifier);
 
-        return (handler, reload, writer);
+        return (handler, reload, writer, notifier);
     }
 
     private sealed class SpyReloadService : IModProjectReloadService

@@ -18,7 +18,9 @@ import {
     CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
+import { dockBodyCss, dockChromeCss, dockOverviewCss } from './shared/dockChrome';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
+import { useEdgeResize } from './useEdgeResize';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -1724,6 +1726,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 ctx.textBaseline = 'middle';
             }
             for (const m of graphModel.values()) {
+                // A mounted node draws itself; its stand-in rect would only sit behind it. For most
+                // nodes that is merely wasted paint, but a junction's box is transparent (the
+                // diamond is its shape), so the rect showed through as a coloured square around it.
+                if (mountedIds.has(m.dto.id)) { continue; }
+
                 const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
                 if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
                 const color = m.color;
@@ -1857,7 +1864,19 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     justify-content: center;
     padding: 2px 10px;
     cursor: pointer;
-    ${p => p.selected ? 'outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;' : ''}
+    /* The OR node's box is transparent - the rotated inner square is its shape - so outlining the
+       box draws a rectangle around a diamond. Outline the diamond instead: an outline on a rotated
+       element rotates with it. */
+    ${p => p.selected ? `
+        &:not(.k-OrJunction):not(.k-StagingOr) {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+        &.k-OrJunction .diamond, &.k-StagingOr .diamond {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+    ` : ''}
 
     .title {
         font-size: 12px;
@@ -1946,7 +1965,7 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
 
 const { RefSocket } = Presets.classic;
 
-function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): JSX.Element {
+function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     const dto = props.data.dto;
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
@@ -1980,7 +1999,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
                     <button
                         className="discard" title="Discard - nothing was saved"
                         onClick={() => editorHandleRef?.discardStagingJunction(dto.id)}
-                    >×</button>
+                    ><span className="codicon codicon-close" /></button>
                 </Drag.NoDrag>
             ) : null}
             {dto.kind === 'TacticalPlot' && output ? (
@@ -1988,7 +2007,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
                     <button
                         className="jump" title="Jump to this battle's own story"
                         onClick={() => onReachableFromRequested(dto.id)}
-                    >→</button>
+                    ><span className="codicon codicon-arrow-right" /></button>
                 </Drag.NoDrag>
             ) : null}
             {input ? (
@@ -2007,7 +2026,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
     );
 }
 
-function StoryNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): JSX.Element {
+function StoryNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     return props.data.dto.kind === 'Event'
         ? <EventNodeView data={props.data} emit={props.emit} />
         : <VirtualNodeView data={props.data} emit={props.emit} />;
@@ -2196,7 +2215,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
 function BlurCommitInput(props: {
     value: string; disabled: boolean; onCommit: (v: string) => void;
     placeholder?: string; className?: string;
-}): JSX.Element {
+}): React.JSX.Element {
     const [value, setValue] = useState(props.value);
     const focused = useRef(false);
     useEffect(() => { if (!focused.current) { setValue(props.value); } }, [props.value]);
@@ -2226,7 +2245,7 @@ function RefValueInput(props: {
     fetchOptions: (prefix: string) => Promise<ParamOption[]>;
     onInput?: (v: string) => void;
     placeholder?: string; className?: string;
-}): JSX.Element {
+}): React.JSX.Element {
     const [value, setValue] = useState(props.value);
     const [options, setOptions] = useState<ParamOption[]>([]);
     const [open, setOpen] = useState(false);
@@ -2320,7 +2339,7 @@ function EventParamRows(props: {
     params: { position: number; value: string }[] | null | undefined;
     schema: StoryParamSchemaDto[];
     readOnly: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
     const rows = paramRowSpecs(props.params, props.schema);
     const label = props.kind === 'event' ? 'Param' : 'Reward';
     const schemaByPosition = new Map(props.schema.map(s => [s.position, s]));
@@ -2355,7 +2374,7 @@ function EventParamRows(props: {
                 const title = `${label} ${row.position + 1}`
                     + (schemaParam?.description ? ` - ${schemaParam.description}` : '')
                     + (row.missing ? ' (required)' : optionalUnset ? ' (optional)' : '')
-                    + (diagnostic ? `\n⚠ ${diagnostic.message}` : '');
+                    + (diagnostic ? `\nWarning: ${diagnostic.message}` : '');
                 // List params hold several tokens; go-to targets the first one.
                 const firstToken = row.value.split(/[\s,]+/).filter(t => t)[0] ?? '';
                 if (isBoolean) {
@@ -2420,7 +2439,7 @@ function EventParamRows(props: {
                                     onClick={() => vscode.postMessage({
                                         type: 'resolveRef', value: firstToken, referenceType,
                                     })}
-                                >↗</button>
+                                ><span className="codicon codicon-go-to-file" /></button>
                             </Drag.NoDrag>
                         ) : null}
                     </div>
@@ -2437,7 +2456,7 @@ function EventParamRows(props: {
  */
 function SectionHead(props: {
     nodeId: string; section: NodeSection; summary: string | null;
-}): JSX.Element {
+}): React.JSX.Element {
     const collapsed = isSectionCollapsed(props.nodeId, props.section);
     const label = props.section === 'general' ? 'General'
         : props.section === 'trigger' ? 'Trigger' : 'Reward';
@@ -2449,7 +2468,7 @@ function SectionHead(props: {
                     title={collapsed ? `Expand the ${label.toLowerCase()} section` : `Collapse the ${label.toLowerCase()} section`}
                     onClick={() => toggleSection(props.nodeId, props.section)}
                 >
-                    {collapsed ? '▸' : '▾'} {label}
+                    <span className={`codicon codicon-chevron-${collapsed ? 'right' : 'down'}`} /> {label}
                     {collapsed && props.summary ? ` - ${props.summary}` : ''}
                 </span>
             </Drag.NoDrag>
@@ -2469,7 +2488,7 @@ function TypeRow(props: {
     threadUri: string | null | undefined;
     eventName: string;
     readOnly: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
     const clearKind = props.kind === 'trigger' ? 'clearEventType' : 'clearRewardType';
     return (
         <div className="row">
@@ -2484,7 +2503,7 @@ function TypeRow(props: {
                                 borderColor: stepColor(props.kind, props.typeName),
                                 color: 'var(--vscode-editor-foreground)',
                             }}
-                            title={`${props.typeName} - remove it (✕) to attach a different type`}
+                            title={`${props.typeName} - remove the type to attach a different one`}
                         >
                             <span
                                 className={`codicon ${props.kind === 'trigger' ? 'codicon-zap' : 'codicon-gift'}`}
@@ -2501,7 +2520,7 @@ function TypeRow(props: {
                                 onClick={() => sendCommand(
                                     { kind: clearKind, threadUri: props.threadUri, eventName: props.eventName },
                                     `Remove ${props.kind} '${props.typeName}' and its parameters from '${props.eventName}'?`)}
-                            >✕</button>
+                            ><span className="codicon codicon-close" /></button>
                         </Drag.NoDrag>
                     )}
                 </>
@@ -2514,7 +2533,7 @@ function TypeRow(props: {
     );
 }
 
-function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): JSX.Element {
+function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): React.JSX.Element {
     const dto = props.data.dto;
     const input = props.data.inputs['in'];
     const output = props.data.outputs['out'];
@@ -2558,7 +2577,7 @@ function EventNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }): J
  * chrome (the EventBody wrapper, lifecycle border, sockets) stays with EventNodeView; this is just
  * the form, so the node modal can mount the very same UI for a single event.
  */
-function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.Element {
+function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.JSX.Element {
     const dto = props.dto;
     const readOnly = props.readOnly;
 
@@ -2641,13 +2660,13 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                             <button
                                 className="rename-ok" title="Apply rename (Enter)"
                                 onMouseDown={e => { e.preventDefault(); commitTitle(); }}
-                            >✓</button>
+                            ><span className="codicon codicon-check" /></button>
                         </Drag.NoDrag>
                         <Drag.NoDrag>
                             <button
                                 title="Cancel (Esc)"
                                 onMouseDown={e => { e.preventDefault(); cancelRename(); }}
-                            >✗</button>
+                            ><span className="codicon codicon-close" /></button>
                         </Drag.NoDrag>
                     </>
                 ) : (
@@ -2660,7 +2679,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                 )}
                 {readOnly || editingTitle ? null : (
                     <Drag.NoDrag>
-                        <button title="Rename this event" onClick={openRename}>✎</button>
+                        <button title="Rename this event" onClick={openRename}><span className="codicon codicon-edit" /></button>
                     </Drag.NoDrag>
                 )}
                 {(nodeDiagnostics.get(dto.id)?.length ?? 0) > 0 ? (
@@ -2668,19 +2687,19 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                         className={'diag-badge ' + (nodeDiagnostics.get(dto.id)!.some(d => d.severity === 'error')
                             ? 'diag-error' : 'diag-warning')}
                         title={nodeDiagnostics.get(dto.id)!.map(d => d.message).join('\n')}
-                    >⚠{nodeDiagnostics.get(dto.id)!.length}</span>
+                    ><span className="codicon codicon-warning" />{nodeDiagnostics.get(dto.id)!.length}</span>
                 ) : null}
                 <Drag.NoDrag>
                     <button
                         title="Open in XML"
                         onClick={() => vscode.postMessage({ type: 'openXml', threadUri: dto.threadUri, line: dto.line ?? 0 })}
-                    >↗</button>
+                    ><span className="codicon codicon-go-to-file" /></button>
                 </Drag.NoDrag>
                 <Drag.NoDrag>
                     <button
                         title="Show only what's reachable from here"
                         onClick={() => onReachableFromRequested(dto.id)}
-                    >⭑</button>
+                    ><span className="codicon codicon-filter" /></button>
                 </Drag.NoDrag>
                 {readOnly ? null : (
                     <Drag.NoDrag>
@@ -2689,7 +2708,7 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): JSX.El
                             onClick={() => sendCommand(
                                 { kind: 'deleteEvent', threadUri: dto.threadUri, eventName: dto.label },
                                 `Delete story event '${dto.label}'?`)}
-                        >🗑</button>
+                        ><span className="codicon codicon-trash" /></button>
                     </Drag.NoDrag>
                 )}
             </div>
@@ -2794,7 +2813,7 @@ const ConnSvg = styled.svg`
     }
 `;
 
-function StoryConnectionView(props: { data: StoryConnection }): JSX.Element | null {
+function StoryConnectionView(props: { data: StoryConnection }): React.JSX.Element | null {
     const { path } = Presets.classic.useConnection();
     if (!path) { return null; }
     // Sankey-style branch glow: prereq edges feeding a branch carry its hue, so a branch's flow
@@ -2829,7 +2848,7 @@ const SocketDot = styled.div`
     &:hover { opacity: 1; }
 `;
 
-function StorySocketView(): JSX.Element {
+function StorySocketView(): React.JSX.Element {
     return <SocketDot data-testid="socket" />;
 }
 
@@ -2878,6 +2897,12 @@ const GlobalStyle = createGlobalStyle`
         animation: story-flash 0.8s ease-in-out 2;
         border-radius: 6px;
         z-index: 5;
+    }
+    /* Same reason as the selection outline: on an OR node the ring belongs to the diamond, not to
+       the transparent box around it. */
+    .story-flash.k-OrJunction, .story-flash.k-StagingOr { animation: none; }
+    .story-flash.k-OrJunction .diamond, .story-flash.k-StagingOr .diamond {
+        animation: story-flash 0.8s ease-in-out 2;
     }
 
     /* Server-backed suggestion dropdown (RefValueInput) - global because it renders both inside
@@ -2950,6 +2975,8 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 const Shell = styled.div`
+    ${dockChromeCss}
+
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -3059,15 +3086,8 @@ const Shell = styled.div`
     .dock-header .header-right { position: absolute; right: 8px; }
     .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
     .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
-    .dock-overview {
-        flex-shrink: 0;
-        border-top: 1px solid var(--vscode-panel-border);
-        padding: 6px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-    .dock-overview > input[type=text] { width: 100%; }
+    ${dockBodyCss}
+    ${dockOverviewCss}
     /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
     /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
     .overview-mid { display: flex; align-items: center; gap: 10px; padding-right: 10px; }
@@ -3175,50 +3195,25 @@ const Shell = styled.div`
 
     /* ── Palette (dock content, Edit mode) ─────────────────────────────── */
     .palette-scroll { min-width: 0; }
-    .palette-scroll input[type=text] { width: 100%; margin-bottom: 10px; }
-    .palette-group { margin-bottom: 14px; }
+    .palette-scroll .dock-search { margin-bottom: 10px; }
     .palette-new {
         padding-bottom: 12px;
         border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
     }
-    .palette-head {
-        font-size: 11px;
-        font-weight: bold;
-        text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
-        margin-bottom: 7px;
-    }
-    .palette-head.toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
-    .palette-head.toggle:hover { color: var(--vscode-editor-foreground); }
-    .palette-head .palette-count { margin-left: auto; font-weight: normal; opacity: 0.6; }
+    .dock-section-title.toggle { cursor: pointer; user-select: none; }
+    .dock-section-title.toggle:hover { color: var(--vscode-editor-foreground); }
     /* Colour family: just a gap between groups - no box (the tile tint is the grouping). */
     .tile-family { margin-bottom: 7px; }
-    /* auto-rows keeps every tile the same (fixed-minimum) height, whatever its label wrapping. */
-    .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(46px, auto); gap: 4px; }
+    /* Geometry comes from the shared dock chrome, so a palette tile is the same object as a tile in
+       the localisation docks. Only the colour is this editor's own: tiles are tinted by type family,
+       which is what makes the palette scannable. */
     .palette-tile {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        padding: 4px;
-        border: 1px solid;
-        border-radius: 4px;
+        border-style: solid;
+        border-width: 1px;
         cursor: grab;
-        overflow: hidden;
     }
     .palette-tile:hover { outline: 1px solid var(--vscode-focusBorder); }
-    .palette-tile .tile-glyph { font-size: 16px; line-height: 1; }
-    .palette-tile .tile-label {
-        font-size: 10px;
-        line-height: 1.15;
-        text-align: center;
-        width: 100%;
-        /* Never truncate a type name - wrap it instead. */
-        white-space: normal;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-    }
+
     .palette-empty { font-size: 11px; color: var(--vscode-descriptionForeground); }
 
     /* ── Minimap (dock overview) ───────────────────────────────────────── */
@@ -3353,11 +3348,24 @@ const Shell = styled.div`
         vertical-align: -1px;
         margin-right: 3px;
     }
+
+    /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
+       renders, so they are figures and not text - and the house rule keeps user-facing strings
+       ASCII, which a box-drawing character is not. */
+    .shape-circle, .shape-diamond {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border: 1.5px solid currentColor;
+        vertical-align: -1px;
+    }
+    .shape-circle { border-radius: 50%; }
+    .shape-diamond { transform: rotate(45deg); }
 `;
 
 const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
 
-function App(): JSX.Element {
+function App(): React.JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
     const filtersRef = useRef<GraphFilters>({ ...EMPTY_FILTERS });
@@ -3372,7 +3380,7 @@ function App(): JSX.Element {
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
-    const [status, setStatus] = useState<string | null>('Loading story graph…');
+    const [status, setStatus] = useState<string | null>('Loading story graph...');
     // True while a full rebuild's auto-arrange is in flight, so the canvas stays covered instead
     // of flashing the pre-layout node stack (every node starts at the same spot) before it settles.
     const [layouting, setLayouting] = useState(false);
@@ -3726,7 +3734,7 @@ function App(): JSX.Element {
                     break;
                 }
                 case 'error':
-                    setStatus('⚠ ' + String(msg.message));
+                    setStatus('Warning: ' + String(msg.message));
                     break;
             }
         };
@@ -3820,7 +3828,7 @@ function App(): JSX.Element {
                         className="canvas" ref={containerRef}
                         onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
                     />
-                    {status || layouting ? <p className="status">{status ?? 'Arranging layout…'}</p> : null}
+                    {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
                 </div>
                 <div className="right-dock" style={{ width: dockWidth }}>
                     <div className="resize-handle-w" title="Drag to resize" {...dockResize} />
@@ -3845,16 +3853,21 @@ function App(): JSX.Element {
                             ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes} /> : null}
                         {mode === 'simulate' && simState?.running ? <SimControls state={simState} /> : null}
                         {mode === 'simulate' && !simState?.running
-                            ? <div className="dock-hint">Starting simulation…</div> : null}
+                            ? <div className="dock-hint">Starting simulation...</div> : null}
                         {mode === 'view'
                             ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
                                 or Simulation to run it forward.</div> : null}
                     </div>
                     <div className="dock-overview">
-                        <input
-                            type="text" placeholder="Filter event names…" value={filters.nameFilter}
-                            onChange={e => setFilter({ nameFilter: e.target.value })}
-                        />
+                        <div className="dock-search">
+                            <div className="dock-section-title">Filter</div>
+                            <div className="search-field">
+                                <input
+                                    type="text" placeholder="Filter event names..." value={filters.nameFilter}
+                                    onChange={e => setFilter({ nameFilter: e.target.value })}
+                                />
+                            </div>
+                        </div>
                         <div className="overview-mid">
                             <div className="overview-tools">
                                 {anyFilter ? (
@@ -3922,8 +3935,10 @@ function App(): JSX.Element {
                     <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-green, #89d185)' }} />Armed</span>
                     <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-purple, #b180d7)' }} />Fired</span>
                     <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-red, #f14c4c)' }} />Disabled</span>
-                    <span>◇ OR</span><span>○ AND</span><span>dashed = portal / tactical / untested</span>
-                    <span>drag socket→socket = prereq</span>
+                    <span><span className="shape-diamond" /> OR</span>
+                    <span><span className="shape-circle" /> AND</span>
+                    <span>dashed = portal / tactical / untested</span>
+                    <span>drag socket to socket = prereq</span>
                 </div>
             </div>
         </Shell>
@@ -3931,7 +3946,10 @@ function App(): JSX.Element {
 }
 
 /** Session-remembered chrome sizes, so a re-mount (mode switch, sim restart) keeps the choice. */
-let paletteWidthMemo = 270;
+// Same default as the localisation editors' dock, and the same resize range - the two docks hold
+// the same kind of thing (a titled grid of tiles over a search block) and looked subtly unlike each
+// other only because this number was picked separately.
+let paletteWidthMemo = 300;
 let simBarHeightMemo = 140;
 
 /**
@@ -3940,35 +3958,6 @@ let simBarHeightMemo = 140;
  * left edge), 'n' = dragging up grows (a bottom bar's top edge). Plain pointer capture on the handle
  * - no window listeners to leak.
  */
-function useEdgeResize(
-    initial: number, min: number, max: number, axis: 'e' | 'w' | 'n', persist: (v: number) => void,
-): { size: number; handleProps: Record<string, unknown> } {
-    const [size, setSize] = useState(initial);
-    const drag = useRef<{ start: number; base: number } | null>(null);
-    const clamp = (v: number): number => Math.max(min, Math.min(max, v));
-    const horizontal = axis === 'e' || axis === 'w';
-    return {
-        size,
-        handleProps: {
-            onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => {
-                e.preventDefault();
-                e.currentTarget.setPointerCapture(e.pointerId);
-                drag.current = { start: horizontal ? e.clientX : e.clientY, base: size };
-            },
-            onPointerMove: (e: ReactPointerEvent<HTMLDivElement>) => {
-                if (!drag.current) { return; }
-                const delta = axis === 'e' ? e.clientX - drag.current.start
-                    : axis === 'w' ? drag.current.start - e.clientX
-                        : drag.current.start - e.clientY;
-                const next = clamp(drag.current.base + delta);
-                setSize(next);
-                persist(next);
-            },
-            onPointerUp: () => { drag.current = null; },
-        },
-    };
-}
-
 let problemsHeightMemo = 150;
 
 /**
@@ -3980,7 +3969,7 @@ function ProblemsBar(props: {
     problems: StoryDiagnosticDto[];
     onJump: (nodeId: string) => void;
     onClose: () => void;
-}): JSX.Element {
+}): React.JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
         problemsHeightMemo, 60, 420, 'n', v => { problemsHeightMemo = v; });
     return (
@@ -3998,7 +3987,7 @@ function ProblemsBar(props: {
                     onClick={problem.nodeId ? () => props.onJump(problem.nodeId!) : undefined}
                 >
                     <span className={'diag-badge diag-' + (problem.severity === 'error' ? 'error' : 'warning')}>
-                        {problem.severity === 'error' ? '⛔' : '⚠'}
+                        <span className={'codicon codicon-' + (problem.severity === 'error' ? 'error' : 'warning')} />
                     </span>
                     <span className="problem-node" title={problem.nodeId ?? problem.uri}>
                         {problem.nodeId
@@ -4012,7 +4001,7 @@ function ProblemsBar(props: {
                             vscode.postMessage({ type: 'openXml', threadUri: problem.uri, line: problem.line });
                         }}
                         title="Open in XML"
-                    >↗</button>
+                    ><span className="codicon codicon-go-to-file" /></button>
                 </div>
             ))}
         </div>
@@ -4021,7 +4010,7 @@ function ProblemsBar(props: {
 
 /** The running simulation: clock, flag inspector, intervention queue, and the step log. */
 /** The simulation driver controls - clock, flags, and pending interventions - stacked for the dock. */
-function SimControls(props: { state: SimState }): JSX.Element {
+function SimControls(props: { state: SimState }): React.JSX.Element {
     const state = props.state;
     const [advanceBy, setAdvanceBy] = useState('10');
     const [flagName, setFlagName] = useState('');
@@ -4045,13 +4034,13 @@ function SimControls(props: { state: SimState }): JSX.Element {
                         <span className="sim-name" title={f.name}>{f.name}</span>
                         <button onClick={() => sendSim('setFlag', { flag: f.name, value: f.value !== 0 ? 0 : 1 })}
                             title={`Toggle ${f.name}`}>
-                            {f.value !== 0 ? '1 → 0' : '0 → 1'}
+                            {f.value !== 0 ? '1 to 0' : '0 to 1'}
                         </button>
                     </div>
                 ))}
                 <div className="sim-row">
                     <input
-                        type="text" placeholder="Set flag…" value={flagName}
+                        type="text" placeholder="Set flag..." value={flagName}
                         onChange={e => setFlagName(e.target.value)}
                         onKeyDown={e => {
                             if (e.key === 'Enter' && flagName.trim()) {
@@ -4085,7 +4074,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
                             title="Simulate a Lua Story_Event call"
                             onChange={e => { if (e.target.value) { sendSim('luaNotify', { id: e.target.value }); } }}
                         >
-                            <option value="">Lua Story_Event…</option>
+                            <option value="">Lua Story_Event...</option>
                             {state.luaNotifications.map(id => <option key={id} value={id}>{id}</option>)}
                         </select>
                     </div>
@@ -4096,7 +4085,7 @@ function SimControls(props: { state: SimState }): JSX.Element {
 }
 
 /** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
-function SimLog(props: { state: SimState; onClose: () => void }): JSX.Element {
+function SimLog(props: { state: SimState; onClose: () => void }): React.JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
         simBarHeightMemo, 60, 320, 'n', v => { simBarHeightMemo = v; });
     return (
@@ -4135,7 +4124,7 @@ const ROTARY_MODES: { id: EditorMode; icon: string; label: string; angle: number
 function RotaryModeSwitch(props: {
     mode: EditorMode; onSelect: (m: EditorMode) => void;
     available: { edit: boolean; simulate: boolean };
-}): JSX.Element {
+}): React.JSX.Element {
     const enabled = ROTARY_MODES.filter(
         m => (m.id === 'edit' ? props.available.edit
             : m.id === 'simulate' ? props.available.simulate : true));
@@ -4183,7 +4172,7 @@ const MINIMAP_H = 118;
  * click/drag pans. Width is dynamic - measured from its flex slot - with a fixed height. Stays live
  * via the `onAreaChanged` bridge (pan/zoom/node-move) and re-reads node geometry on every render.
  */
-function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
+function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Element {
     const [, force] = useReducer((x: number) => x + 1, 0);
     const wrapRef = useRef<HTMLDivElement>(null);
     const [width, setWidth] = useState(150);
@@ -4202,7 +4191,7 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): JSX.Element {
     const handle = props.getHandle();
     const data = handle?.getMinimap();
 
-    let inner: JSX.Element;
+    let inner: React.JSX.Element;
     if (!data || data.nodes.length === 0) {
         inner = <div className="minimap minimap-empty">no nodes</div>;
     } else {
@@ -4277,7 +4266,7 @@ function laneColorFor(key: string): string {
  * is in LOD mode (large + zoomed out); zooming past K_DETAIL mounts the real nodes and this returns
  * null. This is what makes opening a large campaign instant - nothing is mounted into rete.
  */
-function LodOverview(props: { getHandle: () => EditorHandle | null }): JSX.Element {
+function LodOverview(props: { getHandle: () => EditorHandle | null }): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     // A screen-space canvas sitting behind the nodes (z-index below .canvas). Redrawing a few
     // thousand rects/lines imperatively is ~1-2ms, so pan/zoom stays smooth - unlike an SVG in the
@@ -4308,7 +4297,7 @@ function LodOverview(props: { getHandle: () => EditorHandle | null }): JSX.Eleme
  */
 function SwimlaneCanvas(props: {
     getHandle: () => EditorHandle | null; showThread: boolean; showChapter: boolean;
-}): JSX.Element {
+}): React.JSX.Element {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const { showThread, showChapter } = props;
     useEffect(() => {
@@ -4335,7 +4324,7 @@ function TacticalCreateBar(props: {
     initialType: string | null;
     onCreate(threadUri: string, newName: string, value: 'land' | 'space', file: string): void;
     onClose(): void;
-}): JSX.Element {
+}): React.JSX.Element {
     const [name, setName] = useState('New_Tactical_Link');
     const [thread, setThread] = useState(props.threads[0] ?? '');
     const [value, setValue] = useState<'land' | 'space'>(
@@ -4357,7 +4346,7 @@ function TacticalCreateBar(props: {
                 <option value="space">Space</option>
             </select>
             <input
-                type="text" placeholder="Tactical plot manifest file…" value={file}
+                type="text" placeholder="Tactical plot manifest file..." value={file}
                 onChange={e => setFile(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') { create(); } }}
             />
@@ -4401,7 +4390,7 @@ function fadedBg(color: string): string {
     return `color-mix(in srgb, ${color} 20%, var(--vscode-editorWidget-background))`;
 }
 
-function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JSX.Element {
+function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): React.JSX.Element {
     const [search, setSearch] = useState('');
     // Collapse state per collapsible group; Rewards starts collapsed (it's the long one).
     const [collapsed, setCollapsed] = useState<Record<string, boolean>>({ Rewards: true });
@@ -4423,12 +4412,12 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
     // The whole tile is washed in its family colour - no glyph (they were all identical). Structural
     // tiles (New/AND/OR) keep a distinguishing glyph since their shapes actually differ.
     const tile = (
-        key: string, glyph: JSX.Element | null, label: string, drag: PaletteDrag, hint: string
-    ): JSX.Element => {
+        key: string, glyph: React.JSX.Element | null, label: string, drag: PaletteDrag, hint: string
+    ): React.JSX.Element => {
         const color = stepColor(drag.category, drag.type);
         return (
             <div
-                key={key} className="palette-tile" draggable
+                key={key} className="dock-tile palette-tile" draggable
                 style={{ background: fadedBg(color), borderColor: color }}
                 onDragStart={e => onDragStart(e, drag)}
                 title={`${label}\n${hint}`}
@@ -4445,7 +4434,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
      */
     const typeGroup = (
         label: string, category: 'trigger' | 'reward', items: string[], hint: string
-    ): JSX.Element | null => {
+    ): React.JSX.Element | null => {
         if (!items.length) { return null; }
         const isCollapsed = q === '' && collapsed[label];
         const families = new Map<string, string[]>();
@@ -4455,14 +4444,14 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
             if (list) { list.push(t); } else { families.set(c, [t]); }
         }
         return (
-            <div className="palette-group">
+            <div className="dock-section">
                 <div
-                    className="palette-head toggle"
+                    className="dock-section-title toggle"
                     onClick={() => setCollapsed(c => ({ ...c, [label]: !c[label] }))}
                     title={isCollapsed ? `Expand ${label}` : `Collapse ${label}`}
                 >
-                    {isCollapsed ? '▸' : '▾'} {label}
-                    <span className="palette-count">{items.length}</span>
+                    <span className={`codicon codicon-chevron-${isCollapsed ? 'right' : 'down'}`} /> {label}
+                    <span className="section-count">{items.length}</span>
                 </div>
                 {isCollapsed ? null : [...families.entries()].map(([color, names]) => (
                     <div key={color} className="tile-family">
@@ -4477,20 +4466,24 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
 
     return (
         <div className="palette-scroll">
-            <input
-                type="text" placeholder="Search node types…" value={search}
-                onChange={e => setSearch(e.target.value)}
-            />
+            <div className="dock-search">
+                <div className="search-field">
+                    <input
+                        type="text" placeholder="Search node types..." value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                </div>
+            </div>
             {showBlank || showAndJunction || showOrJunction ? (
-                <div className="palette-group palette-new">
+                <div className="dock-section palette-new">
                     <div className="tile-grid">
                         {showBlank ? tile('blank', <span className="codicon codicon-add" />, 'New event',
                             { category: 'blank', type: null },
                             'Drag onto the canvas to create a new untyped event, then edit it in place') : null}
-                        {showAndJunction ? tile('and', <span className="junction-glyph">◯</span>, 'AND',
+                        {showAndJunction ? tile('and', <span className="junction-glyph shape-circle" />, 'AND',
                             { category: 'andJunction', type: null },
                             'Drag onto the canvas, wire event outputs into it, then drag its output onto the event that should require all of them together') : null}
-                        {showOrJunction ? tile('or', <span className="junction-glyph">◇</span>, 'OR',
+                        {showOrJunction ? tile('or', <span className="junction-glyph shape-diamond" />, 'OR',
                             { category: 'orJunction', type: null },
                             'Drag onto the canvas, wire event outputs into it, then drag its output onto the event that any one of them should arm') : null}
                     </div>

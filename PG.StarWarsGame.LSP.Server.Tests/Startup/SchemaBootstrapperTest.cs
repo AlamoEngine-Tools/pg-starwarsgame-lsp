@@ -84,16 +84,6 @@ public sealed class SchemaBootstrapperTest
         }
     }
 
-    private sealed class RecordingUserNotifier : IUserNotifier
-    {
-        public List<string> Errors { get; } = [];
-
-        public void ShowError(string message)
-        {
-            Errors.Add(message);
-        }
-    }
-
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
     {
         return Build(factory, new RecordingUserNotifier(), out _);

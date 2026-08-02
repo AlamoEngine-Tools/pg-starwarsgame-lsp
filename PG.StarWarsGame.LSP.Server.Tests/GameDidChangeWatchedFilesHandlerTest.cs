@@ -50,7 +50,8 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         FakeWorkspaceHost? host = null,
         MockFileSystem? fs = null,
         FakeReloadService? reload = null,
-        ISchemaProvider? schema = null)
+        ISchemaProvider? schema = null,
+        ILocalisationWriteLedger? writeLedger = null)
     {
         var fileSystem = fs ?? new MockFileSystem();
         var fileHelper = new FileHelper(fileSystem);
@@ -75,6 +76,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             indexer,
             reload ?? new FakeReloadService(),
             schemaProvider,
+            writeLedger ?? new LocalisationWriteLedger(fileHelper),
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
     }
 
@@ -294,6 +296,54 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Equal(1, reload.LocalisationReloadCount);
         Assert.Empty(spy.Updates);
     }
+
+    // The storm this closes: saving from the localisation editor already reloads the index, and the
+    // watcher then reports that same write - so one save reloaded twice and told every open tab the
+    // index had moved twice, each time costing a full re-read of a 19,000-row file.
+    [Fact]
+    public async Task Handle_CsvUnderTextRoot_HoldingWhatTheServerJustWrote_DoesNotReloadAgain()
+    {
+        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
+        const string path = @"c:\mods\mymod\data\text\mastertextfile.csv";
+        const string content = "key,ENGLISH\r\nTEXT_A,Hello\r\n";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [path] = new(content) });
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+        var ledger = new LocalisationWriteLedger(new FileHelper(fs));
+        ledger.Record(path, LocalisationContentHash.Compute(content));
+
+        var handler = BuildHandler(new SpyIndexService(), fs: fs, reload: reload, writeLedger: ledger);
+        await handler.Handle(Changed(csvUri), CancellationToken.None);
+
+        Assert.Equal(0, reload.LocalisationReloadCount);
+    }
+
+    // Matching on content is what makes the suppression safe - an edit that landed between the
+    // server's write and the watcher event still has to be picked up.
+    [Fact]
+    public async Task Handle_CsvUnderTextRoot_ChangedSinceTheServerWroteIt_StillReloads()
+    {
+        const string csvUri = "file:///c:/mods/mymod/data/text/mastertextfile.csv";
+        const string path = @"c:\mods\mymod\data\text\mastertextfile.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [path] = new("key,ENGLISH\r\nTEXT_A,Edited by someone else\r\n")
+        });
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+        var ledger = new LocalisationWriteLedger(new FileHelper(fs));
+        ledger.Record(path, LocalisationContentHash.Compute("key,ENGLISH\r\nTEXT_A,Hello\r\n"));
+
+        var handler = BuildHandler(new SpyIndexService(), fs: fs, reload: reload, writeLedger: ledger);
+        await handler.Handle(Changed(csvUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+    }
+
 
     [Fact]
     public async Task Handle_PropertiesUnderTextRoot_TriggersLocalisationReload()

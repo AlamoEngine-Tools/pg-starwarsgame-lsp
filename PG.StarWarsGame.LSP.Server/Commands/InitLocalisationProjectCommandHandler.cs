@@ -15,6 +15,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Commands;
 
@@ -29,6 +30,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     private readonly IModProjectFileWriter _fileWriter;
     private readonly ILanguageService _langService;
     private readonly ILogger<InitLocalisationProjectCommandHandler> _logger;
+    private readonly IUserNotifier _notifier;
     private readonly IModProjectReloadService _reloadService;
     private readonly ILocalisationSeedFileWriter _seedWriter;
 
@@ -41,8 +43,10 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         IModProjectFileWriter fileWriter,
         ILocalisationSeedFileWriter seedWriter,
         ILogger<InitLocalisationProjectCommandHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        IUserNotifier notifier)
     {
+        _notifier = notifier;
         _baselineProvider = baselineProvider;
         _factory = factory;
         _langService = langService;
@@ -58,7 +62,7 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
     {
         if (!_config.Current.Features.Tools.Localisation)
         {
-            _logger.LogWarning("{Cmd}: {Reason}", CommandName, LocalisationFeatureDisabled.Message);
+            Fail(LocalisationFeatureDisabled.Message);
             return Unit.Value;
         }
 
@@ -86,17 +90,15 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             var clientDirectory = args?.Value<string>("directory");
             if (string.IsNullOrWhiteSpace(clientFormat) || string.IsNullOrWhiteSpace(clientDirectory))
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.initLocalisationProject: no existing localisation config and no " +
-                    "format/directory provided to bootstrap one.");
+                Fail("Cannot initialise a localisation project: this project does not declare one yet, " +
+                     "and no format and directory were given to create it with.");
                 return Unit.Value;
             }
 
             if (rootLayer?.ProjectPath is not { } pgprojPath)
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.initLocalisationProject: no .pgproj found; cannot bootstrap a " +
-                    "localisation project.");
+                Fail("Cannot initialise a localisation project: no .pgproj file was found in this " +
+                     "workspace, so there is nowhere to record the new localisation settings.");
                 return Unit.Value;
             }
 
@@ -108,7 +110,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         var fileName = LocalisationFormatUtility.ToSeedFileName(format);
         if (fileName is null)
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: unsupported format '{Format}'.", format);
+            Fail($"Cannot initialise a localisation project: '{format}' is not a format that can be " +
+                 "created. Use CSV, XML or NLS.");
             return Unit.Value;
         }
 
@@ -116,8 +119,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
 
         if (fs.File.Exists(targetPath))
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: '{Path}' already exists; not overwriting.",
-                targetPath);
+            Fail($"Localisation project not initialised: '{targetPath}' already exists and was left " +
+                 "untouched. Delete or move it first if you want to start over.");
             return Unit.Value;
         }
 
@@ -136,7 +139,8 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
         var writtenPath = await _seedWriter.WriteAsync(merged, format, targetDir, ct);
         if (writtenPath is null)
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.initLocalisationProject: unsupported format '{Format}'.", format);
+            Fail($"Cannot initialise a localisation project: '{format}' is not a format that can be " +
+                 "created. Use CSV, XML or NLS.");
             return Unit.Value;
         }
 
@@ -156,7 +160,23 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             await _reloadService.ReloadLocalisationAsync(ct);
         }
 
+        _notifier.ShowInfo($"Localisation project initialised: created '{writtenPath}'.");
         return Unit.Value;
+    }
+
+    /// <summary>
+    ///     Reports a reason this command did nothing, to the user and to the log.
+    /// </summary>
+    /// <remarks>
+    ///     Every one of these was log-only, and <c>workspace/executeCommand</c> hands the client no
+    ///     result to inspect - so the client announced success unconditionally and a refusal was
+    ///     indistinguishable from a completed run. The user sees the reason now; the log keeps it
+    ///     for a bug report.
+    /// </remarks>
+    private void Fail(string message)
+    {
+        _logger.LogWarning("{Cmd}: {Reason}", CommandName, message);
+        _notifier.ShowError(message);
     }
 
     protected override ExecuteCommandRegistrationOptions CreateRegistrationOptions(

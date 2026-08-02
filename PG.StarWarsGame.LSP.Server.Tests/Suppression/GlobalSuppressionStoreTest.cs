@@ -26,11 +26,11 @@ public sealed class GlobalSuppressionStoreTest
     private static (GlobalSuppressionStore Store, MockFileSystem Fs) Build(
         bool withProject = true, string? existingJson = null)
     {
-        return BuildWith(new RecordingNotifier(), withProject, existingJson);
+        return BuildWith(new RecordingUserNotifier(), withProject, existingJson);
     }
 
     private static (GlobalSuppressionStore Store, MockFileSystem Fs) BuildWith(
-        RecordingNotifier notifier, bool withProject = true, string? existingJson = null)
+        RecordingUserNotifier notifier, bool withProject = true, string? existingJson = null)
     {
         var files = new Dictionary<string, MockFileData> { [PgprojPath] = new("{}") };
         if (existingJson is not null) files[SidecarPath] = new(existingJson);
@@ -132,7 +132,7 @@ public sealed class GlobalSuppressionStoreTest
     [Fact]
     public void UnreadableEntry_IsReportedToTheUser()
     {
-        var notifier = new RecordingNotifier();
+        var notifier = new RecordingUserNotifier();
         var (store, _) = BuildWith(notifier, existingJson:
             """[{"id":"garbage"},{"id":"aetswg-010-0001"}]""");
 
@@ -144,7 +144,7 @@ public sealed class GlobalSuppressionStoreTest
     [Fact]
     public void CorruptSidecar_IsReportedToTheUser()
     {
-        var notifier = new RecordingNotifier();
+        var notifier = new RecordingUserNotifier();
         var (store, _) = BuildWith(notifier, existingJson: "{ this is not json");
 
         store.GetAll();
@@ -156,7 +156,7 @@ public sealed class GlobalSuppressionStoreTest
     [Fact]
     public void UnreadableEntry_IsReportedOnlyOnce()
     {
-        var notifier = new RecordingNotifier();
+        var notifier = new RecordingUserNotifier();
         var (store, _) = BuildWith(notifier, existingJson: """[{"id":"garbage"}]""");
 
         store.GetAll();
@@ -169,7 +169,7 @@ public sealed class GlobalSuppressionStoreTest
     [Fact]
     public void ValidEntries_ReportNothing()
     {
-        var notifier = new RecordingNotifier();
+        var notifier = new RecordingUserNotifier();
         var (store, _) = BuildWith(notifier, existingJson: """[{"id":"aetswg-010-0001"}]""");
 
         store.GetAll();
@@ -188,16 +188,6 @@ public sealed class GlobalSuppressionStoreTest
 
         Assert.Single(store.GetAll());
         Assert.False(fs.File.Exists(SidecarPath));
-    }
-
-    private sealed class RecordingNotifier : IUserNotifier
-    {
-        public List<string> Errors { get; } = [];
-
-        public void ShowError(string message)
-        {
-            Errors.Add(message);
-        }
     }
 
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService

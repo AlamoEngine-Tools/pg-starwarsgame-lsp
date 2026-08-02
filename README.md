@@ -177,15 +177,52 @@ The `<!-- <Override Name="..."/> -->` marker in XML is a different mechanism and
 
 ## Localisation editor
 
-An activity bar panel (the **AET Localisation** icon) provides a Key × Language table editor for `.csv`, `.xml`, and `.properties` localisation files.
+Localisation files declared in the `.pgproj` are listed in the **EaWEdit: Localisation** activity
+bar view, grouped into **Text files** and **Credits files**. Opening one from the tree gives a Key
+by Language table in its own editor tab, so it can be split, moved to another column, or kept open
+beside the XML that references its keys. One tab per file; two files can sit side by side.
 
-- **Project picker** - switch between localisation files declared in the `.pgproj`
-- **Inline editing** - edit translation values directly in the grid; changes are written back to disk immediately
-- **Add Language** - adds a language column from the game's official language list; only languages not already present in the file are offered
-- **Inherited baseline** - the "Inherited" toggle overlays all base-game EaW + FoC keys as read-only rows for reference
-- **Search** - filters visible rows by key name or any translation value
-- **Sortable columns** - click any column header to sort ascending, click again for descending, click a third time to restore original order
-- **Initialise from baseline** - the **+ New** button creates a fresh localisation file pre-populated with all EaW + FoC baseline keys; choose CSV, XML, or NLS (Properties) format
+- **Editing** - edit any cell in the grid. Changes are staged, shown as a count on the **Save**
+  button, and written only when you save
+- **Validate** - checks the staged changes without writing. Duplicate and empty keys are errors in
+  a text file and expected in a credits file, so they are not reported there
+- **Rows** - add, delete and reorder rows; reordering is offered on credits files, where position
+  carries meaning
+- **Add Language** - adds a language column from the game's official language list
+- **Filter** - the box in the right-hand dock filters rows by plain text, wildcard (`*`, `?`) or
+  regular expression, scoped to keys, one language, or everything
+- **Export DAT** - from the file's context menu in the tree
+- **New project** - creates a localisation file pre-populated from the EaW + FoC baseline, or
+  imports existing files
+
+A save rewrites only the rows you changed - untouched rows keep their original quoting, comments and
+line endings - and is refused if the file changed on disk since the tab loaded it.
+
+### Credits files
+
+A credits file is ordered and may repeat a key: it is the running list the end-credits crawl reads,
+not a lookup table. Rows are addressed by position rather than by key, so duplicates, blank spacer
+rows and order all survive editing. Credits files also get a **Preview crawl** button, which plays
+the staged rows as scrolling end credits.
+
+Files are recognised by the engine's naming - anything beginning with `credits`. A project that
+names them differently can say so:
+
+```jsonc
+"localisation": {
+  "type": "CSV",
+  "directory": "data/text",
+  "credits": {
+    // "convention" (default), "explicit" (only the files listed), or "none"
+    "detection": "convention",
+    "files": ["rolls.csv"]
+  }
+}
+```
+
+Use `none` when a project's ordinary text file happens to be named like a credits file. Each project
+reads one localisation format, so a CSV project's credits file is expected to be a `.csv`; compiled
+`.dat` files are an export target, not editable.
 
 ---
 
@@ -235,7 +272,6 @@ The baseline is a snapshot of all vanilla game objects and localisation keys. It
 
 | Setting | Default | Description |
 |---|---|---|
-| `aet-eaw-edit.localisation.editorEnabled` | `false` | Show the localisation editor panel in the activity bar |
 | `aet-eaw-edit.localisation.format` | `format-dat` | Default format when creating a new localisation project (`format-dat`, `format-csv`, `format-xml`) |
 
 ---
@@ -264,8 +300,8 @@ The server binary and extension must be the same version. Download the matching 
 **Features only work in some files**
 Only files inside directories declared in your `.pgproj` are indexed. Add the relevant paths to `directories.xml` or `directories.scripts` as needed.
 
-**The localisation panel is not visible**
-Set `aet-eaw-edit.localisation.editorEnabled` to `true`, then reload the window (`Ctrl+Shift+P` → **Developer: Reload Window**).
+**The localisation views are not visible**
+Set `aet-eaw-edit.features.tools.localisation` to `true`. Feature flags are applied at startup, so restart the server afterwards (`Ctrl+Shift+P` > **EaWEdit: Restart LSP Server**).
 
 **Viewing server output**
 Set `aet-eaw-edit.lsp.debug.traceServer` to `messages` and open the **EaWEdit** output channel in the Output panel.

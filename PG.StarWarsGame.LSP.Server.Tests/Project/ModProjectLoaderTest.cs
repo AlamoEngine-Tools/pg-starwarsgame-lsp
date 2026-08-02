@@ -400,6 +400,117 @@ public sealed class ModProjectLoaderTest
         Assert.Null(model.Localisation);
     }
 
+    // ── localisation.credits ─────────────────────────────────────────────────
+
+    [Fact]
+    public void Load_CreditsNode_IsParsed()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": {
+                                "type": "CSV", "directory": "data/text",
+                                "credits": { "detection": "explicit", "files": ["rolls.csv"] }
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal("explicit", model.Localisation!.Credits!.Detection);
+        Assert.Equal(["rolls.csv"], model.Localisation.Credits.Files);
+    }
+
+    // Absent means "use the convention", which is the behaviour every existing .pgproj already
+    // relies on - it must not become a required node.
+    [Fact]
+    public void Load_AbsentCreditsNode_IsNull()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": { "type": "CSV", "directory": "data/text" }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        Assert.Null(loader.Load(ProjectPath).Localisation!.Credits);
+    }
+
+    [Fact]
+    public void Load_CreditsNode_DetectionDefaultsToConvention()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": {
+                                "type": "CSV", "directory": "data/text",
+                                "credits": { "files": ["rolls.csv"] }
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        Assert.Equal("convention", loader.Load(ProjectPath).Localisation!.Credits!.Detection);
+    }
+
+    // "explicit" with nothing listed classifies nothing, which is indistinguishable from "none"
+    // except that the author plainly meant to list something. Fail rather than silently do nothing.
+    [Fact]
+    public void Load_CreditsExplicitWithNoFiles_ThrowsClearException()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": {
+                                "type": "CSV", "directory": "data/text",
+                                "credits": { "detection": "explicit" }
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("localisation.credits.files", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_CreditsUnrecognisedDetection_ThrowsClearException()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": {
+                                "type": "CSV", "directory": "data/text",
+                                "credits": { "detection": "guess" }
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("localisation.credits.detection", ex.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("convention", ex.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Load_CreditsDetection_IsCaseInsensitive_NormalizedToLowercase()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "localisation": {
+                                "type": "CSV", "directory": "data/text",
+                                "credits": { "detection": "NONE" }
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        Assert.Equal("none", loader.Load(ProjectPath).Localisation!.Credits!.Detection);
+    }
+
     [Fact]
     public void Load_LocalisationNode_UnrecognisedType_ThrowsClearException()
     {

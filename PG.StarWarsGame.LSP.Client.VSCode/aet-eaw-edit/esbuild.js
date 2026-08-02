@@ -56,11 +56,18 @@ async function main() {
   // The webview bundle builds first (and fully, in watch mode too) so the sentinel-emitting
   // extension context always signals "finished" last.
   const webviewCtx = await esbuild.context({
-    entryPoints: ['src/webview/storyGraph.tsx'],
+    // One context, one entry per webview: watch mode then covers both, and both share the same
+    // browser/iife settings. outdir rather than outfile because there is more than one output.
+    entryPoints: [
+      'src/webview/storyGraph.tsx',
+      'src/webview/translationEditor.tsx',
+      'src/webview/creditsEditor.tsx',
+      'src/webview/creditsPreview.tsx',
+    ],
     bundle: true,
     format: 'iife',
     platform: 'browser',
-    outfile: 'out/webview/storyGraph.js',
+    outdir: 'out/webview',
     // The auto-arrange plugin imports the node-flavoured elkjs entry (worker files); the
     // bundled build is the self-contained browser variant with the same ELK constructor.
     alias: { elkjs: 'elkjs/lib/elk.bundled.js' },
