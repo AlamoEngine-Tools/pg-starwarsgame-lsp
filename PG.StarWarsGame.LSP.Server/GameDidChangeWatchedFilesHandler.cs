@@ -10,6 +10,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using LspFileSystemWatcher = OmniSharp.Extensions.LanguageServer.Protocol.Models.FileSystemWatcher;
@@ -25,6 +26,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
+    private readonly ILocalisationWriteLedger _writeLedger;
 
     public GameDidChangeWatchedFilesHandler(
         IGameIndexService indexService,
@@ -33,8 +35,10 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         IWorkspaceIndexer indexer,
         IModProjectReloadService reloadService,
         ISchemaProvider schema,
+        ILocalisationWriteLedger writeLedger,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
+        _writeLedger = writeLedger;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
         _fileHelper = fileHelper;
@@ -80,7 +84,13 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 // path below is always a silent no-op.
                 if (path is not null && IsUnderTextRoot(path))
                 {
-                    localisationTextChanged = true;
+                    // Unless this is the server reading back its own write - saving from the
+                    // localisation editor already reloads the index, so reacting to the watcher
+                    // event for that same write reloaded everything a second time and told every
+                    // open tab the index had moved twice over.
+                    if (!await IsOwnWriteEchoAsync(path, ct))
+                        localisationTextChanged = true;
+
                     continue;
                 }
 
@@ -168,6 +178,31 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         }
 
         return names;
+    }
+
+    /// <summary>
+    ///     Whether this file currently holds exactly what the server last wrote to it.
+    /// </summary>
+    /// <remarks>
+    ///     Content, not timing: an edit that landed between the write and the watcher event has a
+    ///     different hash and is reloaded as it should be. A file that has since been deleted is a
+    ///     real change too.
+    /// </remarks>
+    private async Task<bool> IsOwnWriteEchoAsync(string path, CancellationToken ct)
+    {
+        try
+        {
+            if (!_fileHelper.FileSystem.File.Exists(path)) return false;
+
+            var current = await _fileHelper.FileSystem.File.ReadAllTextAsync(path, ct);
+            return _writeLedger.ConsumeEcho(path, LocalisationContentHash.Compute(current));
+        }
+        catch (Exception ex)
+        {
+            // Unreadable here means "reload and let the loader report it properly".
+            _logger.LogDebug(ex, "Could not read {Path} to check for an own-write echo.", path);
+            return false;
+        }
     }
 
     private bool IsUnderTextRoot(string path)

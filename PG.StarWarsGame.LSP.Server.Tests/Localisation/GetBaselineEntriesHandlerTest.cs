@@ -8,6 +8,7 @@ using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
@@ -196,6 +197,7 @@ public sealed class GetBaselineEntriesHandlerTest
             sp.GetRequiredService<IBaselineTranslationProvider>(),
             langService,
             factory,
+            new FileHelper(sp.GetRequiredService<IFileSystem>()),
             projectRegistry,
             layerRegistry,
             config ?? new FakeLspConfigurationProvider());

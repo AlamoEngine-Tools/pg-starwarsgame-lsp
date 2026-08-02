@@ -25,14 +25,17 @@ public sealed class ApplyCreditsBatchHandler
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ApplyCreditsBatchHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
+    private readonly ILocalisationWriteLedger _writeLedger;
 
     public ApplyCreditsBatchHandler(
         ILocalisationDocumentEditor editor,
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<ApplyCreditsBatchHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        ILocalisationWriteLedger writeLedger)
     {
+        _writeLedger = writeLedger;
         _editor = editor;
         _reloadService = reloadService;
         _fileHelper = fileHelper;
@@ -82,11 +85,16 @@ public sealed class ApplyCreditsBatchHandler
         if (!result.Success)
             return new ApplyCreditsBatchResult(false, result.FailedIndex, result.Error);
 
+        var written = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
+        var writtenHash = LocalisationContentHash.Compute(written);
+
+        // Recorded before the reload, so the watcher event for this write - which can arrive at any
+        // point after it - is recognised as our own and does not reload everything a second time.
+        _writeLedger.Record(request.ProjectFilePath, writtenHash);
+
         await _reloadService.ReloadLocalisationAsync(ct);
 
-        var written = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
-        return new ApplyCreditsBatchResult(true,
-            NewContentHash: LocalisationContentHash.Compute(written));
+        return new ApplyCreditsBatchResult(true, NewContentHash: writtenHash);
     }
 
     private static ApplyCreditsBatchResult Fail(string error)

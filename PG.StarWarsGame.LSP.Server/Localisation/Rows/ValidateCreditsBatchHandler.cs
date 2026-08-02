@@ -65,6 +65,19 @@ public sealed class ValidateCreditsBatchHandler
                     $"Change {(composed.FailedIndex ?? 0) + 1}: {composed.Error}")
             ]));
 
-        return Task.FromResult(new ValidateCreditsBatchResult([]));
+        // Nothing about a credits key is checkable - duplicates and blanks are the format. Nor is
+        // "this language has fewer entries": a German dub recorded with a smaller cast is a shorter
+        // list, not a broken one, and the export dropping the empty entries is what lets one file
+        // carry both. What IS wrong in any language is a heading left with nothing under it.
+        var problems = new List<LocProblemDto>();
+        var (rows, languages, rowsError) =
+            _editor.DryRunRows(request.ProjectFilePath, request.Commands);
+        if (rowsError is null)
+            foreach (var (language, index, label) in
+                     CreditsCoverageInspector.Inspect(rows, languages))
+                problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Warning,
+                    CreditsCoverageInspector.Message(language, label)));
+
+        return Task.FromResult(new ValidateCreditsBatchResult(problems));
     }
 }

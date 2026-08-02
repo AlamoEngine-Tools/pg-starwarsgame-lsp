@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import * as vscode from 'vscode';
+
+import { emptyNavigatorMessage } from './navigatorPlaceholder';
 import { LanguageClient } from 'vscode-languageclient/node';
 
 interface StoryPlotThreadDto { file: string; suspended: boolean; uri?: string | null; }
@@ -46,7 +48,36 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
 
     constructor(private readonly _getLspClient: () => LanguageClient | undefined) {}
 
+    /**
+     * Whether the workspace scan has finished. Until it has, an empty answer means "not indexed
+     * yet" - saying "none found" and correcting it a moment later is worse than saying nothing.
+     */
+    private _scanned = false;
+    /** Fetched ahead of the view being revealed, so the first look does not pay for a round trip. */
+    private _preloaded = false;
+
     refresh(): void {
+        this._preloaded = false;
+        this._onDidChangeTreeData.fire(undefined);
+    }
+
+    /** Fetches the campaign list in the background and repaints. */
+    async preload(): Promise<void> {
+        this._scanned = true;
+
+        const client = this._getLspClient();
+        if (!client) { return; }
+
+        try {
+            const result = await client.sendRequest<GetStoryPlotsResult>('aet/getStoryPlots', {});
+            if (!result.error) {
+                this._campaigns = result.campaigns ?? [];
+                this._preloaded = true;
+            }
+        } catch {
+            // Left unloaded; the view fetches when it is opened.
+        }
+
         this._onDidChangeTreeData.fire(undefined);
     }
 
@@ -83,6 +114,12 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
     }
 
     private async _loadRoot(): Promise<StoryTreeItem[]> {
+        if (this._preloaded) {
+            return this._campaigns.length === 0
+                ? [this._infoItem(emptyNavigatorMessage(this._scanned, 'story campaigns'))]
+                : this._setItems();
+        }
+
         const client = this._getLspClient();
         if (!client) {
             return [this._infoItem('LSP server is not running.')];
@@ -97,7 +134,7 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
             return [this._infoItem(`Cannot load story plots: ${e}`)];
         }
         if (!this._campaigns.length) {
-            return [this._infoItem('No story campaigns found in this workspace.')];
+            return [this._infoItem(emptyNavigatorMessage(this._scanned, 'story campaigns'))];
         }
         return this._setItems();
     }

@@ -83,7 +83,12 @@ public sealed class GetLocalisationRowsHandler
             document.Languages,
             LocalisationContentHash.Compute(content),
             category,
-            category == LocCategory.Credits);
+            category == LocCategory.Credits,
+            // Format only - credits included. The engine loads the crawl from
+            // creditstext_<LANGUAGE>.dat, but that constrains the DAT export, not the file being
+            // edited: ExportLocalisationToDatHandler writes one CreditsText_<LANGUAGE>.dat per
+            // language found in the source, which is how one credits file produces every crawl.
+            CanAddLanguage: LocalisationDocumentEditor.SupportsMultipleLanguages(extension));
     }
 
     /// <summary>

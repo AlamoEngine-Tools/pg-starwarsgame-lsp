@@ -12,7 +12,11 @@
 
 import styled from 'styled-components';
 
+import { dockBodyCss, dockChromeCss, dockOverviewCss } from '../shared/dockChrome';
+
 export const Shell = styled.div`
+    ${dockChromeCss}
+
     /* 100% of the host's element, not 100vh: viewport units ignore the body's own box, so any
        margin or padding the host applies would make this overflow by exactly that much. */
     height: 100%;
@@ -59,47 +63,6 @@ export const Shell = styled.div`
         z-index: 15;
     }
 
-    /* The step library: the three kinds of line a credits file is built from, as things you pick
-       up and place. */
-    .step-library { display: flex; flex-direction: column; gap: 6px; }
-    .step-tile {
-        display: flex;
-        align-items: flex-start;
-        gap: 8px;
-        padding: 6px 8px;
-        border: 1px solid var(--vscode-panel-border, #444);
-        border-radius: 4px;
-        background: var(--vscode-editorWidget-background, #252526);
-        cursor: grab;
-        text-align: left;
-        color: inherit;
-        font: inherit;
-        width: 100%;
-    }
-    .step-tile:hover {
-        border-color: var(--vscode-focusBorder, #007fd4);
-        background: var(--vscode-list-hoverBackground, #2a2d2e);
-    }
-    .step-tile:active { cursor: grabbing; }
-    .step-tile .codicon { flex-shrink: 0; margin-top: 1px; opacity: 0.8; }
-    .step-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-    .step-label { font-weight: 600; display: flex; align-items: center; gap: 6px; }
-    /* The raw token, in the monospace the file itself would show it in. */
-    .step-token {
-        font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.85em;
-        font-weight: 400;
-        padding: 0 4px;
-        border: 1px solid var(--vscode-panel-border, #444);
-        border-radius: 3px;
-        opacity: 0.75;
-    }
-    .step-hint {
-        font-size: 0.9em;
-        opacity: 0.7;
-        white-space: normal;
-        line-height: 1.3;
-    }
     .step-help {
         margin: 0;
         font-size: 0.9em;
@@ -199,6 +162,11 @@ export const Shell = styled.div`
 
     .head-row {
         display: grid;
+        /* An item beyond the declared tracks makes a new column, never a new row. Without this a
+           header cell the template did not account for wrapped underneath the first column, which
+           reads as the table having lost its layout. */
+        grid-auto-flow: column;
+        grid-auto-columns: min-content;
         position: sticky;
         top: 0;
         z-index: 2;
@@ -208,6 +176,58 @@ export const Shell = styled.div`
     }
 
     .head-row .cell { padding: 4px 8px; white-space: nowrap; }
+
+    /* The column picker sits at the right-hand end of the header, above the rows' unused trailing
+       track. Positioned so the flyout can hang from it. */
+    .head-row .column-menu {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+    .column-flyout {
+        /* Fixed, not absolute: the header scrolls inside .grid-area, which clips whatever reaches
+           past its edge - and this hangs off the rightmost cell. Placed from the gear's viewport
+           box when it opens. */
+        position: fixed;
+        z-index: 25;
+        min-width: 160px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        background: var(--vscode-editorWidget-background, #252526);
+        box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+        font-weight: normal;
+        white-space: nowrap;
+    }
+    /* The flyout hangs off a header cell, so it sits inside .grid and inherits the rule that
+       stretches every input in the table to fill its cell. On a checkbox that reserves the whole
+       row and pushes the language name out past the flyout's edge - which is how this ended up
+       looking like a column of checkboxes with the names floating over the dock beside them.
+       Anything else put in the header will need the same undoing. */
+    .column-flyout input[type=checkbox] {
+        width: auto;
+        padding: 0;
+        border: none;
+        background: initial;
+    }
+    .column-flyout input[type=checkbox]:hover,
+    .column-flyout input[type=checkbox]:focus { border: none; }
+
+    .column-flyout-title {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        opacity: 0.65;
+    }
 
     /* Sortable headers read as controls, so the affordance is visible before the click rather than
        being something you have to guess at. */
@@ -320,14 +340,8 @@ export const Shell = styled.div`
 
     /* Filters sit at the foot of the dock, as they do in the story graph editor - the header is for
        acting on the file, the foot for narrowing what you are looking at. */
-    .dock-overview {
-        flex-shrink: 0;
-        border-top: 1px solid var(--vscode-panel-border, #444);
-        padding: 6px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
+    ${dockBodyCss}
+    ${dockOverviewCss}
 
     /* Header controls, matching the story graph editor: soft icon buttons with almost no chrome
        until hovered, the glyph doing the talking. */
@@ -422,10 +436,6 @@ export const Shell = styled.div`
     input[type=text]:focus, select:focus {
         border-color: var(--vscode-focusBorder, #007fd4);
     }
-
-    .dock-overview > input[type=text] { width: 100%; }
-    .filters-below { display: flex; flex-direction: column; gap: 4px; }
-    .filters-below select { width: 100%; }
 
     /* The search-mode toggles: icon buttons, the same ones the graph editor's overview tools use. */
     .mode-group { display: flex; gap: 4px; }

@@ -66,7 +66,18 @@ public sealed class ValidateTranslationBatchHandler
                     $"Change {(translated.FailedIndex ?? 0) + 1}: {translated.Error}")
             ]));
 
-        return Task.FromResult(new ValidateTranslationBatchResult(
-            TranslationKeyInspector.Inspect(translated.ResultingKeys ?? [])));
+        var problems = TranslationKeyInspector.Inspect(translated.ResultingKeys ?? []).ToList();
+
+        // A language left half-filled is not a key problem, so it is checked from the resulting
+        // rows rather than from the key list.
+        var (rows, languages, rowsError) =
+            _editor.DryRunRows(request.ProjectFilePath, translated.Commands ?? []);
+        if (rowsError is null)
+            foreach (var (language, empty, total) in
+                     LanguageCoverageInspector.Inspect(rows, languages))
+                problems.Add(new LocTranslationProblemDto(null, language, LocProblemSeverity.Warning,
+                    LanguageCoverageInspector.Message(language, empty, total)));
+
+        return Task.FromResult(new ValidateTranslationBatchResult(problems));
     }
 }

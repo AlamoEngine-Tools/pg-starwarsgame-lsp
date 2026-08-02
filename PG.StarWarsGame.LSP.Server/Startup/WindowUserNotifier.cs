@@ -33,4 +33,16 @@ public sealed class WindowUserNotifier : IUserNotifier
             _logger.LogWarning(ex, "Failed to show error notification to the client (non-fatal).");
         }
     }
+
+    public void ShowInfo(string message)
+    {
+        try
+        {
+            _facade.Window.ShowInfo(message);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to show info notification to the client (non-fatal).");
+        }
+    }
 }

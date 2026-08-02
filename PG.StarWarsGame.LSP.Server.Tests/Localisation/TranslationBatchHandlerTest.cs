@@ -284,7 +284,8 @@ public sealed class TranslationBatchHandlerTest
         return (
             new ApplyTranslationBatchHandler(
                 editor, reload, helper,
-                NullLogger<ApplyTranslationBatchHandler>.Instance, configuration),
+                NullLogger<ApplyTranslationBatchHandler>.Instance, configuration,
+                new LocalisationWriteLedger(helper)),
             new ValidateTranslationBatchHandler(editor, helper, configuration),
             reload);
     }

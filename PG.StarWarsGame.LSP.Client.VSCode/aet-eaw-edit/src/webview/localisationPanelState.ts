@@ -8,6 +8,8 @@
 export class LocalisationPanelState {
     private _pending: Record<string, unknown>[] = [];
     private _contentHash: string | undefined;
+    /** The hash of the contents the webview was last handed. See {@link shouldDeliver}. */
+    private _deliveredHash: string | undefined;
 
     /** The staged commands, in the order the user performed them. */
     get pending(): Record<string, unknown>[] {
@@ -44,7 +46,24 @@ export class LocalisationPanelState {
      */
     noteRead(contentHash: string | undefined): void {
         this._contentHash = contentHash;
+        this._deliveredHash = contentHash;
         this._pending = [];
+    }
+
+    /**
+     * Whether a freshly read file is worth handing to the webview.
+     *
+     * A save makes the server reload its localisation index, and the file watcher then reports the
+     * server's own write - so a single save announced "the index moved" twice, and every open tab
+     * re-read its file and re-rendered every row for a document that had not changed. That also
+     * resets the tab (selection, sort, the inherited toggle) and costs a second baseline fetch, so
+     * it is felt, not merely wasteful.
+     *
+     * A read with no hash always goes through: there is nothing to compare, and suppressing it
+     * would leave the tab showing nothing.
+     */
+    shouldDeliver(contentHash: string | undefined): boolean {
+        return contentHash === undefined || contentHash !== this._deliveredHash;
     }
 
     /**
@@ -54,7 +73,13 @@ export class LocalisationPanelState {
      * "no content hash provided".
      */
     noteSaved(newContentHash: string | undefined): void {
-        if (newContentHash) { this._contentHash = newContentHash; }
+        if (newContentHash) {
+            this._contentHash = newContentHash;
+            // The webview already shows this state - it is what it just asked to be written - so
+            // the watcher echo that follows must not be taken for someone else's edit.
+            this._deliveredHash = newContentHash;
+        }
+
         this._pending = [];
     }
 

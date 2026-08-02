@@ -25,10 +25,19 @@ public sealed record GetLocalisationRowsParams(string ProjectFilePath) : IReques
 ///     Whether row order is significant and duplicate keys are legal. True for credits. The client
 ///     uses it to decide whether to offer reordering, and to stop treating the key as an identity.
 /// </param>
+/// <param name="CanAddLanguage">
+///     Whether this file can gain another language column at all. False for the single-language
+///     formats - <c>.properties</c> and <c>.dat</c>, which hold one language by construction (the
+///     DAT's is its file name). The rule belongs to
+///     <see cref="LocalisationDocumentEditor" />, which is what refuses the command; it is reported
+///     here so the client can leave the action out rather than offering something that will be
+///     rejected, and so the list of single-language formats exists in one place.
+/// </param>
 public sealed record GetLocalisationRowsResult(
     IReadOnlyList<LocRowDto> Rows,
     IReadOnlyList<string> Languages,
     string ContentHash,
     string Category = LocCategory.Text,
     bool Ordered = false,
-    string? Error = null);
+    string? Error = null,
+    bool CanAddLanguage = false);

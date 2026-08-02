@@ -56,7 +56,7 @@ public class LspServerFixture : IAsyncLifetime
             await InitializeSpawnedAsync(workspacePath);
     }
 
-    public async ValueTask DisposeAsync()
+    public virtual async ValueTask DisposeAsync()
     {
         if (_client is IAsyncDisposable asyncClient)
             await asyncClient.DisposeAsync();

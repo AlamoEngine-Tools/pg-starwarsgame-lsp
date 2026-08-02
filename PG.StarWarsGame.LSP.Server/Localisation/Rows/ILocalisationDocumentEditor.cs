@@ -61,4 +61,15 @@ public interface ILocalisationDocumentEditor
     ///     </para>
     /// </summary>
     LocalisationEditResult DryRunFile(string filePath, IReadOnlyList<LocEditCommandDto> commands);
+
+    /// <summary>
+    ///     The rows and languages the file would hold once a batch lands, without writing.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="DryRunFile" /> answers "does this compose"; this answers "what would it say",
+    ///     which is what any check about the <em>content</em> needs - language coverage, to begin
+    ///     with. Returns no rows and the reason when the batch does not compose.
+    /// </remarks>
+    (IReadOnlyList<LocRowDto> Rows, IReadOnlyList<string> Languages, string? Error) DryRunRows(
+        string filePath, IReadOnlyList<LocEditCommandDto> commands);
 }

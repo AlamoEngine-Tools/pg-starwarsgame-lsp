@@ -115,13 +115,4 @@ public sealed class ProjectConfigurationResolverTest
         Assert.Contains("projectReferences", message, StringComparison.OrdinalIgnoreCase);
     }
 
-    private sealed class RecordingUserNotifier : IUserNotifier
-    {
-        public List<string> Errors { get; } = [];
-
-        public void ShowError(string message)
-        {
-            Errors.Add(message);
-        }
-    }
 }

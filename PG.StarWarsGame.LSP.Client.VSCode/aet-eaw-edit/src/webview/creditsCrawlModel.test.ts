@@ -21,6 +21,27 @@ describe('isSpacerRow', () => {
             isSpacerRow(multi(0, 'CENTER', ['ENGLISH', '[TBL]'], ['GERMAN', '[TBL]'])), true);
     });
 
+    // What a real multi-language credits file looks like: the author writes the marker once and
+    // leaves the other columns empty. Requiring the sentinel in every language meant a blank line
+    // loaded from disk rendered as an editable row showing "[TBL]" as text, while one inserted in
+    // the editor - which writes the marker into every column - rendered correctly.
+    it('treats a row marked in one language and empty in the rest as a spacer', () => {
+        assert.equal(
+            isSpacerRow(multi(0, 'CENTER', ['ENGLISH', '[TBL]'], ['GERMAN', ''])), true);
+    });
+
+    it('treats a marked row with only whitespace elsewhere as a spacer', () => {
+        assert.equal(
+            isSpacerRow(multi(0, 'CENTER', ['ENGLISH', '[TBL]'], ['GERMAN', '   '])), true);
+    });
+
+    // Nothing marks this one, so it is an ordinary row that happens to be empty - left visible and
+    // editable rather than turned into a marker the user cannot type into.
+    it('does not treat an entirely empty row as a spacer', () => {
+        assert.equal(
+            isSpacerRow(multi(0, 'CENTER', ['ENGLISH', ''], ['GERMAN', ''])), false);
+    });
+
     it('does not treat a partly translated row as a spacer', () => {
         assert.equal(
             isSpacerRow(multi(0, 'CENTER', ['ENGLISH', '[TBL]'], ['GERMAN', 'Regie'])), false);

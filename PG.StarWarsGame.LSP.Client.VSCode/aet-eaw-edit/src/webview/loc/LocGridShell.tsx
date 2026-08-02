@@ -131,7 +131,11 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
                         is display:block and whose rows are absolutely positioned cannot keep its
                         header and body columns aligned, and the row/cell display overrides fight
                         the table layout algorithm. One template string drives both. */}
-                    <div className="grid" style={{ minWidth: 'fit-content' }}>
+                    {/* min-content, not fit-content: the columns' own minimums decide how narrow
+                        the table may get, not whatever text happens to be in the rows currently
+                        mounted. With a virtualised list fit-content made the width depend on the
+                        scroll position. */}
+                    <div className="grid" style={{ minWidth: 'min-content' }}>
                         <div className="head-row" style={{ gridTemplateColumns: props.columns }}>
                             {props.header}
                         </div>

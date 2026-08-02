@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import * as vscode from 'vscode';
+
+import { emptyNavigatorMessage } from './navigatorPlaceholder';
 import { LanguageClient } from 'vscode-languageclient/node';
 
 import {
@@ -39,9 +41,49 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
     private readonly _onDidChangeTreeData = new vscode.EventEmitter<LocTreeItem | undefined>();
     readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
 
+    /**
+     * Whether the workspace scan has finished.
+     *
+     * Until it has, an empty answer from the server means "not indexed yet", not "this workspace
+     * has none" - and the tree said the latter, then corrected itself a moment later when the index
+     * landed. It now says it is still working.
+     */
+    private _scanned = false;
+    /**
+     * The last answer from the server, fetched ahead of the view being opened.
+     *
+     * A tree view only asks for its children when it is first revealed, so without this the first
+     * click paid for the round trip. Cleared by {@link refresh} so the next read is fresh.
+     */
+    private _cached: LocProjectInfo[] | undefined;
+
     constructor(private readonly _getLspClient: () => LanguageClient | undefined) {}
 
     refresh(): void {
+        this._cached = undefined;
+        this._onDidChangeTreeData.fire(undefined);
+    }
+
+    /**
+     * Fetches the file list in the background and repaints.
+     *
+     * Called when the workspace scan completes, so the view is ready before it is looked at.
+     */
+    async preload(): Promise<void> {
+        this._scanned = true;
+
+        const client = this._getLspClient();
+        if (!client) { return; }
+
+        try {
+            const result = await client.sendRequest<GetLocalisationProjectsResult>(
+                'aet/getLocalisationProjects', {});
+            this._cached = result.error ? undefined : result.projects ?? [];
+        } catch {
+            // Left uncached; the view falls back to fetching when it is opened.
+            this._cached = undefined;
+        }
+
         this._onDidChangeTreeData.fire(undefined);
     }
 
@@ -55,6 +97,12 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
     }
 
     private async _loadRoot(): Promise<LocTreeItem[]> {
+        if (this._cached !== undefined) {
+            return this._cached.length === 0
+                ? [infoItem(emptyNavigatorMessage(this._scanned, 'localisation files'))]
+                : groupProjects(this._cached).map(node => this._toItem(node));
+        }
+
         const client = this._getLspClient();
         if (!client) { return [infoItem('LSP server is not running.')]; }
 
@@ -68,9 +116,10 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
 
         if (result.error) { return [infoItem(result.error)]; }
         if (!result.projects || result.projects.length === 0) {
-            return [infoItem('No localisation files found in this workspace.')];
+            return [infoItem(emptyNavigatorMessage(this._scanned, 'localisation files'))];
         }
 
+        this._cached = result.projects;
         return groupProjects(result.projects).map(node => this._toItem(node));
     }
 

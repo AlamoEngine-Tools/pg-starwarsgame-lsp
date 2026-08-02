@@ -19,6 +19,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Commands;
 
@@ -41,6 +42,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     private readonly ILanguageService _langService;
     private readonly ILogger<ImportLocalisationProjectCommandHandler> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
+    private readonly IUserNotifier _notifier;
     private readonly IModProjectReloadService _reloadService;
     private readonly ILocalisationSeedFileWriter _seedWriter;
     private readonly IXmlTranslationImporter _xmlImporter;
@@ -58,8 +60,10 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         IModProjectReloadService reloadService,
         IModProjectFileWriter fileWriter,
         ILogger<ImportLocalisationProjectCommandHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        IUserNotifier notifier)
     {
+        _notifier = notifier;
         _csvImporter = csvImporter;
         _xmlImporter = xmlImporter;
         _nlsImporter = nlsImporter;
@@ -79,13 +83,14 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
     {
         if (!_config.Current.Features.Tools.Localisation)
         {
-            _logger.LogWarning("{Cmd}: {Reason}", CommandName, LocalisationFeatureDisabled.Message);
+            Fail(LocalisationFeatureDisabled.Message);
             return Unit.Value;
         }
 
         if (request.Arguments?.FirstOrDefault() is not JObject args)
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.importLocalisationProject invoked without arguments.");
+            Fail("Cannot import localisation files: the command was invoked without any settings to " +
+                 "import with. Run it from the Localisation view rather than directly.");
             return Unit.Value;
         }
 
@@ -97,8 +102,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         if (string.IsNullOrWhiteSpace(sourceFormat) || string.IsNullOrWhiteSpace(sourceDirectory) ||
             string.IsNullOrWhiteSpace(targetFormat))
         {
-            _logger.LogWarning(
-                "aet-eaw-edit.lsp.importLocalisationProject: missing sourceFormat/sourceDirectory/targetFormat.");
+            Fail("Cannot import localisation files: the source format, source folder and target " +
+                 "format are all required.");
             return Unit.Value;
         }
 
@@ -106,16 +111,15 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             .OrderByDescending(l => l.Rank).FirstOrDefault();
         if (rootLayer?.ProjectPath is not { } pgprojPath)
         {
-            _logger.LogWarning("aet-eaw-edit.lsp.importLocalisationProject: no .pgproj found; cannot import.");
+            Fail("Cannot import localisation files: no .pgproj file was found in this workspace, so " +
+                 "there is nowhere to record the imported localisation settings.");
             return Unit.Value;
         }
 
         var fs = _fileHelper.FileSystem;
         if (!fs.Directory.Exists(sourceDirectory))
         {
-            _logger.LogWarning(
-                "aet-eaw-edit.lsp.importLocalisationProject: source directory '{Dir}' does not exist.",
-                sourceDirectory);
+            Fail($"Cannot import localisation files: the folder '{sourceDirectory}' does not exist.");
             return Unit.Value;
         }
 
@@ -125,9 +129,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             .ToList();
         if (sourceFiles.Count == 0)
         {
-            _logger.LogWarning(
-                "aet-eaw-edit.lsp.importLocalisationProject: no {Ext} files found in '{Dir}'.",
-                sourceExt, sourceDirectory);
+            Fail($"Nothing to import: no {sourceExt} files were found in '{sourceDirectory}'. Check " +
+                 "that the folder and the source format match what is actually there.");
             return Unit.Value;
         }
 
@@ -135,36 +138,37 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         var sameFormat = string.Equals(sourceFormat, targetFormat, StringComparison.OrdinalIgnoreCase);
 
         string relativeDirectory;
+        string outcome;
         if (sameFormat)
         {
             // Pure registration - the user's existing files are left untouched.
             var relative = fs.Path.GetRelativePath(pgprojDir, sourceDirectory);
             if (fs.Path.IsPathRooted(relative))
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.importLocalisationProject: '{Dir}' cannot be expressed as a path " +
-                    "relative to the .pgproj (different drive/root); cannot import.", sourceDirectory);
+                Fail($"Cannot import localisation files: '{sourceDirectory}' is on a different drive " +
+                     "or root from the .pgproj, so it cannot be recorded as a relative path. Copy the " +
+                     "files inside the project folder first.");
                 return Unit.Value;
             }
 
             relativeDirectory = relative.Replace('\\', '/').ToLowerInvariant();
+            outcome = $"Localisation project imported: registered {sourceFiles.Count} {sourceExt} " +
+                      $"file(s) in '{relativeDirectory}'. The files themselves were not changed.";
         }
         else
         {
             if (string.IsNullOrWhiteSpace(targetDirectory))
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.importLocalisationProject: targetDirectory is required when " +
-                    "converting from {Source} to {Target}.", sourceFormat, targetFormat);
+                Fail($"Cannot convert {sourceFormat} to {targetFormat}: no target folder was given for " +
+                     "the converted file.");
                 return Unit.Value;
             }
 
             var targetFileName = LocalisationFormatUtility.ToSeedFileName(targetFormat);
             if (targetFileName is null)
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.importLocalisationProject: unsupported target format '{Format}'.",
-                    targetFormat);
+                Fail($"Cannot import localisation files: '{targetFormat}' is not a format that can be " +
+                     "written. Use CSV, XML or NLS.");
                 return Unit.Value;
             }
 
@@ -172,23 +176,31 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             var targetPath = fs.Path.Combine(absoluteTargetDir, targetFileName);
             if (fs.File.Exists(targetPath))
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.importLocalisationProject: '{Path}' already exists; not overwriting.",
-                    targetPath);
+                Fail($"Nothing was imported: '{targetPath}' already exists and was left untouched. " +
+                     "Delete or move it first, or choose a different target folder.");
                 return Unit.Value;
             }
 
             var languages = _langService.OfficiallySupported();
             var merged = _factory.CreateKeyed(languages);
+
+            // A file that cannot be read is skipped rather than failing the whole import - one
+            // corrupt file among twenty should not block the other nineteen. But skipping silently
+            // is how an import "succeeds" into an empty file, so the count is reported below.
+            var skipped = 0;
             foreach (var path in sourceFiles)
-                await ImportFileAsync(path, sourceFormat, merged, ct);
+                if (!await ImportFileAsync(path, sourceFormat, merged, ct))
+                    skipped++;
+
+            if (skipped > 0)
+                Fail($"{skipped} of {sourceFiles.Count} file(s) in '{sourceDirectory}' could not be " +
+                     "read and were left out of the import. See the EaWEdit LSP output for which.");
 
             var writtenPath = await _seedWriter.WriteAsync(merged, targetFormat, absoluteTargetDir, ct);
             if (writtenPath is null)
             {
-                _logger.LogWarning(
-                    "aet-eaw-edit.lsp.importLocalisationProject: unsupported target format '{Format}'.",
-                    targetFormat);
+                Fail($"Cannot import localisation files: '{targetFormat}' is not a format that can be " +
+                     "written. Use CSV, XML or NLS.");
                 return Unit.Value;
             }
 
@@ -197,6 +209,8 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 sourceFiles.Count, sourceFormat, writtenPath);
 
             relativeDirectory = targetDirectory;
+            outcome = $"Localisation project imported: converted {sourceFiles.Count - skipped} " +
+                      $"{sourceFormat} file(s) into '{writtenPath}'.";
         }
 
         await _fileWriter.SetLocalisationAsync(pgprojPath, targetFormat.ToUpperInvariant(), relativeDirectory, ct);
@@ -206,10 +220,23 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             "aet-eaw-edit.lsp.importLocalisationProject: registered '{Dir}' ({Format}) with '{Pgproj}'.",
             relativeDirectory, targetFormat, pgprojPath);
 
+        _notifier.ShowInfo(outcome);
         return Unit.Value;
     }
 
-    private async Task ImportFileAsync(
+    /// <summary>
+    ///     Reports a reason this command did nothing (or did less than asked), to the user and to
+    ///     the log. See the same helper on
+    ///     <see cref="InitLocalisationProjectCommandHandler" /> for why it exists.
+    /// </summary>
+    private void Fail(string message)
+    {
+        _logger.LogWarning("{Cmd}: {Reason}", CommandName, message);
+        _notifier.ShowError(message);
+    }
+
+    /// <summary>Reads one source file into <paramref name="db" />. False if it had to be skipped.</summary>
+    private async Task<bool> ImportFileAsync(
         string path, string format, IKeyedTranslationDatabase db, CancellationToken ct)
     {
         // DAT is binary - never goes through the text-read path below. It's also one file per
@@ -221,7 +248,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 _logger.LogWarning(
                     "aet-eaw-edit.lsp.importLocalisationProject: could not determine a language from DAT " +
                     "file name '{Path}' (expected '..._<LANGUAGE>.dat'); skipping.", path);
-                return;
+                return false;
             }
 
             try
@@ -233,9 +260,10 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
             {
                 _logger.LogWarning(ex,
                     "aet-eaw-edit.lsp.importLocalisationProject: failed to import DAT file '{Path}'.", path);
+                return false;
             }
 
-            return;
+            return true;
         }
 
         string content;
@@ -246,7 +274,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "aet-eaw-edit.lsp.importLocalisationProject: could not read '{Path}'.", path);
-            return;
+            return false;
         }
 
         try
@@ -275,7 +303,10 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "aet-eaw-edit.lsp.importLocalisationProject: failed to import '{Path}'.", path);
+            return false;
         }
+
+        return true;
     }
 
     private static string ResourceTypeToExtension(string format)

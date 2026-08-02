@@ -54,7 +54,15 @@ export function isBlankSentinel(value: string): boolean {
  * as a spacer hid its key and its translations behind a marker offering nothing but deletion.
  */
 export function isSpacerRow(row: LocRow): boolean {
-    return row.values.length > 0 && row.values.every(v => isBlankSentinel(v.value));
+    // Marked in at least one language and carrying no text in any of them. Requiring the marker in
+    // every language was wrong for the files people actually write: a spacer is typically marked
+    // once and left empty in the other columns, so a blank line loaded from disk was drawn as an
+    // ordinary row showing "[TBL]" as its text - while one inserted here, which writes the marker
+    // into every column, came out right. A row that is merely empty everywhere is NOT a spacer:
+    // nothing marks it as one, and it stays visible and editable rather than becoming a marker
+    // that cannot be typed into.
+    return row.values.some(v => isBlankSentinel(v.value))
+        && row.values.every(v => isBlank(v.value));
 }
 
 function isBlank(value: string): boolean {

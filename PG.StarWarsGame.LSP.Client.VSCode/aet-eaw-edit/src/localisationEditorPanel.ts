@@ -10,6 +10,8 @@ import { LocalisationPanelState } from './webview/localisationPanelState';
 interface LocValueDto { language: string; value: string; }
 interface LocRowDto { index: number; key: string; values: LocValueDto[]; }
 
+interface GetLanguagesResult { languages: string[] }
+
 interface GetLocalisationRowsResult {
     rows: LocRowDto[];
     languages: string[];
@@ -17,6 +19,7 @@ interface GetLocalisationRowsResult {
     category: string;
     ordered: boolean;
     error?: string | null;
+    canAddLanguage: boolean;
 }
 
 interface ApplyLocalisationBatchResult {
@@ -128,6 +131,14 @@ export class LocalisationEditorPanel {
                     case 'crawlRows':
                         this._sendCrawlRows(msg);
                         break;
+                    case 'convertFormat':
+                        await this._convertFormat(msg.targetFormat as string);
+                        break;
+                    case 'exportDat':
+                        await vscode.commands.executeCommand(
+                            'aet-eaw-edit.lsp.exportLocalisationToDat',
+                            { project: { filePath: this._filePath } });
+                        break;
                     default:
                         break;
                 }
@@ -190,6 +201,31 @@ export class LocalisationEditorPanel {
         for (const panel of [...LocalisationEditorPanel._panels.values()]) { panel._panel.dispose(); }
     }
 
+    /**
+     * The languages the engine officially supports, cached for the life of the tab.
+     *
+     * A property of the game rather than of the file, so it is fetched once. The editor offers only
+     * these when adding a language - a made-up identifier produces a column the game never reads.
+     */
+    private _supportedLanguages: string[] | undefined;
+
+    private async _supportedLanguagesAsync(): Promise<string[]> {
+        if (this._supportedLanguages !== undefined) { return this._supportedLanguages; }
+
+        const client = this._getLspClient();
+        if (!client) { return []; }
+
+        try {
+            const result = await client.sendRequest<GetLanguagesResult>('aet/getLanguages', {});
+            this._supportedLanguages = result.languages ?? [];
+        } catch {
+            // Not fatal: the editor is fully usable, it just cannot offer to add a language.
+            this._supportedLanguages = [];
+        }
+
+        return this._supportedLanguages;
+    }
+
     private async _sendRows(): Promise<void> {
         const client = this._getLspClient();
         if (!client) { this._post({ type: 'error', message: 'LSP server is not running.' }); return; }
@@ -199,14 +235,34 @@ export class LocalisationEditorPanel {
 
         if (result.error) { this._post({ type: 'error', message: result.error }); return; }
 
+        // An unchanged file is not re-delivered. A save reloads the server's localisation index and
+        // the watcher then reports that same write, so one save announced the index had moved twice
+        // over - and each announcement made every open tab hand its webview every row again, reset
+        // its selection, sort and inherited toggle, and re-fetch the baseline. See shouldDeliver.
+        if (!this._state.shouldDeliver(result.contentHash)) { return; }
+
         this._state.noteRead(result.contentHash);
         this._post({
+            supportedLanguages: await this._supportedLanguagesAsync(),
             type: 'rows',
             rows: result.rows,
             languages: result.languages,
             category: result.category,
             ordered: result.ordered,
+            canAddLanguage: result.canAddLanguage,
         });
+    }
+
+    /**
+     * Rewrites this file in another format, keeping the original.
+     *
+     * Delegated to the command rather than requested here, so the palette entry and this button are
+     * the same code path - including how the outcome is reported.
+     */
+    private async _convertFormat(targetFormat: string): Promise<void> {
+        await vscode.commands.executeCommand(
+            'aet-eaw-edit.lsp.convertLocalisationFormat',
+            { filePath: this._filePath, targetFormat, category: this._category });
     }
 
     /**

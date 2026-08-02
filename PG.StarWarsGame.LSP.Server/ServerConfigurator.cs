@@ -118,6 +118,7 @@ public static class ServerConfigurator
             .WithHandler<GetBaselineEntriesHandler>()
             .WithHandler<GetLanguagesHandler>()
             .WithHandler<ExportLocalisationToDatHandler>()
+            .WithHandler<ConvertLocalisationFormatHandler>()
             .WithHandler<GetLocalisationRowsHandler>()
             .WithHandler<ApplyTranslationBatchHandler>()
             .WithHandler<ValidateTranslationBatchHandler>()
@@ -235,6 +236,8 @@ public static class ServerConfigurator
                 services.AddSingleton<IModProjectReloadService, ModProjectReloadService>();
                 services.AddSingleton<IModProjectFileWriter, ModProjectFileWriter>();
                 services.AddSingleton<ILocalisationSeedFileWriter, LocalisationSeedFileWriter>();
+                services.AddSingleton<ILocalisationFormatConverter, LocalisationFormatConverter>();
+                services.AddSingleton<ILocalisationWriteLedger, LocalisationWriteLedger>();
                 services.AddSingleton<ILocalisationEntryWriter, LocalisationEntryWriter>();
 
                 // Linear startup pipeline and its stage collaborators.

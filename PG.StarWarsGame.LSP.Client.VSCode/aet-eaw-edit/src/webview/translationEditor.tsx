@@ -7,19 +7,26 @@
 // no meaning the user can see, which is also why the grid can be sorted freely and why adding an
 // entry never asks where to put it.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import styled from 'styled-components';
 
 import { BaselineSuggestion, suggestBaselineKeys } from './baselineSuggestions';
 import { CellInput, menuAction, RowMenuFrame } from './loc/LocCells';
 import { gridFooterLabel } from './loc/gridFooter';
+import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
+import { languageCopyValues } from './loc/languageCopy';
+import { languageFillValues } from './loc/languageFill';
+import { LocColumnMenu } from './loc/LocColumnMenu';
+import { emptyLanguages } from './loc/columnVisibility';
 import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
+import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
 import { LocRow } from './loc/locRow';
+import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
 import { severityIconFor, validateTitle } from './loc/validateState';
-import { FilterMode, matchesFilter } from './locFilter';
+import { buildRowFilter, FilterMode } from './locFilter';
 import {
     BaselineEntryDto, BaselineRow, baselineValuesFor, findInheritedKeys, hideInherited,
     toBaselineRows,
@@ -32,6 +39,8 @@ import { countDuplicateKeys, nextSort, sortRows, SortState } from './translation
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState('');
+    // What the box shows is immediate; what the grid applies waits for typing to settle.
+    const appliedFilter = useDebounced(filter, FILTER_DEBOUNCE_MS);
     const [mode, setMode] = useState<FilterMode>('text');
     const [scope, setScope] = useState('all');
     // View order only. Null is the order the file has on disk.
@@ -40,6 +49,13 @@ function App(): React.JSX.Element {
     // default: a mod's text file is largely a copy of the game's, and the point is what it changes.
     const [baseline, setBaseline] = useState<BaselineRow[]>([]);
     const [showInherited, setShowInherited] = useState(false);
+    // View only. A hidden column is still edited by every command and still written on save - a
+    // wide file is simply easier to read a few languages at a time.
+    //
+    // Null means "the user has not chosen", in which case the languages the file says nothing in
+    // are hidden. Once they touch the picker their choice is explicit and stands, including for a
+    // language they have just added and not yet written anything in.
+    const [hiddenLanguages, setHiddenLanguages] = useState<Set<string> | null>(null);
     // Open when adding an entry. The key is validated before the row exists, so there is never a
     // blank half-row in the grid waiting to be filled in.
     const [adding, setAdding] = useState(false);
@@ -53,6 +69,7 @@ function App(): React.JSX.Element {
     // decide what this one hides or how it is sorted.
     const onFileLoaded = useCallback(() => {
         setSort(null);
+        setHiddenLanguages(null);
         setBaseline([]);
         setShowInherited(false);
         setSelected(null);
@@ -70,7 +87,8 @@ function App(): React.JSX.Element {
     });
 
     const {
-        rows, languages, error, loaded, queue, problems, validation, stage, save, validate,
+        rows, languages, setLanguages, canAddLanguage, supportedLanguages, error, loaded, queue,
+        problems, validation, stage, save, validate,
     } = panel;
 
     /** Adds a fully formed entry from the dialog. Position is never asked for. */
@@ -110,19 +128,29 @@ function App(): React.JSX.Element {
         }
     }, [baseline, languages, stage]);
 
+    // Read by toggleLanguage, which must not be re-created on every row change.
+    const rowsRef = useRef(rows);
+    const languagesRef = useRef(languages);
+    rowsRef.current = rows;
+    languagesRef.current = languages;
+
     /** Entries identical to what a lower layer already provides. */
     const inherited = useMemo(
         () => findInheritedKeys(rows, baseline, languages),
         [rows, baseline, languages]);
 
+    // Compiled once per filter change rather than once per row: this is the same pattern for every
+    // row, and rebuilding it 19,000 times a keystroke is what made typing here stall.
+    const rowFilter = useMemo(
+        () => buildRowFilter(appliedFilter, mode, scope), [appliedFilter, mode, scope]);
+
     // Hide inherited, then filter, then order. All three are projections over the staged rows;
     // edits address entries by key, so none of them can move an edit onto the wrong entry.
     const visible = useMemo(
         () => sortRows(
-            hideInherited(rows, inherited, showInherited)
-                .filter(row => matchesFilter(row, filter, mode, scope)),
+            hideInherited(rows, inherited, showInherited).filter(rowFilter.test),
             sort),
-        [rows, inherited, showInherited, filter, mode, scope, sort]);
+        [rows, inherited, showInherited, rowFilter, sort]);
 
     const problemKeys = useMemo(() => {
         const byKey = new Map<string, LocProblem>();
@@ -159,9 +187,34 @@ function App(): React.JSX.Element {
     }, [rows, inherited]);
 
     // One template for the header and every row, so the columns cannot drift apart.
+    const hidden = useMemo(
+        () => hiddenLanguages ?? new Set(emptyLanguages(rows, languages)),
+        [hiddenLanguages, rows, languages]);
+
+    const shownLanguages = useMemo(
+        () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
+
+    // A trailing track for the column picker, which sits at the right-hand end of the header.
     const columns = useMemo(
-        () => `260px ${languages.map(() => 'minmax(160px, 1fr)').join(' ')}`,
-        [languages]);
+        () => `260px ${shownLanguages.map(() => 'minmax(160px, 1fr)').join(' ')} 32px`,
+        [shownLanguages]);
+
+    /**
+     * Hides or shows a language column.
+     *
+     * Hiding the column the search is scoped to would leave the grid filtered by something the user
+     * can no longer see - the results would look arbitrary - so the scope goes back to everything.
+     */
+    const toggleLanguage = useCallback((language: string, visible: boolean) => {
+        setHiddenLanguages(current => {
+            // Materialises the default on first use, so choosing one column does not silently
+            // reveal every other one that was hidden for being empty.
+            const next = new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current));
+            if (visible) { next.delete(language); } else { next.add(language); }
+            return next;
+        });
+        if (!visible) { setScope(s => (s === language ? 'all' : s)); }
+    }, []);
 
     if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
     if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
@@ -205,7 +258,7 @@ function App(): React.JSX.Element {
     const header = (
         <>
             <HeadCell label="Key" column="key" sort={sort} onSort={setSort} />
-            {languages.map(language => (
+            {shownLanguages.map(language => (
                 <HeadCell
                     key={language}
                     label={language}
@@ -214,6 +267,7 @@ function App(): React.JSX.Element {
                     onSort={setSort}
                 />
             ))}
+            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage} />
         </>
     );
 
@@ -225,7 +279,7 @@ function App(): React.JSX.Element {
                     onCommit={next => stage({ kind: 'renameKey', key: row.key, newKey: next })}
                 />
             </div>
-            {languages.map(language => (
+            {shownLanguages.map(language => (
                 <div className="cell" key={language}>
                     <CellInput
                         value={valueOf(row, language)}
@@ -266,6 +320,57 @@ function App(): React.JSX.Element {
 
     const dockContent = (
         <>
+            <LocDockActions
+                languages={languages}
+                canAddLanguage={canAddLanguage}
+                supportedLanguages={supportedLanguages}
+                rowCount={rows.length}
+                baselineFillCount={language => languageFillValues(language, rows, baseline).length}
+                onAddLanguage={(language, fillFromBaseline) => {
+                    stage({ kind: 'addLanguage', language });
+                    setLanguages(current => [...current, language]);
+                    // Explicit from here on, so the column just added is not hidden for being empty.
+                    setHiddenLanguages(current =>
+                        new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current)));
+
+                    // Staged as ordinary edits, so the filled text is visible in the grid before it
+                    // is saved and is discarded with everything else if the tab is abandoned.
+                    if (fillFromBaseline) {
+                        const filled = languageFillValues(language, rows, baseline);
+
+                        // Filling from the baseline makes those entries match the layer below in
+                        // every language - which is the definition of inherited, so with inherited
+                        // entries hidden they would drop off screen the moment the column arrived.
+                        // Adding a language must not look like losing most of the file.
+                        if (filled.length > 0) { setShowInherited(true); }
+
+                        for (const value of filled) {
+                            stage({ kind: 'setValue', key: value.key, language, value: value.value });
+                        }
+                    }
+                }}
+                copyLanguageCount={(from, to) => languageCopyValues(from, to, rows).length}
+                onCopyLanguage={(from, to) => {
+                    for (const copied of languageCopyValues(from, to, rows)) {
+                        stage({ kind: 'setValue', key: copied.key, language: to, value: copied.value });
+                    }
+                }}
+                baselineFillCountFor={language => languageFillValues(language, rows, baseline).length}
+                onFillFromBaseline={language => {
+                    const filled = languageFillValues(language, rows, baseline);
+                    // Same reason as the add-language fill: these entries now match the layer below
+                    // in every language, so hiding inherited entries would make them vanish as they
+                    // arrive.
+                    if (filled.length > 0) { setShowInherited(true); }
+                    for (const value of filled) {
+                        stage({ kind: 'setValue', key: value.key, language, value: value.value });
+                    }
+                }}
+                onConvertFormat={(format: ConvertibleFormat) =>
+                    post({ type: 'convertFormat', targetFormat: format })}
+                onExportDat={() => post({ type: 'exportDat' })}
+            />
+
             {/* A repeated key is an error the validator reports: only one of the two would ever be
                 read. Row counts live under the table, where they describe it. */}
             {duplicateCount > 0 && (
@@ -278,53 +383,31 @@ function App(): React.JSX.Element {
     );
 
     const dockOverview = (
-        <>
-            <input
-                type="text"
-                className="filter"
-                placeholder={placeholderFor(mode)}
-                value={filter}
-                onChange={e => setFilter(e.target.value)}
-            />
-
-            <div className="mode-group">
-                {(['text', 'wildcard', 'regex'] as FilterMode[]).map(m => (
-                    <button
-                        key={m}
-                        className={`icon-btn${mode === m ? ' active' : ''}`}
-                        title={titleFor(m)}
-                        aria-label={m}
-                        aria-pressed={mode === m}
-                        onClick={() => setMode(m)}
-                    >
-                        <span className={`codicon codicon-${iconFor(m)}`} />
-                    </button>
-                ))}
-            </div>
-
-            <div className="filters-below">
-                <select value={scope} onChange={e => setScope(e.target.value)} title="Search in">
-                    <option value="all">All fields</option>
-                    <option value="key">Key only</option>
-                    {languages.map(language => (
-                        <option key={language} value={language}>{language}</option>
-                    ))}
-                </select>
-
-                <label
-                    className="inherited-toggle"
-                    title="Show entries whose value is identical to the layer below this file"
-                >
-                    <input
-                        type="checkbox"
-                        checked={showInherited}
-                        onChange={e => setShowInherited(e.target.checked)}
-                    />
-                    Inherited
-                    {inherited.size > 0 && <span className="badge">{inherited.size}</span>}
-                </label>
-            </div>
-        </>
+        <LocSearch
+            filter={filter}
+            onFilter={setFilter}
+            mode={mode}
+            onMode={setMode}
+            scope={scope}
+            onScope={setScope}
+            languages={languages}
+            error={rowFilter.error}
+            placeholders={PLACEHOLDERS}
+            keyScopeLabel="Key only"
+        >
+            <label
+                className="inherited-toggle"
+                title="Show entries whose value is identical to the layer below this file"
+            >
+                <input
+                    type="checkbox"
+                    checked={showInherited}
+                    onChange={e => setShowInherited(e.target.checked)}
+                />
+                Inherited
+                {inherited.size > 0 && <span className="badge">{inherited.size}</span>}
+            </label>
+        </LocSearch>
     );
 
     return (
@@ -580,19 +663,10 @@ function valueOf(row: LocRow, language: string): string {
     return row.values.find(v => v.language === language)?.value ?? '';
 }
 
-function iconFor(mode: FilterMode): string {
-    return mode === 'text' ? 'case-sensitive' : mode === 'wildcard' ? 'star-full' : 'regex';
-}
 
-function titleFor(mode: FilterMode): string {
-    return mode === 'text' ? 'Plain text search'
-        : mode === 'wildcard' ? 'Wildcard: * matches any text, ? matches one character'
-            : 'Regular expression (case-insensitive)';
-}
 
-function placeholderFor(mode: FilterMode): string {
-    return mode === 'wildcard' ? 'TEXT_UNIT_*' : mode === 'regex' ? '^TEXT_.*' : 'Filter rows...';
-}
+// Examples from this file's own vocabulary.
+const PLACEHOLDERS: Record<FilterMode, string> = { text: 'Filter rows...', wildcard: 'TEXT_*_NAME', regex: '^TEXT_.*NAME$' };
 
 // Covers the whole editor rather than the grid alone, so the dialog cannot be scrolled away from
 // or edited around while it is open.

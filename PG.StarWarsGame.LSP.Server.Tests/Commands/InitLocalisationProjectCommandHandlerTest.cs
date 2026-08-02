@@ -34,7 +34,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     {
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
-        var (handler, fs, reload, writer) = BuildHandler(
+        var (handler, fs, reload, writer, _) = BuildHandler(
             ConfiguredLayer("Csv", "/mod/data/text"), lspConfig: config);
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
@@ -49,7 +49,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_RootLayerConfigured_CreatesFileAtItsOwnDirectoryAndFormat()
     {
-        var (handler, fs, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
+        var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -61,7 +61,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     {
         // Even if the client (mistakenly, or from stale state) sends a different format, the
         // project's own declared format wins.
-        var (handler, fs, _, _) = BuildHandler(ConfiguredLayer("Xml", "/mod/data/text"));
+        var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer("Xml", "/mod/data/text"));
 
         await handler.Handle(BootstrapRequest("Nls", "some/other/dir"), CancellationToken.None);
 
@@ -72,7 +72,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_RootLayerConfigured_DoesNotWriteToPgproj()
     {
-        var (handler, _, _, writer) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
+        var (handler, _, _, writer, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -82,7 +82,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_RootLayerConfigured_TriggersLocalisationOnlyReload_NotFullReload()
     {
-        var (handler, _, reload, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
+        var (handler, _, reload, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -97,7 +97,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("EXISTING")
         });
-        var (handler, fs, reload, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"), mockFs);
+        var (handler, fs, reload, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"), mockFs);
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -112,7 +112,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [InlineData("Nls", "MasterTextFile.properties")]
     public async Task Handle_RootLayerConfigured_EachFormat_CreatesExpectedFile(string format, string fileName)
     {
-        var (handler, fs, _, _) = BuildHandler(ConfiguredLayer(format, "/mod/data/text"));
+        var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer(format, "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -122,7 +122,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_RootLayerConfigured_CsvContent_ContainsBaselineKeys()
     {
-        var (handler, fs, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
+        var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -134,7 +134,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_RootLayerConfigured_XmlContent_IsWellFormedWithEntries()
     {
-        var (handler, fs, _, _) = BuildHandler(ConfiguredLayer("Xml", "/mod/data/text"));
+        var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer("Xml", "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -146,7 +146,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_RootLayerConfigured_UnsupportedFormat_NoFileCreated()
     {
-        var (handler, fs, reload, writer) = BuildHandler(ConfiguredLayer("Dat", "/mod/data/text"));
+        var (handler, fs, reload, writer, _) = BuildHandler(ConfiguredLayer("Dat", "/mod/data/text"));
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
@@ -161,7 +161,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_MissingDirectory_NoFileCreated()
     {
-        var (handler, fs, reload, writer) = BuildHandler(BootstrapLayer());
+        var (handler, fs, reload, writer, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(FormatOnlyRequest("Csv"), CancellationToken.None);
 
@@ -173,7 +173,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_MissingFormat_NoFileCreated()
     {
-        var (handler, fs, reload, writer) = BuildHandler(BootstrapLayer());
+        var (handler, fs, reload, writer, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(DirectoryOnlyRequest("data/text"), CancellationToken.None);
 
@@ -187,7 +187,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     {
         // No resolved project at all (heuristic/no-.pgproj mode) - nothing to write a
         // localisation node into, so bootstrap is impossible.
-        var (handler, fs, reload, writer) = BuildHandler(null);
+        var (handler, fs, reload, writer, _) = BuildHandler(null);
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
@@ -199,7 +199,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_ValidFormatAndDirectory_CreatesFileRelativeToPgproj()
     {
-        var (handler, fs, _, _) = BuildHandler(BootstrapLayer());
+        var (handler, fs, _, _, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
@@ -209,7 +209,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_ValidFormatAndDirectory_WritesLocalisationNodeToPgproj()
     {
-        var (handler, _, _, writer) = BuildHandler(BootstrapLayer());
+        var (handler, _, _, writer, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
@@ -222,7 +222,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_ValidFormatAndDirectory_TriggersFullReload_NotLocalisationOnly()
     {
-        var (handler, _, reload, _) = BuildHandler(BootstrapLayer());
+        var (handler, _, reload, _, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
@@ -237,7 +237,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         {
             ["/mod/data/text/MasterTextFile.csv"] = new("EXISTING")
         });
-        var (handler, fs, reload, writer) = BuildHandler(BootstrapLayer(), mockFs);
+        var (handler, fs, reload, writer, _) = BuildHandler(BootstrapLayer(), mockFs);
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
@@ -249,7 +249,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NoExistingConfig_UnsupportedFormat_NoFileCreated_NoPgprojWrite()
     {
-        var (handler, fs, reload, writer) = BuildHandler(BootstrapLayer());
+        var (handler, fs, reload, writer, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(BootstrapRequest("Dat", "data/text"), CancellationToken.None);
 
@@ -261,7 +261,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     [Fact]
     public async Task Handle_NullArguments_NoExistingConfig_NoFileCreated()
     {
-        var (handler, fs, reload, writer) = BuildHandler(BootstrapLayer());
+        var (handler, fs, reload, writer, _) = BuildHandler(BootstrapLayer());
 
         await handler.Handle(new ExecuteCommandParams
         {
@@ -271,6 +271,90 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         Assert.Empty(fs.AllFiles);
         Assert.False(reload.FullyReloaded);
         Assert.Null(writer.LastCall);
+    }
+
+    // ── what the user is told ────────────────────────────────────────────────
+    //
+    // Every bail-out below used to be a LogWarning and nothing else, while the client showed
+    // "Localisation project initialised." the moment the request returned - it has no result to
+    // inspect, so it could only guess. Success and total no-op were indistinguishable from the
+    // outside, which is the whole reason this command was reported as doing nothing.
+
+    [Fact]
+    public async Task Handle_Success_TellsTheUserWhatWasCreated()
+    {
+        var (handler, _, _, _, notifier) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"));
+
+        await handler.Handle(NoArgsRequest(), CancellationToken.None);
+
+        Assert.Empty(notifier.Errors);
+        Assert.Contains("MasterTextFile.csv", Assert.Single(notifier.Infos), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Handle_LocalisationFlagOff_TellsTheUserWhy()
+    {
+        var config = FakeLspConfigurationProvider.WithFeatures(
+            new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
+        var (handler, _, _, _, notifier) = BuildHandler(
+            ConfiguredLayer("Csv", "/mod/data/text"), lspConfig: config);
+
+        await handler.Handle(NoArgsRequest(), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Single(notifier.Errors);
+    }
+
+    // The likeliest one to hit in practice: run Initialise twice. It refused, said nothing, and the
+    // client still reported success.
+    [Fact]
+    public async Task Handle_FileAlreadyExists_TellsTheUserItWasNotOverwritten()
+    {
+        var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.csv"] = new("EXISTING")
+        });
+        var (handler, _, _, _, notifier) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"), mockFs);
+
+        await handler.Handle(NoArgsRequest(), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains("MasterTextFile.csv", message, StringComparison.Ordinal);
+        Assert.Contains("exists", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_UnsupportedFormat_TellsTheUserWhichFormat()
+    {
+        var (handler, _, _, _, notifier) = BuildHandler(ConfiguredLayer("Dat", "/mod/data/text"));
+
+        await handler.Handle(NoArgsRequest(), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Contains("Dat", Assert.Single(notifier.Errors), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task Handle_NoExistingConfig_MissingFormatOrDirectory_TellsTheUser()
+    {
+        var (handler, _, _, _, notifier) = BuildHandler(BootstrapLayer());
+
+        await handler.Handle(FormatOnlyRequest("Csv"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Single(notifier.Errors);
+    }
+
+    [Fact]
+    public async Task Handle_NoPgproj_TellsTheUser()
+    {
+        var (handler, _, _, _, notifier) = BuildHandler(null);
+
+        await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
+
+        Assert.Empty(notifier.Infos);
+        Assert.Contains("pgproj", Assert.Single(notifier.Errors), StringComparison.OrdinalIgnoreCase);
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
@@ -322,7 +406,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     }
 
     private static (InitLocalisationProjectCommandHandler handler, MockFileSystem fs,
-        SpyReloadService reload, SpyFileWriter writer) BuildHandler(
+        SpyReloadService reload, SpyFileWriter writer, RecordingUserNotifier notifier) BuildHandler(
             ProjectLayer? rootLayer, MockFileSystem? initialFs = null,
             ILspConfigurationProvider? lspConfig = null)
     {
@@ -346,6 +430,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             sp.GetRequiredService<IPropertiesTranslationExporter>(),
             sp.GetRequiredService<ILanguageService>(),
             new FileHelper(mockFs));
+        var notifier = new RecordingUserNotifier();
         var handler = new InitLocalisationProjectCommandHandler(
             sp.GetRequiredService<IBaselineTranslationProvider>(),
             sp.GetRequiredService<ITranslationDatabaseFactory>(),
@@ -355,9 +440,10 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             writer,
             seedWriter,
             NullLogger<InitLocalisationProjectCommandHandler>.Instance,
-            lspConfig ?? new FakeLspConfigurationProvider());
+            lspConfig ?? new FakeLspConfigurationProvider(),
+            notifier);
 
-        return (handler, mockFs, reload, writer);
+        return (handler, mockFs, reload, writer, notifier);
     }
 
     private sealed class SpyReloadService : IModProjectReloadService

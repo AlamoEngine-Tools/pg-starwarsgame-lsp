@@ -37,6 +37,22 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         _fileHelper = fileHelper;
     }
 
+    /// <summary>
+    ///     Whether a file in this format can hold more than one language, and so can be given
+    ///     another language column.
+    /// </summary>
+    /// <remarks>
+    ///     The two that cannot are single-language by construction: a <c>.properties</c> file has no
+    ///     way to name a second language, and a <c>.dat</c> carries its one language in its file
+    ///     name. Both <c>addLanguage</c> refusals below defer to this, and so does the read endpoint
+    ///     that tells the client whether to offer the action at all - the list of formats lives here
+    ///     only.
+    /// </remarks>
+    public static bool SupportsMultipleLanguages(string extension)
+    {
+        return extension.ToLowerInvariant() is not (".properties" or ".dat");
+    }
+
     public async Task<LocalisationEditResult> ApplyToFileAsync(
         string filePath, IReadOnlyList<LocEditCommandDto> commands, CancellationToken ct)
     {
@@ -86,6 +102,52 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         }
 
         return Apply(fs.File.ReadAllText(filePath), extension, commands);
+    }
+
+    /// <inheritdoc />
+    public (IReadOnlyList<LocRowDto> Rows, IReadOnlyList<string> Languages, string? Error) DryRunRows(
+        string filePath, IReadOnlyList<LocEditCommandDto> commands)
+    {
+        var fs = _fileHelper.FileSystem;
+        var extension = fs.Path.GetExtension(filePath).ToLowerInvariant();
+
+        LocDocument document;
+        try
+        {
+            document = _reader.ReadFile(filePath);
+        }
+        catch (Exception ex)
+        {
+            return ([], [], $"Failed to read the file: {ex.Message}");
+        }
+
+        // Applied to the rows in memory rather than by composing and re-reading: a .dat has no text
+        // to compose, and for the others a second parse would buy nothing here.
+        var rows = document.Rows.ToList();
+        var languages = document.Languages.ToList();
+
+        for (var i = 0; i < commands.Count; i++)
+        {
+            var command = commands[i];
+
+            // addLanguage changes the language list, not a row - ApplyToRows does not own that list
+            // and refuses the command outright. Handled here instead: the new language is added and
+            // every row is left without a value for it, which is exactly the state the coverage
+            // check should see (a column added and not yet filled in).
+            if (string.Equals(command.Kind, "addLanguage", StringComparison.Ordinal))
+            {
+                if (!string.IsNullOrWhiteSpace(command.Language)
+                    && !languages.Contains(command.Language, StringComparer.OrdinalIgnoreCase))
+                    languages.Add(command.Language);
+
+                continue;
+            }
+
+            if (ApplyToRows(rows, command, languages) is { } error)
+                return ([], [], $"Change {i + 1}: {error}");
+        }
+
+        return (rows, languages, null);
     }
 
     /// <inheritdoc />
@@ -313,6 +375,29 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         return writer.ToString();
     }
 
+    /// <summary>
+    ///     Adds a translation element after the ones already there, indented to match.
+    /// </summary>
+    /// <remarks>
+    ///     The document is parsed and written with whitespace preserved, so a new element carries
+    ///     none of its own: without copying the indentation in front of a sibling it would land
+    ///     inline, and adding one language would show up in a diff as the whole row reformatted.
+    /// </remarks>
+    private static void AppendTranslation(XElement data, XElement translation)
+    {
+        var last = data.Elements().LastOrDefault();
+        if (last is null)
+        {
+            data.Add(translation);
+            return;
+        }
+
+        if (last.PreviousNode is XText indent && string.IsNullOrWhiteSpace(indent.Value))
+            last.AddAfterSelf(new XText(indent.Value), translation);
+        else
+            last.AddAfterSelf(translation);
+    }
+
     private static string? ApplyXmlCommand(LocEditCommandDto command, List<XElement> rows, XNamespace ns)
     {
         if (command.Kind == "addLanguage")
@@ -331,13 +416,31 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         switch (command.Kind)
         {
             case "setCell":
-                var translation = element
-                    .Elements(ns + "TranslationData")
+                if (string.IsNullOrWhiteSpace(command.Language)) return "No language given.";
+
+                var data = element.Elements(ns + "TranslationData").FirstOrDefault();
+                if (data is null)
+                {
+                    data = new XElement(ns + "TranslationData");
+                    element.Add(data);
+                }
+
+                var translation = data
                     .Elements(ns + "Translation")
                     .FirstOrDefault(e => string.Equals(
                         e.Attribute("Language")?.Value, command.Language, StringComparison.OrdinalIgnoreCase));
 
-                if (translation is null) return $"Row {index} has no '{command.Language}' translation.";
+                // A language exists in this format only where a value does - there is no column list
+                // to extend, which is why addLanguage has nothing to do here. So writing a value for
+                // a language the row does not carry yet is how that language comes into existence.
+                // Refusing instead meant every write to a newly added language failed on save.
+                if (translation is null)
+                {
+                    translation = new XElement(ns + "Translation",
+                        new XAttribute("Language", command.Language));
+                    AppendTranslation(data, translation);
+                }
+
                 translation.Value = command.Value ?? string.Empty;
                 return null;
 
@@ -530,8 +633,8 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         {
             if (string.IsNullOrWhiteSpace(command.Language)) return "No language given.";
 
-            if (_extension == ".properties")
-                return ".properties files are single-language and cannot take another column.";
+            if (!SupportsMultipleLanguages(_extension))
+                return $"{_extension} files are single-language and cannot take another column.";
 
             if (_languages.Any(l => string.Equals(l, command.Language, StringComparison.OrdinalIgnoreCase)))
                 return $"'{command.Language}' is already a language in this file.";

@@ -25,14 +25,17 @@ public sealed class ApplyTranslationBatchHandler
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ApplyTranslationBatchHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
+    private readonly ILocalisationWriteLedger _writeLedger;
 
     public ApplyTranslationBatchHandler(
         ILocalisationDocumentEditor editor,
         IModProjectReloadService reloadService,
         IFileHelper fileHelper,
         ILogger<ApplyTranslationBatchHandler> logger,
-        ILspConfigurationProvider config)
+        ILspConfigurationProvider config,
+        ILocalisationWriteLedger writeLedger)
     {
+        _writeLedger = writeLedger;
         _editor = editor;
         _reloadService = reloadService;
         _fileHelper = fileHelper;
@@ -81,13 +84,18 @@ public sealed class ApplyTranslationBatchHandler
         if (!result.Success)
             return new ApplyTranslationBatchResult(false, result.FailedIndex, result.Error);
 
-        await _reloadService.ReloadLocalisationAsync(ct);
-
         // Read back rather than hashing composed text, because a binary format has no composed text
         // to hash. The guard reads the file the same way, so the two always agree.
         var written = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
-        return new ApplyTranslationBatchResult(true,
-            NewContentHash: LocalisationContentHash.Compute(written));
+        var writtenHash = LocalisationContentHash.Compute(written);
+
+        // Recorded before the reload, so the watcher event for this write - which can arrive at any
+        // point after it - is recognised as our own and does not reload everything a second time.
+        _writeLedger.Record(request.ProjectFilePath, writtenHash);
+
+        await _reloadService.ReloadLocalisationAsync(ct);
+
+        return new ApplyTranslationBatchResult(true, NewContentHash: writtenHash);
     }
 
     private static ApplyTranslationBatchResult Fail(string error)

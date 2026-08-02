@@ -117,6 +117,11 @@
           "command": "aet-eaw-edit.lsp.exportLocalisationToDat",
           "when": "view == aet-eaw-edit.lsp.localisationNavigator && viewItem =~ /^aetLocFile/",
           "group": "aetLoc@2"
+        },
+        {
+          "command": "aet-eaw-edit.lsp.convertLocalisationFormat",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator && viewItem =~ /^aetLocFile/",
+          "group": "aetLoc@3"
         }
       ]
     },
@@ -190,6 +195,11 @@
       {
         "command": "aet-eaw-edit.lsp.exportLocalisationToDat",
         "title": "EaWEdit: Export Localisation to DAT",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.convertLocalisationFormat",
+        "title": "EaWEdit: Convert Localisation File to Another Format",
         "enablement": "config.aet-eaw-edit.features.tools.localisation"
       },
       {
@@ -617,13 +627,13 @@
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
-    "@types/node": "25.9.3",
-    "@types/react": "^18.3.31",
-    "@types/react-dom": "^18.3.7",
+    "@types/node": "^26.1.2",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
     "@types/vscode": "^1.107.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
-    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
     "@vscode/vsce": "^3.5.0",
     "esbuild": "^0.28.1",
@@ -634,8 +644,8 @@
     "@tanstack/react-virtual": "^3.14.9",
     "@vscode/codicons": "^0.0.45",
     "elkjs": "^0.8.2",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "rete": "^2.0.6",
     "rete-area-plugin": "^2.3.2",
     "rete-auto-arrange-plugin": "^2.0.2",

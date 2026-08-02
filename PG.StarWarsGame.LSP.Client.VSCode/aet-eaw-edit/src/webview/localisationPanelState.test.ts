@@ -112,6 +112,51 @@ describe('LocalisationPanelState', () => {
         assert.equal(state.contentHash, 'hash-2');
     });
 
+    // ── re-delivery ──────────────────────────────────────────────────────────
+    //
+    // A save triggers a localisation reload on the server, and the OS file watcher then reports the
+    // very same write - so one save produced two "the index moved" notifications, each making every
+    // open tab re-read the file and hand the webview 19,000 rows again. Re-rendering that also
+    // resets the tab (selection, sort, inherited toggle) and re-fetches the baseline. Nothing about
+    // the file changed, so none of it should happen.
+
+    it('does not re-deliver a file whose contents have not changed', () => {
+        const state = new LocalisationPanelState();
+        state.noteRead('hash-1');
+
+        assert.equal(state.shouldDeliver('hash-1'), false);
+    });
+
+    it('delivers when the contents did change', () => {
+        const state = new LocalisationPanelState();
+        state.noteRead('hash-1');
+
+        assert.equal(state.shouldDeliver('hash-2'), true);
+    });
+
+    it('delivers the first read', () => {
+        assert.equal(new LocalisationPanelState().shouldDeliver('hash-1'), true);
+    });
+
+    // Without a hash there is nothing to compare, so the read has to go through - suppressing it
+    // would leave a tab showing nothing at all.
+    it('delivers when there is no hash to compare', () => {
+        const state = new LocalisationPanelState();
+        state.noteRead('hash-1');
+
+        assert.equal(state.shouldDeliver(undefined), true);
+    });
+
+    // A save adopts the hash it wrote. The watcher echo that follows carries that same hash, and
+    // must not be mistaken for someone else editing the file.
+    it('does not re-deliver the hash a save just adopted', () => {
+        const state = new LocalisationPanelState();
+        state.noteRead('hash-1');
+        state.noteSaved('hash-2');
+
+        assert.equal(state.shouldDeliver('hash-2'), false);
+    });
+
     it('exposes the queue for a save', () => {
         const state = new LocalisationPanelState();
         const queue = [command(0), command(1)];

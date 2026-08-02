@@ -71,6 +71,52 @@ public sealed class GetLocalisationRowsHandlerTest
         });
     }
 
+    // ── whether another language can be added ────────────────────────────────
+    //
+    // The rule lives in LocalisationDocumentEditor, which refuses per format. The client needs it
+    // before it offers the action, and duplicating an extension list in TypeScript is how the two
+    // drift apart.
+
+    [Fact]
+    public async Task Handle_CsvFile_CanTakeAnotherLanguage()
+    {
+        var handler = BuildHandler(Files());
+
+        var result = await handler.Handle(new GetLocalisationRowsParams(CsvPath), CancellationToken.None);
+
+        Assert.True(result.CanAddLanguage);
+    }
+
+    [Fact]
+    public async Task Handle_PropertiesFile_CannotTakeAnotherLanguage()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            ["/mod/data/text/MasterTextFile.properties"] = new("TEXT_A=Alpha\n")
+        });
+        var handler = BuildHandler(fs);
+
+        var result = await handler.Handle(
+            new GetLocalisationRowsParams("/mod/data/text/MasterTextFile.properties"), CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.False(result.CanAddLanguage);
+    }
+
+    // A credits file may hold several languages, and normally should: the DAT export writes one
+    // CreditsText_<LANGUAGE>.dat per language it finds, so one authoring file produces every crawl.
+    // The engine's per-language DAT constrains the export, not the file being edited.
+    [Fact]
+    public async Task Handle_CreditsFile_CanTakeAnotherLanguage()
+    {
+        var handler = BuildHandler(Files());
+
+        var result = await handler.Handle(new GetLocalisationRowsParams(CreditsPath), CancellationToken.None);
+
+        Assert.Equal(LocCategory.Credits, result.Category);
+        Assert.True(result.CanAddLanguage);
+    }
+
     // ── category and ordering ────────────────────────────────────────────────
 
     [Fact]

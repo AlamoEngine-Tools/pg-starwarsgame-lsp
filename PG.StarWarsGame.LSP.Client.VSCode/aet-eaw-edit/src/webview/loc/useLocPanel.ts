@@ -39,8 +39,21 @@ export interface LocPanel<C> {
     rows: LocRow[];
     setRows: React.Dispatch<React.SetStateAction<LocRow[]>>;
     languages: string[];
+    /**
+     * Adds a language column locally, alongside staging the command.
+     *
+     * The staged rows gain their empty cell from applyStaged, but the column list comes from the
+     * server and would not catch up until the next read - so the column the user just asked for
+     * would not appear until after Save, which looks exactly like the button doing nothing.
+     */
+    setLanguages: React.Dispatch<React.SetStateAction<string[]>>;
     ordered: boolean;
     category: string;
+    /** Whether this file's format can hold more than one language. The server decides; see
+     *  LocalisationDocumentEditor.SupportsMultipleLanguages. */
+    canAddLanguage: boolean;
+    /** The languages the engine officially supports - the only ones worth adding. */
+    supportedLanguages: string[];
     error: string | null;
     loaded: boolean;
 
@@ -69,6 +82,8 @@ export function useLocPanel<C>(options: {
     const [languages, setLanguages] = useState<string[]>([]);
     const [ordered, setOrdered] = useState(false);
     const [category, setCategory] = useState('text');
+    const [canAddLanguage, setCanAddLanguage] = useState(false);
+    const [supportedLanguages, setSupportedLanguages] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
 
@@ -90,6 +105,8 @@ export function useLocPanel<C>(options: {
                     setLanguages(msg.languages as string[]);
                     setOrdered(msg.ordered as boolean);
                     setCategory(msg.category as string);
+                    setCanAddLanguage(msg.canAddLanguage === true);
+                    setSupportedLanguages((msg.supportedLanguages as string[]) ?? []);
                     setQueue([]);
                     setProblems([]);
                     setValidation('unvalidated');
@@ -166,7 +183,8 @@ export function useLocPanel<C>(options: {
     }, [queue, coalesce]);
 
     return {
-        rows, setRows, languages, ordered, category, error, loaded,
+        rows, setRows, languages, setLanguages, ordered, category, canAddLanguage,
+        supportedLanguages, error, loaded,
         queue, problems, validation,
         stage, save, validate,
         post: message => vscode.postMessage(message),

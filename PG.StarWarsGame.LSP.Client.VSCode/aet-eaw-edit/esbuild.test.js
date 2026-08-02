@@ -14,7 +14,7 @@ const path = require('path');
 
 const watch = process.argv.includes('--watch');
 
-/** Every *.test.ts under src/webview, so adding a test file needs no build change. */
+/** Every *.test.ts under src, so adding a test file needs no build change. */
 function findTests(dir) {
     const results = [];
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -29,9 +29,9 @@ function findTests(dir) {
 }
 
 async function main() {
-    const entryPoints = findTests(path.join(__dirname, 'src', 'webview'));
+    const entryPoints = findTests(path.join(__dirname, 'src'));
     if (entryPoints.length === 0) {
-        console.error('No *.test.ts found under src/webview.');
+        console.error('No *.test.ts found under src.');
         process.exit(1);
     }
 

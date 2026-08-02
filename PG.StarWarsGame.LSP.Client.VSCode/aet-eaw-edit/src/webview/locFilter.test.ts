@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { buildMatcher, FilterRow, matchesFilter } from './locFilter';
+import { buildMatcher, buildRowFilter, compileMatcher, FilterRow, matchesFilter } from './locFilter';
 
 function row(key: string, values: Record<string, string>): FilterRow {
     return { key, values: Object.entries(values).map(([language, value]) => ({ language, value })) };
@@ -64,6 +64,71 @@ describe('buildMatcher', () => {
         const match = buildMatcher('([unclosed', 'regex');
 
         assert.equal(match('anything'), false);
+    });
+});
+
+describe('compileMatcher', () => {
+    // An invalid regex used to silently match nothing, so the grid emptied with no way to tell a
+    // typo from a pattern that genuinely has no hits.
+    it('reports why an invalid regex could not be compiled', () => {
+        const compiled = compileMatcher('([unclosed', 'regex');
+
+        assert.equal(typeof compiled.error, 'string');
+        assert.notEqual(compiled.error, '');
+    });
+
+    it('reports no error for a valid pattern', () => {
+        assert.equal(compileMatcher('^TEXT_', 'regex').error, undefined);
+        assert.equal(compileMatcher('A*B', 'wildcard').error, undefined);
+        assert.equal(compileMatcher('([unclosed', 'text').error, undefined);
+    });
+
+    // The behaviour is unchanged - an invalid pattern still matches nothing. Only now it says so.
+    it('still matches nothing for an invalid regex', () => {
+        assert.equal(compileMatcher('([unclosed', 'regex').test('anything'), false);
+    });
+});
+
+describe('buildRowFilter', () => {
+    // The reported hang: matchesFilter compiled a fresh RegExp for every row, so filtering a
+    // 19k-row file recompiled the same pattern 19k times per keystroke. The compiled filter must
+    // build its matcher once and reuse it across rows.
+    it('compiles the pattern once however many rows it is applied to', () => {
+        const originalRegExp = globalThis.RegExp;
+        let constructed = 0;
+        class CountingRegExp extends originalRegExp {
+            constructor(pattern: string | RegExp, flags?: string) {
+                super(pattern as string, flags);
+                constructed++;
+            }
+        }
+        (globalThis as { RegExp: unknown }).RegExp = CountingRegExp;
+        try {
+            const filter = buildRowFilter('TEXT_', 'regex', 'all');
+            constructed = 0;
+            for (let i = 0; i < 500; i++) { filter.test(sample); }
+        } finally {
+            (globalThis as { RegExp: unknown }).RegExp = originalRegExp;
+        }
+
+        assert.equal(constructed, 0);
+    });
+
+    it('matches the same rows matchesFilter does', () => {
+        for (const [pattern, mode, scope] of [
+            ['XWING', 'text', 'all'], ['Fighter', 'text', 'key'],
+            ['Fluegel', 'text', 'GERMAN'], ['^TEXT_', 'regex', 'all'],
+            ['TEXT_*', 'wildcard', 'key'], ['', 'text', 'all'],
+        ] as const) {
+            assert.equal(
+                buildRowFilter(pattern, mode, scope).test(sample),
+                matchesFilter(sample, pattern, mode, scope),
+                `${pattern} / ${mode} / ${scope}`);
+        }
+    });
+
+    it('carries the compile error so the box can show it', () => {
+        assert.equal(typeof buildRowFilter('([unclosed', 'regex', 'all').error, 'string');
     });
 });
 

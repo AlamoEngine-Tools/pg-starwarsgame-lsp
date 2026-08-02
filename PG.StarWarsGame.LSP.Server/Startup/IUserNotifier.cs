@@ -11,4 +11,13 @@ namespace PG.StarWarsGame.LSP.Server.Startup;
 public interface IUserNotifier
 {
     void ShowError(string message);
+
+    /// <summary>
+    ///     Reports that something the user asked for actually happened, and what it did. Needed
+    ///     wherever the client cannot tell success from a silent no-op on its own - a command whose
+    ///     only channel is <c>workspace/executeCommand</c> returns nothing to inspect, so without
+    ///     this the client can only guess, and guessing produced a success message for every
+    ///     failure.
+    /// </summary>
+    void ShowInfo(string message);
 }

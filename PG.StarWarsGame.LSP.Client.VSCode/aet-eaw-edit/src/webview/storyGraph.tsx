@@ -18,6 +18,7 @@ import {
     CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
+import { dockBodyCss, dockChromeCss, dockOverviewCss } from './shared/dockChrome';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
 import { useEdgeResize } from './useEdgeResize';
 import { createRoot } from 'react-dom/client';
@@ -1725,6 +1726,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 ctx.textBaseline = 'middle';
             }
             for (const m of graphModel.values()) {
+                // A mounted node draws itself; its stand-in rect would only sit behind it. For most
+                // nodes that is merely wasted paint, but a junction's box is transparent (the
+                // diamond is its shape), so the rect showed through as a coloured square around it.
+                if (mountedIds.has(m.dto.id)) { continue; }
+
                 const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
                 if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
                 const color = m.color;
@@ -1858,7 +1864,19 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     justify-content: center;
     padding: 2px 10px;
     cursor: pointer;
-    ${p => p.selected ? 'outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;' : ''}
+    /* The OR node's box is transparent - the rotated inner square is its shape - so outlining the
+       box draws a rectangle around a diamond. Outline the diamond instead: an outline on a rotated
+       element rotates with it. */
+    ${p => p.selected ? `
+        &:not(.k-OrJunction):not(.k-StagingOr) {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+        &.k-OrJunction .diamond, &.k-StagingOr .diamond {
+            outline: 2px solid var(--vscode-focusBorder);
+            outline-offset: 2px;
+        }
+    ` : ''}
 
     .title {
         font-size: 12px;
@@ -2880,6 +2898,12 @@ const GlobalStyle = createGlobalStyle`
         border-radius: 6px;
         z-index: 5;
     }
+    /* Same reason as the selection outline: on an OR node the ring belongs to the diamond, not to
+       the transparent box around it. */
+    .story-flash.k-OrJunction, .story-flash.k-StagingOr { animation: none; }
+    .story-flash.k-OrJunction .diamond, .story-flash.k-StagingOr .diamond {
+        animation: story-flash 0.8s ease-in-out 2;
+    }
 
     /* Server-backed suggestion dropdown (RefValueInput) - global because it renders both inside
        Event node bodies and in the toolbar's create forms. */
@@ -2951,6 +2975,8 @@ const GlobalStyle = createGlobalStyle`
 `;
 
 const Shell = styled.div`
+    ${dockChromeCss}
+
     height: 100%;
     display: flex;
     flex-direction: column;
@@ -3060,15 +3086,8 @@ const Shell = styled.div`
     .dock-header .header-right { position: absolute; right: 8px; }
     .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
     .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
-    .dock-overview {
-        flex-shrink: 0;
-        border-top: 1px solid var(--vscode-panel-border);
-        padding: 6px;
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-    }
-    .dock-overview > input[type=text] { width: 100%; }
+    ${dockBodyCss}
+    ${dockOverviewCss}
     /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
     /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
     .overview-mid { display: flex; align-items: center; gap: 10px; padding-right: 10px; }
@@ -3176,50 +3195,25 @@ const Shell = styled.div`
 
     /* ── Palette (dock content, Edit mode) ─────────────────────────────── */
     .palette-scroll { min-width: 0; }
-    .palette-scroll input[type=text] { width: 100%; margin-bottom: 10px; }
-    .palette-group { margin-bottom: 14px; }
+    .palette-scroll .dock-search { margin-bottom: 10px; }
     .palette-new {
         padding-bottom: 12px;
         border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
     }
-    .palette-head {
-        font-size: 11px;
-        font-weight: bold;
-        text-transform: uppercase;
-        color: var(--vscode-descriptionForeground);
-        margin-bottom: 7px;
-    }
-    .palette-head.toggle { display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
-    .palette-head.toggle:hover { color: var(--vscode-editor-foreground); }
-    .palette-head .palette-count { margin-left: auto; font-weight: normal; opacity: 0.6; }
+    .dock-section-title.toggle { cursor: pointer; user-select: none; }
+    .dock-section-title.toggle:hover { color: var(--vscode-editor-foreground); }
     /* Colour family: just a gap between groups - no box (the tile tint is the grouping). */
     .tile-family { margin-bottom: 7px; }
-    /* auto-rows keeps every tile the same (fixed-minimum) height, whatever its label wrapping. */
-    .tile-grid { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-rows: minmax(46px, auto); gap: 4px; }
+    /* Geometry comes from the shared dock chrome, so a palette tile is the same object as a tile in
+       the localisation docks. Only the colour is this editor's own: tiles are tinted by type family,
+       which is what makes the palette scannable. */
     .palette-tile {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 3px;
-        padding: 4px;
-        border: 1px solid;
-        border-radius: 4px;
+        border-style: solid;
+        border-width: 1px;
         cursor: grab;
-        overflow: hidden;
     }
     .palette-tile:hover { outline: 1px solid var(--vscode-focusBorder); }
-    .palette-tile .tile-glyph { font-size: 16px; line-height: 1; }
-    .palette-tile .tile-label {
-        font-size: 10px;
-        line-height: 1.15;
-        text-align: center;
-        width: 100%;
-        /* Never truncate a type name - wrap it instead. */
-        white-space: normal;
-        overflow-wrap: anywhere;
-        word-break: break-word;
-    }
+
     .palette-empty { font-size: 11px; color: var(--vscode-descriptionForeground); }
 
     /* ── Minimap (dock overview) ───────────────────────────────────────── */
@@ -3865,10 +3859,15 @@ function App(): JSX.Element {
                                 or Simulation to run it forward.</div> : null}
                     </div>
                     <div className="dock-overview">
-                        <input
-                            type="text" placeholder="Filter event names..." value={filters.nameFilter}
-                            onChange={e => setFilter({ nameFilter: e.target.value })}
-                        />
+                        <div className="dock-search">
+                            <div className="dock-section-title">Filter</div>
+                            <div className="search-field">
+                                <input
+                                    type="text" placeholder="Filter event names..." value={filters.nameFilter}
+                                    onChange={e => setFilter({ nameFilter: e.target.value })}
+                                />
+                            </div>
+                        </div>
                         <div className="overview-mid">
                             <div className="overview-tools">
                                 {anyFilter ? (
@@ -3947,7 +3946,10 @@ function App(): JSX.Element {
 }
 
 /** Session-remembered chrome sizes, so a re-mount (mode switch, sim restart) keeps the choice. */
-let paletteWidthMemo = 270;
+// Same default as the localisation editors' dock, and the same resize range - the two docks hold
+// the same kind of thing (a titled grid of tiles over a search block) and looked subtly unlike each
+// other only because this number was picked separately.
+let paletteWidthMemo = 300;
 let simBarHeightMemo = 140;
 
 /**
@@ -4415,7 +4417,7 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
         const color = stepColor(drag.category, drag.type);
         return (
             <div
-                key={key} className="palette-tile" draggable
+                key={key} className="dock-tile palette-tile" draggable
                 style={{ background: fadedBg(color), borderColor: color }}
                 onDragStart={e => onDragStart(e, drag)}
                 title={`${label}\n${hint}`}
@@ -4442,14 +4444,14 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
             if (list) { list.push(t); } else { families.set(c, [t]); }
         }
         return (
-            <div className="palette-group">
+            <div className="dock-section">
                 <div
-                    className="palette-head toggle"
+                    className="dock-section-title toggle"
                     onClick={() => setCollapsed(c => ({ ...c, [label]: !c[label] }))}
                     title={isCollapsed ? `Expand ${label}` : `Collapse ${label}`}
                 >
                     <span className={`codicon codicon-chevron-${isCollapsed ? 'right' : 'down'}`} /> {label}
-                    <span className="palette-count">{items.length}</span>
+                    <span className="section-count">{items.length}</span>
                 </div>
                 {isCollapsed ? null : [...families.entries()].map(([color, names]) => (
                     <div key={color} className="tile-family">
@@ -4464,12 +4466,16 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): JS
 
     return (
         <div className="palette-scroll">
-            <input
-                type="text" placeholder="Search node types..." value={search}
-                onChange={e => setSearch(e.target.value)}
-            />
+            <div className="dock-search">
+                <div className="search-field">
+                    <input
+                        type="text" placeholder="Search node types..." value={search}
+                        onChange={e => setSearch(e.target.value)}
+                    />
+                </div>
+            </div>
             {showBlank || showAndJunction || showOrJunction ? (
-                <div className="palette-group palette-new">
+                <div className="dock-section palette-new">
                     <div className="tile-grid">
                         {showBlank ? tile('blank', <span className="codicon codicon-add" />, 'New event',
                             { category: 'blank', type: null },

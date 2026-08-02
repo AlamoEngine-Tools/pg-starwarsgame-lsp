@@ -8,7 +8,7 @@
 // content. None of that can be named by key, which is why this editor and the translation editor
 // are separate programs over a shared grid rather than one grid deciding what kind of file it has.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { CreditsCrawl } from './creditsCrawl';
@@ -19,12 +19,21 @@ import {
 } from './creditsSteps';
 import { CellInput, menuAction, RowMenuFrame } from './loc/LocCells';
 import { gridFooterLabel } from './loc/gridFooter';
+import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
 import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
+import { LocColumnMenu } from './loc/LocColumnMenu';
+import { emptyLanguages } from './loc/columnVisibility';
+import { creditsBaselineValues } from './loc/creditsBaselineFill';
+import { BaselineEntryDto, BaselineRow, toBaselineRows } from './translationInherited';
+import { languageCopyValues } from './loc/languageCopy';
+import { LocTile, LocTileGrid } from './loc/LocTile';
+import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
 import { LocRow } from './loc/locRow';
+import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
 import { severityIconFor, validateTitle } from './loc/validateState';
-import { FilterMode, matchesFilter } from './locFilter';
+import { buildRowFilter, FilterMode } from './locFilter';
 
 /**
  * The drag payload: which kind of line is being placed.
@@ -36,6 +45,8 @@ const STEP_MIME = 'application/x-aet-credits-step';
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState('');
+    // What the box shows is immediate; what the grid applies waits for typing to settle.
+    const appliedFilter = useDebounced(filter, FILTER_DEBOUNCE_MS);
     const [mode, setMode] = useState<FilterMode>('text');
     const [scope, setScope] = useState('all');
     // Set when the crawl is playing over the editor itself, which is what the full-screen button
@@ -48,8 +59,26 @@ function App(): React.JSX.Element {
     // Driven from the editor title bar, where a preview button belongs and where Markdown and
     // LaTeX editors already put theirs.
     const onMessage = useCallback((msg: LocPanelMessage) => {
+        if (msg.type === 'baselineRows') {
+            setBaseline(toBaselineRows((msg.entries as BaselineEntryDto[]) ?? []));
+            return;
+        }
+
         if (msg.type !== 'requestCrawlRows') { return; }
         setPendingCrawl(msg.fullScreen ? 'fullScreen' : 'beside');
+    }, []);
+
+    // The game's own credits, for filling a language from what it already ships. Requested per
+    // file: the server answers with the credits baseline for a credits file and the MasterText one
+    // for a text file, so which arrives depends on what is open.
+    const [baseline, setBaseline] = useState<BaselineRow[]>([]);
+    // Null means "the user has not chosen", in which case the languages this file says nothing in
+    // are hidden - see the translation editor for the same rule.
+    const [hiddenLanguages, setHiddenLanguages] = useState<Set<string> | null>(null);
+    const onFileLoaded = useCallback(() => {
+        setBaseline([]);
+        setHiddenLanguages(null);
+        post({ type: 'requestBaseline' });
     }, []);
     // The row the caret last sat in. "Insert above/below" is meaningless without it: here position
     // is the content, so the user has to be able to say where.
@@ -61,9 +90,10 @@ function App(): React.JSX.Element {
     const [menu, setMenu] = useState<{ x: number; y: number; index: number } | null>(null);
     const [problemsOpen, setProblemsOpen] = useState(false);
 
-    const panel = useLocPanel<LocCommand>({ applyStaged, coalesce, onMessage });
+    const panel = useLocPanel<LocCommand>({ applyStaged, coalesce, onFileLoaded, onMessage });
     const {
-        rows, languages, error, loaded, queue, problems, validation, stage, save, validate,
+        rows, languages, setLanguages, canAddLanguage, supportedLanguages, error, loaded, queue,
+        problems, validation, stage, save, validate,
     } = panel;
 
     /**
@@ -128,9 +158,11 @@ function App(): React.JSX.Element {
         setPendingFocus(to);
     }, [stage]);
 
-    const visible = useMemo(
-        () => rows.filter(row => matchesFilter(row, filter, mode, scope)),
-        [rows, filter, mode, scope]);
+    // Compiled once per filter change rather than once per row - see buildRowFilter.
+    const rowFilter = useMemo(
+        () => buildRowFilter(appliedFilter, mode, scope), [appliedFilter, mode, scope]);
+
+    const visible = useMemo(() => rows.filter(rowFilter.test), [rows, rowFilter]);
 
     const crawlLanguage = scope !== 'all' && scope !== 'key' ? scope : languages[0] ?? '';
 
@@ -222,9 +254,30 @@ function App(): React.JSX.Element {
     }, [problems]);
 
     // One template for the header and every row, so the columns cannot drift apart.
+    const hidden = useMemo(
+        () => hiddenLanguages ?? new Set(emptyLanguages(rows, languages)),
+        [hiddenLanguages, rows, languages]);
+
+    const shownLanguages = useMemo(
+        () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
+
+    const toggleLanguage = useCallback((language: string, visible: boolean) => {
+        setHiddenLanguages(current => {
+            const next = new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current));
+            if (visible) { next.delete(language); } else { next.add(language); }
+            return next;
+        });
+        if (!visible) { setScope(s => (s === language ? 'all' : s)); }
+    }, []);
+
+    const rowsRef = useRef(rows);
+    const languagesRef = useRef(languages);
+    rowsRef.current = rows;
+    languagesRef.current = languages;
+
     const columns = useMemo(
-        () => `260px ${languages.map(() => 'minmax(160px, 1fr)').join(' ')}`,
-        [languages]);
+        () => `260px ${shownLanguages.map(() => 'minmax(160px, 1fr)').join(' ')} 32px`,
+        [shownLanguages]);
 
     if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
     if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
@@ -267,7 +320,8 @@ function App(): React.JSX.Element {
             {/* The key column holds a formatting instruction, not an identifier - calling it "Key"
                 would misdescribe it. */}
             <div className="cell">Format</div>
-            {languages.map(language => <div className="cell" key={language}>{language}</div>)}
+            {shownLanguages.map(language => <div className="cell" key={language}>{language}</div>)}
+            <LocColumnMenu languages={languages} hidden={hidden} onToggle={toggleLanguage} />
         </>
     );
 
@@ -289,7 +343,7 @@ function App(): React.JSX.Element {
                         onCommit={next => stage({ kind: 'setKey', index: row.index, key: next })}
                     />
                 </div>
-                {languages.map(language => (
+                {shownLanguages.map(language => (
                     <div className="cell" key={language}>
                         <CellInput
                             value={valueOf(row, language)}
@@ -334,78 +388,83 @@ function App(): React.JSX.Element {
         </>
     );
 
-    const dockOverview = (
+    const dockContent = (
         <>
-            <input
-                type="text"
-                className="filter"
-                placeholder={placeholderFor(mode)}
-                value={filter}
-                onChange={e => setFilter(e.target.value)}
+            <LocDockActions
+                languages={languages}
+                canAddLanguage={canAddLanguage}
+                supportedLanguages={supportedLanguages}
+                rowCount={rows.length}
+                onAddLanguage={language => {
+                    stage({ kind: 'addLanguage', language });
+                    setLanguages(current => [...current, language]);
+                    setHiddenLanguages(current =>
+                        new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current)));
+                }}
+                copyLanguageCount={(from, to) => languageCopyValues(from, to, rows).length}
+                onCopyLanguage={(from, to) => {
+                    // Positional here: a credits row is addressed by where it sits, and its key is
+                    // a formatting directive that several rows share.
+                    for (const copied of languageCopyValues(from, to, rows)) {
+                        stage({ kind: 'setCell', index: copied.index, language: to, value: copied.value });
+                    }
+                }}
+                baselineFillCountFor={language => creditsBaselineValues(language, rows, baseline).length}
+                onFillFromBaseline={language => {
+                    for (const value of creditsBaselineValues(language, rows, baseline)) {
+                        stage({ kind: 'setCell', index: value.index, language, value: value.value });
+                    }
+                }}
+                onConvertFormat={(format: ConvertibleFormat) =>
+                    post({ type: 'convertFormat', targetFormat: format })}
+                onExportDat={() => post({ type: 'exportDat' })}
             />
 
-            <div className="mode-group">
-                {(['text', 'wildcard', 'regex'] as FilterMode[]).map(m => (
-                    <button
-                        key={m}
-                        className={`icon-btn${mode === m ? ' active' : ''}`}
-                        title={titleFor(m)}
-                        aria-label={m}
-                        aria-pressed={mode === m}
-                        onClick={() => setMode(m)}
-                    >
-                        <span className={`codicon codicon-${iconFor(m)}`} />
-                    </button>
-                ))}
-            </div>
-
-            <div className="filters-below">
-                <select value={scope} onChange={e => setScope(e.target.value)} title="Search in">
-                    <option value="all">All fields</option>
-                    <option value="key">Format only</option>
-                    {languages.map(language => (
-                        <option key={language} value={language}>{language}</option>
+            {/* The three kinds of line the format is built from, as things to pick up and place.
+                Dropping says where far more directly than choosing "insert above" does. On the same
+                tile grid as the actions above: two tile species in one dock read as two unrelated
+                control sets. */}
+            <div className="dock-section">
+                <div className="dock-section-title">Content elements</div>
+                <LocTileGrid>
+                    {CREDITS_STEPS.map(step => (
+                        <LocTile
+                            key={step.id}
+                            icon={step.codicon}
+                            label={step.label}
+                            // The token this becomes in the file, so the tile and the Format column
+                            // are visibly the same thing.
+                            badge={step.token}
+                            title={`Drag onto the table, or click to add at the end - ${step.description}`}
+                            draggable
+                            onDragStart={e => {
+                                e.dataTransfer.setData(STEP_MIME, step.id);
+                                e.dataTransfer.effectAllowed = 'copy';
+                            }}
+                            onDragEnd={() => setDropTarget(null)}
+                            // Clicking appends, so the library works without dragging at all.
+                            onClick={() => insertStep(step, rows.length)}
+                        />
                     ))}
-                </select>
+                </LocTileGrid>
+                <p className="step-help">Drag onto the table to place, or click to add at the end.</p>
             </div>
         </>
     );
 
-    const dockContent = (
-        <>
-            {/* The three kinds of line the format is built from, as things to pick up and place.
-                Dropping says where far more directly than choosing "insert above" does. */}
-            <div className="step-library">
-                {CREDITS_STEPS.map(step => (
-                    <button
-                        key={step.id}
-                        className="step-tile"
-                        draggable
-                        title={`Drag onto the table - ${step.description}`}
-                        onDragStart={e => {
-                            e.dataTransfer.setData(STEP_MIME, step.id);
-                            e.dataTransfer.effectAllowed = 'copy';
-                        }}
-                        onDragEnd={() => setDropTarget(null)}
-                        // Clicking appends, so the library works without dragging at all.
-                        onClick={() => insertStep(step, rows.length)}
-                    >
-                        <span className={`codicon codicon-${step.codicon}`} />
-                        <span className="step-text">
-                            <span className="step-label">
-                                {step.label}
-                                {/* The token this becomes in the file, so the tile and the Format
-                                    column are visibly the same thing. */}
-                                <span className="step-token">{step.token}</span>
-                            </span>
-                            <span className="step-hint">{step.description}</span>
-                        </span>
-                    </button>
-                ))}
-            </div>
-            <p className="step-help">Drag onto the table to place, or click to add at the end.</p>
-
-        </>
+    const dockOverview = (
+        <LocSearch
+            filter={filter}
+            onFilter={setFilter}
+            mode={mode}
+            onMode={setMode}
+            scope={scope}
+            onScope={setScope}
+            languages={languages}
+            error={rowFilter.error}
+            placeholders={PLACEHOLDERS}
+            keyScopeLabel="Format only"
+        />
     );
 
     return (
@@ -586,18 +645,9 @@ async function requestFullScreen(): Promise<void> {
     }
 }
 
-function iconFor(mode: FilterMode): string {
-    return mode === 'text' ? 'case-sensitive' : mode === 'wildcard' ? 'star-full' : 'regex';
-}
 
-function titleFor(mode: FilterMode): string {
-    return mode === 'text' ? 'Plain text search'
-        : mode === 'wildcard' ? 'Wildcard: * matches any text, ? matches one character'
-            : 'Regular expression (case-insensitive)';
-}
 
-function placeholderFor(mode: FilterMode): string {
-    return mode === 'wildcard' ? 'CENTER*' : mode === 'regex' ? '^HEADER$' : 'Filter rows...';
-}
+// Examples from this file's own vocabulary.
+const PLACEHOLDERS: Record<FilterMode, string> = { text: 'Filter rows...', wildcard: 'CENTER*', regex: '^HEADER$' };
 
 createRoot(document.getElementById('root')!).render(<App />);

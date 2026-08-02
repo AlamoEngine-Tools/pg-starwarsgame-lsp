@@ -185,7 +185,8 @@ public sealed class CreditsBatchHandlerTest
         return (
             new ApplyCreditsBatchHandler(
                 editor, reload, helper,
-                NullLogger<ApplyCreditsBatchHandler>.Instance, configuration),
+                NullLogger<ApplyCreditsBatchHandler>.Instance, configuration,
+                new LocalisationWriteLedger(helper)),
             new ValidateCreditsBatchHandler(editor, helper, configuration),
             reload);
     }
