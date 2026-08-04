@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -29,7 +30,7 @@ public interface IStoryLayoutStore
 ///     session only). Orphaned entries (deleted events) are harmless and left in place.
 /// </summary>
 public sealed class StoryLayoutStore(
-    IModProjectReloadService reloadService,
+    IProjectContext project,
     IFileHelper fileHelper,
     ILogger<StoryLayoutStore> logger) : IStoryLayoutStore
 {
@@ -120,10 +121,7 @@ public sealed class StoryLayoutStore(
 
     private string? SidecarPath()
     {
-        var rootLayer = reloadService.LastWorkspaceConfig?.Layers
-            .OrderByDescending(l => l.Rank)
-            .FirstOrDefault();
-        if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-        return ProjectIndexLocator.GetAetswgDirectory(pgprojPath) + "/story-layout.json";
+        // This project's own sidecar: layouts must not leak between projects.
+        return project.AetswgDirectory is { } dir ? dir + "/story-layout.json" : null;
     }
 }

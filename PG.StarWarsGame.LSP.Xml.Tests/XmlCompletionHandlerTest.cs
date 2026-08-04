@@ -1447,7 +1447,8 @@ public sealed class XmlCompletionHandlerTest
         public XmlTagDefinition? LastTag { get; private set; }
         public string? LastPartialValue { get; private set; }
 
-        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition tag, string partialValue)
+        public IReadOnlyList<ValueProposal> GetProposals(XmlValueType _, XmlTagDefinition tag, string partialValue,
+            GameIndex? index = null)
         {
             LastTag = tag;
             LastPartialValue = partialValue;

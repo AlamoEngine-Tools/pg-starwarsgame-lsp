@@ -57,7 +57,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
 
         var line = request.Position.Line;
         var character = request.Position.Character;
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
 
         // Phase 1: XML reference hover from DocumentIndex - no AST needed.
         var xmlRefHover = TryBuildXmlRefHover(index, uri, line, character);

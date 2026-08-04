@@ -37,6 +37,53 @@ public sealed class LspConfigurationProviderTest : IDisposable
         return JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(obj));
     }
 
+    // ── multi-root workspace ─────────────────────────────────────────────────
+
+    [Fact]
+    public void LoadFrom_WorkspaceRoots_AreParsed()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+
+        provider.LoadFrom(Json(new
+        {
+            workspaceRoot = "/ws/moda",
+            workspaceRoots = new[] { "/ws/moda", "/ws/modb" }
+        }));
+
+        Assert.Equal(["/ws/moda", "/ws/modb"], provider.Current.WorkspaceRoots);
+        Assert.Equal("/ws/moda", provider.Current.WorkspaceRoot);
+    }
+
+    [Fact]
+    public void LoadFrom_NoWorkspaceRoots_LeavesTheListEmptyRatherThanNull()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+
+        provider.LoadFrom(Json(new { workspaceRoot = "/ws/moda" }));
+
+        Assert.Empty(provider.Current.WorkspaceRoots);
+    }
+
+    [Fact]
+    public void LoadFrom_ConfigFileInASecondFolder_IsFoundWhenTheFirstHasNone()
+    {
+        // .pg-lsp.json configures the session, not a project, so any open folder may supply it.
+        var second = Path.Combine(_tempDir, "modb");
+        Directory.CreateDirectory(second);
+        File.WriteAllText(
+            Path.Combine(second, ".pg-lsp.json"),
+            JsonSerializer.Serialize(new { GamePath = "/from-second-folder" }));
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+
+        provider.LoadFrom(Json(new
+        {
+            workspaceRoot = Path.Combine(_tempDir, "moda"),
+            workspaceRoots = new[] { Path.Combine(_tempDir, "moda"), second }
+        }));
+
+        Assert.Equal("/from-second-folder", provider.Current.GamePath);
+    }
+
     // ── null / default ───────────────────────────────────────────────────────
 
     [Fact]

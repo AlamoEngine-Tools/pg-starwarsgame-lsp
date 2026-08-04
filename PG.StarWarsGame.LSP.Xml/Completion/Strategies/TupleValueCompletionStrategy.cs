@@ -109,7 +109,7 @@ internal sealed class TupleValueCompletionStrategy : IXmlTagValueCompletionStrat
             Tag = ctx.TagDef!.Tag, ValueType = XmlValueType.DynamicEnumValue,
             ReferenceKind = ReferenceKind.Enum, Enum = enumDef
         };
-        return _proposals.GetProposals(XmlValueType.DynamicEnumValue, synthetic, ctx.PartialValue);
+        return _proposals.GetProposals(XmlValueType.DynamicEnumValue, synthetic, ctx.PartialValue, ctx.Index);
     }
 
     private IReadOnlyList<ValueProposal> HardcodedSetValues(TagValueCompletionContext ctx, string setName)

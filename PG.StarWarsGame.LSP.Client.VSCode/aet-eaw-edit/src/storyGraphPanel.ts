@@ -390,7 +390,7 @@ export class StoryGraphPanel {
         const client = this._getLspClient();
         if (!client) { return; }
         try {
-            const settings = await client.sendRequest<WorkspaceSettingsDto>('aet/getWorkspaceSettings', {});
+            const settings = await client.sendRequest<WorkspaceSettingsDto>('aet/getWorkspaceSettings', { campaign: this._campaign });
             this._skipDeleteConfirm = settings.skipStoryDeleteConfirmation === true;
             this._post({
                 type: 'workspaceSettings',
@@ -405,7 +405,7 @@ export class StoryGraphPanel {
         const client = this._getLspClient();
         if (!client) { return; }
         try {
-            await client.sendRequest('aet/setWorkspaceSettings', { showThreadLanes, showChapterLanes });
+            await client.sendRequest('aet/setWorkspaceSettings', { showThreadLanes, showChapterLanes, campaign: this._campaign });
         } catch { /* preference persistence is best-effort */ }
     }
 
@@ -413,7 +413,7 @@ export class StoryGraphPanel {
         const client = this._getLspClient();
         if (!client) { return false; }
         try {
-            const settings = await client.sendRequest<WorkspaceSettingsDto>('aet/getWorkspaceSettings', {});
+            const settings = await client.sendRequest<WorkspaceSettingsDto>('aet/getWorkspaceSettings', { campaign: this._campaign });
             return settings.skipStoryDeleteConfirmation === true;
         } catch {
             return false;
@@ -424,7 +424,7 @@ export class StoryGraphPanel {
         const client = this._getLspClient();
         if (!client) { return; }
         try {
-            await client.sendRequest('aet/setWorkspaceSettings', { skipStoryDeleteConfirmation: value });
+            await client.sendRequest('aet/setWorkspaceSettings', { skipStoryDeleteConfirmation: value, campaign: this._campaign });
         } catch { /* preference persistence is best-effort */ }
     }
 

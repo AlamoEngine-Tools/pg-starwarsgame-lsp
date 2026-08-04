@@ -136,12 +136,15 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 
 	async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
 		const objectId = uri.query || uri.path.replace(/^\//, '').replace(/\.xml$/i, '');
+		// The source document the preview was opened from, carried in the fragment. Object ids are
+		// unique only within a project, so the server needs it to know which mod's object is meant.
+		const contextUri = uri.fragment || undefined;
 		if (!lspClient) {
 			return '<!-- EaWEdit: LSP server is not running. -->';
 		}
 		try {
 			const result = await lspClient.sendRequest<GetEffectiveObjectResult>(
-				'aet/getEffectiveObject', { objectId });
+				'aet/getEffectiveObject', { objectId, contextUri });
 			if (!result.found) {
 				return `<!-- EaWEdit: no object named '${objectId}' was found in the workspace. -->`;
 			}
@@ -353,7 +356,11 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		],
 		traceOutputChannel: traceChannel,
 		initializationOptions: {
+			// workspaceRoot stays the first folder (it is where .pg-lsp.json is looked up);
+			// workspaceRoots carries all of them, so a multi-root workspace gets one project per
+			// folder rather than only the first folder's .pgproj.
 			workspaceRoot:     vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+			workspaceRoots:    vscode.workspace.workspaceFolders?.map(f => f.uri.fsPath) ?? [],
 			baseGamePath:      cfg('lsp.source').get<string>('baseGameDirectory') || undefined,
 			expansionGamePath: cfg('lsp.source').get<string>('expansionDirectory') || undefined,
 			locale:            cfg('lsp').get<string>('locale', 'en'),
@@ -479,10 +486,19 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		});
 	});
 
-	lspClient.onNotification('$/workspaceScanComplete', () => {
-		logLine('Workspace scan complete.');
+	lspClient.onNotification('$/workspaceScanComplete', (params?: { projects?: { name: string; projectPath: string }[] }) => {
+		const projects = params?.projects ?? [];
+		logLine(`Workspace scan complete (${projects.length} project(s)).`);
 		if (statusItem) {
-			statusItem.text = '$(check) EaWEdit LSP';
+			// A multi-root workspace serves one project per folder, and which ones resolved is the
+			// first thing to check when a folder's files look dead - so surface the count up front
+			// and name them in the tooltip.
+			statusItem.text = projects.length > 1
+				? `$(check) EaWEdit LSP: ${projects.length} projects`
+				: '$(check) EaWEdit LSP';
+			statusItem.tooltip = projects.length > 0
+				? `${CLIENT_NAME}\n${projects.map(p => `${p.name} (${p.projectPath})`).join('\n')}`
+				: CLIENT_NAME;
 		}
 		// Both navigators fetch now rather than when they are first opened. A tree view only asks
 		// for its children on reveal, so without this the first click on either paid for a round
@@ -1039,6 +1055,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				scheme: EFFECTIVE_SCHEME,
 				path: `/${objectId} (effective preview, read-only).xml`,
 				query: objectId,
+				// The document the preview was opened from, so the server resolves the id in that
+				// document's project rather than in whichever project happened to load first.
+				fragment: vscode.window.activeTextEditor?.document.uri.toString() ?? '',
 			});
 			effectiveObjectProvider?.refresh(uri);
 			const doc = await vscode.workspace.openTextDocument(uri);

@@ -40,7 +40,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<LocationOrLocationLinks?>(null);
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
 
         if (!index.Documents.TryGetValue(uri, out var docIndex))
             return Task.FromResult<LocationOrLocationLinks?>(null);

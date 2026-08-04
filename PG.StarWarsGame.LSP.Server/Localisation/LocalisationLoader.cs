@@ -30,10 +30,9 @@ public sealed class LocalisationLoader : ILocalisationLoader
     private readonly IFileHelper _fileHelper;
     private readonly IGameIndexService _indexService;
     private readonly ILanguageService _langService;
-    private readonly LocalisationLayerRegistry _layerRegistry;
+    private readonly IProjectRegistry _projects;
     private readonly ILogger<LocalisationLoader> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;
-    private readonly LocalisationProjectRegistry _registry;
     private readonly IXmlTranslationImporter _xmlImporter;
 
     public LocalisationLoader(
@@ -48,8 +47,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         ILspConfigurationProvider configProvider,
         IFileHelper fileHelper,
         IGameIndexService indexService,
-        LocalisationProjectRegistry registry,
-        LocalisationLayerRegistry layerRegistry,
+        IProjectRegistry projects,
         ILogger<LocalisationLoader> logger)
     {
         _baselineProvider = baselineProvider;
@@ -63,8 +61,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
         _configProvider = configProvider;
         _fileHelper = fileHelper;
         _indexService = indexService;
-        _registry = registry;
-        _layerRegistry = layerRegistry;
+        _projects = projects;
         _logger = logger;
     }
 
@@ -137,8 +134,11 @@ public sealed class LocalisationLoader : ILocalisationLoader
             }
         }
 
-        _registry.Set(registryEntries);
-        _layerRegistry.Set(layerEntries);
+        // Written into the registries of the project this configuration belongs to: localisation
+        // projects and layers are per mod, and sharing them would list one mod's files under another.
+        var project = _projects.ForConfiguration(workspaceConfig);
+        project.Service<LocalisationProjectRegistry>().Set(registryEntries);
+        project.Service<LocalisationLayerRegistry>().Set(layerEntries);
 
         // Workspace layers (highest precedence first) shadow the shipped baseline.
         var databases = new List<IKeyedTranslationDatabase>(layerDbs) { eawDb, focDb };

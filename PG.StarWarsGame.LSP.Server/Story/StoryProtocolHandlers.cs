@@ -103,7 +103,10 @@ public sealed class GetStoryPlotsHandler(
         var fileName = script.ToLowerInvariant();
         if (!fileName.EndsWith(".lua", StringComparison.Ordinal)) fileName += ".lua";
         var suffix = "/" + fileName;
-        return indexService.Current.Documents.Keys
+        // Across every project: a story thread in one project may name a script that lives in
+        // another, and stopping at the primary project's index would fail to resolve it.
+        return indexService.AllIndices
+            .SelectMany(i => i.Documents.Keys)
             .FirstOrDefault(uri => uri.EndsWith(suffix, StringComparison.Ordinal));
     }
 }

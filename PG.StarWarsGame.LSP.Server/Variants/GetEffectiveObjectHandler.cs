@@ -36,7 +36,11 @@ public sealed class GetEffectiveObjectHandler
         if (!_config.Current.Features.Tools.Variants)
             return Task.FromResult(new GetEffectiveObjectResult(false, false, null, [], string.Empty, null));
 
-        var resolver = new EffectiveObjectResolver(_indexService.Current, _schema, _tagSource);
+        // Resolved in the requesting document's project: its index, and its view of the object id.
+        var index = request.ContextUri is null
+            ? _indexService.Current
+            : _indexService.For(request.ContextUri);
+        var resolver = new EffectiveObjectResolver(index, _schema, _tagSource, request.ContextUri);
         var effective = resolver.Resolve(request.ObjectId);
 
         if (!effective.Found)

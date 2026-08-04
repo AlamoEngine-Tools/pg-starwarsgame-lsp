@@ -22,3 +22,21 @@ public interface IDiagnosticsRepublisher
 {
     Task RepublishAllAsync(CancellationToken ct);
 }
+
+/// <summary>
+///     A diagnostics publisher that can retract everything it published for one document.
+///     <para>
+///         Diagnostics are replaced per URI, so they normally go stale only until the next publish
+///         for that file. Removing a workspace folder has no next publish: the files stop being
+///         indexed, so whatever was last shown for them would stay on screen forever unless it is
+///         explicitly retracted.
+///     </para>
+///     <para>
+///         Implemented by <see cref="DiagnosticsPublisherBase" />, so every language gets it - a
+///         removed folder's files must lose their XML, Lua and dialog diagnostics alike.
+///     </para>
+/// </summary>
+public interface IDocumentDiagnosticsClearer
+{
+    void ClearDocument(string uri);
+}

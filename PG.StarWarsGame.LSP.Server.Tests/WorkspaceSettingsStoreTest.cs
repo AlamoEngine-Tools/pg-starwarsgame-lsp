@@ -27,7 +27,7 @@ public sealed class WorkspaceSettingsStoreTest
             ]
         };
         return new WorkspaceSettingsStore(
-            new StoryCommandTestFixtures.StubReloadService(config),
+            new ProjectContext(config),
             new FileHelper(fs),
             NullLogger<WorkspaceSettingsStore>.Instance);
     }
@@ -52,7 +52,7 @@ public sealed class WorkspaceSettingsStoreTest
     public void NoProjectPath_DegradesToInMemory()
     {
         var store = new WorkspaceSettingsStore(
-            new StoryCommandTestFixtures.StubReloadService(WorkspaceConfiguration.Empty),
+            new ProjectContext(WorkspaceConfiguration.Empty),
             new FileHelper(new MockFileSystem()),
             NullLogger<WorkspaceSettingsStore>.Instance);
 
@@ -65,9 +65,9 @@ public sealed class WorkspaceSettingsStoreTest
     {
         var store = NewStore(new MockFileSystem());
 
-        await new SetWorkspaceSettingsHandler(store)
+        await new SetWorkspaceSettingsHandler(new SingleProjectSettings(store))
             .Handle(new SetWorkspaceSettingsParams(true), CancellationToken.None);
-        var result = await new GetWorkspaceSettingsHandler(store)
+        var result = await new GetWorkspaceSettingsHandler(new SingleProjectSettings(store))
             .Handle(new GetWorkspaceSettingsParams(), CancellationToken.None);
 
         Assert.True(result.SkipStoryDeleteConfirmation);
@@ -78,16 +78,25 @@ public sealed class WorkspaceSettingsStoreTest
     {
         var store = NewStore(new MockFileSystem());
 
-        await new SetWorkspaceSettingsHandler(store)
+        await new SetWorkspaceSettingsHandler(new SingleProjectSettings(store))
             .Handle(new SetWorkspaceSettingsParams(true), CancellationToken.None);
         // A later set touching only the lane toggle must not clobber the delete-confirm preference.
-        await new SetWorkspaceSettingsHandler(store)
+        await new SetWorkspaceSettingsHandler(new SingleProjectSettings(store))
             .Handle(new SetWorkspaceSettingsParams(ShowThreadLanes: true), CancellationToken.None);
-        var result = await new GetWorkspaceSettingsHandler(store)
+        var result = await new GetWorkspaceSettingsHandler(new SingleProjectSettings(store))
             .Handle(new GetWorkspaceSettingsParams(), CancellationToken.None);
 
         Assert.True(result.SkipStoryDeleteConfirmation);
         Assert.True(result.ShowThreadLanes);
         Assert.False(result.ShowChapterLanes);
+    }
+
+    /// <summary>Single-project resolver: every request addresses the one store under test.</summary>
+    private sealed class SingleProjectSettings(IWorkspaceSettingsStore store) : IProjectScopedWorkspaceSettings
+    {
+        public IWorkspaceSettingsStore For(string? contextUri, string? campaign = null)
+        {
+            return store;
+        }
     }
 }

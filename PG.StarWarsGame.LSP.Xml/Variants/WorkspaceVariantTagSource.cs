@@ -37,7 +37,14 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
 
     public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
     {
-        var index = _indexService.Current;
+        return TryGetTags(objectId, null);
+    }
+
+    public IReadOnlyList<VariantTag>? TryGetTags(string objectId, string? contextUri)
+    {
+        // An object id only means something within a project, so the requesting document's project
+        // is what resolves it. No context still means the primary project - the single-project case.
+        var index = contextUri is null ? _indexService.Current : _indexService.For(contextUri);
         if (!index.WorkspaceDefinitions.TryGetValue(objectId, out var defs) || defs.Length == 0)
             return null;
 

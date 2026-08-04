@@ -60,7 +60,7 @@ public sealed class XmlInlayHintHandler : InlayHintsHandlerBase
         if (parsed is null)
             return Task.FromResult<InlayHintContainer?>(null);
 
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
         var range = request.Range;
         var hapDoc = parsed.Html;
         var hints = new List<InlayHint>();

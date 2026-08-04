@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -22,7 +24,7 @@ public sealed class ModProjectReloadServiceTest
         var logger = new ListLogger();
         var service = new ModProjectReloadService(
             new FakeResolver(resolved), indexer, new NullLocalisationLoader(),
-            new RecordingLayerMap(), logger);
+            new RecordingRegistry(), logger);
         return (service, indexer, logger);
     }
 
@@ -100,7 +102,7 @@ public sealed class ModProjectReloadServiceTest
         var localisation = new RecordingLocalisationLoader();
         var indexer = new RecordingIndexer();
         var service = new ModProjectReloadService(
-            new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), new ListLogger());
+            new FakeResolver(SampleConfig), indexer, localisation, new RecordingRegistry(), new ListLogger());
         await service.LoadAsync(["/ws"], CancellationToken.None);
         var indexCallsAfterLoad = indexer.IndexCallCount;
         var localisationCallsAfterLoad = localisation.LoadCallCount;
@@ -123,7 +125,7 @@ public sealed class ModProjectReloadServiceTest
         var refresh = new RecordingClientRefreshNotifier();
         var service = new ModProjectReloadService(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
-            new RecordingLayerMap(), new ListLogger(), refresh);
+            new RecordingRegistry(), new ListLogger(), refresh);
         await service.LoadAsync(["/ws"], CancellationToken.None);
         var before = refresh.CallCount;
 
@@ -138,7 +140,7 @@ public sealed class ModProjectReloadServiceTest
         var refresh = new RecordingClientRefreshNotifier();
         var service = new ModProjectReloadService(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
-            new RecordingLayerMap(), new ListLogger(), refresh);
+            new RecordingRegistry(), new ListLogger(), refresh);
 
         await service.ReloadLocalisationAsync(CancellationToken.None);
 
@@ -156,9 +158,9 @@ public sealed class ModProjectReloadServiceTest
     }
 
     [Fact]
-    public async Task LoadAsync_PublishesConfigLayersToLayerMapBeforeIndexing()
+    public async Task LoadAsync_PublishesConfigLayersToTheProjectsLayerMapBeforeIndexing()
     {
-        var layerMap = new RecordingLayerMap();
+        var registry = new RecordingRegistry();
         var indexer = new RecordingIndexer();
         var layers = new List<ProjectLayer>
         {
@@ -167,59 +169,181 @@ public sealed class ModProjectReloadServiceTest
         };
         var config = SampleConfig with { Layers = layers };
         var service = new ModProjectReloadService(
-            new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, new ListLogger());
+            new FakeResolver(config), indexer, new NullLocalisationLoader(), registry, new ListLogger());
 
         await service.LoadAsync(["/ws"], CancellationToken.None);
 
-        Assert.NotNull(layerMap.LastLayers);
-        Assert.Equal(["Core", "Root"], layerMap.LastLayers!.Select(l => l.Name));
+        Assert.NotNull(registry.LastConfigurations);
+        Assert.Equal("Core", registry.Primary.LayerMap.GetLayerName(0));
+        Assert.Equal("Root", registry.Primary.LayerMap.GetLayerName(1));
+    }
+
+    [Fact]
+    public async Task LoadAsync_NoProjectFound_StillClearsTheProjectSet()
+    {
+        // A reload that stops finding a .pgproj must not leave the previous project's directories
+        // routing live.
+        var registry = new RecordingRegistry();
+        var service = new ModProjectReloadService(
+            new FakeResolver(null), new RecordingIndexer(), new NullLocalisationLoader(), registry,
+            new ListLogger());
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.NotNull(registry.LastConfigurations);
+        Assert.Empty(registry.LastConfigurations!);
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
 
-    private sealed class RecordingLayerMap : IProjectLayerMap
+    // Wraps the real registry so routing behaviour is exercised, while recording what was published.
+    [Fact]
+    public async Task LoadAsync_TwoProjects_IndexesBoth()
     {
-        public IReadOnlyList<ProjectLayer>? LastLayers { get; private set; }
+        var registry = new RecordingRegistry();
+        var indexer = new RecordingIndexer();
+        var service = new ModProjectReloadService(
+            FakeResolver.Many(ProjectConfig("moda"), ProjectConfig("modb")), indexer,
+            new NullLocalisationLoader(), registry, new ListLogger());
 
-        public void SetLayers(IReadOnlyList<ProjectLayer> layers)
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(2, indexer.IndexCallCount);
+        Assert.Equal(2, registry.All.Count);
+    }
+
+    [Fact]
+    public async Task LoadAsync_OneProjectFailsToIndex_StillIndexesTheOthers()
+    {
+        // One broken mod in a multi-root workspace must not silently disable the healthy ones.
+        var registry = new RecordingRegistry();
+        var indexer = new RecordingIndexer("/ws/moda/moda.pgproj");
+        var logger = new ListLogger();
+        var service = new ModProjectReloadService(
+            FakeResolver.Many(ProjectConfig("moda"), ProjectConfig("modb")), indexer,
+            new NullLocalisationLoader(), registry, logger);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(["/ws/modb/modb.pgproj"], indexer.IndexedProjectPaths);
+        Assert.Contains(logger.Entries, e => e.Level == LogLevel.Error);
+    }
+
+    [Fact]
+    public async Task LoadAsync_TwoProjects_UnionsTheirAssetRoots()
+    {
+        // The watched-files handler re-globs from LastAssetRoots, so it has to cover every project.
+        var service = new ModProjectReloadService(
+            FakeResolver.Many(ProjectConfig("moda"), ProjectConfig("modb")), new RecordingIndexer(),
+            new NullLocalisationLoader(), new RecordingRegistry(), new ListLogger());
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(["/ws/moda/art", "/ws/modb/art"], service.LastAssetRoots);
+    }
+
+    [Fact]
+    public async Task LoadAsync_TwoProjects_LoadsLocalisationForEach()
+    {
+        var localisation = new RecordingLocalisationLoader();
+        var service = new ModProjectReloadService(
+            FakeResolver.Many(ProjectConfig("moda"), ProjectConfig("modb")), new RecordingIndexer(),
+            localisation, new RecordingRegistry(), new ListLogger());
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(2, localisation.LoadCallCount);
+    }
+
+    private static WorkspaceConfiguration ProjectConfig(string name)
+    {
+        return new WorkspaceConfiguration(
+            [$"/ws/{name}/xml"], [], [], [$"/ws/{name}/art"], null)
         {
-            LastLayers = layers;
+            ProjectPath = $"/ws/{name}/{name}.pgproj",
+            Layers = [new ProjectLayer(0, name, [$"/ws/{name}/xml"], [], [], [$"/ws/{name}/art"], null)]
+        };
+    }
+
+    private sealed class RecordingRegistry : IProjectRegistry
+    {
+        private readonly ProjectRegistry _inner = new(new FileHelper(new MockFileSystem()));
+
+        public IReadOnlyList<WorkspaceConfiguration>? LastConfigurations { get; private set; }
+
+        public IReadOnlyList<ProjectWorkspace> All => _inner.All;
+        public ProjectWorkspace Primary => _inner.Primary;
+
+        public event Action<IReadOnlyList<ProjectWorkspace>>? ProjectsChanged
+        {
+            add => _inner.ProjectsChanged += value;
+            remove => _inner.ProjectsChanged -= value;
         }
 
-        public int GetRank(string fileUri)
+        public IReadOnlyList<ProjectWorkspace> Resolve(string fileUri)
         {
-            return 0;
+            return _inner.Resolve(fileUri);
         }
 
-        public string? GetLayerName(int rank)
+        public ProjectWorkspace ResolvePrimary(string fileUri)
         {
-            return null;
+            return _inner.ResolvePrimary(fileUri);
+        }
+
+        public ProjectWorkspace ForConfiguration(WorkspaceConfiguration configuration)
+        {
+            return _inner.ForConfiguration(configuration);
+        }
+
+        public void SetProjects(IReadOnlyList<WorkspaceConfiguration> configurations)
+        {
+            LastConfigurations = configurations;
+            _inner.SetProjects(configurations);
         }
     }
 
     private sealed class FakeResolver : IProjectConfigurationResolver
     {
-        private readonly WorkspaceConfiguration? _config;
+        private readonly IReadOnlyList<WorkspaceConfiguration> _configs;
 
         public FakeResolver(WorkspaceConfiguration? config)
         {
-            _config = config;
+            _configs = config is null ? [] : [config];
         }
 
-        public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
+        private FakeResolver(IReadOnlyList<WorkspaceConfiguration> configs)
         {
-            return _config;
+            _configs = configs;
+        }
+
+        public static FakeResolver Many(params WorkspaceConfiguration[] configs)
+        {
+            return new FakeResolver(configs);
+        }
+
+        public IReadOnlyList<WorkspaceConfiguration> ResolveAll(IReadOnlyList<string> roots)
+        {
+            return _configs;
         }
     }
 
     private sealed class RecordingIndexer : IWorkspaceIndexer
     {
+        // Configurations whose IndexDocumentsAsync should throw, keyed by ProjectPath.
+        private readonly HashSet<string> _failing;
+
+        public RecordingIndexer(params string[] failingProjectPaths)
+        {
+            _failing = new HashSet<string>(failingProjectPaths, StringComparer.OrdinalIgnoreCase);
+        }
+
         public WorkspaceConfiguration? LastConfig { get; private set; }
         public IReadOnlyList<string>? LastRoots { get; private set; }
         public int IndexCallCount { get; private set; }
         public bool AssetCatalogApplied { get; private set; }
         public bool BonesApplied { get; private set; }
         public bool DynamicEnumCatalogApplied { get; private set; }
+        public List<string?> IndexedProjectPaths { get; } = [];
 
         public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
         {
@@ -230,21 +354,25 @@ public sealed class ModProjectReloadServiceTest
         public Task<int> IndexDocumentsAsync(WorkspaceConfiguration config, CancellationToken ct,
             Action<int, int>? progress = null)
         {
+            if (config.ProjectPath is not null && _failing.Contains(config.ProjectPath))
+                throw new InvalidOperationException("indexing blew up");
+
             IndexCallCount++;
+            IndexedProjectPaths.Add(config.ProjectPath);
             return Task.FromResult(0);
         }
 
-        public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots)
+        public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots, ProjectWorkspace? project = null)
         {
             DynamicEnumCatalogApplied = true;
         }
 
-        public void ApplyAssetCatalog(IReadOnlyList<string> roots)
+        public void ApplyAssetCatalog(IReadOnlyList<string> roots, ProjectWorkspace? project = null)
         {
             AssetCatalogApplied = true;
         }
 
-        public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
+        public void ApplyModelBoneCatalog(IReadOnlyList<string> roots, ProjectWorkspace? project = null)
         {
             BonesApplied = true;
         }

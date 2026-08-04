@@ -1027,8 +1027,12 @@ public sealed class XmlDiagnosticsPublisherTest
             return NullDisposable.Instance;
         }
 
+        // Applies the index as well as announcing it: GameIndexService CAS-writes _current and then
+        // raises IndexChanged, so a fake that only raised the event would represent no real state -
+        // and the publisher reads each document's index back through For(uri).
         public void Fire(GameIndex index)
         {
+            Current = index;
             IndexChanged?.Invoke(index);
         }
 

@@ -14,18 +14,26 @@ public sealed class ProjectConfigurationResolverTest
     private static readonly string DriveRoot = Path.GetPathRoot(Path.GetFullPath("."))!;
     private static readonly string WorkspaceRoot = Path.Combine(DriveRoot, "mods", "mymod");
     private static readonly string ProjectPath = Path.Combine(WorkspaceRoot, "mymod.pgproj");
+    private static readonly string OtherWorkspaceRoot = Path.Combine(DriveRoot, "mods", "othermod");
+    private static readonly string OtherProjectPath = Path.Combine(OtherWorkspaceRoot, "othermod.pgproj");
 
     private static string AbsLower(string rel)
     {
         return Path.GetFullPath(Path.Combine(WorkspaceRoot, rel)).Replace('\\', '/').ToLowerInvariant();
     }
 
-    private static ProjectConfigurationResolver Build(MockFileSystem fs)
+    private static string OtherAbsLower(string rel)
+    {
+        return Path.GetFullPath(Path.Combine(OtherWorkspaceRoot, rel)).Replace('\\', '/').ToLowerInvariant();
+    }
+
+    // Returned as the interface so the Resolve default implementation is in scope.
+    private static IProjectConfigurationResolver Build(MockFileSystem fs)
     {
         return Build(fs, out _);
     }
 
-    private static ProjectConfigurationResolver Build(MockFileSystem fs, out RecordingUserNotifier notifier)
+    private static IProjectConfigurationResolver Build(MockFileSystem fs, out RecordingUserNotifier notifier)
     {
         var fileHelper = new FileHelper(fs);
         var loader = new ModProjectLoader(fileHelper, NullLogger<ModProjectLoader>.Instance);
@@ -97,6 +105,94 @@ public sealed class ProjectConfigurationResolverTest
         var message = Assert.Single(notifier.Errors);
         Assert.Contains("a.pgproj", message);
         Assert.Contains("b.pgproj", message);
+    }
+
+    [Fact]
+    public void ResolveAll_TwoRootsEachWithAProject_ReturnsBothConfigurations()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("""
+                                {
+                                  "modinfo": { "name": "My Mod" },
+                                  "directories": { "xml": ["data/xml"] }
+                                }
+                                """),
+            [OtherProjectPath] = new("""
+                                     {
+                                       "modinfo": { "name": "Other Mod" },
+                                       "directories": { "xml": ["data/xml"] }
+                                     }
+                                     """)
+        });
+
+        var configs = Build(fs).ResolveAll([WorkspaceRoot, OtherWorkspaceRoot]);
+
+        Assert.Equal(2, configs.Count);
+        Assert.Contains(configs, c => c.XmlDirectories.Contains(AbsLower("data/xml")));
+        Assert.Contains(configs, c => c.XmlDirectories.Contains(OtherAbsLower("data/xml")));
+    }
+
+    [Fact]
+    public void ResolveAll_StampsEachConfigurationWithItsProjectPath()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("""{ "modinfo": { "name": "My Mod" } }"""),
+            [OtherProjectPath] = new("""{ "modinfo": { "name": "Other Mod" } }""")
+        });
+
+        var configs = Build(fs).ResolveAll([WorkspaceRoot, OtherWorkspaceRoot]);
+
+        var paths = configs.Select(c => c.ProjectPath).ToList();
+        Assert.Contains(ProjectPath.Replace('\\', '/').ToLowerInvariant(), paths);
+        Assert.Contains(OtherProjectPath.Replace('\\', '/').ToLowerInvariant(), paths);
+    }
+
+    [Fact]
+    public void ResolveAll_OneProjectFailsToLoad_KeepsTheOtherAndNotifies()
+    {
+        // One broken mod in a multi-root workspace must not take the healthy ones down with it.
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("{ this is not valid json "),
+            [OtherProjectPath] = new("""
+                                     {
+                                       "modinfo": { "name": "Other Mod" },
+                                       "directories": { "xml": ["data/xml"] }
+                                     }
+                                     """)
+        });
+
+        var configs = Build(fs, out var notifier).ResolveAll([WorkspaceRoot, OtherWorkspaceRoot]);
+
+        var config = Assert.Single(configs);
+        Assert.Contains(OtherAbsLower("data/xml"), config.XmlDirectories);
+        Assert.Single(notifier.Errors);
+    }
+
+    [Fact]
+    public void ResolveAll_NoProjects_ReturnsEmpty()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(WorkspaceRoot);
+
+        Assert.Empty(Build(fs).ResolveAll([WorkspaceRoot]));
+    }
+
+    [Fact]
+    public void Resolve_TwoProjects_ReturnsTheFirstForBackwardsCompatibility()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new("""{ "modinfo": { "name": "My Mod" }, "directories": { "xml": ["data/xml"] } }"""),
+            [OtherProjectPath] = new("""{ "modinfo": { "name": "Other Mod" } }""")
+        });
+
+        var config = Build(fs).Resolve([WorkspaceRoot, OtherWorkspaceRoot]);
+
+        Assert.NotNull(config);
+        Assert.Contains(AbsLower("data/xml"), config!.XmlDirectories);
     }
 
     [Fact]

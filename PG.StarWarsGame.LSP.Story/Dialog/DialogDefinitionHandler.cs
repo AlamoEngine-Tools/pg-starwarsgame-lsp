@@ -78,7 +78,7 @@ public sealed class DialogDefinitionHandler : DefinitionHandlerBase
                 var arg = fact.Command.Args[param.Position];
                 if (character < arg.Column || character > arg.Column + arg.Text.Length) continue;
 
-                var symbol = _indexService.Current.Resolve(arg.Text, param.ObjectType?.TypeName);
+                var symbol = _indexService.For(uri).Resolve(arg.Text, param.ObjectType?.TypeName);
                 if (symbol?.Origin is not FileOrigin origin)
                 {
                     _logger.LogDebug("Dialog go-to-def: '{Id}' has no navigable origin", arg.Text);

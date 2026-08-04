@@ -76,7 +76,7 @@ public sealed class XmlHoverHandler : IXmlHoverProvider
 
         var isOnTagName = XmlUtility.IsOnTagName(node!, lineIndex, charPos);
         var locale = _config.Current.Locale;
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
 
         var ctx = new HoverContext(uri, index, _schema, hapDoc, rootNode!, node!, isOnTagName,
             lineIndex, charPos, locale);

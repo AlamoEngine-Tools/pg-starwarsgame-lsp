@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
@@ -11,19 +12,22 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
 {
     private static readonly char[] FlagSeparators = ['|', ','];
 
-    // Rebuilt only on DynamicEnumChanged (baseline/workspace enum-value applies) instead of
-    // recomputing the baseline+workspace union from scratch on every completion keystroke.
-    private IReadOnlyDictionary<string, string[]> _mergedValuesByEnum;
+    // Workspace enum values differ per project, so the union is cached per GameIndex rather than
+    // once for the whole server. A GameIndex is immutable and replaced whenever its project's values
+    // change, so the key doubles as the invalidation: a stale entry is unreachable and collected
+    // with the index it belonged to.
+    private readonly ConditionalWeakTable<GameIndex, IReadOnlyDictionary<string, string[]>> _byIndex = new();
+
+    private readonly IGameIndexService _indexService;
 
     public DynamicEnumValueProposalProvider(IGameIndexService indexService)
     {
-        _mergedValuesByEnum = BuildCache(indexService.Current);
-        indexService.DynamicEnumChanged += index => _mergedValuesByEnum = BuildCache(index);
+        _indexService = indexService;
     }
 
     public XmlValueType ValueType => XmlValueType.DynamicEnumValue;
 
-    public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue)
+    public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex? index = null)
     {
         if (tag.Enum is not { } enumDef)
             return [];
@@ -50,7 +54,7 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
         }
 
         if (enumDef.Kind == EnumKind.DynamicXml)
-            return GetDynamicProposals(enumDef.Name, currentPartial, alreadySelected);
+            return GetDynamicProposals(enumDef.Name, currentPartial, alreadySelected, index);
 
         return enumDef.Values
             .Where(v => !alreadySelected.Contains(v.Name))
@@ -92,9 +96,12 @@ public sealed class DynamicEnumValueProposalProvider : IXmlValueProposalProvider
     }
 
     private IReadOnlyList<ValueProposal> GetDynamicProposals(
-        string enumName, string currentPartial, HashSet<string> alreadySelected)
+        string enumName, string currentPartial, HashSet<string> alreadySelected, GameIndex? index)
     {
-        if (!_mergedValuesByEnum.TryGetValue(enumName, out var values))
+        // The requesting project's index when one was passed; otherwise the primary project's,
+        // which is the single-project answer.
+        var merged = _byIndex.GetValue(index ?? _indexService.Current, BuildCache);
+        if (!merged.TryGetValue(enumName, out var values))
             return [];
 
         return values

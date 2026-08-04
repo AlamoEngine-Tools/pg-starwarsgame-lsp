@@ -35,37 +35,54 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
         _logger = logger;
     }
 
-    public WorkspaceConfiguration? Resolve(IReadOnlyList<string> roots)
+    public IReadOnlyList<WorkspaceConfiguration> ResolveAll(IReadOnlyList<string> roots)
     {
-        _logger.LogDebug("Resolving project configuration under [{Roots}]", string.Join(", ", roots));
+        _logger.LogDebug("Resolving project configurations under [{Roots}]", string.Join(", ", roots));
 
-        // Detection (e.g. multiple .pgproj files under one root) and loading both need to surface
-        // as a user-facing notification rather than failing silently or crashing startup, so both
-        // are covered by the same catch - ModProjectDetector.TryFind can throw just like the loader.
-        try
-        {
-            if (_detector.TryFind(roots, out var pgprojPath) && pgprojPath is not null)
+        var configs = new List<WorkspaceConfiguration>();
+
+        // Roots overlap routinely (the configured game-data directory is usually a subdirectory of a
+        // workspace folder), so the same project can be discovered more than once.
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // Detection and loading are attempted per root so one broken project cannot take the healthy
+        // ones down with it - which is the whole point in a multi-root workspace. Both stages need to
+        // surface as a user-facing notification rather than failing silently or crashing startup, so
+        // both are covered by the same catch: the detector can throw (multiple .pgproj under one
+        // root) just like the loader can.
+        foreach (var root in roots)
+            try
             {
-                var file = _loader.Load(pgprojPath);
-                return _resolver.Resolve(pgprojPath, file);
+                foreach (var pgprojPath in _detector.FindAll([root]))
+                {
+                    var file = _loader.Load(pgprojPath);
+                    var config = _resolver.Resolve(pgprojPath, file);
+                    if (config.ProjectPath is not null && !seen.Add(config.ProjectPath))
+                    {
+                        _logger.LogDebug("Project '{Path}' already resolved from an earlier root; skipping.",
+                            config.ProjectPath);
+                        continue;
+                    }
+
+                    configs.Add(config);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex,
-                "Failed to resolve mod project configuration under [{Roots}]; no directories will be indexed.",
-                string.Join(", ", roots));
+            catch (Exception ex)
+            {
+                _logger.LogError(ex,
+                    "Failed to resolve mod project configuration under '{Root}'; it will not be indexed.",
+                    root);
 
-            // Surface a clear, actionable message to the user as an editor notification rather than
-            // failing silently. ModProjectLoadException already carries a user-facing message.
-            var message = ex is ModProjectLoadException
-                ? ex.Message
-                : $"Could not load mod project configuration: {ex.Message}";
-            _notifier.ShowError(message);
-            return null;
-        }
+                // Surface a clear, actionable message to the user as an editor notification rather
+                // than failing silently. ModProjectLoadException already carries a user-facing message.
+                _notifier.ShowError(ex is ModProjectLoadException
+                    ? ex.Message
+                    : $"Could not load mod project configuration: {ex.Message}");
+            }
 
-        _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
-        return null;
+        if (configs.Count == 0)
+            _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
+
+        return configs;
     }
 }

@@ -87,7 +87,7 @@ public sealed class XmlTextDocumentSyncHandler : TextDocumentSyncHandlerBase
                 // common case for a viewed-but-unedited file), avoiding an expensive re-index and the
                 // symbol-removal flicker that briefly drops resolution back to the baseline. Pass the
                 // current version so an unsaved-edit revert is not dropped as stale.
-                var version = _indexService.Current.Documents.GetValueOrDefault(uri)?.Version ?? 0;
+                var version = _indexService.For(uri).Documents.GetValueOrDefault(uri)?.Version ?? 0;
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
                 await _indexService.UpdateDocumentAsync(uri, text, version, token);
             }

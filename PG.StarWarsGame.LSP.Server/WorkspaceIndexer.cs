@@ -46,17 +46,22 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     private readonly IGameIndexService _indexService;
     private readonly ILogger<WorkspaceIndexer> _logger;
     private readonly IEnumerable<IGameDocumentParser> _parsers;
+    private readonly IProjectRegistry? _registry;
     private readonly ISchemaProvider _schema;
     private readonly IStoryChainProblemStore _storyChainProblems;
 
+    // registry is optional so the many minimal test setups can omit it; without one every apply
+    // targets the injected (routing) index service, which is exactly the single-project behaviour.
     public WorkspaceIndexer(IFileHelper fileHelper, IEnumerable<IGameDocumentParser> parsers,
         IGameIndexService indexService, IFileTypeRegistry fileTypeRegistry, ISchemaProvider schema,
         IEaWXmlContext eaWXmlContext, IProjectIndexCache cache,
         ILuaAnnotationRepository annotationRepository,
         IStoryChainProblemStore storyChainProblems,
         ILspConfigurationProvider configProvider,
-        ILogger<WorkspaceIndexer> logger)
+        ILogger<WorkspaceIndexer> logger,
+        IProjectRegistry? registry = null)
     {
+        _registry = registry;
         _fileHelper = fileHelper;
         _parsers = parsers;
         _indexService = indexService;
@@ -71,6 +76,17 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     }
 
     /// <summary>
+    ///     Where a catalog apply should land. Asset, bone and dynamic-enum catalogs are built from a
+    ///     single project's roots and replace the whole catalog, so they must be written to that
+    ///     project's index - routing them through the shared service would let the last project
+    ///     scanned overwrite every other project's catalog.
+    /// </summary>
+    private IGameIndexService Target(ProjectWorkspace? project)
+    {
+        return project?.Index ?? (IGameIndexService)_indexService;
+    }
+
+    /// <summary>
     ///     Seeds the EaW XML context with the project's declared XML directories, then walks the
     ///     schema's metafile definitions to register concrete file → type mappings (from the
     ///     metafile on disk, or the shipped baseline when absent).
@@ -78,13 +94,21 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     public void PreScanMetafiles(WorkspaceConfiguration config, IReadOnlyList<string> roots)
     {
         _logger.LogDebug("PreScanMetafiles started");
+
+        // This project's own context, so a metafile-discovered directory is recognised only by the
+        // project that ships it. Without a registry (minimal test setups) the injected routing
+        // context is used, which resolves to the single project anyway.
+        var xmlContext = _registry is not null
+            ? (IEaWXmlContext)_registry.ForConfiguration(config).XmlContext
+            : _eaWXmlContext;
+
         if (config.XmlDirectories.Count > 0)
-            _eaWXmlContext.SetDirectories(config.XmlDirectories);
+            xmlContext.SetDirectories(config.XmlDirectories);
 
         var leafLayer = config.Layers.Count > 0
             ? config.Layers.OrderByDescending(l => l.Rank).First()
             : null;
-        _eaWXmlContext.SetLeafDirectories(leafLayer?.XmlDirectories ?? []);
+        xmlContext.SetLeafDirectories(leafLayer?.XmlDirectories ?? []);
 
         var xmlRoots = config.XmlDirectories.ToList();
         var baseline = _indexService.Current.Baseline;
@@ -111,7 +135,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             // Every copy's directory holds EaW XML regardless of which registry wins - seeding the
             // context is about recognising files, not typing them.
             foreach (var path in copies)
-                _eaWXmlContext.AddDirectory(_fileHelper.FileSystem.Path.GetDirectoryName(path)!);
+                xmlContext.AddDirectory(_fileHelper.FileSystem.Path.GetDirectoryName(path)!);
 
             // ...but only the highest layer's copy is read: the engine takes the first file it
             // finds by name and ignores the rest, so a lower layer's entries are shadowed, not
@@ -148,7 +172,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     normalises them relative to their root, unions with the baseline catalog, and publishes
     ///     the merged <see cref="IAssetFileIndex" /> on the GameIndex.
     /// </summary>
-    public void ApplyAssetCatalog(IReadOnlyList<string> roots)
+    public void ApplyAssetCatalog(IReadOnlyList<string> roots, ProjectWorkspace? project = null)
     {
         var baseline = _indexService.Current.Baseline.AssetFiles;
         var workspace = new List<string>();
@@ -170,7 +194,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             "Asset catalog: {Workspace} workspace asset(s) merged with {Baseline} baseline asset(s)",
             workspace.Count, baseline.Count);
 
-        _indexService.ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
+        Target(project).ApplyAssetFiles(MergedAssetFileIndex.Merge(baseline, workspace));
     }
 
     /// <summary>
@@ -178,7 +202,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     catalog (workspace models override shipped ones of the same filename), and publishes the
     ///     merged map on the GameIndex for boneName completion.
     /// </summary>
-    public void ApplyModelBoneCatalog(IReadOnlyList<string> roots)
+    public void ApplyModelBoneCatalog(IReadOnlyList<string> roots, ProjectWorkspace? project = null)
     {
         var baseline = _indexService.Current.Baseline.ModelBones;
         var merged = ImmutableDictionary.CreateBuilder<string, ImmutableArray<string>>(
@@ -202,7 +226,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             "Model bone catalog: {Workspace} workspace model(s) merged with {Baseline} baseline model(s)",
             workspaceCount, baseline.Count);
 
-        _indexService.ApplyModelBones(merged.ToImmutable());
+        Target(project).ApplyModelBones(merged.ToImmutable());
     }
 
     /// <summary>
@@ -212,7 +236,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
     ///     Only files that actually exist in the workspace are included; missing files are silently
     ///     skipped so dependency-only enums degrade gracefully to baseline-only validation.
     /// </summary>
-    public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots)
+    public void ApplyDynamicEnumCatalog(IReadOnlyList<string> xmlRoots, ProjectWorkspace? project = null)
     {
         var sep = _fileHelper.FileSystem.Path.DirectorySeparatorChar;
 
@@ -315,8 +339,8 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             "Dynamic enum catalog: {EnumCount} enum(s) with {ValueCount} workspace value(s) applied",
             workspace.Count, count);
 
-        _indexService.ApplyWorkspaceDynamicEnumValues(workspace);
-        _indexService.ApplyWorkspaceEnumValueDefinitions(defsBuilder.ToImmutable());
+        Target(project).ApplyWorkspaceDynamicEnumValues(workspace);
+        Target(project).ApplyWorkspaceEnumValueDefinitions(defsBuilder.ToImmutable());
     }
 
     /// <summary>

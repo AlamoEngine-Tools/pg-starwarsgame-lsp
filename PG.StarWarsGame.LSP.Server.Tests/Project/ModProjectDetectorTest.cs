@@ -107,7 +107,81 @@ public sealed class ModProjectDetectorTest
         Assert.Contains(Root, ex.Message);
     }
 
-    private static ModProjectDetector Build(MockFileSystem fs)
+    [Fact]
+    public void FindAll_TwoRootsEachWithOnePgproj_ReturnsBoth()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(Root, "a.pgproj")] = new("{}"),
+            [Path.Combine(OtherRoot, "b.pgproj")] = new("{}")
+        });
+        var detector = Build(fs);
+
+        var found = detector.FindAll([Root, OtherRoot]);
+
+        Assert.Equal(2, found.Count);
+        Assert.Contains(Path.Combine(Root, "a.pgproj"), found);
+        Assert.Contains(Path.Combine(OtherRoot, "b.pgproj"), found);
+    }
+
+    [Fact]
+    public void FindAll_SameProjectReachableFromOverlappingRoots_ReturnsItOnce()
+    {
+        // ComputeScanRoots always appends the configured workspaceRoot (the game data directory),
+        // which is frequently a subdirectory of a VS Code workspace folder - so the same .pgproj is
+        // routinely discovered twice and must not become two projects.
+        var nested = Path.Combine(Root, "data");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(nested, "mymod.pgproj")] = new("{}")
+        });
+        var detector = Build(fs);
+
+        var found = detector.FindAll([Root, nested]);
+
+        Assert.Equal(Path.Combine(nested, "mymod.pgproj"), Assert.Single(found));
+    }
+
+    [Fact]
+    public void FindAll_NoPgproj_ReturnsEmpty()
+    {
+        var fs = new MockFileSystem();
+        fs.AddDirectory(Root);
+        var detector = Build(fs);
+
+        Assert.Empty(detector.FindAll([Root]));
+    }
+
+    [Fact]
+    public void FindAll_MultiplePgprojInOneRoot_StillThrows()
+    {
+        // Deliberate: one folder means one project. Two mods are expressed as two workspace folders.
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(Root, "a.pgproj")] = new("{}"),
+            [Path.Combine(Root, "b.pgproj")] = new("{}")
+        });
+        var detector = Build(fs);
+
+        Assert.Throws<ModProjectLoadException>(() => detector.FindAll([Root]));
+    }
+
+    [Fact]
+    public void FindAll_MissingRootDirectory_IsSkipped()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(OtherRoot, "b.pgproj")] = new("{}")
+        });
+        var detector = Build(fs);
+
+        var found = detector.FindAll([Path.Combine(Root, "does", "not", "exist"), OtherRoot]);
+
+        Assert.Equal(Path.Combine(OtherRoot, "b.pgproj"), Assert.Single(found));
+    }
+
+    // Returned as the interface so the TryFind default implementation is in scope.
+    private static IModProjectDetector Build(MockFileSystem fs)
     {
         return new ModProjectDetector(new FileHelper(fs), NullLogger<ModProjectDetector>.Instance);
     }

@@ -40,7 +40,7 @@ public sealed class GlobalSuppressionStoreTest
             : [];
         var fs = new MockFileSystem(files);
         var store = new GlobalSuppressionStore(
-            new StubReloadService(WorkspaceConfiguration.Empty with { Layers = layers }),
+            new ProjectContext(WorkspaceConfiguration.Empty with { Layers = layers }),
             new FileHelper(fs), NullLogger<GlobalSuppressionStore>.Instance, notifier);
         return (store, fs);
     }
@@ -63,7 +63,7 @@ public sealed class GlobalSuppressionStoreTest
         Assert.Contains("intentional in this mod", fs.File.ReadAllText(SidecarPath));
 
         var reread = new GlobalSuppressionStore(
-            new StubReloadService(WorkspaceConfiguration.Empty with
+            new ProjectContext(WorkspaceConfiguration.Empty with
             {
                 Layers = [new ProjectLayer(1, "Mod", [], [], [], [], null, PgprojPath.Replace('\\', '/'))]
             }),

@@ -36,8 +36,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
     {
         _logger.LogDebug("Loading LSP configuration");
 
-        var workspaceRoot = ResolveWorkspaceRoot(initializationOptions);
-        var fromFile = LoadConfigFile(workspaceRoot);
+        var fromFile = LoadConfigFile(ResolveConfigFileRoots(initializationOptions));
         var overlay = ParseInitOptions(initializationOptions, out var overlayFeatures);
         Current = Merge(fromFile, overlay, overlayFeatures);
 
@@ -45,33 +44,48 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             Current.Locale, Current.GamePath ?? "<none>");
     }
 
-    private static string? ResolveWorkspaceRoot(object? initOptions)
+    // workspaceRoot first, then the rest of the folders: .pg-lsp.json configures the session (game
+    // paths, locale, feature flags), which is window-wide rather than per project, so the first
+    // folder that has one wins and the others are ignored.
+    private static IReadOnlyList<string> ResolveConfigFileRoots(object? initOptions)
     {
-        if (initOptions is JsonElement elem &&
-            elem.TryGetProperty("workspaceRoot", out var prop) &&
-            prop.ValueKind == JsonValueKind.String)
-            return prop.GetString();
-        return null;
+        if (initOptions is not JsonElement elem) return [];
+
+        var roots = new List<string>();
+        if (elem.TryGetProperty("workspaceRoot", out var single) && single.ValueKind == JsonValueKind.String &&
+            single.GetString() is { Length: > 0 } first)
+            roots.Add(first);
+
+        foreach (var extra in TryGetStringArray(elem, "workspaceRoots"))
+            if (!roots.Contains(extra, StringComparer.OrdinalIgnoreCase))
+                roots.Add(extra);
+
+        return roots;
     }
 
-    private LspConfiguration LoadConfigFile(string? workspaceRoot)
+    private LspConfiguration LoadConfigFile(IReadOnlyList<string> workspaceRoots)
     {
-        if (string.IsNullOrWhiteSpace(workspaceRoot)) return new LspConfiguration();
-
-        var path = _fileSystem.Path.Combine(workspaceRoot, ".pg-lsp.json");
-        if (!_fileSystem.File.Exists(path)) return new LspConfiguration();
-
-        _logger.LogDebug("Reading .pg-lsp.json from {WorkspaceRoot}", workspaceRoot);
-        try
+        foreach (var workspaceRoot in workspaceRoots)
         {
-            var json = _fileSystem.File.ReadAllText(path);
-            return JsonSerializer.Deserialize<LspConfiguration>(json) ?? new LspConfiguration();
+            if (string.IsNullOrWhiteSpace(workspaceRoot)) continue;
+
+            var path = _fileSystem.Path.Combine(workspaceRoot, ".pg-lsp.json");
+            if (!_fileSystem.File.Exists(path)) continue;
+
+            _logger.LogDebug("Reading .pg-lsp.json from {WorkspaceRoot}", workspaceRoot);
+            try
+            {
+                var json = _fileSystem.File.ReadAllText(path);
+                return JsonSerializer.Deserialize<LspConfiguration>(json) ?? new LspConfiguration();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse .pg-lsp.json at {Path}; using defaults", path);
+                return new LspConfiguration();
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to parse .pg-lsp.json at {Path}; using defaults", path);
-            return new LspConfiguration();
-        }
+
+        return new LspConfiguration();
     }
 
     private LspConfiguration ParseInitOptions(object? initOptions, out FeatureFlags? features)
@@ -106,6 +120,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         features = ParseFeatures(elem);
 
         var workspaceRoot = TryGetString(elem, "workspaceRoot");
+        var workspaceRoots = TryGetStringArray(elem, "workspaceRoots");
         var baseGamePath = TryGetString(elem, "baseGamePath");
         var expansionGamePath = TryGetString(elem, "expansionGamePath");
         var locale = TryGetString(elem, "locale");
@@ -122,6 +137,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         return new LspConfiguration
         {
             WorkspaceRoot = workspaceRoot,
+            WorkspaceRoots = workspaceRoots,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
             Locale = locale ?? "en",
@@ -168,6 +184,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             // the client always sends the complete resolved object, so no per-leaf merge.
             Features = overlayFeatures ?? file.Features,
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
+            WorkspaceRoots = overlay.WorkspaceRoots.Count > 0 ? overlay.WorkspaceRoots : file.WorkspaceRoots,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,
@@ -187,5 +204,18 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         return elem.TryGetProperty(property, out var p) && p.ValueKind == JsonValueKind.String
             ? p.GetString()
             : null;
+    }
+
+    private static IReadOnlyList<string> TryGetStringArray(JsonElement elem, string property)
+    {
+        if (!elem.TryGetProperty(property, out var p) || p.ValueKind != JsonValueKind.Array)
+            return [];
+
+        var values = new List<string>();
+        foreach (var item in p.EnumerateArray())
+            if (item.ValueKind == JsonValueKind.String && item.GetString() is { Length: > 0 } value)
+                values.Add(value);
+
+        return values;
     }
 }

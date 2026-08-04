@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -36,7 +37,7 @@ public interface IWorkspaceSettingsStore
 ///     preference survives the session only). A corrupt file is treated as defaults, never fatal.
 /// </summary>
 public sealed class WorkspaceSettingsStore(
-    IModProjectReloadService reloadService,
+    IProjectContext project,
     IFileHelper fileHelper,
     ILogger<WorkspaceSettingsStore> logger) : IWorkspaceSettingsStore
 {
@@ -111,10 +112,7 @@ public sealed class WorkspaceSettingsStore(
 
     private string? SidecarPath()
     {
-        var rootLayer = reloadService.LastWorkspaceConfig?.Layers
-            .OrderByDescending(l => l.Rank)
-            .FirstOrDefault();
-        if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-        return ProjectIndexLocator.GetAetswgDirectory(pgprojPath) + "/settings/workspace.settings.json";
+        // This project's own sidecar: settings must not leak between projects.
+        return project.AetswgDirectory is { } dir ? dir + "/settings/workspace.settings.json" : null;
     }
 }

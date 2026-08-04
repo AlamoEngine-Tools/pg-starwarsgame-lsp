@@ -571,15 +571,26 @@ public sealed class LocalisationLoaderTest
             new GameIndexService(sp.GetRequiredService<IFileHelper>(), [],
                 NullLogger<GameIndexService>.Instance));
         services.AddSingleton<ILogger<LocalisationLoader>>(NullLogger<LocalisationLoader>.Instance);
-        services.AddSingleton<LocalisationProjectRegistry>();
-        services.AddSingleton<ILocalisationProjectRegistry>(sp => sp.GetRequiredService<LocalisationProjectRegistry>());
-        services.AddSingleton<LocalisationLayerRegistry>();
+
+        // The loader writes into the registries of the project the configuration belongs to, so the
+        // test needs a project to own them. These configurations carry no ProjectPath, so everything
+        // resolves to the single default project - exactly the single-project case.
+        var projects = new ProjectRegistry(
+            new FileHelper(fs), [], NullLoggerFactory.Instance,
+            _ =>
+            {
+                var scoped = new ServiceCollection();
+                scoped.AddSingleton<LocalisationProjectRegistry>();
+                scoped.AddSingleton<LocalisationLayerRegistry>();
+                return scoped.BuildServiceProvider();
+            });
+        services.AddSingleton<IProjectRegistry>(projects);
 
         var sp = services.BuildServiceProvider();
         var loader = ActivatorUtilities.CreateInstance<LocalisationLoader>(sp);
         return (loader, sp.GetRequiredService<IGameIndexService>(),
-            sp.GetRequiredService<LocalisationProjectRegistry>(),
-            sp.GetRequiredService<LocalisationLayerRegistry>());
+            projects.Primary.Service<LocalisationProjectRegistry>(),
+            projects.Primary.Service<LocalisationLayerRegistry>());
     }
 
     private static IServiceProvider BuildDatFixtureServiceProvider(MockFileSystem fs)

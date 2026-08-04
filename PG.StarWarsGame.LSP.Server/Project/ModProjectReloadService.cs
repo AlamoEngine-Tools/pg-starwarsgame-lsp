@@ -17,10 +17,10 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 public sealed class ModProjectReloadService : IModProjectReloadService
 {
     private readonly IWorkspaceIndexer _indexer;
-    private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
     private readonly IClientRefreshNotifier? _refresh;
+    private readonly IProjectRegistry _registry;
     private readonly IProjectConfigurationResolver _resolver;
 
     private List<string>? _lastRoots;
@@ -30,20 +30,29 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         IProjectConfigurationResolver resolver,
         IWorkspaceIndexer indexer,
         ILocalisationLoader localisation,
-        IProjectLayerMap layerMap,
+        IProjectRegistry registry,
         ILogger<ModProjectReloadService> logger,
         IClientRefreshNotifier? refresh = null)
     {
         _resolver = resolver;
         _indexer = indexer;
         _localisation = localisation;
-        _layerMap = layerMap;
+        _registry = registry;
         _logger = logger;
         _refresh = refresh;
     }
 
     public IReadOnlyList<string>? LastAssetRoots { get; private set; }
+
+    /// <summary>
+    ///     The primary project's configuration. Prefer <see cref="LastWorkspaceConfigs" /> - this
+    ///     discards every project but one in a multi-root workspace.
+    /// </summary>
     public WorkspaceConfiguration? LastWorkspaceConfig { get; private set; }
+
+    /// <summary>Every resolved project configuration from the last load, in root order.</summary>
+    public IReadOnlyList<WorkspaceConfiguration> LastWorkspaceConfigs { get; private set; } = [];
+
     public IReadOnlyList<string>? LastWorkspaceRoots { get; private set; }
 
     public async Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
@@ -52,30 +61,61 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _lastRoots = roots;
         LastWorkspaceRoots = roots;
 
-        var config = _resolver.Resolve(roots);
-        if (config is null)
+        var configs = _resolver.ResolveAll(roots);
+
+        // Publish the project set before indexing so every document is routed to its project and
+        // stamped with its layer rank (indexing itself stays parallel - correctness comes from the
+        // rank, not insertion order). This also seeds each project's xml context and layer map.
+        _registry.SetProjects(configs);
+        LastWorkspaceConfigs = configs;
+
+        if (configs.Count == 0)
             // No project file (the resolver already logged); nothing to index.
             return;
 
-        LastWorkspaceConfig = config;
-        // Publish layer precedence before indexing so each document is stamped with its rank
-        // (indexing itself stays parallel - correctness comes from the rank, not insertion order).
-        _layerMap.SetLayers(config.Layers);
-        _indexer.PreScanMetafiles(config, roots);
-        await _indexer.IndexDocumentsAsync(config, ct);
-        _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories);
-        _indexer.ApplyAssetCatalog(config.AssetRoots);
-        _indexer.ApplyModelBoneCatalog(config.AssetRoots);
-        LastAssetRoots = config.AssetRoots;
+        LastWorkspaceConfig = configs[0];
 
-        try
+        // Every project is indexed into its own state. Projects are independent by construction, so
+        // one that fails must not abort the rest - in a multi-root workspace that would mean a
+        // single broken mod silently disabling the others.
+        var assetRoots = new List<string>();
+        foreach (var config in configs)
         {
-            await _localisation.LoadAsync(config, ct);
+            var project = _registry.ForConfiguration(config);
+            try
+            {
+                _indexer.PreScanMetafiles(config, roots);
+                await _indexer.IndexDocumentsAsync(config, ct);
+                _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories, project);
+                _indexer.ApplyAssetCatalog(config.AssetRoots, project);
+                _indexer.ApplyModelBoneCatalog(config.AssetRoots, project);
+                assetRoots.AddRange(config.AssetRoots);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Indexing project '{Project}' failed; other projects are unaffected.",
+                    config.ProjectPath ?? "<unnamed>");
+            }
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Workspace localisation load failed.");
-        }
+
+        LastAssetRoots = assetRoots;
+
+        // Localisation loads per project so each keeps its own resource type and layer set; the
+        // loader merges into the shared localisation index.
+        foreach (var config in configs)
+            try
+            {
+                await _localisation.LoadAsync(config, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Workspace localisation load failed for '{Project}'.",
+                    config.ProjectPath ?? "<unnamed>");
+            }
     }
 
     public async Task ReloadAsync(CancellationToken ct)

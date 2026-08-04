@@ -24,19 +24,21 @@ public sealed class StoryDialogScopeService : IStoryDialogScope
     private readonly IFileHelper _fileHelper;
 
     private readonly object _gate = new();
-    private readonly IModProjectReloadService _reloadService;
+    private readonly IProjectContext _project;
 
     public StoryDialogScopeService(
-        IModProjectReloadService reloadService,
+        IProjectContext project,
         ILspConfigurationProvider configProvider,
         IFileHelper fileHelper)
     {
-        _reloadService = reloadService;
+        _project = project;
         _configProvider = configProvider;
         _fileHelper = fileHelper;
     }
 
-    private IReadOnlyList<string> Roots => _reloadService.LastWorkspaceConfig?.StoryDialogRoots ?? [];
+    // This project's dialog roots only: a .txt is in scope for the project that declares the
+    // directory containing it, not for whichever project happened to load first.
+    private IReadOnlyList<string> Roots => _project.Configuration.StoryDialogRoots;
 
     public bool Enabled =>
         _configProvider.Current.Features.Dialog.Diagnostics && Roots.Count > 0;

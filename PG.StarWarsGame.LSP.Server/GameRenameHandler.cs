@@ -37,7 +37,7 @@ public sealed class GameRenameHandler : RenameHandlerBase
     public override Task<WorkspaceEdit?> Handle(RenameParams request, CancellationToken ct)
     {
         var uri = _fileHelper.NormalizeUri(request.TextDocument.Uri.ToString());
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
 
         if (uri.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
             return Task.FromResult(_config.Current.Features.Xml.Rename

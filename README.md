@@ -69,6 +69,19 @@ The extension uses a small JSON file to understand your mod's layout. Place it a
 
 All paths are relative to the `.pgproj` file. `projectReferences` can list other `.pgproj` files whose symbols your mod inherits (e.g. the vanilla game data alongside your mod).
 
+### Multi-root workspaces
+
+A VS Code multi-root workspace may hold one mod per folder, each with its own `.pgproj`. Every folder is scanned and each project gets its own index, so two unrelated mods can define the same object without colliding: go-to-definition, find-references, completion and diagnostics all answer from the project that owns the file in question. The status bar shows how many projects resolved, and its tooltip names them.
+
+Projects are **isolated by default** - one mod does not see another's symbols simply because both folders are open. Say so explicitly with `projectReferences` when one mod builds on another; a referenced project's files then belong to both closures and are indexed into each.
+
+Adding or removing a folder applies immediately, with no need to restart the server. Only the new folder is scanned: the expensive shared data (schema, base-game baseline, asset and model-bone catalogs) is loaded once for the window and shared by every project.
+
+Two limitations are deliberate:
+
+- **One `.pgproj` per folder.** A folder containing several is an error - add each project as its own folder instead, so it is unambiguous which project a folder means.
+- **Game paths are per window, not per folder.** `baseGameDirectory`, `expansionDirectory` and `locale` apply to the whole session; `.pg-lsp.json` is read from the first folder that has one.
+
 ---
 
 ## XML features

@@ -17,13 +17,21 @@ public sealed class EffectiveObjectResolver
 
     private readonly GameIndex _index;
     private readonly ISchemaProvider _schema;
+    private readonly string? _contextUri;
     private readonly IVariantTagSource _workspaceSource;
 
-    public EffectiveObjectResolver(GameIndex index, ISchemaProvider schema, IVariantTagSource workspaceSource)
+    /// <param name="contextUri">
+    ///     A file in the project this resolution is for. Object ids are only unique within a project,
+    ///     so the workspace tag source is asked in that project's terms. Null keeps the primary
+    ///     project's answer - the single-project behaviour.
+    /// </param>
+    public EffectiveObjectResolver(GameIndex index, ISchemaProvider schema, IVariantTagSource workspaceSource,
+        string? contextUri = null)
     {
         _index = index;
         _schema = schema;
         _workspaceSource = workspaceSource;
+        _contextUri = contextUri;
     }
 
     public EffectiveObject Resolve(string objectId)
@@ -99,7 +107,7 @@ public sealed class EffectiveObjectResolver
 
     private IReadOnlyList<VariantTag> TagsFor(GameSymbol symbol)
     {
-        var workspace = _workspaceSource.TryGetTags(symbol.Id);
+        var workspace = _workspaceSource.TryGetTags(symbol.Id, _contextUri);
         if (workspace is not null)
             return workspace;
 

@@ -23,11 +23,14 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     private readonly IWorkspaceIndexer _indexer;
     private readonly IGameIndexService _indexService;
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
+    private readonly IProjectRegistry? _registry;
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
     private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILocalisationWriteLedger _writeLedger;
 
+    // registry is optional so the minimal test setups can omit it; without one the catalog re-applies
+    // target the shared (routing) index service, which is the single-project behaviour.
     public GameDidChangeWatchedFilesHandler(
         IGameIndexService indexService,
         IGameWorkspaceHost workspaceHost,
@@ -36,8 +39,10 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         IModProjectReloadService reloadService,
         ISchemaProvider schema,
         ILocalisationWriteLedger writeLedger,
-        ILogger<GameDidChangeWatchedFilesHandler> logger)
+        ILogger<GameDidChangeWatchedFilesHandler> logger,
+        IProjectRegistry? registry = null)
     {
+        _registry = registry;
         _writeLedger = writeLedger;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
@@ -149,11 +154,29 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             return Unit.Value;
         }
 
+        // Both catalogs replace a whole per-project catalog, so they are re-applied project by
+        // project - rebuilding only the primary project's would leave the others' catalogs stale.
+        // With no project resolved yet the single un-targeted call is kept: it rebuilds the catalog
+        // down to baseline-only, which is what clears stale entries.
+        var configs = _reloadService.LastWorkspaceConfigs;
+
         if (assetsChanged)
-            _indexer.ApplyAssetCatalog(_reloadService.LastAssetRoots ?? []);
+        {
+            if (configs.Count == 0)
+                _indexer.ApplyAssetCatalog(_reloadService.LastAssetRoots ?? []);
+            else
+                foreach (var config in configs)
+                    _indexer.ApplyAssetCatalog(config.AssetRoots, _registry?.ForConfiguration(config));
+        }
 
         if (dynamicEnumsChanged)
-            _indexer.ApplyDynamicEnumCatalog(_reloadService.LastWorkspaceConfig?.XmlDirectories ?? []);
+        {
+            if (configs.Count == 0)
+                _indexer.ApplyDynamicEnumCatalog([]);
+            else
+                foreach (var config in configs)
+                    _indexer.ApplyDynamicEnumCatalog(config.XmlDirectories, _registry?.ForConfiguration(config));
+        }
 
         if (localisationTextChanged)
             await _reloadService.ReloadLocalisationAsync(ct);
