@@ -131,7 +131,7 @@ public sealed class ExportLocalisationToDatHandler
                 case ".properties":
                     using (var reader = new StreamReader(fileStream))
                     {
-                        _nlsImporter.Import(reader, _langService.Default, merged);
+                        _nlsImporter.Import(reader, NlsLanguageOf(request.ProjectFilePath), merged);
                     }
 
                     break;
@@ -151,10 +151,12 @@ public sealed class ExportLocalisationToDatHandler
         {
             var model = _datExporter.Export(merged, lang);
             if (model.Count == 0) continue;
-            // The engine loads the crawl from creditstextfile_LANGUAGE.dat, so a credits export
-            // written as MasterTextFile_* would never be read.
-            var stem = isCredits ? "CreditsText" : "MasterTextFile";
-            var outPath = fs.Path.Combine(dir, $"{stem}_{lang.LanguageIdentifier}.dat");
+            // Lowercase to match the engine's own files - it ships creditstext_english.dat and
+            // mastertextfile_english.dat, and reads either case. A credits export written under the
+            // MasterText stem would never be read as a crawl, which is why the stem is chosen here.
+            var stem = isCredits ? "creditstext" : "mastertextfile";
+            var outPath = fs.Path.Combine(
+                dir, $"{stem}_{lang.LanguageIdentifier.ToLowerInvariant()}.dat");
             using var outStream = fs.File.Create(outPath);
             _datFileService.CreateDatFile(outStream, model, model.KeySortOrder);
             written.Add(outPath);
@@ -172,5 +174,18 @@ public sealed class ExportLocalisationToDatHandler
         var project = _projectRegistry.Projects.FirstOrDefault(p =>
             string.Equals(p.FilePath, projectFilePath, StringComparison.OrdinalIgnoreCase));
         return project?.Rank;
+    }
+
+    /// <summary>
+    ///     The language a <c>.properties</c> source holds. NLS names its language in the file name and
+    ///     nowhere else, so a file that does not name one falls back to the workspace's configured game
+    ///     language rather than being assumed to be the service default.
+    /// </summary>
+    private IAlamoLanguageDefinition NlsLanguageOf(string path)
+    {
+        return LocalisationFileNameLanguageResolver.Resolve(
+            path, _langService,
+            LocalisationFileNameLanguageResolver.Configured(_langService, _config.Current.Localisation),
+            out _);
     }
 }

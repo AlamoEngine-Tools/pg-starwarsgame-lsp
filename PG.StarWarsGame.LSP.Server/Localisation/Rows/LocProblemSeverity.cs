@@ -11,4 +11,11 @@ public static class LocProblemSeverity
 {
     public const string Error = "error";
     public const string Warning = "warning";
+
+    /// <summary>
+    ///     Worth surfacing, but nothing is wrong. Used where the file is valid and the note is only
+    ///     there so a reader is not surprised - a heading with no entries under it, say, which the
+    ///     crawl renders perfectly well.
+    /// </summary>
+    public const string Info = "info";
 }

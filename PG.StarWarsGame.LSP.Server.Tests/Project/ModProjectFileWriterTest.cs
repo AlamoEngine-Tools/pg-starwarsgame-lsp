@@ -54,8 +54,45 @@ public sealed class ModProjectFileWriterTest
         Assert.Single(root.GetProperty("projectReferences").EnumerateArray());
     }
 
+    /// <summary>
+    ///     A hand-written <c>credits</c> sub-node survives a repoint.
+    ///     <para>
+    ///         Nothing in the server ever writes that node - it exists so a mod whose credits files
+    ///         deviate from the naming convention can say so - and this writer replaced the whole
+    ///         localisation node, so an import or a format conversion silently undid the only way to
+    ///         configure it.
+    ///     </para>
+    /// </summary>
     [Fact]
-    public async Task SetLocalisationAsync_ExistingNode_IsReplaced()
+    public async Task SetLocalisationAsync_ExistingCreditsSettings_AreKept()
+    {
+        const string json = """
+                            {
+                              "name": "My Mod",
+                              "localisation": {
+                                "type": "CSV",
+                                "directory": "old/dir",
+                                "credits": { "detection": "explicit", "files": ["crawl.csv"] }
+                              }
+                            }
+                            """;
+        var (writer, fs) = Build(json);
+
+        await writer.SetLocalisationAsync(Path, "NLS", "data/text", CancellationToken.None);
+
+        var localisation = JsonDocument.Parse(fs.File.ReadAllText(Path))
+            .RootElement.GetProperty("localisation");
+
+        Assert.Equal("NLS", localisation.GetProperty("type").GetString());
+        Assert.Equal("data/text", localisation.GetProperty("directory").GetString());
+
+        var credits = localisation.GetProperty("credits");
+        Assert.Equal("explicit", credits.GetProperty("detection").GetString());
+        Assert.Equal("crawl.csv", credits.GetProperty("files")[0].GetString());
+    }
+
+    [Fact]
+    public async Task SetLocalisationAsync_ExistingNode_TypeAndDirectoryAreOverwritten()
     {
         const string json = """
                             {

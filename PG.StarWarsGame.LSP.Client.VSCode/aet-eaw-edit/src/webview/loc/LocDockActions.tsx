@@ -29,6 +29,11 @@ export interface LocDockActionsProps {
     /** False for the single-language formats, where the action is left out rather than shown failing. */
     canAddLanguage: boolean;
     /**
+     * Whether adding a language creates a sibling file rather than a column. Single-language
+     * formats (.properties, .dat) cannot take a column, so the same action writes a new file.
+     */
+    addLanguageCreatesFile: boolean;
+    /**
      * The languages the engine supports. Only these are offered: a made-up identifier compiles into
      * a column the game never reads, and the mistake is invisible until someone plays in it.
      */
@@ -99,11 +104,13 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
             <div className="dock-section">
                 <div className="dock-section-title">File</div>
                 <LocTileGrid>
-                    {props.canAddLanguage && (
+                    {(props.canAddLanguage || props.addLanguageCreatesFile) && (
                         <LocTile
                             icon="add"
                             label="Add language"
-                            title="Add a language column to this file"
+                            title={props.addLanguageCreatesFile
+                                ? 'Create a file for another language beside this one'
+                                : 'Add a language column to this file'}
                             onClick={() => { setLanguage(''); setDialog('language'); }}
                         />
                     )}

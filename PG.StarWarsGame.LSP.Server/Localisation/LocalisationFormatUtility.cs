@@ -28,16 +28,31 @@ public static class LocalisationFormatUtility
         };
     }
 
-    // The conventional file name used when generating a brand-new localisation file for a
-    // format. Null for a format with no generator (currently DAT).
-    public static string? ToSeedFileName(string format)
+    /// <summary>
+    ///     The conventional file name for a brand-new localisation file. Null for a format with no
+    ///     generator (currently DAT), and null for a single-language format asked for without a
+    ///     language, since such a file cannot be named without one.
+    /// </summary>
+    /// <remarks>
+    ///     Written lowercase to match the engine, whose own files are <c>mastertextfile_english.dat</c>
+    ///     and <c>creditstext_english.dat</c>. The game reads names case-insensitively, so this is a
+    ///     convention rather than a requirement - but writing PascalCase into a directory of lowercase
+    ///     files made a stock text folder look like two different projects.
+    ///     <para>
+    ///         <paramref name="language" /> is required exactly when the format carries its language in
+    ///         the file name - see <see cref="LocalisationFileNameLanguageResolver" />.
+    ///     </para>
+    /// </remarks>
+    public static string? ToSeedFileName(string format, string? language = null)
     {
-        return format.ToLowerInvariant() switch
-        {
-            "csv" => "MasterTextFile.csv",
-            "xml" => "MasterTextFile.xml",
-            "nls" => "MasterTextFile.properties",
-            _ => null
-        };
+        var extension = ToExtension(format);
+        if (extension is null || extension == ".dat") return null;
+
+        if (!LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension))
+            return $"mastertextfile{extension}";
+
+        return string.IsNullOrWhiteSpace(language)
+            ? null
+            : $"mastertextfile_{language.ToLowerInvariant()}{extension}";
     }
 }

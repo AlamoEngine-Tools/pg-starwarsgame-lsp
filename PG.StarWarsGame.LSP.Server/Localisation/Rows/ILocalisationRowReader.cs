@@ -20,9 +20,14 @@ public interface ILocalisationRowReader
     /// <summary>
     ///     Parses <paramref name="text" /> according to <paramref name="extension" /> (with its
     ///     leading dot, lower-case).
+    ///     <para>
+    ///         <paramref name="fileName" /> is what a single-language format's language is read from -
+    ///         a <c>.properties</c> file names its language nowhere else. Omit it and such a file falls
+    ///         back to the workspace's configured game language; the multi-language formats ignore it.
+    ///     </para>
     /// </summary>
     /// <exception cref="NotSupportedException">The extension has no row reader.</exception>
-    LocDocument Read(string text, string extension);
+    LocDocument Read(string text, string extension, string? fileName = null);
 
     /// <summary>
     ///     Reads a file from disk.

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+import { basename } from 'path';
 import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
@@ -20,6 +21,7 @@ interface GetLocalisationRowsResult {
     ordered: boolean;
     error?: string | null;
     canAddLanguage: boolean;
+    addLanguageCreatesFile: boolean;
 }
 
 interface ApplyLocalisationBatchResult {
@@ -133,6 +135,9 @@ export class LocalisationEditorPanel {
                         break;
                     case 'convertFormat':
                         await this._convertFormat(msg.targetFormat as string);
+                        break;
+                    case 'addLanguageFile':
+                        await this._addLanguageFile(msg.language as string);
                         break;
                     case 'exportDat':
                         await vscode.commands.executeCommand(
@@ -250,6 +255,7 @@ export class LocalisationEditorPanel {
             category: result.category,
             ordered: result.ordered,
             canAddLanguage: result.canAddLanguage,
+            addLanguageCreatesFile: result.addLanguageCreatesFile,
         });
     }
 
@@ -263,6 +269,38 @@ export class LocalisationEditorPanel {
         await vscode.commands.executeCommand(
             'aet-eaw-edit.lsp.convertLocalisationFormat',
             { filePath: this._filePath, targetFormat, category: this._category });
+    }
+
+    /**
+     * Adds a language to a single-language project by creating the sibling file that holds it.
+     *
+     * Not part of the staged batch: the batch composes new text for THIS file, and this writes a
+     * different one. It lands on disk immediately, like every other localisation write, so the
+     * result is offered for opening rather than left for the user to find in the tree.
+     */
+    private async _addLanguageFile(language: string): Promise<void> {
+        const client = this._getLspClient();
+        if (!client) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+
+        const result = await client.sendRequest<{ writtenPath?: string | null; error?: string | null }>(
+            'aet/createLocalisationLanguageFile',
+            { projectFilePath: this._filePath, language });
+
+        if (result.error || !result.writtenPath) {
+            vscode.window.showErrorMessage(`EaWEdit: ${result.error ?? 'could not create the file.'}`);
+            return;
+        }
+
+        const writtenPath = result.writtenPath;
+        const choice = await vscode.window.showInformationMessage(
+            `EaWEdit: created ${writtenPath} with every key from this file, ready to translate.`,
+            'Open');
+
+        if (choice === 'Open') {
+            LocalisationEditorPanel.show(
+                writtenPath, basename(writtenPath), this._category, this._extensionUri,
+                this._getLspClient);
+        }
     }
 
     /**

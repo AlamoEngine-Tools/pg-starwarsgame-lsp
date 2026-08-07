@@ -263,6 +263,38 @@
               "Russian"
             ]
           },
+          "aet-eaw-edit.lsp.localisation.language": {
+            "order": 450,
+            "type": "string",
+            "default": "ENGLISH",
+            "markdownDescription": "Which of the game's languages to resolve when showing translated text for a localisation key.\n\nThis is the *game's* language. It is separate from `#aet-eaw-edit.lsp.locale#`, which sets the language this extension writes its own hover text and diagnostics in.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "enum": [
+              "ENGLISH",
+              "GERMAN",
+              "FRENCH",
+              "SPANISH",
+              "ITALIAN",
+              "POLISH",
+              "RUSSIAN",
+              "CHINESE",
+              "JAPANESE",
+              "KOREAN",
+              "THAI"
+            ],
+            "enumItemLabels": [
+              "English",
+              "German",
+              "French",
+              "Spanish",
+              "Italian",
+              "Polish",
+              "Russian",
+              "Chinese",
+              "Japanese (Empire at War only)",
+              "Korean (Empire at War only)",
+              "Thai (Empire at War only)"
+            ]
+          },
           "aet-eaw-edit.lsp.source.baseline.type": {
             "order": 600,
             "type": "string",

@@ -170,11 +170,20 @@ export const dockChromeCss = `
         justify-content: center;
         background: rgba(0, 0, 0, 0.45);
     }
+    /* A moved dialog is positioned by the hook, so the backdrop must stop centring it. */
     .modal {
+        position: relative;
+        /* border-box, so the width the resize hook writes back is the width it measured. This
+           webview has no global box-sizing reset (the story graph does), so a content-box dialog
+           grew by its own padding and border the instant it was first dragged. */
+        box-sizing: border-box;
         min-width: 280px;
         max-width: min(440px, 90vw);
         max-height: 85vh;
-        overflow: auto;
+        /* hidden, not auto: the box itself must never scroll, or the absolutely-positioned resize
+           handles scroll away with it - and anything overhanging its edges gets clipped. The body
+           scrolls instead, which also keeps the title bar and the buttons pinned. */
+        overflow: hidden;
         display: flex;
         flex-direction: column;
         gap: 10px;
@@ -184,9 +193,68 @@ export const dockChromeCss = `
         background: var(--vscode-editorWidget-background, #252526);
         box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
     }
-    .modal-title { font-weight: 600; font-size: 1.05em; }
-    .modal-body { display: flex; flex-direction: column; gap: 8px; }
+    /* The title bar is the drag handle, so it has to LOOK like one - a flat, full-bleed bar in the
+       host's own title-bar colours, which is where a user already expects to grab a window. Pulled
+       out over the dialog's padding to meet its edges. */
+    .modal-title, .modal > h2.drag-handle {
+        margin: -14px -16px 0;
+        padding: 7px 14px;
+        border-radius: 7px 7px 0 0;
+        border-bottom: 1px solid var(--vscode-titleBar-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+        background: var(--vscode-titleBar-activeBackground, var(--vscode-editorWidget-background, #3c3c3c));
+        color: var(--vscode-titleBar-activeForeground, var(--vscode-foreground, #ccc));
+        font-weight: 600;
+        font-size: 1em;
+    }
+    .drag-handle { cursor: move; user-select: none; touch-action: none; }
+
+    /* The only thing a dialog is allowed to vary: how much room its content needs. Everything else -
+       padding, radius, border, shadow, title bar, handles - is the same box, or they drift into two
+       designs that merely resemble each other. */
+    .modal.modal-wide { min-width: 380px; max-width: min(560px, 90vw); }
+
+    /* Eight grips: four edges, four corners, all wholly inside the box so nothing is clipped.
+
+       The class is namespaced on purpose. The dock's width sash already owns a bare '.resize-handle'
+       (see locGridStyles), which is interpolated after this block at equal specificity - so a shared
+       name let it win and flatten all eight of these into its own 6px full-height strip on the left
+       edge. Every handle then sat on top of the others at the same place, and the dialog looked as
+       though only its left border resized. */
+    .modal-resize { position: absolute; touch-action: none; z-index: 2; }
+    .modal-resize-n { top: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+    .modal-resize-s { bottom: 0; left: 10px; right: 10px; height: 6px; cursor: ns-resize; }
+    .modal-resize-w { left: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+    .modal-resize-e { right: 0; top: 10px; bottom: 10px; width: 6px; cursor: ew-resize; }
+    .modal-resize-nw { top: 0; left: 0; width: 12px; height: 12px; cursor: nwse-resize; }
+    .modal-resize-ne { top: 0; right: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+    .modal-resize-sw { bottom: 0; left: 0; width: 12px; height: 12px; cursor: nesw-resize; }
+    .modal-resize-se {
+        bottom: 0;
+        right: 0;
+        width: 14px;
+        height: 14px;
+        cursor: nwse-resize;
+        /* Two hairlines in the corner - the conventional grip, without shipping an image. */
+        background:
+            linear-gradient(135deg, transparent 50%,
+                var(--vscode-widget-border, rgba(128, 128, 128, 0.55)) 50% 60%, transparent 60%),
+            linear-gradient(135deg, transparent 70%,
+                var(--vscode-widget-border, rgba(128, 128, 128, 0.55)) 70% 80%, transparent 80%);
+    }
+
+    /* The flexible part: the title bar and the buttons keep their height and the body takes what is
+       left, scrolling when the content needs more. min-height:0 because a flex item will not shrink
+       below its content without it, which would push the buttons out of a resized dialog. */
+    .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
     .modal-note { margin: 0; opacity: 0.8; font-size: 0.92em; line-height: 1.35; }
+    .modal-title, .modal > h2.drag-handle, .modal-buttons, .dialog-actions { flex: 0 0 auto; }
     .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; }
 
     .choice-list { display: flex; flex-direction: column; gap: 4px; }

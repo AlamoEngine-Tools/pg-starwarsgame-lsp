@@ -357,6 +357,9 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 			baseGamePath:      cfg('lsp.source').get<string>('baseGameDirectory') || undefined,
 			expansionGamePath: cfg('lsp.source').get<string>('expansionDirectory') || undefined,
 			locale:            cfg('lsp').get<string>('locale', 'en'),
+			// The game's language, not this extension's. `locale` above sets the language the server
+			// writes its own hover text and diagnostics in; this one picks the string table.
+			localisationLanguage: cfg('lsp.localisation').get<string>('language', 'ENGLISH'),
 			schemaUrl:         schemaSource === 'http' ? (cfg('lsp.schema').get<string>('url') || undefined) : undefined,
 			schemaLocalPath:   schemaSource === 'local' ? (cfg('lsp.schema').get<string>('localPath') || undefined) : undefined,
 			baselineType:      cfg('lsp.source.baseline').get<string>('type', 'http'),
@@ -635,7 +638,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				}
 
 				const result = await lspClient.sendRequest<{
-					writtenPath?: string | null; projectFormatChanged: boolean;
+					writtenPath?: string | null; writtenPaths?: string[];
+					projectFormatChanged: boolean;
 					otherFilesInOldFormat: number; error?: string | null;
 				}>('aet/convertLocalisationFormat', { projectFilePath: filePath, targetFormat });
 
@@ -650,8 +654,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					? ` ${result.otherFilesInOldFormat} other file(s) are still in the previous format`
 					+ ' and are no longer loaded.'
 					: '';
+				// A single-language target (NLS) writes one file per language rather than dropping
+				// all but one, so the message has to be able to report more than a single path.
+				const written = result.writtenPaths ?? (result.writtenPath ? [result.writtenPath] : []);
+				const wrote = written.length > 1
+					? `wrote ${written.length} files, one per language: ${written.map(p => path.basename(p)).join(', ')}`
+					: `wrote ${written[0]}`;
 				const choice = await vscode.window.showInformationMessage(
-					`EaWEdit: wrote ${result.writtenPath}. The original file was kept.${orphans}`,
+					`EaWEdit: ${wrote}. The original file was kept.${orphans}`,
 					'Open');
 				localisationNavigatorProvider?.refresh();
 				if (choice === 'Open' && result.writtenPath) {

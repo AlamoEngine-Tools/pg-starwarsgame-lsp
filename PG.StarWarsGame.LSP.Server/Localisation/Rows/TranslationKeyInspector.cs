@@ -1,6 +1,9 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.Commons.Hashing;
+using PG.StarWarsGame.Files.DAT.Binary;
+
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
@@ -11,18 +14,41 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 ///     </para>
 ///     <para>
 ///         What it finds is nearly always pre-existing:
-///         <see cref="KeyedCommandTranslator" /> refuses to create a blank or clashing key, so a
+///         <see cref="KeyedCommandTranslator" /> refuses to create a blank or colliding key, so a
 ///         problem reported here is one the file already had.
 ///     </para>
 /// </summary>
 public static class TranslationKeyInspector
 {
-    public static IReadOnlyList<LocTranslationProblemDto> Inspect(IReadOnlyList<string> keys)
+    /// <summary>
+    ///     Reports blank keys, real collisions, and keys that differ only in case.
+    /// </summary>
+    /// <remarks>
+    ///     Collision is decided by the engine's own rule, not by string comparison: an entry is
+    ///     addressed by the CRC32 of its key bytes in ASCII (<c>DatBinaryConverter</c>), so two keys
+    ///     collide exactly when those hashes match.
+    ///     <para>
+    ///         This used to compare case-insensitively and call any case-only difference an error, on
+    ///         the belief that the game resolves a key however it is spelled. It does not - CRC32 is
+    ///         case-sensitive, so <c>TEXT_A</c> and <c>text_a</c> are two entries and both are read.
+    ///         They stay reported, as a warning, because telling two keys apart by case alone is a
+    ///         trap for whoever reads the file next.
+    ///     </para>
+    ///     <para>
+    ///         Hashing through ASCII also folds every non-ASCII character to <c>?</c>, so two keys
+    ///         differing only outside ASCII collide for real however different they look. No string
+    ///         comparison would ever find that; the checksum does.
+    ///     </para>
+    /// </remarks>
+    public static IReadOnlyList<LocTranslationProblemDto> Inspect(
+        IReadOnlyList<string> keys, ICrc32HashingService hashing)
     {
         var problems = new List<LocTranslationProblemDto>();
-        // Case-insensitive because the game resolves a key regardless of how it is spelled, so two
-        // castings of one name are one entry and only one of them is ever read.
-        var seen = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        // Keyed by the engine's own identity for an entry. Case-insensitive lookup is tracked
+        // separately because it is a readability concern, not a correctness one.
+        var byChecksum = new Dictionary<uint, int>();
+        var byCasing = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         for (var i = 0; i < keys.Count; i++)
         {
@@ -31,18 +57,49 @@ public static class TranslationKeyInspector
             if (string.IsNullOrWhiteSpace(key))
             {
                 problems.Add(new LocTranslationProblemDto(null, null, LocProblemSeverity.Error,
-                    "This entry has no key, so the game cannot reference it."));
+                    "This entry has no key, so the game cannot reference it.", i));
                 continue;
             }
 
-            if (seen.TryGetValue(key, out var first))
+            var checksum = ChecksumOf(key, hashing);
+
+            if (byChecksum.TryGetValue(checksum, out var collidesWith))
+            {
                 problems.Add(new LocTranslationProblemDto(key, null, LocProblemSeverity.Error,
-                    $"'{key}' is already defined on row {first + 1}. "
-                    + "Only one of the two would ever be read."));
+                    CollisionMessage(key, keys[collidesWith], collidesWith, checksum), i));
+                continue;
+            }
+
+            byChecksum[checksum] = i;
+
+            // Only reached when the checksums differ, so these really are two separate entries.
+            if (byCasing.TryGetValue(key, out var differsInCaseFrom))
+                problems.Add(new LocTranslationProblemDto(key, null, LocProblemSeverity.Warning,
+                    $"'{key}' differs from '{keys[differsInCaseFrom]}' on row {differsInCaseFrom + 1} "
+                    + "only in case. The game treats them as two separate entries, so both are read - "
+                    + "but nothing else will make it obvious which is which.", i));
             else
-                seen[key] = i;
+                byCasing[key] = i;
         }
 
         return problems;
+    }
+
+    /// <summary>The engine's identity for a key: CRC32 over its ASCII bytes.</summary>
+    public static uint ChecksumOf(string key, ICrc32HashingService hashing)
+    {
+        return (uint)hashing.GetCrc32(key, DatFileConstants.TextKeyEncoding);
+    }
+
+    private static string CollisionMessage(string key, string existing, int existingIndex, uint checksum)
+    {
+        // An identical key is the ordinary case and deserves the ordinary wording; a genuine hash
+        // collision between different spellings needs to say so, or it reads as a false positive.
+        return string.Equals(key, existing, StringComparison.Ordinal)
+            ? $"'{key}' is already defined on row {existingIndex + 1}. "
+              + "Only one of the two would ever be read."
+            : $"'{key}' has the same checksum (0x{checksum:X8}) as '{existing}' on row "
+              + $"{existingIndex + 1}, so the game cannot tell them apart and only one would ever be "
+              + "read.";
     }
 }

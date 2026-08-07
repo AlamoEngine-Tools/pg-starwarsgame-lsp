@@ -26,12 +26,20 @@ public sealed record GetLocalisationRowsParams(string ProjectFilePath) : IReques
 ///     uses it to decide whether to offer reordering, and to stop treating the key as an identity.
 /// </param>
 /// <param name="CanAddLanguage">
-///     Whether this file can gain another language column at all. False for the single-language
-///     formats - <c>.properties</c> and <c>.dat</c>, which hold one language by construction (the
-///     DAT's is its file name). The rule belongs to
-///     <see cref="LocalisationDocumentEditor" />, which is what refuses the command; it is reported
-///     here so the client can leave the action out rather than offering something that will be
-///     rejected, and so the list of single-language formats exists in one place.
+///     Whether this file can gain another language <em>column</em>. False for the single-language
+///     formats - <c>.properties</c> and <c>.dat</c>, which hold one language by construction and name
+///     it in their file name. The rule belongs to <see cref="LocalisationDocumentEditor" />, which is
+///     what refuses the command; it is reported here so the client does not stage an edit that will
+///     be rejected, and so the list of single-language formats exists in one place.
+/// </param>
+/// <param name="AddLanguageCreatesFile">
+///     Whether adding a language to this file means creating a sibling file rather than a column -
+///     true for exactly the formats <paramref name="CanAddLanguage" /> is false for.
+///     <para>
+///         The two together tell the client which of the two routes to take, so "add a language"
+///         stays one action for the user. It used to be greyed out here, which left no way at all to
+///         add a language to a single-language project.
+///     </para>
 /// </param>
 public sealed record GetLocalisationRowsResult(
     IReadOnlyList<LocRowDto> Rows,
@@ -40,4 +48,5 @@ public sealed record GetLocalisationRowsResult(
     string Category = LocCategory.Text,
     bool Ordered = false,
     string? Error = null,
-    bool CanAddLanguage = false);
+    bool CanAddLanguage = false,
+    bool AddLanguageCreatesFile = false);

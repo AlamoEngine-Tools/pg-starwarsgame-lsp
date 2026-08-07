@@ -6,6 +6,7 @@ using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
@@ -35,6 +36,7 @@ public interface ILocalisationFormatConverter
 
 public sealed class LocalisationFormatConverter : ILocalisationFormatConverter
 {
+    private readonly ILspConfigurationProvider _configProvider;
     private readonly ICsvTranslationExporter _csvExporter;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
@@ -46,13 +48,15 @@ public sealed class LocalisationFormatConverter : ILocalisationFormatConverter
         IXmlTranslationExporter xmlExporter,
         IPropertiesTranslationExporter nlsExporter,
         ILanguageService langService,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        ILspConfigurationProvider configProvider)
     {
         _csvExporter = csvExporter;
         _xmlExporter = xmlExporter;
         _nlsExporter = nlsExporter;
         _langService = langService;
         _fileHelper = fileHelper;
+        _configProvider = configProvider;
     }
 
     public string? ExtensionFor(string format)
@@ -69,11 +73,19 @@ public sealed class LocalisationFormatConverter : ILocalisationFormatConverter
     public async Task<bool> WriteAsync(
         ITranslationDatabase db, string format, string targetPath, CancellationToken ct)
     {
+        // NLS holds one language, so which one it writes is decided by the name it is being written
+        // to - the same rule that decides which language it reads back as. Falls back to the
+        // workspace's configured game language for a target that does not name one.
+        var nlsLanguage = LocalisationFileNameLanguageResolver.Resolve(
+            targetPath, _langService,
+            LocalisationFileNameLanguageResolver.Configured(_langService, _configProvider.Current.Localisation),
+            out _);
+
         var content = format.ToLowerInvariant() switch
         {
             "csv" => _csvExporter.Export(db),
             "xml" => _xmlExporter.Export(db).ToString(),
-            "nls" => _nlsExporter.Export(db, _langService.Default),
+            "nls" => _nlsExporter.Export(db, nlsLanguage),
             _ => null
         };
         if (content is null) return false;

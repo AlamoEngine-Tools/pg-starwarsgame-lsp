@@ -21,6 +21,7 @@ import {
 import { dockBodyCss, dockChromeCss, dockOverviewCss } from './shared/dockChrome';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
 import { useEdgeResize } from './useEdgeResize';
+import { severityIconFor, worstSeverity } from './loc/validateState';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -3779,13 +3780,11 @@ function App(): React.JSX.Element {
     const anyFilter = !!(filters.nameFilter || filters.branch || filters.lifecycle || filters.reachableFrom);
 
     // Validate button reads out validation health (codicon name; coloured via sev-* class):
-    // unvalidated (stale/never run) → error → warning → clean.
-    const severity = !validated ? 'unvalidated'
-        : problems.some(p => p.severity === 'error') ? 'error'
-            : problems.some(p => p.severity === 'warning') ? 'warning' : 'ok';
-    const severityIcon = severity === 'unvalidated' ? 'question'
-        : severity === 'error' ? 'error'
-            : severity === 'warning' ? 'warning' : 'check';
+    // unvalidated (stale/never run) beats error beats warning beats clean. The precedence and the
+    // glyph mapping are shared with the localisation editor's Validate tag so the two controls mean
+    // the same thing - two copies of this rule drifted apart once already.
+    const severity = !validated ? 'unvalidated' : worstSeverity(problems);
+    const severityIcon = severityIconFor(severity);
 
     const { size: dockWidth, handleProps: dockResize } = useEdgeResize(
         paletteWidthMemo, 210, 520, 'w', v => { paletteWidthMemo = v; });

@@ -9,7 +9,6 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import styled from 'styled-components';
 
 import { BaselineSuggestion, suggestBaselineKeys } from './baselineSuggestions';
 import { CellInput, menuAction, RowMenuFrame } from './loc/LocCells';
@@ -23,9 +22,12 @@ import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
 import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
 import { LocRow } from './loc/locRow';
+import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
 import { severityIconFor, validateTitle } from './loc/validateState';
+import { ResizeHandles } from './shared/ResizeHandles';
+import { useMovableDialog } from './shared/useMovableDialog';
 import { buildRowFilter, FilterMode } from './locFilter';
 import {
     BaselineEntryDto, BaselineRow, baselineValuesFor, findInheritedKeys, hideInherited,
@@ -87,7 +89,8 @@ function App(): React.JSX.Element {
     });
 
     const {
-        rows, languages, setLanguages, canAddLanguage, supportedLanguages, error, loaded, queue,
+        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile,
+        supportedLanguages, error, loaded, queue,
         problems, validation, stage, save, validate,
     } = panel;
 
@@ -151,6 +154,10 @@ function App(): React.JSX.Element {
             hideInherited(rows, inherited, showInherited).filter(rowFilter.test),
             sort),
         [rows, inherited, showInherited, rowFilter, sort]);
+
+    // Built from the whole row set, not the visible slice: a row scrolled out of view is still the
+    // row a finding is about, and the map is keyed by index so the grid can look it up per row.
+    const rowSeverities = useMemo(() => severityByRow(problems, rows), [problems, rows]);
 
     const problemKeys = useMemo(() => {
         const byKey = new Map<string, LocProblem>();
@@ -323,10 +330,19 @@ function App(): React.JSX.Element {
             <LocDockActions
                 languages={languages}
                 canAddLanguage={canAddLanguage}
+                addLanguageCreatesFile={addLanguageCreatesFile}
                 supportedLanguages={supportedLanguages}
                 rowCount={rows.length}
                 baselineFillCount={language => languageFillValues(language, rows, baseline).length}
                 onAddLanguage={(language, fillFromBaseline) => {
+                    // A single-language format cannot take a column - the language goes in a new
+                    // file beside this one, which the host has to create because it is not an edit
+                    // to this document and cannot be staged with the rest of the batch.
+                    if (addLanguageCreatesFile) {
+                        post({ type: 'addLanguageFile', language });
+                        return;
+                    }
+
                     stage({ kind: 'addLanguage', language });
                     setLanguages(current => [...current, language]);
                     // Explicit from here on, so the column just added is not hidden for being empty.
@@ -416,7 +432,7 @@ function App(): React.JSX.Element {
             header={header}
             renderRow={renderRow}
             rowClassName={row => [
-                problemKeys.has(row.key) ? 'has-problem' : '',
+                rowSeverityClass(rowSeverities.get(row.index)) ?? '',
                 row.key === selected ? 'selected' : '',
                 // Only visible when showing them, since they are otherwise filtered out entirely.
                 inherited.has(row.key) ? 'inherited' : '',
@@ -586,18 +602,30 @@ function AddTranslationDialog(props: {
         setPicked(true);
     };
 
+    // Movable and resizable like every other dialog: this one carries a key, a value per language
+    // and a suggestion list, so it is the one most likely to need more room - and to need moving
+    // aside to read the row it is about to duplicate.
+    const { dialogProps, dragHandleProps, resizeHandleProps } = useMovableDialog();
+
     return (
-        <Backdrop onPointerDown={e => { if (e.target === e.currentTarget) { props.onCancel(); } }}>
+        <div
+            className="modal-backdrop"
+            onPointerDown={e => { if (e.target === e.currentTarget) { props.onCancel(); } }}
+        >
             <form
-                className="dialog"
+                className="modal modal-wide"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add translation"
                 onSubmit={e => { e.preventDefault(); submit(); }}
                 onKeyDown={e => { if (e.key === 'Escape') { props.onCancel(); } }}
+                {...dialogProps}
             >
-                <h2>Add translation</h2>
+                <h2 className="drag-handle" {...dragHandleProps}>Add translation</h2>
 
+                {/* The scrolling middle, so the title bar and the buttons stay put when the dialog
+                    is resized small - the same structure LocModal has. */}
+                <div className="modal-body">
                 <label className="field">
                     <span>Key</span>
                     <input
@@ -648,13 +676,15 @@ function AddTranslationDialog(props: {
                 {/* Not required: a key with no text yet is a legitimate thing to add, and the
                     untranslated cells are visible in the grid afterwards. */}
                 <p className="hint">Languages you leave empty stay empty.</p>
+                </div>
 
                 <div className="dialog-actions">
                     <button type="button" onClick={props.onCancel}>Cancel</button>
                     <button type="submit" className="primary" disabled={error !== null}>Add</button>
                 </div>
+                <ResizeHandles handleProps={resizeHandleProps} />
             </form>
-        </Backdrop>
+        </div>
     );
 }
 
@@ -666,130 +696,5 @@ function valueOf(row: LocRow, language: string): string {
 
 // Examples from this file's own vocabulary.
 const PLACEHOLDERS: Record<FilterMode, string> = { text: 'Filter rows...', wildcard: 'TEXT_*_NAME', regex: '^TEXT_.*NAME$' };
-
-// Covers the whole editor rather than the grid alone, so the dialog cannot be scrolled away from
-// or edited around while it is open.
-const Backdrop = styled.div`
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
-
-    .dialog {
-        min-width: 380px;
-        max-width: min(560px, 90vw);
-        max-height: 85vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        padding: 16px 18px;
-        background: var(--vscode-editorWidget-background, #252526);
-        border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, #454545));
-        border-radius: 4px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    }
-
-    h2 { margin: 0; font-size: 1.1em; font-weight: 600; }
-
-    .field { display: flex; flex-direction: column; gap: 3px; }
-    .field > span { opacity: 0.85; font-size: 0.9em; }
-
-    .field input {
-        background: var(--vscode-input-background, #3c3c3c);
-        color: var(--vscode-input-foreground, #ccc);
-        border: 1px solid var(--vscode-input-border, transparent);
-        padding: 4px 6px;
-        font: inherit;
-    }
-
-    .field input:focus {
-        outline: 1px solid var(--vscode-focusBorder, #007fd4);
-        outline-offset: -1px;
-    }
-
-    .field input[aria-invalid='true'] {
-        border-color: var(--vscode-inputValidation-errorBorder, #be1100);
-    }
-
-    .field-error {
-        margin: -4px 0 0;
-        color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f48771));
-        font-size: 0.9em;
-    }
-
-    /* Scrolls on its own once a project declares more languages than fit - the key field and the
-       buttons stay put. */
-    .languages {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        max-height: 40vh;
-        overflow-y: auto;
-        padding-top: 4px;
-        border-top: 1px solid var(--vscode-panel-border, #444);
-    }
-
-    .hint { margin: 0; opacity: 0.6; font-size: 0.9em; }
-
-    /* Sits directly under the key field, capped so a broad prefix cannot push the buttons off the
-       dialog. */
-    .suggestions {
-        list-style: none;
-        margin: -4px 0 0;
-        padding: 0;
-        max-height: 30vh;
-        overflow-y: auto;
-        border: 1px solid var(--vscode-panel-border, #444);
-    }
-
-    .suggestions button {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        width: 100%;
-        padding: 3px 6px;
-        background: none;
-        border: none;
-        color: inherit;
-        font: inherit;
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .suggestions button:hover, .suggestions button:focus-visible {
-        background: var(--vscode-list-hoverBackground, #2a2d2e);
-        outline: none;
-    }
-
-    .suggestion-key { white-space: nowrap; }
-    .suggestion-value {
-        opacity: 0.6;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .dialog-actions { display: flex; justify-content: flex-end; gap: 6px; }
-
-    .dialog-actions button {
-        background: var(--vscode-button-secondaryBackground, #3a3d41);
-        color: var(--vscode-button-secondaryForeground, #ccc);
-        border: none;
-        padding: 4px 14px;
-        font: inherit;
-        cursor: pointer;
-    }
-
-    .dialog-actions .primary {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
-    }
-
-    .dialog-actions button:disabled { opacity: 0.5; cursor: default; }
-`;
 
 createRoot(document.getElementById('root')!).render(<App />);

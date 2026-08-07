@@ -42,11 +42,16 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     ///     another language column.
     /// </summary>
     /// <remarks>
-    ///     The two that cannot are single-language by construction: a <c>.properties</c> file has no
-    ///     way to name a second language, and a <c>.dat</c> carries its one language in its file
-    ///     name. Both <c>addLanguage</c> refusals below defer to this, and so does the read endpoint
-    ///     that tells the client whether to offer the action at all - the list of formats lives here
-    ///     only.
+    ///     The two that cannot hold a second language are <c>.properties</c> and <c>.dat</c>: both
+    ///     store one language per file and carry it in the file name, the way Java's
+    ///     <c>ResourceBundle</c> and the engine's own <c>mastertextfile_english.dat</c> do. Another
+    ///     language means another file, not another column.
+    ///     <para>
+    ///         Both <c>addLanguage</c> refusals below defer to this, so does the read endpoint that
+    ///         tells the client whether to offer the action, and so does
+    ///         <see cref="LocalisationFileNameLanguageResolver.CarriesLanguageInFileName" /> - the list
+    ///         of single-language formats lives here only.
+    ///     </para>
     /// </remarks>
     public static bool SupportsMultipleLanguages(string extension)
     {
@@ -62,7 +67,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         if (extension != ".dat")
         {
             var original = await fs.File.ReadAllTextAsync(filePath, ct);
-            var composed = Apply(original, extension, commands);
+            var composed = Apply(original, extension, commands, filePath);
             if (!composed.Success) return composed;
 
             await fs.File.WriteAllTextAsync(filePath, composed.NewText!, ct);
@@ -101,7 +106,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             return LocalisationEditResult.Ok(string.Empty);
         }
 
-        return Apply(fs.File.ReadAllText(filePath), extension, commands);
+        return Apply(fs.File.ReadAllText(filePath), extension, commands, filePath);
     }
 
     /// <inheritdoc />
@@ -186,7 +191,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             return KeyedTranslationResult.Fail(0, $"Unsupported format: {extension}");
         }
 
-        return KeyedCommandTranslator.Translate(document, commands);
+        return KeyedCommandTranslator.Translate(document, commands, _hashing);
     }
 
     /// <summary>
@@ -299,7 +304,8 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     }
 
     public LocalisationEditResult Apply(
-        string originalText, string extension, IReadOnlyList<LocEditCommandDto> commands)
+        string originalText, string extension, IReadOnlyList<LocEditCommandDto> commands,
+        string? fileName = null)
     {
         // XML is composed through XDocument rather than through row slices: with preserved
         // whitespace it already re-serialises untouched markup unchanged, and rebuilding elements
@@ -309,7 +315,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         LocDocument document;
         try
         {
-            document = _reader.Read(originalText, extension);
+            document = _reader.Read(originalText, extension, fileName);
         }
         catch (NotSupportedException)
         {
@@ -346,8 +352,18 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             if (ApplyXmlCommand(commands[i], rows, ns) is { } error)
                 return LocalisationEditResult.Fail(i, error);
 
-        var declaration = document.Declaration is { } d ? d + DetectLineEnding(text) : string.Empty;
-        return LocalisationEditResult.Ok(declaration + Serialise(document.Root));
+        var lineEnding = DetectLineEnding(text);
+        var declaration = document.Declaration is { } d ? d + lineEnding : string.Empty;
+        var body = Serialise(document.Root);
+
+        // An XML parser is required to normalise every line ending to LF (XML 1.0 section 2.11), so a
+        // CRLF file comes out of the tree in LF no matter how carefully the writer is configured -
+        // and a one-cell edit rewrote every line of it. The declaration's ending was already restored
+        // here; the body's never was. Safe as a blind replace because the parse guarantees no CRLF
+        // survived to be doubled.
+        if (lineEnding != "\n") body = body.Replace("\n", lineEnding, StringComparison.Ordinal);
+
+        return LocalisationEditResult.Ok(declaration + body);
     }
 
     /// <summary>

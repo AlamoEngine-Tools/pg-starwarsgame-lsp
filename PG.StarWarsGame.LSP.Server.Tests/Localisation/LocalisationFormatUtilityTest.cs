@@ -46,4 +46,41 @@ public sealed class LocalisationFormatUtilityTest
     {
         Assert.Null(LocalisationFormatUtility.ToExtension(format));
     }
+
+    // ── seed file names ──────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     The engine's own files are lowercase - <c>mastertextfile_english.dat</c>,
+    ///     <c>creditstext_english.dat</c> - and the game reads names case-insensitively. We wrote
+    ///     PascalCase into the same folders, so a stock text directory ended up holding
+    ///     <c>MasterTextFile.csv</c> next to <c>mastertextfile_english.dat</c>.
+    /// </summary>
+    [Theory]
+    [InlineData("csv", "mastertextfile.csv")]
+    [InlineData("xml", "mastertextfile.xml")]
+    public void ToSeedFileName_MultiLanguageFormat_IsLowercaseAndCarriesNoLanguage(
+        string format, string expected)
+    {
+        Assert.Equal(expected, LocalisationFormatUtility.ToSeedFileName(format));
+    }
+
+    /// <summary>
+    ///     A single-language format names its language in the file name, so a seed cannot be written
+    ///     without one - that is what left <c>MasterTextFile.properties</c> holding a language nothing
+    ///     could identify.
+    /// </summary>
+    [Theory]
+    [InlineData("nls", "ENGLISH", "mastertextfile_english.properties")]
+    [InlineData("nls", "GERMAN", "mastertextfile_german.properties")]
+    public void ToSeedFileName_SingleLanguageFormat_CarriesTheLanguageLowercased(
+        string format, string language, string expected)
+    {
+        Assert.Equal(expected, LocalisationFormatUtility.ToSeedFileName(format, language));
+    }
+
+    [Fact]
+    public void ToSeedFileName_SingleLanguageFormatWithNoLanguage_IsNull()
+    {
+        Assert.Null(LocalisationFormatUtility.ToSeedFileName("nls"));
+    }
 }

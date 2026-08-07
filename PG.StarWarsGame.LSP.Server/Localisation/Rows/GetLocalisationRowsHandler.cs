@@ -88,7 +88,9 @@ public sealed class GetLocalisationRowsHandler
             // creditstext_<LANGUAGE>.dat, but that constrains the DAT export, not the file being
             // edited: ExportLocalisationToDatHandler writes one CreditsText_<LANGUAGE>.dat per
             // language found in the source, which is how one credits file produces every crawl.
-            CanAddLanguage: LocalisationDocumentEditor.SupportsMultipleLanguages(extension));
+            CanAddLanguage: LocalisationDocumentEditor.SupportsMultipleLanguages(extension),
+            AddLanguageCreatesFile:
+            LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension));
     }
 
     /// <summary>

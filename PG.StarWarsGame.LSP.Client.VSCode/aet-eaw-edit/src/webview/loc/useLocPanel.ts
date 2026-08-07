@@ -11,6 +11,8 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { LocRow } from '../loc/locRow';
+import { useDebounced, VALIDATE_DEBOUNCE_MS } from './useDebounced';
+import { worstSeverity } from './validateState';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -31,7 +33,7 @@ export interface LocProblem {
     message: string;
 }
 
-export type ValidationState = 'unvalidated' | 'ok' | 'error';
+export type ValidationState = 'unvalidated' | 'ok' | 'info' | 'warning' | 'error';
 
 export interface LocPanelMessage { type: string; [key: string]: unknown }
 
@@ -52,6 +54,8 @@ export interface LocPanel<C> {
     /** Whether this file's format can hold more than one language. The server decides; see
      *  LocalisationDocumentEditor.SupportsMultipleLanguages. */
     canAddLanguage: boolean;
+    /** Adding a language here means creating a sibling file, not a column. */
+    addLanguageCreatesFile: boolean;
     /** The languages the engine officially supports - the only ones worth adding. */
     supportedLanguages: string[];
     error: string | null;
@@ -83,6 +87,7 @@ export function useLocPanel<C>(options: {
     const [ordered, setOrdered] = useState(false);
     const [category, setCategory] = useState('text');
     const [canAddLanguage, setCanAddLanguage] = useState(false);
+    const [addLanguageCreatesFile, setAddLanguageCreatesFile] = useState(false);
     const [supportedLanguages, setSupportedLanguages] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
@@ -106,6 +111,7 @@ export function useLocPanel<C>(options: {
                     setOrdered(msg.ordered as boolean);
                     setCategory(msg.category as string);
                     setCanAddLanguage(msg.canAddLanguage === true);
+                    setAddLanguageCreatesFile(msg.addLanguageCreatesFile === true);
                     setSupportedLanguages((msg.supportedLanguages as string[]) ?? []);
                     setQueue([]);
                     setProblems([]);
@@ -123,9 +129,9 @@ export function useLocPanel<C>(options: {
 
                 case 'problems':
                     setProblems((msg.problems as LocProblem[]) ?? []);
-                    setValidation(
-                        ((msg.problems as LocProblem[]) ?? []).some(p => p.severity === 'error')
-                            ? 'error' : 'ok');
+                    // The tag reads out the highest level reported - see worstSeverity, which is
+                    // the rule the story graph editor's Validate button uses too.
+                    setValidation(worstSeverity((msg.problems as LocProblem[]) ?? []));
                     break;
 
                 case 'saveResult':
@@ -166,6 +172,21 @@ export function useLocPanel<C>(options: {
 
     const { applyStaged, coalesce } = options;
 
+    /**
+     * Re-checks the file as staged edits settle.
+     *
+     * A batch is applied all or nothing, so a single bad change refuses the save and takes every
+     * other change with it. Checking only on demand meant that was discovered at Save - by which
+     * point the offending edit could be two hundred edits back, with no indication which one it
+     * was. Now the problem appears against the row that caused it, while it is still the thing on
+     * screen.
+     */
+    const settledQueue = useDebounced(queue, VALIDATE_DEBOUNCE_MS);
+    useEffect(() => {
+        if (settledQueue.length === 0) { return; }
+        vscode.postMessage({ type: 'validateBatch', commands: coalesce(settledQueue) });
+    }, [settledQueue, coalesce]);
+
     const stage = useCallback((command: C) => {
         setRows(current => applyStaged(current, command));
         setQueue(current => [...current, command]);
@@ -184,6 +205,7 @@ export function useLocPanel<C>(options: {
 
     return {
         rows, setRows, languages, setLanguages, ordered, category, canAddLanguage,
+        addLanguageCreatesFile,
         supportedLanguages, error, loaded,
         queue, problems, validation,
         stage, save, validate,

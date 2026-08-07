@@ -37,11 +37,18 @@ public sealed class ModProjectFileWriter : IModProjectFileWriter
         var root = JsonNode.Parse(text, documentOptions: ParseOptions)?.AsObject()
                    ?? throw new InvalidOperationException($"'{pgprojPath}' is not a valid JSON object.");
 
-        root["localisation"] = new JsonObject
+        // Written into the existing node rather than over it. Replacing it wholesale discarded any
+        // 'credits' settings the user had hand-written - nothing in the server ever writes that node,
+        // so an import or a format conversion silently undid the only way to configure it.
+        var localisation = root["localisation"]?.AsObject();
+        if (localisation is null)
         {
-            ["type"] = type,
-            ["directory"] = directory
-        };
+            localisation = new JsonObject();
+            root["localisation"] = localisation;
+        }
+
+        localisation["type"] = type;
+        localisation["directory"] = directory;
 
         await fs.File.WriteAllTextAsync(pgprojPath, root.ToJsonString(WriteOptions), ct);
     }

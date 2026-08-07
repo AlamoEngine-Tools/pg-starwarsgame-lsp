@@ -12,7 +12,7 @@ import {
 
 interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; error?: string | null; }
 
-type LocNodeKind = 'group' | 'layer' | 'file' | 'info';
+type LocNodeKind = 'group' | 'layer' | 'fileset' | 'file' | 'info';
 
 export class LocTreeItem extends vscode.TreeItem {
     constructor(
@@ -129,6 +129,17 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
         const item = new LocTreeItem(
             node.label, vscode.TreeItemCollapsibleState.Expanded, node.kind, node);
 
+        // A set of language siblings: one logical file the format forced across several. Named for
+        // the file it would be if the format could hold every language, described by the ones it
+        // actually covers - which is the question a translator opens this tree to answer.
+        if (node.kind === 'fileset') {
+            item.iconPath = new vscode.ThemeIcon('symbol-namespace');
+            item.contextValue = 'aetLocFileSet';
+            item.description = node.languages.join(', ');
+            item.tooltip = `${node.languages.length} languages: ${node.languages.join(', ')}`;
+            return item;
+        }
+
         if (node.kind === 'group') {
             // list-ordered for credits: order is the thing that distinguishes them.
             item.iconPath = new vscode.ThemeIcon(
@@ -149,7 +160,12 @@ function fileItem(node: LocTreeNode & { kind: 'file' }): LocTreeItem {
         node.label, vscode.TreeItemCollapsibleState.None, 'file', node, node.project);
 
     item.iconPath = new vscode.ThemeIcon('table');
-    item.description = node.project.resourceType.toUpperCase();
+    // Inside a set the label is the language, so the format is the same on every row and the file
+    // name is the useful thing to show. The model signals that by labelling the node with something
+    // other than the file's own name.
+    item.description = node.label === node.project.label
+        ? node.project.resourceType.toUpperCase()
+        : node.project.label;
     item.tooltip = node.project.filePath;
     // Distinct context values so a menu can offer credits-only actions without checking the label.
     item.contextValue = node.project.category === CREDITS_CATEGORY ? 'aetLocFileCredits' : 'aetLocFile';

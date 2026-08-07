@@ -4,6 +4,7 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -120,6 +121,29 @@ public sealed class CreditsBatchHandlerTest
         Assert.Empty(result.Problems);
     }
 
+    /// <summary>
+    ///     A heading with nothing under it is reported as information, never as a problem.
+    ///     <para>
+    ///         A credits key is a formatting directive, so such a file is valid and the crawl renders
+    ///         it exactly as written - it just reads the heading out and moves on. It is worth seeing,
+    ///         since it usually means the label was translated and the names under it were not, but
+    ///         grading a valid file as broken teaches people to ignore the tag.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task Validate_AHeadingWithNothingUnderIt_IsInformationNotAProblem()
+    {
+        var (_, validate, _) = Build(Files(
+            "key,ENGLISH\nHEADER,Directed by\nHEADER,Produced by\nCENTER,SOMEONE\n"));
+
+        var result = await validate.Handle(
+            new ValidateCreditsBatchParams(Path, []), CancellationToken.None);
+
+        var problem = Assert.Single(result.Problems);
+        Assert.Equal(LocProblemSeverity.Info, problem.Severity);
+        Assert.Contains("Directed by", problem.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Validate_ABatchThatCannotCompose_IsReported()
     {
@@ -173,6 +197,7 @@ public sealed class CreditsBatchHandlerTest
         services.AddSingleton<IFileSystem>(fs);
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         var sp = services.BuildServiceProvider();

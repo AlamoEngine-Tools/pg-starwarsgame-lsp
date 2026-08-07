@@ -13,10 +13,11 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 ///     entries is exactly what lets one file carry both. Warning about that would be noise on every
 ///     correctly translated file.
 ///     <para>
-///         What is a mistake in any language is a <c>HEADER</c> that survives into the crawl with no
-///         <c>CENTER</c> line beneath it: the heading is read out, and then the crawl moves on to
-///         the next section. That happens when the label is translated but the names under it are
-///         not, which no budget explains.
+///         What it does report is a <c>HEADER</c> that survives into the crawl with no <c>CENTER</c>
+///         line beneath it: the heading is read out, and then the crawl moves on to the next section.
+///         That is usually a label translated without the names under it - but it is not an error.
+///         A credits key is a formatting directive, so such a file is valid and renders exactly as
+///         written, which is why the finding is graded as information rather than as a problem.
 ///     </para>
 ///     <para>
 ///         Keyed on the shipped directives. A file using its own vocabulary simply reports nothing
@@ -59,9 +60,10 @@ public static class CreditsCoverageInspector
 
     public static string Message(string language, string label)
     {
-        return $"In {language}, '{label}' is a heading with nothing under it - the crawl reads it "
-               + "out and moves straight on. Either fill in the entries below it or leave the "
-               + "heading itself empty so the whole section is skipped.";
+        return $"In {language}, '{label}' is a heading with nothing under it. The crawl reads it out "
+               + "and moves straight on, which is valid - a credits key is a formatting directive, "
+               + "not an entry. Usually it means the label was translated and the names under it were "
+               + "not; leaving the heading itself empty skips the whole section.";
     }
 
     private static bool IsHeader(LocRowDto row)

@@ -14,6 +14,7 @@ using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -125,7 +126,10 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
 
         var sourceExt = ResourceTypeToExtension(sourceFormat);
         var sourceFiles = fs.Directory
-            .EnumerateFiles(sourceDirectory, $"*{sourceExt}", SearchOption.TopDirectoryOnly)
+            .EnumerateFiles(sourceDirectory, "*", SearchOption.TopDirectoryOnly)
+            // Filtered rather than globbed - see LocalisationLoader.EnumerateFromTextRoots.
+            .Where(p => string.Equals(
+                fs.Path.GetExtension(p), sourceExt, StringComparison.OrdinalIgnoreCase))
             .ToList();
         if (sourceFiles.Count == 0)
         {
@@ -164,7 +168,10 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 return Unit.Value;
             }
 
-            var targetFileName = LocalisationFormatUtility.ToSeedFileName(targetFormat);
+            var targetFileName = LocalisationFormatUtility.ToSeedFileName(
+                targetFormat,
+                LocalisationFileNameLanguageResolver
+                    .Configured(_langService, _config.Current.Localisation).LanguageIdentifier);
             if (targetFileName is null)
             {
                 Fail($"Cannot import localisation files: '{targetFormat}' is not a format that can be " +
@@ -243,7 +250,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         // language with no self-describing language tag, so the language comes from the file name.
         if (string.Equals(format, "dat", StringComparison.OrdinalIgnoreCase))
         {
-            if (!DatFileNameLanguageResolver.TryResolve(path, _langService, out var language))
+            if (!LocalisationFileNameLanguageResolver.TryResolve(path, _langService, out var language))
             {
                 _logger.LogWarning(
                     "aet-eaw-edit.lsp.importLocalisationProject: could not determine a language from DAT " +
@@ -294,7 +301,7 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
                 case "nls":
                     using (var reader = new StringReader(content))
                     {
-                        _nlsImporter.Import(reader, _langService.Default, db);
+                        _nlsImporter.Import(reader, NlsLanguageOf(path), db);
                     }
 
                     break;
@@ -325,5 +332,18 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
         ExecuteCommandCapability capability, ClientCapabilities clientCapabilities)
     {
         return new ExecuteCommandRegistrationOptions { Commands = new Container<string>(CommandName) };
+    }
+
+    /// <summary>
+    ///     The language a <c>.properties</c> source holds. NLS names its language in the file name and
+    ///     nowhere else, so a file that does not name one falls back to the workspace's configured game
+    ///     language rather than being assumed to be the service default.
+    /// </summary>
+    private IAlamoLanguageDefinition NlsLanguageOf(string path)
+    {
+        return LocalisationFileNameLanguageResolver.Resolve(
+            path, _langService,
+            LocalisationFileNameLanguageResolver.Configured(_langService, _config.Current.Localisation),
+            out _);
     }
 }

@@ -10,6 +10,7 @@ using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
@@ -25,27 +26,31 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     private readonly ILanguageService _langService;
     private readonly IPropertiesTranslationImporter _nlsImporter;
 
+    private readonly ILspConfigurationProvider _configProvider;
+
     public LocalisationRowReader(
         IPropertiesTranslationImporter nlsImporter,
         ITranslationDatabaseFactory factory,
         ILanguageService langService,
         IDatFileService datFileService,
-        IFileHelper fileHelper)
+        IFileHelper fileHelper,
+        ILspConfigurationProvider configProvider)
     {
         _nlsImporter = nlsImporter;
         _factory = factory;
         _langService = langService;
         _datFileService = datFileService;
         _fileHelper = fileHelper;
+        _configProvider = configProvider;
     }
 
-    public LocDocument Read(string text, string extension)
+    public LocDocument Read(string text, string extension, string? fileName = null)
     {
         return extension switch
         {
             ".csv" => ReadCsv(text),
             ".xml" => ReadXml(text),
-            ".properties" => ReadProperties(text),
+            ".properties" => ReadProperties(text, fileName),
             // .dat is binary - it has no text form to hand in. Use ReadFile.
             _ => throw new NotSupportedException($"No row reader for '{extension}'.")
         };
@@ -58,7 +63,9 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 
         return extension == ".dat"
             ? ReadDat(filePath)
-            : Read(fs.File.ReadAllText(filePath), extension);
+            // The name is passed on because a single-language format carries its language there and
+            // nowhere else; for the multi-language formats it is simply unused.
+            : Read(fs.File.ReadAllText(filePath), extension, filePath);
     }
 
     // ── DAT ──────────────────────────────────────────────────────────────────
@@ -77,10 +84,11 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     {
         var model = _datFileService.Load(filePath).Content;
 
-        var language = DatFileNameLanguageResolver.TryResolve(filePath, _langService, out var resolved)
-                       && resolved is not null
-            ? resolved
-            : _langService.Default;
+        var language = LocalisationFileNameLanguageResolver.Resolve(
+            filePath, _langService,
+            LocalisationFileNameLanguageResolver.Configured(
+                _langService, _configProvider.Current.Localisation),
+            out _);
 
         var identifier = language.LanguageIdentifier;
         var rows = new List<LocRowDto>(model.Count);
@@ -193,10 +201,18 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
     ///     server sees them; positions come from a line scan, because the importer cannot say where
     ///     an entry was. The two are zipped by order, which holds because the importer preserves it.
     /// </summary>
-    private LocDocument ReadProperties(string text)
+    private LocDocument ReadProperties(string text, string? fileName)
     {
         var lineEnding = DetectLineEnding(text);
-        var language = _langService.Default;
+
+        // A .properties file holds one language and cannot name it inside, so it comes from the file
+        // name. Without a name to go on - Read called with text alone - the workspace's configured
+        // game language is the only thing left to assume.
+        var configured = LocalisationFileNameLanguageResolver.Configured(
+            _langService, _configProvider.Current.Localisation);
+        var language = fileName is null
+            ? configured
+            : LocalisationFileNameLanguageResolver.Resolve(fileName, _langService, configured, out _);
 
         var db = _factory.CreateOrdered([language]);
         using (var reader = new StringReader(text))

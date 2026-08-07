@@ -30,6 +30,7 @@ import { LocTile, LocTileGrid } from './loc/LocTile';
 import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
 import { LocRow } from './loc/locRow';
+import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
 import { severityIconFor, validateTitle } from './loc/validateState';
@@ -92,7 +93,8 @@ function App(): React.JSX.Element {
 
     const panel = useLocPanel<LocCommand>({ applyStaged, coalesce, onFileLoaded, onMessage });
     const {
-        rows, languages, setLanguages, canAddLanguage, supportedLanguages, error, loaded, queue,
+        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile,
+        supportedLanguages, error, loaded, queue,
         problems, validation, stage, save, validate,
     } = panel;
 
@@ -242,6 +244,9 @@ function App(): React.JSX.Element {
         setDropTarget(null);
         insertStep(step, target.index);
     }, [rows.length, insertStep]);
+
+    // See the translation editor: keyed by row index so the grid can tint per row.
+    const rowSeverities = useMemo(() => severityByRow(problems, rows), [problems, rows]);
 
     const problemRows = useMemo(() => {
         const byIndex = new Map<number, LocProblem>();
@@ -393,9 +398,18 @@ function App(): React.JSX.Element {
             <LocDockActions
                 languages={languages}
                 canAddLanguage={canAddLanguage}
+                addLanguageCreatesFile={addLanguageCreatesFile}
                 supportedLanguages={supportedLanguages}
                 rowCount={rows.length}
                 onAddLanguage={(language, fillFromBaseline) => {
+                    // A single-language format cannot take a column - the language goes in a new
+                    // file beside this one, which the host has to create because it is not an edit
+                    // to this document and cannot be staged with the rest of the batch.
+                    if (addLanguageCreatesFile) {
+                        post({ type: 'addLanguageFile', language });
+                        return;
+                    }
+
                     stage({ kind: 'addLanguage', language });
                     setLanguages(current => [...current, language]);
 
@@ -481,7 +495,7 @@ function App(): React.JSX.Element {
             header={header}
             renderRow={renderRow}
             rowClassName={row => [
-                problemRows.has(row.index) ? 'has-problem' : '',
+                rowSeverityClass(rowSeverities.get(row.index)) ?? '',
                 row.index === selected ? 'selected' : '',
             ].filter(Boolean).join(' ')}
             rowTitle={row => problemRows.get(row.index)?.message}

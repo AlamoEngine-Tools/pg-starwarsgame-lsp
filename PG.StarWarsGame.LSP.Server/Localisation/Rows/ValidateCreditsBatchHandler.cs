@@ -68,14 +68,19 @@ public sealed class ValidateCreditsBatchHandler
         // Nothing about a credits key is checkable - duplicates and blanks are the format. Nor is
         // "this language has fewer entries": a German dub recorded with a smaller cast is a shorter
         // list, not a broken one, and the export dropping the empty entries is what lets one file
-        // carry both. What IS wrong in any language is a heading left with nothing under it.
+        // carry both.
+        //
+        // A heading with nothing under it is reported, but only as information. A credits key is a
+        // formatting directive, so a HEADER with no CENTER lines beneath it is a valid file that
+        // renders exactly as written - it is usually an unfinished translation, which is worth
+        // seeing, but calling it a problem overstates a file the engine reads without complaint.
         var problems = new List<LocProblemDto>();
         var (rows, languages, rowsError) =
             _editor.DryRunRows(request.ProjectFilePath, request.Commands);
         if (rowsError is null)
             foreach (var (language, index, label) in
                      CreditsCoverageInspector.Inspect(rows, languages))
-                problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Warning,
+                problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Info,
                     CreditsCoverageInspector.Message(language, label)));
 
         return Task.FromResult(new ValidateCreditsBatchResult(problems));

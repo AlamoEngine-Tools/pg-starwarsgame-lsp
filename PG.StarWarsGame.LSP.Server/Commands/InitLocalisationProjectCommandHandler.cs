@@ -107,7 +107,10 @@ public sealed class InitLocalisationProjectCommandHandler : ExecuteCommandHandle
             targetDir = fs.Path.Combine(fs.Path.GetDirectoryName(pgprojPath)!, clientDirectory);
         }
 
-        var fileName = LocalisationFormatUtility.ToSeedFileName(format);
+        var fileName = LocalisationFormatUtility.ToSeedFileName(
+            format,
+            LocalisationFileNameLanguageResolver
+                .Configured(_langService, _config.Current.Localisation).LanguageIdentifier);
         if (fileName is null)
         {
             Fail($"Cannot initialise a localisation project: '{format}' is not a format that can be " +

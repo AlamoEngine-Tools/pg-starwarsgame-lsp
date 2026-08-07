@@ -7,9 +7,8 @@
 // rather than after: an empty or duplicated key is a row the engine will never read, and a blank
 // row in the grid gives no hint that either is a problem.
 //
-// The two rules mirror what the server checks when it validates a batch (blank keys, and duplicates
-// compared case-insensitively). They are deliberately not stricter: inventing a shape rule here
-// would reject keys the engine accepts.
+// The rules mirror what the server checks when it validates a batch. They are deliberately not
+// stricter: inventing a shape rule here would reject keys the engine accepts.
 
 import { LocValue } from './loc/locRow';
 
@@ -26,6 +25,26 @@ export function normaliseKey(key: string): string {
 }
 
 /**
+ * The key as the engine will see it when it addresses the entry.
+ *
+ * An entry is keyed by the CRC32 of its key encoded as ASCII, and .NET's ASCII encoder replaces
+ * every character above 0x7F with '?'. So `TEST_A" + "Ä` and `TEST_Ö` both become `TEST_?`
+ * and land on the same entry - a collision no comparison of the strings themselves could find.
+ *
+ * Folding rather than hashing: two keys collide exactly when their folded forms match, save for a
+ * true CRC collision between different folded strings. That residue is vanishingly rare and the
+ * server still catches it, which is a much better trade than keeping a second CRC implementation
+ * here for the client and the server to drift apart on.
+ */
+export function foldToEngineKey(key: string): string {
+    let folded = '';
+    for (const character of normaliseKey(key)) {
+        folded += character.codePointAt(0)! > 0x7f ? '?' : character;
+    }
+    return folded;
+}
+
+/**
  * Why the key cannot be used, or null when it can.
  *
  * Returns a message rather than a boolean because the dialog shows it: "already defined" and
@@ -38,14 +57,18 @@ export function validateNewKey(key: string, existingKeys: string[]): string | nu
         return 'A key is required - it is how the game refers to this text.';
     }
 
-    const clash = existingKeys.find(
-        existing => existing.toLowerCase() === candidate.toLowerCase());
+    // Compared on the folded form, and case-sensitively - which is what the engine does. A
+    // case-insensitive compare here used to refuse a differently-cased key the engine reads
+    // perfectly well, and at the same time waved through two keys that genuinely collide.
+    const folded = foldToEngineKey(candidate);
+    const clash = existingKeys.find(existing => foldToEngineKey(existing) === folded);
 
-    if (clash !== undefined) {
-        return `'${clash}' is already in this file. Only one row per key is ever read.`;
-    }
+    if (clash === undefined) { return null; }
 
-    return null;
+    return clash === candidate
+        ? `'${clash}' is already in this file. Only one row per key is ever read.`
+        : `'${clash}' is already in this file, and the game cannot tell it apart from `
+          + `'${candidate}' - it reads keys as ASCII, so both become '${folded}'.`;
 }
 
 /**

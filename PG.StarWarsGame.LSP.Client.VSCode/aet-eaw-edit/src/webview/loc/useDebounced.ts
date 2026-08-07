@@ -28,3 +28,12 @@ export function useDebounced<T>(value: T, delayMs: number): T {
  * Long enough that a run of keystrokes filters once, short enough not to read as lag when you stop.
  */
 export const FILTER_DEBOUNCE_MS = 120;
+
+/**
+ * How long staged edits settle before the file is re-checked.
+ *
+ * Longer than the filter, because each run costs a round trip and a full re-validation of the
+ * batch; short enough that a mistake surfaces while you are still looking at the row that caused
+ * it, rather than at Save with two hundred later edits stacked on top of it.
+ */
+export const VALIDATE_DEBOUNCE_MS = 600;

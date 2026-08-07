@@ -52,7 +52,8 @@ export function LocProblemsBar(props: {
                         >
                             <span
                                 className={`codicon codicon-${
-                                    problem.severity === 'error' ? 'error' : 'warning'
+                                    problem.severity === 'error' ? 'error'
+                                        : problem.severity === 'info' ? 'info' : 'warning'
                                 } sev-${problem.severity}`}
                                 aria-hidden="true"
                             />

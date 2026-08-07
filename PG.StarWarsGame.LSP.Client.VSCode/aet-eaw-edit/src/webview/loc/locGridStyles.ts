@@ -130,6 +130,7 @@ export const Shell = styled.div`
     .problem-row:hover { background: var(--vscode-list-hoverBackground, rgba(128,128,128,0.15)); }
     .problem-row .codicon.sev-error { color: var(--vscode-errorForeground, #f14c4c); }
     .problem-row .codicon.sev-warning { color: var(--vscode-charts-yellow, #cca700); }
+    .problem-row .codicon.sev-info { color: var(--vscode-charts-blue, #3794ff); }
     .problem-target {
         flex-shrink: 0;
         max-width: 220px;
@@ -268,7 +269,24 @@ export const Shell = styled.div`
     }
 
     .data-row:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
-    .data-row.has-problem { outline: 1px solid var(--vscode-errorForeground, #f48771); }
+    /* Rows a validation run had something to say about, tinted by how bad it was. A single red
+       outline for everything made a heading with no entries look as broken as a key collision.
+       Valid rows are left alone deliberately - tinting them all would say nothing.
+
+       The accent bar is an inset shadow rather than a background, so it survives selection: the
+       selected row still shows what is wrong with it. */
+    .data-row.row-sev-error {
+        background: color-mix(in srgb, var(--vscode-errorForeground, #f48771) 13%, transparent);
+        box-shadow: inset 3px 0 0 var(--vscode-errorForeground, #f48771);
+    }
+    .data-row.row-sev-warning {
+        background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 13%, transparent);
+        box-shadow: inset 3px 0 0 var(--vscode-charts-yellow, #cca700);
+    }
+    .data-row.row-sev-info {
+        background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 11%, transparent);
+        box-shadow: inset 3px 0 0 var(--vscode-charts-blue, #3794ff);
+    }
     .data-row.selected { background: var(--vscode-list-inactiveSelectionBackground, #37373d); }
 
     .cell { min-width: 0; padding: 0 4px; }
@@ -384,6 +402,16 @@ export const Shell = styled.div`
         background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 14%, transparent);
         opacity: 1;
     }
+    .validate-btn.sev-info {
+        color: var(--vscode-charts-blue, #3794ff);
+        background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 14%, transparent);
+        opacity: 1;
+    }
+    .validate-btn.sev-warning {
+        color: var(--vscode-charts-yellow, #cca700);
+        background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 16%, transparent);
+        opacity: 1;
+    }
     .validate-btn.sev-error {
         color: var(--vscode-errorForeground, #f14c4c);
         background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 16%, transparent);
@@ -419,6 +447,8 @@ export const Shell = styled.div`
     }
 
     button.validate.sev-ok { color: var(--vscode-charts-green, #89d185); }
+    button.validate.sev-info { color: var(--vscode-charts-blue, #3794ff); }
+    button.validate.sev-warning { color: var(--vscode-charts-yellow, #cca700); }
     button.validate.sev-error { color: var(--vscode-errorForeground, #f48771); }
 
     /* Inputs, selects and the filter row are the story graph editor's rules verbatim, so the two
@@ -516,4 +546,107 @@ export const Shell = styled.div`
     .problems li { border-left: 2px solid transparent; padding-left: 6px; }
     .problems li.sev-error { border-left-color: var(--vscode-errorForeground, #f48771); }
     .problems li.sev-warning { border-left-color: var(--vscode-charts-yellow, #cca700); }
+    .problems li.sev-info { border-left-color: var(--vscode-charts-blue, #3794ff); }
+
+    /* ── Add-translation dialog content ──────────────────────────────────────
+       Only what this dialog's own content needs. Its box, backdrop, title bar and resize handles
+       are the shared .modal base in dockChrome - it used to carry a second copy of all of that,
+       which is how the two dialogs ended up with different padding, radius and shadow. */
+    .field { display: flex; flex-direction: column; gap: 3px; }
+
+    .field > span { opacity: 0.85; font-size: 0.9em; }
+
+    .field input {
+        background: var(--vscode-input-background, #3c3c3c);
+        color: var(--vscode-input-foreground, #ccc);
+        border: 1px solid var(--vscode-input-border, transparent);
+        padding: 4px 6px;
+        font: inherit;
+    }
+
+    .field input:focus {
+        outline: 1px solid var(--vscode-focusBorder, #007fd4);
+        outline-offset: -1px;
+    }
+
+    .field input[aria-invalid='true'] {
+        border-color: var(--vscode-inputValidation-errorBorder, #be1100);
+    }
+
+    .field-error {
+        margin: -4px 0 0;
+        color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f48771));
+        font-size: 0.9em;
+    }
+
+    /* Scrolls on its own once a project declares more languages than fit - the key field and the
+       buttons stay put. */
+    .languages {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        max-height: 40vh;
+        overflow-y: auto;
+        padding-top: 4px;
+        border-top: 1px solid var(--vscode-panel-border, #444);
+    }
+
+    .hint { margin: 0; opacity: 0.6; font-size: 0.9em; }
+
+    /* Sits directly under the key field, capped so a broad prefix cannot push the buttons off the
+       dialog. */
+    .suggestions {
+        list-style: none;
+        margin: -4px 0 0;
+        padding: 0;
+        max-height: 30vh;
+        overflow-y: auto;
+        border: 1px solid var(--vscode-panel-border, #444);
+    }
+
+    .suggestions button {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+        padding: 3px 6px;
+        background: none;
+        border: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .suggestions button:hover, .suggestions button:focus-visible {
+        background: var(--vscode-list-hoverBackground, #2a2d2e);
+        outline: none;
+    }
+
+    .suggestion-key { white-space: nowrap; }
+
+    .suggestion-value {
+        opacity: 0.6;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 6px; }
+
+    .dialog-actions button {
+        background: var(--vscode-button-secondaryBackground, #3a3d41);
+        color: var(--vscode-button-secondaryForeground, #ccc);
+        border: none;
+        padding: 4px 14px;
+        font: inherit;
+        cursor: pointer;
+    }
+
+    .dialog-actions .primary {
+        background: var(--vscode-button-background, #0e639c);
+        color: var(--vscode-button-foreground, #fff);
+    }
+
+    .dialog-actions button:disabled { opacity: 0.5; cursor: default; }
 `;
