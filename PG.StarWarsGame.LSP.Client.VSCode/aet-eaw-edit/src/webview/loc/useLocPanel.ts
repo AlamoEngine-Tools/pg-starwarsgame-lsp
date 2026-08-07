@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { loadDialogGeometry } from '../shared/dialogGeometryStore';
+import { StoredGeometry } from '../shared/modalGeometry';
 import { LocRow } from '../loc/locRow';
 import { useDebounced, VALIDATE_DEBOUNCE_MS } from './useDebounced';
 import { worstSeverity } from './validateState';
@@ -54,6 +56,8 @@ export interface LocPanel<C> {
     /** Whether this file's format can hold more than one language. The server decides; see
      *  LocalisationDocumentEditor.SupportsMultipleLanguages. */
     canAddLanguage: boolean;
+    /** Shown alone at first, when the tab was opened on one language of a set. */
+    focusLanguage: string | null;
     /** Adding a language here means creating a sibling file, not a column. */
     addLanguageCreatesFile: boolean;
     /** The languages the engine officially supports - the only ones worth adding. */
@@ -79,6 +83,12 @@ export function useLocPanel<C>(options: {
     coalesce: (queue: C[]) => C[];
     /** Called when a different file arrives, so the editor can drop its own per-file state. */
     onFileLoaded?: () => void;
+    /**
+     * The tab was re-aimed at a different language of its set. The editor uses this to drop any
+     * columns the user had hidden by hand, so the new focus decides what is shown rather than a
+     * choice made about a different view.
+     */
+    onFocusLanguageChanged?: () => void;
     /** Messages this editor understands and the shared protocol does not. */
     onMessage?: (message: LocPanelMessage) => void;
 }): LocPanel<C> {
@@ -87,6 +97,7 @@ export function useLocPanel<C>(options: {
     const [ordered, setOrdered] = useState(false);
     const [category, setCategory] = useState('text');
     const [canAddLanguage, setCanAddLanguage] = useState(false);
+    const [focusLanguage, setFocusLanguage] = useState<string | null>(null);
     const [addLanguageCreatesFile, setAddLanguageCreatesFile] = useState(false);
     const [supportedLanguages, setSupportedLanguages] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -98,7 +109,7 @@ export function useLocPanel<C>(options: {
 
     // Held in refs so the message listener can stay mounted for the life of the webview. Re-binding
     // it on every render would drop messages that arrive mid-update.
-    const { onFileLoaded, onMessage } = options;
+    const { onFileLoaded, onFocusLanguageChanged, onMessage } = options;
 
     useEffect(() => {
         const handle = (event: MessageEvent): void => {
@@ -111,8 +122,15 @@ export function useLocPanel<C>(options: {
                     setOrdered(msg.ordered as boolean);
                     setCategory(msg.category as string);
                     setCanAddLanguage(msg.canAddLanguage === true);
+                    setFocusLanguage((msg.focusLanguage as string | null) ?? null);
                     setAddLanguageCreatesFile(msg.addLanguageCreatesFile === true);
                     setSupportedLanguages((msg.supportedLanguages as string[]) ?? []);
+                    // Seeded here rather than on a message of its own: it arrives with the file,
+                    // before any dialog can be opened, which is the only ordering that matters.
+                    loadDialogGeometry(
+                        msg.dialogGeometry as Record<string, StoredGeometry> | undefined,
+                        (id, geometry) =>
+                            vscode.postMessage({ type: 'saveDialogGeometry', id, geometry }));
                     setQueue([]);
                     setProblems([]);
                     setValidation('unvalidated');
@@ -143,6 +161,12 @@ export function useLocPanel<C>(options: {
                     }
                     break;
 
+                // The tab was re-aimed at one language of its set, or back at all of them.
+                case 'focusLanguage':
+                    setFocusLanguage((msg.language as string | null) ?? null);
+                    onFocusLanguageChanged?.();
+                    break;
+
                 case 'invalidate':
                     // Only re-read when nothing is staged: reloading over unsaved edits would
                     // discard work still on screen. A dirty tab keeps what it has until Save.
@@ -163,7 +187,7 @@ export function useLocPanel<C>(options: {
         window.addEventListener('message', handle);
         vscode.postMessage({ type: 'ready' });
         return () => window.removeEventListener('message', handle);
-    }, [onFileLoaded, onMessage]);
+    }, [onFileLoaded, onFocusLanguageChanged, onMessage]);
 
     // The panel mirrors the queue so it can offer to save if the tab is closed while dirty.
     useEffect(() => {
@@ -204,7 +228,7 @@ export function useLocPanel<C>(options: {
     }, [queue, coalesce]);
 
     return {
-        rows, setRows, languages, setLanguages, ordered, category, canAddLanguage,
+        rows, setRows, languages, setLanguages, ordered, category, canAddLanguage, focusLanguage,
         addLanguageCreatesFile,
         supportedLanguages, error, loaded,
         queue, problems, validation,

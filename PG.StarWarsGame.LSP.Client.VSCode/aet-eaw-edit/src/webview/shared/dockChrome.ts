@@ -254,8 +254,48 @@ export const dockChromeCss = `
         overflow-y: auto;
     }
     .modal-note { margin: 0; opacity: 0.8; font-size: 0.92em; line-height: 1.35; }
-    .modal-title, .modal > h2.drag-handle, .modal-buttons, .dialog-actions { flex: 0 0 auto; }
-    .modal-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+    .modal-title, .modal > h2.drag-handle, .modal-buttons, .dialog-actions,
+    .modal-pinned { flex: 0 0 auto; }
+
+    /* Content that stays put while the body scrolls - for whatever the rest of the dialog is about,
+       and for the messages explaining why its confirm button is disabled.
+
+       The rule belongs here rather than on the first scrolling section: it marks where the fixed
+       part ends, so scrolled content passes under a visible edge instead of appearing to slide out
+       from beneath the text above it. */
+    .modal-pinned {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding-bottom: 8px;
+        border-bottom: 1px solid var(--vscode-panel-border, #444);
+    }
+    .modal-buttons { display: flex; align-items: center; gap: 8px; }
+
+    /* A one-line hint that shares the button row, so it stays readable however the body is scrolled
+       or the dialog resized - a hint about what confirming will do is worth nothing once it has
+       scrolled out of sight. The auto margin is what pushes the buttons to the right.
+
+       Only for one-liners. A note that explains a control belongs beside that control, in the body. */
+    .modal-footnote {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin: 0 auto 0 0;
+        opacity: 0.75;
+        font-size: 0.9em;
+        line-height: 1.35;
+    }
+    .modal-footnote .codicon { font-size: 14px; opacity: 0.9; flex: 0 0 auto; }
+
+    /* Aligned to the first line rather than centred: the message can wrap, and a centred icon then
+       drifts into the middle of the text block. */
+    .field-error {
+        display: flex;
+        align-items: flex-start;
+        gap: 6px;
+    }
+    .field-error .codicon { font-size: 14px; flex: 0 0 auto; margin-top: 2px; }
 
     .choice-list { display: flex; flex-direction: column; gap: 4px; }
     .choice {

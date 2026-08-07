@@ -127,6 +127,33 @@ describe('groupProjects', () => {
         assert.deepEqual(children[0].children.map(c => c.label), ['ENGLISH', 'GERMAN']);
     });
 
+    // The tree opens a text set as one merged table but not a credits one - credits rows are
+    // addressed by position and duplicate keys are the format, so merging them by key is undefined.
+    // It can only tell them apart if the set says which it is.
+    it('carries the category up onto the set', () => {
+        const nodes = groupProjects([
+            nls('creditstext_english.properties', 'ENGLISH', { category: 'credits' }),
+            nls('creditstext_german.properties', 'GERMAN', { category: 'credits' }),
+        ]);
+
+        const set = nodes[0].children[0];
+        assert.equal(set.kind, 'fileset');
+        assert.equal(set.kind === 'fileset' ? set.category : '', 'credits');
+    });
+
+    // The set is named for the file it would be if the format could hold every language - the
+    // folder it sits in is not part of that name.
+    it('names a set without the folder it lives in', () => {
+        const nodes = groupProjects([
+            nls('mastertextfile_english.properties', 'ENGLISH',
+                { filePath: '/mods/my mod/data/text/mastertextfile_english.properties' }),
+            nls('mastertextfile_german.properties', 'GERMAN',
+                { filePath: '/mods/my mod/data/text/mastertextfile_german.properties' }),
+        ]);
+
+        assert.equal(nodes[0].children[0].label, 'mastertextfile.properties');
+    });
+
     it('names the languages a set holds so the tree can describe it', () => {
         const nodes = groupProjects([
             nls('mastertextfile_german.properties', 'GERMAN'),

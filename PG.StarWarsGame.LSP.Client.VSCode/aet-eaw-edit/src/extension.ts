@@ -16,6 +16,7 @@ import {
 	TransportKind,
 } from 'vscode-languageclient/node';
 import { CreditsPreviewPanel } from './creditsPreviewPanel';
+import { initDialogGeometryStorage } from './dialogGeometryStorage';
 import { LocalisationEditorPanel } from './localisationEditorPanel';
 import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
 import { LocProjectInfo } from './webview/localisationTreeModel';
@@ -523,6 +524,9 @@ async function stopLspClient(): Promise<void> {
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
 
+	// Per project, not per machine: where a dialog belongs depends on the mod being edited.
+	initDialogGeometryStorage(context.workspaceState);
+
 	localisationNavigatorProvider = new LocalisationNavigatorViewProvider(() => lspClient);
 	context.subscriptions.push(
 		vscode.window.registerTreeDataProvider(
@@ -571,9 +575,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					project = picked.project;
 				}
 
-				LocalisationEditorPanel.show(
-					project.filePath, project.label, project.category,
-					context.extensionUri, () => lspClient);
+				// A node standing for a set of single-language files opens them as one table, so a
+				// translation sits beside its source. A language inside that set opens the same
+				// table with the other columns hidden - the set is the project either way, which is
+				// why both are named after the set rather than after whichever file was clicked.
+				LocalisationEditorPanel.showSet(
+					arg?.setFilePaths ?? [project.filePath],
+					arg?.setLabel ?? project.label,
+					project.category, context.extensionUri, () => lspClient,
+					arg?.focusLanguage);
 			}),
 		// The crawl lives in the editor title bar, where a preview belongs - the same place a
 		// Markdown or LaTeX editor puts one. Both are gated to the credits panel by its view type.

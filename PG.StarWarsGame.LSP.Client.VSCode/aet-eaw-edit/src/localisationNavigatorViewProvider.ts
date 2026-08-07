@@ -20,7 +20,19 @@ export class LocTreeItem extends vscode.TreeItem {
         collapsibleState: vscode.TreeItemCollapsibleState,
         public readonly kind: LocNodeKind,
         public readonly node?: LocTreeNode,
-        public readonly project?: LocProjectInfo
+        public readonly project?: LocProjectInfo,
+        /**
+         * Every file the editor should open together, for a node that stands for a set of
+         * single-language files. One entry for an ordinary file.
+         */
+        public readonly setFilePaths?: string[],
+        /** The language to show alone at first, when this node is one language of a set. */
+        public readonly focusLanguage?: string,
+        /**
+         * What to call the tab: the set's name, not the one file the node happens to stand for.
+         * Opening ENGLISH of a set is a view of the set, so the tab is named after the set.
+         */
+        public readonly setLabel?: string
     ) {
         super(label, collapsibleState);
     }
@@ -93,6 +105,21 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
 
     async getChildren(element?: LocTreeItem): Promise<LocTreeItem[]> {
         if (!element) { return this._loadRoot(); }
+
+        // A language inside a set opens the whole set, focused on that language - the set is the
+        // project, and seeing one language of it alone is a view, not a different document. The
+        // context has to come from here: a child node does not know which set it belongs to.
+        if (element.kind === 'fileset' && element.setFilePaths !== undefined) {
+            const setFilePaths = element.setFilePaths;
+            const setLabel = element.setLabel;
+
+            return (element.node?.children ?? []).map(child => (child.kind === 'file'
+                // The child's label is its language - see gatherSiblings - and the tab is named
+                // after the set, because opening one language of it is a view of the set.
+                ? fileItem(child, setFilePaths, child.label, setLabel)
+                : this._toItem(child)));
+        }
+
         return (element.node?.children ?? []).map(child => this._toItem(child));
     }
 
@@ -126,8 +153,19 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
     private _toItem(node: LocTreeNode): LocTreeItem {
         if (node.kind === 'file') { return fileItem(node); }
 
+        // Credits are left out of set-opening: their rows are addressed by position and duplicate
+        // keys are the format, so merging them by key is not defined. They stay one file per tab.
+        const setProjects = node.kind === 'fileset' && node.category !== CREDITS_CATEGORY
+            ? node.children.flatMap(child => (child.kind === 'file' ? [child.project] : []))
+            : [];
+        const setFiles = setProjects.length > 0 ? setProjects.map(p => p.filePath) : undefined;
+
+        // A set carries one of its own files as its project. Everything downstream reads the
+        // category off that, and a set with none fell through to the "pick a file" prompt instead
+        // of opening at all.
         const item = new LocTreeItem(
-            node.label, vscode.TreeItemCollapsibleState.Expanded, node.kind, node);
+            node.label, vscode.TreeItemCollapsibleState.Expanded, node.kind, node, setProjects[0],
+            setFiles, undefined, node.kind === 'fileset' ? node.label : undefined);
 
         // A set of language siblings: one logical file the format forced across several. Named for
         // the file it would be if the format could hold every language, described by the ones it
@@ -137,6 +175,17 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
             item.contextValue = 'aetLocFileSet';
             item.description = node.languages.join(', ');
             item.tooltip = `${node.languages.length} languages: ${node.languages.join(', ')}`;
+
+            // Opening the set is the point of grouping it: the whole project in one table, every
+            // language beside its source.
+            if (setFiles !== undefined && setFiles.length > 0) {
+                item.command = {
+                    command: 'aet-eaw-edit.lsp.openLocalisationEditor',
+                    title: 'Open Localisation Editor',
+                    arguments: [item],
+                };
+            }
+
             return item;
         }
 
@@ -155,9 +204,18 @@ export class LocalisationNavigatorViewProvider implements vscode.TreeDataProvide
     }
 }
 
-function fileItem(node: LocTreeNode & { kind: 'file' }): LocTreeItem {
+/**
+ * @param setFilePaths Every file of the set this one belongs to, when it is part of one. Opening a
+ *     language opens the whole set focused on it - the set is the project, and one language of it
+ *     is a view rather than a separate document.
+ */
+function fileItem(
+    node: LocTreeNode & { kind: 'file' }, setFilePaths?: string[], focusLanguage?: string,
+    setLabel?: string,
+): LocTreeItem {
     const item = new LocTreeItem(
-        node.label, vscode.TreeItemCollapsibleState.None, 'file', node, node.project);
+        node.label, vscode.TreeItemCollapsibleState.None, 'file', node, node.project,
+        setFilePaths, focusLanguage, setLabel);
 
     item.iconPath = new vscode.ThemeIcon('table');
     // Inside a set the label is the language, so the format is the same on every row and the file

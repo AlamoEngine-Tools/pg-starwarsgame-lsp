@@ -579,27 +579,27 @@ export const Shell = styled.div`
         font-size: 0.9em;
     }
 
-    /* Scrolls on its own once a project declares more languages than fit - the key field and the
-       buttons stay put. */
+    /* Flows; it does not scroll on its own. The dialog body is the scroller, and a list that kept
+       its own cap went on scrolling however tall the dialog was made - the height went to dead space
+       underneath while the languages stayed behind a scrollbar. One scroller per dialog. */
     .languages {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        max-height: 40vh;
-        overflow-y: auto;
         padding-top: 4px;
-        border-top: 1px solid var(--vscode-panel-border, #444);
     }
 
     .hint { margin: 0; opacity: 0.6; font-size: 0.9em; }
 
-    /* Sits directly under the key field, capped so a broad prefix cannot push the buttons off the
-       dialog. */
+    /* The one list that does keep a cap: it appears under the key field while typing, and a broad
+       prefix would otherwise shove the rest of the form down the moment a letter is deleted. Capped
+       in px rather than vh so it is a number of rows, not a fraction of whatever window you happen
+       to be in. */
     .suggestions {
         list-style: none;
         margin: -4px 0 0;
         padding: 0;
-        max-height: 30vh;
+        max-height: 180px;
         overflow-y: auto;
         border: 1px solid var(--vscode-panel-border, #444);
     }

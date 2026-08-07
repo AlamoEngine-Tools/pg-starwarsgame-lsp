@@ -38,6 +38,67 @@ export function clampSize(size: Size, origin: Point, viewport: Viewport): Size {
     };
 }
 
+/**
+ * A dialog's remembered geometry.
+ *
+ * The corner is stored as a fraction of the viewport rather than in pixels: the editor is reopened
+ * at whatever size the window happens to be, and a dialog parked against the right edge of a wide
+ * window should come back against the right edge of a narrow one, not off the side of it.
+ *
+ * The size stays in pixels, because that is a decision about the content - how many languages you
+ * want to see at once - and should not shrink just because the window did. It is only scaled down
+ * when it genuinely no longer fits.
+ */
+export interface StoredGeometry {
+    xRatio: number;
+    yRatio: number;
+    width: number;
+    height: number;
+}
+
+/** What to remember about a dialog the user has placed. */
+export function toStoredGeometry(rect: Rect, viewport: Viewport): StoredGeometry {
+    // Guarded against a zero viewport, which a hidden webview can report.
+    const usableWidth = Math.max(1, viewport.width);
+    const usableHeight = Math.max(1, viewport.height);
+
+    return {
+        xRatio: rect.x / usableWidth,
+        yRatio: rect.y / usableHeight,
+        width: rect.width,
+        height: rect.height,
+    };
+}
+
+/**
+ * Where a remembered dialog should reappear.
+ *
+ * A dialog too big for the current window is scaled down by a single factor rather than clipped or
+ * clamped per axis, so it keeps the shape it was given and stays recognisably the dialog that was
+ * put there - "resize relatively" rather than "squash to fit".
+ */
+export function fromStoredGeometry(stored: StoredGeometry, viewport: Viewport): Rect {
+    const scale = Math.min(
+        1,
+        viewport.width / Math.max(1, stored.width),
+        viewport.height / Math.max(1, stored.height));
+
+    const size: Size = {
+        width: Math.max(MIN_MODAL_SIZE.width, Math.round(stored.width * scale)),
+        height: Math.max(MIN_MODAL_SIZE.height, Math.round(stored.height * scale)),
+    };
+
+    const position = clampPosition(
+        {
+            x: Math.round(stored.xRatio * viewport.width),
+            y: Math.round(stored.yRatio * viewport.height),
+        },
+        size,
+        viewport);
+
+    return { ...position, ...size };
+}
+
 /** Which edge or corner is being dragged. Named like the CSS cursors they map to. */
 export type ResizeDirection = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 

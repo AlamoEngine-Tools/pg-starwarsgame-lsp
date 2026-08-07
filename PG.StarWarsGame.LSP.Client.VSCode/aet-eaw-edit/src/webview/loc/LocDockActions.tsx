@@ -11,6 +11,7 @@
 
 import { useState } from 'react';
 
+import { DIALOG_IDS } from '../shared/dialogGeometryStore';
 import { LocModal } from './LocModal';
 import { LocTile, LocTileGrid } from './LocTile';
 
@@ -145,6 +146,9 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
             {dialog === 'language' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.addLanguage}
+                    footnote={'The column is added to every row, and nothing reaches the file '
+                        + 'until you save.'}
                     title="Add a language"
                     confirmLabel="Add"
                     canConfirm={language !== ''}
@@ -195,10 +199,6 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                 </label>
                             )}
 
-                            <p className="modal-note">
-                                The column is added to every row. Entries the game does not translate
-                                are left empty. Nothing reaches the file until you save.
-                            </p>
                         </>
                     )}
                 </LocModal>
@@ -206,6 +206,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
             {dialog === 'copy' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.fillLanguage}
                     title="Fill in a language"
                     confirmLabel="Fill"
                     canConfirm={copyCount > 0 && (fromGame || copyFrom !== copyTo)}
@@ -277,6 +278,8 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
             {dialog === 'convert' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.convertFormat}
+                    footnote={'The new file is written beside this one and the original is kept.'}
                     title="Convert to another format"
                     confirmLabel="Convert"
                     onCancel={close}
@@ -296,15 +299,12 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             </label>
                         ))}
                     </div>
-                    <p className="modal-note">
-                        The new file is written beside this one and the project is repointed at it.
-                        The original file is kept.
-                    </p>
                 </LocModal>
             )}
 
             {dialog === 'export' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.exportDat}
                     title="Export to DAT"
                     confirmLabel="Export"
                     onCancel={close}

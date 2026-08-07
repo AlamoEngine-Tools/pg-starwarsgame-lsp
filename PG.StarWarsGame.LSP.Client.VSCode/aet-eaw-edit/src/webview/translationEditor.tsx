@@ -26,6 +26,7 @@ import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
 import { severityIconFor, validateTitle } from './loc/validateState';
+import { DIALOG_IDS } from './shared/dialogGeometryStore';
 import { ResizeHandles } from './shared/ResizeHandles';
 import { useMovableDialog } from './shared/useMovableDialog';
 import { buildRowFilter, FilterMode } from './locFilter';
@@ -84,12 +85,16 @@ function App(): React.JSX.Element {
         }
     }, []);
 
+    // Re-aiming the tab at another language of its set drops any by-hand column choices, so the new
+    // focus decides what is shown rather than a choice made about a different view of the set.
+    const onFocusLanguageChanged = useCallback(() => setHiddenLanguages(null), []);
+
     const panel = useLocPanel<TranslationCommand>({
-        applyStaged, coalesce, onFileLoaded, onMessage,
+        applyStaged, coalesce, onFileLoaded, onFocusLanguageChanged, onMessage,
     });
 
     const {
-        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile,
+        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile, focusLanguage,
         supportedLanguages, error, loaded, queue,
         problems, validation, stage, save, validate,
     } = panel;
@@ -195,8 +200,13 @@ function App(): React.JSX.Element {
 
     // One template for the header and every row, so the columns cannot drift apart.
     const hidden = useMemo(
-        () => hiddenLanguages ?? new Set(emptyLanguages(rows, languages)),
-        [hiddenLanguages, rows, languages]);
+        // Opened on one language of a set: that column alone. The rest are hidden, not absent, so
+        // the column menu brings any of them back - which is what makes this a view of the set
+        // rather than a different document. With no focus, the default is to hide empty columns.
+        () => hiddenLanguages ?? new Set(focusLanguage === null
+            ? emptyLanguages(rows, languages)
+            : languages.filter(l => l.toUpperCase() !== focusLanguage.toUpperCase())),
+        [hiddenLanguages, rows, languages, focusLanguage]);
 
     const shownLanguages = useMemo(
         () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
@@ -605,7 +615,8 @@ function AddTranslationDialog(props: {
     // Movable and resizable like every other dialog: this one carries a key, a value per language
     // and a suggestion list, so it is the one most likely to need more room - and to need moving
     // aside to read the row it is about to duplicate.
-    const { dialogProps, dragHandleProps, resizeHandleProps } = useMovableDialog();
+    const { dialogProps, dragHandleProps, resizeHandleProps } =
+        useMovableDialog(DIALOG_IDS.addTranslation);
 
     return (
         <div
@@ -623,9 +634,10 @@ function AddTranslationDialog(props: {
             >
                 <h2 className="drag-handle" {...dragHandleProps}>Add translation</h2>
 
-                {/* The scrolling middle, so the title bar and the buttons stay put when the dialog
-                    is resized small - the same structure LocModal has. */}
-                <div className="modal-body">
+                {/* Pinned: the key is what every other field is about, and its error is the reason
+                    Add is disabled - both have to stay readable while the language list scrolls,
+                    or a small dialog hides the thing you are being asked to fix. */}
+                <div className="modal-pinned">
                 <label className="field">
                     <span>Key</span>
                     <input
@@ -641,7 +653,12 @@ function AddTranslationDialog(props: {
                         onBlur={() => setTouched(true)}
                     />
                 </label>
-                {touched && error !== null && <p className="field-error">{error}</p>}
+                {touched && error !== null && (
+                    <p className="field-error">
+                        <span className="codicon codicon-error" aria-hidden="true" />
+                        {error}
+                    </p>
+                )}
 
                 {/* Keys the layers below define but this file does not - which is exactly what an
                     override is. Taking one fills in the inherited text to edit from. */}
@@ -659,7 +676,11 @@ function AddTranslationDialog(props: {
                         ))}
                     </ul>
                 )}
+                </div>
 
+                {/* The scrolling middle, so the title bar, the key and the buttons stay put when the
+                    dialog is resized small. */}
+                <div className="modal-body">
                 <div className="languages">
                     {props.languages.map(language => (
                         <label className="field" key={language}>
@@ -673,12 +694,16 @@ function AddTranslationDialog(props: {
                     ))}
                 </div>
 
-                {/* Not required: a key with no text yet is a legitimate thing to add, and the
-                    untranslated cells are visible in the grid afterwards. */}
-                <p className="hint">Languages you leave empty stay empty.</p>
                 </div>
 
                 <div className="dialog-actions">
+                    {/* Not required: a key with no text yet is a legitimate thing to add, and the
+                        untranslated cells are visible in the grid afterwards. On the button row so
+                        it is still there when the language list has been scrolled past it. */}
+                    <p className="modal-footnote">
+                        <span className="codicon codicon-info" aria-hidden="true" />
+                        Languages you leave empty stay empty.
+                    </p>
                     <button type="button" onClick={props.onCancel}>Cancel</button>
                     <button type="submit" className="primary" disabled={error !== null}>Add</button>
                 </div>

@@ -6,7 +6,10 @@ import * as vscode from 'vscode';
 import { LanguageClient } from 'vscode-languageclient/node';
 
 import { CreditsPreviewPanel } from './creditsPreviewPanel';
+import { readDialogGeometry, saveDialogGeometry } from './dialogGeometryStorage';
+import { StoredGeometry } from './webview/shared/modalGeometry';
 import { LocalisationPanelState } from './webview/localisationPanelState';
+import { KeyedCommand, mergeMembers, partitionCommands } from './webview/loc/locSetMerge';
 
 interface LocValueDto { language: string; value: string; }
 interface LocRowDto { index: number; key: string; values: LocValueDto[]; }
@@ -54,6 +57,18 @@ interface GetBaselineEntriesResult {
  * Modelled on {@link StoryGraphPanel}, including its close-time save prompt - a disposed webview
  * cannot veto its own close, so the queue is mirrored here as it changes.
  */
+/**
+ * One file of an open set, and what is known about it.
+ *
+ * A single file is a set of one, so every path below is the same path - there is no separate
+ * "one file" mode to keep in step with the set one.
+ */
+interface Member {
+    filePath: string;
+    languages: string[];
+    contentHash?: string;
+}
+
 export class LocalisationEditorPanel {
     private static readonly _panels = new Map<string, LocalisationEditorPanel>();
 
@@ -63,8 +78,29 @@ export class LocalisationEditorPanel {
     private readonly _panel: vscode.WebviewPanel;
     private readonly _state = new LocalisationPanelState();
 
+    /** Every file the table is built from, in column order. */
+    private _members: Member[] = [];
+
+    /**
+     * The file a file-level action applies to: convert, export to DAT, open as text.
+     *
+     * The first of the set. Those actions are about one file on disk, and for a set the one the
+     * tree was opened on is the only defensible choice.
+     */
+    private get _filePath(): string {
+        return this._filePaths[0];
+    }
+
     private constructor(
-        private readonly _filePath: string,
+        private readonly _filePaths: string[],
+        /** Which language's column to show alone at first, when opened on one file of a set. */
+        /**
+         * Which language's column to show alone, when opened on one file of a set.
+         *
+         * Not readonly: the set and each of its languages are one tab, so clicking a different one
+         * of them has to re-aim the tab that is already open rather than appear to do nothing.
+         */
+        private _focusLanguage: string | undefined,
         private readonly _label: string,
         private readonly _category: string,
         private readonly _extensionUri: vscode.Uri,
@@ -89,7 +125,7 @@ export class LocalisationEditorPanel {
             });
 
         this._panel.onDidDispose(() => {
-            LocalisationEditorPanel._panels.delete(key(_filePath));
+            LocalisationEditorPanel._panels.delete(setKey(_filePaths));
             if (LocalisationEditorPanel._active === this) { LocalisationEditorPanel._active = null; }
             void this._promptSaveOnClose();
         });
@@ -139,6 +175,9 @@ export class LocalisationEditorPanel {
                     case 'addLanguageFile':
                         await this._addLanguageFile(msg.language as string);
                         break;
+                    case 'saveDialogGeometry':
+                        saveDialogGeometry(msg.id as string, msg.geometry as StoredGeometry);
+                        break;
                     case 'exportDat':
                         await vscode.commands.executeCommand(
                             'aet-eaw-edit.lsp.exportLocalisationToDat',
@@ -154,12 +193,49 @@ export class LocalisationEditorPanel {
         filePath: string, label: string, category: string, extensionUri: vscode.Uri,
         getLspClient: () => LanguageClient | undefined
     ): void {
-        const existing = LocalisationEditorPanel._panels.get(key(filePath));
-        if (existing) { existing._panel.reveal(); return; }
+        LocalisationEditorPanel.showSet([filePath], label, category, extensionUri, getLspClient);
+    }
+
+    /**
+     * Opens a set of single-language files as one table.
+     *
+     * Keyed on the whole set, so opening the set and then one of its files reveals the same tab
+     * rather than a second one holding a competing staged queue for the same files.
+     *
+     * @param focusLanguage Shown alone at first - what opening one language of a set means. The
+     *     other columns are hidden, not absent, so they are one click away in the column menu.
+     */
+    static showSet(
+        filePaths: string[], label: string, category: string, extensionUri: vscode.Uri,
+        getLspClient: () => LanguageClient | undefined, focusLanguage?: string
+    ): void {
+        const id = setKey(filePaths);
+        const existing = LocalisationEditorPanel._panels.get(id);
+        if (existing) {
+            // The set and every language in it map to one tab - deliberately, so they cannot stage
+            // competing edits against the same files. Revealing alone is therefore not enough:
+            // clicking a language while the set is open has to change which columns are shown, or
+            // the click does nothing at all.
+            existing._focusOn(focusLanguage);
+            existing._panel.reveal();
+            return;
+        }
 
         LocalisationEditorPanel._panels.set(
-            key(filePath),
-            new LocalisationEditorPanel(filePath, label, category, extensionUri, getLspClient));
+            id,
+            new LocalisationEditorPanel(
+                filePaths, focusLanguage, label, category, extensionUri, getLspClient));
+    }
+
+    /**
+     * Re-aims an open tab at one language of its set, or back at all of them.
+     *
+     * A message rather than a re-read: the files have not changed, and re-reading would throw away
+     * the staged queue along with the user's sort and selection just to hide some columns.
+     */
+    private _focusOn(language: string | undefined): void {
+        this._focusLanguage = language;
+        this._post({ type: 'focusLanguage', language: language ?? null });
     }
 
     /**
@@ -235,27 +311,51 @@ export class LocalisationEditorPanel {
         const client = this._getLspClient();
         if (!client) { this._post({ type: 'error', message: 'LSP server is not running.' }); return; }
 
-        const result = await client.sendRequest<GetLocalisationRowsResult>(
-            'aet/getLocalisationRows', { projectFilePath: this._filePath });
+        // Read one file at a time rather than in parallel: the server serialises these anyway, and
+        // a failure part-way through is far easier to report when the order is known.
+        const results: GetLocalisationRowsResult[] = [];
+        for (const filePath of this._filePaths) {
+            const result = await client.sendRequest<GetLocalisationRowsResult>(
+                'aet/getLocalisationRows', { projectFilePath: filePath });
 
-        if (result.error) { this._post({ type: 'error', message: result.error }); return; }
+            if (result.error) { this._post({ type: 'error', message: result.error }); return; }
+            results.push(result);
+        }
 
-        // An unchanged file is not re-delivered. A save reloads the server's localisation index and
+        // An unchanged set is not re-delivered. A save reloads the server's localisation index and
         // the watcher then reports that same write, so one save announced the index had moved twice
         // over - and each announcement made every open tab hand its webview every row again, reset
         // its selection, sort and inherited toggle, and re-fetch the baseline. See shouldDeliver.
-        if (!this._state.shouldDeliver(result.contentHash)) { return; }
+        // For a set the hashes are combined, so any one file moving counts as the set moving.
+        const combinedHash = results.map(r => r.contentHash).join('|');
+        if (!this._state.shouldDeliver(combinedHash)) { return; }
 
-        this._state.noteRead(result.contentHash);
+        this._members = this._filePaths.map((filePath, i) => ({
+            filePath,
+            languages: results[i].languages,
+            contentHash: results[i].contentHash,
+        }));
+
+        const merged = mergeMembers(this._members.map((m, i) => ({
+            filePath: m.filePath, languages: m.languages, rows: results[i].rows,
+        })));
+
+        this._state.noteRead(combinedHash);
         this._post({
             supportedLanguages: await this._supportedLanguagesAsync(),
+            // Sent with the file so a dialog knows where it belongs on its first render - asking
+            // for it when one opens would show it centred and then move it.
+            dialogGeometry: readDialogGeometry(),
             type: 'rows',
-            rows: result.rows,
-            languages: result.languages,
-            category: result.category,
-            ordered: result.ordered,
-            canAddLanguage: result.canAddLanguage,
-            addLanguageCreatesFile: result.addLanguageCreatesFile,
+            rows: merged.rows,
+            languages: merged.languages,
+            category: results[0].category,
+            ordered: results[0].ordered,
+            // A set is several single-language files, so a language is a file, not a column - the
+            // grid offers "add language" as a new sibling either way.
+            canAddLanguage: this._members.length === 1 && results[0].canAddLanguage,
+            addLanguageCreatesFile: results[0].addLanguageCreatesFile,
+            focusLanguage: this._focusLanguage ?? null,
         });
     }
 
@@ -337,27 +437,85 @@ export class LocalisationEditorPanel {
         this._post({ type: 'problems', problems: result.problems ?? [], error: result.error ?? null });
     }
 
+    /**
+     * Writes the staged batch.
+     *
+     * A set is written one file at a time, each batch atomic on its own. Not atomic across the set:
+     * that would need the server to check every hash before writing any, and the failure this
+     * guards against - one file having moved on disk - is per file anyway. A refused language is
+     * named, and the whole queue stays staged so nothing is silently half-applied from the user's
+     * point of view.
+     */
     private async _save(commands: Record<string, unknown>[]): Promise<void> {
         const client = this._getLspClient();
         if (!client) { return; }
 
-        const result = await client.sendRequest<ApplyLocalisationBatchResult>(
-            isCredits(this._category) ? 'aet/applyCreditsBatch' : 'aet/applyTranslationBatch',
-            {
-                projectFilePath: this._filePath,
-                expectedContentHash: this._state.contentHash,
-                commands,
+        const method = isCredits(this._category) ? 'aet/applyCreditsBatch' : 'aet/applyTranslationBatch';
+
+        // A set that has not been read yet has no members; fall back to the file it was opened on.
+        const members = this._members.length > 0
+            ? this._members
+            : [{ filePath: this._filePath, languages: [], contentHash: this._state.contentHash }];
+
+        const batches = members.length === 1
+            ? new Map([[members[0].filePath, commands as unknown as KeyedCommand[]]])
+            : partitionCommands(commands as unknown as KeyedCommand[], members.map(m => ({
+                filePath: m.filePath, languages: m.languages, rows: [],
+            })));
+
+        const failures: { member: Member; result: ApplyLocalisationBatchResult }[] = [];
+        let firstFailedIndex: number | null = null;
+
+        for (const member of members) {
+            const batch = batches.get(member.filePath);
+            // Untouched by this batch: writing it anyway would spend its hash and make the watcher
+            // announce a change to a file nobody edited.
+            if (batch === undefined || batch.length === 0) { continue; }
+
+            const result = await client.sendRequest<ApplyLocalisationBatchResult>(method, {
+                projectFilePath: member.filePath,
+                expectedContentHash: member.contentHash,
+                commands: batch,
             });
 
-        if (!result.success) {
+            if (result.success) {
+                member.contentHash = result.newContentHash ?? member.contentHash;
+                continue;
+            }
+
+            failures.push({ member, result });
+            firstFailedIndex ??= result.failedIndex ?? null;
+        }
+
+        if (failures.length > 0) {
             this._state.noteSaveFailed();
-            await this._reportSaveFailure(result);
-            this._post({ type: 'saveResult', success: false, failedIndex: result.failedIndex ?? null });
+            await this._reportSetSaveFailure(failures);
+            this._post({ type: 'saveResult', success: false, failedIndex: firstFailedIndex });
             return;
         }
 
-        this._state.noteSaved(result.newContentHash ?? undefined);
+        this._state.noteSaved(members.map(m => m.contentHash ?? '').join('|'));
         this._post({ type: 'saveResult', success: true });
+    }
+
+    /** Names the languages that would not take the write, so the user knows what is still staged. */
+    private async _reportSetSaveFailure(
+        failures: { member: Member; result: ApplyLocalisationBatchResult }[],
+    ): Promise<void> {
+        if (this._members.length <= 1) {
+            await this._reportSaveFailure(failures[0].result);
+            return;
+        }
+
+        const named = failures
+            .map(f => `${f.member.languages.join('/') || basename(f.member.filePath)}: `
+                + `${f.result.error ?? 'unknown error'}`)
+            .join('; ');
+
+        const choice = await vscode.window.showErrorMessage(
+            `EaWEdit: could not save - ${named}. Your edits are still staged.`, 'Reload');
+
+        if (choice === 'Reload') { await this._sendRows(); }
     }
 
     /**
@@ -405,6 +563,14 @@ function isCredits(category: string): boolean {
 
 function key(filePath: string): string {
     return filePath.toLowerCase();
+}
+
+/**
+ * Identifies an open set. Sorted, so opening the same files in a different order reveals the tab
+ * that is already open rather than a second one staging edits against the same files.
+ */
+function setKey(filePaths: string[]): string {
+    return filePaths.map(key).sort().join('|');
 }
 
 function buildHtml(scriptUri: vscode.Uri, codiconUri: vscode.Uri, cspSource: string): string {

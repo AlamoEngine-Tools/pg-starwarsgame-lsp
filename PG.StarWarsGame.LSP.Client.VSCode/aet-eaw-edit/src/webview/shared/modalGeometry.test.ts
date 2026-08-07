@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-    centredPosition, clampPosition, clampSize, MIN_MODAL_SIZE, resizeRect,
+    centredPosition, clampPosition, clampSize, fromStoredGeometry, MIN_MODAL_SIZE, resizeRect,
+    toStoredGeometry,
 } from './modalGeometry';
 
 const viewport = { width: 1000, height: 800 };
@@ -57,6 +58,80 @@ describe('clampSize', () => {
         const clamped = clampSize({ width: 900, height: 700 }, { x: 990, y: 790 }, viewport);
 
         assert.deepEqual(clamped, MIN_MODAL_SIZE);
+    });
+});
+
+describe('remembered geometry', () => {
+    it('stores the corner as a fraction of the viewport', () => {
+        const stored = toStoredGeometry({ x: 250, y: 200, width: 400, height: 300 }, viewport);
+
+        assert.deepEqual(stored, { xRatio: 0.25, yRatio: 0.25, width: 400, height: 300 });
+    });
+
+    it('round-trips unchanged when the window has not moved', () => {
+        const rect = { x: 250, y: 200, width: 400, height: 300 };
+
+        assert.deepEqual(fromStoredGeometry(toStoredGeometry(rect, viewport), viewport), rect);
+    });
+
+    // A dialog parked against the right edge of a wide window belongs against the right edge of a
+    // narrow one, not off the side of it.
+    it('keeps a dialog against the edge it was parked at when the window is smaller', () => {
+        const stored = toStoredGeometry({ x: 700, y: 500, width: 300, height: 300 }, viewport);
+        const restored = fromStoredGeometry(stored, { width: 500, height: 400 });
+
+        assert.equal(restored.x + restored.width, 500);
+        assert.equal(restored.y + restored.height, 400);
+    });
+
+    // Proportional placement is only the starting point - it still has to fit.
+    it('places a dialog by ratio when there is room for it', () => {
+        const stored = toStoredGeometry({ x: 250, y: 200, width: 300, height: 200 }, viewport);
+        const restored = fromStoredGeometry(stored, { width: 800, height: 600 });
+
+        assert.deepEqual([restored.x, restored.y], [200, 150]);
+    });
+
+    // "Resize relatively": one scale factor for both axes, so it keeps its shape rather than being
+    // squashed into whatever is left.
+    it('scales an oversized dialog down by a single factor', () => {
+        const restored = fromStoredGeometry(
+            { xRatio: 0, yRatio: 0, width: 800, height: 600 }, { width: 400, height: 600 });
+
+        assert.deepEqual([restored.width, restored.height], [400, 300]);
+    });
+
+    it('does not enlarge a dialog just because the window grew', () => {
+        const stored = toStoredGeometry({ x: 0, y: 0, width: 400, height: 300 }, viewport);
+        const restored = fromStoredGeometry(stored, { width: 4000, height: 3000 });
+
+        assert.deepEqual([restored.width, restored.height], [400, 300]);
+    });
+
+    it('never restores below the minimum usable size', () => {
+        const restored = fromStoredGeometry(
+            { xRatio: 0, yRatio: 0, width: 10, height: 10 }, viewport);
+
+        assert.deepEqual([restored.width, restored.height], [MIN_MODAL_SIZE.width, MIN_MODAL_SIZE.height]);
+    });
+
+    // Restoring must not put the title bar off-screen: it is the only way to drag it back.
+    it('pulls a remembered position back inside the window', () => {
+        const restored = fromStoredGeometry(
+            { xRatio: 0.95, yRatio: 0.95, width: 400, height: 300 }, viewport);
+
+        assert.ok(restored.x + restored.width <= viewport.width);
+        assert.ok(restored.y + restored.height <= viewport.height);
+    });
+
+    // A hidden webview reports a zero-sized viewport; that must not produce NaN ratios that then
+    // poison the stored value for every later session.
+    it('survives a zero-sized viewport without producing NaN', () => {
+        const stored = toStoredGeometry({ x: 10, y: 10, width: 400, height: 300 },
+            { width: 0, height: 0 });
+
+        assert.ok(Number.isFinite(stored.xRatio));
+        assert.ok(Number.isFinite(stored.yRatio));
     });
 });
 

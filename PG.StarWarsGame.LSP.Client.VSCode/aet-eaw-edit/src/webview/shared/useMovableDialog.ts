@@ -7,13 +7,16 @@
 // keeps following the pointer outside the handle, and there is nothing to unsubscribe if the dialog
 // closes mid-drag.
 //
-// A dialog stays centred by layout until it is first moved or resized. Only then does it take an
-// explicit position, so the common case - open, read, confirm - is untouched by any of this.
+// A dialog stays centred by layout until it is first moved or resized, or until it is reopened
+// somewhere it was previously put. Only then does it take an explicit position, so a dialog that has
+// never been moved is untouched by any of this.
 
 import { CSSProperties, PointerEvent as ReactPointerEvent, useCallback, useRef, useState } from 'react';
 
+import { rememberedGeometry, rememberGeometry } from './dialogGeometryStore';
 import {
-    centredPosition, clampPosition, Point, Rect, resizeRect, ResizeDirection, Size,
+    centredPosition, clampPosition, fromStoredGeometry, Point, Rect, resizeRect, ResizeDirection,
+    Size, toStoredGeometry,
 } from './modalGeometry';
 
 /** Every edge and corner, in the order the handles are rendered. */
@@ -33,8 +36,21 @@ type DragState =
     | { kind: 'move'; pointerX: number; pointerY: number; base: Rect }
     | { kind: 'resize'; pointerX: number; pointerY: number; base: Rect; direction: ResizeDirection };
 
-export function useMovableDialog(): MovableDialog {
-    const [rect, setRect] = useState<Rect | null>(null);
+/**
+ * @param dialogId Identifies the dialog across sessions, so it reopens where it was left. Omit it
+ *     for a dialog whose placement is not worth remembering; it then always opens centred.
+ */
+export function useMovableDialog(dialogId?: string): MovableDialog {
+    // Restored on the first render rather than in an effect, so a remembered dialog is painted where
+    // it belongs instead of appearing centred and then jumping.
+    const [rect, setRect] = useState<Rect | null>(() => {
+        if (dialogId === undefined) { return null; }
+
+        const stored = rememberedGeometry(dialogId);
+        return stored === undefined
+            ? null
+            : fromStoredGeometry(stored, { width: window.innerWidth, height: window.innerHeight });
+    });
 
     const element = useRef<HTMLElement | null>(null);
     const drag = useRef<DragState | null>(null);
@@ -97,11 +113,23 @@ export function useMovableDialog(): MovableDialog {
     }, []);
 
     const endDrag = useCallback((e: ReactPointerEvent<HTMLElement>) => {
+        const wasDragging = drag.current !== null;
         drag.current = null;
         if (e.currentTarget.hasPointerCapture(e.pointerId)) {
             e.currentTarget.releasePointerCapture(e.pointerId);
         }
-    }, []);
+
+        // Where it ended up is the decision worth keeping; everywhere it passed through is not.
+        if (wasDragging && dialogId !== undefined) {
+            setRect(current => {
+                if (current !== null) {
+                    rememberGeometry(dialogId, toStoredGeometry(
+                        current, { width: window.innerWidth, height: window.innerHeight }));
+                }
+                return current;
+            });
+        }
+    }, [dialogId]);
 
     const dragging = { onPointerMove, onPointerUp: endDrag, onPointerCancel: endDrag };
 

@@ -7,6 +7,8 @@ import { ResizeHandles } from '../shared/ResizeHandles';
 import { useMovableDialog } from '../shared/useMovableDialog';
 
 export interface LocModalProps {
+    /** Identifies the dialog across sessions, so it reopens where it was last put. */
+    dialogId: string;
     title: string;
     /** Label for the confirming button. Disabled while {@link canConfirm} is false. */
     confirmLabel: string;
@@ -14,6 +16,13 @@ export interface LocModalProps {
     onConfirm: () => void;
     onCancel: () => void;
     children: ReactNode;
+    /**
+     * A one-line hint shown on the button row, where it stays put however the body is scrolled.
+     *
+     * For a note about what confirming does. A note explaining a particular control belongs beside
+     * that control, in {@link children} - this row has space for a line, not a paragraph.
+     */
+    footnote?: ReactNode;
 }
 
 /**
@@ -28,7 +37,7 @@ export interface LocModalProps {
  */
 export function LocModal(props: LocModalProps): React.JSX.Element {
     const { onCancel } = props;
-    const { dialogProps, dragHandleProps, resizeHandleProps } = useMovableDialog();
+    const { dialogProps, dragHandleProps, resizeHandleProps } = useMovableDialog(props.dialogId);
 
     // Escape closes from anywhere in the dialog, including the buttons.
     useEffect(() => {
@@ -55,6 +64,12 @@ export function LocModal(props: LocModalProps): React.JSX.Element {
                 <div className="modal-title drag-handle" {...dragHandleProps}>{props.title}</div>
                 <div className="modal-body">{props.children}</div>
                 <div className="modal-buttons">
+                    {props.footnote !== undefined && (
+                        <p className="modal-footnote">
+                            <span className="codicon codicon-info" aria-hidden="true" />
+                            {props.footnote}
+                        </p>
+                    )}
                     <button className="btn" onClick={onCancel}>Cancel</button>
                     <button
                         className="btn primary"
