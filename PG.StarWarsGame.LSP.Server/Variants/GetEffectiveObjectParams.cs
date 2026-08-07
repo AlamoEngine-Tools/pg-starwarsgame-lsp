@@ -15,4 +15,11 @@ public sealed record GetEffectiveObjectParams : IRequest<GetEffectiveObjectResul
 {
     /// <summary>Id (Name) of the object to resolve.</summary>
     public string ObjectId { get; init; } = string.Empty;
+
+    /// <summary>
+    ///     The document the request came from. Object ids are unique only within a project, so in a
+    ///     multi-root workspace two mods can both define the same name - this says which one is meant.
+    ///     Omitted means the primary project, which is the single-project case.
+    /// </summary>
+    public string? ContextUri { get; init; }
 }

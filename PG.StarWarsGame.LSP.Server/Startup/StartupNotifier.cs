@@ -3,8 +3,21 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
+
+/// <summary>Payload of <c>$/workspaceScanComplete</c>: the projects the session ended up serving.</summary>
+public sealed class WorkspaceScanCompleteParams
+{
+    public IReadOnlyList<ScannedProject> Projects { get; init; } = [];
+}
+
+public sealed class ScannedProject
+{
+    public string Name { get; init; } = string.Empty;
+    public string ProjectPath { get; init; } = string.Empty;
+}
 
 /// <summary>
 ///     Fires the one-shot client signals emitted when the startup pipeline finishes and the gate is
@@ -18,13 +31,16 @@ public sealed class StartupNotifier : IStartupNotifier
     private readonly ILanguageServerFacade _facade;
     private readonly ILogger<StartupNotifier> _logger;
     private readonly IClientRefreshNotifier _refresh;
+    private readonly IProjectRegistry? _registry;
 
+    // registry is optional so the minimal test setups can omit it; production always wires it.
     public StartupNotifier(ILanguageServerFacade facade, IClientRefreshNotifier refresh,
-        ILogger<StartupNotifier> logger)
+        ILogger<StartupNotifier> logger, IProjectRegistry? registry = null)
     {
         _facade = facade;
         _refresh = refresh;
         _logger = logger;
+        _registry = registry;
     }
 
     public void NotifyScanComplete()
@@ -32,7 +48,21 @@ public sealed class StartupNotifier : IStartupNotifier
         _logger.LogInformation("Notifying workspace scan complete.");
         try
         {
-            _facade.SendNotification("$/workspaceScanComplete");
+            // The resolved projects travel with the notification so the client can say how many
+            // mods it is serving without a follow-up round trip.
+            _facade.SendNotification("$/workspaceScanComplete", new WorkspaceScanCompleteParams
+            {
+                Projects = _registry?.All
+                    .Where(w => w.Id is not null)
+                    .Select(w => new ScannedProject
+                    {
+                        Name = w.Configuration.Layers.Count > 0
+                            ? w.Configuration.Layers[^1].Name
+                            : w.Id!,
+                        ProjectPath = w.Id!
+                    })
+                    .ToList() ?? []
+            });
         }
         catch (Exception ex)
         {

@@ -20,7 +20,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     the per-language diagnostics feature flags): while it returns false, index changes
 ///     publish nothing.
 /// </summary>
-public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
+public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher, IDocumentDiagnosticsClearer
 {
     private readonly int _debounceMs;
     private readonly IGlobalSuppressionStore? _globalSuppressions;
@@ -123,6 +123,20 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
                && suppressions.IsSuppressed(id, diagnostic.Range.Start.Line);
     }
 
+    /// <summary>
+    ///     Retracts this publisher's diagnostics for one document and stops tracking it, so a later
+    ///     <see cref="ClearAllPublished" /> does not publish for it again.
+    /// </summary>
+    public virtual void ClearDocument(string uri)
+    {
+        Publish(EmptyParams(uri));
+        lock (_publishLock)
+        {
+            _lastPublishedUris = _lastPublishedUris.Where(u => !string.Equals(u, uri, StringComparison.Ordinal))
+                .ToHashSet(StringComparer.Ordinal);
+        }
+    }
+
     protected void ClearAllPublished()
     {
         foreach (var uri in _lastPublishedUris)
@@ -205,7 +219,11 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
             try
             {
-                PublishForDocument(doc.Uri, doc.Text, index);
+                // Each document is diagnosed by the project that owns it, not by whichever project
+                // raised the event that woke this run. A shared dependency is diagnosed by its most
+                // specific owner: publishing every owner's view would merge two projects' analyses
+                // into one file's diagnostics, which is exactly the mixing separation forbids.
+                PublishForDocument(doc.Uri, doc.Text, _indexService.For(doc.Uri));
             }
             catch (Exception ex)
             {

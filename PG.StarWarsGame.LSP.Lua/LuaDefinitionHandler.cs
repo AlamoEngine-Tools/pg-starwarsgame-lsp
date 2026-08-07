@@ -52,7 +52,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
 
         var line = request.Position.Line;
         var character = request.Position.Character;
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
 
         // Path A: LuaGlobal symbol/reference via DocumentIndex.
         if (index.Documents.TryGetValue(uri, out var docIndex))

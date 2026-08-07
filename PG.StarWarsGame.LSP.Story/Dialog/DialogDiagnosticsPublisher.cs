@@ -97,13 +97,15 @@ public sealed class DialogDiagnosticsPublisher : DiagnosticsPublisherBase, IDial
         var text = _textSource.GetText(canonicalUri)?.Text;
         if (text is null) return Task.CompletedTask;
 
-        PublishForDocument(uri, text, _indexService.Current);
+        PublishForDocument(uri, text, _indexService.For(canonicalUri));
         return Task.CompletedTask;
     }
 
-    public void ClearDocument(string uri)
+    // Normalises first: the sync handler and the workspace-folder handler pass raw client URIs,
+    // and the base class tracks published URIs in canonical form.
+    public override void ClearDocument(string uri)
     {
-        Publish(EmptyParams(_fileHelper.NormalizeUri(uri)));
+        base.ClearDocument(_fileHelper.NormalizeUri(uri));
     }
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)

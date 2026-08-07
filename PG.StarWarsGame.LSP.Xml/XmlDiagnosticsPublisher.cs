@@ -222,8 +222,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         if (!DiagnosticsEnabled) return;
 
         ClearAllPublished();
-        var index = _indexService.Current;
-        foreach (var uri in index.Documents.Keys)
+
+        // Every project, not just the primary one: a multi-root workspace has an index per root
+        // project, and a sweep that stopped at the first would leave the others' documents with
+        // the diagnostics ClearAllPublished just wiped.
+        foreach (var uri in _indexService.AllIndices.SelectMany(i => i.Documents.Keys).Distinct(StringComparer.Ordinal))
             await RevalidateDocumentAsync(uri, ct);
     }
 
@@ -231,7 +234,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         if (!DiagnosticsEnabled) return Task.CompletedTask;
 
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
         var text = _textSource.GetText(_fileHelper.NormalizeUri(uri))?.Text;
         if (text is null) return Task.CompletedTask;
 

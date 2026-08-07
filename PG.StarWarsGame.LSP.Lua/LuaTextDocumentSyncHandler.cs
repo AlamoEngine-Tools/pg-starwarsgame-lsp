@@ -84,7 +84,7 @@ public sealed class LuaTextDocumentSyncHandler : TextDocumentSyncHandlerBase
                 // removal landing last silently deleted the document's symbols from the index.
                 // UpdateDocumentAsync alone skips the re-parse when the buffer already matched
                 // disk. Pass the current version so an unsaved-edit revert is not dropped as stale.
-                var version = _indexService.Current.Documents.GetValueOrDefault(uri)?.Version ?? 0;
+                var version = _indexService.For(uri).Documents.GetValueOrDefault(uri)?.Version ?? 0;
                 var text = await _fileHelper.FileSystem.File.ReadAllTextAsync(localPath, token);
                 await _indexService.UpdateDocumentAsync(uri, text, version, token);
             }

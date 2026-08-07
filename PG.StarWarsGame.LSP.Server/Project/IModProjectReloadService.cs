@@ -11,9 +11,14 @@ public interface IModProjectReloadService
     // handler to re-glob loose asset files when one changes on disk. Null until the first load.
     IReadOnlyList<string>? LastAssetRoots { get; }
 
-    // The workspace configuration resolved by the most recent successful load. Null until the
-    // first successful load that finds a .pgproj.
+    // The primary project's configuration from the most recent successful load. Null until the
+    // first successful load that finds a .pgproj. Prefer LastWorkspaceConfigs - this discards every
+    // project but one in a multi-root workspace.
     WorkspaceConfiguration? LastWorkspaceConfig { get; }
+
+    // Every project configuration resolved by the most recent load, in root order. Empty until the
+    // first successful load.
+    IReadOnlyList<WorkspaceConfiguration> LastWorkspaceConfigs => LastWorkspaceConfig is null ? [] : [LastWorkspaceConfig];
 
     // The workspace roots passed to the most recent LoadAsync call. Null until the first load.
     IReadOnlyList<string>? LastWorkspaceRoots { get; }

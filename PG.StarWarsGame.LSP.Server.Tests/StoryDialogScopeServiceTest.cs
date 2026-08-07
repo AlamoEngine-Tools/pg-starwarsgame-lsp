@@ -29,7 +29,7 @@ public sealed class StoryDialogScopeServiceTest
         var config = WorkspaceConfiguration.Empty with { StoryDialogRoots = roots ?? [DialogRoot] };
         var provider = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Dialog = new DialogFeatureFlags { Diagnostics = flagOn } });
-        var scope = new StoryDialogScopeService(new StubReloadService(config), provider, fileHelper);
+        var scope = new StoryDialogScopeService(new ProjectContext(config), provider, fileHelper);
         return (scope, fileHelper);
     }
 

@@ -31,6 +31,7 @@ public static class LuaLanguageServiceExtensions
         services.AddSingleton<IGameDocumentParser, LuaGameDocumentParser>();
         services.AddSingleton<LuaDiagnosticsPublisher>();
         services.AddSingleton<IDiagnosticsRepublisher>(sp => sp.GetRequiredService<LuaDiagnosticsPublisher>());
+        services.AddSingleton<IDocumentDiagnosticsClearer>(sp => sp.GetRequiredService<LuaDiagnosticsPublisher>());
         return services;
     }
 }

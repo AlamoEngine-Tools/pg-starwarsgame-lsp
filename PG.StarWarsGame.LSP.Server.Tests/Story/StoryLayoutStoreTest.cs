@@ -30,7 +30,7 @@ public sealed class StoryLayoutStoreTest
             : [];
         var config = WorkspaceConfiguration.Empty with { Layers = layers };
         var store = new StoryLayoutStore(
-            new StubReloadService(config), new FileHelper(fs), NullLogger<StoryLayoutStore>.Instance);
+            new ProjectContext(config), new FileHelper(fs), NullLogger<StoryLayoutStore>.Instance);
         return (store, fs);
     }
 
@@ -83,7 +83,7 @@ public sealed class StoryLayoutStoreTest
             Layers = [new ProjectLayer(1, "Mod", [], [], [], [], null, PgprojPath.Replace('\\', '/'))]
         };
         var fresh = new StoryLayoutStore(
-            new StubReloadService(config), new FileHelper(fs), NullLogger<StoryLayoutStore>.Instance);
+            new ProjectContext(config), new FileHelper(fs), NullLogger<StoryLayoutStore>.Instance);
 
         var entry = Assert.Single(fresh.Get("GC"));
         Assert.Equal(5, entry.X);
@@ -113,30 +113,9 @@ public sealed class StoryLayoutStoreTest
             Layers = [new ProjectLayer(1, "Mod", [], [], [], [], null, PgprojPath.Replace('\\', '/'))]
         };
         var fresh = new StoryLayoutStore(
-            new StubReloadService(config), new FileHelper(fs), NullLogger<StoryLayoutStore>.Instance);
+            new ProjectContext(config), new FileHelper(fs), NullLogger<StoryLayoutStore>.Instance);
 
         Assert.Empty(fresh.Get("GC"));
     }
 
-    private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService
-    {
-        public IReadOnlyList<string>? LastAssetRoots => null;
-        public WorkspaceConfiguration? LastWorkspaceConfig => config;
-        public IReadOnlyList<string>? LastWorkspaceRoots => null;
-
-        public Task LoadAsync(IEnumerable<string> workspaceRoots, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task ReloadAsync(CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public Task ReloadLocalisationAsync(CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-    }
 }

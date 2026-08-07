@@ -78,7 +78,10 @@ public sealed class ModProjectResolver
         return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType)
         {
             Layers = layers,
-            StoryDialogRoots = storyDialog
+            StoryDialogRoots = storyDialog,
+            // Taken from the graph's last entry rather than the rootPath argument so the identity is
+            // normalised exactly like every ProjectLayer.ProjectPath it must be correlated with.
+            ProjectPath = ordered.Count > 0 ? ordered[^1].Path : null
         };
     }
 

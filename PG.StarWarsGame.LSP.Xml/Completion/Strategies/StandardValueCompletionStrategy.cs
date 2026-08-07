@@ -25,7 +25,7 @@ internal sealed class StandardValueCompletionStrategy : IXmlTagValueCompletionSt
         if (ctx.StoryParamSide is not null) return [];
         if (ctx.TagDef is null || ctx.TagDef.ReferenceKind == ReferenceKind.BoneName) return [];
 
-        var proposals = _proposals.GetProposals(ctx.TagDef.ValueType, ctx.TagDef, ctx.PartialValue)
+        var proposals = _proposals.GetProposals(ctx.TagDef.ValueType, ctx.TagDef, ctx.PartialValue, ctx.Index)
             .Concat(_completionRegistry.GetProposals(ctx.TagDef, ctx.PartialValue, ctx.Index));
 
         return proposals.Select(p => new CompletionItem

@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 
@@ -45,16 +46,16 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
     private readonly object _gate = new();
     private readonly ILogger<GlobalSuppressionStore> _logger;
     private readonly IUserNotifier? _notifier;
-    private readonly IModProjectReloadService _reloadService;
+    private readonly IProjectContext _project;
     private List<SuppressionEntry>? _cache;
 
     public GlobalSuppressionStore(
-        IModProjectReloadService reloadService,
+        IProjectContext project,
         IFileHelper fileHelper,
         ILogger<GlobalSuppressionStore> logger,
         IUserNotifier? notifier = null)
     {
-        _reloadService = reloadService;
+        _project = project;
         _fileHelper = fileHelper;
         _logger = logger;
         _notifier = notifier;
@@ -178,10 +179,7 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
 
     private string? SidecarPath()
     {
-        var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
-            .OrderByDescending(l => l.Rank)
-            .FirstOrDefault();
-        if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-        return ProjectIndexLocator.GetAetswgDirectory(pgprojPath) + "/suppressions.json";
+        // This project's own sidecar: suppressions must not leak between projects.
+        return _project.AetswgDirectory is { } dir ? dir + "/suppressions.json" : null;
     }
 }

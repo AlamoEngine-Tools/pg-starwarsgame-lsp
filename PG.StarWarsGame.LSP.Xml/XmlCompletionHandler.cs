@@ -99,7 +99,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
                 return Task.FromResult(new CompletionList());
 
             var isStoryParser = IsStoryParserDocument(uri);
-            var index = _indexService.Current;
+            var index = _indexService.For(uri);
             var tagNameCtx = new TagNameCompletionContext(
                 uri, index, _schema, enclosingNode, enclosingNode.Name,
                 XmlUtility.GetDepth(enclosingNode), prefix, text, lineIndex, character, isStoryParser);
@@ -183,7 +183,7 @@ public sealed class XmlCompletionHandler : CompletionHandlerBase
         }
 
         var partialValue = ExtractPartialValue(line, character);
-        var valueIndex = _indexService.Current;
+        var valueIndex = _indexService.For(uri);
         var tupleSlotIndex = tagDef is not null && TupleValueTypes.Contains(tagDef.ValueType)
             ? ComputeTupleSlotIndex(text, enclosingValueNode!, lineIndex, character)
             : 0;

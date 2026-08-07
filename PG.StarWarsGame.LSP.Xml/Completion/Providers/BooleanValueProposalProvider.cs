@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 
@@ -16,7 +17,7 @@ public sealed class BooleanValueProposalProvider : IXmlValueProposalProvider
 
     public XmlValueType ValueType => XmlValueType.Boolean;
 
-    public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue)
+    public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex? index = null)
     {
         if (string.IsNullOrEmpty(partialValue))
             return AllProposals;

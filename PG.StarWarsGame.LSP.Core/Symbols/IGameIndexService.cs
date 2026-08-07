@@ -11,6 +11,25 @@ public interface IGameIndexService
 {
     GameIndex Current { get; }
 
+    /// <summary>
+    ///     The index of the project that owns <paramref name="uri" />. In a multi-root workspace each
+    ///     root project has its own index, so a handler must answer from the one its request belongs
+    ///     to - two unrelated mods defining the same object must not cross-resolve. Falls back to
+    ///     <see cref="Current" /> for files outside every project, and the default implementation
+    ///     keeps single-project setups (and test fakes) working unchanged.
+    /// </summary>
+    GameIndex For(string uri)
+    {
+        return Current;
+    }
+
+    /// <summary>
+    ///     Every project's index. For the genuinely workspace-wide sweeps (revalidate everything,
+    ///     enumerate all indexed documents) that must not stop at the primary project. The default
+    ///     implementation keeps single-project setups and test fakes working unchanged.
+    /// </summary>
+    IReadOnlyList<GameIndex> AllIndices => [Current];
+
     Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct);
 
     /// <summary>

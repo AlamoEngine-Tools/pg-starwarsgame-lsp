@@ -50,7 +50,7 @@ public sealed class XmlCodeLensHandler : CodeLensHandlerBase
         if (!_eaWXmlContext.IsEaWXmlFile(uri))
             return Task.FromResult<CodeLensContainer?>(null);
 
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
         if (!index.Documents.TryGetValue(uri, out var docIndex))
             return Task.FromResult<CodeLensContainer?>(new CodeLensContainer());
 

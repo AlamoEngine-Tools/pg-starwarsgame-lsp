@@ -358,7 +358,7 @@ public sealed class TupleValueCompletionStrategyTest
         public string? LastPartialValue { get; private set; }
 
         public IReadOnlyList<ValueProposal> GetProposals(XmlValueType valueType, XmlTagDefinition tag,
-            string partialValue)
+            string partialValue, GameIndex? index = null)
         {
             LastValueType = valueType;
             LastTag = tag;

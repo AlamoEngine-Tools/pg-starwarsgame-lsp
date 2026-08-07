@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion;
 
@@ -16,11 +17,11 @@ public sealed class XmlValueProposalRegistry : IXmlValueProposalRegistry
     }
 
     public IReadOnlyList<ValueProposal> GetProposals(
-        XmlValueType valueType, XmlTagDefinition tag, string partialValue)
+        XmlValueType valueType, XmlTagDefinition tag, string partialValue, GameIndex? index = null)
     {
         if (!_providers.TryGetValue(valueType, out var provider))
             return [];
 
-        return provider.GetProposals(tag, partialValue);
+        return provider.GetProposals(tag, partialValue, index);
     }
 }

@@ -61,7 +61,7 @@ public sealed class LuaInlayHintHandler : InlayHintsHandlerBase
             return Task.FromResult<InlayHintContainer?>(null);
 
         var range = request.Range;
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
         var root = parsed.Tree.GetRoot();
         var hints = new List<InlayHint>();
 

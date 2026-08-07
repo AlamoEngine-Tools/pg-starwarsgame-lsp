@@ -233,7 +233,7 @@ public sealed class DynamicEnumValueProposalProviderTest
     // ── DynamicEnumChanged cache invalidation ──────────────────────────────────
 
     [Fact]
-    public void DynamicEnumChanged_Fired_RebuildsCacheFromNewIndex()
+    public void DynamicEnumChanged_NewIndexApplied_ProposalsComeFromIt()
     {
         var enumDef = new EnumDefinition { Name = "DamageType", Kind = EnumKind.DynamicXml, Values = [] };
         var tag = new XmlTagDefinition
@@ -276,7 +276,9 @@ public sealed class DynamicEnumValueProposalProviderTest
 
 file sealed class FakeIndexService(GameIndex? current = null) : IGameIndexService
 {
-    public GameIndex Current { get; } = current ?? GameIndex.Empty;
+    // Settable: production applies the new index and raises DynamicEnumChanged together, so a fake
+    // that only raised the event would not represent any real state.
+    public GameIndex Current { get; private set; } = current ?? GameIndex.Empty;
 
     public event Action<GameIndex>? IndexChanged
     {
@@ -337,6 +339,7 @@ file sealed class FakeIndexService(GameIndex? current = null) : IGameIndexServic
 
     public void RaiseDynamicEnumChanged(GameIndex index)
     {
+        Current = index;
         DynamicEnumChanged?.Invoke(index);
     }
 

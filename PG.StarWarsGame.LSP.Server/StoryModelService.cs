@@ -47,7 +47,7 @@ public sealed class StoryModelService : IStoryModelService
     private readonly IGameIndexService _indexService;
     private readonly ILogger<StoryModelService> _logger;
     private readonly Dictionary<string, ModelCache> _models = new(StringComparer.OrdinalIgnoreCase);
-    private readonly IModProjectReloadService _reloadService;
+    private readonly IProjectContext _project;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
     private ChainCache? _chain;
@@ -58,14 +58,14 @@ public sealed class StoryModelService : IStoryModelService
     private bool _servedIncompleteScan;
 
     public StoryModelService(
-        IModProjectReloadService reloadService,
+        IProjectContext project,
         IGameIndexService indexService,
         ISchemaProvider schema,
         IFileHelper fileHelper,
         IDocumentTextSource textSource,
         ILogger<StoryModelService> logger)
     {
-        _reloadService = reloadService;
+        _project = project;
         _indexService = indexService;
         _schema = schema;
         _fileHelper = fileHelper;
@@ -199,10 +199,11 @@ public sealed class StoryModelService : IStoryModelService
         return chain;
     }
 
+    // THIS project's xml roots, highest layer first. Deliberately not a union across projects: each
+    // project models only its own campaigns, so a chain scan never reads another mod's files.
     private IReadOnlyList<string> XmlRootsHighestFirst()
     {
-        var roots = _reloadService.LastWorkspaceConfig?.XmlDirectories ?? [];
-        return roots.Reverse().ToList();
+        return _project.Configuration.XmlDirectories.Reverse().ToList();
     }
 
     private (string Uri, string Text)? ReadXmlRelative(string xmlRelativePath)
@@ -221,16 +222,17 @@ public sealed class StoryModelService : IStoryModelService
 
     private bool VersionsMatch(IReadOnlyDictionary<string, int?> recorded)
     {
-        var documents = _indexService.Current.Documents;
+        // Resolved per URI: a chain can span projects, and each document is versioned in the index
+        // of the project that owns it.
         foreach (var (uri, version) in recorded)
-            if ((documents.TryGetValue(uri, out var doc) ? doc.Version : null) != version)
+            if (CurrentVersionOf(uri) != version)
                 return false;
         return true;
     }
 
     private int? CurrentVersionOf(string uri)
     {
-        return _indexService.Current.Documents.TryGetValue(uri, out var doc) ? doc.Version : null;
+        return _indexService.For(uri).Documents.TryGetValue(uri, out var doc) ? doc.Version : null;
     }
 
     private sealed record ChainCache(StoryChainScanResult Result, IReadOnlyDictionary<string, int?> DocumentVersions);

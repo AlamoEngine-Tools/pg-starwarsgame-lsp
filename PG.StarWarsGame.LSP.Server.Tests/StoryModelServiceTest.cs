@@ -45,7 +45,7 @@ public sealed class StoryModelServiceTest
     }
 
     private static (StoryModelService Service, MockFileSystem Fs, MutableIndexService Index,
-        FakeHost Host, FileHelper FileHelper, StubReloadService Reload) Build(
+        FakeHost Host, FileHelper FileHelper, MutableProjectContext Project) Build(
             Dictionary<string, MockFileData>? files = null, IReadOnlyList<string>? xmlDirs = null,
             bool configured = true)
     {
@@ -54,15 +54,15 @@ public sealed class StoryModelServiceTest
         var index = new MutableIndexService();
         var host = new FakeHost();
         var config = WorkspaceConfiguration.Empty with { XmlDirectories = xmlDirs ?? [XmlDir] };
-        var reload = new StubReloadService(configured ? config : null);
+        var project = new MutableProjectContext(configured ? config : null);
         var service = new StoryModelService(
-            reload,
+            project,
             index,
             new SpecialDefSchemaProvider(),
             fileHelper,
             new DocumentTextSource(host, fileHelper, NullLogger<DocumentTextSource>.Instance),
             NullLogger<StoryModelService>.Instance);
-        return (service, fs, index, host, fileHelper, reload);
+        return (service, fs, index, host, fileHelper, project);
     }
 
     private static WorkspaceConfiguration DefaultConfig()
@@ -181,11 +181,11 @@ public sealed class StoryModelServiceTest
     {
         // Startup window: a client request arrives before the pipeline has published the
         // workspace config. The scan reads nothing - that empty result must not stick.
-        var (service, _, _, _, _, reload) = Build(configured: false);
+        var (service, _, _, _, _, project) = Build(configured: false);
 
         Assert.Empty(service.GetChainResult().Campaigns);
 
-        reload.LastWorkspaceConfig = DefaultConfig();
+        project.Configuration = DefaultConfig();
 
         Assert.Equal(["GC_One"], service.GetCampaignNames());
     }
@@ -195,15 +195,22 @@ public sealed class StoryModelServiceTest
     {
         // The change notifier must be able to announce campaigns that only became resolvable
         // after startup, so the navigator's early empty answer gets corrected.
-        var (service, _, _, _, _, reload) = Build(configured: false);
+        var (service, _, _, _, _, project) = Build(configured: false);
         _ = service.GetChainResult();
 
-        reload.LastWorkspaceConfig = DefaultConfig();
+        project.Configuration = DefaultConfig();
 
         Assert.Equal(["GC_One"], service.GetInvalidatedCampaigns());
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────
+
+    /// <summary>Re-pointable project context, mirroring ProjectWorkspace.Apply on a reload.</summary>
+    private sealed class MutableProjectContext(WorkspaceConfiguration? configuration) : IProjectContext
+    {
+        public WorkspaceConfiguration Configuration { get; set; } = configuration ?? WorkspaceConfiguration.Empty;
+        public string? AetswgDirectory => ProjectContext.ResolveAetswgDirectory(Configuration);
+    }
 
     private sealed class StubReloadService(WorkspaceConfiguration? config) : IModProjectReloadService
     {

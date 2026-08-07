@@ -59,7 +59,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
         var line = request.Position.Line;
         var character = request.Position.Character;
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
 
         var ctx = LuaCompletionContextClassifier.Classify(parsed.Text, line, character);
         return Task.FromResult(BuildCompletions(ctx, uri, parsed, line, character, index));

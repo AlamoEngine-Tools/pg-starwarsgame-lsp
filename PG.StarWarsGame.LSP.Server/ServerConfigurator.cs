@@ -99,6 +99,7 @@ public static class ServerConfigurator
             .WithHandler<GameRenameHandler>()
             .WithHandler<GamePrepareRenameHandler>()
             .WithHandler<GameDidChangeWatchedFilesHandler>()
+            .WithHandler<GameDidChangeWorkspaceFoldersHandler>()
             .WithHandler<XmlCodeActionHandler>()
             .WithHandler<XmlCodeLensHandler>()
             .WithHandler<XmlLinkedEditingRangeHandler>()
@@ -161,15 +162,40 @@ public static class ServerConfigurator
                 services.AddSingleton<SchemaProviderProxy>();
                 services.AddSingleton<ISchemaProvider>(sp => sp.GetRequiredService<SchemaProviderProxy>());
 
-                services.AddSingleton<EaWXmlContext>();
-                services.AddSingleton<IEaWXmlContext>(sp => sp.GetRequiredService<EaWXmlContext>());
-                services.AddSingleton<IProjectLayerMap, ProjectLayerMap>();
+                // One ProjectWorkspace per root .pgproj; the three services below are per-project
+                // state, so outside a project scope they are injected as routing facades that
+                // answer from the project owning the file in the request. With a single project
+                // (the common case) every route resolves to that project, so behaviour is unchanged.
+                // Constructed explicitly: the parsers and logger factory are optional constructor
+                // parameters (so the many minimal test setups can omit them), and a container that
+                // silently fell back to the defaults would give every project a parser-less index.
+                services.AddSingleton<ProjectScopeFactory>(sp => new ProjectScopeFactory(
+                    new ProjectScopeFactory.SharedServices
+                    {
+                        FileHelper = sp.GetRequiredService<IFileHelper>(),
+                        Schema = sp.GetRequiredService<ISchemaProvider>(),
+                        Config = sp.GetRequiredService<ILspConfigurationProvider>(),
+                        TextSource = sp.GetRequiredService<IDocumentTextSource>(),
+                        LoggerFactory = sp.GetRequiredService<ILoggerFactory>(),
+                        Notifier = sp.GetRequiredService<IUserNotifier>()
+                    }));
+
+                // Each project builds its own provider from the factory's explicit shared list, so
+                // per-project services cannot be accidentally shared - see ProjectScopeFactory.
+                services.AddSingleton<ProjectRegistry>(sp => new ProjectRegistry(
+                    sp.GetRequiredService<IFileHelper>(),
+                    sp.GetServices<IGameDocumentParser>(),
+                    sp.GetRequiredService<ILoggerFactory>(),
+                    sp.GetRequiredService<ProjectScopeFactory>().Create));
+                services.AddSingleton<IProjectRegistry>(sp => sp.GetRequiredService<ProjectRegistry>());
+                services.AddSingleton<IEaWXmlContext, RoutedEaWXmlContext>();
+                services.AddSingleton<IProjectLayerMap, RoutedProjectLayerMap>();
 
                 services.AddSingleton<IGameWorkspaceHost, GameWorkspaceHost>();
                 services.AddSingleton<IDocumentTextSource, DocumentTextSource>();
                 services.AddSingleton<IGameDocumentParser, XmlGameDocumentParser>();
-                services.AddSingleton<IGameIndexService, GameIndexService>();
-                services.AddSingleton<IFileTypeRegistry, FileTypeRegistry>();
+                services.AddSingleton<IGameIndexService, RoutedGameIndexService>();
+                services.AddSingleton<IFileTypeRegistry, RoutedFileTypeRegistry>();
                 // Live chain problems (open-buffer-first, invalidated per document version); the
                 // startup snapshot it also accepts only answers until the first real scan.
                 services.AddSingleton<IStoryChainProblemStore>(sp =>
@@ -178,7 +204,7 @@ public static class ServerConfigurator
                         sp.GetRequiredService<ILspConfigurationProvider>()));
 
                 // Story campaign models (per-campaign threads + graph) and their diagnostics.
-                services.AddSingleton<IStoryModelService, StoryModelService>();
+                services.AddSingleton<IStoryModelService, RoutedStoryModelService>();
                 services.AddSingleton<IStoryGraphDiagnosticsSource, StoryGraphDiagnosticsService>();
                 services.AddSingleton<StoryGraphChangeNotifier>(sp =>
                     new StoryGraphChangeNotifier(
@@ -193,11 +219,11 @@ public static class ServerConfigurator
                 // open-editor sync come free); the facade is resolved lazily per call.
                 services.AddSingleton<IWorkspaceEditApplier>(sp =>
                     new FacadeWorkspaceEditApplier(() => sp.GetRequiredService<ILanguageServerFacade>()));
-                services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
-                services
-                    .AddSingleton<Core.Diagnostics.Suppression.IGlobalSuppressionStore,
-                        GlobalSuppressionStore>();
-                services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
+                // Per-project state: the instances live in each project's own provider
+                // (ProjectScopeFactory); what is injected here routes to the right one.
+                services.AddSingleton<Core.Diagnostics.Suppression.IGlobalSuppressionStore,
+                    RoutedGlobalSuppressionStore>();
+
                 services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
                     sp.GetRequiredService<IStoryModelService>(),
                     sp.GetRequiredService<IGameIndexService>(),
@@ -206,7 +232,9 @@ public static class ServerConfigurator
                         .SendNotification("aet/storySimChanged", new StorySimChangedParams(campaign))));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
-                services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
+                services.AddSingleton<IStoryDialogScope, RoutedStoryDialogScope>();
+                services.AddSingleton<IStoryLayoutStore, RoutedStoryLayoutStore>();
+                services.AddSingleton<IProjectScopedWorkspaceSettings, RoutedWorkspaceSettingsStore>();
                 services.AddSingleton<DialogFactProducer>();
                 services.AddSingleton<IDialogDiagnosticsHandler, UnknownDialogCommandHandler>();
                 services.AddSingleton<IDialogDiagnosticsHandler, DialogCommandArityHandler>();
@@ -218,6 +246,8 @@ public static class ServerConfigurator
                 services.AddSingleton<IDialogDiagnosticsRevalidator>(sp =>
                     sp.GetRequiredService<DialogDiagnosticsPublisher>());
                 services.AddSingleton<Core.Diagnostics.IDiagnosticsRepublisher>(sp =>
+                    sp.GetRequiredService<DialogDiagnosticsPublisher>());
+                services.AddSingleton<Core.Diagnostics.IDocumentDiagnosticsClearer>(sp =>
                     sp.GetRequiredService<DialogDiagnosticsPublisher>());
 
                 // The inbound event gate: buffers client notifications while the linear startup
@@ -262,12 +292,10 @@ public static class ServerConfigurator
                 services.AddLuaLanguageServices();
                 services.AddXmlLanguageServices();
                 services.SupportLocalisationBaseline();
-                services.AddSingleton<LocalisationProjectRegistry>();
-                services.AddSingleton<ILocalisationProjectRegistry>(sp =>
-                    sp.GetRequiredService<LocalisationProjectRegistry>());
-                services.AddSingleton<LocalisationLayerRegistry>();
-                services.AddSingleton<ILocalisationLayerRegistry>(sp =>
-                    sp.GetRequiredService<LocalisationLayerRegistry>());
+
+                services.AddSingleton<ILocalisationProjectRegistry, RoutedLocalisationProjectRegistry>();
+
+                services.AddSingleton<ILocalisationLayerRegistry, RoutedLocalisationLayerRegistry>();
                 services.AddSingleton<ILocalisationLoader, LocalisationLoader>();
                 services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
                 services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
@@ -316,7 +344,7 @@ public static class ServerConfigurator
                 var initLogger = server.Services.GetRequiredService<ILogger<LspConfigurationProvider>>();
                 var config = server.Services.GetRequiredService<ILspConfigurationProvider>();
 
-                var scanRoots = ComputeScanRoots(request, config.Current.WorkspaceRoot);
+                var scanRoots = ComputeScanRoots(request, config.Current);
 
                 // Log whether a .pgproj was found under the scan roots - useful startup breadcrumb only.
                 // Not authoritative: the real resolution (with a user-facing notification on failure,
@@ -376,13 +404,20 @@ public static class ServerConfigurator
             });
     }
 
-    // Builds the scan roots: start from protocol-level workspace folders or RootUri, then always
-    // add the configured workspaceRoot if not already covered. The extension sends
-    // workspaceRoot = the game data directory, which may be a subdirectory of the VS Code
-    // workspace root - so it must always be included, not used as a mere fallback.
-    private static IReadOnlyList<string> ComputeScanRoots(InitializeParams request, string? configWorkspaceRoot)
+    // Builds the scan roots: start from protocol-level workspace folders or RootUri, then add any
+    // configured root not already covered. The extension sends workspaceRoot(s) = the game data
+    // directories, which may be subdirectories of the VS Code workspace folders - so they must
+    // always be included, not used as a mere fallback. Every root is scanned for its own .pgproj,
+    // which is what makes a multi-root workspace produce one project per folder.
+    private static IReadOnlyList<string> ComputeScanRoots(InitializeParams request, LspConfiguration config)
     {
         var folders = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void Add(string? path)
+        {
+            if (!string.IsNullOrEmpty(path) && seen.Add(path)) folders.Add(path);
+        }
 
         var workspaceFolderPaths = request.WorkspaceFolders
             ?.Select(f => f.Uri.GetFileSystemPath())
@@ -390,19 +425,15 @@ public static class ServerConfigurator
             .ToList();
 
         if (workspaceFolderPaths is { Count: > 0 })
-        {
-            folders.AddRange(workspaceFolderPaths!);
-        }
+            foreach (var path in workspaceFolderPaths)
+                Add(path);
         else if (request.RootUri is not null)
-        {
-            var rootPath = request.RootUri.GetFileSystemPath();
-            if (!string.IsNullOrEmpty(rootPath))
-                folders.Add(rootPath);
-        }
+            Add(request.RootUri.GetFileSystemPath());
 
-        if (configWorkspaceRoot is not null &&
-            !folders.Any(f => string.Equals(f, configWorkspaceRoot, StringComparison.OrdinalIgnoreCase)))
-            folders.Add(configWorkspaceRoot);
+        foreach (var configured in config.WorkspaceRoots)
+            Add(configured);
+
+        Add(config.WorkspaceRoot);
 
         return folders;
     }

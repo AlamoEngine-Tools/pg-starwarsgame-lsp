@@ -12,4 +12,16 @@ public interface IVariantTagSource
 {
     /// <summary>Returns the object's direct child tags, or null when this source does not know the object.</summary>
     IReadOnlyList<VariantTag>? TryGetTags(string objectId);
+
+    /// <summary>
+    ///     The same lookup, scoped to the project owning <paramref name="contextUri" />. An object id
+    ///     is only unique within a project - two unrelated mods can both define
+    ///     <c>REBEL_TROOPER</c> - so a bare id has to be resolved against the project the request
+    ///     came from. Passing null (or omitting it) keeps the primary project's answer, which is the
+    ///     single-project behaviour and what the default implementation preserves for test fakes.
+    /// </summary>
+    IReadOnlyList<VariantTag>? TryGetTags(string objectId, string? contextUri)
+    {
+        return TryGetTags(objectId);
+    }
 }

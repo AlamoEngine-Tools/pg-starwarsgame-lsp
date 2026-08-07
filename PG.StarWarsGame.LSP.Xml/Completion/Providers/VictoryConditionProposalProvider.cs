@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Completion;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 
@@ -16,7 +17,7 @@ public sealed class VictoryConditionProposalProvider : IXmlValueProposalProvider
 {
     public XmlValueType ValueType => XmlValueType.Type69;
 
-    public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue)
+    public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue, GameIndex? index = null)
     {
         if (tag.Enum is not { } enumDef)
             return [];

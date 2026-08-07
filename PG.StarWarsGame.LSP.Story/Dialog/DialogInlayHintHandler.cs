@@ -57,7 +57,7 @@ public sealed class DialogInlayHintHandler : InlayHintsHandlerBase
             return Task.FromResult<InlayHintContainer?>(null);
 
         var document = StoryDialogParser.Parse(text);
-        var index = _indexService.Current;
+        var index = _indexService.For(uri);
         var range = request.Range;
         var hints = new List<InlayHint>();
 
