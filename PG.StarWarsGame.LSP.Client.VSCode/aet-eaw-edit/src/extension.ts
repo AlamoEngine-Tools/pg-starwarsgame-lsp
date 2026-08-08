@@ -6,7 +6,6 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import {
 	ClientCapabilities,
-	ExecuteCommandRequest,
 	FeatureState,
 	LanguageClient,
 	LanguageClientOptions,
@@ -19,7 +18,13 @@ import { CreditsPreviewPanel } from './creditsPreviewPanel';
 import { initDialogGeometryStorage } from './dialogGeometryStorage';
 import { LocalisationEditorPanel } from './localisationEditorPanel';
 import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
-import { LocProjectInfo } from './webview/localisationTreeModel';
+import { LspGateway } from './lsp/lspGateway';
+import { vscodeMessageSink } from './lsp/vscodeMessageSink';
+import {
+    ConvertLocalisationFormatResult, ExportLocalisationToDatResult, GetEffectiveObjectResult,
+    GetLocalisationProjectsResult, GetRootLocalisationConfigResult, GetStoryPlotsResult,
+    LOC_CATEGORY, LocProjectInfo, StoryGraphChangedParams, StorySimChangedParams,
+} from './protocol';
 import { StoryGraphPanel } from './storyGraphPanel';
 import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
 
@@ -85,20 +90,6 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 	}
 }
 
-// LocProjectInfo is imported from webview/localisationTreeModel - one definition of the server DTO
-// for the tree, the panel and the palette. The copy that used to live here had already drifted,
-// missing the 'category' field the server has been sending since credits classification landed.
-interface GetLocalisationProjectsResult { projects: LocProjectInfo[]; }
-
-interface GetEffectiveObjectResult {
-	found: boolean;
-	cyclic: boolean;
-	cycleObjectId?: string;
-	chain: string[];
-	xml: string;
-	typeName?: string;
-}
-
 /** URI scheme for the read-only "effective object" virtual documents (variant inheritance). */
 const EFFECTIVE_SCHEME = 'aet-effective';
 
@@ -137,23 +128,35 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 
 	async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
 		const objectId = uri.query || uri.path.replace(/^\//, '').replace(/\.xml$/i, '');
-		if (!lspClient) {
-			return '<!-- EaWEdit: LSP server is not running. -->';
+
+		// The document IS the report here - it is read-only generated text, so a failure is written
+		// into it as a comment rather than raised as a notification over the tab that just opened.
+		const outcome = await lsp.request<GetEffectiveObjectResult>(
+			'aet/getEffectiveObject', { objectId });
+
+		if (!outcome.ok) {
+			return outcome.reason === 'offline'
+				? '<!-- EaWEdit: LSP server is not running. -->'
+				: `<!-- EaWEdit: failed to resolve effective object '${objectId}': ${outcome.message} -->`;
 		}
-		try {
-			const result = await lspClient.sendRequest<GetEffectiveObjectResult>(
-				'aet/getEffectiveObject', { objectId });
-			if (!result.found) {
-				return `<!-- EaWEdit: no object named '${objectId}' was found in the workspace. -->`;
-			}
-			return effectiveObjectBanner(objectId) + result.xml;
-		} catch (e) {
-			return `<!-- EaWEdit: failed to resolve effective object '${objectId}': ${e} -->`;
+		if (!outcome.value.found) {
+			return `<!-- EaWEdit: no object named '${objectId}' was found in the workspace. -->`;
 		}
+		return effectiveObjectBanner(objectId) + outcome.value.xml;
 	}
 }
 
 let lspClient: LanguageClient | undefined;
+
+/**
+ * Every request to the server goes through here.
+ *
+ * Resolves `lspClient` per call rather than holding it: the client is replaced on every restart,
+ * so anything that captured one would keep talking to a dead process. Built once at module scope
+ * because the panels and navigators are handed it at construction and outlive any single client.
+ */
+const lsp = new LspGateway(() => lspClient, vscodeMessageSink);
+
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
 let localisationNavigatorProvider: LocalisationNavigatorViewProvider | undefined;
 let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
@@ -382,15 +385,14 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 					return;
 				}
 
-				let projects: LocProjectInfo[] = [];
-				try {
-					const result = await lspClient!.sendRequest<GetLocalisationProjectsResult>(
-						'aet/getLocalisationProjects', {});
-					projects = result.projects ?? [];
-				} catch {
-					vscode.window.showWarningMessage('EaWEdit: could not fetch localisation projects from server.');
+				const fetched = await lsp.request<GetLocalisationProjectsResult>(
+					'aet/getLocalisationProjects');
+				if (!fetched.ok) {
+					vscode.window.showWarningMessage(
+						'EaWEdit: could not fetch localisation projects from server.');
 					return;
 				}
+				const projects = fetched.value.projects ?? [];
 
 				if (!projects.length) {
 					vscode.window.showWarningMessage(
@@ -503,13 +505,13 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		LocalisationEditorPanel.invalidateAll();
 	});
 
-	lspClient.onNotification('aet/storyGraphChanged', (params: { campaigns: string[] }) => {
+	lspClient.onNotification('aet/storyGraphChanged', (params: StoryGraphChangedParams) => {
 		logLine(`Story graph changed: ${params.campaigns.join(', ')} - refreshing story views.`);
 		storyNavigatorProvider?.refresh();
 		StoryGraphPanel.refreshInvalidated(params.campaigns ?? []);
 	});
 
-	lspClient.onNotification('aet/storySimChanged', (params: { campaign: string }) => {
+	lspClient.onNotification('aet/storySimChanged', (params: StorySimChangedParams) => {
 		StoryGraphPanel.simChanged(params.campaign);
 	});
 }
@@ -527,7 +529,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	// Per project, not per machine: where a dialog belongs depends on the mod being edited.
 	initDialogGeometryStorage(context.workspaceState);
 
-	localisationNavigatorProvider = new LocalisationNavigatorViewProvider(() => lspClient);
+	localisationNavigatorProvider = new LocalisationNavigatorViewProvider(lsp);
 	context.subscriptions.push(
 		vscode.window.registerTreeDataProvider(
 			LocalisationNavigatorViewProvider.viewId, localisationNavigatorProvider),
@@ -548,12 +550,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		// arguments from the command palette (quick-picks a file, grouped by category).
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.openLocalisationEditor',
 			async (arg?: LocTreeItem) => {
-				if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+				if (!lsp.requireRunning()) { return; }
+
+				// The quick pick below is for the palette, where nothing was clicked. A node that
+				// WAS clicked and carries no project is a node that should not have offered this
+				// action - answering it by listing every localisation file in the workspace is how
+				// clicking a credits group ended up offering unrelated .dat translation files.
+				if (arg !== undefined && arg.project === undefined) {
+					vscode.window.showWarningMessage(
+						'EaWEdit: that node groups several files rather than being one. '
+						+ 'Open one of the files under it.');
+					return;
+				}
 
 				let project = arg?.project;
 				if (!project) {
-					const result = await lspClient.sendRequest<{ projects: LocProjectInfo[]; error?: string | null }>(
-						'aet/getLocalisationProjects', {});
+					const result = await lsp.requestOrReport<GetLocalisationProjectsResult>(
+						'aet/getLocalisationProjects', {}, 'could not list localisation files');
+					if (!result) { return; }
 					if (result.error || !result.projects?.length) {
 						vscode.window.showWarningMessage(
 							`EaWEdit: ${result.error ?? 'no localisation files found in this workspace.'}`);
@@ -566,7 +580,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 							.sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label))
 							.map(p => ({
 								label: p.label,
-								description: p.category === 'credits' ? 'Credits' : 'Text',
+								description: p.category === LOC_CATEGORY.credits ? 'Credits' : 'Text',
 								detail: p.filePath,
 								project: p,
 							})),
@@ -582,7 +596,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				LocalisationEditorPanel.showSet(
 					arg?.setFilePaths ?? [project.filePath],
 					arg?.setLabel ?? project.label,
-					project.category, context.extensionUri, () => lspClient,
+					project.category, context.extensionUri, lsp,
 					arg?.focusLanguage);
 			}),
 		// The crawl lives in the editor title bar, where a preview belongs - the same place a
@@ -609,15 +623,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		// and the way its outcome is reported live in one place rather than two that drift.
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.convertLocalisationFormat',
 			async (arg?: LocTreeItem | { filePath?: string; targetFormat?: string; category?: string }) => {
-				if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+				if (!lsp.requireRunning()) { return; }
 
 				const direct = arg as { filePath?: string; targetFormat?: string; category?: string } | undefined;
 				let filePath = direct?.filePath ?? (arg as LocTreeItem | undefined)?.project?.filePath;
 				let category = direct?.category ?? (arg as LocTreeItem | undefined)?.project?.category;
 
 				if (!filePath) {
-					const result = await lspClient.sendRequest<{ projects: LocProjectInfo[]; error?: string | null }>(
-						'aet/getLocalisationProjects', {});
+					const result = await lsp.requestOrReport<GetLocalisationProjectsResult>(
+						'aet/getLocalisationProjects', {}, 'could not list localisation files');
+					if (!result) { return; }
 					if (result.error || !result.projects?.length) {
 						vscode.window.showWarningMessage(
 							`EaWEdit: ${result.error ?? 'no localisation files found in this workspace.'}`);
@@ -647,11 +662,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					targetFormat = picked.label;
 				}
 
-				const result = await lspClient.sendRequest<{
-					writtenPath?: string | null; writtenPaths?: string[];
-					projectFormatChanged: boolean;
-					otherFilesInOldFormat: number; error?: string | null;
-				}>('aet/convertLocalisationFormat', { projectFilePath: filePath, targetFormat });
+				const result = await lsp.requestOrReport<ConvertLocalisationFormatResult>(
+					'aet/convertLocalisationFormat',
+					{ projectFilePath: filePath, targetFormat },
+					`could not convert ${path.basename(filePath)} to ${targetFormat}`);
+				if (!result) { return; }
 
 				if (result.error) {
 					vscode.window.showErrorMessage(`EaWEdit: ${result.error}`);
@@ -677,19 +692,21 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				if (choice === 'Open' && result.writtenPath) {
 					LocalisationEditorPanel.show(
 						result.writtenPath, path.basename(result.writtenPath),
-						category ?? 'text', context.extensionUri, () => lspClient);
+						category ?? LOC_CATEGORY.text, context.extensionUri, lsp);
 				}
 			}),
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.exportLocalisationToDat',
 			async (arg?: LocTreeItem) => {
 				const filePath = arg?.project?.filePath;
-				if (!lspClient || !filePath) {
+				if (!filePath) {
 					vscode.window.showWarningMessage('EaWEdit: no localisation file selected.');
 					return;
 				}
+				if (!lsp.requireRunning()) { return; }
 
-				const result = await lspClient.sendRequest<{ writtenFiles: string[]; error?: string | null }>(
-					'aet/exportLocalisationToDat', { projectFilePath: filePath });
+				const result = await lsp.requestOrReport<ExportLocalisationToDatResult>(
+					'aet/exportLocalisationToDat', { projectFilePath: filePath }, 'DAT export failed');
+				if (!result) { return; }
 
 				if (result.error) {
 					vscode.window.showErrorMessage(`EaWEdit: DAT export failed - ${result.error}`);
@@ -705,7 +722,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		vscode.workspace.registerTextDocumentContentProvider(EFFECTIVE_SCHEME, effectiveObjectProvider)
 	);
 
-	storyNavigatorProvider = new StoryNavigatorViewProvider(() => lspClient);
+	storyNavigatorProvider = new StoryNavigatorViewProvider(lsp);
 	context.subscriptions.push(
 		vscode.window.registerTreeDataProvider(StoryNavigatorViewProvider.viewId, storyNavigatorProvider),
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.refreshStoryNavigator',
@@ -713,19 +730,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 		// Opens the read-only story graph panel. Invoked with the campaign tree item (inline icon
 		// in the navigator) or without arguments from the command palette (quick-picks a campaign).
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryGraph', async (arg?: StoryTreeItem | string) => {
-			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+			if (!lsp.requireRunning()) { return; }
 			let campaign = typeof arg === 'string' ? arg : arg?.campaignName;
 			if (!campaign) {
-				let campaigns: { name: string }[] = [];
-				try {
-					const result = await lspClient.sendRequest<{ campaigns: { name: string }[]; error?: string }>(
-						'aet/getStoryPlots', {});
-					if (result.error) { vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); return; }
-					campaigns = result.campaigns ?? [];
-				} catch (e) {
-					vscode.window.showWarningMessage(`EaWEdit: cannot load story campaigns: ${e}`);
-					return;
-				}
+				const result = await lsp.requestOrReport<GetStoryPlotsResult>(
+					'aet/getStoryPlots', {}, 'cannot load story campaigns');
+				if (!result) { return; }
+				if (result.error) { vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); return; }
+
+				const campaigns = result.campaigns ?? [];
 				if (!campaigns.length) {
 					vscode.window.showInformationMessage('EaWEdit: no story campaigns found in this workspace.');
 					return;
@@ -734,7 +747,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					title: 'Open Story Graph', placeHolder: 'Select a campaign',
 				});
 			}
-			if (campaign) { StoryGraphPanel.show(campaign, context.extensionUri, () => lspClient); }
+			if (campaign) { StoryGraphPanel.show(campaign, context.extensionUri, lsp); }
 		}),
 		// Prefer the server-resolved URI: manifest entries and on-disk names differ in casing
 		// throughout vanilla data (the engine is case-insensitive, findFiles is not), and the
@@ -824,20 +837,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.revalidateWorkspace', async () => {
-			if (!lspClient) {
-				vscode.window.showWarningMessage('EaWEdit LSP: server is not running.');
-				return;
-			}
-			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet-eaw-edit.lsp.revalidateWorkspace',
-				arguments: [],
-			});
+			await lsp.executeCommand('aet-eaw-edit.lsp.revalidateWorkspace', [],
+				'could not revalidate the workspace');
 		}),
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.newModProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+			if (!lsp.requireRunning()) { return; }
 			const name = await vscode.window.showInputBox({
 				prompt: 'Mod name',
 				placeHolder: 'My Awesome Mod',
@@ -849,35 +856,37 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				openLabel: 'Select mod root folder',
 			});
 			if (!folders?.length) {return;}
-			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet-eaw-edit.lsp.newModProject',
-				arguments: [{ name: name.trim(), path: folders[0].fsPath }],
-			});
-			vscode.window.showInformationMessage(`Mod project '${name.trim()}' created.`);
+			// Announced only once it actually ran. The old code said "created" whether or not the
+			// request got through, so a server that had died reported a project that did not exist.
+			const created = await lsp.executeCommand(
+				'aet-eaw-edit.lsp.newModProject',
+				[{ name: name.trim(), path: folders[0].fsPath }],
+				`could not create the mod project '${name.trim()}'`);
+			if (created) {
+				vscode.window.showInformationMessage(`Mod project '${name.trim()}' created.`);
+			}
 		}),
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.reloadProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
-			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet-eaw-edit.lsp.reloadProject',
-				arguments: [],
-			});
+			await lsp.executeCommand('aet-eaw-edit.lsp.reloadProject', [],
+				'could not reload the project');
 		}),
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.initLocalisationProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+			if (!lsp.requireRunning()) { return; }
 
-			let rootConfig: { configured: boolean; type: string | null; directory: string | null };
-			try {
-				rootConfig = await lspClient.sendRequest('aet/getRootLocalisationConfig', {});
-			} catch {
-				vscode.window.showWarningMessage('EaWEdit LSP: could not query the project\'s localisation config.');
+			const config = await lsp.request<GetRootLocalisationConfigResult>(
+				'aet/getRootLocalisationConfig');
+			if (!config.ok) {
+				vscode.window.showWarningMessage(
+					'EaWEdit LSP: could not query the project\'s localisation config.');
 				return;
 			}
+			const rootConfig = config.value;
 
 			// The .pgproj already declares a localisation node - it wins outright, no picker.
 			if (rootConfig.configured) {
@@ -886,10 +895,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					{ modal: true }, 'Initialise'
 				);
 				if (confirmed !== 'Initialise') { return; }
-				await lspClient.sendRequest(ExecuteCommandRequest.type, {
-					command: 'aet-eaw-edit.lsp.initLocalisationProject',
-					arguments: [{}],
-				});
+				await lsp.executeCommand('aet-eaw-edit.lsp.initLocalisationProject', [{}],
+					'could not initialise the localisation project');
 				return;
 			}
 
@@ -917,16 +924,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			});
 			if (!directory) { return; }
 
-			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet-eaw-edit.lsp.initLocalisationProject',
-				arguments: [{ format: formatItem.label, directory: directory.trim() }],
-			});
+			await lsp.executeCommand(
+				'aet-eaw-edit.lsp.initLocalisationProject',
+				[{ format: formatItem.label, directory: directory.trim() }],
+				'could not initialise the localisation project');
 		}),
 	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.importLocalisationProject', async () => {
-			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+			if (!lsp.requireRunning()) { return; }
 
 			const convertibleFormats = [
 				{ label: 'CSV', description: 'Comma-separated values (.csv)' },
@@ -1000,15 +1007,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				if (!targetDirectory) { return; }
 			}
 
-			await lspClient.sendRequest(ExecuteCommandRequest.type, {
-				command: 'aet-eaw-edit.lsp.importLocalisationProject',
-				arguments: [{
+			await lsp.executeCommand(
+				'aet-eaw-edit.lsp.importLocalisationProject',
+				[{
 					sourceFormat: sourceFormatItem.label,
 					sourceDirectory,
 					targetFormat: targetFormatItem.label,
 					...(targetDirectory ? { targetDirectory: targetDirectory.trim() } : {}),
 				}],
-			});
+				'could not import the localisation files');
 			// No message here: executeCommand returns nothing to check, so anything said at this
 			// point is a guess. The server reports the outcome - what it wrote, or why it did not.
 		}),
@@ -1039,7 +1046,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	// palette (prompts for the object name).
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.showEffectiveObject', async (objectIdArg?: string) => {
-			if (!lspClient) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
+			if (!lsp.requireRunning()) { return; }
 
 			let objectId = objectIdArg;
 			if (!objectId) {

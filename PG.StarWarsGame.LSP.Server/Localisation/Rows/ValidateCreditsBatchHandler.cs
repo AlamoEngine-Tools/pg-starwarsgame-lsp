@@ -37,9 +37,8 @@ public sealed class ValidateCreditsBatchHandler
     public Task<ValidateCreditsBatchResult> Handle(
         ValidateCreditsBatchParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Task.FromResult(
-                new ValidateCreditsBatchResult([], LocalisationFeatureDisabled.Message));
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
+            return Task.FromResult(new ValidateCreditsBatchResult([], rejection));
 
         var fs = _fileHelper.FileSystem;
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
@@ -58,10 +57,16 @@ public sealed class ValidateCreditsBatchHandler
                 [], $"Failed to read the file: {ex.Message}"));
         }
 
+        // An addressing failure is about one staged change, not about a row, so it is reported
+        // against the batch with the command number the user can count to in the queue - and with a
+        // null Index. The two indices are unrelated: LocalisationEditResult.FailedIndex counts
+        // commands in the batch, LocProblemDto.Index is a row in the file. The grid tints the row
+        // Index names and scrolls to it, so passing the command number here highlighted whichever
+        // row happened to share its number. Same shape as ValidateTranslationBatchHandler.
         if (!composed.Success)
             return Task.FromResult(new ValidateCreditsBatchResult(
             [
-                new LocProblemDto(composed.FailedIndex, null, LocProblemSeverity.Error,
+                new LocProblemDto(null, null, LocProblemSeverity.Error,
                     $"Change {(composed.FailedIndex ?? 0) + 1}: {composed.Error}")
             ]));
 

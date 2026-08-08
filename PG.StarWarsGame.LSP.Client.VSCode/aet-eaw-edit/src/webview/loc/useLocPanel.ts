@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { LocProblemDto } from '../../protocol';
 import { loadDialogGeometry } from '../shared/dialogGeometryStore';
 import { StoredGeometry } from '../shared/modalGeometry';
 import { LocRow } from '../loc/locRow';
@@ -27,13 +28,14 @@ export function post(message: unknown): void {
     vscode.postMessage(message);
 }
 
-export interface LocProblem {
-    index?: number | null;
-    key?: string | null;
-    language?: string | null;
-    severity: string;
-    message: string;
-}
+/**
+ * A validation finding, in the editors' own vocabulary.
+ *
+ * The union of what the two validators report - see LocProblemDto in ../../protocol for why every
+ * locator on it is optional. Aliased rather than re-declared so the ~15 call sites in this folder
+ * keep reading in grid terms.
+ */
+export type LocProblem = LocProblemDto;
 
 export type ValidationState = 'unvalidated' | 'ok' | 'info' | 'warning' | 'error';
 

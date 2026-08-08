@@ -3,16 +3,11 @@
 
 import * as vscode from 'vscode';
 
-import { emptyNavigatorMessage } from './navigatorPlaceholder';
-import { LanguageClient } from 'vscode-languageclient/node';
-
-interface StoryPlotThreadDto { file: string; suspended: boolean; uri?: string | null; }
-interface StoryLuaScriptDto { name: string; uri?: string | null; }
-interface StoryFactionDto {
-    faction: string; manifestFile: string; threads: StoryPlotThreadDto[]; luaScripts: StoryLuaScriptDto[];
-}
-interface StoryCampaignDto { name: string; factions: StoryFactionDto[]; set?: string | null; }
-interface GetStoryPlotsResult { campaigns: StoryCampaignDto[]; error?: string | null; }
+import { LspGateway } from './lsp/lspGateway';
+import { LspTreeDataProvider } from './lspTreeDataProvider';
+import {
+    GetStoryPlotsResult, StoryCampaignDto, StoryFactionDto, StoryLuaScriptDto, StoryPlotThreadDto,
+} from './protocol';
 
 type StoryNodeKind = 'set' | 'campaign' | 'faction' | 'thread' | 'lua' | 'info';
 
@@ -38,57 +33,53 @@ export class StoryTreeItem extends vscode.TreeItem {
  * Campaign_Set fall under an "Ungrouped" node. The tree re-fetches on every expand of the root, so
  * a plain `refresh()` after `aet/storyGraphChanged` is enough to stay current.
  */
-export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<StoryTreeItem> {
+export class StoryNavigatorViewProvider
+    extends LspTreeDataProvider<StoryTreeItem, GetStoryPlotsResult> {
     public static readonly viewId = 'aet-eaw-edit.lsp.storyNavigator';
 
-    private readonly _onDidChangeTreeData = new vscode.EventEmitter<StoryTreeItem | undefined>();
-    readonly onDidChangeTreeData = this._onDidChangeTreeData.event;
+    protected readonly method = 'aet/getStoryPlots';
+    protected readonly subject = 'story campaigns';
 
-    private _campaigns: StoryCampaignDto[] = [];
-
-    constructor(private readonly _getLspClient: () => LanguageClient | undefined) {}
+    constructor(lsp: LspGateway) {
+        super(lsp);
+    }
 
     /**
-     * Whether the workspace scan has finished. Until it has, an empty answer means "not indexed
-     * yet" - saying "none found" and correcting it a moment later is worse than saying nothing.
+     * The campaigns the tree is currently built from.
+     *
+     * Every level below the root is drilled out of this rather than re-fetched, so an expand costs
+     * nothing. Empty when the root has not loaded, which is the only state in which a child can be
+     * asked for before the data exists.
      */
-    private _scanned = false;
-    /** Fetched ahead of the view being revealed, so the first look does not pay for a round trip. */
-    private _preloaded = false;
-
-    refresh(): void {
-        this._preloaded = false;
-        this._onDidChangeTreeData.fire(undefined);
+    private get _campaigns(): StoryCampaignDto[] {
+        return this.data?.campaigns ?? [];
     }
 
-    /** Fetches the campaign list in the background and repaints. */
-    async preload(): Promise<void> {
-        this._scanned = true;
-
-        const client = this._getLspClient();
-        if (!client) { return; }
-
-        try {
-            const result = await client.sendRequest<GetStoryPlotsResult>('aet/getStoryPlots', {});
-            if (!result.error) {
-                this._campaigns = result.campaigns ?? [];
-                this._preloaded = true;
-            }
-        } catch {
-            // Left unloaded; the view fetches when it is opened.
-        }
-
-        this._onDidChangeTreeData.fire(undefined);
+    protected errorOf(data: GetStoryPlotsResult): string | null | undefined {
+        return data.error;
     }
 
-    getTreeItem(element: StoryTreeItem): vscode.TreeItem {
-        return element;
+    protected isEmpty(data: GetStoryPlotsResult): boolean {
+        return !data.campaigns || data.campaigns.length === 0;
     }
 
-    async getChildren(element?: StoryTreeItem): Promise<StoryTreeItem[]> {
-        if (!element) {
-            return this._loadRoot();
-        }
+    protected rootItems(): StoryTreeItem[] {
+        return this._setItems();
+    }
+
+    protected infoItem(message: string): StoryTreeItem {
+        return this._infoItem(message);
+    }
+
+    protected failureMessage(
+        outcome: { reason: 'offline' | 'failed'; message: string },
+    ): string {
+        return outcome.reason === 'offline'
+            ? 'LSP server is not running.'
+            : `Cannot load story plots: ${outcome.message}`;
+    }
+
+    protected childrenOf(element: StoryTreeItem): StoryTreeItem[] {
         if (element.kind === 'set') {
             // A named set lists the campaigns carrying that Campaign_Set; the "Ungrouped" node
             // (setName undefined) lists the campaigns that declare none.
@@ -111,32 +102,6 @@ export class StoryNavigatorViewProvider implements vscode.TreeDataProvider<Story
             ];
         }
         return [];
-    }
-
-    private async _loadRoot(): Promise<StoryTreeItem[]> {
-        if (this._preloaded) {
-            return this._campaigns.length === 0
-                ? [this._infoItem(emptyNavigatorMessage(this._scanned, 'story campaigns'))]
-                : this._setItems();
-        }
-
-        const client = this._getLspClient();
-        if (!client) {
-            return [this._infoItem('LSP server is not running.')];
-        }
-        try {
-            const result = await client.sendRequest<GetStoryPlotsResult>('aet/getStoryPlots', {});
-            if (result.error) {
-                return [this._infoItem(result.error)];
-            }
-            this._campaigns = result.campaigns ?? [];
-        } catch (e) {
-            return [this._infoItem(`Cannot load story plots: ${e}`)];
-        }
-        if (!this._campaigns.length) {
-            return [this._infoItem(emptyNavigatorMessage(this._scanned, 'story campaigns'))];
-        }
-        return this._setItems();
     }
 
     // Root level: one node per Campaign_Set (sorted), then an "Ungrouped" node for campaigns with

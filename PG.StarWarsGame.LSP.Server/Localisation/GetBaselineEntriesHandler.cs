@@ -45,7 +45,7 @@ public sealed class GetBaselineEntriesHandler
     public Task<GetBaselineEntriesResult> Handle(
         GetBaselineEntriesParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
+        if (!LocalisationFeatureDisabled.IsEnabled(_config))
             return Task.FromResult(GetBaselineEntriesResult.Empty);
 
         var languages = _langService.OfficiallySupported();

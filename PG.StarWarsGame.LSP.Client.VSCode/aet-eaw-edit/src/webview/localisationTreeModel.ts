@@ -4,21 +4,11 @@
 // Pure shape of the localisation Files tree, kept free of `vscode` so the grouping rules can be
 // unit-tested on their own. The view provider is then a thin mapping from these nodes to TreeItems.
 
-/** One localisation file, as `aet/getLocalisationProjects` reports it. */
-export interface LocProjectInfo {
-    label: string;
-    filePath: string;
-    resourceType: string;
-    projectName: string;
-    rank: number;
-    /** 'text' or 'credits'; anything else is treated as text rather than hidden. */
-    category: string;
-    /**
-     * The language this file holds, for the single-language formats that name one in their file
-     * name (.properties, .dat). Absent for CSV and XML, which carry every language inside the file.
-     */
-    language?: string | null;
-}
+import { LOC_CATEGORY, LocProjectInfo } from '../protocol';
+
+// Re-exported so a consumer of the tree model does not need a second import for the thing every
+// node in it carries. The declaration itself lives in ../protocol, with the rest of the contract.
+export { LocProjectInfo };
 
 export type LocTreeNode =
     | { kind: 'group'; label: string; category: string; children: LocTreeNode[] }
@@ -30,7 +20,8 @@ export type LocTreeNode =
     }
     | { kind: 'file'; label: string; project: LocProjectInfo; children: LocTreeNode[] };
 
-export const CREDITS_CATEGORY = 'credits';
+/** Alias for the protocol constant, kept so the tree's own rules read in its vocabulary. */
+export const CREDITS_CATEGORY = LOC_CATEGORY.credits;
 
 /**
  * Groups files into "Text files" and "Credits files", with a project level inserted only where it
@@ -141,6 +132,31 @@ interface SiblingName {
     directory: string;
     /** The file name without its language suffix, e.g. `mastertextfile.properties`. */
     setLabel: string;
+}
+
+/**
+ * The other files of the same logical project - the ones the tree groups into one set.
+ *
+ * Built on the same rule the tree groups by, rather than a second one that would answer "are these
+ * two files related" differently from what the user can see grouped in front of them.
+ *
+ * Empty for a file that names no language (CSV, XML), which carries every language itself and has
+ * no siblings by construction.
+ */
+export function siblingsOf(
+    project: LocProjectInfo, projects: readonly LocProjectInfo[],
+): LocProjectInfo[] {
+    const name = siblingName(project);
+    if (name === null) { return []; }
+
+    return projects.filter(other => {
+        if (other.filePath.toLowerCase() === project.filePath.toLowerCase()) { return false; }
+
+        const otherName = siblingName(other);
+        return otherName !== null
+            && otherName.directory === name.directory
+            && otherName.setLabel === name.setLabel;
+    });
 }
 
 /** Null for a file that names no language, which therefore has no siblings. */

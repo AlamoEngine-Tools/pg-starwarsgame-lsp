@@ -3,60 +3,23 @@
 
 import { basename } from 'path';
 import * as vscode from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
 
 import { CreditsPreviewPanel } from './creditsPreviewPanel';
+import { LspGateway } from './lsp/lspGateway';
 import { readDialogGeometry, saveDialogGeometry } from './dialogGeometryStorage';
 import { StoredGeometry } from './webview/shared/modalGeometry';
 import { LocalisationPanelState } from './webview/localisationPanelState';
 import { KeyedCommand, mergeMembers, partitionCommands } from './webview/loc/locSetMerge';
+import { siblingsOf } from './webview/localisationTreeModel';
+import {
+    PanelRegistry, panelSetKey, WebviewMessage, WebviewPanelHost,
+} from './webviewPanelHost';
+import {
+    ApplyLocalisationBatchResult, CreateLocalisationLanguageFileResult, GetBaselineEntriesResult,
+    GetLanguagesResult, GetLocalisationProjectsResult, GetLocalisationRowsResult, LOC_CATEGORY,
+    LocRowDto, ValidateLocalisationBatchResult,
+} from './protocol';
 
-interface LocValueDto { language: string; value: string; }
-interface LocRowDto { index: number; key: string; values: LocValueDto[]; }
-
-interface GetLanguagesResult { languages: string[] }
-
-interface GetLocalisationRowsResult {
-    rows: LocRowDto[];
-    languages: string[];
-    contentHash: string;
-    category: string;
-    ordered: boolean;
-    error?: string | null;
-    canAddLanguage: boolean;
-    addLanguageCreatesFile: boolean;
-}
-
-interface ApplyLocalisationBatchResult {
-    success: boolean;
-    failedIndex?: number | null;
-    error?: string | null;
-    newContentHash?: string | null;
-}
-
-interface LocProblemDto {
-    index?: number | null;
-    language?: string | null;
-    severity: string;
-    message: string;
-}
-
-interface ValidateLocalisationBatchResult { problems: LocProblemDto[]; error?: string | null; }
-
-interface GetBaselineEntriesResult {
-    entries: { key: string; translations: Record<string, string> }[];
-}
-
-/**
- * The localisation grid, hosted in a real editor tab.
- *
- * One panel per file, keyed by lower-cased path: two tabs on one file would each hold their own
- * staged queue and their own content hash, so whichever saved second would be refused as stale
- * having silently lost the other's work.
- *
- * Modelled on {@link StoryGraphPanel}, including its close-time save prompt - a disposed webview
- * cannot veto its own close, so the queue is mirrored here as it changes.
- */
 /**
  * One file of an open set, and what is known about it.
  *
@@ -69,13 +32,22 @@ interface Member {
     contentHash?: string;
 }
 
-export class LocalisationEditorPanel {
-    private static readonly _panels = new Map<string, LocalisationEditorPanel>();
+/**
+ * The localisation grid, hosted in a real editor tab.
+ *
+ * One panel per set of files, keyed case-insensitively by their paths: two tabs on one file would
+ * each hold their own staged queue and their own content hash, so whichever saved second would be
+ * refused as stale having silently lost the other's work.
+ *
+ * Shares its close-time save prompt with {@link StoryGraphPanel} - a disposed webview cannot veto
+ * its own close, so the queue is mirrored here as it changes.
+ */
+export class LocalisationEditorPanel extends WebviewPanelHost {
+    private static readonly _panels = new PanelRegistry<LocalisationEditorPanel>();
 
     /** The tab a title-bar command applies to. */
     private static _active: LocalisationEditorPanel | null = null;
 
-    private readonly _panel: vscode.WebviewPanel;
     private readonly _state = new LocalisationPanelState();
 
     /** Every file the table is built from, in column order. */
@@ -104,96 +76,87 @@ export class LocalisationEditorPanel {
         private readonly _label: string,
         private readonly _category: string,
         private readonly _extensionUri: vscode.Uri,
-        private readonly _getLspClient: () => LanguageClient | undefined
+        private readonly _lsp: LspGateway
     ) {
-        const label = _label;
-        const extensionUri = _extensionUri;
         // Two view types, so a menu contribution can target one kind of file. The credits editor
         // has a crawl to preview; the translation editor has nothing of the sort.
-        this._panel = vscode.window.createWebviewPanel(
-            isCredits(this._category) ? 'aetCreditsEditor' : 'aetTranslationEditor',
-            `Loc: ${label}`, vscode.ViewColumn.Active,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                // The grid has its own filter box, but Ctrl+F in a table is muscle memory.
-                enableFindWidget: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'out', 'webview'),
-                    vscode.Uri.joinPath(extensionUri, 'out', 'codicons'),
-                ],
-            });
+        //
+        // Two editors as well, not one that decides what it is looking at: a credits file is an
+        // ordered list addressed by position, a translation file a lookup table addressed by key,
+        // and the single grid that tried to be both put credits behaviour into text files
+        // repeatedly. The category comes from the tree, so the choice is made before the webview
+        // exists - the script cannot be swapped afterwards.
+        super(_extensionUri, {
+            viewType: isCredits(_category) ? 'aetCreditsEditor' : 'aetTranslationEditor',
+            title: `Loc: ${_label}`,
+            column: vscode.ViewColumn.Active,
+            script: isCredits(_category) ? 'creditsEditor.js' : 'translationEditor.js',
+            enableFindWidget: true,
+            // The grid fills the tab exactly. Without this the editor sits inside whatever margin
+            // and padding the host's default stylesheet gives the body, and a full-height layout
+            // then overflows by that much - which pushes the footer under the table off the bottom
+            // of the window.
+            bodyStyle: '  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }\n'
+                + '  #root { height: 100%; }',
+        });
 
-        this._panel.onDidDispose(() => {
-            LocalisationEditorPanel._panels.delete(setKey(_filePaths));
+        this.onDidDispose(() => {
             if (LocalisationEditorPanel._active === this) { LocalisationEditorPanel._active = null; }
             void this._promptSaveOnClose();
         });
 
         // Tracked so a command contributed to the editor title bar knows which tab it belongs to -
         // a menu command carries no argument identifying the panel it was clicked on.
-        this._panel.onDidChangeViewState(e => {
+        this.panel.onDidChangeViewState(e => {
             if (e.webviewPanel.active) { LocalisationEditorPanel._active = this; }
         });
         LocalisationEditorPanel._active = this;
+    }
 
-        // Two editors, not one that decides what it is looking at: a credits file is an ordered
-        // list addressed by position, a translation file a lookup table addressed by key, and the
-        // single grid that tried to be both put credits behaviour into text files repeatedly.
-        const script = isCredits(this._category) ? 'creditsEditor.js' : 'translationEditor.js';
-        const scriptUri = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(extensionUri, 'out', 'webview', script));
-        const codiconUri = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(extensionUri, 'out', 'codicons', 'codicon.css'));
-        this._panel.webview.html = buildHtml(scriptUri, codiconUri, this._panel.webview.cspSource);
-
-        this._panel.webview.onDidReceiveMessage(
-            async (msg: { type: string; [key: string]: unknown }) => {
-                switch (msg.type) {
-                    case 'ready':
-                    case 'fetch':
-                        await this._sendRows();
-                        break;
-                    case 'pendingSync':
-                        this._state.syncPending(msg.commands as Record<string, unknown>[]);
-                        break;
-                    case 'validateBatch':
-                        await this._validate(msg.commands as Record<string, unknown>[]);
-                        break;
-                    case 'saveBatch':
-                        await this._save(msg.commands as Record<string, unknown>[]);
-                        break;
-                    case 'requestBaseline':
-                        await this._sendBaseline();
-                        break;
-                    case 'crawlRows':
-                        this._sendCrawlRows(msg);
-                        break;
-                    case 'convertFormat':
-                        await this._convertFormat(msg.targetFormat as string);
-                        break;
-                    case 'addLanguageFile':
-                        await this._addLanguageFile(msg.language as string);
-                        break;
-                    case 'saveDialogGeometry':
-                        saveDialogGeometry(msg.id as string, msg.geometry as StoredGeometry);
-                        break;
-                    case 'exportDat':
-                        await vscode.commands.executeCommand(
-                            'aet-eaw-edit.lsp.exportLocalisationToDat',
-                            { project: { filePath: this._filePath } });
-                        break;
-                    default:
-                        break;
-                }
-            });
+    protected async onMessage(msg: WebviewMessage): Promise<void> {
+        switch (msg.type) {
+            case 'ready':
+            case 'fetch':
+                await this._sendRows();
+                break;
+            case 'pendingSync':
+                this._state.syncPending(msg.commands as Record<string, unknown>[]);
+                break;
+            case 'validateBatch':
+                await this._validate(msg.commands as Record<string, unknown>[]);
+                break;
+            case 'saveBatch':
+                await this._save(msg.commands as Record<string, unknown>[]);
+                break;
+            case 'requestBaseline':
+                await this._sendBaseline();
+                break;
+            case 'crawlRows':
+                this._sendCrawlRows(msg);
+                break;
+            case 'convertFormat':
+                await this._convertFormat(msg.targetFormat as string);
+                break;
+            case 'addLanguageFile':
+                await this._addLanguageFile(msg.language as string);
+                break;
+            case 'saveDialogGeometry':
+                saveDialogGeometry(msg.id as string, msg.geometry as StoredGeometry);
+                break;
+            case 'exportDat':
+                await vscode.commands.executeCommand(
+                    'aet-eaw-edit.lsp.exportLocalisationToDat',
+                    { project: { filePath: this._filePath } });
+                break;
+            default:
+                break;
+        }
     }
 
     static show(
-        filePath: string, label: string, category: string, extensionUri: vscode.Uri,
-        getLspClient: () => LanguageClient | undefined
+        filePath: string, label: string, category: string, extensionUri: vscode.Uri, lsp: LspGateway
     ): void {
-        LocalisationEditorPanel.showSet([filePath], label, category, extensionUri, getLspClient);
+        LocalisationEditorPanel.showSet([filePath], label, category, extensionUri, lsp);
     }
 
     /**
@@ -207,9 +170,9 @@ export class LocalisationEditorPanel {
      */
     static showSet(
         filePaths: string[], label: string, category: string, extensionUri: vscode.Uri,
-        getLspClient: () => LanguageClient | undefined, focusLanguage?: string
+        lsp: LspGateway, focusLanguage?: string
     ): void {
-        const id = setKey(filePaths);
+        const id = panelSetKey(filePaths);
         const existing = LocalisationEditorPanel._panels.get(id);
         if (existing) {
             // The set and every language in it map to one tab - deliberately, so they cannot stage
@@ -217,14 +180,14 @@ export class LocalisationEditorPanel {
             // clicking a language while the set is open has to change which columns are shown, or
             // the click does nothing at all.
             existing._focusOn(focusLanguage);
-            existing._panel.reveal();
+            existing.reveal();
             return;
         }
 
-        LocalisationEditorPanel._panels.set(
+        LocalisationEditorPanel._panels.track(
             id,
             new LocalisationEditorPanel(
-                filePaths, focusLanguage, label, category, extensionUri, getLspClient));
+                filePaths, focusLanguage, label, category, extensionUri, lsp));
     }
 
     /**
@@ -235,7 +198,7 @@ export class LocalisationEditorPanel {
      */
     private _focusOn(language: string | undefined): void {
         this._focusLanguage = language;
-        this._post({ type: 'focusLanguage', language: language ?? null });
+        this.post({ type: 'focusLanguage', language: language ?? null });
     }
 
     /**
@@ -246,8 +209,8 @@ export class LocalisationEditorPanel {
      * since silently reloading would discard work still visible on screen.
      */
     static invalidateAll(): void {
-        for (const panel of LocalisationEditorPanel._panels.values()) {
-            panel._post({ type: 'invalidate', dirty: panel._state.isDirty });
+        for (const panel of LocalisationEditorPanel._panels.all) {
+            panel.post({ type: 'invalidate', dirty: panel._state.isDirty });
         }
     }
 
@@ -259,7 +222,7 @@ export class LocalisationEditorPanel {
      * is asked for its staged rows first - the preview is of what you are about to save.
      */
     static previewCrawl(fullScreen: boolean): void {
-        LocalisationEditorPanel._active?._post({ type: 'requestCrawlRows', fullScreen });
+        LocalisationEditorPanel._active?.post({ type: 'requestCrawlRows', fullScreen });
     }
 
     /** Forwards the editor's staged rows to the preview beside it, if one is open. */
@@ -279,7 +242,7 @@ export class LocalisationEditorPanel {
     }
 
     static disposeAll(): void {
-        for (const panel of [...LocalisationEditorPanel._panels.values()]) { panel._panel.dispose(); }
+        LocalisationEditorPanel._panels.disposeAll();
     }
 
     /**
@@ -293,33 +256,43 @@ export class LocalisationEditorPanel {
     private async _supportedLanguagesAsync(): Promise<string[]> {
         if (this._supportedLanguages !== undefined) { return this._supportedLanguages; }
 
-        const client = this._getLspClient();
-        if (!client) { return []; }
+        // Not fatal: the editor is fully usable, it just cannot offer to add a language. Not cached
+        // when the server is down either, so the list arrives once it comes back.
+        if (!this._lsp.isRunning) { return []; }
 
-        try {
-            const result = await client.sendRequest<GetLanguagesResult>('aet/getLanguages', {});
-            this._supportedLanguages = result.languages ?? [];
-        } catch {
-            // Not fatal: the editor is fully usable, it just cannot offer to add a language.
-            this._supportedLanguages = [];
-        }
-
+        const result = await this._lsp.requestOr<GetLanguagesResult>(
+            'aet/getLanguages', {}, { languages: [] });
+        this._supportedLanguages = result.languages ?? [];
         return this._supportedLanguages;
     }
 
     private async _sendRows(): Promise<void> {
-        const client = this._getLspClient();
-        if (!client) { this._post({ type: 'error', message: 'LSP server is not running.' }); return; }
-
         // Read one file at a time rather than in parallel: the server serialises these anyway, and
         // a failure part-way through is far easier to report when the order is known.
+        //
+        // Reported into the webview rather than as a notification: these rows are the tab's whole
+        // content, so the message belongs where the table would have been. A rejected read used to
+        // escape here as an unhandled rejection and leave the grid stuck on "Loading...".
         const results: GetLocalisationRowsResult[] = [];
         for (const filePath of this._filePaths) {
-            const result = await client.sendRequest<GetLocalisationRowsResult>(
+            const outcome = await this._lsp.request<GetLocalisationRowsResult>(
                 'aet/getLocalisationRows', { projectFilePath: filePath });
 
-            if (result.error) { this._post({ type: 'error', message: result.error }); return; }
-            results.push(result);
+            if (!outcome.ok) {
+                this.post({
+                    type: 'error',
+                    message: outcome.reason === 'offline'
+                        ? 'LSP server is not running.'
+                        : `Cannot read ${basename(filePath)}: ${outcome.message}`,
+                });
+                return;
+            }
+
+            if (outcome.value.error) {
+                this.post({ type: 'error', message: outcome.value.error });
+                return;
+            }
+            results.push(outcome.value);
         }
 
         // An unchanged set is not re-delivered. A save reloads the server's localisation index and
@@ -341,7 +314,7 @@ export class LocalisationEditorPanel {
         })));
 
         this._state.noteRead(combinedHash);
-        this._post({
+        this.post({
             supportedLanguages: await this._supportedLanguagesAsync(),
             // Sent with the file so a dialog knows where it belongs on its first render - asking
             // for it when one opens would show it centred and then move it.
@@ -357,6 +330,56 @@ export class LocalisationEditorPanel {
             addLanguageCreatesFile: results[0].addLanguageCreatesFile,
             focusLanguage: this._focusLanguage ?? null,
         });
+
+        // Only for a credits file with nothing in it. That is the one state where the editor can
+        // offer to start it from a sibling, and the one where reading those siblings is worth the
+        // round trips - a file with rows already has its content and would never use them.
+        if (isCredits(this._category) && merged.rows.length === 0) {
+            await this._sendSeedSources();
+        }
+    }
+
+    /**
+     * The other language files of this project, with their contents, so an empty credits file can
+     * be started from one of them.
+     *
+     * Sent as its own message rather than folded into `rows`, so the shared panel hook stays free
+     * of a concept only the credits editor has - it forwards anything it does not recognise.
+     *
+     * Best-effort throughout: this is a convenience, and an editor that cannot offer it is still a
+     * working editor.
+     */
+    private async _sendSeedSources(): Promise<void> {
+        const listed = await this._lsp.requestOr<GetLocalisationProjectsResult>(
+            'aet/getLocalisationProjects', {}, { projects: [] });
+
+        const self = (listed.projects ?? []).find(
+            p => p.filePath.toLowerCase() === this._filePath.toLowerCase());
+        if (self === undefined) { return; }
+
+        const sources: {
+            filePath: string; label: string; language: string; rowCount: number; rows: LocRowDto[];
+        }[] = [];
+
+        for (const sibling of siblingsOf(self, listed.projects ?? [])) {
+            const read = await this._lsp.request<GetLocalisationRowsResult>(
+                'aet/getLocalisationRows', { projectFilePath: sibling.filePath });
+            if (!read.ok || read.value.error) { continue; }
+
+            // A sibling with nothing in it is no more use as a starting point than this file is.
+            const rows = read.value.rows ?? [];
+            if (rows.length === 0) { continue; }
+
+            sources.push({
+                filePath: sibling.filePath,
+                label: sibling.label,
+                language: sibling.language ?? '',
+                rowCount: rows.length,
+                rows,
+            });
+        }
+
+        if (sources.length > 0) { this.post({ type: 'seedSources', sources }); }
     }
 
     /**
@@ -379,12 +402,11 @@ export class LocalisationEditorPanel {
      * result is offered for opening rather than left for the user to find in the tree.
      */
     private async _addLanguageFile(language: string): Promise<void> {
-        const client = this._getLspClient();
-        if (!client) { vscode.window.showWarningMessage('EaWEdit LSP: server is not running.'); return; }
-
-        const result = await client.sendRequest<{ writtenPath?: string | null; error?: string | null }>(
+        const result = await this._lsp.requestOrReport<CreateLocalisationLanguageFileResult>(
             'aet/createLocalisationLanguageFile',
-            { projectFilePath: this._filePath, language });
+            { projectFilePath: this._filePath, language },
+            `could not create the ${language} file`);
+        if (result === undefined) { return; }
 
         if (result.error || !result.writtenPath) {
             vscode.window.showErrorMessage(`EaWEdit: ${result.error ?? 'could not create the file.'}`);
@@ -398,8 +420,7 @@ export class LocalisationEditorPanel {
 
         if (choice === 'Open') {
             LocalisationEditorPanel.show(
-                writtenPath, basename(writtenPath), this._category, this._extensionUri,
-                this._getLspClient);
+                writtenPath, basename(writtenPath), this._category, this._extensionUri, this._lsp);
         }
     }
 
@@ -412,29 +433,28 @@ export class LocalisationEditorPanel {
      * would interrupt editing over a convenience.
      */
     private async _sendBaseline(): Promise<void> {
-        const client = this._getLspClient();
-        if (!client) { this._post({ type: 'baselineRows', entries: [] }); return; }
-
-        try {
-            const result = await client.sendRequest<GetBaselineEntriesResult>(
-                'aet/getBaselineEntries', { projectFilePath: this._filePath });
-            this._post({ type: 'baselineRows', entries: result.entries ?? [] });
-        } catch {
-            this._post({ type: 'baselineRows', entries: [] });
-        }
+        const result = await this._lsp.requestOr<GetBaselineEntriesResult>(
+            'aet/getBaselineEntries', { projectFilePath: this._filePath }, { entries: [] });
+        this.post({ type: 'baselineRows', entries: result.entries ?? [] });
     }
 
     private async _validate(commands: Record<string, unknown>[]): Promise<void> {
-        const client = this._getLspClient();
-        if (!client) { return; }
-
-        const result = await client.sendRequest<ValidateLocalisationBatchResult>(
+        // The Validate tag reads out whatever comes back, so a failure has to arrive as a result
+        // too - otherwise the tag sits on the previous run's verdict, describing a document that no
+        // longer exists.
+        const outcome = await this._lsp.request<ValidateLocalisationBatchResult>(
             isCredits(this._category)
                 ? 'aet/validateCreditsBatch'
                 : 'aet/validateTranslationBatch',
             { projectFilePath: this._filePath, commands });
 
-        this._post({ type: 'problems', problems: result.problems ?? [], error: result.error ?? null });
+        this.post(outcome.ok
+            ? {
+                type: 'problems',
+                problems: outcome.value.problems ?? [],
+                error: outcome.value.error ?? null,
+            }
+            : { type: 'problems', problems: [], error: outcome.message });
     }
 
     /**
@@ -447,8 +467,14 @@ export class LocalisationEditorPanel {
      * point of view.
      */
     private async _save(commands: Record<string, unknown>[]): Promise<void> {
-        const client = this._getLspClient();
-        if (!client) { return; }
+        // Answered rather than abandoned: a silent return left the Save button spinning with the
+        // queue neither written nor released, which looks exactly like the button doing nothing.
+        if (!this._lsp.isRunning) {
+            void vscode.window.showWarningMessage(
+                'EaWEdit LSP: server is not running; your edits are still staged.');
+            this.post({ type: 'saveResult', success: false });
+            return;
+        }
 
         const method = isCredits(this._category) ? 'aet/applyCreditsBatch' : 'aet/applyTranslationBatch';
 
@@ -472,11 +498,18 @@ export class LocalisationEditorPanel {
             // announce a change to a file nobody edited.
             if (batch === undefined || batch.length === 0) { continue; }
 
-            const result = await client.sendRequest<ApplyLocalisationBatchResult>(method, {
+            // A rejected write is a failure of this file like any other, so it joins the list
+            // rather than escaping. Before, it left the loop mid-set: the files already written
+            // stayed written, and the user was told nothing at all.
+            const outcome = await this._lsp.request<ApplyLocalisationBatchResult>(method, {
                 projectFilePath: member.filePath,
                 expectedContentHash: member.contentHash,
                 commands: batch,
             });
+
+            const result: ApplyLocalisationBatchResult = outcome.ok
+                ? outcome.value
+                : { success: false, error: outcome.message };
 
             if (result.success) {
                 member.contentHash = result.newContentHash ?? member.contentHash;
@@ -490,12 +523,12 @@ export class LocalisationEditorPanel {
         if (failures.length > 0) {
             this._state.noteSaveFailed();
             await this._reportSetSaveFailure(failures);
-            this._post({ type: 'saveResult', success: false, failedIndex: firstFailedIndex });
+            this.post({ type: 'saveResult', success: false, failedIndex: firstFailedIndex });
             return;
         }
 
         this._state.noteSaved(members.map(m => m.contentHash ?? '').join('|'));
-        this._post({ type: 'saveResult', success: true });
+        this.post({ type: 'saveResult', success: true });
     }
 
     /** Names the languages that would not take the write, so the user knows what is still staged. */
@@ -542,15 +575,8 @@ export class LocalisationEditorPanel {
         if (choice === 'Save') { await this._save(this._state.pending); }
     }
 
-    private _post(msg: unknown): void {
-        void this._panel.webview.postMessage(msg);
-    }
 }
 
-/**
- * Panels are keyed case-insensitively: Windows hands the same file back under different casings,
- * and two panels for one file would diverge.
- */
 /**
  * Which of the two editors a file gets, and which protocol its edits travel over.
  *
@@ -558,43 +584,5 @@ export class LocalisationEditorPanel {
  * webview is created - the script cannot be swapped afterwards.
  */
 function isCredits(category: string): boolean {
-    return category === 'credits';
-}
-
-function key(filePath: string): string {
-    return filePath.toLowerCase();
-}
-
-/**
- * Identifies an open set. Sorted, so opening the same files in a different order reveals the tab
- * that is already open rather than a second one staging edits against the same files.
- */
-function setKey(filePaths: string[]): string {
-    return filePaths.map(key).sort().join('|');
-}
-
-function buildHtml(scriptUri: vscode.Uri, codiconUri: vscode.Uri, cspSource: string): string {
-    // A bundled script, so script-src is the extension origin rather than 'unsafe-inline' - which
-    // is what the old sidebar webview needed, having its JS inlined as a template literal.
-    // style-src still needs 'unsafe-inline' for styled-components' injected style tags.
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src ${cspSource}; font-src ${cspSource}; img-src ${cspSource} data:;">
-<link rel="stylesheet" href="${codiconUri}">
-<style>
-  /* The grid fills the tab exactly. Without this the editor sits inside whatever margin and
-     padding the host's default stylesheet gives the body, and a full-height layout then overflows
-     by that much - which pushes the footer under the table off the bottom of the window. */
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-  #root { height: 100%; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script src="${scriptUri}"></script>
-</body>
-</html>`;
+    return category === LOC_CATEGORY.credits;
 }

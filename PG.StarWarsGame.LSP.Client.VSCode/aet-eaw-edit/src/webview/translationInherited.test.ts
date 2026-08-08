@@ -38,7 +38,7 @@ describe('toBaselineRows', () => {
     });
 
     it('tolerates an entry with no translations', () => {
-        const rows = toBaselineRows([{ key: 'K' } as { key: string; translations: undefined }]);
+        const rows = toBaselineRows([{ key: 'K' }]);
 
         assert.deepEqual(rows[0].values, []);
     });

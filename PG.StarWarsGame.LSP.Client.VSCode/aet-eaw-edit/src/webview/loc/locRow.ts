@@ -6,7 +6,12 @@
 // How a row is *addressed* is what differs - translations by key, credits by position - so that
 // lives in each editor's own staging module rather than here.
 
-export interface LocValue { language: string; value: string; }
+// The shapes themselves are the server's, declared in ../../protocol. Named here in the grid's own
+// vocabulary - a row on screen, not a row on the wire - because that is what every consumer in this
+// folder is talking about, and because `index` carries a meaning below that the wire does not fix.
+import { LocRowDto, LocValueDto } from '../../protocol';
+
+export type LocValue = LocValueDto;
 
 /**
  * One row as the server read it.
@@ -15,4 +20,4 @@ export interface LocValue { language: string; value: string; }
  * - it edits by key - but it is still what the grid uses to identify a row in the DOM and to scroll
  * a freshly added one into view, so it stays equal to the row's position in both editors.
  */
-export interface LocRow { index: number; key: string; values: LocValue[]; }
+export type LocRow = LocRowDto;

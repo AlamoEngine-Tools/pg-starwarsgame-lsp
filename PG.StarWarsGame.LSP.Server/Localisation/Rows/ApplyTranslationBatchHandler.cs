@@ -10,22 +10,20 @@ using PG.StarWarsGame.LSP.Server.Project;
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
-///     Commits a staged batch of key-addressed translation edits.
+///     Commits a staged batch of key-addressed translation edits. All or nothing: if any command
+///     fails the file is left untouched and the client keeps its queue, so a partial save can never
+///     leave the grid and the file disagreeing about what was written.
 ///     <para>
-///         Writes to disk rather than sending <c>workspace/applyEdit</c>, for the same reason the
-///         credits path does: the whole localisation read path is disk-based, so an applyEdit would
-///         leave the file unsaved and make every later read stale.
+///         Everything this shares with the credits side is in
+///         <see cref="ApplyLocalisationBatchHandlerBase{TCommand,TResult}" />. What is left here is
+///         the resolution of keys to rows, which is the whole reason the two are separate endpoints.
 ///     </para>
 /// </summary>
 public sealed class ApplyTranslationBatchHandler
-    : IJsonRpcRequestHandler<ApplyTranslationBatchParams, ApplyTranslationBatchResult>
+    : ApplyLocalisationBatchHandlerBase<LocKeyedCommandDto, ApplyTranslationBatchResult>,
+        IJsonRpcRequestHandler<ApplyTranslationBatchParams, ApplyTranslationBatchResult>
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationDocumentEditor _editor;
-    private readonly IFileHelper _fileHelper;
-    private readonly ILogger<ApplyTranslationBatchHandler> _logger;
-    private readonly IModProjectReloadService _reloadService;
-    private readonly ILocalisationWriteLedger _writeLedger;
 
     public ApplyTranslationBatchHandler(
         ILocalisationDocumentEditor editor,
@@ -34,72 +32,33 @@ public sealed class ApplyTranslationBatchHandler
         ILogger<ApplyTranslationBatchHandler> logger,
         ILspConfigurationProvider config,
         ILocalisationWriteLedger writeLedger)
+        : base(reloadService, fileHelper, logger, config, writeLedger)
     {
-        _writeLedger = writeLedger;
         _editor = editor;
-        _reloadService = reloadService;
-        _fileHelper = fileHelper;
-        _logger = logger;
-        _config = config;
     }
 
-    public async Task<ApplyTranslationBatchResult> Handle(
+    protected override string FileKind => "localisation file";
+
+    public Task<ApplyTranslationBatchResult> Handle(
         ApplyTranslationBatchParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Fail(LocalisationFeatureDisabled.Message);
-
-        if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Fail("No project file path provided.");
-
-        var fs = _fileHelper.FileSystem;
-        if (!fs.File.Exists(request.ProjectFilePath))
-            return Fail($"File not found: {request.ProjectFilePath}");
-
-        // Checked once for the whole batch, before anything is composed: the batch is atomic, so
-        // there is no point discovering a stale file halfway through.
-        if (await LocalisationConcurrencyGuard.CheckAsync(
-                fs, request.ProjectFilePath, request.ExpectedContentHash, ct) is { } stale)
-            return Fail(stale.Error!);
-
-        if (request.Commands.Count == 0)
-        {
-            var unchanged = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
-            return new ApplyTranslationBatchResult(true,
-                NewContentHash: LocalisationContentHash.Compute(unchanged));
-        }
-
-        LocalisationEditResult result;
-        try
-        {
-            result = await _editor.ApplyKeyedToFileAsync(
-                request.ProjectFilePath, request.Commands, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not write localisation file '{Path}'.", request.ProjectFilePath);
-            return Fail($"Could not write the file: {ex.Message}");
-        }
-
-        if (!result.Success)
-            return new ApplyTranslationBatchResult(false, result.FailedIndex, result.Error);
-
-        // Read back rather than hashing composed text, because a binary format has no composed text
-        // to hash. The guard reads the file the same way, so the two always agree.
-        var written = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
-        var writtenHash = LocalisationContentHash.Compute(written);
-
-        // Recorded before the reload, so the watcher event for this write - which can arrive at any
-        // point after it - is recognised as our own and does not reload everything a second time.
-        _writeLedger.Record(request.ProjectFilePath, writtenHash);
-
-        await _reloadService.ReloadLocalisationAsync(ct);
-
-        return new ApplyTranslationBatchResult(true, NewContentHash: writtenHash);
+        return ApplyBatchAsync(
+            request.ProjectFilePath, request.ExpectedContentHash, request.Commands, ct);
     }
 
-    private static ApplyTranslationBatchResult Fail(string error)
+    protected override Task<LocalisationEditResult> ApplyAsync(
+        string filePath, IReadOnlyList<LocKeyedCommandDto> commands, CancellationToken ct)
     {
-        return new ApplyTranslationBatchResult(false, null, error);
+        return _editor.ApplyKeyedToFileAsync(filePath, commands, ct);
+    }
+
+    protected override ApplyTranslationBatchResult Succeeded(string newContentHash)
+    {
+        return new ApplyTranslationBatchResult(true, NewContentHash: newContentHash);
+    }
+
+    protected override ApplyTranslationBatchResult Failed(int? failedIndex, string error)
+    {
+        return new ApplyTranslationBatchResult(false, failedIndex, error);
     }
 }

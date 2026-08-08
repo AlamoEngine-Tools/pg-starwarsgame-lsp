@@ -216,20 +216,49 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 return LocalisationEditResult.Fail(i, error);
 
         var language = document.Languages.FirstOrDefault() ?? string.Empty;
-        // The key is hashed exactly as the DAT builders do - same service, same encoding - so an
-        // edited row's checksum matches what the game expects to look up.
+
+        // Checked before anything is opened. A .dat stores keys as ASCII bytes and DatStringEntry
+        // refuses anything else - but it did so from inside the write, as "Value contains non-ASCII
+        // characters (Parameter 'value')", which names the wrong field and no row at all.
+        for (var i = 0; i < rows.Count; i++)
+            if (!rows[i].Key.All(char.IsAscii))
+                return LocalisationEditResult.Fail(
+                    i,
+                    $"Row {i + 1}: '{rows[i].Key}' cannot be used as a key - a .dat stores keys as "
+                    + "ASCII. Rename the entry using unaccented letters; the translation itself is "
+                    + "unaffected.");
+
+        // Materialised HERE, not left lazy. Building an entry is what validates its key, and the
+        // sequence used to be enumerated inside CreateDatFile - by which point File.Create had
+        // already truncated the file. One unwritable key destroyed the file it refused to write.
         var entries = rows.Select(r => new DatStringEntry(
             r.Key,
             _hashing.GetCrc32(r.Key, Encoding.ASCII),
-            r.Values.FirstOrDefault(v => v.Language == language)?.Value ?? string.Empty));
+            r.Values.FirstOrDefault(v => v.Language == language)?.Value ?? string.Empty)).ToList();
 
         var fileType = sortOrder == DatFileType.OrderedByCrc32
             ? DatFileType.OrderedByCrc32
             : DatFileType.NotOrdered;
 
-        using (var stream = fs.File.Create(filePath))
+        // Written beside the target and moved over it, so the original survives every way this can
+        // fail - a rejected entry, a full disk, a crash halfway through. Truncating the real file
+        // first and hoping the write succeeds is what turned a refused save into an empty file.
+        var temporary = filePath + ".aettmp";
+        try
         {
-            _datFileService.CreateDatFile(stream, entries, fileType);
+            using (var stream = fs.File.Create(temporary))
+            {
+                _datFileService.CreateDatFile(stream, entries, fileType);
+            }
+
+            fs.File.Move(temporary, filePath, true);
+        }
+        catch
+        {
+            // The original is still untouched; clear the partial away so it is not mistaken for a
+            // localisation file by the next scan.
+            if (fs.File.Exists(temporary)) fs.File.Delete(temporary);
+            throw;
         }
 
         return LocalisationEditResult.Ok(string.Empty);
@@ -538,7 +567,16 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         public string Compose()
         {
             var builder = new StringBuilder();
-            if (_preamble.Length > 0) builder.Append(_preamble).Append(_lineEnding);
+
+            // A CSV that had nothing in it has no header line to preserve, and one has to be there
+            // or the first row written becomes the header when the file is read back - a line
+            // silently swallowed and every value shifted a column. The languages come from the rows
+            // that arrived; see InsertRow, which is what establishes them.
+            var preamble = _preamble.Length == 0 && _extension == ".csv" && _languages.Count > 0
+                ? CsvHeader()
+                : _preamble;
+
+            if (preamble.Length > 0) builder.Append(preamble).Append(_lineEnding);
 
             foreach (var row in _rows)
             {
@@ -548,6 +586,24 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             }
 
             return builder.ToString();
+        }
+
+        /// <summary>
+        ///     The header line for a CSV that never had one: the key column, then one per language.
+        ///     Written through CsvHelper like every row, so a language whose name needed quoting is
+        ///     quoted the same way the reader expects.
+        /// </summary>
+        private string CsvHeader()
+        {
+            using var writer = new StringWriter();
+            using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture));
+
+            // Column 0 is the key; the rest name languages - see LocalisationRowReader.ReadCsv.
+            csv.WriteField("key");
+            foreach (var language in _languages) csv.WriteField(language);
+
+            csv.NextRecord();
+            return writer.ToString().TrimEnd('\r', '\n');
         }
 
         private string Serialise(RowState row)
@@ -611,6 +667,21 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             var at = command.Index ?? _rows.Count;
             if (at < 0 || at > _rows.Count)
                 return $"Cannot insert at row {at} (the file has {_rows.Count} rows).";
+
+            // A file with nothing in it declares no columns, so the FIRST row to arrive establishes
+            // them - the same thing addLanguage does, just implied rather than asked for. Without
+            // this the values had nowhere to go: the composer writes one column per DECLARED
+            // language, so seeding an empty CSV produced a bare list of keys with every value
+            // dropped, and the first of those keys was then read back as the header row.
+            //
+            // Only while there are none. Once the file has columns, a value for an undeclared
+            // language is a mistake to refuse rather than a column to invent silently - adding one
+            // here would let a stray language widen the file without anyone asking for it.
+            if (_languages.Count == 0)
+                foreach (var value in command.Values ?? [])
+                    if (!_languages.Any(l =>
+                            string.Equals(l, value.Language, StringComparison.OrdinalIgnoreCase)))
+                        _languages.Add(value.Language);
 
             _rows.Insert(at, new RowState
             {

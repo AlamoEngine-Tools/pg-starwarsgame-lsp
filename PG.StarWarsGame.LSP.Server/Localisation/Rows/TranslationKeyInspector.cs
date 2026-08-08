@@ -21,7 +21,8 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 public static class TranslationKeyInspector
 {
     /// <summary>
-    ///     Reports blank keys, real collisions, and keys that differ only in case.
+    ///     Reports blank keys, keys ASCII cannot hold, real collisions, and keys that differ only in
+    ///     case.
     /// </summary>
     /// <remarks>
     ///     Collision is decided by the engine's own rule, not by string comparison: an entry is
@@ -36,8 +37,11 @@ public static class TranslationKeyInspector
     ///     </para>
     ///     <para>
     ///         Hashing through ASCII also folds every non-ASCII character to <c>?</c>, so two keys
-    ///         differing only outside ASCII collide for real however different they look. No string
-    ///         comparison would ever find that; the checksum does.
+    ///         differing only outside ASCII would collide for real however different they look. In
+    ///         practice that pair never reaches the collision check any more: a key ASCII cannot
+    ///         hold is refused on its own account first, because the writer cannot store it at all.
+    ///         The folding is still what makes the checksum the right identity to compare - it is
+    ///         simply no longer the way a collision gets discovered.
     ///     </para>
     /// </remarks>
     public static IReadOnlyList<LocTranslationProblemDto> Inspect(
@@ -58,6 +62,23 @@ public static class TranslationKeyInspector
             {
                 problems.Add(new LocTranslationProblemDto(null, null, LocProblemSeverity.Error,
                     "This entry has no key, so the game cannot reference it.", i));
+                continue;
+            }
+
+            // Reported before anything else about this key, and instead of it: a key the file
+            // cannot be written with is not worth also discussing collisions or casing for.
+            //
+            // A compiled .dat stores keys as ASCII bytes and the writer refuses anything else, so
+            // this is fatal rather than cosmetic - and it used to surface only when Save reached
+            // the writer, once per language file, reading "Value contains non-ASCII characters
+            // (Parameter 'value')". That names the wrong field - it is the key being rejected - and
+            // arrives after every edit has been made.
+            if (NonAsciiIn(key) is { Length: > 0 } offending)
+            {
+                problems.Add(new LocTranslationProblemDto(key, null, LocProblemSeverity.Error,
+                    $"'{key}' cannot be used as a key: {offending}cannot be written to a .dat, "
+                    + "which stores keys as ASCII. Rename the entry using unaccented letters - the "
+                    + "translation itself is unaffected.", i));
                 continue;
             }
 
@@ -83,6 +104,30 @@ public static class TranslationKeyInspector
         }
 
         return problems;
+    }
+
+    /// <summary>
+    ///     The characters of <paramref name="key" /> that ASCII cannot hold, phrased for a message,
+    ///     or empty when there are none.
+    ///     <para>
+    ///         Named rather than merely counted: "this key has non-ASCII characters" leaves the user
+    ///         hunting through a string for something their font may render identically to its plain
+    ///         counterpart.
+    ///     </para>
+    /// </summary>
+    private static string NonAsciiIn(string key)
+    {
+        var offending = new List<char>();
+        foreach (var c in key)
+            if (!char.IsAscii(c) && !offending.Contains(c))
+                offending.Add(c);
+
+        if (offending.Count == 0) return string.Empty;
+
+        var quoted = offending.Select(c => $"'{c}'").ToList();
+        return quoted.Count == 1
+            ? $"{quoted[0]} "
+            : $"{string.Join(", ", quoted.Take(quoted.Count - 1))} and {quoted[^1]} ";
     }
 
     /// <summary>The engine's identity for a key: CRC32 over its ASCII bytes.</summary>

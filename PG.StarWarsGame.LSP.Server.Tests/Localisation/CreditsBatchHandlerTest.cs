@@ -158,6 +158,36 @@ public sealed class CreditsBatchHandlerTest
         Assert.Contains("Change 1", problem.Message);
     }
 
+    /// <summary>
+    ///     A batch that cannot compose is about a staged command, not about a row - so it names the
+    ///     command in its message and leaves <see cref="LocProblemDto.Index" /> null.
+    ///     <para>
+    ///         The two indices are unrelated and both are small integers, which is what made putting
+    ///         one where the other belongs invisible.
+    ///         <see cref="LocalisationEditResult.FailedIndex" /> counts commands in the batch;
+    ///         <see cref="LocProblemDto.Index" /> is a row in the file, and the grid uses it to tint
+    ///         that row and to scroll to it. Sending the command number here made a failed edit
+    ///         highlight whichever row happened to share its number - a row the user had not touched
+    ///         and the message did not mention. The translation validator has always reported this
+    ///         correctly; this is the credits side matching it.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task Validate_ABatchThatCannotCompose_NamesNoRow()
+    {
+        // Deleting row 99 of a 3-row file fails as command 0. Row 0 exists and is untouched by the
+        // batch, so reporting index 0 would point the grid at a perfectly good row.
+        var (_, validate, _) = Build(Files());
+
+        var result = await validate.Handle(
+            new ValidateCreditsBatchParams(Path,
+                [new LocEditCommandDto("deleteRow", 99)]),
+            CancellationToken.None);
+
+        var problem = Assert.Single(result.Problems);
+        Assert.Null(problem.Index);
+    }
+
     [Fact]
     public async Task Validate_WritesNothing()
     {

@@ -10,12 +10,13 @@
 // Keyed text files only. A credits file keys every row by a formatting directive, so matching by
 // key against a baseline would pair unrelated lines.
 
+import { BaselineEntryDto } from '../protocol';
 import { LocRow, LocValue } from './loc/locRow';
 
 export interface BaselineRow { key: string; values: LocValue[]; }
 
-/** The shape `aet/getBaselineEntries` returns. */
-export interface BaselineEntryDto { key: string; translations: Record<string, string> | undefined }
+// Re-exported so the editors reading a baseline need only one import for it.
+export { BaselineEntryDto };
 
 /**
  * Converts the server's entries into the grid's row shape.
@@ -29,6 +30,8 @@ export interface BaselineEntryDto { key: string; translations: Record<string, st
 export function toBaselineRows(entries: BaselineEntryDto[]): BaselineRow[] {
     return entries.map(entry => ({
         key: entry.key,
+        // `?? {}` despite the contract promising a dictionary: an entry with no translations at all
+        // serialises as an omitted field, and the alternative is a crash on the whole baseline.
         values: Object.entries(entry.translations ?? {})
             .map(([language, value]) => ({ language: language.toUpperCase(), value })),
     }));

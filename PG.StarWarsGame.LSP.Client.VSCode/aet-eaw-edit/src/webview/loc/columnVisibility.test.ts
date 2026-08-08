@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { emptyLanguages } from './columnVisibility';
+import { defaultHiddenLanguages, emptyLanguages } from './columnVisibility';
 
 const languages = ['ENGLISH', 'GERMAN', 'FRENCH'];
 
@@ -14,6 +14,44 @@ function row(index: number, values: Record<string, string>) {
         values: Object.entries(values).map(([language, value]) => ({ language, value })),
     };
 }
+
+describe('defaultHiddenLanguages', () => {
+    const populated = [
+        row(0, { ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: 'Alpha FR' }),
+    ];
+
+    // The bug this pins: the grid rendered the focus default while the column menu's first click
+    // seeded itself from emptyLanguages instead. On a set opened on one language, ticking a second
+    // language started from the wrong set and revealed every column at once.
+    it('hides everything but the focus language', () => {
+        assert.deepEqual(
+            defaultHiddenLanguages(populated, languages, 'ENGLISH'),
+            ['GERMAN', 'FRENCH']);
+    });
+
+    it('matches the focus language regardless of casing', () => {
+        assert.deepEqual(
+            defaultHiddenLanguages(populated, languages, 'english'),
+            ['GERMAN', 'FRENCH']);
+    });
+
+    // Without a focus the rule is the other one: get emptiness out of the way, nothing else.
+    it('hides only the empty columns when nothing is focused', () => {
+        const rows = [row(0, { ENGLISH: 'Alpha', GERMAN: 'Alfa', FRENCH: '' })];
+
+        assert.deepEqual(defaultHiddenLanguages(rows, languages, null), ['FRENCH']);
+        assert.deepEqual(defaultHiddenLanguages(rows, languages, undefined), ['FRENCH']);
+    });
+
+    it('hides nothing when every column has something and nothing is focused', () => {
+        assert.deepEqual(defaultHiddenLanguages(populated, languages, null), []);
+    });
+
+    // A focus that is not one of the file's languages would otherwise hide the entire table.
+    it('still shows the focus language when it is the only one', () => {
+        assert.deepEqual(defaultHiddenLanguages(populated, ['ENGLISH'], 'ENGLISH'), []);
+    });
+});
 
 describe('emptyLanguages', () => {
     it('names a language nothing in the file says anything in', () => {

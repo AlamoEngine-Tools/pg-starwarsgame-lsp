@@ -22,6 +22,41 @@ const baseline = [
     },
 ];
 
+/**
+ * What a one-language file can and cannot be filled from - the rule the "Fill language" tile is
+ * gated on.
+ *
+ * Matching by text means a line is identified by what it says in *another* language. That makes
+ * these two cases opposites, which is not obvious from the outside and is why they are pinned here:
+ * a language the file already has cannot be filled (its own text is the thing being replaced, and
+ * there is nothing else to look the line up by), while a language it does not have yet can be
+ * (the existing language's text is the lookup key).
+ */
+describe('creditsBaselineValues, on a file with one language', () => {
+    // The reported dead end: on a GERMAN-only credits file the Fill dialog offered "From the game",
+    // then reported "there is nothing left to fill in for GERMAN" - and always would have.
+    it('can never fill the only language the file has', () => {
+        const rows = [
+            { index: 0, key: 'HEADER', values: [{ language: 'GERMAN', value: '' }] },
+            { index: 1, key: 'CENTER', values: [{ language: 'GERMAN', value: 'Petroglyph' }] },
+        ];
+
+        assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), []);
+    });
+
+    // The Add-language dialog's fill offer, which is why baselineFillCount stays available even
+    // when the Fill tile is not.
+    it('can fill a language the file does not have yet', () => {
+        const rows = [
+            { index: 0, key: 'HEADER', values: [{ language: 'ENGLISH', value: 'Voice Cast' }] },
+        ];
+
+        assert.deepEqual(creditsBaselineValues('GERMAN', rows, baseline), [
+            { index: 0, key: 'HEADER', value: 'Sprecher' },
+        ]);
+    });
+});
+
 describe('creditsBaselineValues', () => {
     // Matched by the text, not by the key: a credits key is a formatting directive that hundreds of
     // rows share, so it identifies nothing.

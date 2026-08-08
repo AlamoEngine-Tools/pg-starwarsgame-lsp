@@ -7,7 +7,7 @@
 // no meaning the user can see, which is also why the grid can be sorted freely and why adding an
 // entry never asks where to put it.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { BaselineSuggestion, suggestBaselineKeys } from './baselineSuggestions';
@@ -17,7 +17,8 @@ import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
 import { languageCopyValues } from './loc/languageCopy';
 import { languageFillValues } from './loc/languageFill';
 import { LocColumnMenu } from './loc/LocColumnMenu';
-import { emptyLanguages } from './loc/columnVisibility';
+import { LocDockHeader } from './loc/LocDockHeader';
+import { useLocColumns } from './loc/useLocColumns';
 import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
 import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
@@ -25,7 +26,6 @@ import { LocRow } from './loc/locRow';
 import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
-import { severityIconFor, validateTitle } from './loc/validateState';
 import { DIALOG_IDS } from './shared/dialogGeometryStore';
 import { ResizeHandles } from './shared/ResizeHandles';
 import { useMovableDialog } from './shared/useMovableDialog';
@@ -136,12 +136,6 @@ function App(): React.JSX.Element {
         }
     }, [baseline, languages, stage]);
 
-    // Read by toggleLanguage, which must not be re-created on every row change.
-    const rowsRef = useRef(rows);
-    const languagesRef = useRef(languages);
-    rowsRef.current = rows;
-    languagesRef.current = languages;
-
     /** Entries identical to what a lower layer already provides. */
     const inherited = useMemo(
         () => findInheritedKeys(rows, baseline, languages),
@@ -198,40 +192,16 @@ function App(): React.JSX.Element {
         };
     }, [rows, inherited]);
 
-    // One template for the header and every row, so the columns cannot drift apart.
-    const hidden = useMemo(
-        // Opened on one language of a set: that column alone. The rest are hidden, not absent, so
-        // the column menu brings any of them back - which is what makes this a view of the set
-        // rather than a different document. With no focus, the default is to hide empty columns.
-        () => hiddenLanguages ?? new Set(focusLanguage === null
-            ? emptyLanguages(rows, languages)
-            : languages.filter(l => l.toUpperCase() !== focusLanguage.toUpperCase())),
-        [hiddenLanguages, rows, languages, focusLanguage]);
+    // Hiding the column the search is scoped to would leave the grid filtered by something the
+    // user can no longer see - the results would look arbitrary - so the scope goes back to
+    // everything.
+    const onColumnHidden = useCallback(
+        (language: string) => setScope(s => (s === language ? 'all' : s)), []);
 
-    const shownLanguages = useMemo(
-        () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
-
-    // A trailing track for the column picker, which sits at the right-hand end of the header.
-    const columns = useMemo(
-        () => `260px ${shownLanguages.map(() => 'minmax(160px, 1fr)').join(' ')} 32px`,
-        [shownLanguages]);
-
-    /**
-     * Hides or shows a language column.
-     *
-     * Hiding the column the search is scoped to would leave the grid filtered by something the user
-     * can no longer see - the results would look arbitrary - so the scope goes back to everything.
-     */
-    const toggleLanguage = useCallback((language: string, visible: boolean) => {
-        setHiddenLanguages(current => {
-            // Materialises the default on first use, so choosing one column does not silently
-            // reveal every other one that was hidden for being empty.
-            const next = new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current));
-            if (visible) { next.delete(language); } else { next.add(language); }
-            return next;
-        });
-        if (!visible) { setScope(s => (s === language ? 'all' : s)); }
-    }, []);
+    const { hidden, shownLanguages, columns, toggleLanguage, materialise } = useLocColumns({
+        rows, languages, hiddenLanguages, setHiddenLanguages, focusLanguage,
+        onHidden: onColumnHidden,
+    });
 
     if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
     if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
@@ -309,30 +279,14 @@ function App(): React.JSX.Element {
         </>
     );
 
-    // Laid out like the story graph editor's: Save pinned left, Validate a soft severity pill
-    // pinned right, both icon-first.
-    const severityIcon = severityIconFor(validation);
-
     const dockHeader = (
-        <>
-            <button
-                className={`icon-btn header-left${queue.length > 0 ? ' active' : ''}`}
-                disabled={queue.length === 0}
-                onClick={save}
-                title="Save - write all staged changes to the file"
-            >
-                <span className="codicon codicon-save" />
-                {queue.length > 0 ? ` ${queue.length}` : ''}
-            </button>
-            <button
-                className={`icon-btn validate-btn header-right sev-${validation}`}
-                onClick={validate}
-                title={validateTitle(validation, problems.length, queue.length)}
-            >
-                <span className={`codicon codicon-${severityIcon}`} />
-                {problems.length ? ` ${problems.length}` : ''}
-            </button>
-        </>
+        <LocDockHeader
+            queue={queue}
+            problems={problems}
+            validation={validation}
+            onSave={save}
+            onValidate={validate}
+        />
     );
 
     const dockContent = (
@@ -356,8 +310,7 @@ function App(): React.JSX.Element {
                     stage({ kind: 'addLanguage', language });
                     setLanguages(current => [...current, language]);
                     // Explicit from here on, so the column just added is not hidden for being empty.
-                    setHiddenLanguages(current =>
-                        new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current)));
+                    materialise();
 
                     // Staged as ordinary edits, so the filled text is visible in the grid before it
                     // is saved and is discarded with everything else if the tab is abandoned.

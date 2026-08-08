@@ -21,7 +21,7 @@ public sealed class GetLanguagesHandler
 
     public Task<GetLanguagesResult> Handle(GetLanguagesParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
+        if (!LocalisationFeatureDisabled.IsEnabled(_config))
             return Task.FromResult(new GetLanguagesResult([]));
 
         var languages = _langService.OfficiallySupported()

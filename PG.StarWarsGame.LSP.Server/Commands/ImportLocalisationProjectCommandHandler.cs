@@ -82,9 +82,9 @@ public sealed class ImportLocalisationProjectCommandHandler : ExecuteCommandHand
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
         {
-            Fail(LocalisationFeatureDisabled.Message);
+            Fail(rejection);
             return Unit.Value;
         }
 

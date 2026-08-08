@@ -82,8 +82,8 @@ public sealed class ConvertLocalisationFormatHandler
     public async Task<ConvertLocalisationFormatResult> Handle(
         ConvertLocalisationFormatParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Fail(LocalisationFeatureDisabled.Message);
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
+            return Fail(rejection);
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Fail("No localisation file was given to convert.");

@@ -35,6 +35,64 @@ public sealed class TranslationKeyInspectorTest
         return TranslationKeyInspector.Inspect(keys, Hashing());
     }
 
+    /// <summary>
+    ///     A key outside ASCII cannot be written at all: a compiled <c>.dat</c> stores keys as ASCII
+    ///     bytes, and the writer refuses one that is not.
+    ///     <para>
+    ///         Reported here so it appears while the file is being edited. It used to surface only
+    ///         when Save reached the writer, as <c>Value contains non-ASCII characters (Parameter
+    ///         'value')</c> - which names the wrong field, since it is the KEY being rejected, and
+    ///         arrives once per language file after every edit has been made.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public void AKeyOutsideAscii_IsReportedRatherThanLeftToTheWriter()
+    {
+        var problem = Assert.Single(Inspect("TEXT_CAFÉ"));
+
+        Assert.Equal(LocProblemSeverity.Error, problem.Severity);
+        Assert.Equal("TEXT_CAFÉ", problem.Key);
+        Assert.Equal(0, problem.Index);
+    }
+
+    /// <summary>The offending characters are named: "somewhere in this key" is not actionable.</summary>
+    [Fact]
+    public void AKeyOutsideAscii_NamesWhatIsWrongWithIt()
+    {
+        var problem = Assert.Single(Inspect("TEXT_ÜBER_ÄRGER"));
+
+        Assert.Contains("Ü", problem.Message, StringComparison.Ordinal);
+        Assert.Contains("Ä", problem.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     Values carry the translation and are expected to hold accents - only the key is limited.
+    /// </summary>
+    [Fact]
+    public void AnAsciiKey_IsFineHoweverAccentedItsTranslationIs()
+    {
+        Assert.Empty(Inspect("TEXT_CAFE"));
+    }
+
+    /// <summary>
+    ///     Two keys differing only outside ASCII fold to the same checksum and so collide for real -
+    ///     which is what this input used to be reported as, since it is the easiest way to force a
+    ///     collision between two keys that look nothing alike.
+    ///     <para>
+    ///         It is now reported per key instead, because that is the more useful answer: BOTH are
+    ///         unwritable on their own, so renaming one to resolve a "collision" would leave the
+    ///         file still refusing to save on the other.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public void TwoKeysOutsideAscii_AreEachReportedOnTheirOwnTerms()
+    {
+        var problems = Inspect("TEXT_Ä", "TEXT_Ö");
+
+        Assert.Equal(2, problems.Count);
+        Assert.All(problems, p => Assert.Equal(LocProblemSeverity.Error, p.Severity));
+    }
+
     [Fact]
     public void AWellFormedFile_HasNoProblems()
     {
@@ -87,21 +145,6 @@ public sealed class TranslationKeyInspectorTest
         var problem = Assert.Single(Inspect("TEXT_A", "TEXT_A"));
 
         Assert.Equal(LocProblemSeverity.Error, problem.Severity);
-    }
-
-    /// <summary>
-    ///     Keys are hashed as ASCII, which folds every non-ASCII character to '?' - so two keys that
-    ///     differ only outside ASCII collide for real, however different they look. A string
-    ///     comparison of any casing could never find this.
-    /// </summary>
-    [Fact]
-    public void KeysCollidingOnlyAfterAsciiFolding_AreAnError()
-    {
-        var problems = Inspect("TEXT_Ä", "TEXT_Ö");
-
-        var problem = Assert.Single(problems);
-        Assert.Equal(LocProblemSeverity.Error, problem.Severity);
-        Assert.Contains("checksum", problem.Message, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>A case-only difference does not stop the real duplicate being reported.</summary>

@@ -40,9 +40,9 @@ public sealed class CreateLocalisationKeyCommandHandler : ExecuteCommandHandlerB
 
     public override async Task<Unit> Handle(ExecuteCommandParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
         {
-            _logger.LogWarning("{Cmd}: {Reason}", CommandName, LocalisationFeatureDisabled.Message);
+            _logger.LogWarning("{Cmd}: {Reason}", CommandName, rejection);
             return Unit.Value;
         }
 

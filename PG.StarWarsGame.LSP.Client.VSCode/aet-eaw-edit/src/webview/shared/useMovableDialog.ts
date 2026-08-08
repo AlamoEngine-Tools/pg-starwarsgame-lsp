@@ -15,7 +15,7 @@ import { CSSProperties, PointerEvent as ReactPointerEvent, useCallback, useRef, 
 
 import { rememberedGeometry, rememberGeometry } from './dialogGeometryStore';
 import {
-    centredPosition, clampPosition, fromStoredGeometry, Point, Rect, resizeRect, ResizeDirection,
+    centredPosition, clampPosition, fromStoredGeometry, Rect, resizeRect, ResizeDirection,
     Size, toStoredGeometry,
 } from './modalGeometry';
 

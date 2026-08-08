@@ -22,7 +22,7 @@ public sealed class GetRootLocalisationConfigHandler
     public Task<GetRootLocalisationConfigResult> Handle(
         GetRootLocalisationConfigParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
+        if (!LocalisationFeatureDisabled.IsEnabled(_config))
             return Task.FromResult(GetRootLocalisationConfigResult.NotConfigured);
 
         var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
