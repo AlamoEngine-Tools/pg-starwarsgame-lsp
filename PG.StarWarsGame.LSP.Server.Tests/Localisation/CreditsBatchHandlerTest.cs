@@ -4,6 +4,7 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -120,6 +121,29 @@ public sealed class CreditsBatchHandlerTest
         Assert.Empty(result.Problems);
     }
 
+    /// <summary>
+    ///     A heading with nothing under it is reported as information, never as a problem.
+    ///     <para>
+    ///         A credits key is a formatting directive, so such a file is valid and the crawl renders
+    ///         it exactly as written - it just reads the heading out and moves on. It is worth seeing,
+    ///         since it usually means the label was translated and the names under it were not, but
+    ///         grading a valid file as broken teaches people to ignore the tag.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task Validate_AHeadingWithNothingUnderIt_IsInformationNotAProblem()
+    {
+        var (_, validate, _) = Build(Files(
+            "key,ENGLISH\nHEADER,Directed by\nHEADER,Produced by\nCENTER,SOMEONE\n"));
+
+        var result = await validate.Handle(
+            new ValidateCreditsBatchParams(Path, []), CancellationToken.None);
+
+        var problem = Assert.Single(result.Problems);
+        Assert.Equal(LocProblemSeverity.Info, problem.Severity);
+        Assert.Contains("Directed by", problem.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Validate_ABatchThatCannotCompose_IsReported()
     {
@@ -132,6 +156,36 @@ public sealed class CreditsBatchHandlerTest
 
         var problem = Assert.Single(result.Problems);
         Assert.Contains("Change 1", problem.Message);
+    }
+
+    /// <summary>
+    ///     A batch that cannot compose is about a staged command, not about a row - so it names the
+    ///     command in its message and leaves <see cref="LocProblemDto.Index" /> null.
+    ///     <para>
+    ///         The two indices are unrelated and both are small integers, which is what made putting
+    ///         one where the other belongs invisible.
+    ///         <see cref="LocalisationEditResult.FailedIndex" /> counts commands in the batch;
+    ///         <see cref="LocProblemDto.Index" /> is a row in the file, and the grid uses it to tint
+    ///         that row and to scroll to it. Sending the command number here made a failed edit
+    ///         highlight whichever row happened to share its number - a row the user had not touched
+    ///         and the message did not mention. The translation validator has always reported this
+    ///         correctly; this is the credits side matching it.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task Validate_ABatchThatCannotCompose_NamesNoRow()
+    {
+        // Deleting row 99 of a 3-row file fails as command 0. Row 0 exists and is untouched by the
+        // batch, so reporting index 0 would point the grid at a perfectly good row.
+        var (_, validate, _) = Build(Files());
+
+        var result = await validate.Handle(
+            new ValidateCreditsBatchParams(Path,
+                [new LocEditCommandDto("deleteRow", 99)]),
+            CancellationToken.None);
+
+        var problem = Assert.Single(result.Problems);
+        Assert.Null(problem.Index);
     }
 
     [Fact]
@@ -173,6 +227,7 @@ public sealed class CreditsBatchHandlerTest
         services.AddSingleton<IFileSystem>(fs);
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         var sp = services.BuildServiceProvider();

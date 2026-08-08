@@ -4,9 +4,12 @@
 using System.IO.Abstractions;
 using System.Xml.Linq;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
+
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -51,6 +54,7 @@ public sealed class LocalisationXmlAddLanguageTest
         services.AddSingleton<IFileSystem>(new FileSystem());
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         return services.BuildServiceProvider().GetRequiredService<ILocalisationDocumentEditor>();

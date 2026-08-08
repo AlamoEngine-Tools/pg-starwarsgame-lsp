@@ -3,10 +3,13 @@
 
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
+
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -35,6 +38,7 @@ public sealed class DatRowRoundTripTest
         services.AddSingleton<IFileSystem>(new FileSystem());
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         var sp = services.BuildServiceProvider();

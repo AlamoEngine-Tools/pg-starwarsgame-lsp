@@ -41,6 +41,49 @@ public sealed class ConvertLocalisationFormatHandlerTest
         Assert.True(fs.File.Exists("/mod/data/text/MasterTextFile.xml"));
     }
 
+    // ── converting to a single-language format ───────────────────────────────
+
+    /// <summary>
+    ///     NLS holds one language per file, so a multi-language source becomes one file per language,
+    ///     each named for the language it holds.
+    ///     <para>
+    ///         It used to write a single <c>MasterTextFile.properties</c> containing whichever language
+    ///         happened to be the service default, silently discarding the rest - and the success
+    ///         message said only "wrote X. The original file was kept."
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task Convert_MultiLanguageCsvToNls_WritesOneFilePerLanguage()
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [CsvPath] = new("key,ENGLISH,GERMAN\nTEXT_A,Hello,Hallo\nTEXT_B,World,Welt\n"),
+            [PgprojPath] = new("{}")
+        });
+        var (handler, _, _, _) = Build(fs);
+
+        var result = await handler.Handle(Request(CsvPath, "Nls"), CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.Equal(
+            ["/mod/data/text/mastertextfile_english.properties", "/mod/data/text/mastertextfile_german.properties"],
+            result.WrittenPaths.OrderBy(p => p, StringComparer.Ordinal));
+        Assert.Contains("Hallo", fs.File.ReadAllText("/mod/data/text/mastertextfile_german.properties"));
+        Assert.Contains("Hello", fs.File.ReadAllText("/mod/data/text/mastertextfile_english.properties"));
+    }
+
+    /// <summary>A language with no content anywhere produces no file at all.</summary>
+    [Fact]
+    public async Task Convert_SingleLanguageCsvToNls_WritesOnlyThatLanguage()
+    {
+        var (handler, _, _, _) = Build();
+
+        var result = await handler.Handle(Request(CsvPath, "Nls"), CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.Equal("/mod/data/text/mastertextfile_english.properties", Assert.Single(result.WrittenPaths));
+    }
+
     // The point of "convert, keep the old file": the original is a fallback until the user is happy
     // with the result, so it has to survive untouched.
     [Fact]
@@ -322,7 +365,8 @@ public sealed class ConvertLocalisationFormatHandlerTest
                 sp.GetRequiredService<IXmlTranslationExporter>(),
                 sp.GetRequiredService<IPropertiesTranslationExporter>(),
                 sp.GetRequiredService<ILanguageService>(),
-                new FileHelper(fs)),
+                new FileHelper(fs),
+                config ?? new FakeLspConfigurationProvider()),
             new FileHelper(fs),
             registry ?? DefaultRegistry(),
             reload,

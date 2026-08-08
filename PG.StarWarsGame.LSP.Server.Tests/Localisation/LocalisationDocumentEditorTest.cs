@@ -3,9 +3,12 @@
 
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
+
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -26,6 +29,7 @@ public sealed class LocalisationDocumentEditorTest
         services.AddSingleton<IFileSystem>(new FileSystem());
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         return services.BuildServiceProvider().GetRequiredService<ILocalisationDocumentEditor>();
@@ -332,6 +336,36 @@ public sealed class LocalisationDocumentEditorTest
         Assert.Equal(Xml, Apply(Xml, ".xml"));
     }
 
+    /// <summary>
+    ///     A save keeps the file's own line endings.
+    ///     <para>
+    ///         An XML parser is required to normalise every line ending to LF (XML 1.0 section 2.11),
+    ///         so a CRLF file came back entirely in LF and a one-cell edit rewrote every line of it.
+    ///         Written with explicit endings rather than relying on <c>Xml</c> above, whose endings are
+    ///         whatever the checkout gave this source file - which is why the bug hid here for so long.
+    ///     </para>
+    /// </summary>
+    [Theory]
+    [InlineData("\r\n")]
+    [InlineData("\n")]
+    public void Xml_Save_KeepsTheFilesOwnLineEndings(string lineEnding)
+    {
+        var text = string.Join(lineEnding, [
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
+            "<Localisations xmlns=\"urn:alamoenginetools:localisation:v1\">",
+            "  <Localisation key=\"TEXT_A\">",
+            "    <TranslationData>",
+            "      <Translation Language=\"ENGLISH\">Alpha</Translation>",
+            "    </TranslationData>",
+            "  </Localisation>",
+            "</Localisations>"
+        ]);
+
+        var result = Apply(text, ".xml", SetCell(0, "ENGLISH", "Changed"));
+
+        Assert.Equal(text.Replace("Alpha", "Changed", StringComparison.Ordinal), result);
+    }
+
     [Fact]
     public void Xml_SetCell_ChangesOnlyThatTranslation()
     {
@@ -414,6 +448,7 @@ public sealed class LocalisationDocumentEditorTest
         services.AddSingleton<IFileSystem>(new FileSystem());
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         var reader = services.BuildServiceProvider().GetRequiredService<ILocalisationRowReader>();
 

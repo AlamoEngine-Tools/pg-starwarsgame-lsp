@@ -42,8 +42,8 @@ public sealed class GetLocalisationRowsHandler
     public async Task<GetLocalisationRowsResult> Handle(
         GetLocalisationRowsParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Failure(LocalisationFeatureDisabled.Message);
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
+            return Failure(rejection);
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Failure("No project file path provided.");
@@ -88,7 +88,9 @@ public sealed class GetLocalisationRowsHandler
             // creditstext_<LANGUAGE>.dat, but that constrains the DAT export, not the file being
             // edited: ExportLocalisationToDatHandler writes one CreditsText_<LANGUAGE>.dat per
             // language found in the source, which is how one credits file produces every crawl.
-            CanAddLanguage: LocalisationDocumentEditor.SupportsMultipleLanguages(extension));
+            CanAddLanguage: LocalisationDocumentEditor.SupportsMultipleLanguages(extension),
+            AddLanguageCreatesFile:
+            LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(extension));
     }
 
     /// <summary>

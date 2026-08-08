@@ -11,6 +11,10 @@
 
 import { useState } from 'react';
 
+import { DIALOG_IDS } from '../shared/dialogGeometryStore';
+import {
+    canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,
+} from './fillLanguage';
 import { LocModal } from './LocModal';
 import { LocTile, LocTileGrid } from './LocTile';
 
@@ -28,6 +32,11 @@ export interface LocDockActionsProps {
     languages: string[];
     /** False for the single-language formats, where the action is left out rather than shown failing. */
     canAddLanguage: boolean;
+    /**
+     * Whether adding a language creates a sibling file rather than a column. Single-language
+     * formats (.properties, .dat) cannot take a column, so the same action writes a new file.
+     */
+    addLanguageCreatesFile: boolean;
     /**
      * The languages the engine supports. Only these are offered: a made-up identifier compiles into
      * a column the game never reads, and the mistake is invisible until someone plays in it.
@@ -57,6 +66,20 @@ export interface LocDockActionsProps {
      * Fills a language from the game's own text. Absent where there is no baseline to draw on.
      */
     onFillFromBaseline?: (language: string) => void;
+    /**
+     * Whether that fill ADDS lines rather than filling cells that are already there - which is what
+     * it means on a file with nothing in it. Only the wording changes; the editor decides when.
+     */
+    fillsByAdding?: boolean;
+    /**
+     * The project's other language files, offered as a starting point for a file with nothing in
+     * it. Empty where there are none, or where starting from one makes no sense.
+     */
+    seedSources?: readonly {
+        filePath: string; label: string; language: string; rowCount: number;
+    }[];
+    /** Copies every line of one of {@link seedSources} in, ready to translate. */
+    onSeedFrom?: (filePath: string, language: string) => void;
     onConvertFormat: (format: ConvertibleFormat) => void;
     onExportDat: () => void;
 }
@@ -71,7 +94,8 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
     const [copyFrom, setCopyFrom] = useState('');
     const [copyTo, setCopyTo] = useState('');
     // Where the text comes from: another column of this file, or what the game itself ships.
-    const [fillSource, setFillSource] = useState<'language' | 'baseline'>('language');
+    const [fillSource, setFillSource] = useState<FillSource>('language');
+    const [seedFrom, setSeedFrom] = useState('');
 
     const close = (): void => setDialog(null);
 
@@ -81,12 +105,38 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
     const addable = props.supportedLanguages.filter(l => !have.has(l.toUpperCase()));
     const fillCount = language === '' ? undefined : props.baselineFillCount?.(language);
 
-    const fromGame = fillSource === 'baseline';
-    const copyCount = copyTo === ''
-        ? 0
-        : fromGame
-            ? props.baselineFillCount?.(copyTo) ?? 0
-            : copyFrom === '' ? 0 : props.copyLanguageCount?.(copyFrom, copyTo) ?? 0;
+    // Whether this file has a second language at all. The tile already gates on it; the radio
+    // inside the dialog did not, so a single-language file offered "From another language" and
+    // then a dropdown holding only the language being filled in.
+    const canCopy = props.onCopyLanguage !== undefined && canCopyBetweenLanguages(props.languages);
+    // Starting from a sibling file only makes sense for a file with nothing in it - otherwise it
+    // would be appending someone else's list to content that is already there.
+    const seedSources = props.seedSources ?? [];
+    const canSeed = props.onSeedFrom !== undefined && props.fillsByAdding === true
+        && seedSources.length > 0;
+    // Resolved to exactly one source, so these three cannot disagree - see resolveFillSource for
+    // what went wrong when they were derived independently.
+    const source = resolveFillSource(fillSource, { canCopy, canSeed });
+    const fromFile = source === 'file';
+    const fromGame = source === 'baseline';
+    const fromLanguage = source === 'language';
+    const copyFromLanguages = copyFromOptions(props.languages, copyTo);
+
+    // Also the whole confirm condition for the dialog: the source list excludes the target, and
+    // languageCopyValues answers 0 for a language copied into itself in any case.
+    const copyCount = fromFile
+        ? seedSources.find(s => s.filePath === seedFrom)?.rowCount ?? 0
+        : copyTo === ''
+            ? 0
+            : fromGame
+                ? props.baselineFillCount?.(copyTo) ?? 0
+                : copyFrom === '' ? 0 : props.copyLanguageCount?.(copyFrom, copyTo) ?? 0;
+
+    // Re-aims the source when the target takes it, so the two can never name the same language.
+    const changeCopyTo = (next: string): void => {
+        setCopyTo(next);
+        setCopyFrom(current => nextCopyFrom(props.languages, next, current));
+    };
 
     const addLanguage = (): void => {
         if (language === '') { return; }
@@ -99,24 +149,36 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
             <div className="dock-section">
                 <div className="dock-section-title">File</div>
                 <LocTileGrid>
-                    {props.canAddLanguage && (
+                    {(props.canAddLanguage || props.addLanguageCreatesFile) && (
                         <LocTile
                             icon="add"
                             label="Add language"
-                            title="Add a language column to this file"
+                            title={props.addLanguageCreatesFile
+                                ? 'Create a file for another language beside this one'
+                                : 'Add a language column to this file'}
                             onClick={() => { setLanguage(''); setDialog('language'); }}
                         />
                     )}
-                    {(props.onFillFromBaseline !== undefined
-                        || (props.onCopyLanguage !== undefined && props.languages.length > 1)) && (
+                    {(props.onFillFromBaseline !== undefined || canCopy || canSeed) && (
                         <LocTile
                             icon="copy"
                             label="Fill language"
                             title="Copy one language into the cells another has left empty"
                             onClick={() => {
-                                setCopyFrom(props.languages[0] ?? '');
-                                setCopyTo(props.languages[1] ?? props.languages[0] ?? '');
-                                setFillSource(props.languages.length > 1 ? 'language' : 'baseline');
+                                // Fill the second language from the first, which is the common
+                                // case: the first is the one that was written, the rest follow it.
+                                const target = props.languages[1] ?? props.languages[0] ?? '';
+                                setCopyTo(target);
+                                setCopyFrom(nextCopyFrom(props.languages, target, ''));
+                                setSeedFrom(current => current || seedSources[0]?.filePath || '');
+                                // A file with nothing in it is being started rather than topped up,
+                                // and its own project's text beats the game's as a starting point.
+                                // Otherwise the usual case is copying between its own columns.
+                                setFillSource(props.fillsByAdding
+                                    ? (canSeed ? 'file' : 'baseline')
+                                    : canCopyBetweenLanguages(props.languages)
+                                        ? 'language'
+                                        : 'baseline');
                                 setDialog('copy');
                             }}
                         />
@@ -138,6 +200,15 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
             {dialog === 'language' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.addLanguage}
+                    // Two different things happen, so the dialog must not describe only one of
+                    // them: a format that takes a column stages an edit, and a single-language
+                    // format writes a whole new file on the spot.
+                    footnote={props.addLanguageCreatesFile
+                        ? 'A new file is written beside this one, carrying every key from it, '
+                          + 'ready to translate.'
+                        : 'The column is added to every row, and nothing reaches the file '
+                          + 'until you save.'}
                     title="Add a language"
                     confirmLabel="Add"
                     canConfirm={language !== ''}
@@ -164,7 +235,13 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                 ))}
                             </div>
 
-                            {props.baselineFillCount !== undefined && (
+                            {/* Not offered when the language becomes a new file: creating one is
+                                the host's job and cannot be staged with the rest of the batch, so
+                                both editors return the moment they have asked for it and the fill
+                                never runs. The checkbox was shown, ticked by default, and silently
+                                discarded. Fill the new file from the game once it is open. */}
+                            {props.baselineFillCount !== undefined
+                                && !props.addLanguageCreatesFile && (
                                 <label
                                     className="check-field"
                                     title="Copy the game's own text for this language into the keys it defines"
@@ -188,10 +265,6 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                 </label>
                             )}
 
-                            <p className="modal-note">
-                                The column is added to every row. Entries the game does not translate
-                                are left empty. Nothing reaches the file until you save.
-                            </p>
                         </>
                     )}
                 </LocModal>
@@ -199,28 +272,30 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
             {dialog === 'copy' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.fillLanguage}
                     title="Fill in a language"
                     confirmLabel="Fill"
-                    canConfirm={copyCount > 0 && (fromGame || copyFrom !== copyTo)}
+                    canConfirm={copyCount > 0}
                     onCancel={close}
                     onConfirm={() => {
-                        if (fromGame) { props.onFillFromBaseline?.(copyTo); }
+                        if (fromFile) { props.onSeedFrom?.(seedFrom, copyTo); }
+                        else if (fromGame) { props.onFillFromBaseline?.(copyTo); }
                         else { props.onCopyLanguage?.(copyFrom, copyTo); }
                         close();
                     }}
                 >
                     <label className="field">
                         <span className="field-label">Fill in</span>
-                        <select value={copyTo} onChange={e => setCopyTo(e.target.value)}>
+                        <select value={copyTo} onChange={e => changeCopyTo(e.target.value)}>
                             {props.languages.map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
                     </label>
 
                     <div className="choice-list">
-                        {props.onCopyLanguage !== undefined && (
-                            <label className={`choice${!fromGame ? ' selected' : ''}`}>
+                        {canCopy && (
+                            <label className={`choice${fromLanguage ? ' selected' : ''}`}>
                                 <input
-                                    type="radio" name="fill-source" checked={!fromGame}
+                                    type="radio" name="fill-source" checked={fromLanguage}
                                     onChange={() => setFillSource('language')}
                                 />
                                 <span className="choice-label">From another language</span>
@@ -237,26 +312,62 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                 <span className="choice-detail">what Empire at War already ships</span>
                             </label>
                         )}
+                        {canSeed && (
+                            <label className={`choice${fromFile ? ' selected' : ''}`}>
+                                <input
+                                    type="radio" name="fill-source" checked={fromFile}
+                                    onChange={() => {
+                                        setFillSource('file');
+                                        // Pre-select, so the choice is complete the moment it is made.
+                                        setSeedFrom(current =>
+                                            current || seedSources[0]?.filePath || '');
+                                    }}
+                                />
+                                <span className="choice-label">From another file</span>
+                                <span className="choice-detail">
+                                    this project&apos;s own text, ready to translate
+                                </span>
+                            </label>
+                        )}
                     </div>
 
-                    {!fromGame && (
+                    {fromFile && (
                         <label className="field">
                             <span className="field-label">Copy from</span>
+                            <select value={seedFrom} onChange={e => setSeedFrom(e.target.value)}>
+                                {seedSources.map(s => (
+                                    <option key={s.filePath} value={s.filePath}>
+                                        {s.language ? `${s.language} - ${s.label}` : s.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </label>
+                    )}
+
+                    {fromLanguage && (
+                        <label className="field">
+                            <span className="field-label">Copy from</span>
+                            {/* The language being filled in is left out: copying it into itself
+                                fills nothing, so offering it can only produce a disabled Fill. */}
                             <select value={copyFrom} onChange={e => setCopyFrom(e.target.value)}>
-                                {props.languages.map(l => <option key={l} value={l}>{l}</option>)}
+                                {copyFromLanguages.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
                         </label>
                     )}
 
                     <p className="modal-note">
-                        {!fromGame && copyFrom === copyTo
-                            ? 'Pick two different languages.'
+                        {fromFile
+                            ? `${copyCount} line(s) would be copied in, in that file's order, `
+                              + `as ${copyTo} - ready to translate over.`
                             : copyCount === 0
                                 ? `There is nothing left to fill in for ${copyTo}.`
-                                : `${copyCount} empty cell(s) would be filled. Anything ${copyTo} `
-                                  + 'already says is left alone.'}
+                                : props.fillsByAdding && fromGame
+                                    ? `${copyCount} line(s) would be added, in the order the game `
+                                      + 'plays them. Edit or delete what you do not want afterwards.'
+                                    : `${copyCount} empty cell(s) would be filled. Anything `
+                                      + `${copyTo} already says is left alone.`}
                     </p>
-                    {!fromGame && (
+                    {fromLanguage && (
                         <p className="modal-note">
                             Most of a credits list is names, and a name is usually the same in every
                             language. Only do this where that holds: a cell left empty is dropped
@@ -270,6 +381,8 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
             {dialog === 'convert' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.convertFormat}
+                    footnote={'The new file is written beside this one and the original is kept.'}
                     title="Convert to another format"
                     confirmLabel="Convert"
                     onCancel={close}
@@ -289,15 +402,12 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                             </label>
                         ))}
                     </div>
-                    <p className="modal-note">
-                        The new file is written beside this one and the project is repointed at it.
-                        The original file is kept.
-                    </p>
                 </LocModal>
             )}
 
             {dialog === 'export' && (
                 <LocModal
+                    dialogId={DIALOG_IDS.exportDat}
                     title="Export to DAT"
                     confirmLabel="Export"
                     onCancel={close}

@@ -10,22 +10,15 @@ using PG.StarWarsGame.LSP.Server.Project;
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
-///     Commits a staged batch of position-addressed credits edits.
-///     <para>
-///         Writes to disk rather than sending <c>workspace/applyEdit</c>: the whole localisation
-///         read path is disk-based, so an applyEdit would leave the file unsaved and make every
-///         later read stale.
-///     </para>
+///     Commits a staged batch of position-addressed credits edits. See
+///     <see cref="ApplyLocalisationBatchHandlerBase{TCommand,TResult}" /> for everything this shares
+///     with the translation side; what is left here is how a credits edit is addressed.
 /// </summary>
 public sealed class ApplyCreditsBatchHandler
-    : IJsonRpcRequestHandler<ApplyCreditsBatchParams, ApplyCreditsBatchResult>
+    : ApplyLocalisationBatchHandlerBase<LocEditCommandDto, ApplyCreditsBatchResult>,
+        IJsonRpcRequestHandler<ApplyCreditsBatchParams, ApplyCreditsBatchResult>
 {
-    private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationDocumentEditor _editor;
-    private readonly IFileHelper _fileHelper;
-    private readonly ILogger<ApplyCreditsBatchHandler> _logger;
-    private readonly IModProjectReloadService _reloadService;
-    private readonly ILocalisationWriteLedger _writeLedger;
 
     public ApplyCreditsBatchHandler(
         ILocalisationDocumentEditor editor,
@@ -34,71 +27,33 @@ public sealed class ApplyCreditsBatchHandler
         ILogger<ApplyCreditsBatchHandler> logger,
         ILspConfigurationProvider config,
         ILocalisationWriteLedger writeLedger)
+        : base(reloadService, fileHelper, logger, config, writeLedger)
     {
-        _writeLedger = writeLedger;
         _editor = editor;
-        _reloadService = reloadService;
-        _fileHelper = fileHelper;
-        _logger = logger;
-        _config = config;
     }
 
-    public async Task<ApplyCreditsBatchResult> Handle(
+    protected override string FileKind => "credits file";
+
+    public Task<ApplyCreditsBatchResult> Handle(
         ApplyCreditsBatchParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Fail(LocalisationFeatureDisabled.Message);
-
-        if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
-            return Fail("No project file path provided.");
-
-        var fs = _fileHelper.FileSystem;
-        if (!fs.File.Exists(request.ProjectFilePath))
-            return Fail($"File not found: {request.ProjectFilePath}");
-
-        // Checked once for the whole batch, before anything is composed: the batch is atomic, so
-        // there is no point discovering a stale file halfway through.
-        if (await LocalisationConcurrencyGuard.CheckAsync(
-                fs, request.ProjectFilePath, request.ExpectedContentHash, ct) is { } stale)
-            return Fail(stale.Error!);
-
-        if (request.Commands.Count == 0)
-        {
-            var unchanged = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
-            return new ApplyCreditsBatchResult(true,
-                NewContentHash: LocalisationContentHash.Compute(unchanged));
-        }
-
-        LocalisationEditResult result;
-        try
-        {
-            // The editor owns the write: .dat is binary, so there is no text for this handler to
-            // save, and the DAT services write through a real file stream.
-            result = await _editor.ApplyToFileAsync(request.ProjectFilePath, request.Commands, ct);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not write credits file '{Path}'.", request.ProjectFilePath);
-            return Fail($"Could not write the file: {ex.Message}");
-        }
-
-        if (!result.Success)
-            return new ApplyCreditsBatchResult(false, result.FailedIndex, result.Error);
-
-        var written = await fs.File.ReadAllTextAsync(request.ProjectFilePath, ct);
-        var writtenHash = LocalisationContentHash.Compute(written);
-
-        // Recorded before the reload, so the watcher event for this write - which can arrive at any
-        // point after it - is recognised as our own and does not reload everything a second time.
-        _writeLedger.Record(request.ProjectFilePath, writtenHash);
-
-        await _reloadService.ReloadLocalisationAsync(ct);
-
-        return new ApplyCreditsBatchResult(true, NewContentHash: writtenHash);
+        return ApplyBatchAsync(
+            request.ProjectFilePath, request.ExpectedContentHash, request.Commands, ct);
     }
 
-    private static ApplyCreditsBatchResult Fail(string error)
+    protected override Task<LocalisationEditResult> ApplyAsync(
+        string filePath, IReadOnlyList<LocEditCommandDto> commands, CancellationToken ct)
     {
-        return new ApplyCreditsBatchResult(false, null, error);
+        return _editor.ApplyToFileAsync(filePath, commands, ct);
+    }
+
+    protected override ApplyCreditsBatchResult Succeeded(string newContentHash)
+    {
+        return new ApplyCreditsBatchResult(true, NewContentHash: newContentHash);
+    }
+
+    protected override ApplyCreditsBatchResult Failed(int? failedIndex, string error)
+    {
+        return new ApplyCreditsBatchResult(false, failedIndex, error);
     }
 }

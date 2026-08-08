@@ -77,6 +77,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
             reload ?? new FakeReloadService(),
             schemaProvider,
             writeLedger ?? new LocalisationWriteLedger(fileHelper),
+            new OpenStartupGate(),
             NullLogger<GameDidChangeWatchedFilesHandler>.Instance);
     }
 
@@ -453,6 +454,61 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Equal(0, reload.LocalisationReloadCount);
     }
 
+    /// <summary>
+    ///     A file in a subfolder of a text root is not the loader's business, so it must not force a
+    ///     rebuild.
+    ///     <para>
+    ///         The text-root test was a recursive prefix match while
+    ///         <c>LocalisationLoader.EnumerateFromTextRoots</c> globs <c>TopDirectoryOnly</c>, so a
+    ///         change below the root paid for a full localisation reload that could not load the file
+    ///         that triggered it.
+    ///     </para>
+    /// </summary>
+    [Fact]
+    public async Task Handle_CsvInASubfolderOfATextRoot_NotRoutedToLocalisationReload()
+    {
+        const string csvUri = "file:///c:/mods/mymod/data/text/archive/old.csv";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\archive\old.csv"] = new("key,ENGLISH")
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "csv")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(csvUri), CancellationToken.None);
+
+        Assert.Equal(0, reload.LocalisationReloadCount);
+    }
+
+    /// <summary>
+    ///     DAT is a localisation format a project can declare, and the engine's own files are DAT -
+    ///     it went unwatched entirely, so the one format that is genuinely split per language never
+    ///     noticed a change on disk.
+    /// </summary>
+    [Fact]
+    public async Task Handle_DatInATextRoot_IsRoutedToLocalisationReload()
+    {
+        const string datUri = "file:///c:/mods/mymod/data/text/mastertextfile_english.dat";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"c:\mods\mymod\data\text\mastertextfile_english.dat"] = new([1, 2, 3])
+        });
+        var spy = new SpyIndexService();
+        var reload = new FakeReloadService
+        {
+            LastWorkspaceConfig = new WorkspaceConfiguration([], [], ["c:/mods/mymod/data/text"], [], "dat")
+        };
+
+        var handler = BuildHandler(spy, fs: fs, reload: reload);
+        await handler.Handle(Changed(datUri), CancellationToken.None);
+
+        Assert.Equal(1, reload.LocalisationReloadCount);
+    }
+
     [Fact]
     public async Task Handle_CsvChanged_NoWorkspaceConfigYet_NotRoutedToLocalisationReload()
     {
@@ -760,5 +816,24 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         }
 
         public IEnumerable<TrackedDocument> All => _docs.Values;
+    }
+
+    /// <summary>
+    ///     A gate that is already open, so a change is handled on the spot. The buffering path is the
+    ///     startup pipeline's own concern and is covered by <c>StartupGateTest</c>.
+    /// </summary>
+    private sealed class OpenStartupGate : IStartupGate
+    {
+        public bool IsOpen => true;
+
+        public Task RunOrBufferAsync(Func<CancellationToken, Task> action, CancellationToken ct)
+        {
+            return action(ct);
+        }
+
+        public Task OpenAsync()
+        {
+            return Task.CompletedTask;
+        }
     }
 }

@@ -3,6 +3,16 @@
 
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
+using Microsoft.Extensions.DependencyInjection;
+
+using PG.Commons.Hashing;
+
+using PG.StarWarsGame.Localisation.Baseline;
+
+using System.IO.Abstractions;
+
+using System.IO.Abstractions.TestingHelpers;
+
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 /// <summary>
@@ -16,6 +26,14 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 /// </summary>
 public sealed class KeyedCommandTranslatorTest
 {
+    private static ICrc32HashingService Hashing()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IFileSystem>(new MockFileSystem());
+        services.SupportLocalisationBaseline();
+        return services.BuildServiceProvider().GetRequiredService<ICrc32HashingService>();
+    }
+
     private static LocDocument Document(params string[] keys)
     {
         var rows = keys.Select((key, index) => new LocRowDto(
@@ -31,7 +49,7 @@ public sealed class KeyedCommandTranslatorTest
     private static IReadOnlyList<LocEditCommandDto> Translate(
         LocDocument document, params LocKeyedCommandDto[] commands)
     {
-        var result = KeyedCommandTranslator.Translate(document, commands);
+        var result = KeyedCommandTranslator.Translate(document, commands, Hashing());
         Assert.True(result.Success, result.Error);
         return result.Commands!;
     }
@@ -60,7 +78,7 @@ public sealed class KeyedCommandTranslatorTest
     public void SetValue_OnAKeyTheFileDoesNotHave_FailsNamingIt()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [SetValue("TEXT_MISSING", "x")]);
+            Document("TEXT_A"), [SetValue("TEXT_MISSING", "x")], Hashing());
 
         Assert.False(result.Success);
         Assert.Equal(0, result.FailedIndex);
@@ -76,7 +94,7 @@ public sealed class KeyedCommandTranslatorTest
     public void SetValue_OnADuplicateKey_FailsNamingBothRows()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A", "TEXT_DUP", "TEXT_B", "TEXT_DUP"), [SetValue("TEXT_DUP", "x")]);
+            Document("TEXT_A", "TEXT_DUP", "TEXT_B", "TEXT_DUP"), [SetValue("TEXT_DUP", "x")], Hashing());
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_DUP", result.Error);
@@ -114,21 +132,43 @@ public sealed class KeyedCommandTranslatorTest
     public void AddEntry_WithAKeyTheFileAlreadyHas_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "TEXT_A", Values: [])]);
+            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "TEXT_A", Values: [])], Hashing());
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_A", result.Error);
     }
 
     /// <summary>
-    ///     The game reads one row per key regardless of casing, so a differently-cased addition
-    ///     would create a row that is never read.
+    ///     A differently-cased key is a different entry, so adding one is allowed.
+    ///     <para>
+    ///         This used to be refused outright, on the belief that the game reads one row per key
+    ///         however it is cased. It does not: an entry is addressed by the CRC32 of its key bytes
+    ///         and that hash is case-sensitive, so both rows are read. Blocking the edit stopped
+    ///         something the engine handles perfectly well. It is still worth flagging, which
+    ///         <see cref="TranslationKeyInspector" /> now does as a warning.
+    ///     </para>
     /// </summary>
     [Fact]
-    public void AddEntry_ClashingOnlyInCase_Fails()
+    public void AddEntry_DifferingOnlyInCase_IsAllowed()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "text_a", Values: [])]);
+            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "text_a", Values: [])], Hashing());
+
+        Assert.True(result.Success, result.Error);
+        Assert.Equal(["TEXT_A", "text_a"], result.ResultingKeys);
+    }
+
+    /// <summary>
+    ///     A key whose checksum matches one already present is refused: the engine cannot tell the
+    ///     two apart, so the second row would never be read. Keys are hashed as ASCII, which folds
+    ///     every non-ASCII character to '?', so these two collide despite looking nothing alike.
+    /// </summary>
+    [Fact]
+    public void AddEntry_CollidingOnChecksum_Fails()
+    {
+        var result = KeyedCommandTranslator.Translate(
+            Document("TEXT_Ä"), [new LocKeyedCommandDto("addEntry", "TEXT_Ö", Values: [])],
+            Hashing());
 
         Assert.False(result.Success);
     }
@@ -141,7 +181,7 @@ public sealed class KeyedCommandTranslatorTest
     public void AddEntry_WithABlankKey_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "   ", Values: [])]);
+            Document("TEXT_A"), [new LocKeyedCommandDto("addEntry", "   ", Values: [])], Hashing());
 
         Assert.False(result.Success);
     }
@@ -150,7 +190,7 @@ public sealed class KeyedCommandTranslatorTest
     public void RenameKey_ToABlankKey_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("renameKey", "TEXT_A", NewKey: "")]);
+            Document("TEXT_A"), [new LocKeyedCommandDto("renameKey", "TEXT_A", NewKey: "")], Hashing());
 
         Assert.False(result.Success);
     }
@@ -211,7 +251,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_A", "TEXT_B"),
-            [new LocKeyedCommandDto("deleteEntry", "TEXT_A"), SetValue("TEXT_A", "x")]);
+            [new LocKeyedCommandDto("deleteEntry", "TEXT_A"), SetValue("TEXT_A", "x")], Hashing());
 
         Assert.False(result.Success);
         Assert.Equal(1, result.FailedIndex);
@@ -251,7 +291,7 @@ public sealed class KeyedCommandTranslatorTest
             [
                 new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_RENAMED"),
                 SetValue("TEXT_B", "x")
-            ]);
+            ], Hashing());
 
         Assert.False(result.Success);
         Assert.Equal(1, result.FailedIndex);
@@ -262,7 +302,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_A", "TEXT_B"),
-            [new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_A")]);
+            [new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_A")], Hashing());
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_A", result.Error);
@@ -285,7 +325,7 @@ public sealed class KeyedCommandTranslatorTest
     public void UnknownKind_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("moveRow", "TEXT_A")]);
+            Document("TEXT_A"), [new LocKeyedCommandDto("moveRow", "TEXT_A")], Hashing());
 
         Assert.False(result.Success);
         Assert.Contains("moveRow", result.Error);
@@ -299,7 +339,7 @@ public sealed class KeyedCommandTranslatorTest
     public void FailedBatch_ProducesNoCommandsAtAll()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [SetValue("TEXT_A", "fine"), SetValue("TEXT_MISSING", "bad")]);
+            Document("TEXT_A"), [SetValue("TEXT_A", "fine"), SetValue("TEXT_MISSING", "bad")], Hashing());
 
         Assert.False(result.Success);
         Assert.Null(result.Commands);
@@ -319,7 +359,7 @@ public sealed class KeyedCommandTranslatorTest
                 new LocKeyedCommandDto("deleteEntry", "TEXT_A"),
                 new LocKeyedCommandDto("addEntry", "TEXT_NEW", Values: []),
                 new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_B2")
-            ]);
+            ], Hashing());
 
         Assert.True(result.Success, result.Error);
         Assert.Equal(["TEXT_B2", "TEXT_NEW"], result.ResultingKeys);

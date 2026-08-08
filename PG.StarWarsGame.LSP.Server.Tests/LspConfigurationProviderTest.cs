@@ -138,6 +138,30 @@ public sealed class LspConfigurationProviderTest : IDisposable
         Assert.Equal("fr", provider.Current.Locale);
     }
 
+    /// <summary>
+    ///     The merge used to rebuild <see cref="LspConfiguration" /> property by property and simply
+    ///     omit <c>Localisation</c>, so every localisation setting written into <c>.pg-lsp.json</c> was
+    ///     silently replaced by the defaults the moment initializationOptions were overlaid.
+    /// </summary>
+    [Fact]
+    public void LoadFrom_ConfigFileDeclaresLocalisation_SurvivesTheOverlay()
+    {
+        var config = new
+        {
+            Localisation = new { ResourceType = "Xml", Language = "GERMAN", SourcePaths = new[] { "/a/b.xml" } }
+        };
+        File.WriteAllText(
+            Path.Combine(_tempDir, ".pg-lsp.json"),
+            JsonSerializer.Serialize(config));
+
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { workspaceRoot = _tempDir }));
+
+        Assert.Equal("Xml", provider.Current.Localisation.ResourceType);
+        Assert.Equal("GERMAN", provider.Current.Localisation.Language);
+        Assert.Equal(["/a/b.xml"], provider.Current.Localisation.SourcePaths);
+    }
+
     [Fact]
     public void LoadFrom_ConfigFileMissing_UsesDefaults()
     {

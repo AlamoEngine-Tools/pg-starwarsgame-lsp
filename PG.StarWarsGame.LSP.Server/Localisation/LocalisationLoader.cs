@@ -73,11 +73,13 @@ public sealed class LocalisationLoader : ILocalisationLoader
         var config = _configProvider.Current;
         var locConfig = config.Localisation;
 
-        if (!_langService.TryGetByIdentifier(config.Locale, out var language))
-            language = _langService.Default;
+        // The GAME's language, not the LSP's own. config.Locale is ISO 639-1 and names the language
+        // this server writes hover text and diagnostics in; it must never decide which string table
+        // resolves.
+        var language = LocalisationFileNameLanguageResolver.Configured(_langService, locConfig);
 
-        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, language!);
-        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, language!);
+        var eawDb = _baselineProvider.GetMasterText(GameContext.EaW, language);
+        var focDb = _baselineProvider.GetMasterText(GameContext.FoC, language);
 
         var registryEntries = new List<LocProjectInfo>();
         var layerDbs = new List<IKeyedTranslationDatabase>();
@@ -96,7 +98,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
                 var paths = EnumerateFromTextRoots(layer.TextRoots, layerType);
                 if (paths.Count == 0) continue;
 
-                var db = _factory.CreateKeyed([language!]);
+                var db = _factory.CreateKeyed([language]);
                 foreach (var path in paths)
                 {
                     var category = CreditsFileClassifier.Classify(path, layer.Credits);
@@ -107,10 +109,11 @@ public sealed class LocalisationLoader : ILocalisationLoader
                     // accept a typo colliding with a credits line, and duplicate keys would make
                     // GetValue non-deterministic.
                     if (category == LocCategory.Text)
-                        await TryImportFileAsync(path, layerType, language!, db, ct);
+                        await TryImportFileAsync(path, layerType, language, db, ct);
 
                     registryEntries.Add(new LocProjectInfo(
-                        Path.GetFileName(path), path, layerType, layer.Name, layer.Rank, category));
+                        Path.GetFileName(path), path, layerType, layer.Name, layer.Rank, category,
+                        FileNameLanguageOf(path, layerType)));
                 }
 
                 layerDbs.Add(db);
@@ -125,10 +128,10 @@ public sealed class LocalisationLoader : ILocalisationLoader
 
             if (sourcePaths.Count > 0)
             {
-                var db = _factory.CreateKeyed([language!]);
+                var db = _factory.CreateKeyed([language]);
                 foreach (var path in sourcePaths)
                 {
-                    await TryImportFileAsync(path, resourceType, language!, db, ct);
+                    await TryImportFileAsync(path, resourceType, language, db, ct);
                     registryEntries.Add(
                         new LocProjectInfo(Path.GetFileName(path), path, resourceType, "workspace", 0));
                 }
@@ -142,7 +145,7 @@ public sealed class LocalisationLoader : ILocalisationLoader
 
         // Workspace layers (highest precedence first) shadow the shipped baseline.
         var databases = new List<IKeyedTranslationDatabase>(layerDbs) { eawDb, focDb };
-        _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex(databases, language!));
+        _indexService.ApplyLocalisation(new TranslationDatabaseLocalisationIndex(databases, language));
     }
 
     // Project layers that carry text, highest precedence first. Falls back to a single synthetic
@@ -163,6 +166,25 @@ public sealed class LocalisationLoader : ILocalisationLoader
         return [];
     }
 
+    /// <summary>
+    ///     The language a file's name declares, for the formats that declare one there.
+    ///     <para>
+    ///         Null for the multi-language formats, and also null when a single-language file does not
+    ///         name a language: reporting the assumed fallback would let the navigator show a language
+    ///         the file never claimed, which is the invisible-language problem in a new place.
+    ///     </para>
+    /// </summary>
+    private string? FileNameLanguageOf(string path, string resourceType)
+    {
+        if (!LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(
+                ResourceTypeToExtension(resourceType)))
+            return null;
+
+        return LocalisationFileNameLanguageResolver.TryResolve(path, _langService, out var language)
+            ? language!.LanguageIdentifier
+            : null;
+    }
+
     private IReadOnlyList<string> EnumerateFromTextRoots(IReadOnlyList<string> textRoots, string resourceType)
     {
         var ext = ResourceTypeToExtension(resourceType);
@@ -170,8 +192,15 @@ public sealed class LocalisationLoader : ILocalisationLoader
         foreach (var dir in textRoots)
         {
             if (!_fileHelper.FileSystem.Directory.Exists(dir)) continue;
+
+            // Enumerated wide and filtered here rather than globbed on "*<ext>": .NET's glob matching
+            // is case-insensitive on Windows but case-sensitive elsewhere, so a ".CSV" file was
+            // invisible on Linux and macOS - and MockFileSystem does not reproduce that, so no test
+            // would have caught it.
             results.AddRange(_fileHelper.FileSystem.Directory
-                .EnumerateFiles(dir, $"*{ext}", SearchOption.TopDirectoryOnly));
+                .EnumerateFiles(dir, "*", SearchOption.TopDirectoryOnly)
+                .Where(p => string.Equals(
+                    _fileHelper.FileSystem.Path.GetExtension(p), ext, StringComparison.OrdinalIgnoreCase)));
         }
 
         return results;
@@ -181,23 +210,37 @@ public sealed class LocalisationLoader : ILocalisationLoader
         string path, string resourceType, IAlamoLanguageDefinition language,
         IKeyedTranslationDatabase db, CancellationToken ct)
     {
-        // DAT is binary - never goes through the text-read path below. It's also one file per
-        // language with no self-describing language tag, so the language comes from the file
-        // name, not the workspace default passed in above (used by CSV/XML/NLS only).
-        if (string.Equals(resourceType, "dat", StringComparison.OrdinalIgnoreCase))
+        // A single-language file (.dat, .properties) names its language in its file name and holds
+        // nothing else. One that holds a different language than the index resolves contributes
+        // nothing, so it is skipped rather than imported as though its text were the index language -
+        // which is how German strings used to end up served as English translations.
+        if (LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(ResourceTypeToExtension(resourceType)))
         {
-            if (!DatFileNameLanguageResolver.TryResolve(path, _langService, out var datLanguage))
-            {
+            var fileLanguage = LocalisationFileNameLanguageResolver.Resolve(
+                path, _langService, language, out var resolvedFromFileName);
+
+            if (!resolvedFromFileName)
                 _logger.LogWarning(
-                    "Could not determine a language from DAT file name {Path} " +
-                    "(expected '..._<LANGUAGE>.dat'); skipping.", path);
+                    "{Path} does not say which language it holds; assuming {Language}. Rename it to " +
+                    "'..._{Language}{Extension}' to make it explicit.",
+                    path, language.LanguageIdentifier, ResourceTypeToExtension(resourceType));
+
+            if (!fileLanguage.Equals(language))
+            {
+                _logger.LogDebug(
+                    "Skipping {Path}: it holds {FileLanguage} and the index resolves {IndexLanguage}.",
+                    path, fileLanguage.LanguageIdentifier, language.LanguageIdentifier);
                 return;
             }
+        }
 
+        // DAT is binary - it never goes through the text-read path below.
+        if (string.Equals(resourceType, "dat", StringComparison.OrdinalIgnoreCase))
+        {
             try
             {
                 using var datFile = _datFileService.Load(path);
-                _datImporter.Import(datFile.Content, datLanguage!, db);
+                _datImporter.Import(datFile.Content, language, db);
             }
             catch (Exception ex)
             {

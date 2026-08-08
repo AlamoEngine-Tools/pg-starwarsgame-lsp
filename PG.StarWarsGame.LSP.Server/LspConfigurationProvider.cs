@@ -109,6 +109,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var baseGamePath = TryGetString(elem, "baseGamePath");
         var expansionGamePath = TryGetString(elem, "expansionGamePath");
         var locale = TryGetString(elem, "locale");
+        var localisationLanguage = TryGetString(elem, "localisationLanguage");
         var schemaUrl = TryGetString(elem, "schemaUrl");
         var schemaLocalPath = TryGetString(elem, "schemaLocalPath");
         var baselineLocalPath = TryGetString(elem, "baselineLocalPath");
@@ -125,6 +126,10 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
             Locale = locale ?? "en",
+            Localisation = new LocalisationConfig
+            {
+                Language = localisationLanguage ?? LocalisationConfig.DefaultLanguage
+            },
             SchemaSource = !string.IsNullOrWhiteSpace(schemaLocalPath)
                 ? new SchemaSourceConfig { Type = SchemaSourceType.Local, LocalPath = schemaLocalPath }
                 : string.IsNullOrWhiteSpace(schemaUrl)
@@ -171,6 +176,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,
+            Localisation = MergeLocalisation(file.Localisation, overlay.Localisation),
             SchemaSource = overlay.SchemaSource.Type == SchemaSourceType.Local
                            || overlay.SchemaSource.Url != new SchemaSourceConfig().Url
                 ? overlay.SchemaSource
@@ -179,6 +185,26 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
                              || overlay.BaselineSource.Url != new BaselineSourceConfig().Url
                 ? overlay.BaselineSource
                 : file.BaselineSource
+        };
+    }
+
+    /// <summary>
+    ///     Merges the localisation node per-property rather than picking one side wholesale.
+    ///     <para>
+    ///         Only <see cref="LocalisationConfig.Language" /> travels over initializationOptions;
+    ///         <c>ResourceType</c> and <c>SourcePaths</c> exist in <c>.pg-lsp.json</c> alone. Taking the
+    ///         overlay whole would therefore reset them to defaults whenever a client set the language,
+    ///         and omitting this node entirely - which is what the merge used to do - discarded every
+    ///         localisation setting a config file declared.
+    ///     </para>
+    /// </summary>
+    private static LocalisationConfig MergeLocalisation(LocalisationConfig file, LocalisationConfig overlay)
+    {
+        return file with
+        {
+            Language = overlay.Language != LocalisationConfig.DefaultLanguage
+                ? overlay.Language
+                : file.Language
         };
     }
 

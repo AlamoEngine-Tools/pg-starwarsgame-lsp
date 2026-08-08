@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.Commons.Hashing;
+
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
@@ -38,7 +40,8 @@ public static class KeyedCommandTranslator
     ///     </para>
     /// </summary>
     public static KeyedTranslationResult Translate(
-        LocDocument document, IReadOnlyList<LocKeyedCommandDto> commands)
+        LocDocument document, IReadOnlyList<LocKeyedCommandDto> commands,
+        ICrc32HashingService hashing)
     {
         // The working key list mirrors what the document will look like as each command lands. Only
         // the keys are tracked, because position is the only thing that has to be derived.
@@ -67,7 +70,7 @@ public static class KeyedCommandTranslator
                     if (string.IsNullOrWhiteSpace(key))
                         return KeyedTranslationResult.Fail(i, BlankKey);
 
-                    if (Clashes(keys, key))
+                    if (Collides(keys, key, hashing))
                         return KeyedTranslationResult.Fail(i,
                             $"'{key}' is already in this file. Only one row per key is ever read.");
 
@@ -97,7 +100,7 @@ public static class KeyedCommandTranslator
                         return KeyedTranslationResult.Fail(i, BlankKey);
 
                     // Excluding the row being renamed, so changing only a key's casing is allowed.
-                    if (Clashes(keys, newKey, index))
+                    if (Collides(keys, newKey, hashing, index))
                         return KeyedTranslationResult.Fail(i,
                             $"'{newKey}' is already in this file. Only one row per key is ever read.");
 
@@ -167,14 +170,24 @@ public static class KeyedCommandTranslator
     }
 
     /// <summary>
-    ///     Whether a name is already taken, ignoring case: the game reads one row per key regardless
-    ///     of how it is spelled, so a differently-cased addition would create a row that is never
-    ///     read.
+    ///     Whether a name would land on an entry the file already has.
     /// </summary>
-    private static bool Clashes(List<string> keys, string key, int ignoreIndex = -1)
+    /// <remarks>
+    ///     Decided by the engine's own identity for an entry - the CRC32 of the key's ASCII bytes -
+    ///     rather than by comparing strings. This used to compare case-insensitively and refuse a
+    ///     differently-cased key outright, on the belief that the game reads one row per key however
+    ///     it is spelled. It does not: that hash is case-sensitive, so both rows are read, and
+    ///     refusing the edit blocked something the engine handles perfectly well. Case-only
+    ///     differences are now reported by <see cref="TranslationKeyInspector" /> as a warning
+    ///     instead of being made impossible here.
+    /// </remarks>
+    private static bool Collides(
+        List<string> keys, string key, ICrc32HashingService hashing, int ignoreIndex = -1)
     {
+        var checksum = TranslationKeyInspector.ChecksumOf(key, hashing);
+
         for (var i = 0; i < keys.Count; i++)
-            if (i != ignoreIndex && string.Equals(keys[i], key, StringComparison.OrdinalIgnoreCase))
+            if (i != ignoreIndex && TranslationKeyInspector.ChecksumOf(keys[i], hashing) == checksum)
                 return true;
 
         return false;

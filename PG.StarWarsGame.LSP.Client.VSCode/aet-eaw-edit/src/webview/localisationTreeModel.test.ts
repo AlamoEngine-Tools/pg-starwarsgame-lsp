@@ -18,6 +18,16 @@ function project(overrides: Partial<LocProjectInfo> = {}): LocProjectInfo {
     };
 }
 
+function nls(label: string, language: string, overrides: Partial<LocProjectInfo> = {}): LocProjectInfo {
+    return project({
+        label,
+        filePath: `/ws/data/text/${label}`,
+        resourceType: 'Nls',
+        language,
+        ...overrides,
+    });
+}
+
 describe('groupProjects', () => {
     it('returns nothing for an empty workspace', () => {
         assert.deepEqual(groupProjects([]), []);
@@ -98,5 +108,111 @@ describe('groupProjects', () => {
 
         assert.equal(nodes[0].label, 'Text files');
         assert.equal(nodes[0].children.length, 1);
+    });
+
+    // ── language siblings ────────────────────────────────────────────────────
+
+    // A .properties or .dat project is one logical file split across languages. Listed flat, the
+    // parts read as unrelated files that happen to sort next to each other.
+    it('gathers language siblings under one entry', () => {
+        const nodes = groupProjects([
+            nls('mastertextfile_english.properties', 'ENGLISH'),
+            nls('mastertextfile_german.properties', 'GERMAN'),
+        ]);
+
+        const children = nodes[0].children;
+        assert.equal(children.length, 1);
+        assert.equal(children[0].kind, 'fileset');
+        assert.equal(children[0].label, 'mastertextfile.properties');
+        assert.deepEqual(children[0].children.map(c => c.label), ['ENGLISH', 'GERMAN']);
+    });
+
+    // The tree opens a text set as one merged table but not a credits one - credits rows are
+    // addressed by position and duplicate keys are the format, so merging them by key is undefined.
+    // It can only tell them apart if the set says which it is.
+    it('carries the category up onto the set', () => {
+        const nodes = groupProjects([
+            nls('creditstext_english.properties', 'ENGLISH', { category: 'credits' }),
+            nls('creditstext_german.properties', 'GERMAN', { category: 'credits' }),
+        ]);
+
+        const set = nodes[0].children[0];
+        assert.equal(set.kind, 'fileset');
+        assert.equal(set.kind === 'fileset' ? set.category : '', 'credits');
+    });
+
+    // The set is named for the file it would be if the format could hold every language - the
+    // folder it sits in is not part of that name.
+    it('names a set without the folder it lives in', () => {
+        const nodes = groupProjects([
+            nls('mastertextfile_english.properties', 'ENGLISH',
+                { filePath: '/mods/my mod/data/text/mastertextfile_english.properties' }),
+            nls('mastertextfile_german.properties', 'GERMAN',
+                { filePath: '/mods/my mod/data/text/mastertextfile_german.properties' }),
+        ]);
+
+        assert.equal(nodes[0].children[0].label, 'mastertextfile.properties');
+    });
+
+    it('names the languages a set holds so the tree can describe it', () => {
+        const nodes = groupProjects([
+            nls('mastertextfile_german.properties', 'GERMAN'),
+            nls('mastertextfile_english.properties', 'ENGLISH'),
+        ]);
+
+        const set = nodes[0].children[0];
+        assert.deepEqual(set.kind === 'fileset' ? set.languages : [], ['ENGLISH', 'GERMAN']);
+    });
+
+    // One file is not a set - a parent there is a node you always expand past, the same reason the
+    // project level only appears when more than one project contributes.
+    it('leaves a lone single-language file flat', () => {
+        const nodes = groupProjects([nls('mastertextfile_english.properties', 'ENGLISH')]);
+
+        assert.equal(nodes[0].children[0].kind, 'file');
+        assert.equal(nodes[0].children[0].label, 'mastertextfile_english.properties');
+    });
+
+    // Grouping is by name, so two stems in one folder stay apart.
+    it('keeps different stems in separate sets', () => {
+        const nodes = groupProjects([
+            nls('mastertextfile_english.properties', 'ENGLISH'),
+            nls('mastertextfile_german.properties', 'GERMAN'),
+            nls('extratext_english.properties', 'ENGLISH'),
+            nls('extratext_german.properties', 'GERMAN'),
+        ]);
+
+        assert.deepEqual(nodes[0].children.map(c => c.label),
+            ['extratext.properties', 'mastertextfile.properties']);
+    });
+
+    // CSV and XML hold every language in one file, so they have no siblings to gather.
+    it('never groups a multi-language format', () => {
+        const nodes = groupProjects([
+            project({ label: 'a_english.csv', filePath: '/ws/data/text/a_english.csv' }),
+            project({ label: 'a_german.csv', filePath: '/ws/data/text/a_german.csv' }),
+        ]);
+
+        assert.deepEqual(nodes[0].children.map(c => c.kind), ['file', 'file']);
+    });
+
+    // Two projects can each ship a mastertextfile_*.properties; merging them would hide one layer
+    // behind the other.
+    it('does not merge sets across projects', () => {
+        const nodes = groupProjects([
+            nls('mastertextfile_english.properties', 'ENGLISH', { projectName: 'Root', rank: 2 }),
+            nls('mastertextfile_german.properties', 'GERMAN', { projectName: 'Root', rank: 2 }),
+            nls('mastertextfile_english.properties', 'ENGLISH',
+                { projectName: 'Dep', rank: 1, filePath: '/dep/data/text/mastertextfile_english.properties' }),
+            nls('mastertextfile_french.properties', 'FRENCH',
+                { projectName: 'Dep', rank: 1, filePath: '/dep/data/text/mastertextfile_french.properties' }),
+        ]);
+
+        const layers = nodes[0].children;
+        assert.deepEqual(layers.map(l => l.label), ['Root', 'Dep']);
+        for (const layer of layers) {
+            assert.equal(layer.children.length, 1);
+            assert.equal(layer.children[0].kind, 'fileset');
+        }
     });
 });

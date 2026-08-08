@@ -20,7 +20,15 @@ namespace PG.StarWarsGame.LSP.Server.Localisation;
 public sealed record ConvertLocalisationFormatParams(string ProjectFilePath, string TargetFormat)
     : IRequest<ConvertLocalisationFormatResult>;
 
-/// <param name="WrittenPath">The new file, or null if nothing was written.</param>
+/// <param name="WrittenPaths">
+///     Every file written. Usually one - but a single-language target (NLS) gets one file per
+///     language found in the source, since the format cannot hold more than one and writing a single
+///     file would silently discard the rest.
+/// </param>
+/// <param name="WrittenPath">
+///     The first of <paramref name="WrittenPaths" />, or null if nothing was written. Kept so a
+///     caller that only wants something to open does not have to reason about the fan-out.
+/// </param>
 /// <param name="ProjectFormatChanged">
 ///     Whether the <c>.pgproj</c> localisation node was repointed at the new format. False when the
 ///     converted file was not the one the project's declared format describes - the new file is
@@ -32,7 +40,10 @@ public sealed record ConvertLocalisationFormatParams(string ProjectFilePath, str
 ///     about while it is still one undo away.
 /// </param>
 public sealed record ConvertLocalisationFormatResult(
-    string? WrittenPath,
+    IReadOnlyList<string> WrittenPaths,
     bool ProjectFormatChanged = false,
     int OtherFilesInOldFormat = 0,
-    string? Error = null);
+    string? Error = null)
+{
+    public string? WrittenPath => WrittenPaths.Count > 0 ? WrittenPaths[0] : null;
+}

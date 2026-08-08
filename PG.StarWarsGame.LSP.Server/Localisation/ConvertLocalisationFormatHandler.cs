@@ -10,6 +10,7 @@ using PG.StarWarsGame.Localisation.IO.Csv;
 using PG.StarWarsGame.Localisation.IO.Dat;
 using PG.StarWarsGame.Localisation.IO.Properties;
 using PG.StarWarsGame.Localisation.IO.Xml;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -81,8 +82,8 @@ public sealed class ConvertLocalisationFormatHandler
     public async Task<ConvertLocalisationFormatResult> Handle(
         ConvertLocalisationFormatParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Fail(LocalisationFeatureDisabled.Message);
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
+            return Fail(rejection);
 
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath))
             return Fail("No localisation file was given to convert.");
@@ -105,11 +106,11 @@ public sealed class ConvertLocalisationFormatHandler
         if (string.Equals(sourceExtension, targetExtension, StringComparison.OrdinalIgnoreCase))
             return Fail($"'{request.ProjectFilePath}' is already in that format.");
 
-        var targetPath = fs.Path.ChangeExtension(request.ProjectFilePath, targetExtension);
-        if (fs.File.Exists(targetPath))
-            return Fail(
-                $"Cannot convert: '{targetPath}' already exists and was left untouched. Delete or " +
-                "move it first.");
+        // A single-language target gets one file per language in the source. Writing one file would
+        // mean picking a language and dropping the others, which is exactly the silent data loss this
+        // avoids - and the name has to say which language each file holds anyway.
+        var fansOutPerLanguage =
+            LocalisationFileNameLanguageResolver.CarriesLanguageInFileName(targetExtension);
 
         // Credits repeat their keys and their order is the content, so they need the ordered
         // database - a keyed one silently collapses the crawl. Nothing is seeded underneath either
@@ -124,15 +125,60 @@ public sealed class ConvertLocalisationFormatHandler
         if (await ReadSourceAsync(request.ProjectFilePath, sourceExtension, db, ct) is { } readError)
             return Fail(readError);
 
-        if (!await _converter.WriteAsync(db, targetFormat, targetPath, ct))
-            return Fail($"'{request.TargetFormat}' is not a format that can be written. Use CSV, XML or NLS.");
+        var targets = fansOutPerLanguage
+            ? TargetsPerLanguage(request.ProjectFilePath, targetExtension, db)
+            : [fs.Path.ChangeExtension(request.ProjectFilePath, targetExtension)];
+
+        if (targets.Count == 0)
+            return Fail($"Cannot convert: '{request.ProjectFilePath}' holds no translations.");
+
+        // Checked before anything is written, so a collision cannot leave half a fan-out on disk.
+        foreach (var existing in targets.Where(fs.File.Exists))
+            return Fail(
+                $"Cannot convert: '{existing}' already exists and was left untouched. Delete or " +
+                "move it first.");
+
+        foreach (var target in targets)
+            if (!await _converter.WriteAsync(db, targetFormat, target, ct))
+                return Fail(
+                    $"'{request.TargetFormat}' is not a format that can be written. Use CSV, XML or NLS.");
 
         _logger.LogInformation(
-            "aet/convertLocalisationFormat: wrote '{Target}' from '{Source}'.",
-            targetPath, request.ProjectFilePath);
+            "aet/convertLocalisationFormat: wrote {Count} file(s) from '{Source}': {Targets}.",
+            targets.Count, request.ProjectFilePath, string.Join(", ", targets));
 
         var (changed, leftBehind) = await RepointProjectAsync(sourceExtension, targetFormat, ct);
-        return new ConvertLocalisationFormatResult(targetPath, changed, leftBehind);
+        return new ConvertLocalisationFormatResult(targets, changed, leftBehind);
+    }
+
+    /// <summary>
+    ///     One target path per language that actually carries a translation, named for that language.
+    ///     <para>
+    ///         Languages are taken from the entries rather than from <c>db.Languages</c>: the database
+    ///         is created with every officially supported language registered, so the registered set
+    ///         would produce a file per language the game knows, nearly all of them empty.
+    ///     </para>
+    /// </summary>
+    private IReadOnlyList<string> TargetsPerLanguage(
+        string sourcePath, string targetExtension, ITranslationDatabase db)
+    {
+        var fs = _fileHelper.FileSystem;
+        var stem = fs.Path.GetFileNameWithoutExtension(sourcePath).ToLowerInvariant();
+
+        // Built by replacing the source's file name in place rather than through Path.Combine, so the
+        // separators the caller used survive - Combine would emit '\' on Windows for a path given
+        // with '/', which the single-file branch (Path.ChangeExtension) does not do.
+        var nameStart = sourcePath.Length - fs.Path.GetFileName(sourcePath).Length;
+        var directoryPrefix = sourcePath[..nameStart];
+
+        return db
+            .SelectMany(entry => entry.Translations
+                .Where(t => !string.IsNullOrEmpty(t.Value))
+                .Select(t => t.Key.LanguageIdentifier))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(id => id, StringComparer.Ordinal)
+            .Select(id => $"{directoryPrefix}{stem}_{id.ToLowerInvariant()}{targetExtension}")
+            .ToList();
     }
 
     /// <summary>Reads the file into <paramref name="db" />, or returns why it could not be.</summary>
@@ -145,7 +191,7 @@ public sealed class ConvertLocalisationFormatHandler
             // than by anything inside it.
             if (extension == ".dat")
             {
-                if (!DatFileNameLanguageResolver.TryResolve(path, _langService, out var language))
+                if (!LocalisationFileNameLanguageResolver.TryResolve(path, _langService, out var language))
                     return $"Cannot convert '{path}': its name does not say which language it holds " +
                            "(expected '..._<LANGUAGE>.dat').";
 
@@ -170,7 +216,7 @@ public sealed class ConvertLocalisationFormatHandler
                 case ".properties":
                     using (var reader = new StringReader(content))
                     {
-                        _nlsImporter.Import(reader, _langService.Default, db);
+                        _nlsImporter.Import(reader, NlsLanguageOf(path), db);
                     }
 
                     return null;
@@ -232,6 +278,19 @@ public sealed class ConvertLocalisationFormatHandler
     private ConvertLocalisationFormatResult Fail(string message)
     {
         _logger.LogWarning("aet/convertLocalisationFormat: {Reason}", message);
-        return new ConvertLocalisationFormatResult(null, Error: message);
+        return new ConvertLocalisationFormatResult([], Error: message);
+    }
+
+    /// <summary>
+    ///     The language a <c>.properties</c> source holds. NLS names its language in the file name and
+    ///     nowhere else, so a file that does not name one falls back to the workspace's configured game
+    ///     language rather than being assumed to be the service default.
+    /// </summary>
+    private IAlamoLanguageDefinition NlsLanguageOf(string path)
+    {
+        return LocalisationFileNameLanguageResolver.Resolve(
+            path, _langService,
+            LocalisationFileNameLanguageResolver.Configured(_langService, _config.Current.Localisation),
+            out _);
     }
 }

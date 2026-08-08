@@ -4,6 +4,7 @@
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Configuration;
@@ -12,6 +13,8 @@ using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
+
+using PG.Commons.Hashing;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -272,6 +275,7 @@ public sealed class TranslationBatchHandlerTest
         services.AddSingleton<IFileSystem>(fs);
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         services.AddSingleton<ILocalisationDocumentEditor, LocalisationDocumentEditor>();
         var sp = services.BuildServiceProvider();
@@ -286,7 +290,8 @@ public sealed class TranslationBatchHandlerTest
                 editor, reload, helper,
                 NullLogger<ApplyTranslationBatchHandler>.Instance, configuration,
                 new LocalisationWriteLedger(helper)),
-            new ValidateTranslationBatchHandler(editor, helper, configuration),
+            new ValidateTranslationBatchHandler(
+                editor, helper, sp.GetRequiredService<ICrc32HashingService>(), configuration),
             reload);
     }
 

@@ -39,7 +39,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
-        Assert.False(fs.File.Exists("/mod/data/text/MasterTextFile.csv"));
+        Assert.False(fs.File.Exists("/mod/data/text/mastertextfile.csv"));
         Assert.False(reload.LocalisationOnlyReloaded);
         Assert.Null(writer.LastCall);
     }
@@ -53,7 +53,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
-        Assert.True(fs.File.Exists("/mod/data/text/MasterTextFile.csv"));
+        Assert.True(fs.File.Exists("/mod/data/text/mastertextfile.csv"));
     }
 
     [Fact]
@@ -65,8 +65,8 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         await handler.Handle(BootstrapRequest("Nls", "some/other/dir"), CancellationToken.None);
 
-        Assert.True(fs.File.Exists("/mod/data/text/MasterTextFile.xml"));
-        Assert.False(fs.File.Exists("/mod/some/other/dir/MasterTextFile.properties"));
+        Assert.True(fs.File.Exists("/mod/data/text/mastertextfile.xml"));
+        Assert.False(fs.File.Exists("/mod/some/other/dir/mastertextfile_english.properties"));
     }
 
     [Fact]
@@ -95,21 +95,21 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("EXISTING")
+            ["/mod/data/text/mastertextfile.csv"] = new("EXISTING")
         });
         var (handler, fs, reload, _, _) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"), mockFs);
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
-        Assert.Equal("EXISTING", fs.File.ReadAllText("/mod/data/text/MasterTextFile.csv"));
+        Assert.Equal("EXISTING", fs.File.ReadAllText("/mod/data/text/mastertextfile.csv"));
         Assert.False(reload.LocalisationOnlyReloaded);
         Assert.False(reload.FullyReloaded);
     }
 
     [Theory]
-    [InlineData("Csv", "MasterTextFile.csv")]
-    [InlineData("Xml", "MasterTextFile.xml")]
-    [InlineData("Nls", "MasterTextFile.properties")]
+    [InlineData("Csv", "mastertextfile.csv")]
+    [InlineData("Xml", "mastertextfile.xml")]
+    [InlineData("Nls", "mastertextfile_english.properties")]
     public async Task Handle_RootLayerConfigured_EachFormat_CreatesExpectedFile(string format, string fileName)
     {
         var (handler, fs, _, _, _) = BuildHandler(ConfiguredLayer(format, "/mod/data/text"));
@@ -126,7 +126,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
-        var content = fs.File.ReadAllText("/mod/data/text/MasterTextFile.csv");
+        var content = fs.File.ReadAllText("/mod/data/text/mastertextfile.csv");
         Assert.StartsWith("key,", content.Split('\n')[0]);
         Assert.Contains("TEXT_", content);
     }
@@ -138,7 +138,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
-        var xdoc = XDocument.Parse(fs.File.ReadAllText("/mod/data/text/MasterTextFile.xml"));
+        var xdoc = XDocument.Parse(fs.File.ReadAllText("/mod/data/text/mastertextfile.xml"));
         Assert.NotNull(xdoc.Root);
         Assert.NotEmpty(xdoc.Root.Elements());
     }
@@ -203,7 +203,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
-        Assert.True(fs.File.Exists("/mod/data/text/MasterTextFile.csv"));
+        Assert.True(fs.File.Exists("/mod/data/text/mastertextfile.csv"));
     }
 
     [Fact]
@@ -235,13 +235,13 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("EXISTING")
+            ["/mod/data/text/mastertextfile.csv"] = new("EXISTING")
         });
         var (handler, fs, reload, writer, _) = BuildHandler(BootstrapLayer(), mockFs);
 
         await handler.Handle(BootstrapRequest("Csv", "data/text"), CancellationToken.None);
 
-        Assert.Equal("EXISTING", fs.File.ReadAllText("/mod/data/text/MasterTextFile.csv"));
+        Assert.Equal("EXISTING", fs.File.ReadAllText("/mod/data/text/mastertextfile.csv"));
         Assert.Null(writer.LastCall);
         Assert.False(reload.FullyReloaded);
     }
@@ -288,7 +288,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
         await handler.Handle(NoArgsRequest(), CancellationToken.None);
 
         Assert.Empty(notifier.Errors);
-        Assert.Contains("MasterTextFile.csv", Assert.Single(notifier.Infos), StringComparison.Ordinal);
+        Assert.Contains("mastertextfile.csv", Assert.Single(notifier.Infos), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -312,7 +312,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("EXISTING")
+            ["/mod/data/text/mastertextfile.csv"] = new("EXISTING")
         });
         var (handler, _, _, _, notifier) = BuildHandler(ConfiguredLayer("Csv", "/mod/data/text"), mockFs);
 
@@ -320,7 +320,7 @@ public sealed class InitLocalisationProjectCommandHandlerTest
 
         Assert.Empty(notifier.Infos);
         var message = Assert.Single(notifier.Errors);
-        Assert.Contains("MasterTextFile.csv", message, StringComparison.Ordinal);
+        Assert.Contains("mastertextfile.csv", message, StringComparison.Ordinal);
         Assert.Contains("exists", message, StringComparison.OrdinalIgnoreCase);
     }
 
@@ -429,7 +429,8 @@ public sealed class InitLocalisationProjectCommandHandlerTest
             sp.GetRequiredService<IXmlTranslationExporter>(),
             sp.GetRequiredService<IPropertiesTranslationExporter>(),
             sp.GetRequiredService<ILanguageService>(),
-            new FileHelper(mockFs));
+            new FileHelper(mockFs),
+            new FakeLspConfigurationProvider());
         var notifier = new RecordingUserNotifier();
         var handler = new InitLocalisationProjectCommandHandler(
             sp.GetRequiredService<IBaselineTranslationProvider>(),

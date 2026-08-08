@@ -119,6 +119,7 @@ public static class ServerConfigurator
             .WithHandler<GetLanguagesHandler>()
             .WithHandler<ExportLocalisationToDatHandler>()
             .WithHandler<ConvertLocalisationFormatHandler>()
+            .WithHandler<CreateLocalisationLanguageFileHandler>()
             .WithHandler<GetLocalisationRowsHandler>()
             .WithHandler<ApplyTranslationBatchHandler>()
             .WithHandler<ValidateTranslationBatchHandler>()

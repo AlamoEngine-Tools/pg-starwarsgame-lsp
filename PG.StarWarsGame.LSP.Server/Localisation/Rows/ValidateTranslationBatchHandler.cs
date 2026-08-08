@@ -5,6 +5,8 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 
+using PG.Commons.Hashing;
+
 namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 /// <summary>
@@ -22,23 +24,25 @@ public sealed class ValidateTranslationBatchHandler
     private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationDocumentEditor _editor;
     private readonly IFileHelper _fileHelper;
+    private readonly ICrc32HashingService _hashing;
 
     public ValidateTranslationBatchHandler(
         ILocalisationDocumentEditor editor,
         IFileHelper fileHelper,
+        ICrc32HashingService hashing,
         ILspConfigurationProvider config)
     {
         _editor = editor;
         _fileHelper = fileHelper;
+        _hashing = hashing;
         _config = config;
     }
 
     public Task<ValidateTranslationBatchResult> Handle(
         ValidateTranslationBatchParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Task.FromResult(
-                new ValidateTranslationBatchResult([], LocalisationFeatureDisabled.Message));
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
+            return Task.FromResult(new ValidateTranslationBatchResult([], rejection));
 
         var fs = _fileHelper.FileSystem;
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
@@ -66,7 +70,7 @@ public sealed class ValidateTranslationBatchHandler
                     $"Change {(translated.FailedIndex ?? 0) + 1}: {translated.Error}")
             ]));
 
-        var problems = TranslationKeyInspector.Inspect(translated.ResultingKeys ?? []).ToList();
+        var problems = TranslationKeyInspector.Inspect(translated.ResultingKeys ?? [], _hashing).ToList();
 
         // A language left half-filled is not a key problem, so it is checked from the resulting
         // rows rather than from the key list.

@@ -10,9 +10,29 @@
 
 import { ValidationState } from './useLocPanel';
 
+/**
+ * The state the tag shows: the highest level anything reported.
+ *
+ * The same rule the story graph editor's Validate button uses, so the two controls mean the same
+ * thing - error beats warning beats info beats clean. Shared rather than reimplemented, because
+ * two copies of
+ * a precedence rule drift and the whole point is that they match.
+ *
+ * An unrecognised severity is treated as a warning: a level this does not know about must still be
+ * visible, and neither reading it as clean nor softening it to information would show it honestly.
+ */
+export function worstSeverity(problems: readonly { severity: string }[]): ValidationState {
+    if (problems.some(p => p.severity === 'error')) { return 'error'; }
+    if (problems.some(p => p.severity !== 'info')) { return 'warning'; }
+    if (problems.length > 0) { return 'info'; }
+    return 'ok';
+}
+
 export function severityIconFor(validation: ValidationState): string {
     return validation === 'unvalidated' ? 'question'
-        : validation === 'error' ? 'error' : 'check';
+        : validation === 'error' ? 'error'
+            : validation === 'warning' ? 'warning'
+                : validation === 'info' ? 'info' : 'check';
 }
 
 /**
@@ -34,6 +54,12 @@ export function validateTitle(
         return `Validate - no problems found. ${action}`;
     }
 
-    const plural = problemCount === 1 ? 'problem' : 'problems';
-    return `Validate - ${problemCount} ${plural} found. ${action}`;
+    // Each level is named for what it is. Calling a case-only key difference or a heading with no
+    // entries a "problem" overstates both - the game reads either perfectly well - and a tag that
+    // cries problem at valid files is one people learn to ignore.
+    const noun = validation === 'warning' ? (problemCount === 1 ? 'warning' : 'warnings')
+        : validation === 'info' ? (problemCount === 1 ? 'note' : 'notes')
+            : (problemCount === 1 ? 'problem' : 'problems');
+
+    return `Validate - ${problemCount} ${noun} found. ${action}`;
 }

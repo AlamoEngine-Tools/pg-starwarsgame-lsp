@@ -37,7 +37,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var config = FakeLspConfigurationProvider.WithFeatures(
             new FeatureFlags { Tools = new ToolsFeatureFlags { Localisation = false } });
@@ -113,7 +113,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, _, _, notifier) = BuildHandler(mockFs);
 
@@ -128,7 +128,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, _, _, notifier) = BuildHandler(mockFs);
 
@@ -136,7 +136,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             Request("Csv", "/mod/data/text", "Xml", "data/converted"), CancellationToken.None);
 
         Assert.Empty(notifier.Errors);
-        Assert.Contains("MasterTextFile.xml", Assert.Single(notifier.Infos), StringComparison.Ordinal);
+        Assert.Contains("mastertextfile.xml", Assert.Single(notifier.Infos), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -198,7 +198,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, _, _, notifier) = BuildHandler(mockFs);
 
@@ -213,8 +213,8 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
-            ["/mod/data/converted/MasterTextFile.xml"] = new("<EXISTING/>")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
+            ["/mod/data/converted/mastertextfile.xml"] = new("<EXISTING/>")
         });
         var (handler, _, _, notifier) = BuildHandler(mockFs);
 
@@ -223,7 +223,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
 
         Assert.Empty(notifier.Infos);
         Assert.Contains("exists", Assert.Single(notifier.Errors), StringComparison.OrdinalIgnoreCase);
-        Assert.Equal("<EXISTING/>", mockFs.File.ReadAllText("/mod/data/converted/MasterTextFile.xml"));
+        Assert.Equal("<EXISTING/>", mockFs.File.ReadAllText("/mod/data/converted/mastertextfile.xml"));
     }
 
     // A per-file failure was logged and skipped, so an import could report success having read
@@ -252,13 +252,13 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         const string original = "key,ENGLISH\nTEXT_A,Hello\n";
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new(original)
+            ["/mod/data/text/mastertextfile.csv"] = new(original)
         });
         var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(Request("Csv", "/mod/data/text", "Csv"), CancellationToken.None);
 
-        Assert.Equal(original, mockFs.File.ReadAllText("/mod/data/text/MasterTextFile.csv"));
+        Assert.Equal(original, mockFs.File.ReadAllText("/mod/data/text/mastertextfile.csv"));
         Assert.Single(mockFs.AllFiles); // no new file created
     }
 
@@ -267,7 +267,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, _, writer, _) = BuildHandler(mockFs);
 
@@ -284,7 +284,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, reload, _, _) = BuildHandler(mockFs);
 
@@ -298,7 +298,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/elsewhere/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/elsewhere/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, _, writer, _) = BuildHandler(mockFs);
 
@@ -315,14 +315,14 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_CONVERTED,Hello World\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_CONVERTED,Hello World\n")
         });
         var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
 
-        var xdoc = XDocument.Parse(mockFs.File.ReadAllText("/mod/data/text2/MasterTextFile.xml"));
+        var xdoc = XDocument.Parse(mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.xml"));
         Assert.Contains(xdoc.Root!.Elements(), e =>
             e.Attribute("key")?.Value == "TEXT_CONVERTED");
     }
@@ -333,14 +333,14 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         const string original = "key,ENGLISH\nTEXT_A,Hello\n";
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new(original)
+            ["/mod/data/text/mastertextfile.csv"] = new(original)
         });
         var (handler, _, _, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
 
-        Assert.Equal(original, mockFs.File.ReadAllText("/mod/data/text/MasterTextFile.csv"));
+        Assert.Equal(original, mockFs.File.ReadAllText("/mod/data/text/mastertextfile.csv"));
     }
 
     [Fact]
@@ -348,7 +348,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, _, writer, _) = BuildHandler(mockFs);
 
@@ -365,7 +365,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, reload, writer, _) = BuildHandler(mockFs);
 
@@ -380,15 +380,15 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
-            ["/mod/data/text2/MasterTextFile.xml"] = new("EXISTING")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n"),
+            ["/mod/data/text2/mastertextfile.xml"] = new("EXISTING")
         });
         var (handler, reload, writer, _) = BuildHandler(mockFs);
 
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
 
-        Assert.Equal("EXISTING", mockFs.File.ReadAllText("/mod/data/text2/MasterTextFile.xml"));
+        Assert.Equal("EXISTING", mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.xml"));
         Assert.False(reload.FullyReloaded);
         Assert.Null(writer.LastCall);
     }
@@ -398,7 +398,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
     {
         var mockFs = new MockFileSystem(new Dictionary<string, MockFileData>
         {
-            ["/mod/data/text/MasterTextFile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
+            ["/mod/data/text/mastertextfile.csv"] = new("key,ENGLISH\nTEXT_A,Hello\n")
         });
         var (handler, reload, writer, _) = BuildHandler(mockFs);
 
@@ -423,7 +423,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         await handler.Handle(
             Request("Csv", "/mod/data/text", "Xml", "data/text2"), CancellationToken.None);
 
-        var xdoc = XDocument.Parse(mockFs.File.ReadAllText("/mod/data/text2/MasterTextFile.xml"));
+        var xdoc = XDocument.Parse(mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.xml"));
         var keys = xdoc.Root!.Elements().Select(e => e.Attribute("key")?.Value).ToList();
         Assert.Contains("TEXT_A", keys);
         Assert.Contains("TEXT_B", keys);
@@ -463,7 +463,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         await handler.Handle(
             Request("Dat", "/mod/data/text", "Csv", "data/text2"), CancellationToken.None);
 
-        var csv = mockFs.File.ReadAllText("/mod/data/text2/MasterTextFile.csv");
+        var csv = mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.csv");
         Assert.Contains("TEXT_FROM_DAT", csv);
         Assert.Contains("Hello From DAT", csv);
     }
@@ -484,7 +484,7 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
         await handler.Handle(
             Request("Dat", "/mod/data/text", "Csv", "data/text2"), CancellationToken.None);
 
-        var csv = mockFs.File.ReadAllText("/mod/data/text2/MasterTextFile.csv");
+        var csv = mockFs.File.ReadAllText("/mod/data/text2/mastertextfile.csv");
         Assert.Contains("TEXT_GOOD", csv);
         Assert.True(reload.FullyReloaded);
     }
@@ -559,7 +559,8 @@ public sealed class ImportLocalisationProjectCommandHandlerTest
             sp.GetRequiredService<IXmlTranslationExporter>(),
             sp.GetRequiredService<IPropertiesTranslationExporter>(),
             sp.GetRequiredService<ILanguageService>(),
-            new FileHelper(mockFs));
+            new FileHelper(mockFs),
+            lspConfig ?? new FakeLspConfigurationProvider());
 
         var handler = new ImportLocalisationProjectCommandHandler(
             sp.GetRequiredService<ICsvTranslationImporter>(),

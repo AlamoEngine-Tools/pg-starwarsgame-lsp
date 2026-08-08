@@ -19,8 +19,14 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 /// </summary>
 public interface ILocalisationDocumentEditor
 {
+    /// <param name="fileName">
+    ///     Where a single-language format's language is read from - see
+    ///     <see cref="ILocalisationRowReader.Read" />. Omit it and a <c>.properties</c> file falls back
+    ///     to the workspace's configured game language.
+    /// </param>
     LocalisationEditResult Apply(
-        string originalText, string extension, IReadOnlyList<LocEditCommandDto> commands);
+        string originalText, string extension, IReadOnlyList<LocEditCommandDto> commands,
+        string? fileName = null);
 
     /// <summary>
     ///     Applies a batch to a file on disk and writes the result.

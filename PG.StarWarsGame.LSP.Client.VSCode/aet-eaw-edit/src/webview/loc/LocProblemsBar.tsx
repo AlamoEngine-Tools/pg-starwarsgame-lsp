@@ -8,11 +8,8 @@
 // so every message was truncated, and a list that appears and disappears there shifts the controls
 // above it.
 
-import { useEdgeResize } from '../useEdgeResize';
+import { ProblemsPanel } from '../shared/ProblemsPanel';
 import { LocProblem } from './useLocPanel';
-
-// Module-level so a remount keeps the height the user dragged it to.
-let problemsHeightMemo = 120;
 
 export function LocProblemsBar(props: {
     problems: LocProblem[];
@@ -22,24 +19,20 @@ export function LocProblemsBar(props: {
     jumpTo: (problem: LocProblem) => (() => void) | null;
     onClose: () => void;
 }): React.JSX.Element {
-    const { size: height, handleProps } = useEdgeResize(
-        problemsHeightMemo, 60, 420, 'n', v => { problemsHeightMemo = v; });
-
     const errors = props.problems.filter(p => p.severity === 'error').length;
+    // The error count is only worth showing when it is not simply the total - "3 problems, 3
+    // errors" says the same thing twice.
+    const title = `Problems (${props.problems.length}${
+        errors > 0 && errors < props.problems.length ? `, ${errors} errors` : ''})`;
 
     return (
-        <div className="loc-problems" style={{ height }}>
-            <div className="resize-handle-n" title="Drag to resize" {...handleProps} />
-            <div className="panel-bar">
-                <span className="panel-title">
-                    Problems ({props.problems.length}{errors > 0 && errors < props.problems.length
-                        ? `, ${errors} errors` : ''})
-                </span>
-                <button className="panel-close" onClick={props.onClose} title="Close">
-                    <span className="codicon codicon-close" />
-                </button>
-            </div>
-
+        <ProblemsPanel
+            className="loc-problems"
+            memoKey="loc"
+            defaultHeight={120}
+            title={title}
+            onClose={props.onClose}
+        >
             <div className="problem-list">
                 {props.problems.map((problem, i) => {
                     const jump = props.jumpTo(problem);
@@ -52,7 +45,8 @@ export function LocProblemsBar(props: {
                         >
                             <span
                                 className={`codicon codicon-${
-                                    problem.severity === 'error' ? 'error' : 'warning'
+                                    problem.severity === 'error' ? 'error'
+                                        : problem.severity === 'info' ? 'info' : 'warning'
                                 } sev-${problem.severity}`}
                                 aria-hidden="true"
                             />
@@ -64,6 +58,6 @@ export function LocProblemsBar(props: {
                     );
                 })}
             </div>
-        </div>
+        </ProblemsPanel>
     );
 }

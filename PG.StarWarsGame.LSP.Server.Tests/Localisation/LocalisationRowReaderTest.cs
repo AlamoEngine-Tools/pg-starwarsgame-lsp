@@ -3,9 +3,12 @@
 
 using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
+
+using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -26,6 +29,7 @@ public sealed class LocalisationRowReaderTest
         services.AddSingleton<IFileSystem>(new FileSystem());
         services.SupportLocalisationBaseline();
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
+        services.TryAddSingleton<ILspConfigurationProvider>(new FakeLspConfigurationProvider());
         services.AddSingleton<ILocalisationRowReader, LocalisationRowReader>();
         return services.BuildServiceProvider().GetRequiredService<ILocalisationRowReader>();
     }
@@ -247,6 +251,38 @@ public sealed class LocalisationRowReaderTest
         Assert.Equal("TEXT_A", doc.Rows[0].Key);
         Assert.Single(doc.Languages);
         Assert.Equal("Beta", Value(doc.Rows[1], doc.Languages[0]));
+    }
+
+    /// <summary>
+    ///     A <c>.properties</c> file holds one language and names it in its file name, so the column
+    ///     the grid shows must come from there.
+    ///     <para>
+    ///         It used to be hardcoded to the language service's default while the index imported the
+    ///         same file under the configured language - so a German file was edited in a column
+    ///         labelled ENGLISH and served as English translations.
+    ///     </para>
+    /// </summary>
+    [Theory]
+    [InlineData("/text/mastertextfile_german.properties", "GERMAN")]
+    [InlineData("/text/MasterTextFile_FRENCH.properties", "FRENCH")]
+    public void Properties_FileNameNamesALanguage_ThatIsTheColumn(string fileName, string expected)
+    {
+        var doc = Reader().Read("TEXT_A=Alpha\n", ".properties", fileName);
+
+        Assert.Equal([expected], doc.Languages);
+        Assert.Equal("Alpha", Value(doc.Rows[0], expected));
+    }
+
+    /// <summary>
+    ///     A file predating the convention still opens, under the workspace's configured game
+    ///     language. <see cref="FakeLspConfigurationProvider" /> leaves that at its ENGLISH default.
+    /// </summary>
+    [Fact]
+    public void Properties_FileNameNamesNoLanguage_FallsBackToTheConfiguredLanguage()
+    {
+        var doc = Reader().Read("TEXT_A=Alpha\n", ".properties", "/text/mastertextfile.properties");
+
+        Assert.Equal(["ENGLISH"], doc.Languages);
     }
 
     // Comments are the only documentation a .properties file has; a save that dropped them would

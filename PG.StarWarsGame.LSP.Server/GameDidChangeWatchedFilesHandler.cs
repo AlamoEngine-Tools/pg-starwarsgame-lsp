@@ -25,6 +25,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
+    private readonly IStartupGate _startupGate;
     private readonly IGameWorkspaceHost _workspaceHost;
     private readonly ILocalisationWriteLedger _writeLedger;
 
@@ -36,8 +37,10 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         IModProjectReloadService reloadService,
         ISchemaProvider schema,
         ILocalisationWriteLedger writeLedger,
+        IStartupGate startupGate,
         ILogger<GameDidChangeWatchedFilesHandler> logger)
     {
+        _startupGate = startupGate;
         _writeLedger = writeLedger;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
@@ -49,6 +52,16 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
     }
 
     public override async Task<Unit> Handle(DidChangeWatchedFilesParams request, CancellationToken ct)
+    {
+        // Buffered until the startup pipeline has run. Before it has, LastWorkspaceConfig is null, so
+        // nothing can be classified as being under a text root and every change was silently dropped -
+        // the startup load covers most of that by reading the disk afterwards, but a change landing
+        // between its enumeration and its completion was lost outright.
+        await _startupGate.RunOrBufferAsync(token => HandleChangesAsync(request, token), ct);
+        return Unit.Value;
+    }
+
+    private async Task HandleChangesAsync(DidChangeWatchedFilesParams request, CancellationToken ct)
     {
         // Workspace-wide reactions (project reload, asset re-glob, enum re-scan, localisation
         // reload) are batched: the loop only sets flags and each reaction runs at most once per
@@ -146,7 +159,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
             // dynamic enums, model bones, localisation) - the scoped reloads below would be
             // redundant work against the outdated configuration.
             await _reloadService.ReloadAsync(ct);
-            return Unit.Value;
+            return;
         }
 
         if (assetsChanged)
@@ -157,8 +170,6 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
 
         if (localisationTextChanged)
             await _reloadService.ReloadLocalisationAsync(ct);
-
-        return Unit.Value;
     }
 
     // Matches by filename only, same as WorkspaceIndexer.ApplyDynamicEnumCatalog's file search —
@@ -210,12 +221,18 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         var textRoots = _reloadService.LastWorkspaceConfig?.TextRoots;
         if (textRoots is null || textRoots.Count == 0) return false;
 
-        var fileUri = _fileHelper.PathToFileUri(path);
+        // Direct children only, matching LocalisationLoader.EnumerateFromTextRoots, which globs
+        // TopDirectoryOnly. A recursive test here meant a change anywhere below a text root paid for
+        // a full localisation rebuild that could not load the file that triggered it.
+        var directory = _fileHelper.FileSystem.Path.GetDirectoryName(path);
+        if (string.IsNullOrEmpty(directory)) return false;
+
+        var directoryUri = _fileHelper.PathToFileUri(directory).TrimEnd('/');
         foreach (var root in textRoots)
         {
-            var rootUri = _fileHelper.PathToFileUri(root);
-            var rootPrefix = rootUri.EndsWith('/') ? rootUri : rootUri + "/";
-            if (fileUri.StartsWith(rootPrefix, StringComparison.Ordinal))
+            if (string.Equals(
+                    _fileHelper.PathToFileUri(root).TrimEnd('/'), directoryUri,
+                    StringComparison.Ordinal))
                 return true;
         }
 
@@ -232,7 +249,11 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
                 new LspFileSystemWatcher { GlobPattern = "**/*.lua" },
                 new LspFileSystemWatcher { GlobPattern = "**/*.pgproj" },
                 new LspFileSystemWatcher { GlobPattern = "**/*.csv" },
-                new LspFileSystemWatcher { GlobPattern = "**/*.properties" })
+                new LspFileSystemWatcher { GlobPattern = "**/*.properties" },
+                // DAT is a localisation format like the rest - a project can declare it, and the
+                // engine's own files are DAT. Leaving it unwatched meant the one format that is
+                // genuinely split per language never noticed a change on disk.
+                new LspFileSystemWatcher { GlobPattern = "**/*.dat" })
         };
     }
 }

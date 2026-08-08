@@ -37,9 +37,8 @@ public sealed class ValidateCreditsBatchHandler
     public Task<ValidateCreditsBatchResult> Handle(
         ValidateCreditsBatchParams request, CancellationToken ct)
     {
-        if (!_config.Current.Features.Tools.Localisation)
-            return Task.FromResult(
-                new ValidateCreditsBatchResult([], LocalisationFeatureDisabled.Message));
+        if (LocalisationFeatureDisabled.Rejection(_config) is { } rejection)
+            return Task.FromResult(new ValidateCreditsBatchResult([], rejection));
 
         var fs = _fileHelper.FileSystem;
         if (string.IsNullOrWhiteSpace(request.ProjectFilePath)
@@ -58,24 +57,35 @@ public sealed class ValidateCreditsBatchHandler
                 [], $"Failed to read the file: {ex.Message}"));
         }
 
+        // An addressing failure is about one staged change, not about a row, so it is reported
+        // against the batch with the command number the user can count to in the queue - and with a
+        // null Index. The two indices are unrelated: LocalisationEditResult.FailedIndex counts
+        // commands in the batch, LocProblemDto.Index is a row in the file. The grid tints the row
+        // Index names and scrolls to it, so passing the command number here highlighted whichever
+        // row happened to share its number. Same shape as ValidateTranslationBatchHandler.
         if (!composed.Success)
             return Task.FromResult(new ValidateCreditsBatchResult(
             [
-                new LocProblemDto(composed.FailedIndex, null, LocProblemSeverity.Error,
+                new LocProblemDto(null, null, LocProblemSeverity.Error,
                     $"Change {(composed.FailedIndex ?? 0) + 1}: {composed.Error}")
             ]));
 
         // Nothing about a credits key is checkable - duplicates and blanks are the format. Nor is
         // "this language has fewer entries": a German dub recorded with a smaller cast is a shorter
         // list, not a broken one, and the export dropping the empty entries is what lets one file
-        // carry both. What IS wrong in any language is a heading left with nothing under it.
+        // carry both.
+        //
+        // A heading with nothing under it is reported, but only as information. A credits key is a
+        // formatting directive, so a HEADER with no CENTER lines beneath it is a valid file that
+        // renders exactly as written - it is usually an unfinished translation, which is worth
+        // seeing, but calling it a problem overstates a file the engine reads without complaint.
         var problems = new List<LocProblemDto>();
         var (rows, languages, rowsError) =
             _editor.DryRunRows(request.ProjectFilePath, request.Commands);
         if (rowsError is null)
             foreach (var (language, index, label) in
                      CreditsCoverageInspector.Inspect(rows, languages))
-                problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Warning,
+                problems.Add(new LocProblemDto(index, language, LocProblemSeverity.Info,
                     CreditsCoverageInspector.Message(language, label)));
 
         return Task.FromResult(new ValidateCreditsBatchResult(problems));

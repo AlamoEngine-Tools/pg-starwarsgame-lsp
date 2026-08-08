@@ -43,6 +43,81 @@ public sealed class LocalisationLoaderTest
         Assert.NotNull(new LspConfiguration().Localisation);
     }
 
+    [Fact]
+    public void LocalisationConfig_Default_LanguageIsEnglish()
+    {
+        Assert.Equal("ENGLISH", new LocalisationConfig().Language);
+    }
+
+    // ── game language vs. the LSP's own locale ───────────────────────────────
+
+    /// <summary>
+    ///     The game translation language comes from <see cref="LocalisationConfig.Language" />.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_ConfiguredLanguageIsGerman_IndexResolvesTheGermanValue()
+    {
+        var (loader, indexService) = BuildBilingualLoader(
+            new LspConfiguration
+            {
+                Localisation = new LocalisationConfig
+                {
+                    ResourceType = "Csv",
+                    Language = "GERMAN",
+                    SourcePaths = [BilingualCsvPath]
+                }
+            });
+
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
+
+        Assert.Equal("X-Fluegler", indexService.Current.Localisation.GetValue("TEXT_MY_UNIT_NAME"));
+    }
+
+    /// <summary>
+    ///     Regression guard for the category error this replaced: <c>LspConfiguration.Locale</c> is the
+    ///     language the LSP writes its OWN hover text and diagnostics in (ISO 639-1, keyed against the
+    ///     schema's per-locale Notes). It must never decide which game translation resolves - wiring the
+    ///     two together would make switching the documentation language silently change the string table.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_LocaleIsGermanButLanguageIsNot_IndexStillResolvesEnglish()
+    {
+        var (loader, indexService) = BuildBilingualLoader(
+            new LspConfiguration
+            {
+                Locale = "de",
+                Localisation = new LocalisationConfig
+                {
+                    ResourceType = "Csv",
+                    SourcePaths = [BilingualCsvPath]
+                }
+            });
+
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
+
+        Assert.Equal("X-Wing Fighter", indexService.Current.Localisation.GetValue("TEXT_MY_UNIT_NAME"));
+    }
+
+    /// <summary>An identifier the language service cannot resolve falls back to the default language.</summary>
+    [Fact]
+    public async Task LoadAsync_LanguageIsUnresolvable_FallsBackToTheDefaultLanguage()
+    {
+        var (loader, indexService) = BuildBilingualLoader(
+            new LspConfiguration
+            {
+                Localisation = new LocalisationConfig
+                {
+                    ResourceType = "Csv",
+                    Language = "KLINGON",
+                    SourcePaths = [BilingualCsvPath]
+                }
+            });
+
+        await loader.LoadAsync(WorkspaceConfiguration.Empty, CancellationToken.None);
+
+        Assert.Equal("X-Wing Fighter", indexService.Current.Localisation.GetValue("TEXT_MY_UNIT_NAME"));
+    }
+
     // ── LocalisationLoader ───────────────────────────────────────────────────
 
     [Fact]
@@ -553,7 +628,104 @@ public sealed class LocalisationLoaderTest
         Assert.DoesNotContain(layerRegistry.Layers, e => e.Database.ContainsKey("CREDIT_LEAD"));
     }
 
+    /// <summary>
+    ///     Files are recognised whatever case their extension is written in.
+    ///     <para>
+    ///         Enumeration used to glob <c>"*.csv"</c>, and .NET's glob matching is case-insensitive on
+    ///         Windows but case-sensitive on Linux and macOS - so an uppercase extension was silently
+    ///         invisible there, and MockFileSystem does not reproduce the difference.
+    ///     </para>
+    /// </summary>
+    [Theory]
+    [InlineData("MY_TEXT.CSV")]
+    [InlineData("My_Text.Csv")]
+    [InlineData("my_text.csv")]
+    public async Task LoadAsync_ExtensionCaseVaries_TheFileIsStillEnumerated(string fileName)
+    {
+        const string dir = "/mod/text";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [$"{dir}/{fileName}"] = new("key,ENGLISH\nTEXT_CASE_PROBE,Probed")
+        });
+
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Csv" } };
+        var (loader, indexService, _, _) = BuildLoader(fs, config);
+
+        await loader.LoadAsync(
+            WorkspaceConfiguration.Empty with { TextRoots = [dir], TextResourceType = "Csv" },
+            CancellationToken.None);
+
+        Assert.True(indexService.Current.Localisation.ContainsKey("TEXT_CASE_PROBE"));
+    }
+
+    /// <summary>
+    ///     A single-language file reports the language its name declares, so the navigator can present
+    ///     a set of siblings as one entry instead of as unrelated files.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_SingleLanguageFormat_RegistryCarriesTheFileNameLanguage()
+    {
+        const string dir = "/mod/text";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [$"{dir}/mastertextfile_english.properties"] = new("TEXT_A=Hello\n"),
+            [$"{dir}/mastertextfile_german.properties"] = new("TEXT_A=Hallo\n")
+        });
+
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Nls" } };
+        var (loader, _, registry, _) = BuildLoader(fs, config);
+
+        await loader.LoadAsync(
+            WorkspaceConfiguration.Empty with { TextRoots = [dir], TextResourceType = "Nls" },
+            CancellationToken.None);
+
+        Assert.Equal(
+            ["ENGLISH", "GERMAN"],
+            registry.Projects.Select(p => p.Language).OrderBy(l => l, StringComparer.Ordinal));
+    }
+
+    /// <summary>
+    ///     A multi-language format names its languages inside the file, so the registry reports none -
+    ///     a language here would let the navigator group files that are not siblings at all.
+    /// </summary>
+    [Fact]
+    public async Task LoadAsync_MultiLanguageFormat_RegistryCarriesNoLanguage()
+    {
+        const string dir = "/mod/text";
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [$"{dir}/mastertextfile_english.csv"] = new("key,ENGLISH\nTEXT_A,Hello")
+        });
+
+        var config = new LspConfiguration { Localisation = new LocalisationConfig { ResourceType = "Csv" } };
+        var (loader, _, registry, _) = BuildLoader(fs, config);
+
+        await loader.LoadAsync(
+            WorkspaceConfiguration.Empty with { TextRoots = [dir], TextResourceType = "Csv" },
+            CancellationToken.None);
+
+        Assert.Null(Assert.Single(registry.Projects).Language);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private const string BilingualCsvPath = "/mod/text/my_text.csv";
+
+    /// <summary>
+    ///     A loader over one CSV carrying the same key in two languages, so a test can tell which
+    ///     language the index actually resolved rather than only that the key exists.
+    /// </summary>
+    private static (LocalisationLoader loader, IGameIndexService indexService) BuildBilingualLoader(
+        LspConfiguration config)
+    {
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [BilingualCsvPath] = new("key,ENGLISH,GERMAN\nTEXT_MY_UNIT_NAME,X-Wing Fighter,X-Fluegler")
+        });
+
+        var (loader, indexService, _, _) = BuildLoader(fs, config);
+        return (loader, indexService);
+    }
 
     private static (LocalisationLoader loader, IGameIndexService indexService,
         LocalisationProjectRegistry registry, LocalisationLayerRegistry layerRegistry) BuildLoader(

@@ -7,9 +7,8 @@
 // no meaning the user can see, which is also why the grid can be sorted freely and why adding an
 // entry never asks where to put it.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import styled from 'styled-components';
 
 import { BaselineSuggestion, suggestBaselineKeys } from './baselineSuggestions';
 import { CellInput, menuAction, RowMenuFrame } from './loc/LocCells';
@@ -18,14 +17,18 @@ import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
 import { languageCopyValues } from './loc/languageCopy';
 import { languageFillValues } from './loc/languageFill';
 import { LocColumnMenu } from './loc/LocColumnMenu';
-import { emptyLanguages } from './loc/columnVisibility';
+import { LocDockHeader } from './loc/LocDockHeader';
+import { useLocColumns } from './loc/useLocColumns';
 import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
 import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
 import { LocRow } from './loc/locRow';
+import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
-import { severityIconFor, validateTitle } from './loc/validateState';
+import { DIALOG_IDS } from './shared/dialogGeometryStore';
+import { ResizeHandles } from './shared/ResizeHandles';
+import { useMovableDialog } from './shared/useMovableDialog';
 import { buildRowFilter, FilterMode } from './locFilter';
 import {
     BaselineEntryDto, BaselineRow, baselineValuesFor, findInheritedKeys, hideInherited,
@@ -82,12 +85,17 @@ function App(): React.JSX.Element {
         }
     }, []);
 
+    // Re-aiming the tab at another language of its set drops any by-hand column choices, so the new
+    // focus decides what is shown rather than a choice made about a different view of the set.
+    const onFocusLanguageChanged = useCallback(() => setHiddenLanguages(null), []);
+
     const panel = useLocPanel<TranslationCommand>({
-        applyStaged, coalesce, onFileLoaded, onMessage,
+        applyStaged, coalesce, onFileLoaded, onFocusLanguageChanged, onMessage,
     });
 
     const {
-        rows, languages, setLanguages, canAddLanguage, supportedLanguages, error, loaded, queue,
+        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile, focusLanguage,
+        supportedLanguages, error, loaded, queue,
         problems, validation, stage, save, validate,
     } = panel;
 
@@ -128,12 +136,6 @@ function App(): React.JSX.Element {
         }
     }, [baseline, languages, stage]);
 
-    // Read by toggleLanguage, which must not be re-created on every row change.
-    const rowsRef = useRef(rows);
-    const languagesRef = useRef(languages);
-    rowsRef.current = rows;
-    languagesRef.current = languages;
-
     /** Entries identical to what a lower layer already provides. */
     const inherited = useMemo(
         () => findInheritedKeys(rows, baseline, languages),
@@ -151,6 +153,10 @@ function App(): React.JSX.Element {
             hideInherited(rows, inherited, showInherited).filter(rowFilter.test),
             sort),
         [rows, inherited, showInherited, rowFilter, sort]);
+
+    // Built from the whole row set, not the visible slice: a row scrolled out of view is still the
+    // row a finding is about, and the map is keyed by index so the grid can look it up per row.
+    const rowSeverities = useMemo(() => severityByRow(problems, rows), [problems, rows]);
 
     const problemKeys = useMemo(() => {
         const byKey = new Map<string, LocProblem>();
@@ -186,35 +192,16 @@ function App(): React.JSX.Element {
         };
     }, [rows, inherited]);
 
-    // One template for the header and every row, so the columns cannot drift apart.
-    const hidden = useMemo(
-        () => hiddenLanguages ?? new Set(emptyLanguages(rows, languages)),
-        [hiddenLanguages, rows, languages]);
+    // Hiding the column the search is scoped to would leave the grid filtered by something the
+    // user can no longer see - the results would look arbitrary - so the scope goes back to
+    // everything.
+    const onColumnHidden = useCallback(
+        (language: string) => setScope(s => (s === language ? 'all' : s)), []);
 
-    const shownLanguages = useMemo(
-        () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
-
-    // A trailing track for the column picker, which sits at the right-hand end of the header.
-    const columns = useMemo(
-        () => `260px ${shownLanguages.map(() => 'minmax(160px, 1fr)').join(' ')} 32px`,
-        [shownLanguages]);
-
-    /**
-     * Hides or shows a language column.
-     *
-     * Hiding the column the search is scoped to would leave the grid filtered by something the user
-     * can no longer see - the results would look arbitrary - so the scope goes back to everything.
-     */
-    const toggleLanguage = useCallback((language: string, visible: boolean) => {
-        setHiddenLanguages(current => {
-            // Materialises the default on first use, so choosing one column does not silently
-            // reveal every other one that was hidden for being empty.
-            const next = new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current));
-            if (visible) { next.delete(language); } else { next.add(language); }
-            return next;
-        });
-        if (!visible) { setScope(s => (s === language ? 'all' : s)); }
-    }, []);
+    const { hidden, shownLanguages, columns, toggleLanguage, materialise } = useLocColumns({
+        rows, languages, hiddenLanguages, setHiddenLanguages, focusLanguage,
+        onHidden: onColumnHidden,
+    });
 
     if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
     if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
@@ -292,30 +279,14 @@ function App(): React.JSX.Element {
         </>
     );
 
-    // Laid out like the story graph editor's: Save pinned left, Validate a soft severity pill
-    // pinned right, both icon-first.
-    const severityIcon = severityIconFor(validation);
-
     const dockHeader = (
-        <>
-            <button
-                className={`icon-btn header-left${queue.length > 0 ? ' active' : ''}`}
-                disabled={queue.length === 0}
-                onClick={save}
-                title="Save - write all staged changes to the file"
-            >
-                <span className="codicon codicon-save" />
-                {queue.length > 0 ? ` ${queue.length}` : ''}
-            </button>
-            <button
-                className={`icon-btn validate-btn header-right sev-${validation}`}
-                onClick={validate}
-                title={validateTitle(validation, problems.length, queue.length)}
-            >
-                <span className={`codicon codicon-${severityIcon}`} />
-                {problems.length ? ` ${problems.length}` : ''}
-            </button>
-        </>
+        <LocDockHeader
+            queue={queue}
+            problems={problems}
+            validation={validation}
+            onSave={save}
+            onValidate={validate}
+        />
     );
 
     const dockContent = (
@@ -323,15 +294,23 @@ function App(): React.JSX.Element {
             <LocDockActions
                 languages={languages}
                 canAddLanguage={canAddLanguage}
+                addLanguageCreatesFile={addLanguageCreatesFile}
                 supportedLanguages={supportedLanguages}
                 rowCount={rows.length}
                 baselineFillCount={language => languageFillValues(language, rows, baseline).length}
                 onAddLanguage={(language, fillFromBaseline) => {
+                    // A single-language format cannot take a column - the language goes in a new
+                    // file beside this one, which the host has to create because it is not an edit
+                    // to this document and cannot be staged with the rest of the batch.
+                    if (addLanguageCreatesFile) {
+                        post({ type: 'addLanguageFile', language });
+                        return;
+                    }
+
                     stage({ kind: 'addLanguage', language });
                     setLanguages(current => [...current, language]);
                     // Explicit from here on, so the column just added is not hidden for being empty.
-                    setHiddenLanguages(current =>
-                        new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current)));
+                    materialise();
 
                     // Staged as ordinary edits, so the filled text is visible in the grid before it
                     // is saved and is discarded with everything else if the tab is abandoned.
@@ -416,7 +395,7 @@ function App(): React.JSX.Element {
             header={header}
             renderRow={renderRow}
             rowClassName={row => [
-                problemKeys.has(row.key) ? 'has-problem' : '',
+                rowSeverityClass(rowSeverities.get(row.index)) ?? '',
                 row.key === selected ? 'selected' : '',
                 // Only visible when showing them, since they are otherwise filtered out entirely.
                 inherited.has(row.key) ? 'inherited' : '',
@@ -586,18 +565,32 @@ function AddTranslationDialog(props: {
         setPicked(true);
     };
 
+    // Movable and resizable like every other dialog: this one carries a key, a value per language
+    // and a suggestion list, so it is the one most likely to need more room - and to need moving
+    // aside to read the row it is about to duplicate.
+    const { dialogProps, dragHandleProps, resizeHandleProps } =
+        useMovableDialog(DIALOG_IDS.addTranslation);
+
     return (
-        <Backdrop onPointerDown={e => { if (e.target === e.currentTarget) { props.onCancel(); } }}>
+        <div
+            className="modal-backdrop"
+            onPointerDown={e => { if (e.target === e.currentTarget) { props.onCancel(); } }}
+        >
             <form
-                className="dialog"
+                className="modal modal-wide"
                 role="dialog"
                 aria-modal="true"
                 aria-label="Add translation"
                 onSubmit={e => { e.preventDefault(); submit(); }}
                 onKeyDown={e => { if (e.key === 'Escape') { props.onCancel(); } }}
+                {...dialogProps}
             >
-                <h2>Add translation</h2>
+                <h2 className="drag-handle" {...dragHandleProps}>Add translation</h2>
 
+                {/* Pinned: the key is what every other field is about, and its error is the reason
+                    Add is disabled - both have to stay readable while the language list scrolls,
+                    or a small dialog hides the thing you are being asked to fix. */}
+                <div className="modal-pinned">
                 <label className="field">
                     <span>Key</span>
                     <input
@@ -613,7 +606,12 @@ function AddTranslationDialog(props: {
                         onBlur={() => setTouched(true)}
                     />
                 </label>
-                {touched && error !== null && <p className="field-error">{error}</p>}
+                {touched && error !== null && (
+                    <p className="field-error">
+                        <span className="codicon codicon-error" aria-hidden="true" />
+                        {error}
+                    </p>
+                )}
 
                 {/* Keys the layers below define but this file does not - which is exactly what an
                     override is. Taking one fills in the inherited text to edit from. */}
@@ -631,7 +629,11 @@ function AddTranslationDialog(props: {
                         ))}
                     </ul>
                 )}
+                </div>
 
+                {/* The scrolling middle, so the title bar, the key and the buttons stay put when the
+                    dialog is resized small. */}
+                <div className="modal-body">
                 <div className="languages">
                     {props.languages.map(language => (
                         <label className="field" key={language}>
@@ -645,16 +647,22 @@ function AddTranslationDialog(props: {
                     ))}
                 </div>
 
-                {/* Not required: a key with no text yet is a legitimate thing to add, and the
-                    untranslated cells are visible in the grid afterwards. */}
-                <p className="hint">Languages you leave empty stay empty.</p>
+                </div>
 
                 <div className="dialog-actions">
+                    {/* Not required: a key with no text yet is a legitimate thing to add, and the
+                        untranslated cells are visible in the grid afterwards. On the button row so
+                        it is still there when the language list has been scrolled past it. */}
+                    <p className="modal-footnote">
+                        <span className="codicon codicon-info" aria-hidden="true" />
+                        Languages you leave empty stay empty.
+                    </p>
                     <button type="button" onClick={props.onCancel}>Cancel</button>
                     <button type="submit" className="primary" disabled={error !== null}>Add</button>
                 </div>
+                <ResizeHandles handleProps={resizeHandleProps} />
             </form>
-        </Backdrop>
+        </div>
     );
 }
 
@@ -666,130 +674,5 @@ function valueOf(row: LocRow, language: string): string {
 
 // Examples from this file's own vocabulary.
 const PLACEHOLDERS: Record<FilterMode, string> = { text: 'Filter rows...', wildcard: 'TEXT_*_NAME', regex: '^TEXT_.*NAME$' };
-
-// Covers the whole editor rather than the grid alone, so the dialog cannot be scrolled away from
-// or edited around while it is open.
-const Backdrop = styled.div`
-    position: absolute;
-    inset: 0;
-    z-index: 20;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(0, 0, 0, 0.45);
-
-    .dialog {
-        min-width: 380px;
-        max-width: min(560px, 90vw);
-        max-height: 85vh;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
-        padding: 16px 18px;
-        background: var(--vscode-editorWidget-background, #252526);
-        border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border, #454545));
-        border-radius: 4px;
-        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
-    }
-
-    h2 { margin: 0; font-size: 1.1em; font-weight: 600; }
-
-    .field { display: flex; flex-direction: column; gap: 3px; }
-    .field > span { opacity: 0.85; font-size: 0.9em; }
-
-    .field input {
-        background: var(--vscode-input-background, #3c3c3c);
-        color: var(--vscode-input-foreground, #ccc);
-        border: 1px solid var(--vscode-input-border, transparent);
-        padding: 4px 6px;
-        font: inherit;
-    }
-
-    .field input:focus {
-        outline: 1px solid var(--vscode-focusBorder, #007fd4);
-        outline-offset: -1px;
-    }
-
-    .field input[aria-invalid='true'] {
-        border-color: var(--vscode-inputValidation-errorBorder, #be1100);
-    }
-
-    .field-error {
-        margin: -4px 0 0;
-        color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f48771));
-        font-size: 0.9em;
-    }
-
-    /* Scrolls on its own once a project declares more languages than fit - the key field and the
-       buttons stay put. */
-    .languages {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-        max-height: 40vh;
-        overflow-y: auto;
-        padding-top: 4px;
-        border-top: 1px solid var(--vscode-panel-border, #444);
-    }
-
-    .hint { margin: 0; opacity: 0.6; font-size: 0.9em; }
-
-    /* Sits directly under the key field, capped so a broad prefix cannot push the buttons off the
-       dialog. */
-    .suggestions {
-        list-style: none;
-        margin: -4px 0 0;
-        padding: 0;
-        max-height: 30vh;
-        overflow-y: auto;
-        border: 1px solid var(--vscode-panel-border, #444);
-    }
-
-    .suggestions button {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-        width: 100%;
-        padding: 3px 6px;
-        background: none;
-        border: none;
-        color: inherit;
-        font: inherit;
-        text-align: left;
-        cursor: pointer;
-    }
-
-    .suggestions button:hover, .suggestions button:focus-visible {
-        background: var(--vscode-list-hoverBackground, #2a2d2e);
-        outline: none;
-    }
-
-    .suggestion-key { white-space: nowrap; }
-    .suggestion-value {
-        opacity: 0.6;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .dialog-actions { display: flex; justify-content: flex-end; gap: 6px; }
-
-    .dialog-actions button {
-        background: var(--vscode-button-secondaryBackground, #3a3d41);
-        color: var(--vscode-button-secondaryForeground, #ccc);
-        border: none;
-        padding: 4px 14px;
-        font: inherit;
-        cursor: pointer;
-    }
-
-    .dialog-actions .primary {
-        background: var(--vscode-button-background, #0e639c);
-        color: var(--vscode-button-foreground, #fff);
-    }
-
-    .dialog-actions button:disabled { opacity: 0.5; cursor: default; }
-`;
 
 createRoot(document.getElementById('root')!).render(<App />);

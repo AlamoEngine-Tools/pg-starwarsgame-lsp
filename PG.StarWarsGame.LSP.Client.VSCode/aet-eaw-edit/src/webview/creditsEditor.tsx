@@ -8,7 +8,7 @@
 // content. None of that can be named by key, which is why this editor and the translation editor
 // are separate programs over a shared grid rather than one grid deciding what kind of file it has.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { CreditsCrawl } from './creditsCrawl';
@@ -22,17 +22,19 @@ import { gridFooterLabel } from './loc/gridFooter';
 import { ConvertibleFormat, LocDockActions } from './loc/LocDockActions';
 import { LocGridMessage, LocGridShell } from './loc/LocGridShell';
 import { LocColumnMenu } from './loc/LocColumnMenu';
-import { emptyLanguages } from './loc/columnVisibility';
+import { LocDockHeader } from './loc/LocDockHeader';
+import { useLocColumns } from './loc/useLocColumns';
 import { creditsBaselineValues } from './loc/creditsBaselineFill';
+import { creditsBaselineSeed, CreditsSeedRow, creditsFileSeed } from './loc/creditsSeed';
 import { BaselineEntryDto, BaselineRow, toBaselineRows } from './translationInherited';
 import { languageCopyValues } from './loc/languageCopy';
 import { LocTile, LocTileGrid } from './loc/LocTile';
 import { LocSearch } from './loc/LocSearch';
 import { LocProblemsBar } from './loc/LocProblemsBar';
 import { LocRow } from './loc/locRow';
+import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
-import { severityIconFor, validateTitle } from './loc/validateState';
 import { buildRowFilter, FilterMode } from './locFilter';
 
 /**
@@ -42,6 +44,21 @@ import { buildRowFilter, FilterMode } from './locFilter';
  * a step and dropped into the file as a row.
  */
 const STEP_MIME = 'application/x-aet-credits-step';
+
+/**
+ * Another language file of this project, offered as a starting point for a file with nothing in it.
+ *
+ * Sent by the panel only when this file is empty - see LocalisationEditorPanel._sendSeedSources.
+ * It carries the rows, so picking one stages the copy locally like any other edit: nothing reaches
+ * disk until Save, and discarding puts the file back to empty.
+ */
+interface SeedSource {
+    filePath: string;
+    label: string;
+    language: string;
+    rowCount: number;
+    rows: LocRow[];
+}
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState('');
@@ -64,6 +81,11 @@ function App(): React.JSX.Element {
             return;
         }
 
+        if (msg.type === 'seedSources') {
+            setSeedSources((msg.sources as SeedSource[]) ?? []);
+            return;
+        }
+
         if (msg.type !== 'requestCrawlRows') { return; }
         setPendingCrawl(msg.fullScreen ? 'fullScreen' : 'beside');
     }, []);
@@ -75,9 +97,13 @@ function App(): React.JSX.Element {
     // Null means "the user has not chosen", in which case the languages this file says nothing in
     // are hidden - see the translation editor for the same rule.
     const [hiddenLanguages, setHiddenLanguages] = useState<Set<string> | null>(null);
+    // Only ever non-empty for a file with nothing in it; the panel decides and sends them unasked.
+    const [seedSources, setSeedSources] = useState<SeedSource[]>([]);
     const onFileLoaded = useCallback(() => {
         setBaseline([]);
         setHiddenLanguages(null);
+        // A different file has different siblings, and the panel re-sends them if they apply.
+        setSeedSources([]);
         post({ type: 'requestBaseline' });
     }, []);
     // The row the caret last sat in. "Insert above/below" is meaningless without it: here position
@@ -92,7 +118,8 @@ function App(): React.JSX.Element {
 
     const panel = useLocPanel<LocCommand>({ applyStaged, coalesce, onFileLoaded, onMessage });
     const {
-        rows, languages, setLanguages, canAddLanguage, supportedLanguages, error, loaded, queue,
+        rows, languages, setLanguages, canAddLanguage, addLanguageCreatesFile,
+        supportedLanguages, error, loaded, queue,
         problems, validation, stage, save, validate,
     } = panel;
 
@@ -243,6 +270,9 @@ function App(): React.JSX.Element {
         insertStep(step, target.index);
     }, [rows.length, insertStep]);
 
+    // See the translation editor: keyed by row index so the grid can tint per row.
+    const rowSeverities = useMemo(() => severityByRow(problems, rows), [problems, rows]);
+
     const problemRows = useMemo(() => {
         const byIndex = new Map<number, LocProblem>();
         for (const problem of problems) {
@@ -253,31 +283,36 @@ function App(): React.JSX.Element {
         return byIndex;
     }, [problems]);
 
-    // One template for the header and every row, so the columns cannot drift apart.
-    const hidden = useMemo(
-        () => hiddenLanguages ?? new Set(emptyLanguages(rows, languages)),
-        [hiddenLanguages, rows, languages]);
+    // See the translation editor: hiding the column the search is scoped to would leave the grid
+    // filtered by something the user can no longer see.
+    const onColumnHidden = useCallback(
+        (language: string) => setScope(s => (s === language ? 'all' : s)), []);
 
-    const shownLanguages = useMemo(
-        () => languages.filter(l => !hidden.has(l)), [languages, hidden]);
+    // No focusLanguage: a credits set is never opened one language at a time, since credits stay
+    // one file per tab - their rows are addressed by position, so merging them by key is not
+    // defined. The default here is therefore always "hide the empty columns".
+    const { hidden, shownLanguages, columns, toggleLanguage, materialise } = useLocColumns({
+        rows, languages, hiddenLanguages, setHiddenLanguages, onHidden: onColumnHidden,
+    });
 
-    const toggleLanguage = useCallback((language: string, visible: boolean) => {
-        setHiddenLanguages(current => {
-            const next = new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current));
-            if (visible) { next.delete(language); } else { next.add(language); }
-            return next;
-        });
-        if (!visible) { setScope(s => (s === language ? 'all' : s)); }
-    }, []);
+    // Nothing on screen is what "empty" means to whoever is looking at it, whatever the file
+    // happens to hold. It is also the one state in which seeding cannot overwrite anything.
+    const isEmptyFile = rows.length === 0;
 
-    const rowsRef = useRef(rows);
-    const languagesRef = useRef(languages);
-    rowsRef.current = rows;
-    languagesRef.current = languages;
-
-    const columns = useMemo(
-        () => `260px ${shownLanguages.map(() => 'minmax(160px, 1fr)').join(' ')} 32px`,
-        [shownLanguages]);
+    /**
+     * Turns seed rows into staged inserts.
+     *
+     * Appended one at a time: each insert lands at the end of what is there so far, and the running
+     * order IS the content of a credits file. Staged like any other edit, so nothing reaches disk
+     * until Save and discarding puts the file back to empty.
+     */
+    const seedInto = (seeds: CreditsSeedRow[], language: string): void =>
+        seeds.forEach((seed, at) => stage({
+            kind: 'insertRow',
+            index: at,
+            key: seed.key,
+            values: languages.map(l => ({ language: l, value: l === language ? seed.value : '' })),
+        }));
 
     if (error) { return <LocGridMessage>{error}</LocGridMessage>; }
     if (!loaded) { return <LocGridMessage>Loading...</LocGridMessage>; }
@@ -362,30 +397,14 @@ function App(): React.JSX.Element {
             </>
         ));
 
-    // Laid out like the story graph editor's: Save pinned left, Validate a soft severity pill
-    // pinned right, both icon-first.
-    const severityIcon = severityIconFor(validation);
-
     const dockHeader = (
-        <>
-            <button
-                className={`icon-btn header-left${queue.length > 0 ? ' active' : ''}`}
-                disabled={queue.length === 0}
-                onClick={save}
-                title="Save - write all staged changes to the file"
-            >
-                <span className="codicon codicon-save" />
-                {queue.length > 0 ? ` ${queue.length}` : ''}
-            </button>
-            <button
-                className={`icon-btn validate-btn header-right sev-${validation}`}
-                onClick={validate}
-                title={validateTitle(validation, problems.length, queue.length)}
-            >
-                <span className={`codicon codicon-${severityIcon}`} />
-                {problems.length ? ` ${problems.length}` : ''}
-            </button>
-        </>
+        <LocDockHeader
+            queue={queue}
+            problems={problems}
+            validation={validation}
+            onSave={save}
+            onValidate={validate}
+        />
     );
 
     const dockContent = (
@@ -393,9 +412,18 @@ function App(): React.JSX.Element {
             <LocDockActions
                 languages={languages}
                 canAddLanguage={canAddLanguage}
+                addLanguageCreatesFile={addLanguageCreatesFile}
                 supportedLanguages={supportedLanguages}
                 rowCount={rows.length}
                 onAddLanguage={(language, fillFromBaseline) => {
+                    // A single-language format cannot take a column - the language goes in a new
+                    // file beside this one, which the host has to create because it is not an edit
+                    // to this document and cannot be staged with the rest of the batch.
+                    if (addLanguageCreatesFile) {
+                        post({ type: 'addLanguageFile', language });
+                        return;
+                    }
+
                     stage({ kind: 'addLanguage', language });
                     setLanguages(current => [...current, language]);
 
@@ -405,8 +433,8 @@ function App(): React.JSX.Element {
                             stage({ kind: 'setCell', index: value.index, language, value: value.value });
                         }
                     }
-                    setHiddenLanguages(current =>
-                        new Set(current ?? emptyLanguages(rowsRef.current, languagesRef.current)));
+                    // Explicit from here on, so the column just added is not hidden for being empty.
+                    materialise();
                 }}
                 copyLanguageCount={(from, to) => languageCopyValues(from, to, rows).length}
                 onCopyLanguage={(from, to) => {
@@ -416,8 +444,29 @@ function App(): React.JSX.Element {
                         stage({ kind: 'setCell', index: copied.index, language: to, value: copied.value });
                     }
                 }}
-                baselineFillCount={language => creditsBaselineValues(language, rows, baseline).length}
-                onFillFromBaseline={language => {
+                // An empty table is seeded, a populated one is filled - see fillFromBaseline.
+                baselineFillCount={language => (isEmptyFile
+                    ? creditsBaselineSeed(language, baseline).length
+                    : creditsBaselineValues(language, rows, baseline).length)}
+                fillsByAdding={isEmptyFile}
+                seedSources={seedSources}
+                onSeedFrom={(filePath, language) => {
+                    const source = seedSources.find(s => s.filePath === filePath);
+                    if (source === undefined) { return; }
+                    seedInto(creditsFileSeed(source.rows, source.language), language);
+                }}
+                // Offered when the file is empty, or when a second language is present to match
+                // lines by. Absent otherwise, which hides the Fill tile: credits are matched by
+                // text, so filling a language a populated file already has needs another language
+                // to identify each line by - the target's own text is what is being replaced. With
+                // one language and rows on screen it could never fill anything, and the dialog only
+                // said so after opening it: "there is nothing left to fill in", every time.
+                onFillFromBaseline={!isEmptyFile && languages.length < 2 ? undefined : language => {
+                    if (isEmptyFile) {
+                        seedInto(creditsBaselineSeed(language, baseline), language);
+                        return;
+                    }
+
                     for (const value of creditsBaselineValues(language, rows, baseline)) {
                         stage({ kind: 'setCell', index: value.index, language, value: value.value });
                     }
@@ -481,7 +530,7 @@ function App(): React.JSX.Element {
             header={header}
             renderRow={renderRow}
             rowClassName={row => [
-                problemRows.has(row.index) ? 'has-problem' : '',
+                rowSeverityClass(rowSeverities.get(row.index)) ?? '',
                 row.index === selected ? 'selected' : '',
             ].filter(Boolean).join(' ')}
             rowTitle={row => problemRows.get(row.index)?.message}

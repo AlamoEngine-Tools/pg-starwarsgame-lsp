@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { blankDraft, draftToCommandValues, normaliseKey, validateNewKey } from './translationNewRow';
+import {
+    blankDraft, draftToCommandValues, foldToEngineKey, normaliseKey, validateNewKey,
+} from './translationNewRow';
 
 const EXISTING = ['TEXT_ALPHA', 'TEXT_BETA'];
 
@@ -27,10 +29,29 @@ describe('validateNewKey', () => {
         assert.ok(error?.includes('TEXT_ALPHA'), `message should name the key, got '${error}'`);
     });
 
-    // The server compares keys case-insensitively when it validates a batch, so accepting a
-    // different-cased duplicate here would only move the rejection to Save.
-    it('rejects a duplicate differing only in case', () => {
-        assert.notEqual(validateNewKey('text_alpha', EXISTING), null);
+    /**
+     * The engine keys an entry by the CRC32 of its ASCII bytes, and that hash is case-sensitive - so
+     * a differently-cased key is a second entry the game reads perfectly well, not a duplicate.
+     * Refusing it here contradicted the server, which now reports it as a warning instead.
+     */
+    it('allows a key differing only in case, which the engine reads as a separate entry', () => {
+        assert.equal(validateNewKey('text_alpha', EXISTING), null);
+    });
+
+    /**
+     * The collision no string comparison finds: keys are encoded as ASCII, which folds every
+     * character above 0x7F to '?', so these two land on the same entry however different they look.
+     * This is the case that used to sail past the dialog and only fail at Save.
+     */
+    it('rejects a key that collides only after ASCII folding', () => {
+        const error = validateNewKey('TEST_Ö', ['TEST_Ä']);
+
+        assert.notEqual(error, null);
+        assert.match(error!, /ASCII/);
+    });
+
+    it('accepts two keys whose non-ASCII characters sit in different places', () => {
+        assert.equal(validateNewKey('TEST_ÄX', ['TEST_XÄ']), null);
     });
 
     // The key is trimmed before it is stored, so surrounding spaces must not sneak a duplicate past.
@@ -73,5 +94,25 @@ describe('draftToCommandValues', () => {
             { language: 'ENGLISH', value: 'hello' },
             { language: 'GERMAN', value: '' },
         ]);
+    });
+});
+
+describe('foldToEngineKey', () => {
+    it('leaves a plain ASCII key alone', () => {
+        assert.equal(foldToEngineKey('TEXT_ALPHA'), 'TEXT_ALPHA');
+    });
+
+    // Matches .NET's ASCII encoder, which substitutes '?' for anything it cannot represent.
+    it('replaces every character above ASCII with a question mark', () => {
+        assert.equal(foldToEngineKey('TEST_Ä'), 'TEST_?');
+        assert.equal(foldToEngineKey('TEST_Ö'), 'TEST_?');
+    });
+
+    it('keeps case, because the engine hash is case-sensitive', () => {
+        assert.notEqual(foldToEngineKey('TEXT_A'), foldToEngineKey('text_a'));
+    });
+
+    it('trims, since the key is stored trimmed', () => {
+        assert.equal(foldToEngineKey('  TEXT_A  '), 'TEXT_A');
     });
 });

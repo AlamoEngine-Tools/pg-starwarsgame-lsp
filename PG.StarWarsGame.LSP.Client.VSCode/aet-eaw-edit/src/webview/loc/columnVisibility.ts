@@ -5,6 +5,31 @@ import { BLANK_SENTINEL_VALUE } from '../creditsCrawlModel';
 import { LocRow } from './locRow';
 
 /**
+ * The columns hidden before the user has chosen anything.
+ *
+ * There are two such defaults and they must be computed in one place, because one of them is what
+ * the grid renders and the other is what the first click on the column menu starts editing. They
+ * used to be written out separately: the render honoured the focus language, the click seeded
+ * itself from {@link emptyLanguages} alone. So on a set opened on one language, ticking a second
+ * language did not add it - it started from "hide the empty ones", removed the ticked language
+ * from that, and revealed every column at once.
+ *
+ * @param focusLanguage The single language to show, when the tab was opened on one language of a
+ *     set. Null or undefined for the ordinary case, where the default is to hide empty columns.
+ */
+export function defaultHiddenLanguages(
+    rows: LocRow[], languages: string[], focusLanguage: string | null | undefined,
+): string[] {
+    if (focusLanguage === null || focusLanguage === undefined) {
+        return emptyLanguages(rows, languages);
+    }
+
+    // Everything but the focus - hidden, not absent, so the column menu brings any of them back.
+    // That is what makes this a view of the set rather than a different document.
+    return languages.filter(l => l.toUpperCase() !== focusLanguage.toUpperCase());
+}
+
+/**
  * The languages a file declares but says nothing in.
  *
  * Hidden by default: a project that declares six languages and has written two shows four columns

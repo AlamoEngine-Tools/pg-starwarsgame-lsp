@@ -10,7 +10,12 @@
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { LocProblemDto } from '../../protocol';
+import { loadDialogGeometry } from '../shared/dialogGeometryStore';
+import { StoredGeometry } from '../shared/modalGeometry';
 import { LocRow } from '../loc/locRow';
+import { useDebounced, VALIDATE_DEBOUNCE_MS } from './useDebounced';
+import { worstSeverity } from './validateState';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
@@ -23,15 +28,16 @@ export function post(message: unknown): void {
     vscode.postMessage(message);
 }
 
-export interface LocProblem {
-    index?: number | null;
-    key?: string | null;
-    language?: string | null;
-    severity: string;
-    message: string;
-}
+/**
+ * A validation finding, in the editors' own vocabulary.
+ *
+ * The union of what the two validators report - see LocProblemDto in ../../protocol for why every
+ * locator on it is optional. Aliased rather than re-declared so the ~15 call sites in this folder
+ * keep reading in grid terms.
+ */
+export type LocProblem = LocProblemDto;
 
-export type ValidationState = 'unvalidated' | 'ok' | 'error';
+export type ValidationState = 'unvalidated' | 'ok' | 'info' | 'warning' | 'error';
 
 export interface LocPanelMessage { type: string; [key: string]: unknown }
 
@@ -52,6 +58,10 @@ export interface LocPanel<C> {
     /** Whether this file's format can hold more than one language. The server decides; see
      *  LocalisationDocumentEditor.SupportsMultipleLanguages. */
     canAddLanguage: boolean;
+    /** Shown alone at first, when the tab was opened on one language of a set. */
+    focusLanguage: string | null;
+    /** Adding a language here means creating a sibling file, not a column. */
+    addLanguageCreatesFile: boolean;
     /** The languages the engine officially supports - the only ones worth adding. */
     supportedLanguages: string[];
     error: string | null;
@@ -75,6 +85,12 @@ export function useLocPanel<C>(options: {
     coalesce: (queue: C[]) => C[];
     /** Called when a different file arrives, so the editor can drop its own per-file state. */
     onFileLoaded?: () => void;
+    /**
+     * The tab was re-aimed at a different language of its set. The editor uses this to drop any
+     * columns the user had hidden by hand, so the new focus decides what is shown rather than a
+     * choice made about a different view.
+     */
+    onFocusLanguageChanged?: () => void;
     /** Messages this editor understands and the shared protocol does not. */
     onMessage?: (message: LocPanelMessage) => void;
 }): LocPanel<C> {
@@ -83,6 +99,8 @@ export function useLocPanel<C>(options: {
     const [ordered, setOrdered] = useState(false);
     const [category, setCategory] = useState('text');
     const [canAddLanguage, setCanAddLanguage] = useState(false);
+    const [focusLanguage, setFocusLanguage] = useState<string | null>(null);
+    const [addLanguageCreatesFile, setAddLanguageCreatesFile] = useState(false);
     const [supportedLanguages, setSupportedLanguages] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [loaded, setLoaded] = useState(false);
@@ -93,7 +111,7 @@ export function useLocPanel<C>(options: {
 
     // Held in refs so the message listener can stay mounted for the life of the webview. Re-binding
     // it on every render would drop messages that arrive mid-update.
-    const { onFileLoaded, onMessage } = options;
+    const { onFileLoaded, onFocusLanguageChanged, onMessage } = options;
 
     useEffect(() => {
         const handle = (event: MessageEvent): void => {
@@ -106,7 +124,15 @@ export function useLocPanel<C>(options: {
                     setOrdered(msg.ordered as boolean);
                     setCategory(msg.category as string);
                     setCanAddLanguage(msg.canAddLanguage === true);
+                    setFocusLanguage((msg.focusLanguage as string | null) ?? null);
+                    setAddLanguageCreatesFile(msg.addLanguageCreatesFile === true);
                     setSupportedLanguages((msg.supportedLanguages as string[]) ?? []);
+                    // Seeded here rather than on a message of its own: it arrives with the file,
+                    // before any dialog can be opened, which is the only ordering that matters.
+                    loadDialogGeometry(
+                        msg.dialogGeometry as Record<string, StoredGeometry> | undefined,
+                        (id, geometry) =>
+                            vscode.postMessage({ type: 'saveDialogGeometry', id, geometry }));
                     setQueue([]);
                     setProblems([]);
                     setValidation('unvalidated');
@@ -123,9 +149,9 @@ export function useLocPanel<C>(options: {
 
                 case 'problems':
                     setProblems((msg.problems as LocProblem[]) ?? []);
-                    setValidation(
-                        ((msg.problems as LocProblem[]) ?? []).some(p => p.severity === 'error')
-                            ? 'error' : 'ok');
+                    // The tag reads out the highest level reported - see worstSeverity, which is
+                    // the rule the story graph editor's Validate button uses too.
+                    setValidation(worstSeverity((msg.problems as LocProblem[]) ?? []));
                     break;
 
                 case 'saveResult':
@@ -135,6 +161,12 @@ export function useLocPanel<C>(options: {
                         setValidation('unvalidated');
                         vscode.postMessage({ type: 'fetch' });
                     }
+                    break;
+
+                // The tab was re-aimed at one language of its set, or back at all of them.
+                case 'focusLanguage':
+                    setFocusLanguage((msg.language as string | null) ?? null);
+                    onFocusLanguageChanged?.();
                     break;
 
                 case 'invalidate':
@@ -157,7 +189,7 @@ export function useLocPanel<C>(options: {
         window.addEventListener('message', handle);
         vscode.postMessage({ type: 'ready' });
         return () => window.removeEventListener('message', handle);
-    }, [onFileLoaded, onMessage]);
+    }, [onFileLoaded, onFocusLanguageChanged, onMessage]);
 
     // The panel mirrors the queue so it can offer to save if the tab is closed while dirty.
     useEffect(() => {
@@ -165,6 +197,21 @@ export function useLocPanel<C>(options: {
     }, [queue]);
 
     const { applyStaged, coalesce } = options;
+
+    /**
+     * Re-checks the file as staged edits settle.
+     *
+     * A batch is applied all or nothing, so a single bad change refuses the save and takes every
+     * other change with it. Checking only on demand meant that was discovered at Save - by which
+     * point the offending edit could be two hundred edits back, with no indication which one it
+     * was. Now the problem appears against the row that caused it, while it is still the thing on
+     * screen.
+     */
+    const settledQueue = useDebounced(queue, VALIDATE_DEBOUNCE_MS);
+    useEffect(() => {
+        if (settledQueue.length === 0) { return; }
+        vscode.postMessage({ type: 'validateBatch', commands: coalesce(settledQueue) });
+    }, [settledQueue, coalesce]);
 
     const stage = useCallback((command: C) => {
         setRows(current => applyStaged(current, command));
@@ -183,7 +230,8 @@ export function useLocPanel<C>(options: {
     }, [queue, coalesce]);
 
     return {
-        rows, setRows, languages, setLanguages, ordered, category, canAddLanguage,
+        rows, setRows, languages, setLanguages, ordered, category, canAddLanguage, focusLanguage,
+        addLanguageCreatesFile,
         supportedLanguages, error, loaded,
         queue, problems, validation,
         stage, save, validate,

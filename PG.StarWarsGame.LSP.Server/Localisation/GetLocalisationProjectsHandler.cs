@@ -21,7 +21,7 @@ public sealed class GetLocalisationProjectsHandler
     public Task<GetLocalisationProjectsResult> Handle(
         GetLocalisationProjectsParams request, CancellationToken cancellationToken)
     {
-        if (!_config.Current.Features.Tools.Localisation)
+        if (!LocalisationFeatureDisabled.IsEnabled(_config))
             return Task.FromResult(new GetLocalisationProjectsResult([]));
 
         return Task.FromResult(new GetLocalisationProjectsResult(_registry.Projects));

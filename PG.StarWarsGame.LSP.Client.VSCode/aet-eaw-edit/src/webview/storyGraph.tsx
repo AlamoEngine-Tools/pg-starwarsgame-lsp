@@ -19,8 +19,14 @@ import {
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
 import { dockBodyCss, dockChromeCss, dockOverviewCss } from './shared/dockChrome';
+import { ProblemsPanel } from './shared/ProblemsPanel';
+import { FrameNotifier } from './storyGraph/frameNotifier';
+import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
+import { paramRowSpecs } from './storyGraph/paramRows';
+import { StagedRenames } from './storyGraph/stagedRenames';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
 import { useEdgeResize } from './useEdgeResize';
+import { severityIconFor, worstSeverity } from './loc/validateState';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -29,41 +35,26 @@ import { ConnectionPlugin, Presets as ConnectionPresets } from 'rete-connection-
 import { Drag, Presets, ReactArea2D, ReactPlugin, RenderEmit } from 'rete-react-plugin';
 import styled, { createGlobalStyle } from 'styled-components';
 
+import {
+    StoryDiagnosticDto, StoryGraphEdgeDto, StoryGraphNodeDto, StoryLayoutEntryDto,
+    StoryParamOptionDto, StoryParamSchemaDto, StorySimStateDto,
+} from '../protocol';
+
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
 
-// ── Protocol DTOs (camelCased server records; keep in sync with StoryProtocol.cs) ───────────────
+// The wire shapes come from ../protocol - one declaration shared with the extension host that
+// forwards them. The copy that used to sit here had already drifted from the host'"'"'s: it carried
+// storyChapter and the host'"'"'s did not.
 
-interface StoryGraphNodeDto {
-    id: string; kind: string; label: string; threadUri?: string | null; line?: number | null;
-    eventType?: string | null; rewardType?: string | null; branch?: string | null;
-    lifecycle?: string | null; reachable: boolean;
-    eventParams?: { position: number; value: string }[] | null;
-    rewardParams?: { position: number; value: string }[] | null;
-    perpetual?: boolean; storyDialog?: string | null; storyChapter?: number | null;
-}
-interface StoryGraphEdgeDto { fromId: string; toId: string; kind: string; label?: string | null; }
-interface StoryParamSchemaDto {
-    position: number; valueType: string; referenceType?: string | null;
-    enumName?: string | null; optional: boolean; description?: string | null;
-    enumValues?: string[] | null;
-}
-interface ParamOption { value: string; detail?: string | null; }
-interface StoryDiagnosticDto {
-    nodeId?: string | null; side?: string | null; position?: number | null;
-    severity: string; message: string; uri: string; line: number; column: number;
-}
-interface StoryLayoutEntry { file: string; eventName: string; x: number; y: number; }
-interface GraphFilters { nameFilter: string; branch: string; lifecycle: string; reachableFrom: string; }
-interface SimFlag { name: string; value: number; }
-interface SimNodeState { nodeId: string; lifecycle: string; }
-interface SimIntervention {
-    kind: string; nodeId: string; eventName: string; eventType?: string | null; options: string[];
-}
-interface SimState {
-    running: boolean; clock: number; flags: SimFlag[]; nodes: SimNodeState[];
-    interventions: SimIntervention[]; luaNotifications: string[]; log: string[];
-}
+/**
+ * The complete filter state this view holds.
+ *
+ * Distinct from the protocol'"'"'s FilterState, whose every field is optional: that one describes
+ * what gets sent, and "no branch filter" travels as an absent field. Here every filter always has
+ * a value, because every filter always has a control showing it.
+ */
+interface FilterState { nameFilter: string; branch: string; lifecycle: string; reachableFrom: string; }
 
 function sendSim(method: string, args?: Record<string, unknown>): void {
     vscode.postMessage({ type: 'sim', method, args });
@@ -75,11 +66,11 @@ function sendSim(method: string, args?: Record<string, unknown>): void {
  * message returns. The timeout guarantees the suggestion dropdown never hangs on a lost reply.
  */
 let optionRequestCounter = 0;
-const pendingOptionRequests = new Map<number, (options: ParamOption[]) => void>();
+const pendingOptionRequests = new Map<number, (options: StoryParamOptionDto[]) => void>();
 
 function fetchParamOptions(
     side: 'event' | 'reward', typeName: string, position: number, prefix: string,
-): Promise<ParamOption[]> {
+): Promise<StoryParamOptionDto[]> {
     const requestId = ++optionRequestCounter;
     return new Promise(resolve => {
         pendingOptionRequests.set(requestId, resolve);
@@ -90,7 +81,7 @@ function fetchParamOptions(
     });
 }
 
-const EMPTY_FILTERS: GraphFilters = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
+const EMPTY_FILTERS: FilterState = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
 
 /** Event/reward type names flagged `untested` in the schema - set once, read during render. */
 const untestedTypes = new Set<string>();
@@ -98,37 +89,6 @@ const untestedTypes = new Set<string>();
 /** Event/reward type name → its param schema - set once from the 'schema' message; read by node bodies. */
 const eventTypeParams = new Map<string, StoryParamSchemaDto[]>();
 const rewardTypeParams = new Map<string, StoryParamSchemaDto[]>();
-
-/** One editable param row on an inline node body. `missing` = mandatory and still unset. */
-interface ParamRowSpec { position: number; value: string; missing: boolean; }
-
-/**
- * Rows to render for one param kind on a node body: EVERY schema-declared param (the type
- * dictates the fields - optional ones render as empty "(optional)" slots), plus any value present
- * in the XML beyond what the schema declares (legacy/unknown slots still need to be visible and
- * editable). Shared between rendering and node-height estimation so the two never disagree about
- * how tall the node actually is.
- */
-function paramRowSpecs(
-    existing: { position: number; value: string }[] | null | undefined,
-    schema: StoryParamSchemaDto[],
-): ParamRowSpec[] {
-    const byPosition = new Map((existing ?? []).map(p => [p.position, p.value]));
-    const rows: ParamRowSpec[] = [];
-    for (const p of schema) {
-        rows.push({
-            position: p.position,
-            value: byPosition.get(p.position) ?? '',
-            missing: !p.optional && !byPosition.has(p.position),
-        });
-        byPosition.delete(p.position);
-    }
-    for (const [position, value] of byPosition) {
-        rows.push({ position, value, missing: false });
-    }
-    rows.sort((a, b) => a.position - b.position);
-    return rows;
-}
 
 const EVENT_NODE_WIDTH = 280;
 const EVENT_ROW_H = 22;
@@ -185,29 +145,6 @@ const autoRenameKey = (threadUri: string | null | undefined, name: string): stri
  * Presence of a key = that node is being renamed; the value is the current draft text.
  */
 const renameDrafts = new Map<string, string>();
-
-/**
- * A short row label from a schema param description ("Attacker faction." → "Attacker faction"),
- * or null when the schema has nothing usable - the caller falls back to "Param N".
- */
-function shortParamLabel(schema: StoryParamSchemaDto | undefined): string | null {
-    const description = schema?.description?.trim();
-    if (!description) { return null; }
-    const label = description.split(/[(,;.]/)[0].trim();
-    return label.length ? label : null;
-}
-
-/**
- * A checkbox label from a boolean param's description: the checkbox already encodes the 0/1
- * mechanics, so strip the "1 = " prefix and take just the semantic phrase —
- * "1 = loop the movie; 0 = …" → "Loop the movie". Null when the description has another shape.
- */
-function booleanParamLabel(description: string | null | undefined): string | null {
-    if (!description) { return null; }
-    const match = /^\s*[01]\s*=\s*([^;.(]+)/.exec(description);
-    const text = match?.[1].trim();
-    return text ? text[0].toUpperCase() + text.slice(1) : null;
-}
 
 /**
  * VS Code's themed categorical chart palette - these track the active colour theme (and invert with
@@ -373,7 +310,7 @@ interface EditorHandle {
      * Applies a server graph. `full` clears and auto-arranges (first load, filter changes);
      * otherwise the graph is patched in place - the viewport and node positions stay put.
      */
-    setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[],
+    setGraph(nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[],
         full: boolean): Promise<void>;
     /** Overrides node lifecycles from the simulation (null restores the static analysis view). */
     applyLifecycles(byNodeId: ReadonlyMap<string, string> | null): void;
@@ -477,42 +414,22 @@ let onReachableFromRequested: (nodeId: string) => void = () => { /* replaced by 
 /** A gesture locally changed the graph without a server command - re-fetch to reconcile. */
 let onGraphDesynced: () => void = () => { /* replaced by App */ };
 
-/** Subscribers (the minimap) notified when the viewport pans/zooms or a node moves. */
-const areaChangeSubs = new Set<() => void>();
-function subscribeAreaChange(cb: () => void): () => void {
-    areaChangeSubs.add(cb);
-    return () => { areaChangeSubs.delete(cb); };
-}
-let areaChangeScheduled = false;
-function scheduleAreaChanged(): void {
-    if (areaChangeScheduled) { return; }
-    areaChangeScheduled = true;
-    requestAnimationFrame(() => {
-        areaChangeScheduled = false;
-        for (const cb of areaChangeSubs) { cb(); }
-    });
-}
+/** Notified (the minimap) when the viewport pans/zooms or a node moves. */
+const areaChanged = new FrameNotifier();
+const subscribeAreaChange = (cb: () => void): (() => void) => areaChanged.subscribe(cb);
+const scheduleAreaChanged = (): void => areaChanged.schedule();
 
 /**
- * Subscribers notified when node *geometry* changes (a node moved, or the graph was rebuilt) —
- * deliberately NOT on pan/zoom. The swimlane overlay lives inside rete's transformed content
- * holder, so panning moves it for free; recomputing its bounds per pan frame would walk every node
- * for nothing.
+ * Notified when node *geometry* changes (a node moved, or the graph was rebuilt) - deliberately
+ * NOT on pan/zoom. The swimlane overlay lives inside rete's transformed content holder, so panning
+ * moves it for free; recomputing its bounds per pan frame would walk every node for nothing.
+ *
+ * A second notifier rather than a second flag on the first: they fire on different events, and
+ * that is the whole distinction being drawn here.
  */
-const geometryChangeSubs = new Set<() => void>();
-function subscribeGeometryChange(cb: () => void): () => void {
-    geometryChangeSubs.add(cb);
-    return () => { geometryChangeSubs.delete(cb); };
-}
-let geometryChangeScheduled = false;
-function scheduleGeometryChanged(): void {
-    if (geometryChangeScheduled) { return; }
-    geometryChangeScheduled = true;
-    requestAnimationFrame(() => {
-        geometryChangeScheduled = false;
-        for (const cb of geometryChangeSubs) { cb(); }
-    });
-}
+const geometryChanged = new FrameNotifier();
+const subscribeGeometryChange = (cb: () => void): (() => void) => geometryChanged.subscribe(cb);
+const scheduleGeometryChanged = (): void => geometryChanged.schedule();
 
 /** Set by App once the editor exists - VirtualNodeView's staging-junction discard button needs
  * to call straight into the editor (`discardStagingJunction`), not through a command round trip. */
@@ -543,11 +460,9 @@ let onPendingChanged: () => void = () => { /* replaced by App */ };
 /** Set by App: asks the extension for a preview graph over the current pending queue. */
 let requestPreview: () => void = () => { /* replaced by App */ };
 
-// Chain of staged renames (oldName → latest name). A gesture reads the node's dto.label, which lags
-// a staged rename until the preview lands - so an edit made in that window would carry a name the
-// batch no longer knows once its rename runs. Resolving through this map keeps every staged command
-// pointed at the event's latest name, so the batch composes in order without "event not found".
-const stagedRenames = new Map<string, string>();
+// See StagedRenames: a gesture reads the node's dto.label, which lags a staged rename until the
+// preview lands, so every staged command is retargeted through this to the event's latest name.
+const stagedRenames = new StagedRenames();
 
 /** Whether there are unsaved staged changes - drives the dirty-exit prompt and Save button. */
 function hasPendingChanges(): boolean {
@@ -560,26 +475,15 @@ function clearPendingCommands(): void {
     onPendingChanged();
 }
 
-/** Follows the staged-rename chain to the event's latest name. */
-function resolveStagedName(name: string): string {
-    let current = name;
-    for (let i = 0; i < 64; i++) { // bounded against a pathological cycle
-        const next = stagedRenames.get(current.toLowerCase());
-        if (next === undefined || next === current) { break; }
-        current = next;
-    }
-    return current;
-}
-
 /** Applies a staged command to the local graph, queues it, and previews structural changes. */
 function stageCommand(payload: Record<string, unknown>): void {
     // Retarget to the event's latest staged name (dto.label may still show a pre-rename name).
     if (typeof payload.eventName === 'string') {
-        const resolved = resolveStagedName(payload.eventName);
+        const resolved = stagedRenames.resolve(payload.eventName);
         if (resolved !== payload.eventName) { payload = { ...payload, eventName: resolved }; }
     }
     if (payload.kind === 'renameEvent' && typeof payload.newName === 'string') {
-        stagedRenames.set((payload.eventName as string).toLowerCase(), payload.newName);
+        stagedRenames.record(payload.eventName as string, payload.newName);
     }
 
     applyOptimistic(payload);
@@ -966,7 +870,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     };
 
     const saveAllPositions = (): void => {
-        const entries: StoryLayoutEntry[] = [];
+        const entries: StoryLayoutEntryDto[] = [];
         for (const m of graphModel.values()) {
             if (m.dto.kind !== 'Event') { continue; }
             entries.push({
@@ -1109,7 +1013,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // Populate graphModel from stored positions without mounting anything. Returns false (→ slow
     // elk path) when any event lacks a saved position (first-ever open of this campaign).
     const buildModelFromLayout = (
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): boolean => {
         const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
         const events = nodes.filter(n => n.kind === 'Event');
@@ -1288,7 +1192,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // position, new nodes are placed (stored/drop position, else midpoint of neighbours). Used for a
     // windowed update (preview / push) so editing a big graph never has to mount the whole thing.
     const rebuildModelFromGraph = (
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): void => {
         const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
         const oldPos = new Map<string, { x: number; y: number }>();
@@ -1337,7 +1241,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     };
 
     const windowedUpdate = async (
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): Promise<void> => {
         rebuildModelFromGraph(nodes, edges, layout);
         lastEdges = edges;
@@ -1348,7 +1252,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     };
 
     const buildFull = async (
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): Promise<void> => {
         await editor.clear();
         graphModel.clear();
@@ -1409,7 +1313,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
     /** Reconciles the live graph against the server's - no re-layout, viewport untouched. */
     const patch = async (
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[]
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): Promise<void> => {
         const incoming = new Map(nodes.map(d => [d.id, d]));
         const branches = branchIndex(nodes);
@@ -1499,7 +1403,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
     return {
         setGraph(
-            nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[],
+            nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[],
             full: boolean
         ): Promise<void> {
             const run = async (): Promise<void> => {
@@ -2242,12 +2146,12 @@ function BlurCommitInput(props: {
  */
 function RefValueInput(props: {
     value: string; disabled: boolean; onCommit: (v: string) => void;
-    fetchOptions: (prefix: string) => Promise<ParamOption[]>;
+    fetchOptions: (prefix: string) => Promise<StoryParamOptionDto[]>;
     onInput?: (v: string) => void;
     placeholder?: string; className?: string;
 }): React.JSX.Element {
     const [value, setValue] = useState(props.value);
-    const [options, setOptions] = useState<ParamOption[]>([]);
+    const [options, setOptions] = useState<StoryParamOptionDto[]>([]);
     const [open, setOpen] = useState(false);
     const focused = useRef(false);
     const fetchSeq = useRef(0);
@@ -3368,14 +3272,14 @@ const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
 function App(): React.JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
-    const filtersRef = useRef<GraphFilters>({ ...EMPTY_FILTERS });
+    const filtersRef = useRef<FilterState>({ ...EMPTY_FILTERS });
     // User-driven fetches (filter changes) re-layout; edit-driven refreshes patch in place.
     const fullRenderRef = useRef(true);
     const pendingGraphRef = useRef<{
-        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntry[]; full: boolean;
+        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntryDto[]; full: boolean;
     } | null>(null);
 
-    const [filters, setFiltersState] = useState<GraphFilters>({ ...EMPTY_FILTERS });
+    const [filters, setFiltersState] = useState<FilterState>({ ...EMPTY_FILTERS });
     const [branches, setBranches] = useState<string[]>([]);
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
@@ -3385,8 +3289,8 @@ function App(): React.JSX.Element {
     // of flashing the pre-layout node stack (every node starts at the same spot) before it settles.
     const [layouting, setLayouting] = useState(false);
     const [createRequest, setCreateRequest] = useState<CreateRequest | null>(null);
-    const [simState, setSimState] = useState<SimState | null>(null);
-    const simRef = useRef<SimState | null>(null);
+    const [simState, setSimState] = useState<StorySimStateDto | null>(null);
+    const simRef = useRef<StorySimStateDto | null>(null);
     const [mode, setMode] = useState<EditorMode>('view');
     // Which modes the flags permit. Both default off, matching the extension's own fallbacks, so a
     // panel that somehow never receives the message stays read-only rather than offering modes whose
@@ -3541,7 +3445,7 @@ function App(): React.JSX.Element {
         createEventAt(position, drag.category === 'trigger' ? drag.type : null);
     }, [mode, createEventAt]);
 
-    const applySimOverlay = useCallback((state: SimState | null) => {
+    const applySimOverlay = useCallback((state: StorySimStateDto | null) => {
         simRef.current = state;
         setSimState(state);
         const handle = editorRef.current;
@@ -3551,7 +3455,7 @@ function App(): React.JSX.Element {
             : null);
     }, []);
 
-    const fetchGraph = useCallback((next: GraphFilters) => {
+    const fetchGraph = useCallback((next: FilterState) => {
         filtersRef.current = next;
         setFiltersState(next);
         fullRenderRef.current = true;
@@ -3560,7 +3464,7 @@ function App(): React.JSX.Element {
 
     /** Runs setGraph, keeping the canvas covered for the duration of a full rebuild's auto-arrange. */
     const runSetGraph = useCallback((handle: EditorHandle, g: {
-        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntry[]; full: boolean;
+        nodes: StoryGraphNodeDto[]; edges: StoryGraphEdgeDto[]; layout: StoryLayoutEntryDto[]; full: boolean;
     }) => {
         if (g.full) { setLayouting(true); }
         // Re-apply staged edits once the (re)built graph settles, so a reconcile never reverts them.
@@ -3570,7 +3474,7 @@ function App(): React.JSX.Element {
     }, []);
 
     const applyGraph = useCallback((
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntry[], full: boolean
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[], full: boolean
     ) => {
         setBranches(() => {
             const found = [...new Set(nodes.map(n => n.branch).filter((b): b is string => !!b))].sort();
@@ -3649,14 +3553,14 @@ function App(): React.JSX.Element {
                     applyGraph(
                         graphNodes,
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
-                        (msg.layout as StoryLayoutEntry[] | undefined) ?? [],
+                        (msg.layout as StoryLayoutEntryDto[] | undefined) ?? [],
                         full);
                     // A running simulation keeps painting its lifecycles over fresh renders.
                     if (simRef.current?.running) { applySimOverlay(simRef.current); }
                     break;
                 }
                 case 'simState':
-                    applySimOverlay((msg.state as SimState | null) ?? null);
+                    applySimOverlay((msg.state as StorySimStateDto | null) ?? null);
                     break;
                 case 'simChanged':
                     sendSim('getState');
@@ -3665,7 +3569,7 @@ function App(): React.JSX.Element {
                     const resolve = pendingOptionRequests.get(msg.requestId as number);
                     if (resolve) {
                         pendingOptionRequests.delete(msg.requestId as number);
-                        resolve((msg.options as ParamOption[] | undefined) ?? []);
+                        resolve((msg.options as StoryParamOptionDto[] | undefined) ?? []);
                     }
                     break;
                 }
@@ -3767,7 +3671,7 @@ function App(): React.JSX.Element {
         };
     }, [runSetGraph]);
 
-    const setFilter = (patch: Partial<GraphFilters>): void => fetchGraph({ ...filtersRef.current, ...patch });
+    const setFilter = (patch: Partial<FilterState>): void => fetchGraph({ ...filtersRef.current, ...patch });
     const clearFilters = (): void => fetchGraph({ ...EMPTY_FILTERS });
     const toggleLane = (which: 'thread' | 'chapter'): void => {
         const nextThread = which === 'thread' ? !showThreadLanes : showThreadLanes;
@@ -3779,13 +3683,11 @@ function App(): React.JSX.Element {
     const anyFilter = !!(filters.nameFilter || filters.branch || filters.lifecycle || filters.reachableFrom);
 
     // Validate button reads out validation health (codicon name; coloured via sev-* class):
-    // unvalidated (stale/never run) → error → warning → clean.
-    const severity = !validated ? 'unvalidated'
-        : problems.some(p => p.severity === 'error') ? 'error'
-            : problems.some(p => p.severity === 'warning') ? 'warning' : 'ok';
-    const severityIcon = severity === 'unvalidated' ? 'question'
-        : severity === 'error' ? 'error'
-            : severity === 'warning' ? 'warning' : 'check';
+    // unvalidated (stale/never run) beats error beats warning beats clean. The precedence and the
+    // glyph mapping are shared with the localisation editor's Validate tag so the two controls mean
+    // the same thing - two copies of this rule drifted apart once already.
+    const severity = !validated ? 'unvalidated' : worstSeverity(problems);
+    const severityIcon = severityIconFor(severity);
 
     const { size: dockWidth, handleProps: dockResize } = useEdgeResize(
         paletteWidthMemo, 210, 520, 'w', v => { paletteWidthMemo = v; });
@@ -3958,27 +3860,27 @@ let simBarHeightMemo = 140;
  * left edge), 'n' = dragging up grows (a bottom bar's top edge). Plain pointer capture on the handle
  * - no window listeners to leak.
  */
-let problemsHeightMemo = 150;
-
 /**
  * The campaign's validation problems. A row whose diagnostic lives on a graph node is clickable
  * as a whole (jumps to the node); the ↗ button opens the XML at the diagnostic's line either way.
- * Resizable by dragging its top edge, like the sim bar.
+ *
+ * The frame - resizable top edge, counted title, close button, remembered height - is
+ * {@link ProblemsPanel}, shared with the localisation editors. Only the rows are the graph's own:
+ * these name a node and offer its XML, which is not what a table of translations has to say.
  */
 function ProblemsBar(props: {
     problems: StoryDiagnosticDto[];
     onJump: (nodeId: string) => void;
     onClose: () => void;
 }): React.JSX.Element {
-    const { size: height, handleProps } = useEdgeResize(
-        problemsHeightMemo, 60, 420, 'n', v => { problemsHeightMemo = v; });
     return (
-        <div className="problems" style={{ height }}>
-            <div className="resize-handle-n" title="Drag to resize" {...handleProps} />
-            <div className="panel-bar">
-                <span className="panel-title">Problems ({props.problems.length})</span>
-                <button className="panel-close" onClick={props.onClose} title="Close"><span className="codicon codicon-close" /></button>
-            </div>
+        <ProblemsPanel
+            className="problems"
+            memoKey="storyGraph"
+            defaultHeight={150}
+            title={`Problems (${props.problems.length})`}
+            onClose={props.onClose}
+        >
             {props.problems.map((problem, i) => (
                 <div
                     className={'problem-row' + (problem.nodeId ? ' clickable' : '')}
@@ -4004,13 +3906,13 @@ function ProblemsBar(props: {
                     ><span className="codicon codicon-go-to-file" /></button>
                 </div>
             ))}
-        </div>
+        </ProblemsPanel>
     );
 }
 
 /** The running simulation: clock, flag inspector, intervention queue, and the step log. */
 /** The simulation driver controls - clock, flags, and pending interventions - stacked for the dock. */
-function SimControls(props: { state: SimState }): React.JSX.Element {
+function SimControls(props: { state: StorySimStateDto }): React.JSX.Element {
     const state = props.state;
     const [advanceBy, setAdvanceBy] = useState('10');
     const [flagName, setFlagName] = useState('');
@@ -4085,7 +3987,7 @@ function SimControls(props: { state: SimState }): React.JSX.Element {
 }
 
 /** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
-function SimLog(props: { state: SimState; onClose: () => void }): React.JSX.Element {
+function SimLog(props: { state: StorySimStateDto; onClose: () => void }): React.JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
         simBarHeightMemo, 60, 320, 'n', v => { simBarHeightMemo = v; });
     return (

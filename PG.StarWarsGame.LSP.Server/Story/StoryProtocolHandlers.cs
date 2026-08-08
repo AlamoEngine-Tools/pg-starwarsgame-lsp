@@ -33,6 +33,11 @@ public sealed class GetStoryPlotsHandler(
         var index = indexService.Current;
         var setByCampaignOrigin = BuildSetByCampaignOrigin(index);
 
+        // Every indexed .lua document by its file name. Built once here rather than scanned per
+        // script: this runs inside campaign x faction x script, and the scan it replaces was over
+        // every document in the workspace - on a large mod that is four nested loops deep.
+        var luaUrisByFileName = BuildLuaUriIndex(index);
+
         // The Campaign_Set a campaign belongs to: resolve the campaign object, then look up the set
         // that records a member at its definition origin (the group index keys set -> members).
         string? SetForCampaign(string campaignName)
@@ -48,11 +53,14 @@ public sealed class GetStoryPlotsHandler(
         {
             var model = modelService.GetCampaignModel(campaign.Name);
 
-            // Manifest entries use engine casing; canonical thread URIs are lowercase.
+            // Manifest entries use engine casing; canonical thread URIs are lowercase. Indexed by
+            // file name once per campaign, for the same reason as the Lua map above - a manifest
+            // with fifty threads used to walk the campaign's whole thread list fifty times.
+            var threadUrisByFileName = BuildThreadUriIndex(model);
+
             string? ResolveUri(string thread)
             {
-                return model?.Threads.FirstOrDefault(t => t.DocumentUri.EndsWith(
-                    "/" + thread.ToLowerInvariant(), StringComparison.Ordinal))?.DocumentUri;
+                return threadUrisByFileName.GetValueOrDefault(thread.ToLowerInvariant());
             }
 
             var factions = new List<StoryFactionDto>();
@@ -71,7 +79,8 @@ public sealed class GetStoryPlotsHandler(
 
                 var luaScripts = new List<StoryLuaScriptDto>();
                 foreach (var script in contents?.LuaScripts ?? [])
-                    luaScripts.Add(new StoryLuaScriptDto(script, ResolveLuaUri(script)));
+                    luaScripts.Add(new StoryLuaScriptDto(
+                        script, ResolveLuaUri(script, luaUrisByFileName)));
                 factions.Add(new StoryFactionDto(faction.Faction, faction.ManifestFile,
                     threads, luaScripts));
             }
@@ -96,15 +105,48 @@ public sealed class GetStoryPlotsHandler(
         return map;
     }
 
+    /// <summary>
+    ///     Every indexed <c>.lua</c> document, by its file name.
+    ///     <para>
+    ///         First wins on a repeated name, which is what the scan this replaces did: it took the
+    ///         first URI ending in the name. A duplicate file name across layers is therefore
+    ///         resolved the same way it always was.
+    ///     </para>
+    /// </summary>
+    private static Dictionary<string, string> BuildLuaUriIndex(GameIndex index)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var uri in index.Documents.Keys)
+        {
+            if (!uri.EndsWith(".lua", StringComparison.Ordinal)) continue;
+            var slash = uri.LastIndexOf('/');
+            map.TryAdd(slash < 0 ? uri : uri[(slash + 1)..], uri);
+        }
+
+        return map;
+    }
+
+    /// <summary>A campaign's thread documents by file name; see {@link BuildLuaUriIndex}.</summary>
+    private static Dictionary<string, string> BuildThreadUriIndex(StoryCampaignModel? model)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var thread in model?.Threads ?? [])
+        {
+            var uri = thread.DocumentUri;
+            var slash = uri.LastIndexOf('/');
+            map.TryAdd(slash < 0 ? uri : uri[(slash + 1)..], uri);
+        }
+
+        return map;
+    }
+
     // Manifest Lua_Script entries are extensionless engine-cased names; indexed lua documents
     // are keyed by lowercase canonical URI.
-    private string? ResolveLuaUri(string script)
+    private static string? ResolveLuaUri(string script, Dictionary<string, string> byFileName)
     {
         var fileName = script.ToLowerInvariant();
         if (!fileName.EndsWith(".lua", StringComparison.Ordinal)) fileName += ".lua";
-        var suffix = "/" + fileName;
-        return indexService.Current.Documents.Keys
-            .FirstOrDefault(uri => uri.EndsWith(suffix, StringComparison.Ordinal));
+        return byFileName.GetValueOrDefault(fileName);
     }
 }
 

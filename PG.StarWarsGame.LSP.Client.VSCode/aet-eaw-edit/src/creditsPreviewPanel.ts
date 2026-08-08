@@ -3,6 +3,10 @@
 
 import * as vscode from 'vscode';
 
+import {
+    PanelRegistry, panelKey, WebviewMessage, WebviewPanelHost,
+} from './webviewPanelHost';
+
 /**
  * The credits crawl in its own tab beside the editor, the way a Markdown or LaTeX preview opens.
  *
@@ -10,46 +14,34 @@ import * as vscode from 'vscode';
  * changing what it is showing. It holds no state of its own: the editor pushes rows in, and this
  * only decides where they are drawn.
  */
-export class CreditsPreviewPanel {
-    private static readonly _panels = new Map<string, CreditsPreviewPanel>();
+export class CreditsPreviewPanel extends WebviewPanelHost {
+    private static readonly _panels = new PanelRegistry<CreditsPreviewPanel>();
 
-    private readonly _panel: vscode.WebviewPanel;
     private _ready = false;
     private _pending: unknown | null = null;
 
-    private constructor(filePath: string, label: string, extensionUri: vscode.Uri) {
-        this._panel = vscode.window.createWebviewPanel(
-            'aetCreditsPreview', `Preview: ${label}`, vscode.ViewColumn.Beside,
-            {
-                enableScripts: true,
-                retainContextWhenHidden: true,
-                localResourceRoots: [
-                    vscode.Uri.joinPath(extensionUri, 'out', 'webview'),
-                    vscode.Uri.joinPath(extensionUri, 'out', 'codicons'),
-                ],
-            });
-
-        this._panel.onDidDispose(() => CreditsPreviewPanel._panels.delete(key(filePath)));
-
-        const scriptUri = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(extensionUri, 'out', 'webview', 'creditsPreview.js'));
-        const codiconUri = this._panel.webview.asWebviewUri(
-            vscode.Uri.joinPath(extensionUri, 'out', 'codicons', 'codicon.css'));
-        this._panel.webview.html = buildHtml(
-            scriptUri, codiconUri, this._panel.webview.cspSource);
-
-        this._panel.webview.onDidReceiveMessage((msg: { type: string }) => {
-            if (msg.type === 'ready') {
-                // Rows may have arrived before the webview finished loading; hold them until it
-                // says it is listening, or the first preview opens empty.
-                this._ready = true;
-                if (this._pending !== null) {
-                    void this._panel.webview.postMessage(this._pending);
-                    this._pending = null;
-                }
-            }
-            if (msg.type === 'close') { this._panel.dispose(); }
+    private constructor(label: string, extensionUri: vscode.Uri) {
+        super(extensionUri, {
+            viewType: 'aetCreditsPreview',
+            title: `Preview: ${label}`,
+            column: vscode.ViewColumn.Beside,
+            script: 'creditsPreview.js',
+            bodyStyle: '  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }\n'
+                + '  #root { height: 100%; position: relative; }',
         });
+    }
+
+    protected onMessage(msg: WebviewMessage): void {
+        if (msg.type === 'ready') {
+            // Rows may have arrived before the webview finished loading; hold them until it
+            // says it is listening, or the first preview opens empty.
+            this._ready = true;
+            if (this._pending !== null) {
+                this.post(this._pending);
+                this._pending = null;
+            }
+        }
+        if (msg.type === 'close') { this.dispose(); }
     }
 
     /**
@@ -58,15 +50,15 @@ export class CreditsPreviewPanel {
      * Reveals without stealing focus: the user is editing, and the preview updating beside them
      * should not take the caret out of the cell they are typing in.
      */
-    static show(
-        filePath: string, label: string, extensionUri: vscode.Uri, payload: unknown
-    ): void {
-        let panel = CreditsPreviewPanel._panels.get(key(filePath));
+    static show(filePath: string, label: string, extensionUri: vscode.Uri, payload: unknown): void {
+        const key = panelKey(filePath);
+        let panel = CreditsPreviewPanel._panels.get(key);
+
         if (panel === undefined) {
-            panel = new CreditsPreviewPanel(filePath, label, extensionUri);
-            CreditsPreviewPanel._panels.set(key(filePath), panel);
+            panel = CreditsPreviewPanel._panels.track(
+                key, new CreditsPreviewPanel(label, extensionUri));
         } else {
-            panel._panel.reveal(panel._panel.viewColumn, true);
+            panel.reveal(true);
         }
 
         panel._send(payload);
@@ -74,45 +66,18 @@ export class CreditsPreviewPanel {
 
     /** Pushes new rows to an open preview, and does nothing when there is none. */
     static update(filePath: string, payload: unknown): void {
-        CreditsPreviewPanel._panels.get(key(filePath))?._send(payload);
+        CreditsPreviewPanel._panels.get(panelKey(filePath))?._send(payload);
     }
 
     static isOpen(filePath: string): boolean {
-        return CreditsPreviewPanel._panels.has(key(filePath));
+        return CreditsPreviewPanel._panels.has(panelKey(filePath));
     }
 
     static disposeAll(): void {
-        for (const panel of [...CreditsPreviewPanel._panels.values()]) { panel._panel.dispose(); }
+        CreditsPreviewPanel._panels.disposeAll();
     }
 
     private _send(payload: unknown): void {
-        if (this._ready) { void this._panel.webview.postMessage(payload); } else {
-            this._pending = payload;
-        }
+        if (this._ready) { this.post(payload); } else { this._pending = payload; }
     }
-}
-
-/** Windows path casing: two keys for one file would mean two previews of it. */
-function key(filePath: string): string {
-    return filePath.toLowerCase();
-}
-
-function buildHtml(scriptUri: vscode.Uri, codiconUri: vscode.Uri, cspSource: string): string {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy"
-      content="default-src 'none'; style-src 'unsafe-inline' ${cspSource}; script-src ${cspSource}; font-src ${cspSource}; img-src ${cspSource} data:;">
-<link rel="stylesheet" href="${codiconUri}">
-<style>
-  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
-  #root { height: 100%; position: relative; }
-</style>
-</head>
-<body>
-<div id="root"></div>
-<script src="${scriptUri}"></script>
-</body>
-</html>`;
 }

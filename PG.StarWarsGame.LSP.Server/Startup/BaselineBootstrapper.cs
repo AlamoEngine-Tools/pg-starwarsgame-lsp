@@ -60,7 +60,10 @@ public sealed class BaselineBootstrapper : IBaselineBootstrapper
 
         try
         {
-            if (!_languageService.TryGetByIdentifier(_config.Current.Locale, out var language))
+            // The game's language, not the LSP's own - see LocalisationLoader for why these are
+            // different settings.
+            if (!_languageService.TryGetByIdentifier(
+                    _config.Current.Localisation.Language, out var language))
                 language = _languageService.Default;
             var eawDb = _localisationProvider.GetMasterText(GameContext.EaW, language!);
             var focDb = _localisationProvider.GetMasterText(GameContext.FoC, language!);
