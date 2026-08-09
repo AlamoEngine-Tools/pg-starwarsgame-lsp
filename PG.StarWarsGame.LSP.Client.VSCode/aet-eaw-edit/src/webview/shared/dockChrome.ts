@@ -327,6 +327,38 @@ export const dockBodyCss = `
     .dock-content { scrollbar-gutter: stable; }
 `;
 
+/**
+ * The right-hand tool dock itself.
+ *
+ * Tools live on the right in this extension - that is the layout the story graph and the
+ * localisation editors already established - so the frame is shared rather than restated. Only the
+ * geometry is here; a dock's header is its own, because what belongs in one differs per editor.
+ */
+export const rightDockCss = `
+    .right-dock {
+        position: relative;
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-left: 1px solid var(--vscode-panel-border);
+        background: var(--vscode-sideBar-background);
+    }
+    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
+    .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
+    /* Sits just outside the dock's left edge, so the grab area is not stolen from its content. */
+    .resize-handle-w {
+        position: absolute;
+        top: 0;
+        left: -3px;
+        width: 6px;
+        height: 100%;
+        cursor: ew-resize;
+        z-index: 2;
+    }
+    .resize-handle-w:hover { background: var(--vscode-sash-hoverBorder, #007fd4); }
+`;
+
 /** The dock foot, where the search and overview controls live. Shared for its breathing room. */
 export const dockOverviewCss = `
     .dock-overview {

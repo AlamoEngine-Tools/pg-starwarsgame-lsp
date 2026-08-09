@@ -18,7 +18,8 @@ import {
     CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
-import { dockBodyCss, dockChromeCss, dockOverviewCss } from './shared/dockChrome';
+import { dockBodyCss, dockChromeCss, dockOverviewCss, rightDockCss } from './shared/dockChrome';
+import { RightDock } from './shared/RightDock';
 import { ProblemsPanel } from './shared/ProblemsPanel';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
@@ -2967,15 +2968,7 @@ const Shell = styled.div`
     }
 
     /* ── Right dock ─────────────────────────────────────────────────────── */
-    .right-dock {
-        position: relative;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        border-left: 1px solid var(--vscode-panel-border);
-        background: var(--vscode-sideBar-background);
-    }
+    ${rightDockCss}
     /* The dial is always dead-centre; Save/Validate float over the sides so they never shift it. */
     .dock-header {
         position: relative;
@@ -2988,8 +2981,6 @@ const Shell = styled.div`
     }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
-    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
-    .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
     ${dockBodyCss}
     ${dockOverviewCss}
     /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
@@ -3689,9 +3680,6 @@ function App(): React.JSX.Element {
     const severity = !validated ? 'unvalidated' : worstSeverity(problems);
     const severityIcon = severityIconFor(severity);
 
-    const { size: dockWidth, handleProps: dockResize } = useEdgeResize(
-        paletteWidthMemo, 210, 520, 'w', v => { paletteWidthMemo = v; });
-
     return (
         <Shell>
             <GlobalStyle />
@@ -3732,9 +3720,12 @@ function App(): React.JSX.Element {
                     />
                     {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
                 </div>
-                <div className="right-dock" style={{ width: dockWidth }}>
-                    <div className="resize-handle-w" title="Drag to resize" {...dockResize} />
-                    <div className="dock-header">
+                <RightDock
+                    initialWidth={paletteWidthMemo}
+                    minWidth={210}
+                    maxWidth={520}
+                    onWidthChange={v => { paletteWidthMemo = v; }}
+                    header={<>
                         {mode === 'edit' ? (
                             <button
                                 className={'icon-btn header-left' + (pendingCount > 0 ? ' active' : '')}
@@ -3749,8 +3740,8 @@ function App(): React.JSX.Element {
                             onClick={() => { validateEdits(); }}
                             title="Validate - check the story for problems (opens the panel below)"
                         ><span className={'codicon codicon-' + severityIcon} />{problems.length ? ` ${problems.length}` : ''}</button>
-                    </div>
-                    <div className="dock-content">
+                    </>}
+                    content={<>
                         {mode === 'edit'
                             ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes} /> : null}
                         {mode === 'simulate' && simState?.running ? <SimControls state={simState} /> : null}
@@ -3759,8 +3750,8 @@ function App(): React.JSX.Element {
                         {mode === 'view'
                             ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
                                 or Simulation to run it forward.</div> : null}
-                    </div>
-                    <div className="dock-overview">
+                    </>}
+                    overview={<>
                         <div className="dock-search">
                             <div className="dock-section-title">Filter</div>
                             <div className="search-field">
@@ -3817,8 +3808,8 @@ function App(): React.JSX.Element {
                                 {LIFECYCLES.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
                         </div>
-                    </div>
-                </div>
+                    </>}
+                />
             </div>
             <div className="bottom-panels">
                 {showProblems && problems.length ? (

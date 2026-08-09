@@ -100,12 +100,13 @@ const CHROME = {
      * contain - and they span the card edge to edge rather than sitting inside the text inset.
      * They are also all-or-nothing: either tag being present brings up BOTH panels, so the pair
      * always shows its six slots together rather than one panel appearing alone.
+     *
+     * Their geometry is DERIVED, not measured: each panel holds exactly three square icon slots,
+     * so the slot is a third of the panel's interior width and the interior is one slot tall.
+     * Measuring agrees - slot 2 spans 75px in both panels against a ~226px interior.
      */
-    againstBoxHeight: 42,
+    againstSlots: 3,
     againstGap: 5,
-    /** Measured 35.6 and 40.1 units for the two icons in the reference box; three fit per panel. */
-    againstTile: 38,
-    againstPadding: 3,
     againstLabelInset: 3,
     separatorGap: 3,
     /**
@@ -132,16 +133,24 @@ const CHROME = {
      */
     separator: 'rgb(47, 55, 88)',
     abilitySlot: 'rgba(110, 126, 158, 0.70)',
-    /** Sampled off the blip in the galactic card. */
-    blipFill: 'rgb(206, 173, 45)',
-    blipLabel: 'rgb(20, 20, 20)',
+    /**
+     * The blip is a BLACK disc with a GOLD numeral, not the other way round. A cut straight
+     * through it reads rgb(0,0,0) either side of a rgb(255,215,56) stroke. An earlier reading of
+     * rgb(206,173,45) as the fill was an antialiased edge pixel of the digit itself - the yellow
+     * region measured 7px wide and 14px tall, which is a "1", not a 30px disc.
+     */
+    blipFill: 'rgb(0, 0, 0)',
+    blipLabel: 'rgb(255, 215, 56)',
 
-    // Sampled from the game: each panel uses three tones of one hue - a dark fill, a mid border
-    // and a light label. The border takes the lightest variant, so it matches the label exactly.
-    strongFill: 'rgb(0, 89, 0)',
+    // Three tones of one hue, and the "light dark light" is the SLOTS, not a gradient across one
+    // fill: slots 1 and 3 take the lighter tone, slot 2 a darker hue of it. The border takes the
+    // lightest variant, so it matches the label exactly.
+    strongSlot: 'rgb(0, 91, 0)',
+    strongSlotDark: 'rgb(0, 63, 0)',
     strongBorder: 'rgb(0, 192, 0)',
     strongLabel: 'rgb(0, 192, 0)',
-    weakFill: 'rgb(89, 0, 0)',
+    weakSlot: 'rgb(91, 0, 0)',
+    weakSlotDark: 'rgb(63, 0, 0)',
     weakBorder: 'rgb(192, 0, 0)',
     weakLabel: 'rgb(192, 0, 0)',
 } as const;
@@ -223,7 +232,7 @@ function textStyle(
  */
 function AgainstPanel(
     {
-        label, refs, layout, u, width, labelColor, fill, border,
+        label, refs, layout, u, width, labelColor, slotFill, slotFillDark, border,
     }: {
         label: string;
         refs: readonly { objectId: string; displayName?: string | null }[];
@@ -231,10 +240,14 @@ function AgainstPanel(
         u: (n: number) => string;
         width: number;
         labelColor: string;
-        fill: string;
+        slotFill: string;
+        slotFillDark: string;
         border: string;
     },
 ): React.JSX.Element {
+    // Three square slots fill the interior exactly, so the slot size is the interior width over
+    // three - and the interior is one slot tall.
+    const slot = (width - 2) / CHROME.againstSlots;
     // Fixed width, not flex: a panel shown on its own keeps its half-card size rather than
     // stretching to fill the row.
     return (
@@ -254,47 +267,52 @@ function AgainstPanel(
             </div>
             <div
                 style={{
-                    background: fill,
                     border: `${u(1)} solid ${border}`,
-                    height: u(CHROME.againstBoxHeight),
-                    padding: u(CHROME.againstPadding),
+                    height: u(slot + 2),
                     boxSizing: 'border-box',
                     display: 'flex',
-                    gap: u(CHROME.againstPadding),
-                    alignItems: 'flex-start',
                     overflow: 'hidden',
                 }}
             >
-                {/* The game draws each referenced unit's icon here. Textures are not decoded yet,
-                    so each tile stands in with the unit's name set very small - enough to answer
-                    "did I point this at the right unit?" without pretending to be the artwork. */}
-                {refs.map(r => (
-                    <div
-                        key={r.objectId}
-                        title={r.displayName ? `${r.displayName} (${r.objectId})` : r.objectId}
-                        style={{
-                            width: u(CHROME.againstTile),
-                            height: u(CHROME.againstTile),
-                            flex: '0 0 auto',
-                            background: 'rgba(0, 0, 0, 0.38)',
-                            border: `${u(1)} solid rgba(255, 255, 255, 0.28)`,
-                            boxSizing: 'border-box',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: u(1),
-                            ...fontOf('Arial'),
-                            fontSize: u(4.5),
-                            lineHeight: u(5),
-                            color: 'rgba(255, 255, 255, 0.92)',
-                            textAlign: 'center',
-                            overflow: 'hidden',
-                            wordBreak: 'break-word',
-                        }}
-                    >
-                        {r.displayName ?? r.objectId}
-                    </div>
-                ))}
+                {/* Always three slots, filled left to right. Slots 1 and 3 take the lighter tone
+                    and slot 2 a darker hue of it - that banding is the panel's own chrome, not
+                    something the icons bring, so an empty slot still shows its tone.
+                    The game draws each referenced unit's icon in a slot. Textures are not decoded
+                    yet, so an occupied slot stands in with the unit's name set very small - enough
+                    to answer "did I point this at the right unit?" without faking the artwork. */}
+                {Array.from({ length: CHROME.againstSlots }, (_, i) => {
+                    const ref = refs[i];
+                    return (
+                        <div
+                            key={ref?.objectId ?? `empty-${i}`}
+                            title={ref === undefined
+                                ? undefined
+                                : ref.displayName
+                                    ? `${ref.displayName} (${ref.objectId})`
+                                    : ref.objectId}
+                            style={{
+                                width: u(slot),
+                                height: u(slot),
+                                flex: '0 0 auto',
+                                background: i === 1 ? slotFillDark : slotFill,
+                                boxSizing: 'border-box',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: u(2),
+                                ...fontOf('Arial'),
+                                fontSize: u(4.5),
+                                lineHeight: u(5),
+                                color: 'rgba(255, 255, 255, 0.92)',
+                                textAlign: 'center',
+                                overflow: 'hidden',
+                                wordBreak: 'break-word',
+                            }}
+                        >
+                            {ref === undefined ? '' : ref.displayName ?? ref.objectId}
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
@@ -563,7 +581,8 @@ export function EncyclopediaCard(
                         u={u}
                         width={againstWidth}
                         labelColor={CHROME.strongLabel}
-                        fill={CHROME.strongFill}
+                        slotFill={CHROME.strongSlot}
+                        slotFillDark={CHROME.strongSlotDark}
                         border={CHROME.strongBorder}
                     />
                     <AgainstPanel
@@ -573,7 +592,8 @@ export function EncyclopediaCard(
                         u={u}
                         width={againstWidth}
                         labelColor={CHROME.weakLabel}
-                        fill={CHROME.weakFill}
+                        slotFill={CHROME.weakSlot}
+                        slotFillDark={CHROME.weakSlotDark}
                         border={CHROME.weakBorder}
                     />
                 </div>
