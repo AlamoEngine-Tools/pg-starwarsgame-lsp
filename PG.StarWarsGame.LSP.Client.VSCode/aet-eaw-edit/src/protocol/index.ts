@@ -3,6 +3,7 @@
 
 // The whole wire contract, in one import. See README.md for the rules this module keeps.
 
+export * from './encyclopedia';
 export * from './localisation';
 export * from './story';
 export * from './workspace';

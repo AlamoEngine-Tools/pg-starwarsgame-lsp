@@ -30,6 +30,7 @@ using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
+using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -126,6 +127,7 @@ public static class ServerConfigurator
             .WithHandler<ApplyCreditsBatchHandler>()
             .WithHandler<ValidateCreditsBatchHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
+            .WithHandler<GetEncyclopediaEntryHandler>()
             .WithHandler<GetStoryPlotsHandler>()
             .WithHandler<GetStoryGraphHandler>()
             .WithHandler<GetStoryNodeDetailHandler>()
