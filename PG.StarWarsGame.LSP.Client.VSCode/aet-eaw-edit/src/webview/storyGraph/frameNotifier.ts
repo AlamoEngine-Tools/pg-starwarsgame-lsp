@@ -23,9 +23,16 @@ export class FrameNotifier {
 
     /**
      * @param _schedule How to defer to the next frame. Injected so this is testable without a
-     *     browser - production passes `requestAnimationFrame`.
+     *     browser; the default calls the global.
+     *
+     * The default WRAPS `requestAnimationFrame` rather than referencing it. Passing the bare
+     * function means it is later invoked as `this._schedule(...)`, i.e. with the notifier as
+     * receiver - and the browser rejects that with "Illegal invocation", because a WebIDL
+     * operation on the global accepts no receiver but its own. That threw on the very first poke,
+     * and since the flag below is raised before the call, both notifiers then went silently dead
+     * and the story graph stopped rendering.
      */
-    constructor(private readonly _schedule: (fn: () => void) => void = requestAnimationFrame) {}
+    constructor(private readonly _schedule: (fn: () => void) => void = fn => requestAnimationFrame(fn)) {}
 
     subscribe(callback: () => void): Unsubscribe {
         this._subscribers.add(callback);
@@ -37,6 +44,18 @@ export class FrameNotifier {
         if (this._scheduled) { return; }
         this._scheduled = true;
 
+        try {
+            this._doSchedule();
+        } catch (error) {
+            // Lower the flag before rethrowing. Leaving it raised is what turned a single failed
+            // schedule into a permanently dead notifier: every later call took the early return
+            // above, so the failure was loud once and silent forever after.
+            this._scheduled = false;
+            throw error;
+        }
+    }
+
+    private _doSchedule(): void {
         this._schedule(() => {
             // Cleared before the callbacks run, so a subscriber that pokes this again gets the
             // next frame rather than being swallowed by the flag it is still inside.
