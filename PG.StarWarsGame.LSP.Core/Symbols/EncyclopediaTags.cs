@@ -32,14 +32,17 @@ public static class EncyclopediaTags
     /// </summary>
     public const string PopulationValue = "Population_Value";
 
+    /// <summary>
+    ///     Sub-object list of the unit's active abilities, the ones drawn as icons on the unit.
+    ///     Document order is significant: the popup slots the first two and hides the rest.
+    /// </summary>
+    public const string UnitAbilitiesData = "Unit_Abilities_Data";
+
     /// <summary>GameObject references whose own <see cref="TextId" /> supplies the label.</summary>
     public const string GoodAgainst = "Encyclopedia_Good_Against";
 
     /// <inheritdoc cref="GoodAgainst" />
     public const string VulnerableTo = "Encyclopedia_Vulnerable_To";
-
-    /// <summary>Sub-object list of Unit_Ability entries; GUI-activated ones get a popup slot.</summary>
-    public const string UnitAbilities = "Unit_Abilities_Data";
 
     /// <summary>
     ///     Whether <paramref name="symbol" /> would show a popup - that is, whether it or anything in

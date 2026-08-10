@@ -29,18 +29,20 @@ export interface EncyclopediaLine {
 }
 
 /**
- * One GUI-activated ability, drawn as a slot in the class row. At most two are sent - the popup
- * has room for two, and a unit with more shows the first two in document order.
+ * One active ability from `Unit_Abilities_Data`, in declaration order.
+ *
+ * The list arrives complete. The popup only has room for two slots, but the rest are meaningful -
+ * modders park abilities past the second slot deliberately, to keep an auto-activated one off the
+ * UI or to drive tactical GUI grouping - so trimming is the card's decision, not the server's.
  */
 export interface EncyclopediaAbility {
-    /** The `Unit_Ability`'s `Type`, e.g. `LUCKY_SHOT`. */
+    /** e.g. `DEFEND`, `POWER_TO_WEAPONS`. Drawn in the slot until real icons are reachable. */
     type: string;
-    /** `GUI_Activated_Ability_Name`; its presence is what makes the ability GUI-activated. */
+    /** `GUI_Activated_Ability_Name`; absent for an ability with no command-bar activation. */
     abilityName?: string | null;
     /**
-     * `Alternate_Icon_Name` - the alternate-state icon, and the only icon the schema defines for
-     * an ability. Nothing in the shipped data gives a primary one, so the ordinary icon appears to
-     * come from the engine. Null for almost every ability.
+     * `Alternate_Icon_Name` - the alternate state's icon, and the only icon an ability carries in
+     * data. The default one is hardcoded in the engine, which is why slots show text for now.
      */
     alternateIconName?: string | null;
 }
@@ -121,7 +123,7 @@ export interface GetEncyclopediaEntryResult {
      * is a layout input as well as a value.
      */
     populationValue?: number | null;
-    /** GUI-activated abilities, at most two, in document order. */
+    /** Active abilities in declaration order, complete; the card slots the first two. */
     abilities: EncyclopediaAbility[];
     goodAgainst: EncyclopediaReference[];
     vulnerableTo: EncyclopediaReference[];

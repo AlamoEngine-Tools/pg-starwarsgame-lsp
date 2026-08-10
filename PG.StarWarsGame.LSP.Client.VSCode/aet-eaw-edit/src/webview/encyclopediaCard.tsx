@@ -93,6 +93,11 @@ const CHROME = {
     blipTop: 2,
     /** Ability slots at the right of the class row, measured ~34px = ~19 units. */
     abilityIconSize: 19,
+    /**
+     * The popup has room for exactly two. Measured as two boxes spanning x 440..522 on a card of
+     * 60..530, each ~20 units square with a ~5-unit gap.
+     */
+    abilitySlots: 2,
     abilityGap: 2,
 
     /**
@@ -452,7 +457,9 @@ export function EncyclopediaCard(
                     style={{
                         position: 'absolute',
                         left: u(textLeft),
-                        right: 0,
+                        // Inset from the card edge, not flush to it: the game's right-hand ability
+                        // slot ends about one content inset short of the border.
+                        right: u(layout.offsetX),
                         top: u(CHROME.headerHeight),
                         bottom: 0,
                         display: 'flex',
@@ -486,11 +493,14 @@ export function EncyclopediaCard(
                             {entry.unitClass ?? ''}
                         </span>
 
-                    {/* One slot per GUI-activated ability the object actually has - none, one or
-                        two. The artwork is still a placeholder: an ability's ordinary icon is not
-                        in the data anywhere, only the alternate-state one, so the engine must
-                        supply it. The type stands in so the slot still identifies its ability. */}
-                    {entry.abilities.map(ability => (
+                    {/* Exactly two slots: ability 0 left, ability 1 right. Anything further down
+                        the list is simply not drawn - the game does the same, and modders rely on
+                        it to keep auto-activated abilities off the UI or to drive tactical GUI
+                        grouping, so the extras are intent rather than overflow to surface.
+                        The artwork is a placeholder: an ability's ordinary icon is nowhere in the
+                        data, only the alternate-state one, so the engine must supply it. The type
+                        stands in so a slot still says which ability it is. */}
+                    {entry.abilities.slice(0, CHROME.abilitySlots).map(ability => (
                         <div
                             key={ability.abilityName ?? ability.type}
                             style={{

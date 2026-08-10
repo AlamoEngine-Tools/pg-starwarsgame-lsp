@@ -28,18 +28,17 @@ public sealed record EncyclopediaLine(string Key, string? Text);
 public sealed record EncyclopediaReference(string ObjectId, string? DisplayName);
 
 /// <summary>
-///     One GUI-activated ability, drawn as a slot in the popup's class row.
+///     One active ability from <c>Unit_Abilities_Data</c>, in the order the XML declares them.
 /// </summary>
-/// <param name="Type">The <c>Type</c> of the <c>Unit_Ability</c>, e.g. <c>LUCKY_SHOT</c>.</param>
+/// <param name="Type">The ability type, e.g. <c>DEFEND</c> or <c>POWER_TO_WEAPONS</c>.</param>
 /// <param name="AbilityName">
 ///     <c>GUI_Activated_Ability_Name</c> - the entry it cross-references in the object's
-///     <c>Abilities</c> list. Its presence is what makes the ability GUI-activated at all.
+///     <c>Abilities</c> list. Null for an ability with no command-bar activation.
 /// </param>
 /// <param name="AlternateIconName">
 ///     <c>Alternate_Icon_Name</c>, the icon for the ability's alternate state. This is the only
 ///     icon the schema defines for an ability: nothing in the shipped data gives a *primary* one,
-///     so the ordinary icon appears to be supplied by the engine, presumably keyed off
-///     <paramref name="Type" />. Null for the overwhelming majority of abilities.
+///     because the engine hardcodes those. Null for the overwhelming majority of abilities.
 /// </param>
 public sealed record EncyclopediaAbility(string Type, string? AbilityName, string? AlternateIconName);
 
@@ -59,6 +58,11 @@ public sealed record EncyclopediaAbility(string Type, string? AbilityName, strin
 ///     <c>Population_Value</c>, drawn as the blip at the popup's top-left, or <see langword="null" />
 ///     when the object has none - in which case the game shifts the header left into that space.
 ///     Null rather than 0 for an unparsable value: a wrong number is worse than no blip.
+/// </param>
+/// <param name="Abilities">
+///     Active abilities in declaration order. Every entry is returned, not just the two the popup
+///     slots: hiding the rest is a display rule, and modders deliberately park auto-activated
+///     abilities past the second slot, so the extras are meaningful rather than an error.
 /// </param>
 /// <param name="GoodAgainst">Targets from <c>Encyclopedia_Good_Against</c>.</param>
 /// <param name="VulnerableTo">Targets from <c>Encyclopedia_Vulnerable_To</c>.</param>

@@ -32,9 +32,6 @@ namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 public sealed class GetEncyclopediaEntryHandler
     : IJsonRpcRequestHandler<GetEncyclopediaEntryParams, GetEncyclopediaEntryResult>
 {
-    /// <summary>The popup has room for two ability icons; a unit with more shows the first two.</summary>
-    private const int MaxAbilitySlots = 2;
-
     private readonly ILspConfigurationProvider _config;
     private readonly IGameIndexService _indexService;
     private readonly ISchemaProvider _schema;
@@ -111,22 +108,32 @@ public sealed class GetEncyclopediaEntryHandler
     }
 
     /// <summary>
-    ///     The GUI-activated abilities the popup shows, at most two, in document order.
+    ///     The unit's active abilities, in document order.
     /// </summary>
     /// <remarks>
-    ///     Only <c>Unit_Ability</c> entries carrying <c>GUI_Activated_Ability_Name</c> count: that
-    ///     tag is what binds one to a command-bar button, and an entry without it (a passive like
-    ///     <c>SPOILER_LOCK</c>) has no icon and must not consume a slot. The card has room for two,
-    ///     so a unit with more shows the first two and the rest are simply not drawn.
+    ///     Every <c>Unit_Ability</c> is returned, and deliberately so on both counts.
     ///     <para>
-    ///         Read out of the tag's verbatim fragment rather than a flat value, because
-    ///         <c>Unit_Abilities_Data</c> is a sub-object list - its children are the data.
+    ///         Not filtered to <c>GUI_Activated_Ability_Name</c>: the whole
+    ///         <c>Unit_Abilities_Data</c> list is what the unit shows as icons, and an entry lacking
+    ///         a command-bar binding is still one of them.
+    ///     </para>
+    ///     <para>
+    ///         Not truncated to the two the popup has room for either. Which ones get drawn is a
+    ///         display rule, and modders park abilities past the second slot on purpose - to keep an
+    ///         auto-activated one off the UI, or to drive tactical GUI grouping, which keys off
+    ///         ability type. Cutting the list here would erase intent the client may want to report.
+    ///     </para>
+    ///     <para>
+    ///         Read from the tag's verbatim fragment rather than its value, because
+    ///         <c>Unit_Abilities_Data</c> is a sub-object list - the children are the data and the
+    ///         value itself is only whitespace. Parsed with HAP, which lower-cases element names.
     ///     </para>
     /// </remarks>
     private static IReadOnlyList<EncyclopediaAbility> ResolveAbilities(EffectiveObject effective)
     {
         var fragment = effective.Tags.FirstOrDefault(t =>
-            string.Equals(t.TagName, EncyclopediaTags.UnitAbilities, StringComparison.OrdinalIgnoreCase))
+                string.Equals(t.TagName, EncyclopediaTags.UnitAbilitiesData,
+                    StringComparison.OrdinalIgnoreCase))
             ?.Fragment;
         if (string.IsNullOrWhiteSpace(fragment))
             return [];
@@ -138,19 +145,19 @@ public sealed class GetEncyclopediaEntryHandler
         var abilities = new List<EncyclopediaAbility>();
         foreach (var node in root.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element
-                                 && string.Equals(n.Name, "unit_ability", StringComparison.OrdinalIgnoreCase)))
+                                 && string.Equals(n.Name, "unit_ability",
+                                     StringComparison.OrdinalIgnoreCase)))
         {
-            var guiName = ChildText(node, "gui_activated_ability_name");
-            if (string.IsNullOrWhiteSpace(guiName))
+            // Type is what a slot draws while icons are out of reach, so an entry without one has
+            // nothing to show - and letting it take a slot would displace the ability after it.
+            var type = ChildText(node, "type");
+            if (string.IsNullOrWhiteSpace(type))
                 continue;
 
             abilities.Add(new EncyclopediaAbility(
-                ChildText(node, "type") ?? string.Empty,
-                guiName,
+                type,
+                ChildText(node, "gui_activated_ability_name"),
                 ChildText(node, "alternate_icon_name")));
-
-            if (abilities.Count == MaxAbilitySlots)
-                break;
         }
 
         return abilities;

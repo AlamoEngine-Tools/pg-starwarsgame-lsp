@@ -177,6 +177,120 @@ public sealed class GetEncyclopediaEntryHandlerTest
         Assert.Equal(["Star Destroyer"], result.VulnerableTo.Select(r => r.DisplayName));
     }
 
+    // ── active abilities ─────────────────────────────────────────────────────
+
+    private const string ThreeAbilities = """
+        <Unit_Abilities_Data SubObjectList="Yes">
+            <!-- Primary ability -->
+            <Unit_Ability>
+                <Type>DEFEND</Type>
+                <Recharge_Seconds>30.0f</Recharge_Seconds>
+                <GUI_Activated_Ability_Name>Infiltrator_Grenade_Attack</GUI_Activated_Ability_Name>
+            </Unit_Ability>
+            <Unit_Ability>
+                <Type>POWER_TO_WEAPONS</Type>
+            </Unit_Ability>
+            <Unit_Ability>
+                <Type>SPREAD_OUT</Type>
+                <Mod_Multiplier>SPEED_MULTIPLIER, 0.5f</Mod_Multiplier>
+            </Unit_Ability>
+        </Unit_Abilities_Data>
+        """;
+
+    [Fact]
+    public async Task Handle_UnitAbilities_ReportsEveryAbilityInDocumentOrder()
+    {
+        // Order is the whole contract: the card slots ability 0 left and ability 1 right. The rest
+        // are returned too - the game hides them, and modders rely on that, so whether to draw
+        // them is the client's call and not something to decide by truncating here.
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U",
+            new VariantTag("Unit_Abilities_Data", string.Empty, ThreeAbilities, 0));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal(["DEFEND", "POWER_TO_WEAPONS", "SPREAD_OUT"],
+            result.Abilities.Select(a => a.Type));
+    }
+
+    [Fact]
+    public async Task Handle_UnitAbilities_CapturesTheGuiActivatedNameWhereThereIsOne()
+    {
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U",
+            new VariantTag("Unit_Abilities_Data", string.Empty, ThreeAbilities, 0));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal("Infiltrator_Grenade_Attack", result.Abilities[0].AbilityName);
+        Assert.Null(result.Abilities[1].AbilityName);
+    }
+
+    [Fact]
+    public async Task Handle_NoAbilitiesTag_ReportsNone()
+    {
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U", Tag("Mass", "5"));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Empty(result.Abilities);
+    }
+
+    [Fact]
+    public async Task Handle_AbilityWithoutAType_IsSkippedRatherThanSlottedBlank()
+    {
+        // Type is what the slot draws until real icons exist, so an entry without one has nothing
+        // to show - and silently occupying a slot would shift the ability after it.
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U", new VariantTag(
+            "Unit_Abilities_Data", string.Empty,
+            "<Unit_Abilities_Data><Unit_Ability><Recharge_Seconds>1</Recharge_Seconds></Unit_Ability>"
+            + "<Unit_Ability><Type>DEFEND</Type></Unit_Ability></Unit_Abilities_Data>",
+            0));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal(["DEFEND"], result.Abilities.Select(a => a.Type));
+    }
+
+    [Fact]
+    public async Task Handle_Variant_InheritsAbilitiesFromBase()
+    {
+        var index = IndexWith(new FakeLocalisation(), Sym("V", "B"), Sym("B"));
+        var source = new FakeVariantTagSource()
+            .With("B", new VariantTag("Unit_Abilities_Data", string.Empty, ThreeAbilities, 0))
+            .With("V", Tag("Mass", "1"));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "V" }, CancellationToken.None);
+
+        Assert.Equal(3, result.Abilities.Count);
+        Assert.Equal("DEFEND", result.Abilities[0].Type);
+    }
+
+    [Fact]
+    public async Task Handle_AbilityWithAlternateIcon_ReportsIt()
+    {
+        // The alternate-state icon is the only icon an ability carries in data - the default is
+        // hardcoded in the engine - so it is worth surfacing even though nothing draws it yet.
+        var index = IndexWith(new FakeLocalisation(), Sym("U"));
+        var source = new FakeVariantTagSource().With("U", new VariantTag(
+            "Unit_Abilities_Data", string.Empty,
+            "<Unit_Abilities_Data><Unit_Ability><Type>SHIELD</Type>"
+            + "<Alternate_Icon_Name>i_shield.tga</Alternate_Icon_Name></Unit_Ability></Unit_Abilities_Data>",
+            0));
+
+        var result = await Handler(index, source)
+            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
+
+        Assert.Equal("i_shield.tga", result.Abilities[0].AlternateIconName);
+    }
+
     // ── the population blip ──────────────────────────────────────────────────
 
     [Fact]
@@ -229,100 +343,6 @@ public sealed class GetEncyclopediaEntryHandlerTest
             .Handle(new GetEncyclopediaEntryParams { ObjectId = "V" }, CancellationToken.None);
 
         Assert.Equal(2, result.PopulationValue);
-    }
-
-    // ── GUI-activated abilities ──────────────────────────────────────────────
-
-    private static VariantTag AbilitiesTag(string innerXml)
-    {
-        const string name = "Unit_Abilities_Data";
-        var fragment = $"<{name} SubObjectList=\"Yes\">{innerXml}</{name}>";
-        return new VariantTag(name, string.Empty, fragment, 0);
-    }
-
-    [Fact]
-    public async Task Handle_OnlyAbilitiesWithAGuiName_Count()
-    {
-        // A Unit_Ability without GUI_Activated_Ability_Name has no command-bar button, so it must
-        // not take one of the popup's two ability slots.
-        var index = IndexWith(new FakeLocalisation(), Sym("U"));
-        var source = new FakeVariantTagSource().With("U", AbilitiesTag("""
-            <Unit_Ability>
-                <Type>LUCKY_SHOT</Type>
-                <GUI_Activated_Ability_Name>Lucky</GUI_Activated_Ability_Name>
-            </Unit_Ability>
-            <Unit_Ability>
-                <Type>SPOILER_LOCK</Type>
-            </Unit_Ability>
-            """));
-
-        var result = await Handler(index, source)
-            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
-
-        Assert.Single(result.Abilities);
-        Assert.Equal("LUCKY_SHOT", result.Abilities[0].Type);
-        Assert.Equal("Lucky", result.Abilities[0].AbilityName);
-    }
-
-    [Fact]
-    public async Task Handle_MoreThanTwoGuiAbilities_KeepsTheFirstTwoInDocumentOrder()
-    {
-        var index = IndexWith(new FakeLocalisation(), Sym("U"));
-        var source = new FakeVariantTagSource().With("U", AbilitiesTag("""
-            <Unit_Ability><Type>ONE</Type><GUI_Activated_Ability_Name>A</GUI_Activated_Ability_Name></Unit_Ability>
-            <Unit_Ability><Type>TWO</Type><GUI_Activated_Ability_Name>B</GUI_Activated_Ability_Name></Unit_Ability>
-            <Unit_Ability><Type>THREE</Type><GUI_Activated_Ability_Name>C</GUI_Activated_Ability_Name></Unit_Ability>
-            """));
-
-        var result = await Handler(index, source)
-            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
-
-        Assert.Equal(["ONE", "TWO"], result.Abilities.Select(a => a.Type));
-    }
-
-    [Fact]
-    public async Task Handle_AbilityWithAlternateIcon_ReportsIt()
-    {
-        var index = IndexWith(new FakeLocalisation(), Sym("U"));
-        var source = new FakeVariantTagSource().With("U", AbilitiesTag("""
-            <Unit_Ability>
-                <Type>SHIELD</Type>
-                <GUI_Activated_Ability_Name>S</GUI_Activated_Ability_Name>
-                <Alternate_Icon_Name>i_shield.tga</Alternate_Icon_Name>
-            </Unit_Ability>
-            """));
-
-        var result = await Handler(index, source)
-            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
-
-        Assert.Equal("i_shield.tga", result.Abilities[0].AlternateIconName);
-    }
-
-    [Fact]
-    public async Task Handle_NoAbilitiesTag_ReportsNone()
-    {
-        var index = IndexWith(new FakeLocalisation(), Sym("U"));
-        var source = new FakeVariantTagSource().With("U", Tag("Mass", "5"));
-
-        var result = await Handler(index, source)
-            .Handle(new GetEncyclopediaEntryParams { ObjectId = "U" }, CancellationToken.None);
-
-        Assert.Empty(result.Abilities);
-    }
-
-    [Fact]
-    public async Task Handle_Variant_InheritsAbilitiesFromBase()
-    {
-        var index = IndexWith(new FakeLocalisation(), Sym("V", "B"), Sym("B"));
-        var source = new FakeVariantTagSource()
-            .With("B", AbilitiesTag(
-                "<Unit_Ability><Type>BASE</Type><GUI_Activated_Ability_Name>X</GUI_Activated_Ability_Name></Unit_Ability>"))
-            .With("V", Tag("Mass", "1"));
-
-        var result = await Handler(index, source)
-            .Handle(new GetEncyclopediaEntryParams { ObjectId = "V" }, CancellationToken.None);
-
-        Assert.Equal(["BASE"], result.Abilities.Select(a => a.Type));
     }
 
     // ── layout travels with the text ─────────────────────────────────────────
