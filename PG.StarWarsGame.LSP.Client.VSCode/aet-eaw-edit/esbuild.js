@@ -63,6 +63,7 @@ async function main() {
       'src/webview/translationEditor.tsx',
       'src/webview/creditsEditor.tsx',
       'src/webview/creditsPreview.tsx',
+      'src/webview/encyclopediaPreview.tsx',
     ],
     bundle: true,
     format: 'iife',

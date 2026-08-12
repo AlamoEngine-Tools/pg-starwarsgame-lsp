@@ -13,7 +13,7 @@ import { ReactNode, useEffect, useRef } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
 import { LocRow } from '../loc/locRow';
-import { useEdgeResize } from '../useEdgeResize';
+import { RightDock } from '../shared/RightDock';
 import { Shell } from './locGridStyles';
 
 const ROW_HEIGHT = 26;
@@ -76,9 +76,6 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
         estimateSize: () => ROW_HEIGHT,
         overscan: 12,
     });
-
-    const { size: dockWidth, handleProps } = useEdgeResize(
-        dockWidthMemo, 210, 520, 'w', v => { dockWidthMemo = v; });
 
     const { focusRowIndex, onFocused, rows } = props;
 
@@ -174,14 +171,15 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
                 {props.footer && <div className="grid-footer">{props.footer}</div>}
                 </div>
 
-                <div className="dock" style={{ width: `${dockWidth}px` }}>
-                    <div className="resize-handle" {...handleProps} />
-                    <div className="dock-header">{props.dockHeader}</div>
-                    <div className="dock-content">{props.dockContent}</div>
-                    {props.dockOverview && (
-                        <div className="dock-overview">{props.dockOverview}</div>
-                    )}
-                </div>
+                <RightDock
+                    initialWidth={dockWidthMemo}
+                    minWidth={210}
+                    maxWidth={520}
+                    onWidthChange={v => { dockWidthMemo = v; }}
+                    header={props.dockHeader}
+                    content={props.dockContent}
+                    overview={props.dockOverview}
+                />
             </div>
         </Shell>
     );

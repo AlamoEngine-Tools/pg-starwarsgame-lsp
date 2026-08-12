@@ -15,6 +15,7 @@ import {
 	TransportKind,
 } from 'vscode-languageclient/node';
 import { CreditsPreviewPanel } from './creditsPreviewPanel';
+import { EncyclopediaPanel } from './encyclopediaPanel';
 import { initDialogGeometryStorage } from './dialogGeometryStorage';
 import { LocalisationEditorPanel } from './localisationEditorPanel';
 import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
@@ -22,8 +23,9 @@ import { LspGateway } from './lsp/lspGateway';
 import { vscodeMessageSink } from './lsp/vscodeMessageSink';
 import {
     ConvertLocalisationFormatResult, ExportLocalisationToDatResult, GetEffectiveObjectResult,
-    GetLocalisationProjectsResult, GetRootLocalisationConfigResult, GetStoryPlotsResult,
-    LOC_CATEGORY, LocProjectInfo, StoryGraphChangedParams, StorySimChangedParams,
+    GetEncyclopediaEntryResult, GetLocalisationProjectsResult, GetRootLocalisationConfigResult,
+    GetStoryPlotsResult, LOC_CATEGORY, LocProjectInfo, StoryGraphChangedParams,
+    StorySimChangedParams,
 } from './protocol';
 import { StoryGraphPanel } from './storyGraphPanel';
 import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
@@ -242,6 +244,7 @@ function resolveFeatureFlags() {
 			// fires) - that is the escape hatch for trying it out.
 			storySimulator: flag('tools.storySimulator', false),
 			variants:       flag('tools.variants', true),
+			encyclopedia:   flag('tools.encyclopedia', true),
 		},
 		story: {
 			discovery:        flag('story.discovery', false),
@@ -1041,6 +1044,44 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			})
 	);
 
+	// Opens the encyclopedia popup preview for a GameObject. Triggered by the "preview encyclopedia"
+	// code lens (objectId passed as the first argument), or from the command palette (prompts).
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.showEncyclopedia', async (objectIdArg?: string) => {
+			if (!lsp.requireRunning()) { return; }
+
+			let objectId = objectIdArg;
+			if (!objectId) {
+				objectId = await vscode.window.showInputBox({
+					title: 'Preview Encyclopedia Popup',
+					prompt: 'Name of the GameObject whose popup to preview',
+					validateInput: v => (v?.trim() ? null : 'Object name is required'),
+				});
+			}
+			if (!objectId?.trim()) { return; }
+			const id = objectId.trim();
+
+			// Both the first open and the SP/MP toggle go through here, so the panel never has to
+			// know how to reach the server - it asks, this fetches.
+			const load = async (multiplayer: boolean, retarget: boolean): Promise<void> => {
+				const entry = await lsp.requestOrReport<GetEncyclopediaEntryResult>(
+					'aet/getEncyclopediaEntry', { objectId: id, multiplayer },
+					'load the encyclopedia entry');
+				if (entry === undefined) { return; }
+
+				if (retarget) {
+					EncyclopediaPanel.show(context.extensionUri, entry,
+						mp => void load(mp, false));
+				} else {
+					EncyclopediaPanel.update(entry);
+				}
+			};
+
+			// Retargeting keeps whatever SP/MP mode the panel is already showing.
+			await load(EncyclopediaPanel.multiplayer(), true);
+		})
+	);
+
 	// Opens the read-only "effective object" virtual document for a variant GameObject. Triggered by
 	// the "show effective object" code lens (objectId passed as the first argument), or from the command
 	// palette (prompts for the object name).
@@ -1091,5 +1132,6 @@ export async function deactivate(): Promise<void> {
 	StoryGraphPanel.disposeAll();
 	LocalisationEditorPanel.disposeAll();
 	CreditsPreviewPanel.disposeAll();
+	EncyclopediaPanel.disposeAll();
 	await stopLspClient();
 }

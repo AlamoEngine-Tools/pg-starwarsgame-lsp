@@ -163,6 +163,11 @@
         "enablement": "config.aet-eaw-edit.features.tools.variants"
       },
       {
+        "command": "aet-eaw-edit.lsp.showEncyclopedia",
+        "title": "EaWEdit: Preview Encyclopedia Popup",
+        "enablement": "config.aet-eaw-edit.features.tools.encyclopedia"
+      },
+      {
         "command": "aet-eaw-edit.lsp.openStoryGraph",
         "title": "EaWEdit: Open Story Graph",
         "icon": "$(type-hierarchy)",
@@ -639,6 +644,12 @@
             "type": "boolean",
             "default": true,
             "markdownDescription": "Enables the variant-inheritance tooling: the *Show Effective Object* command and its code lens.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.tools.encyclopedia": {
+            "order": 2100,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables the encyclopedia popup preview: the *Preview Encyclopedia Popup* command and its code lens.\n\nThe preview reads translations but never writes any, so it is independent of `#aet-eaw-edit.features.tools.localisation#`.\n\nChanging this setting automatically restarts the LSP server."
           }
         }
       }

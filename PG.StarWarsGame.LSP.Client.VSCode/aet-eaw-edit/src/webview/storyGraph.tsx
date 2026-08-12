@@ -18,9 +18,14 @@ import {
     CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
-import { dockBodyCss, dockChromeCss, dockOverviewCss } from './shared/dockChrome';
+import { dockBodyCss, dockChromeCss, dockOverviewCss, rightDockCss } from './shared/dockChrome';
+import { RightDock } from './shared/RightDock';
 import { ProblemsPanel } from './shared/ProblemsPanel';
 import { FrameNotifier } from './storyGraph/frameNotifier';
+import { canReuseStoredLayout } from './storyGraph/layoutReuse';
+import { labelLayout, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
+import { shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
+import { Extent, fitZoom } from './storyGraph/viewportFit';
 import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
 import { paramRowSpecs } from './storyGraph/paramRows';
 import { StagedRenames } from './storyGraph/stagedRenames';
@@ -100,6 +105,13 @@ const EVENT_BODY_PAD = 26;
 
 /** Above this node count, Event nodes start with Trigger/Reward collapsed (perf on big campaigns). */
 const LARGE_GRAPH_NODE_COUNT = 60;
+
+/**
+ * How many frames to wait for the container to be laid out before giving up on measuring it.
+ * ~1s at 60fps: long enough for a webview that is still settling, short enough that a genuinely
+ * zero-sized panel does not hang the first render.
+ */
+const MEASURE_FRAME_BUDGET = 60;
 
 type NodeSection = 'general' | 'trigger' | 'reward';
 
@@ -545,6 +557,13 @@ const K_DETAIL = 0.32;
 // window mounts as real interactive nodes.
 const K_LABEL = 0.12;
 
+/** Reference text and size for measuring the LOD label font's average character advance. */
+const LABEL_SAMPLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789';
+const LABEL_MEASURE_PX = 100;
+
+/** Inset between a node's rect and its label text, in screen pixels. */
+const LABEL_PAD = 4;
+
 // Overview colour for a node (canvas needs a concrete colour, not a CSS var): events by lifecycle
 // (matching the node border + legend), junctions purple.
 function lodColor(dto: StoryGraphNodeDto): string {
@@ -896,9 +915,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             || context.type === 'nodetranslated') {
             scheduleAreaChanged();
         }
-        // In windowed (big-graph) mode, pan/zoom reconciles which nodes are mounted to the viewport:
-        // zoomed out shows the cheap overview, zoomed in mounts just the visible screenful.
-        if ((context.type === 'zoomed' || context.type === 'translated') && windowed) {
+        // Zoom always reconciles - crossing K_DETAIL swaps between the overview and real nodes for
+        // every graph, however small. Panning only matters when windowed, where it changes which
+        // screenful is mounted; an unwindowed graph already has everything mounted.
+        if (context.type === 'zoomed' || (context.type === 'translated' && windowed)) {
             scheduleReconcile();
         }
         // Swimlane bounds only depend on where the nodes are, not on the viewport.
@@ -1017,21 +1037,26 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     ): boolean => {
         const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
         const events = nodes.filter(n => n.kind === 'Event');
-        if (events.length === 0 || !events.every(n => stored.has(layoutKey(n)))) { return false; }
+        if (events.length === 0 || !canReuseStoredLayout(events.map(layoutKey), new Set(stored.keys()))) {
+            return false;
+        }
         graphModel.clear();
         const branchByEvent = branchIndex(nodes);
         const colorFor = (dto: StoryGraphNodeDto): string => overviewColor(dto, branchOfNodeId(dto.id, branchByEvent));
-        for (const dto of nodes) {
-            if (dto.kind !== 'Event') { continue; }
-            const e = stored.get(layoutKey(dto))!;
+        for (const dto of events) {
+            // An event with no stored entry - newly added since the layout was written - is left
+            // for the placement pass below rather than discarding everyone else's positions.
+            const e = stored.get(layoutKey(dto));
+            if (e === undefined) { continue; }
             const { w, h } = modelSizeFor(dto);
             graphModel.set(dto.id, { dto, x: e.x, y: e.y, w, h, color: colorFor(dto) });
         }
-        // Junctions sit at the midpoint of their event neighbours. Some connect only to OTHER
-        // junctions, so iterate until those chains resolve; anything still unplaced (a cycle or an
-        // orphan) lands at the graph centre - never (0,0), which would stretch the minimap's extent
-        // and leave an empty region you can accidentally pan to.
-        const junctions = nodes.filter(n => n.kind !== 'Event');
+        // Everything still unplaced - junctions, and events added since the layout was saved - sits
+        // at the midpoint of its neighbours. Some connect only to OTHER unplaced nodes, so iterate
+        // until those chains resolve; anything left over (a cycle or an orphan) lands at the graph
+        // centre - never (0,0), which would stretch the minimap's extent and leave an empty region
+        // you can accidentally pan to.
+        const junctions = nodes.filter(n => !graphModel.has(n.id));
         for (let pass = 0; pass < 6; pass++) {
             let changed = false;
             for (const dto of junctions) {
@@ -1057,6 +1082,12 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const viewportRect = (margin: number): { minX: number; minY: number; maxX: number; maxY: number } => {
         const { k, x, y } = area.area.transform;
         const w = container.clientWidth, h = container.clientHeight;
+        // An unmeasured container (or a zero zoom) would give a zero-area - or NaN - rectangle, and
+        // then nothing is "in window" and the graph mounts nothing at all. Cull nothing instead:
+        // mounting too much is a performance problem, mounting nothing looks like a broken editor.
+        if (!(w > 0) || !(h > 0) || !(k > 0)) {
+            return { minX: -Infinity, minY: -Infinity, maxX: Infinity, maxY: Infinity };
+        }
         const minX = -x / k, minY = -y / k, maxX = (w - x) / k, maxY = (h - y) / k;
         const mx = (maxX - minX) * margin, my = (maxY - minY) * margin;
         return { minX: minX - mx, minY: minY - my, maxX: maxX + mx, maxY: maxY + my };
@@ -1116,15 +1147,29 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         const wasApplying = applyingServerGraph;
         applyingServerGraph = true;
         try {
-            for (const id of present) {
-                for (const edge of lastEdges) {
-                    if (edge.fromId === id || edge.toId === id) {
-                        mountedConnKeys.delete(connectionKey(edge.fromId, edge.toId, edge.kind));
-                    }
+            // Batched, deliberately - the mirror of mountNodes.
+            //
+            // This used to remove one node at a time, and each `await` let rete re-render before
+            // the next. Dropping a whole large campaign to the overview then played out node by
+            // node: parts of the graph turned into LOD rectangles while the rest were still real
+            // nodes, which is the stutter you see on a first open. Worse, the per-node version
+            // rescanned every connection and every edge for each node - O(nodes x edges) on the
+            // one path where both are largest.
+            const removing = new Set(present);
+
+            const doomed = editor.getConnections()
+                .filter(c => removing.has(c.source) || removing.has(c.target));
+            await Promise.all(doomed.map(c => editor.removeConnection(c.id)));
+
+            // One pass over the edges rather than one pass per node.
+            for (const edge of lastEdges) {
+                if (removing.has(edge.fromId) || removing.has(edge.toId)) {
+                    mountedConnKeys.delete(connectionKey(edge.fromId, edge.toId, edge.kind));
                 }
-                await removeNodeWithConnections(id);
-                mountedIds.delete(id);
             }
+
+            await Promise.all(present.map(id => editor.removeNode(id)));
+            for (const id of present) { mountedIds.delete(id); }
         } finally {
             applyingServerGraph = wasApplying;
         }
@@ -1137,23 +1182,35 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // screenful (+margin) and unmount what scrolled away. Coalesced via scheduleReconcile.
     let reconciling = false;
     let reconcilePending = false;
+    /**
+     * Brings the mounted set and the overview into line with the current zoom.
+     *
+     * Runs for EVERY graph, not just windowed ones. The overview is a zoom decision - below
+     * K_DETAIL a real node is an unreadable smudge whatever the graph's size - while `windowed`
+     * only decides whether the detailed view mounts the visible screenful or all of it.
+     */
     const reconcileWindow = async (): Promise<void> => {
-        if (!windowed) { return; }
         if (reconciling) { reconcilePending = true; return; }
         reconciling = true;
         try {
             do {
                 reconcilePending = false;
-                if (area.area.transform.k < K_DETAIL) {
+                if (shouldShowOverview(area.area.transform.k, K_DETAIL)) {
+                    // Unmount even for a small graph: the overview canvas sits BEHIND the nodes, so
+                    // leaving them mounted would draw both, with shrunken real nodes on top of it.
                     if (mountedIds.size > 0) { await unmountNodes([...mountedIds]); }
                     // Toggle the overview on. It re-renders on geometryChange, so fire that ONLY on the
                     // transition, never per frame - otherwise zooming rebuilds the whole SVG each frame.
                     if (!lodActive) { lodActive = true; scheduleGeometryChanged(); }
                 } else {
                     if (lodActive) { lodActive = false; scheduleGeometryChanged(); }
-                    const r = viewportRect(0.5);
                     const want = new Set<string>();
-                    for (const [id, m] of graphModel) { if (inWindow(m, r)) { want.add(id); } }
+                    if (windowed) {
+                        const r = viewportRect(0.5);
+                        for (const [id, m] of graphModel) { if (inWindow(m, r)) { want.add(id); } }
+                    } else {
+                        for (const id of graphModel.keys()) { want.add(id); }
+                    }
                     await unmountNodes([...mountedIds].filter(id => !want.has(id)));
                     await mountNodes([...want].filter(id => !mountedIds.has(id)));
                 }
@@ -1172,20 +1229,49 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     };
 
     // Fit the viewport to the whole model (mirrors AreaExtensions.zoomAt, which needs mounted nodes).
-    const fitModel = async (): Promise<void> => {
-        if (graphModel.size === 0) { return; }
+    /**
+     * Centres the model in the viewport at the zoom that fits it.
+     *
+     * Returns whether it actually fitted. False means the container had no measurable size, and
+     * the caller must NOT read `transform.k` to decide anything: an unmeasured container used to
+     * yield k = 0, which reads as "enormous graph" and sent the whole thing down the windowed
+     * branch, mounting nothing.
+     */
+    const fitModel = async (): Promise<boolean> => {
+        if (graphModel.size === 0) { return false; }
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         for (const m of graphModel.values()) {
             minX = Math.min(minX, m.x); minY = Math.min(minY, m.y);
             maxX = Math.max(maxX, m.x + m.w); maxY = Math.max(maxY, m.y + m.h);
         }
-        const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
         const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
-        const w = container.clientWidth, h = container.clientHeight;
-        const k = Math.min((h / bh) * 0.9, (w / bw) * 0.9, 1);
-        area.area.transform.x = w / 2 - cx * k;
-        area.area.transform.y = h / 2 - cy * k;
+
+        const view = await measuredView();
+        if (view === null) { return false; }
+
+        const k = fitZoom(view, { width: maxX - minX, height: maxY - minY });
+        if (k === null) { return false; }
+
+        area.area.transform.x = view.width / 2 - cx * k;
+        area.area.transform.y = view.height / 2 - cy * k;
         await area.area.zoom(k, 0, 0);
+        return true;
+    };
+
+    /**
+     * The container's size, waiting a few frames for layout if it has not happened yet.
+     *
+     * A webview that is still laying out reports 0x0, and the graph can be handed its data before
+     * that settles. Bounded rather than open-ended: if the panel really is zero-sized (hidden, or
+     * collapsed to nothing) we give up and let the caller fall back, instead of never rendering.
+     */
+    const measuredView = async (): Promise<Extent | null> => {
+        for (let frame = 0; frame < MEASURE_FRAME_BUDGET; frame++) {
+            const width = container.clientWidth, height = container.clientHeight;
+            if (width > 0 && height > 0) { return { width, height }; }
+            await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        }
+        return null;
     };
 
     // Rebuild the model from a fresh server graph WITHOUT refitting: existing nodes keep their
@@ -1262,18 +1348,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         lastEdges = edges;
 
         if (buildModelFromLayout(nodes, edges, layout)) {
-            // Stored layout exists → no elk, no full mount. Fit the model; if the whole graph fits at
-            // a readable zoom (small graph) mount it all, otherwise window it behind the LOD overview.
+            // Stored layout exists → no elk. Fit it, then let cost decide whether to window and
+            // zoom decide whether to draw the overview. A failed fit only means the viewport was
+            // never measured; `reconcileWindow` reads the zoom itself, so nothing here depends on
+            // a fabricated one.
             await fitModel();
-            if (area.area.transform.k >= K_DETAIL) {
-                windowed = false;
-                lodActive = false;
-                await mountAllFromModel();
-                rebuildModel();
-            } else {
-                windowed = true; // big graph → cheap overview; the window mounts as the user zooms in
-                lodActive = true;
-            }
+            windowed = shouldWindow(graphModel.size);
+            await reconcileWindow();
+            if (!windowed && !lodActive) { rebuildModel(); }
             scheduleGeometryChanged();
             scheduleAreaChanged();
             return;
@@ -1305,10 +1387,30 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             })
             .filter((c): c is StoryConnection => c !== null);
         await Promise.all(conns.map(c => editor.addConnection(c)));
+
+        // This path adds nodes to the editor directly rather than through mountNodes, so record
+        // what is now mounted. Without this the bookkeeping says "nothing is mounted" while the
+        // editor holds the entire campaign, and the later teardown finds nothing to remove: the
+        // overview is switched on OVER a full set of real nodes, which is both of them drawn at
+        // once and the stutter that comes with it.
+        for (const node of created) { mountedIds.add(node.id); }
+        for (const edge of edges) {
+            if (byId.has(edge.fromId) && byId.has(edge.toId)) {
+                mountedConnKeys.add(connectionKey(edge.fromId, edge.toId, edge.kind));
+            }
+        }
+
         await arrange.layout({ options: ARRANGE_OPTIONS });
         rebuildModel();
         saveAllPositions(); // persist so the next open takes the fast path
-        void AreaExtensions.zoomAt(area, editor.getNodes());
+        await AreaExtensions.zoomAt(area, editor.getNodes());
+
+        // Elk needs every node mounted to lay them out, so this path necessarily starts unwindowed.
+        // Now that positions exist, adopt the same cost decision every later open makes - otherwise
+        // a first-ever open of a large campaign stays fully mounted for the whole session, which is
+        // exactly when it is slowest and most noticeable.
+        windowed = shouldWindow(graphModel.size);
+        await reconcileWindow();
     };
 
     /** Reconciles the live graph against the server's - no re-layout, viewport untouched. */
@@ -1591,7 +1693,12 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
             ctx.clearRect(0, 0, w, h);
-            if (!windowed) { return; } // small graph: fully mounted, the real nodes are the view
+            // Two reasons to paint: a windowed graph always needs stand-ins for the nodes it has
+            // not mounted and the edges rete is not drawing, and ANY graph zoomed past K_DETAIL is
+            // showing the overview instead of real nodes. This used to test `windowed` alone, on
+            // the assumption that a small graph is always fully mounted - no longer true now that
+            // zooming out unmounts one, which left a blank canvas rather than an overview.
+            if (!windowed && !lodActive) { return; }
             const { k, x, y } = area.area.transform;
             // Edges: culled to the viewport, and cheap straight lines when zoomed out but socket-
             // anchored beziers once zoomed in (where the curve actually reads). Both go output (right)
@@ -1622,10 +1729,35 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // Off-screen nodes skipped. Font/colour set once, labels truncated (no per-node clip).
             const showLabels = k >= K_LABEL;
             let fontPx = 11;
+            let maxLines = 1;
+            let advancePerPx = 0;
             let labelColor = '#cccccc';
             if (showLabels) {
                 labelColor = getComputedStyle(container).getPropertyValue('--vscode-editor-foreground').trim() || '#cccccc';
-                fontPx = Math.min(13, Math.max(8, Math.round(k * 55)));
+
+                // Measure the font once per frame instead of assuming 0.55em per character. The
+                // guess is what made the truncation land in the wrong place, so most names were
+                // sliced down to their first few characters.
+                ctx.font = `${LABEL_MEASURE_PX}px sans-serif`;
+                advancePerPx = ctx.measureText(LABEL_SAMPLE).width
+                    / LABEL_SAMPLE.length / LABEL_MEASURE_PX;
+
+                // Sized so the graph's longest label fits a node - from the whole model, not just
+                // what is on screen, so the text does not resize while panning.
+                let longest = '';
+                let nodeWidth = 0;
+                let nodeHeight = 0;
+                for (const m of graphModel.values()) {
+                    if (m.dto.kind !== 'Event') { continue; }
+                    if (m.dto.label.length > longest.length) { longest = m.dto.label; }
+                    if (m.w > nodeWidth) { nodeWidth = m.w; }
+                    if (m.h > nodeHeight) { nodeHeight = m.h; }
+                }
+                const fit = labelLayout(longest, Math.max(0, nodeWidth * k - LABEL_PAD * 2),
+                    Math.max(0, nodeHeight * k - LABEL_PAD * 2), advancePerPx,
+                    Math.min(13, Math.max(8, Math.round(k * 55))));
+                fontPx = fit.fontPx;
+                maxLines = fit.maxLines;
                 ctx.font = `${fontPx}px sans-serif`;
                 ctx.textBaseline = 'middle';
             }
@@ -1643,9 +1775,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 if (showLabels && m.dto.kind === 'Event' && sw > 30) {
                     ctx.globalAlpha = 1;
                     ctx.fillStyle = labelColor;
-                    const maxChars = Math.max(1, Math.floor((sw - 8) / (fontPx * 0.55)));
-                    const text = m.dto.label.length > maxChars ? m.dto.label.slice(0, maxChars) : m.dto.label;
-                    ctx.fillText(text, sx + 4, sy + sh / 2);
+                    // Arithmetic from the measured advance rather than measureText per node -
+                    // hundreds of these are drawn per frame.
+                    const lines = wrapLabel(m.dto.label, sw - LABEL_PAD * 2, maxLines,
+                        s => s.length * advancePerPx * fontPx);
+                    // Centre the block vertically, so a one-line label still sits mid-node.
+                    const step = fontPx * LINE_RATIO;
+                    let ly = sy + sh / 2 - (lines.length - 1) * step / 2;
+                    for (const line of lines) {
+                        ctx.fillText(line, sx + LABEL_PAD, ly);
+                        ly += step;
+                    }
                 }
             }
             ctx.globalAlpha = 1;
@@ -2967,15 +3107,7 @@ const Shell = styled.div`
     }
 
     /* ── Right dock ─────────────────────────────────────────────────────── */
-    .right-dock {
-        position: relative;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        border-left: 1px solid var(--vscode-panel-border);
-        background: var(--vscode-sideBar-background);
-    }
+    ${rightDockCss}
     /* The dial is always dead-centre; Save/Validate float over the sides so they never shift it. */
     .dock-header {
         position: relative;
@@ -2988,8 +3120,6 @@ const Shell = styled.div`
     }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
-    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
-    .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
     ${dockBodyCss}
     ${dockOverviewCss}
     /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
@@ -3689,9 +3819,6 @@ function App(): React.JSX.Element {
     const severity = !validated ? 'unvalidated' : worstSeverity(problems);
     const severityIcon = severityIconFor(severity);
 
-    const { size: dockWidth, handleProps: dockResize } = useEdgeResize(
-        paletteWidthMemo, 210, 520, 'w', v => { paletteWidthMemo = v; });
-
     return (
         <Shell>
             <GlobalStyle />
@@ -3732,9 +3859,12 @@ function App(): React.JSX.Element {
                     />
                     {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
                 </div>
-                <div className="right-dock" style={{ width: dockWidth }}>
-                    <div className="resize-handle-w" title="Drag to resize" {...dockResize} />
-                    <div className="dock-header">
+                <RightDock
+                    initialWidth={paletteWidthMemo}
+                    minWidth={210}
+                    maxWidth={520}
+                    onWidthChange={v => { paletteWidthMemo = v; }}
+                    header={<>
                         {mode === 'edit' ? (
                             <button
                                 className={'icon-btn header-left' + (pendingCount > 0 ? ' active' : '')}
@@ -3749,8 +3879,8 @@ function App(): React.JSX.Element {
                             onClick={() => { validateEdits(); }}
                             title="Validate - check the story for problems (opens the panel below)"
                         ><span className={'codicon codicon-' + severityIcon} />{problems.length ? ` ${problems.length}` : ''}</button>
-                    </div>
-                    <div className="dock-content">
+                    </>}
+                    content={<>
                         {mode === 'edit'
                             ? <NodePalette eventTypes={eventTypes} rewardTypes={rewardTypes} /> : null}
                         {mode === 'simulate' && simState?.running ? <SimControls state={simState} /> : null}
@@ -3759,8 +3889,8 @@ function App(): React.JSX.Element {
                         {mode === 'view'
                             ? <div className="dock-hint">Read-only. Switch to Edit to change the story,
                                 or Simulation to run it forward.</div> : null}
-                    </div>
-                    <div className="dock-overview">
+                    </>}
+                    overview={<>
                         <div className="dock-search">
                             <div className="dock-section-title">Filter</div>
                             <div className="search-field">
@@ -3817,8 +3947,8 @@ function App(): React.JSX.Element {
                                 {LIFECYCLES.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
                         </div>
-                    </div>
-                </div>
+                    </>}
+                />
             </div>
             <div className="bottom-panels">
                 {showProblems && problems.length ? (

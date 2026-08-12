@@ -12,10 +12,11 @@
 
 import styled from 'styled-components';
 
-import { dockBodyCss, dockChromeCss, dockOverviewCss } from '../shared/dockChrome';
+import { dockBodyCss, dockChromeCss, dockOverviewCss, rightDockCss } from '../shared/dockChrome';
 
 export const Shell = styled.div`
     ${dockChromeCss}
+    ${rightDockCss}
 
     /* 100% of the host's element, not 100vh: viewport units ignore the body's own box, so any
        margin or padding the host applies would make this overflow by exactly that much. */
@@ -321,25 +322,6 @@ export const Shell = styled.div`
         border-color: var(--vscode-focusBorder, #007fd4);
         background: var(--vscode-input-background, #3c3c3c);
     }
-
-    .dock {
-        position: relative;
-        flex-shrink: 0;
-        display: flex;
-        flex-direction: column;
-        border-left: 1px solid var(--vscode-panel-border, #444);
-        background: var(--vscode-sideBar-background, #252526);
-    }
-
-    .resize-handle {
-        position: absolute;
-        left: -3px;
-        top: 0;
-        bottom: 0;
-        width: 6px;
-        cursor: ew-resize;
-    }
-    .resize-handle:hover { background: var(--vscode-sash-hoverBorder, #007fd4); }
 
     .dock-header {
         position: relative;

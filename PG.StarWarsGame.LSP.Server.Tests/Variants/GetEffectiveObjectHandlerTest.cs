@@ -2,10 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Localisation;
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Variants;
 
@@ -27,9 +24,9 @@ public sealed class GetEffectiveObjectHandlerTest
     }
 
     private static GetEffectiveObjectHandler Handler(
-        GameIndex index, FakeTagSource source, ILspConfigurationProvider? config = null)
+        GameIndex index, FakeVariantTagSource source, ILspConfigurationProvider? config = null)
     {
-        return new GetEffectiveObjectHandler(new FakeIndexService(index), new NullSchema(), source,
+        return new GetEffectiveObjectHandler(new FakeGameIndexService(index), new NullSchemaProvider(), source,
             config ?? new FakeLspConfigurationProvider());
     }
 
@@ -40,7 +37,7 @@ public sealed class GetEffectiveObjectHandlerTest
     {
         // Same arrange as Handle_Variant_RendersMergedEffectiveXml - only the flag differs.
         var index = IndexWith(Sym("V", "B"), Sym("B"));
-        var source = new FakeTagSource()
+        var source = new FakeVariantTagSource()
             .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0))
             .With("V", new VariantTag("Mass", "5", "<Mass>5</Mass>", 0));
         var config = FakeLspConfigurationProvider.WithFeatures(
@@ -57,7 +54,7 @@ public sealed class GetEffectiveObjectHandlerTest
     public async Task Handle_Variant_RendersMergedEffectiveXml()
     {
         var index = IndexWith(Sym("V", "B"), Sym("B"));
-        var source = new FakeTagSource()
+        var source = new FakeVariantTagSource()
             .With("B", new VariantTag("Max_Health", "100", "<Max_Health>100</Max_Health>", 0))
             .With("V", new VariantTag("Mass", "5", "<Mass>5</Mass>", 0));
 
@@ -75,7 +72,7 @@ public sealed class GetEffectiveObjectHandlerTest
     [Fact]
     public async Task Handle_UnknownId_NotFound()
     {
-        var result = await Handler(GameIndex.Empty, new FakeTagSource())
+        var result = await Handler(GameIndex.Empty, new FakeVariantTagSource())
             .Handle(new GetEffectiveObjectParams { ObjectId = "NOPE" }, CancellationToken.None);
 
         Assert.False(result.Found);
@@ -86,148 +83,11 @@ public sealed class GetEffectiveObjectHandlerTest
     public async Task Handle_CyclicChain_FlagsCyclic()
     {
         var index = IndexWith(Sym("A", "B"), Sym("B", "A"));
-        var source = new FakeTagSource().With("A", new VariantTag("X", "1", "<X>1</X>", 0));
+        var source = new FakeVariantTagSource().With("A", new VariantTag("X", "1", "<X>1</X>", 0));
 
         var result = await Handler(index, source)
             .Handle(new GetEffectiveObjectParams { ObjectId = "A" }, CancellationToken.None);
 
         Assert.True(result.Cyclic);
-    }
-
-    private sealed class NullSchema : ISchemaProvider
-    {
-        public XmlTagDefinition? GetTag(string tagName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
-        {
-            return [];
-        }
-
-        public IReadOnlyList<XmlTagDefinition> AllTags => [];
-
-        public GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
-        {
-            return [];
-        }
-
-        public EnumDefinition? GetEnum(string enumName)
-        {
-            return null;
-        }
-
-        public IReadOnlyList<EnumDefinition> AllEnums => [];
-        public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
-        public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
-
-        public event EventHandler? SchemaRefreshed
-        {
-            add { }
-            remove { }
-        }
-    }
-
-    private sealed class FakeTagSource : IVariantTagSource
-    {
-        private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
-        {
-            return _byId.GetValueOrDefault(objectId);
-        }
-
-        public FakeTagSource With(string id, params VariantTag[] tags)
-        {
-            _byId[id] = tags;
-            return this;
-        }
-    }
-
-    private sealed class FakeIndexService : IGameIndexService
-    {
-        public FakeIndexService(GameIndex index)
-        {
-            Current = index;
-        }
-
-        public GameIndex Current { get; }
-
-        public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
-        {
-            return Task.CompletedTask;
-        }
-
-        public void InjectDocument(DocumentIndex document)
-        {
-        }
-
-        public void RemoveDocument(string uri)
-        {
-        }
-
-        public void ApplyBaseline(BaselineIndex baseline)
-        {
-        }
-
-        public void ApplyLocalisation(ILocalisationIndex index)
-        {
-        }
-
-        public void ApplyAssetFiles(IAssetFileIndex index)
-        {
-        }
-
-        public void ApplyModelBones(ImmutableDictionary<string, ImmutableArray<string>> bones)
-        {
-        }
-
-        public void ApplyWorkspaceDynamicEnumValues(ImmutableDictionary<string, ImmutableArray<string>> values)
-        {
-        }
-
-        public void ApplyWorkspaceEnumValueDefinitions(
-            ImmutableDictionary<string, ImmutableDictionary<string, FileOrigin>> definitions)
-        {
-        }
-
-        public IDisposable BeginBulkUpdate()
-        {
-            return new NoopScope();
-        }
-
-        public event Action<GameIndex>? IndexChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<ILocalisationIndex>? LocalisationChanged
-        {
-            add { }
-            remove { }
-        }
-
-        public event Action<GameIndex>? DynamicEnumChanged
-        {
-            add { }
-            remove { }
-        }
-
-        private sealed class NoopScope : IDisposable
-        {
-            public void Dispose()
-            {
-            }
-        }
     }
 }

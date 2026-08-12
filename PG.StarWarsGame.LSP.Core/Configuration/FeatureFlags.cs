@@ -110,6 +110,13 @@ public record ToolsFeatureFlags
     public bool Variants { get; init; } = true;
 
     /// <summary>
+    ///     Gates <c>aet/getEncyclopediaEntry</c> and the encyclopedia popup preview built on it.
+    ///     Independent of <see cref="Localisation" />: the endpoint reads translations but writes
+    ///     none, so a workspace can preview popups with the localisation editor turned off.
+    /// </summary>
+    public bool Encyclopedia { get; init; } = true;
+
+    /// <summary>
     ///     Gates the story editor protocol: every <c>aet/getStory*</c> endpoint and the
     ///     <c>aet/storyGraphChanged</c> notification (builds on <c>features.story.discovery</c>).
     ///     This is the read surface - the panel and its View mode.
