@@ -54,6 +54,10 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly IXmlParseCache _parseCache;
     private readonly ISchemaProvider _schema;
     private readonly IXmlHardpointFactProducer? _hardpointProducer;
+
+    // Null in the test convenience constructors and whenever no workspace icon catalog exists;
+    // the icon-repack diagnostic then simply never fires.
+    private readonly IIconRepackStatusProvider? _iconRepack;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IStoryChainProblemStore? _storyChainProblems;
     private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
@@ -82,13 +86,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryChainProblemStore storyChainProblems,
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         IXmlHardpointFactProducer hardpointProducer,
-        ServerOptions? options = null)
+        ServerOptions? options = null,
+        IIconRepackStatusProvider? iconRepack = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics, hardpointProducer)
+            storyGraphDiagnostics, hardpointProducer, iconRepack: iconRepack)
     {
     }
 
@@ -113,9 +118,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryChainProblemStore? storyChainProblems = null,
         IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
         IXmlHardpointFactProducer? hardpointProducer = null,
-        IGlobalSuppressionStore? globalSuppressions = null)
+        IGlobalSuppressionStore? globalSuppressions = null,
+        IIconRepackStatusProvider? iconRepack = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
+        _iconRepack = iconRepack;
         _hardpointProducer = hardpointProducer;
         _configProvider = configProvider;
         _indexService = indexService;
@@ -150,7 +157,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
-        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en");
+        var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en",
+            _iconRepack?.IconsAwaitingRepack);
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
         // parse and every request handler touching the same content.

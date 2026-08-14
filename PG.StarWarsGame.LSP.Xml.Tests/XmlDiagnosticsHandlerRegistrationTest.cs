@@ -72,7 +72,10 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // lists (Type69) against the GalacticVictoryCondition enum (A5).
         // 106 → 107: CampaignStoryAttachmentHandler added - validates how a <Campaign> attaches plot
         // manifests to factions across both *_Story_Name authoring forms.
-        const int expectedHandlerCount = 107;
+        // 107 → 108: IconAwaitingRepackHandler added - an Icon_Name whose art exists as a raw source
+        // but is missing from the workspace mega texture, i.e. drawn but never repacked. Kept apart
+        // from TextureFileExistenceHandler because the fix is a rebuild, not a drawing.
+        const int expectedHandlerCount = 108;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

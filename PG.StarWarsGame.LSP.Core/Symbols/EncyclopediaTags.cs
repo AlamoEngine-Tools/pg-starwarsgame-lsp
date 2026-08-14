@@ -38,6 +38,12 @@ public static class EncyclopediaTags
     /// </summary>
     public const string UnitAbilitiesData = "Unit_Abilities_Data";
 
+    /// <summary>
+    ///     The object's portrait, named as it appears in the mega texture directory - normally with a
+    ///     <c>.TGA</c> suffix, though authors write it either way.
+    /// </summary>
+    public const string IconName = "Icon_Name";
+
     /// <summary>GameObject references whose own <see cref="TextId" /> supplies the label.</summary>
     public const string GoodAgainst = "Encyclopedia_Good_Against";
 

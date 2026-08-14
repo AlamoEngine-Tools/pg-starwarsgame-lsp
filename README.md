@@ -311,3 +311,16 @@ Set `aet-eaw-edit.lsp.debug.traceServer` to `messages` and open the **EaWEdit** 
 ## Issues
 
 Report bugs and feature requests at [AlamoEngine-Tools/pg-starwarsgame-lsp/issues](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues).
+
+---
+
+## Licensing and third-party components
+
+This project is licensed under the [MIT License](LICENSE).
+
+Third-party components and their license terms are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Every release also ships a machine-readable SPDX
+SBOM per artifact — one for the language server, one for the VS Code extension — attached to the
+GitHub release.
+
+No game assets are redistributed: the editor reads game data from your own installation.

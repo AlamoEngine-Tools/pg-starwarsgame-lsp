@@ -24,6 +24,7 @@
         </PackageReference>
         <PackageReference Include="GitHubActionsTestLogger"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+        <PackageReference Include="Pfim"/>
         <PackageReference Include="System.IO.Abstractions.TestingHelpers"/>
     </ItemGroup>
 
@@ -39,3 +40,4 @@
     </ItemGroup>
 
 </Project>
+

@@ -20,6 +20,7 @@ using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.Files.MTD;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.Files.XML;
+using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -474,7 +475,57 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
         $$"""{ "version": 1, "hash": "{{Convert.ToHexString(SHA256.HashData(data)).ToLowerInvariant()}}" }""");
     Console.WriteLine($"Manifest: {manifestFile}");
 
+    // ── Icon sidecar ──────────────────────────────────────────────────────────
+    //
+    // Baking the base game's UI icons HERE, rather than reading them in the server, is the whole
+    // point: this is the only place holding the engine's MEG-aware GameRepository, so a fully
+    // MEG-packed install resolves for free and the running server never needs engine initialisation.
+    // Written as a sidecar so the ~3 MB payload is only paid for by sessions that open a preview.
+
+    await WriteIconSidecarAsync(engine, mtdFileService, outputFile, manifestHash);
+
     return 0;
+}
+
+static async Task WriteIconSidecarAsync(
+    IStarWarsGameEngineHandle engine,
+    IMtdFileService mtdFileService,
+    string outputFile,
+    string manifestHash)
+{
+    // The engine's virtual file system wants backslashed, uppercase paths.
+    const string mtdPath = @"DATA\ART\TEXTURES\MT_COMMANDBAR.MTD";
+    const string texturePath = @"DATA\ART\TEXTURES\MT_COMMANDBAR.TGA";
+
+    try
+    {
+        IReadOnlyDictionary<string, byte[]> icons;
+
+        using (var mtdStream = engine.GameRepository.TryOpenFile(mtdPath))
+        using (var textureStream = engine.GameRepository.TryOpenFile(texturePath))
+        {
+            if (mtdStream is null || textureStream is null)
+            {
+                Console.WriteLine(
+                    $"Icons: skipped - {(mtdStream is null ? mtdPath : texturePath)} not found in the game repository.");
+                return;
+            }
+
+            var directory = mtdFileService.Load(mtdStream).Content;
+            icons = MegaTextureIconExtractor.ExtractAll(directory, textureStream);
+        }
+
+        var pack = IconPackSerializer.Serialize(icons, manifestHash, DateTimeOffset.UtcNow);
+        var sidecarFile = IconPackSerializer.SidecarPathFor(outputFile);
+        await File.WriteAllBytesAsync(sidecarFile, pack);
+        Console.WriteLine($"Icons: {sidecarFile} ({icons.Count} icon(s), {pack.Length:N0} bytes)");
+    }
+    catch (Exception ex)
+    {
+        // A missing or malformed mega texture must not fail an otherwise good baseline build - the
+        // server falls back to its embedded placeholder when the sidecar is absent.
+        Console.WriteLine($"Icons: skipped - {ex.Message}");
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

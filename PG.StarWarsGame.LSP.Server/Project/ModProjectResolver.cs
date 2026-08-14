@@ -78,7 +78,10 @@ public sealed class ModProjectResolver
         return new WorkspaceConfiguration(xml, scripts, text, assets, textResourceType)
         {
             Layers = layers,
-            StoryDialogRoots = storyDialog
+            StoryDialogRoots = storyDialog,
+            // Root project only - a mega texture replaces rather than merges, so a dependency's
+            // icon configuration has no say in which one the root project ships.
+            Icons = root.Icons
         };
     }
 

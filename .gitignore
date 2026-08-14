@@ -513,3 +513,4 @@ docs/
 *.md
 *.MD
 /dist
+.vscode-test/

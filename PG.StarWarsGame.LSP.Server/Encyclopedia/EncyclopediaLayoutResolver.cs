@@ -35,7 +35,7 @@ public sealed class EncyclopediaLayoutResolver
     ///     because the file was absent would be less useful than one that draws the stock popup.
     /// </summary>
     public static readonly EncyclopediaLayout Defaults = new(
-        262d, 14d, 5d, 2d, 0.75d,
+        262d, 14d, 5d, 2d, 0.75d, 0.66d,
         new EncyclopediaRgba(255, 255, 255, 128),
         new EncyclopediaTextStyle(HeaderComponent, "Arial Bold", 7d, 1.0d,
             new EncyclopediaRgba(255, 255, 255, 255), EncyclopediaTextAlignment.Left),
@@ -62,8 +62,9 @@ public sealed class EncyclopediaLayoutResolver
         var (offsetX, offsetY) = Pair(back, "Offset", Defaults.OffsetX, Defaults.OffsetY);
 
         // encyclopedia_icon's Size is a pair of scales, not a pixel size: X scales the unit icon in
-        // the header, Y the ability icons. Falls back as a unit with a dummy Y, which is unused.
-        var (iconScale, _) = Pair(TagsOf(IconComponent), "Size", Defaults.IconScale, 0d);
+        // the header, Y the ability icons - both per the shipped file's own comment on the tag.
+        var (iconScale, abilityIconScale) =
+            Pair(TagsOf(IconComponent), "Size", Defaults.IconScale, Defaults.AbilityIconScale);
 
         return new EncyclopediaLayout(
             width,
@@ -71,6 +72,7 @@ public sealed class EncyclopediaLayoutResolver
             offsetX,
             offsetY,
             iconScale,
+            abilityIconScale,
             Colour(back, "Color", Defaults.BackdropColor),
             Style(HeaderComponent, Defaults.Header),
             Style(BodyComponent, Defaults.Body),

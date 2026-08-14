@@ -29,6 +29,23 @@ export interface EncyclopediaLine {
 }
 
 /**
+ * A piece of artwork with the size it was authored at.
+ *
+ * The dimensions are the point: the card lays out AROUND its artwork - the header band's height,
+ * the Against panel's aspect, the separator's thickness, the ability slot's size - and all of it is
+ * reskinnable. Without them the card has to assume the base game's sizes, which silently squashes a
+ * mod's own art back into them. Read from the PNG header, so they describe what was actually cut.
+ *
+ * `width`/`height` are 0 when the header could not be read; treat that as "unknown" and fall back to
+ * a nominal size rather than dividing by it.
+ */
+export interface EncyclopediaImage {
+    dataUri: string;
+    width: number;
+    height: number;
+}
+
+/**
  * One active ability from `Unit_Abilities_Data`, in declaration order.
  *
  * The list arrives complete. The popup only has room for two slots, but the rest are meaningful -
@@ -36,21 +53,39 @@ export interface EncyclopediaLine {
  * UI or to drive tactical GUI grouping - so trimming is the card's decision, not the server's.
  */
 export interface EncyclopediaAbility {
-    /** e.g. `DEFEND`, `POWER_TO_WEAPONS`. Drawn in the slot until real icons are reachable. */
+    /** e.g. `DEFEND`, `POWER_TO_WEAPONS`. Drawn in the slot when no icon resolves. */
     type: string;
     /** `GUI_Activated_Ability_Name`; absent for an ability with no command-bar activation. */
     abilityName?: string | null;
     /**
      * `Alternate_Icon_Name` - the alternate state's icon, and the only icon an ability carries in
-     * data. The default one is hardcoded in the engine, which is why slots show text for now.
+     * data. The default one is hardcoded in the engine, hence the guess below.
      */
     alternateIconName?: string | null;
+    /**
+     * The ability's icon, absent when none was found.
+     *
+     * The server finds it by guessing `I_SA_<TYPE>` against the mega texture - nothing in the game's
+     * data links an ability to its icon. The guess is validated by the lookup, so a miss means no
+     * icon rather than the wrong one, and the slot falls back to the type text.
+     *
+     * Its natural size sizes the slot: the ability scale applies to the icon's own dimensions, and a
+     * mod may ship these at other than the base game's 26.
+     */
+    icon?: EncyclopediaImage | null;
 }
 
 /** A `Good_Against` / `Vulnerable_To` target, named via its own `Text_ID`. */
 export interface EncyclopediaReference {
     objectId: string;
     displayName?: string | null;
+    /**
+     * The referenced unit's own portrait, as a `data:image/png;base64,...` URI - the server resolves
+     * the unit the list names, then that unit's `Icon_Name` through the ordinary icon resolver.
+     * Absent when the target is unknown or icons are unavailable, in which case the slot falls back
+     * to showing the unit's name.
+     */
+    iconDataUri?: string | null;
 }
 
 /** Four 0-255 channels, alpha last, exactly as the game writes them. */
@@ -96,10 +131,17 @@ export interface EncyclopediaLayout {
     offsetX: number;
     offsetY: number;
     /**
-     * The factor the header draws the unit icon at, from `encyclopedia_icon`'s `Size` X. The icon
-     * asset is 50 units square, so the drawn size is `50 * iconScale` - stock 0.75 gives 37.5.
+     * The factor the header draws the unit icon at, from `encyclopedia_icon`'s `Size` X. Stock is
+     * 0.75 and the header icon measures 50 units, so 0.75 is the popup's REFERENCE scale rather
+     * than a plain multiplier - read other scales relative to it. See {@link abilityIconScale}.
      */
     iconScale: number;
+    /**
+     * The factor the class row draws each ability icon at, from the same tag's Y - the shipped file
+     * comments it as "Y is the scale of the ability icon". Stock 0.66 against a 26-unit ability
+     * asset puts the slot at `26 * 0.66 / 0.75`, about 23 units.
+     */
+    abilityIconScale: number;
     backdropColor: EncyclopediaRgba;
     header: EncyclopediaTextStyle;
     body: EncyclopediaTextStyle;
@@ -129,4 +171,77 @@ export interface GetEncyclopediaEntryResult {
     vulnerableTo: EncyclopediaReference[];
     /** Ships with the text so the card can never draw one against a stale copy of the other. */
     layout: EncyclopediaLayout;
+    /** The object's portrait, absent when nothing supplied one. */
+    icon?: EncyclopediaIcon | null;
+    /** The card's own chrome from the mega texture, absent when none of it resolved. */
+    chrome?: EncyclopediaChrome | null;
+}
+
+/**
+ * The popup's chrome, cut from the mega texture - the pieces the engine builds the card from rather
+ * than any unit's artwork.
+ *
+ * Sizes quoted below are the BASE GAME's. Do not hardcode them: each piece carries its own, and a
+ * mod reskinning the atlas may ship any of them at a different size. Absent fields are normal - the
+ * card keeps its calibrated CSS rendition as the fallback, so chrome can only sharpen it.
+ */
+export interface EncyclopediaChrome {
+    /** `E_BACKGROUND`, 48x48 in the base game, stretched across the backdrop. */
+    background?: EncyclopediaImage | null;
+    /**
+     * `E_TOPBAR`, the full-width header band - 262x20 in the base game, 262 being the card's own
+     * width - WITH the population blip's black disc baked into its left end at x 1..19, y 1..18.
+     * The disc is artwork: draw the band and it is already there.
+     */
+    topBar?: EncyclopediaImage | null;
+    /**
+     * `E_TOPBAR2`, the same band with NO disc, for objects without a `Population_Value`. The two
+     * variants ship at identical sizes, which is why only their pixels tell them apart.
+     */
+    topBarNoBlip?: EncyclopediaImage | null;
+    /**
+     * `E_LINE`, the separator under the class row - 232x27 in the base game, and almost entirely
+     * transparent padding around a one-pixel rule. Draw it at its natural height; squashing it to a
+     * thin strip interpolates the rule away entirely.
+     */
+    line?: EncyclopediaImage | null;
+    /** `E_AGAINST_FRAME`, one Strong/Weak Against panel; 129x43 in the base game. */
+    againstFrame?: EncyclopediaImage | null;
+    /** `E_UNIT_AGAINST`, a single slot inside that panel; 43x43 in the base game. */
+    unitAgainst?: EncyclopediaImage | null;
+}
+
+/**
+ * Where a resolved icon's pixels came from. The first three mirror the server's `IconSource`;
+ * `Fallback` is the opposite - no layer supplied the icon and the server sent its built-in
+ * placeholder so the card still has a portrait slot.
+ */
+export type EncyclopediaIconSource =
+    | 'WorkspaceMegaTexture'
+    | 'LooseSource'
+    | 'Baseline'
+    | 'Fallback';
+
+/**
+ * A resolved icon, pre-encoded by the server so the webview needs no decoding step - and no blob
+ * URLs, which the panel's content security policy would block anyway.
+ */
+export interface EncyclopediaIcon {
+    /** The name as written in `Icon_Name`. */
+    name: string;
+    /** A complete `data:image/png;base64,...` URI. */
+    dataUri: string;
+    source: EncyclopediaIconSource;
+    /**
+     * The icon resolved only from a raw source image while the workspace's mega texture lacks it:
+     * drawn, but never repacked, so the game would not show it yet.
+     */
+    isMegaTextureStale: boolean;
+    /**
+     * Natural pixel size, or 0 when unknown. Worth having even though the header draws the portrait
+     * into a fixed slot: several shipped portraits are NOT square (50x49, 47x47, 44x45), so knowing
+     * the real dimensions is what lets the card draw them without distorting them.
+     */
+    width: number;
+    height: number;
 }

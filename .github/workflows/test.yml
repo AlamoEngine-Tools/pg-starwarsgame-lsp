@@ -30,6 +30,42 @@ jobs:
     - name: Build
       run: dotnet build PG.StarWarsGame.LSP.slnx --configuration Release
 
+    # One SBOM per shippable artifact, not one per repo: the language server is a standalone
+    # deliverable that could front any editor, so it and the VS Code extension are inventoried
+    # separately. Runs AFTER the build on purpose - there are no packages.lock.json files here, so
+    # Syft can only see NuGet dependencies through the *.deps.json emitted into bin/.
+    # Ubuntu only: the matrix would otherwise produce two identical copies of each.
+    # Production dependencies only, matching the server half, which is scanned from build output and
+    # so describes what ships rather than the whole build closure. Installed clean into a separate
+    # directory because the build itself needs its dev dependencies - scanning the extension folder
+    # would sweep in esbuild, typescript and eslint, and a scanner reading that would flag CVEs in
+    # build tooling no user ever receives.
+    - name: Prepare the extension's production dependencies for SBOM scanning
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        mkdir -p sbom-extension
+        cp PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/package.json sbom-extension/
+        cp PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/package-lock.json sbom-extension/
+        cd sbom-extension && npm ci --omit=dev --ignore-scripts --no-audit --no-fund
+
+    - name: Generate server SBOM
+      if: matrix.os == 'ubuntu-latest'
+      uses: anchore/sbom-action@v0
+      with:
+        path: PG.StarWarsGame.LSP.Server/bin/Release
+        format: spdx-json
+        artifact-name: server.sbom.spdx.json
+        output-file: server.sbom.spdx.json
+
+    - name: Generate extension SBOM
+      if: matrix.os == 'ubuntu-latest'
+      uses: anchore/sbom-action@v0
+      with:
+        path: sbom-extension
+        format: spdx-json
+        artifact-name: extension.sbom.spdx.json
+        output-file: extension.sbom.spdx.json
+
     - name: Unit & Integration Tests
       # E2E tests require /foc (game data) and /schema (EaW YAML) which are in .gitignore.
       # Run each project individually - solution-wide run with all E2E tests filtered produces

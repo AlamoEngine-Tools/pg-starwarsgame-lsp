@@ -133,6 +133,7 @@ public static class XmlLanguageServiceExtensions
 
         // Asset-file existence handlers (shared asset-file catalog)
         services.AddSingleton<IXmlDiagnosticsHandler, TextureFileExistenceHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, IconAwaitingRepackHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ModelFileExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioFileExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, MapFileExistenceHandler>();

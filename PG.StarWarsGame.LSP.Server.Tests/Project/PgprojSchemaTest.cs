@@ -95,6 +95,56 @@ public sealed class PgprojSchemaTest
         Assert.True(Evaluate(json).IsValid);
     }
 
+    // ── icons ────────────────────────────────────────────────────────────────
+
+    [Theory]
+    [InlineData("""{ "megaTexture": "data/art/textures/mt_mymod" }""")]
+    [InlineData("""{ "sourceRoots": ["data/art/icons"] }""")]
+    [InlineData("""{ "megaTexture": "data/art/textures/mt_mymod", "sourceRoots": [] }""")]
+    [InlineData("""{ }""")]
+    public void IconsNode_AcceptsTheDocumentedShapes(string icons)
+    {
+        var json = $$"""
+                     {
+                       "name": "Mod",
+                       "icons": {{icons}}
+                     }
+                     """;
+
+        Assert.True(Evaluate(json).IsValid, DescribeErrors("icons node", Evaluate(json)));
+    }
+
+    // megaTexture names a .mtd/.tga PAIR, so an extension means the author misunderstood the field.
+    // Catching it in the authoring schema turns a load failure into a red squiggle while typing.
+    [Theory]
+    [InlineData("""{ "megaTexture": "data/art/textures/mt_mymod.mtd" }""")]
+    [InlineData("""{ "megaTexture": "data/art/textures/mt_mymod.tga" }""")]
+    [InlineData("""{ "megaTexture": "data/art/textures/mt_mymod.TGA" }""")]
+    [InlineData("""{ "megaTexture": "" }""")]
+    [InlineData("""{ "megaTexture": 1 }""")]
+    [InlineData("""{ "sourceRoots": "data/art/icons" }""")]
+    [InlineData("""{ "sourceRoots": [""] }""")]
+    [InlineData("""{ "unknown": true }""")]
+    public void IconsNode_RejectsMalformedShapes(string icons)
+    {
+        var json = $$"""
+                     {
+                       "name": "Mod",
+                       "icons": {{icons}}
+                     }
+                     """;
+
+        Assert.False(Evaluate(json).IsValid, $"schema wrongly accepted icons: {icons}");
+    }
+
+    [Fact]
+    public void IconsNode_IsOptional()
+    {
+        const string json = """{ "name": "Mod" }""";
+
+        Assert.True(Evaluate(json).IsValid);
+    }
+
     private static string DescribeErrors(string file, EvaluationResults result)
     {
         var lines = result.Details

@@ -59,7 +59,15 @@ public sealed record EncyclopediaTextStyle(
 /// <param name="IconScale">
 ///     The factor the header draws the unit icon at, from <c>encyclopedia_icon</c>'s <c>Size</c> X
 ///     (the shipped file comments that tag as "X is the scale of the icon in the unit header").
-///     The icon asset is 50 units square, so the drawn size is 50 * this - stock 0.75 gives 37.5.
+///     Stock is 0.75, and the header icon measures 50 units - so 0.75 is the popup's REFERENCE
+///     scale rather than a plain multiplier on the asset, and a client should read a scale relative
+///     to it. See <paramref name="AbilityIconScale" />, which the same reading sizes correctly.
+/// </param>
+/// <param name="AbilityIconScale">
+///     The factor the class row draws each ability icon at, from the same tag's Y - commented in
+///     the shipped file as "Y is the scale of the ability icon". Stock is 0.66 against an ability
+///     asset of 26 units, which at the reference scale above puts the slot at 26 * 0.66 / 0.75, or
+///     about 23 units.
 /// </param>
 /// <param name="BackdropColor">Tint applied to the frame behind the text.</param>
 /// <param name="Header">The name row (<c>encyclopedia_header_text</c>).</param>
@@ -73,6 +81,7 @@ public sealed record EncyclopediaLayout(
     double OffsetX,
     double OffsetY,
     double IconScale,
+    double AbilityIconScale,
     EncyclopediaRgba BackdropColor,
     EncyclopediaTextStyle Header,
     EncyclopediaTextStyle Body,

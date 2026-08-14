@@ -111,8 +111,16 @@ public sealed class EncyclopediaLayoutResolverTest
     public void Resolve_NothingIndexed_UsesBaseGameIconScale()
     {
         // encyclopedia_icon's Size is "0.75 0.66", and the shipped comment says X is the scale of
-        // the icon in the unit header. The icon asset is 50px, so the header draws it at 37.5.
+        // the icon in the unit header.
         Assert.Equal(0.75d, Resolve(GameIndex.Empty, new FakeVariantTagSource()).IconScale);
+    }
+
+    [Fact]
+    public void Resolve_NothingIndexed_UsesBaseGameAbilityIconScale()
+    {
+        // The SAME tag's Y, which the shipped file comments as "Y is the scale of the ability
+        // icon". Both halves are real values; reading only X threw the ability scale away.
+        Assert.Equal(0.66d, Resolve(GameIndex.Empty, new FakeVariantTagSource()).AbilityIconScale);
     }
 
     [Fact]
@@ -122,7 +130,10 @@ public sealed class EncyclopediaLayoutResolverTest
         var source = new FakeVariantTagSource()
             .With("encyclopedia_icon", Tag("Size", "1.0 0.5"));
 
-        Assert.Equal(1.0d, Resolve(index, source).IconScale);
+        var layout = Resolve(index, source);
+
+        Assert.Equal(1.0d, layout.IconScale);
+        Assert.Equal(0.5d, layout.AbilityIconScale);
     }
 
     [Fact]
@@ -131,7 +142,11 @@ public sealed class EncyclopediaLayoutResolverTest
         var index = IndexWith("encyclopedia_icon");
         var source = new FakeVariantTagSource().With("encyclopedia_icon", Tag("Size", "big"));
 
-        Assert.Equal(0.75d, Resolve(index, source).IconScale);
+        var layout = Resolve(index, source);
+
+        Assert.Equal(0.75d, layout.IconScale);
+        // Falls back as a unit: a half-read pair would silently pair a stock X with a junk Y.
+        Assert.Equal(0.66d, layout.AbilityIconScale);
     }
 
     // ── alignment is encoded as presence ─────────────────────────────────────

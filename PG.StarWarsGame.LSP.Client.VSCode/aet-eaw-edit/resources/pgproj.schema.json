@@ -146,6 +146,29 @@
         }
       }
     },
+    "icons": {
+      "description": "Where this project's UI icons live. Omit entirely to use the engine convention (data/art/textures/mt_commandbar).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "megaTexture": {
+          "description": "Path to the mega texture pair relative to this .pgproj, WITHOUT an extension - it names both the .mtd directory and the .tga atlas, e.g. \"data/art/textures/mt_commandbar\".",
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "\\.([mM][tT][dD]|[tT][gG][aA])$"
+          }
+        },
+        "sourceRoots": {
+          "description": "Folders of raw icon source images that a packer builds the mega texture from, in priority order. The packed .mtd always wins; these let the server tell a missing icon apart from one that exists but was never repacked.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
     "projectReferences": {
       "type": "array",
       "items": {
