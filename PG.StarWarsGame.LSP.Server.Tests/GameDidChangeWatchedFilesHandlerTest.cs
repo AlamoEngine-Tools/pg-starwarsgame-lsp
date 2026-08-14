@@ -224,6 +224,29 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
         Assert.Empty(spy.Updates);
     }
 
+    // ── watched globs ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     Every file kind the server reacts to on disk has to be watched, or that reaction is
+    ///     simply dead: the handler can only run for a notification the client was asked to send.
+    /// </summary>
+    /// <remarks>
+    ///     Inherited from a test on the old <c>ProjectFileWatcherRegistrar</c>, which built a second
+    ///     copy of this list that nothing used - and had already drifted, missing <c>**/*.dat</c>.
+    ///     That class is gone; this asserts the list that is actually registered.
+    /// </remarks>
+    [Theory]
+    [InlineData("**/*.xml")]      // game data AND dynamic enum sources
+    [InlineData("**/*.lua")]      // story scripts
+    [InlineData("**/*.pgproj")]   // project file - a change re-derives the whole configuration
+    [InlineData("**/*.csv")]      // localisation
+    [InlineData("**/*.properties")]
+    [InlineData("**/*.dat")]      // the engine's own localisation format
+    public void WatchedGlobs_CoversEveryFileKindTheServerReactsTo(string glob)
+    {
+        Assert.Contains(glob, GameDidChangeWatchedFilesHandler.WatchedGlobs);
+    }
+
     // ── dynamic enum source file changes ─────────────────────────────────────────
 
     [Fact]

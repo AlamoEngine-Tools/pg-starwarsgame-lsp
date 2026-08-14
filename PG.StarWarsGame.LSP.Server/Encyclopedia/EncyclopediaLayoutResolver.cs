@@ -34,9 +34,19 @@ public sealed class EncyclopediaLayoutResolver
     ///     last resort for workspaces with no indexed component - a preview that drew nothing
     ///     because the file was absent would be less useful than one that draws the stock popup.
     /// </summary>
+    /// <summary>
+    ///     The faction frames <c>encyclopedia_back</c> ships, in slot order. Exactly two, and that
+    ///     is the whole of the base game's faction awareness: the atlas carries no third frame, so
+    ///     playing a faction past slot 1 draws none rather than falling back to another faction's.
+    /// </summary>
+    private static readonly string[] DefaultFactionFrames =
+        ["i_tooltip_rebel_frame.tga", "i_tooltip_empire_frame.tga"];
+
     public static readonly EncyclopediaLayout Defaults = new(
         262d, 14d, 5d, 2d, 0.75d, 0.66d,
         new EncyclopediaRgba(255, 255, 255, 128),
+        "e_background.tga",
+        DefaultFactionFrames,
         new EncyclopediaTextStyle(HeaderComponent, "Arial Bold", 7d, 1.0d,
             new EncyclopediaRgba(255, 255, 255, 255), EncyclopediaTextAlignment.Left),
         new EncyclopediaTextStyle(BodyComponent, "Arial", 7d, 1.0d,
@@ -74,6 +84,8 @@ public sealed class EncyclopediaLayoutResolver
             iconScale,
             abilityIconScale,
             Colour(back, "Color", Defaults.BackdropColor),
+            Text(back, "Blank_Texture_Name") ?? Defaults.BackdropTextureName,
+            Names(back, "Icon_Alternate_Texture_Name") ?? Defaults.FactionFrameTextureNames,
             Style(HeaderComponent, Defaults.Header),
             Style(BodyComponent, Defaults.Body),
             Style(RightComponent, Defaults.RightText),
@@ -153,6 +165,26 @@ public sealed class EncyclopediaLayoutResolver
     {
         var parts = Numbers(tags, tagName);
         return parts is { Length: >= 2 } ? (parts[0], parts[1]) : (fallbackX, fallbackY);
+    }
+
+    /// <summary>
+    ///     Reads a whitespace-separated list of texture names, or null when the tag is absent or
+    ///     empty so the caller can fall back as a unit.
+    /// </summary>
+    /// <remarks>
+    ///     Names pass through verbatim, case and extension included. The icon catalog already
+    ///     matches either spelling - mega texture entries carry <c>.TGA</c>, loose sources are bare
+    ///     base names - so normalising here would only lose what the author actually wrote.
+    /// </remarks>
+    private static IReadOnlyList<string>? Names(
+        IReadOnlyDictionary<string, string> tags, string tagName)
+    {
+        var raw = Text(tags, tagName);
+        if (raw is null)
+            return null;
+
+        var tokens = raw.Split([' ', '\t', ',', '\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+        return tokens.Length == 0 ? null : tokens;
     }
 
     private static EncyclopediaRgba Colour(

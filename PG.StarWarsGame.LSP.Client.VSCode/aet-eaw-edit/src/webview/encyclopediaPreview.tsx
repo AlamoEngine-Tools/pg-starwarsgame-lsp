@@ -83,6 +83,12 @@ function App(): React.JSX.Element {
      * request stays here; whether it was honoured is read off the entry.
      */
     const [multiplayer, setMultiplayer] = useState(false);
+    /**
+     * Which faction's frame to draw. The engine takes this from the viewing player's faction; a
+     * preview has no player, so the user picks. Held here and never driven from the response - the
+     * same rule the multiplayer toggle had to learn.
+     */
+    const [factionSlot, setFactionSlot] = useState(0);
     const stageRef = useRef<HTMLDivElement>(null);
 
     /**
@@ -132,8 +138,13 @@ function App(): React.JSX.Element {
     const stage = entry === null
         ? <p className="empty">Waiting for the editor...</p>
         : entry.found
-            ? <EncyclopediaCard entry={entry} zoom={zoom} />
+            ? <EncyclopediaCard entry={entry} zoom={zoom} factionSlot={factionSlot} />
             : <p className="empty">No encyclopedia entry for &apos;{entry.objectId}&apos;.</p>;
+
+    // One entry per slot encyclopedia_back declares. Offered only when there is a choice to make -
+    // a mod that ships a single frame gets no picker rather than a control with one option.
+    const factionFrames = entry?.chrome?.factionFrames ?? [];
+    const selectedFrame = factionFrames[factionSlot];
 
     return (
         <Shell>
@@ -164,6 +175,46 @@ function App(): React.JSX.Element {
                         </label>
                         <div className="dock-hint">Scroll over the preview to zoom.</div>
                     </div>
+
+                    {factionFrames.length > 1 && (
+                        <div className="dock-section">
+                            <div className="dock-section-title">Faction</div>
+                            <label className="field">
+                                <span className="field-label">Frame</span>
+                                <select
+                                    value={factionSlot}
+                                    onChange={e => setFactionSlot(Number(e.target.value))}
+                                    title="Which faction's frame the card is drawn with"
+                                >
+                                    {factionFrames.map(frame => (
+                                        <option
+                                            key={frame.slot}
+                                            value={frame.slot}
+                                            title={frame.textureName}
+                                        >
+                                            {frame.slotName ?? `Slot ${frame.slot}`}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            {selectedFrame !== undefined
+                                && (selectedFrame.image === null
+                                    || selectedFrame.image === undefined) && (
+                                <div
+                                    className="status-note"
+                                    style={{
+                                        color: 'var(--vscode-editorWarning-foreground, #cca700)',
+                                    }}
+                                >
+                                    {`No artwork in the mega texture for '${selectedFrame.textureName}'`}
+                                    {' - the card falls back to its measured border.'}
+                                </div>
+                            )}
+                            <div className="dock-hint">
+                                The game picks this from the viewing player&apos;s faction.
+                            </div>
+                        </div>
+                    )}
 
                     <div className="dock-section">
                         <div className="dock-section-title">Body</div>

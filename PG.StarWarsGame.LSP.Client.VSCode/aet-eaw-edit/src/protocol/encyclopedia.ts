@@ -143,6 +143,17 @@ export interface EncyclopediaLayout {
      */
     abilityIconScale: number;
     backdropColor: EncyclopediaRgba;
+    /**
+     * `encyclopedia_back`'s `Blank_Texture_Name` - the atlas entry the backdrop is cut from. Data,
+     * not a constant: unlike `E_TOPBAR`, `E_LINE`, `E_AGAINST_FRAME` and `E_UNIT_AGAINST`, which
+     * appear in no shipped XML and really are engine-fixed, this one is named in the file.
+     */
+    backdropTextureName: string;
+    /**
+     * `encyclopedia_back`'s `Icon_Alternate_Texture_Name`, in list order - one faction frame per
+     * faction slot. The base game ships exactly two.
+     */
+    factionFrameTextureNames: string[];
     header: EncyclopediaTextStyle;
     body: EncyclopediaTextStyle;
     rightText: EncyclopediaTextStyle;
@@ -209,6 +220,38 @@ export interface EncyclopediaChrome {
     againstFrame?: EncyclopediaImage | null;
     /** `E_UNIT_AGAINST`, a single slot inside that panel; 43x43 in the base game. */
     unitAgainst?: EncyclopediaImage | null;
+    /**
+     * The per-faction frames, one entry per slot `encyclopedia_back` declares. Always the full list,
+     * art or no art, so the preview can offer every slot the mod defines.
+     */
+    factionFrames: EncyclopediaFactionFrame[];
+}
+
+/**
+ * One faction's frame for the card.
+ *
+ * The engine picks the slot from the viewing player's faction. A preview has no player, so the
+ * server ships every slot and the panel switches between them locally - which also keeps the switch
+ * instant instead of costing a round trip per click.
+ *
+ * The base game's two frames are the SAME colour, `rgb(103,163,255)`: the rebel entry is a flat 4x4
+ * wash at alpha 130, the empire entry a 64x64 rect opaque in the middle with a feathered edge. So
+ * this is not a red/blue faction tint, and neither frame may be stretched across the card - doing
+ * that washes the dark navy backdrop out to light blue.
+ */
+export interface EncyclopediaFactionFrame {
+    /** Index into the list, which is the faction slot the engine selects by. */
+    slot: number;
+    /** The name as written in the tag, so a slot stays identifiable when its art is missing. */
+    textureName: string;
+    /**
+     * A display name, absent when only a guess was available. Only the first two slots have names
+     * the game's own data confirms - the shipped textures say rebel and empire - and a mod's third
+     * slot belongs to whichever faction that mod added, so it travels unnamed.
+     */
+    slotName?: string | null;
+    /** The artwork, absent when the atlas carries no such entry. */
+    image?: EncyclopediaImage | null;
 }
 
 /**

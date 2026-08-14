@@ -322,4 +322,156 @@ public sealed class GetEncyclopediaEntryIconTest
 
         Assert.Null(result.Chrome);
     }
+
+    // ── the backdrop's name is data ──────────────────────────────────────────
+
+    /// <summary>
+    ///     Runs the handler with a CommandBarComponent in the index as well as the object, so the
+    ///     layout resolver sees a mod's overridden card.
+    /// </summary>
+    private static async Task<GetEncyclopediaEntryResult> RunWithComponent(
+        IIconCatalogProvider? icons, string componentId, VariantTag[] componentTags,
+        params VariantTag[] objectTags)
+    {
+        var component = new GameSymbol(componentId, GameSymbolKind.XmlObject, "CommandBarComponent",
+            new FileOrigin("file:///Commandbarcomponents.xml", 0, 0), null, null);
+
+        var source = new FakeVariantTagSource()
+            .With(ObjectId, objectTags)
+            .With(componentId, componentTags);
+
+        var config = new FakeLspConfigurationProvider();
+        config.Current = config.Current with { WorkspaceRoot = @"C:\mod" };
+
+        var handler = new GetEncyclopediaEntryHandler(
+            new FakeGameIndexService(IndexWith(Sym(), component)), new NullSchemaProvider(),
+            source, config, icons);
+
+        return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
+    }
+
+    /// <summary>
+    ///     <c>encyclopedia_back</c> names its own backdrop in <c>Blank_Texture_Name</c>, so a reskin
+    ///     that renames it must still draw. The other chrome pieces appear in no shipped XML and stay
+    ///     hardcoded, which is the correct treatment for names the engine really does fix.
+    /// </summary>
+    [Fact]
+    public async Task Handle_ModRenamesBackdrop_CutsTheTextureTheModNames()
+    {
+        var result = await RunWithComponent(
+            new StubIconCatalogProvider(CatalogWith("MY_BACKDROP.TGA", "E_BACKGROUND.TGA")),
+            "encyclopedia_back", [Tag("Blank_Texture_Name", "my_backdrop.tga")],
+            Tag("Encyclopedia_Text", "TEXT_A"));
+
+        Assert.NotNull(result.Chrome);
+        Assert.NotNull(result.Chrome.Background);
+    }
+
+    // ── the faction switch ───────────────────────────────────────────────────
+
+    /// <summary>
+    ///     One entry per slot the component lists, in list order, each carrying the name it was cut
+    ///     from so a mislabelled slot is still identifiable.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FactionFrames_AreCutForEverySlotInOrder()
+    {
+        var result = await Run(
+            new StubIconCatalogProvider(
+                CatalogWith("I_TOOLTIP_REBEL_FRAME.TGA", "I_TOOLTIP_EMPIRE_FRAME.TGA")),
+            Tag("Encyclopedia_Text", "TEXT_A"));
+
+        Assert.NotNull(result.Chrome);
+        Assert.Collection(result.Chrome.FactionFrames,
+            rebel =>
+            {
+                Assert.Equal(0, rebel.Slot);
+                Assert.Equal("i_tooltip_rebel_frame.tga", rebel.TextureName);
+                Assert.Equal("Rebel", rebel.SlotName);
+                Assert.StartsWith("data:image/png;base64,", rebel.Image?.DataUri);
+            },
+            empire =>
+            {
+                Assert.Equal(1, empire.Slot);
+                Assert.Equal("i_tooltip_empire_frame.tga", empire.TextureName);
+                Assert.Equal("Empire", empire.SlotName);
+                Assert.StartsWith("data:image/png;base64,", empire.Image?.DataUri);
+            });
+    }
+
+    /// <summary>
+    ///     A named frame the atlas does not carry keeps its slot with no art. Dropping the slot would
+    ///     hide the authoring mistake, and would silently renumber every slot after it - which is the
+    ///     one thing an indexed list cannot survive.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FactionFrameMissingFromAtlas_KeepsTheSlotWithoutArt()
+    {
+        var result = await Run(
+            new StubIconCatalogProvider(CatalogWith("I_TOOLTIP_REBEL_FRAME.TGA")),
+            Tag("Encyclopedia_Text", "TEXT_A"));
+
+        Assert.NotNull(result.Chrome);
+        Assert.Collection(result.Chrome.FactionFrames,
+            rebel => Assert.NotNull(rebel.Image),
+            empire =>
+            {
+                Assert.Equal(1, empire.Slot);
+                Assert.Equal("i_tooltip_empire_frame.tga", empire.TextureName);
+                Assert.Null(empire.Image);
+            });
+    }
+
+    /// <summary>
+    ///     Only the first two slots have names the game's own data confirms - the shipped textures
+    ///     say rebel and empire. A mod's third faction could be anyone, so naming it would be a
+    ///     guess; the slot travels unnamed and the client falls back to its index.
+    /// </summary>
+    [Fact]
+    public async Task Handle_FactionSlotBeyondTheShippedPair_IsLeftUnnamed()
+    {
+        var result = await RunWithComponent(
+            new StubIconCatalogProvider(CatalogWith("MY_FRAME.TGA")),
+            "encyclopedia_back",
+            [Tag("Icon_Alternate_Texture_Name", "a.tga b.tga my_frame.tga")],
+            Tag("Encyclopedia_Text", "TEXT_A"));
+
+        Assert.NotNull(result.Chrome);
+        var third = Assert.Single(result.Chrome.FactionFrames, f => f.Slot == 2);
+        Assert.Null(third.SlotName);
+        Assert.Equal("my_frame.tga", third.TextureName);
+        Assert.NotNull(third.Image);
+    }
+
+    /// <summary>
+    ///     A faction frame is chrome like any other piece, so finding only one still means there is
+    ///     chrome to send.
+    /// </summary>
+    [Fact]
+    public async Task Handle_OnlyAFactionFrameResolves_StillSendsChrome()
+    {
+        var result = await Run(
+            new StubIconCatalogProvider(CatalogWith("I_TOOLTIP_REBEL_FRAME.TGA")),
+            Tag("Encyclopedia_Text", "TEXT_A"));
+
+        Assert.NotNull(result.Chrome);
+        Assert.Null(result.Chrome.TopBar);
+        Assert.NotNull(Assert.Single(result.Chrome.FactionFrames, f => f.Slot == 0).Image);
+    }
+
+    /// <summary>
+    ///     No frame art anywhere still lists the slots: the switch is driven by what the XML declares,
+    ///     not by what the atlas happens to carry.
+    /// </summary>
+    [Fact]
+    public async Task Handle_NoFactionFrameArt_StillListsTheDeclaredSlots()
+    {
+        var result = await Run(
+            new StubIconCatalogProvider(CatalogWith("E_TOPBAR.TGA")),
+            Tag("Encyclopedia_Text", "TEXT_A"));
+
+        Assert.NotNull(result.Chrome);
+        Assert.Equal(2, result.Chrome.FactionFrames.Count);
+        Assert.All(result.Chrome.FactionFrames, f => Assert.Null(f.Image));
+    }
 }

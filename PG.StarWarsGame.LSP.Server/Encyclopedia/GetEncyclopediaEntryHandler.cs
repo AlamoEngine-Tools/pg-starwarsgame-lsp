@@ -95,7 +95,7 @@ public sealed class GetEncyclopediaEntryHandler
             ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.VulnerableTo)),
             layout,
             ResolveIcon(catalog, effective),
-            ResolveChrome(catalog));
+            ResolveChrome(catalog, layout));
     }
 
     /// <summary>
@@ -248,7 +248,7 @@ public sealed class GetEncyclopediaEntryHandler
     ///     null per field when that entry is absent - the client keeps its CSS rendition either way,
     ///     so this can only improve the card, never break it.
     /// </summary>
-    private static EncyclopediaChrome? ResolveChrome(IconCatalog? catalog)
+    private static EncyclopediaChrome? ResolveChrome(IconCatalog? catalog, EncyclopediaLayout layout)
     {
         if (catalog is null)
             return null;
@@ -259,21 +259,32 @@ public sealed class GetEncyclopediaEntryHandler
             return resolved is null ? null : Image(resolved);
         }
 
+        // Slots come from the XML, not from the atlas: a declared frame with no art keeps its place
+        // so the switch still offers it and the indices after it do not shift.
+        var frames = layout.FactionFrameTextureNames
+            .Select((name, slot) => new EncyclopediaFactionFrame(
+                slot, name, EncyclopediaFactionFrame.SlotNameFor(slot), Cut(name)))
+            .ToArray();
+
         var chrome = new EncyclopediaChrome(
-            Cut("E_BACKGROUND.TGA"),
+            // The only chrome name the shipped XML actually states, so the only one read from data.
+            Cut(layout.BackdropTextureName),
             Cut("E_TOPBAR.TGA"),
             Cut("E_TOPBAR2.TGA"),
             Cut("E_LINE.TGA"),
             Cut("E_AGAINST_FRAME.TGA"),
-            Cut("E_UNIT_AGAINST.TGA"));
+            Cut("E_UNIT_AGAINST.TGA"),
+            frames);
 
-        // Nothing resolved at all: send null rather than a record of six nulls, so the client's
-        // "do I have chrome?" check stays a single test.
+        // Nothing resolved at all: send null rather than a record of nulls, so the client's
+        // "do I have chrome?" check stays a single test. Declared-but-artless faction slots do not
+        // count as chrome - they carry no pixels for the card to draw.
         return chrome is
-        {
-            Background: null, TopBar: null, TopBarNoBlip: null,
-            Line: null, AgainstFrame: null, UnitAgainst: null,
-        }
+               {
+                   Background: null, TopBar: null, TopBarNoBlip: null,
+                   Line: null, AgainstFrame: null, UnitAgainst: null,
+               }
+               && frames.All(f => f.Image is null)
             ? null
             : chrome;
     }

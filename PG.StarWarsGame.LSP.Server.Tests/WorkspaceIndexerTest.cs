@@ -634,6 +634,40 @@ public sealed class WorkspaceIndexerTest
     }
 
     [Fact]
+    public void ApplyDynamicEnumCatalog_RescanAfterEdit_PicksUpTheNewValue()
+    {
+        // The live path: the file gains a value on disk and the catalog is re-scanned. Adding a
+        // value to a dynamic enum and having it stay "unknown" is the bug this guards.
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "data", "xml", "enum");
+        var enumFilePath = Path.Combine(xmlDir, "gameobjectpropertiestype.xml");
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [enumFilePath] = new("<EnumDefinition><Turret>0x1</Turret></EnumDefinition>")
+        });
+        var enumDef = new EnumDefinition
+        {
+            Name = "GameObjectPropertiesType", Kind = EnumKind.DynamicXml,
+            SourceFile = "gameobjectpropertiestype.xml", Values = []
+        };
+        var schema = new FakeSchemaWithEnums(enumDef);
+        var svc = new FakeIndexService();
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), schema);
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+        Assert.DoesNotContain("IsANewFlag",
+            svc.AppliedWorkspaceDynamicEnumValues!["GameObjectPropertiesType"]);
+
+        fs.File.WriteAllText(enumFilePath,
+            "<EnumDefinition><Turret>0x1</Turret><IsANewFlag>0x2</IsANewFlag></EnumDefinition>");
+
+        indexer.ApplyDynamicEnumCatalog([xmlDir]);
+
+        Assert.Contains("IsANewFlag",
+            svc.AppliedWorkspaceDynamicEnumValues!["GameObjectPropertiesType"]);
+    }
+
+    [Fact]
     public void ApplyDynamicEnumCatalog_EnumFileInSubdirectory_IsFound()
     {
         var root = Root("ws");

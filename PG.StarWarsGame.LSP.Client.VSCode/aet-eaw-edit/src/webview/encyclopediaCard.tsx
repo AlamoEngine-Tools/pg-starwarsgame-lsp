@@ -517,7 +517,17 @@ function Divider(
  * identical at any zoom - only legibility changes.
  */
 export function EncyclopediaCard(
-    { entry, zoom }: { entry: GetEncyclopediaEntryResult; zoom: number },
+    { entry, zoom, factionSlot = 0 }: {
+        entry: GetEncyclopediaEntryResult;
+        zoom: number;
+        /**
+         * Which faction's frame to draw - an index into `chrome.factionFrames`, which the engine
+         * would pick from the viewing player's faction. A preview has no player, so the caller
+         * chooses. Out-of-range simply draws no frame, which is what the game does for a faction
+         * past the last entry.
+         */
+        factionSlot?: number;
+    },
 ): React.JSX.Element {
     const layout = entry.layout;
     // Chrome cut from the mega texture. Every piece is optional and every use falls back to the
@@ -546,6 +556,10 @@ export function EncyclopediaCard(
     // that particular name happened to be long enough to fill the row.
     const textLeft = iconLeft + ICON_SIZE + CHROME.textGap;
 
+    // The faction frame the engine would draw for the viewing player's faction. Absent art is
+    // normal - the base game ships no frame past slot 1, and a mod may name one the atlas lacks.
+    const factionFrame = chrome?.factionFrames?.[factionSlot]?.image;
+
     const hasAgainst = entry.goodAgainst.length > 0 || entry.vulnerableTo.length > 0;
     // Half the card's inner width, so the pair spans edge to edge with one gap between them.
     const againstWidth = (layout.width - 2 - CHROME.againstGap) / 2;
@@ -554,16 +568,25 @@ export function EncyclopediaCard(
         <div
             style={{
                 width: u(layout.width),
-                // E_BACKGROUND is 48x48 and STRETCHED across the card, not tiled. Tiling was the
-                // obvious reading of a small square texture and it is wrong: the harness showed
-                // visible seams, and the game's own backdrop is a smooth vertical gradient
-                // (rgb(21,32,73) at the top to rgb(16,25,56) at the bottom, sampled from a
-                // screenshot) - which is precisely what stretching a 48px gradient swatch produces
-                // and tiling cannot. The CSS gradient remains the fallback for an atlas without it.
+                // The backdrop art is drawn by the rotated layer below, so the CSS gradient here is
+                // only the fallback for an atlas that ships no E_BACKGROUND.
                 background: chrome?.background
-                    ? `url("${chrome.background.dataUri}") no-repeat center / 100% 100%`
+                    ? 'transparent'
                     : `linear-gradient(${CHROME.backgroundTop}, ${CHROME.backgroundBottom})`,
+                // The card's border IS the faction frame - it is the only per-faction art the
+                // component names, no atlas entry supplies a border of its own, and both shipped
+                // frames are edge art rather than fills. Drawn with border-image so the 4x4 flat
+                // swatch and the 64x64 feathered rect each render as what they are; the measured
+                // colour stays the fallback. Slicing at 25% takes the outer quarter of each edge,
+                // which is the feathered ring on the empire frame and flat colour on the rebel one.
                 border: `${u(1)} solid ${CHROME.border}`,
+                ...(factionFrame
+                    ? { borderImage: `url("${factionFrame.dataUri}") 25% stretch` }
+                    : {}),
+                // Anchors the backdrop layer, and the z-index makes this a stacking context so a
+                // negative-z child cannot escape behind the panel's own background.
+                position: 'relative',
+                zIndex: 0,
                 // No inset at the top: the grey band starts immediately under the border (the
                 // game's border line sits at y=874 and the band at y=876, about one unit apart).
                 // The band also runs the full width inside the border - x 65..535 on a card of
@@ -572,6 +595,46 @@ export function EncyclopediaCard(
                 boxSizing: 'border-box',
             }}
         >
+            {/*
+              * The backdrop, ROTATED A QUARTER TURN.
+              *
+              * E_BACKGROUND is 48x48 and stretched across the card, not tiled - tiling is the
+              * obvious reading of a small square texture and it is wrong, since the harness showed
+              * visible seams where the game's backdrop is smooth. But the texture's gradient runs
+              * HORIZONTALLY (rgb(22,33,73) at x=0 to rgb(17,25,56) at x=47, rows near-identical)
+              * while the card's own pixels show it running vertically between those same two
+              * colours - so the engine draws this one turned on its side.
+              *
+              * Rotating a stretched fill needs the box with its axes swapped, and the card's height
+              * is content-driven. Container query units give it without measuring: 100cqh/100cqw
+              * are the container's height and width, so the inner box is exactly the transpose.
+              */}
+            {chrome?.background && (
+                <div
+                    style={{
+                        position: 'absolute',
+                        inset: 0,
+                        overflow: 'hidden',
+                        containerType: 'size',
+                        // Behind the content but still inside this card's stacking context.
+                        zIndex: -1,
+                    }}
+                >
+                    <div
+                        style={{
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            width: '100cqh',
+                            height: '100cqw',
+                            transform: 'translate(-50%, -50%) rotate(90deg)',
+                            background:
+                                `url("${chrome.background.dataUri}") no-repeat center / 100% 100%`,
+                        }}
+                    />
+                </div>
+            )}
+
             {/*
               * Header: a full-width grey band with the portrait laid OVER its left end.
               *
@@ -926,6 +989,7 @@ export function EncyclopediaCard(
                     />
                 </div>
             )}
+
         </div>
     );
 }

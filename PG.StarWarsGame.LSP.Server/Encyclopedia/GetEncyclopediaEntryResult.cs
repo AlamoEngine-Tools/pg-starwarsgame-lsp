@@ -177,13 +177,59 @@ public sealed record EncyclopediaIcon(
 /// <param name="Line"><c>E_LINE</c>, the separator under the class row.</param>
 /// <param name="AgainstFrame"><c>E_AGAINST_FRAME</c>, one Strong/Weak Against panel.</param>
 /// <param name="UnitAgainst"><c>E_UNIT_AGAINST</c>, a single slot inside that panel.</param>
+/// <param name="FactionFrames">
+///     The per-faction frames drawn over the card, one entry per slot the component declares. Always
+///     listed even when the art is missing, because the slots come from the XML rather than from the
+///     atlas.
+/// </param>
 public sealed record EncyclopediaChrome(
     EncyclopediaImage? Background,
     EncyclopediaImage? TopBar,
     EncyclopediaImage? TopBarNoBlip,
     EncyclopediaImage? Line,
     EncyclopediaImage? AgainstFrame,
-    EncyclopediaImage? UnitAgainst);
+    EncyclopediaImage? UnitAgainst,
+    IReadOnlyList<EncyclopediaFactionFrame> FactionFrames);
+
+/// <summary>
+///     One faction's frame for the card - an entry of <c>encyclopedia_back</c>'s
+///     <c>Icon_Alternate_Texture_Name</c>, which on this component indexes by faction slot.
+/// </summary>
+/// <remarks>
+///     The engine picks the slot from the viewing player's faction; a preview has no player, so the
+///     server ships every slot and the client switches between them locally. That also keeps the
+///     switch instant and spares a round trip per click.
+/// </remarks>
+/// <param name="Slot">The index into the list, which is the faction slot the engine selects by.</param>
+/// <param name="TextureName">The name as written in the tag, so a slot is identifiable without art.</param>
+/// <param name="SlotName">
+///     A display name for the slot, or <see langword="null" /> when there is nothing but a guess to
+///     offer. See <see cref="SlotNameFor" />.
+/// </param>
+/// <param name="Image">The artwork, or <see langword="null" /> when the atlas has no such entry.</param>
+public sealed record EncyclopediaFactionFrame(
+    int Slot, string TextureName, string? SlotName, EncyclopediaImage? Image)
+{
+    /// <summary>
+    ///     The slot names the base game's own data confirms, in slot order.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately only two. The shipped textures are named <c>i_tooltip_rebel_frame</c> and
+    ///     <c>i_tooltip_empire_frame</c>, so those two slots are established by the data itself and
+    ///     cannot be wrong. Nothing establishes a third: the base game ships no further frame, and a
+    ///     mod's extra slot belongs to whichever faction that mod added, so a name here would be a
+    ///     guess dressed as a fact. The engine's one known faction-icon order (<c>FleetIconEnum</c>:
+    ///     GOOD, EVIL, PIRATE, UNDERWORLD, BIG_SLUG, RAID) is evidence for <c>g_planet_fleet</c>, not
+    ///     for this component, and would be wrong for most mods regardless.
+    /// </remarks>
+    private static readonly string[] KnownSlotNames = ["Rebel", "Empire"];
+
+    /// <summary>The display name for a slot, or null when only a guess is available.</summary>
+    public static string? SlotNameFor(int slot)
+    {
+        return slot >= 0 && slot < KnownSlotNames.Length ? KnownSlotNames[slot] : null;
+    }
+}
 
 /// <summary>
 ///     A piece of artwork with the size it was authored at.

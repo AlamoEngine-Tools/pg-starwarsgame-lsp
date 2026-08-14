@@ -70,6 +70,16 @@ public sealed record EncyclopediaTextStyle(
 ///     about 23 units.
 /// </param>
 /// <param name="BackdropColor">Tint applied to the frame behind the text.</param>
+/// <param name="BackdropTextureName">
+///     <c>encyclopedia_back</c>'s <c>Blank_Texture_Name</c> - the atlas entry the card's backdrop is
+///     drawn from. Data rather than a constant: unlike <c>E_TOPBAR</c>, <c>E_LINE</c>,
+///     <c>E_AGAINST_FRAME</c> and <c>E_UNIT_AGAINST</c>, which appear in no shipped XML and so are
+///     genuinely engine-fixed, this one is named in the file and a reskin renames it.
+/// </param>
+/// <param name="FactionFrameTextureNames">
+///     <c>encyclopedia_back</c>'s <c>Icon_Alternate_Texture_Name</c>, in list order - the faction
+///     frames drawn over the card, one per faction slot.
+/// </param>
 /// <param name="Header">The name row (<c>encyclopedia_header_text</c>).</param>
 /// <param name="Body">The body rows (<c>encyclopedia_text</c>).</param>
 /// <param name="RightText">Right-hand rows (<c>encyclopedia_right_text</c>).</param>
@@ -83,6 +93,8 @@ public sealed record EncyclopediaLayout(
     double IconScale,
     double AbilityIconScale,
     EncyclopediaRgba BackdropColor,
+    string BackdropTextureName,
+    IReadOnlyList<string> FactionFrameTextureNames,
     EncyclopediaTextStyle Header,
     EncyclopediaTextStyle Body,
     EncyclopediaTextStyle RightText,

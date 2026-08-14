@@ -350,7 +350,25 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
 	const schemaSource = cfg('lsp.schema').get<string>('source', 'http');
 
+	// Watchers for the files the server reacts to on DISK, as opposed to in an editor buffer:
+	// dynamic enum sources, loose assets, .pgproj, and localisation text.
+	//
+	// These have to be created here. The server declares the same globs in
+	// GameDidChangeWatchedFilesHandler.CreateRegistrationOptions, but that registration never
+	// reached the client - a whole session's log showed didOpen/didChange/didSave/didClose arriving
+	// and not one workspace/didChangeWatchedFiles - so every on-disk change was silently ignored.
+	// That is why adding a value to a dynamic enum stayed "unknown" until the server was restarted,
+	// and it equally affected asset, project-file and localisation reloads.
+	//
+	// Keep this list in step with the server's registration options.
+	const fileEvents = ['**/*.xml', '**/*.lua', '**/*.pgproj', '**/*.csv', '**/*.properties', '**/*.dat']
+		.map(glob => vscode.workspace.createFileSystemWatcher(glob));
+	// The client disposes what it is given, but only on a clean shutdown; tying them to the
+	// extension's own lifetime means a failed start cannot leak OS watchers.
+	context.subscriptions.push(...fileEvents);
+
 	const clientOptions: LanguageClientOptions = {
+		synchronize: { fileEvents },
 		documentSelector: [
 			{ scheme: 'file', language: 'xml' },
 			{ scheme: 'file', language: 'lua' },
