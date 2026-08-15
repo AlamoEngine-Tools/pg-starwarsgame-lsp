@@ -11,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -58,6 +59,11 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     // Null in the test convenience constructors and whenever no workspace icon catalog exists;
     // the icon-repack diagnostic then simply never fires.
     private readonly IIconRepackStatusProvider? _iconRepack;
+
+    // Null wherever nothing can parse an .alo - the test constructors, and any host without the
+    // asset layer. The model-texture diagnostic then simply never fires, which is the right answer:
+    // the Xml project cannot open a binary asset on its own.
+    private readonly IModelTextureIndex? _modelTextures;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IStoryChainProblemStore? _storyChainProblems;
     private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
@@ -87,13 +93,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         IXmlHardpointFactProducer hardpointProducer,
         ServerOptions? options = null,
-        IIconRepackStatusProvider? iconRepack = null)
+        IIconRepackStatusProvider? iconRepack = null,
+        IModelTextureIndex? modelTextures = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics, hardpointProducer, iconRepack: iconRepack)
+            storyGraphDiagnostics, hardpointProducer, iconRepack: iconRepack,
+            modelTextures: modelTextures)
     {
     }
 
@@ -119,10 +127,12 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
         IXmlHardpointFactProducer? hardpointProducer = null,
         IGlobalSuppressionStore? globalSuppressions = null,
-        IIconRepackStatusProvider? iconRepack = null)
+        IIconRepackStatusProvider? iconRepack = null,
+        IModelTextureIndex? modelTextures = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
         _iconRepack = iconRepack;
+        _modelTextures = modelTextures;
         _hardpointProducer = hardpointProducer;
         _configProvider = configProvider;
         _indexService = indexService;
@@ -158,7 +168,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en",
-            _iconRepack?.IconsAwaitingRepack);
+            _iconRepack?.IconsAwaitingRepack, _modelTextures);
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
         // parse and every request handler touching the same content.

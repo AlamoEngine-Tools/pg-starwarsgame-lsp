@@ -16,7 +16,11 @@ import {
 } from 'vscode-languageclient/node';
 import { CreditsPreviewPanel } from './creditsPreviewPanel';
 import { EncyclopediaPanel } from './encyclopediaPanel';
+import { ModelPreviewEditorProvider } from './modelPreviewEditor';
+import { ModelPreviewPanel } from './modelPreviewPanel';
+import { offerShaderSources, shaderDirectory } from './shaderSources';
 import { initDialogGeometryStorage } from './dialogGeometryStorage';
+import { initViewerSettingsStorage } from './viewerSettingsStorage';
 import { LocalisationEditorPanel } from './localisationEditorPanel';
 import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
 import { LspGateway } from './lsp/lspGateway';
@@ -245,6 +249,7 @@ function resolveFeatureFlags() {
 			storySimulator: flag('tools.storySimulator', false),
 			variants:       flag('tools.variants', true),
 			encyclopedia:   flag('tools.encyclopedia', true),
+			modelPreview:   flag('tools.modelPreview', true),
 		},
 		story: {
 			discovery:        flag('story.discovery', false),
@@ -380,6 +385,8 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		initializationOptions: {
 			workspaceRoot:     vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
 			baseGamePath:      cfg('lsp.source').get<string>('baseGameDirectory') || undefined,
+			// The user's own copy of the base shader SOURCES; never shipped with this extension.
+			shaderPath:        shaderDirectory(),
 			expansionGamePath: cfg('lsp.source').get<string>('expansionDirectory') || undefined,
 			locale:            cfg('lsp').get<string>('locale', 'en'),
 			// The game's language, not this extension's. `locale` above sets the language the server
@@ -464,6 +471,11 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		await lspClient?.setTrace(resolvedTrace);
 		logLine('LSP server started and initialized.');
 
+		// Anything already waiting on a server can go now. A model preview restored when the window
+		// opened is resolved by VS Code long before this point, and without being told it would sit
+		// blank for ever on the one request it made and lost.
+		lsp.markReady();
+
 		const serverVersion = lspClient?.initializeResult?.serverInfo?.version;
 		logLine(`Server version reported: ${serverVersion ?? '(none)'}`);
 		if (serverVersion !== REQUIRED_SERVER_VERSION) {
@@ -490,6 +502,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 	}).catch((e: unknown) => {
 		logLine(`LSP server failed to start: ${e}`);
 		lspClient = undefined;
+		lsp.markStopped();
 		if (statusItem) {
 			statusItem.text = '$(error) EaWEdit LSP: failed to start';
 		}
@@ -542,6 +555,7 @@ async function stopLspClient(): Promise<void> {
 		logLine('Stopping LSP server.');
 		await lspClient.stop();
 		lspClient = undefined;
+		lsp.markStopped();
 	}
 }
 
@@ -549,6 +563,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	// Per project, not per machine: where a dialog belongs depends on the mod being edited.
 	initDialogGeometryStorage(context.workspaceState);
+
+	// The preview's room settings follow the person rather than the project, so globalState.
+	initViewerSettingsStorage(context.globalState);
 
 	localisationNavigatorProvider = new LocalisationNavigatorViewProvider(lsp);
 	context.subscriptions.push(
@@ -1064,6 +1081,57 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	// Opens the encyclopedia popup preview for a GameObject. Triggered by the "preview encyclopedia"
 	// code lens (objectId passed as the first argument), or from the command palette (prompts).
+	// Opening a .alo or .ala shows the model instead of the binary editor. Registered whatever the
+	// feature flag says: the flag gates the SERVER endpoints, and a custom editor that vanishes with
+	// a setting would leave those files opening as binary with no hint why.
+	context.subscriptions.push(ModelPreviewEditorProvider.register(context, lsp));
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.previewModel',
+			async (referenceArg?: string) => {
+				if (!lsp.requireRunning()) { return; }
+
+				let reference = referenceArg;
+				if (!reference) {
+					reference = await vscode.window.showInputBox({
+						title: 'Preview Model',
+						prompt: 'Model file name, e.g. EV_StarDestroyer.ALO',
+						validateInput: v => (v?.trim() ? null : 'Model name is required'),
+					});
+				}
+				if (!reference?.trim()) { return; }
+
+				const name = reference.trim();
+				ModelPreviewPanel.show(context.extensionUri, lsp,
+					{ kind: 'model', modelReference: name }, name);
+			}));
+
+	// Never wired to activation: a modder who has not asked for shader-accurate previews should not
+	// be nagged about a download they may not want.
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.shaders.obtain',
+			async () => { await offerShaderSources(context); }));
+
+	context.subscriptions.push(
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.previewAssembledUnit',
+			async (objectIdArg?: string) => {
+				if (!lsp.requireRunning()) { return; }
+
+				let objectId = objectIdArg;
+				if (!objectId) {
+					objectId = await vscode.window.showInputBox({
+						title: 'Preview Assembled Unit',
+						prompt: 'Name of the GameObject to assemble, e.g. Generic_Star_Destroyer',
+						validateInput: v => (v?.trim() ? null : 'Object name is required'),
+					});
+				}
+				if (!objectId?.trim()) { return; }
+
+				const id = objectId.trim();
+				ModelPreviewPanel.show(context.extensionUri, lsp,
+					{ kind: 'object', objectId: id }, id);
+			}));
+
 	context.subscriptions.push(
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.showEncyclopedia', async (objectIdArg?: string) => {
 			if (!lsp.requireRunning()) { return; }
@@ -1151,5 +1219,6 @@ export async function deactivate(): Promise<void> {
 	LocalisationEditorPanel.disposeAll();
 	CreditsPreviewPanel.disposeAll();
 	EncyclopediaPanel.disposeAll();
+	ModelPreviewPanel.disposeAll();
 	await stopLspClient();
 }

@@ -33,6 +33,11 @@ public sealed class MegAssetCatalogBuilderTest
     [InlineData(".wav", true)]
     [InlineData(".mp3", true)]
     [InlineData(".ted", true)]
+    // Animations. Catalogued so a model can be asked which clips exist for it: previewing a MODEL
+    // offered no animations at all, because nothing could enumerate the 19 `.ala` files sitting
+    // beside `Ei_bobafett.alo` under the very prefix the reverse lookup already relies on.
+    [InlineData(".ala", true)]
+    [InlineData(".ALA", true)]
     [InlineData(".xml", false)]
     [InlineData(".lua", false)]
     [InlineData(".exe", false)]

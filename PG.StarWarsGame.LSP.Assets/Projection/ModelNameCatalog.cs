@@ -17,10 +17,11 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 ///     </para>
 ///     <para>
 ///         This type is the single, stable seam for that union. Bones come from the caller-supplied
-///         loader (the vendored <see cref="PG.StarWarsGame.Files.ALO.Services.IAloFileService" />); mesh
-///         names are recovered by the deprecated <see cref="AloMeshNameReader" /> shim. When the ALO
-///         loader gains a native <c>AlamoModel.Meshes</c>, swap the shim call below for it and delete the
-///         shim - no consumer of this method needs to change.
+///         loader (the vendored <see cref="PG.StarWarsGame.Files.ALO.Services.IAloFileService" />), which
+///         exposes no mesh names; those come from
+///         <see cref="Models.AloModelReader" />, read in
+///         <see cref="Models.AloReadOptions.SkipGeometry" /> mode so a whole-repository scan does not
+///         decode millions of vertices it will never look at.
 ///     </para>
 /// </remarks>
 public static class ModelNameCatalog
@@ -46,12 +47,38 @@ public static class ModelNameCatalog
         // added twice; OrdinalIgnoreCase mirrors ModelBoneKey / the hardpoint bone lookup.
         var seen = new HashSet<string>(result, StringComparer.OrdinalIgnoreCase);
 
-#pragma warning disable CS0618 // deliberate: the shim is the only mesh-name source until the loader exposes Meshes
-        foreach (var mesh in AloMeshNameReader.ReadMeshNames(aloBytes))
-#pragma warning restore CS0618
+        foreach (var mesh in ReadMeshNames(aloBytes))
             if (seen.Add(mesh))
                 result.Add(mesh);
 
         return result;
+    }
+
+    /// <summary>
+    ///     The model's mesh names, or none when the file will not parse.
+    /// </summary>
+    /// <remarks>
+    ///     <see cref="Models.AloModelReader" /> is deliberately strict - a preview must refuse a
+    ///     malformed model rather than draw a plausible-looking wrong one. This catalog has the
+    ///     opposite contract: it scans every model in a repository and one bad file must not cost the
+    ///     caller every other model's names. Reconciling the two is this catch, and it belongs here
+    ///     rather than in the reader, because leniency is this scan's requirement and nobody else's.
+    ///     The bones already collected are still returned, so a model that fails here degrades to
+    ///     skeleton-only rather than to nothing.
+    /// </remarks>
+    private static IEnumerable<string> ReadMeshNames(byte[] aloBytes)
+    {
+        try
+        {
+            return Models.AloModelReader
+                .Read(aloBytes, Models.AloReadOptions.SkipGeometry)
+                .Meshes.Select(m => m.Name)
+                .Where(n => n.Length > 0)
+                .ToList();
+        }
+        catch (Models.AloFormatException)
+        {
+            return [];
+        }
     }
 }

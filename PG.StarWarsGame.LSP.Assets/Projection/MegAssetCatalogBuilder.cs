@@ -21,7 +21,10 @@ public static class MegAssetCatalogBuilder
 {
     private static readonly ImmutableHashSet<string> AssetExtensions =
         ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase,
-            ".tga", ".dds", ".alo", ".wav", ".mp3", ".ted");
+            // `.ala` earns its place by being ENUMERABLE rather than by being resolvable: a model
+            // preview has to ask which clips exist for a skeleton, and the animations sit beside
+            // their model under a name prefix with nothing else to discover them by.
+            ".tga", ".dds", ".alo", ".ala", ".wav", ".mp3", ".ted");
 
     /// <summary>
     ///     Builds the combined asset catalog.

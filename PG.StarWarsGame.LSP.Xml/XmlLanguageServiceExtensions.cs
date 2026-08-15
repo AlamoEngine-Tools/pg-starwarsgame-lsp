@@ -133,6 +133,10 @@ public static class XmlLanguageServiceExtensions
 
         // Asset-file existence handlers (shared asset-file catalog)
         services.AddSingleton<IXmlDiagnosticsHandler, TextureFileExistenceHandler>();
+
+        // The textures a model names INSIDE itself. Needs an IModelTextureIndex from the host to do
+        // anything at all - see the handler.
+        services.AddSingleton<IXmlDiagnosticsHandler, ModelTextureExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IconAwaitingRepackHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ModelFileExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioFileExistenceHandler>();

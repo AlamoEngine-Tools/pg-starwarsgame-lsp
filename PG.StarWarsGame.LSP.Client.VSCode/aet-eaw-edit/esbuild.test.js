@@ -37,6 +37,9 @@ async function main() {
 
     const options = {
         entryPoints,
+    // The missing-texture marker is imported as a data URI: the webview's localResourceRoots only
+    // cover out/, so a file under resources/ is not addressable from it at all.
+    loader: { '.png': 'dataurl' },
         bundle: true,
         format: 'cjs',
         platform: 'node',

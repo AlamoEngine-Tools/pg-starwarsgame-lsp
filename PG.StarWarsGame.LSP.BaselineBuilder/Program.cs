@@ -596,9 +596,11 @@ static IReadOnlyList<string> BuildOrderedMegPaths(string? eawLayerPath, string e
     return result;
 }
 
-// Stored in BaselineIndex.SourceManifestHash as informational metadata only.
-// The LSP server does not validate this hash at runtime; no game-install-path config exists.
-// Intended for future version-mismatch tooling.
+// Stored in BaselineIndex.SourceManifestHash as informational metadata only; the LSP server does not
+// validate it at runtime. Intended for future version-mismatch tooling - which is now actually
+// reachable: the server since gained GameAssetResolver, which reads the configured
+// baseGameDirectory/expansionDirectory, so it could compare a live install against the hash the
+// baseline was built from and warn when they diverge.
 static string ComputeManifestHash(string gamePath)
 {
     using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);

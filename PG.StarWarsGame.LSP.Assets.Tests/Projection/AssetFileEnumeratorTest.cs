@@ -76,4 +76,31 @@ public sealed class AssetFileEnumeratorTest
         Assert.DoesNotContain("tools/preview.dds", result);
         Assert.Single(result);
     }
+
+    /**
+     * One list, three copies. Adding `.ala` to the MEG catalogue alone left loose animations
+     * uncatalogued, so a model preview still offered no clips - the workspace's own `.ala` files
+     * never reached the index. The enumerator must answer exactly what the catalogue does.
+     */
+    [Theory]
+    [InlineData(".tga")]
+    [InlineData(".dds")]
+    [InlineData(".alo")]
+    [InlineData(".ala")]
+    [InlineData(".wav")]
+    [InlineData(".mp3")]
+    [InlineData(".ted")]
+    [InlineData(".xml")]
+    [InlineData(".lua")]
+    public void Enumerate_AgreesWithTheCatalogueOnWhatCounts(string extension)
+    {
+        var fileSystem = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [@"C:\Game\Data\Art\sample" + extension] = new("")
+        });
+
+        var found = AssetFileEnumerator.Enumerate(fileSystem, @"C:\Game").Count == 1;
+
+        Assert.Equal(MegAssetCatalogBuilder.IsAssetExtension(extension), found);
+    }
 }

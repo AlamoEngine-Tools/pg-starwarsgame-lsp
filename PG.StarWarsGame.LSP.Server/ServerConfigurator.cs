@@ -22,14 +22,18 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
+using PG.StarWarsGame.LSP.Core.Assets;
+using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
+using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
+using PG.StarWarsGame.Files.MEG;
 using PG.StarWarsGame.Files.MTD;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
@@ -50,6 +54,10 @@ public static class ServerConfigurator
     public static LanguageServerOptions Apply(LanguageServerOptions options,
         CoreServerOptions? serverOptions = null)
     {
+        // Installed before anything else: it decides how the preview protocol's enums reach the
+        // client, and getting it wrong is silent - ordinals where names were expected.
+        options.WithSerializer(PreviewSerialization.Create());
+
         options.ServerInfo = new ServerInfo
         {
             Name = "PG.StarWarsGame.LSP",
@@ -131,6 +139,13 @@ public static class ServerConfigurator
             .WithHandler<ValidateCreditsBatchHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
             .WithHandler<GetEncyclopediaEntryHandler>()
+            .WithHandler<GetPreviewSceneHandler>()
+            .WithHandler<GetModelGlbHandler>()
+            .WithHandler<GetModelDetailHandler>()
+            .WithHandler<GetSubMeshGeometryHandler>()
+            .WithHandler<GetModelTextureHandler>()
+            .WithHandler<GetParticleSystemHandler>()
+            .WithHandler<GetShaderSourceHandler>()
             .WithHandler<GetStoryPlotsHandler>()
             .WithHandler<GetStoryGraphHandler>()
             .WithHandler<GetStoryNodeDetailHandler>()
@@ -281,6 +296,30 @@ public static class ServerConfigurator
                     sp.GetRequiredService<IIconCatalogProvider>());
 
                 services.AddSingleton<IShipNameCatalogProvider, ShipNameCatalogProvider>();
+
+                // Model preview asset resolution. SupportMEG sits alongside SupportMTD above and is
+                // subject to the same CRC32 caveat documented there - if it ever starts calling
+                // PetroglyphCommons.ContributeServices itself, the server will refuse to start with
+                // "Hash provider with key 'CRC32' is already registered" rather than fail subtly.
+                // The archive set is lazy, so a workspace with no game directory configured pays
+                // nothing for this registration.
+                services.SupportMEG();
+                services.AddSingleton<IMegArchiveSet, MegArchiveSet>();
+                services.AddSingleton<IGameAssetResolver, GameAssetResolver>();
+
+                // The textures a model names inside itself, for the XML diagnostics. Registered
+                // behind the Core-side contract as well, the same way the icon catalog is: that is
+                // how the Xml project consumes it without ever referencing the asset layer it
+                // cannot depend on.
+                services.AddSingleton<ModelTextureIndex>();
+                services.AddSingleton<IModelTextureIndex>(sp =>
+                    sp.GetRequiredService<ModelTextureIndex>());
+
+                // Assembles a unit from its XML. Transient rather than singleton: it reads the game
+                // index, which is replaced wholesale on every reindex, so a cached instance would
+                // answer from a stale snapshot.
+                services.AddTransient<PreviewSceneBuilder>();
+                services.AddSingleton<ShaderSourceResolver>();
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
                 services.AddHttpClient(nameof(BaselineLoader));

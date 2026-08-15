@@ -50,7 +50,7 @@
       "aet-eaw-edit": [
         {
           "id": "aet-eaw-edit.lsp.localisationNavigator",
-          "name": "Localisation Editor",          
+          "name": "Localisation Editor",
           "icon": "resources/icons/language-solid-full.svg",
           "when": "config.aet-eaw-edit.features.tools.localisation"
         },
@@ -218,6 +218,21 @@
         "title": "EaWEdit: Play Credits Crawl Full Screen",
         "icon": "$(screen-full)",
         "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.previewModel",
+        "title": "EaWEdit: Preview Model",
+        "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.previewAssembledUnit",
+        "title": "EaWEdit: Preview Assembled Unit",
+        "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
+      },
+      {
+        "command": "aet-eaw-edit.shaders.obtain",
+        "title": "EaWEdit: Set Up Base Shader Sources",
+        "enablement": "config.aet-eaw-edit.features.tools.modelPreview"
       }
     ],
     "configuration": [
@@ -447,6 +462,18 @@
             "type": "boolean",
             "default": false,
             "markdownDescription": "Pass `--wait-for-debugger` to the LSP server process on startup, causing it to pause until a .NET debugger attaches.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`."
+          },
+          "aet-eaw-edit.tools.aloViewerExecutable": {
+            "order": 1400,
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Full path to `AloViewer.exe`.\n\nThe in-editor preview is read-only; this is the tool the *Open in AloViewer* button hands the current model to. Left empty, the button reports that nothing is configured - the extension never searches for an install."
+          },
+          "aet-eaw-edit.tools.particleEditorExecutable": {
+            "order": 1401,
+            "type": "string",
+            "default": "",
+            "markdownDescription": "Full path to `ParticleEditor.exe`.\n\nAs with `#aet-eaw-edit.tools.aloViewerExecutable#`: the preview does not edit, and this is where editing happens."
           }
         }
       },
@@ -645,8 +672,51 @@
             "type": "boolean",
             "default": true,
             "markdownDescription": "Enables the encyclopedia popup preview: the *Preview Encyclopedia Popup* command and its code lens.\n\nThe preview reads translations but never writes any, so it is independent of `#aet-eaw-edit.features.tools.localisation#`.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.features.tools.modelPreview": {
+            "order": 2150,
+            "type": "boolean",
+            "default": true,
+            "markdownDescription": "Enables the 3D model preview: opening an `.alo` shows the model, and a GameObject can be previewed with its hardpoints mounted.\n\nModels that ship with the game are only reachable once `#aet-eaw-edit.lsp.source.baseGameDirectory#` is set - the extension never searches for an install.\n\nChanging this setting automatically restarts the LSP server."
+          },
+          "aet-eaw-edit.shaders.directory": {
+            "order": 2160,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "markdownDescription": "Folder holding the base game's shader **sources** (`.fx`), used to preview models closer to how the game draws them.\n\nThese are published by Petroglyph for mod tooling and are **never redistributed with this extension** - point this at your own extracted copy. Run *EaWEdit: Set Up Base Shader Sources* for help.\n\nA game install does not contain them: it ships compiled `.fxo` bytecode instead."
+          },
+          "aet-eaw-edit.shaders.sourceUrl": {
+            "order": 2170,
+            "type": "string",
+            "default": "",
+            "format": "uri",
+            "scope": "machine-overridable",
+            "markdownDescription": "Overrides where *Set Up Base Shader Sources* sends you, for proxies, mirrors and air-gapped machines.\n\nEmpty uses Petroglyph's own published download."
           }
         }
+      }
+    ],
+    "customEditors": [
+      {
+        "viewType": "aet-eaw-edit.modelPreview",
+        "displayName": "Alamo Model Preview",
+        "selector": [
+          {
+            "filenamePattern": "*.alo"
+          },
+          {
+            "filenamePattern": "*.ALO"
+          },
+          {
+            "filenamePattern": "*.ala"
+          },
+          {
+            "filenamePattern": "*.ALA"
+          }
+        ],
+        "priority": "default"
       }
     ]
   },
@@ -668,7 +738,9 @@
     "@types/node": "^26.1.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
+    "@types/three": "^0.185.4",
     "@types/vscode": "^1.107.0",
+    "@types/yauzl": "^3.4.0",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",
     "@vscode/test-cli": "^0.0.15",
@@ -679,6 +751,7 @@
     "typescript": "^6.0.0"
   },
   "dependencies": {
+    "@tabler/icons-react": "^3.46.0",
     "@tanstack/react-virtual": "^3.14.9",
     "@vscode/codicons": "^0.0.45",
     "elkjs": "^0.8.2",
@@ -691,7 +764,9 @@
     "rete-react-plugin": "^2.1.2",
     "rete-render-utils": "^2.0.3",
     "styled-components": "^6.4.3",
-    "vscode-languageclient": "^10.0.0"
+    "three": "^0.185.1",
+    "vscode-languageclient": "^10.0.0",
+    "yauzl": "^3.4.0"
   },
   "bugs": {
     "url": "https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues",

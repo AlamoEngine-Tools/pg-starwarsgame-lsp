@@ -18,7 +18,9 @@ public sealed class SerializedBaseline
     // v2: FileTypeMap now carries the story chain (StoryPlotManifest/StoryParser entries).
     // v3: ModelBones re-keyed from full relative path to bare filename (ModelBoneKey); old caches
     //     carry the wrong keys and must regenerate or every model reads as bones-unavailable.
-    public const int CurrentSchemaVersion = 3;
+    // v4: `.ala` added to the asset catalogue, so a model can be asked which animations exist for
+    //     it. An older cache simply has none and every model would read as having no clips.
+    public const int CurrentSchemaVersion = 4;
 
     [Key(0)] public GameSymbol[] Symbols { get; set; } = [];
     [Key(1)] public long BuiltAtMs { get; set; }

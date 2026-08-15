@@ -129,9 +129,141 @@ export const dockChromeCss = `
     .search-field .mode-group .icon-btn { min-width: 22px; padding: 2px 4px; border-radius: 4px; }
     .search-field .mode-group .codicon { font-size: 14px; }
 
-    .field { display: flex; flex-direction: column; gap: 3px; }
+    /* A control and its label are a pair and sit close; the gap BETWEEN fields is what the
+       section body sets, and it is larger. Three pixels here had the label almost touching the
+       control above it, so a run of settings read as one block of text with sliders in it. */
+    .field { display: flex; flex-direction: column; gap: 5px; }
     .field select, .field input[type=text] { width: 100%; }
-    .field-label { font-size: 0.9em; opacity: 0.7; }
+    /* Room to actually grab. A range input defaults to a track a few pixels tall inside a box the
+       browser sizes to the thumb, which in a settings panel reads as a hairline. */
+    .field input[type=range] { width: 100%; height: 18px; margin: 0; }
+    .field .btn { width: 100%; padding: 5px 14px; }
+    /* A row, so a label can carry a checkbox on its left and a readout on its right. Laid out the
+       way a section title is: the count goes to the far edge. Without that they simply butted up
+       against the label - "Wind speed1.0", "Light around45 deg" - which read as a missing space. */
+    .field-label { display: flex; align-items: center; gap: 5px; font-size: 0.9em; opacity: 0.7; }
+
+    /* The mark on a label that has more to say. Sized and coloured like the text around it until
+       it has a warning to carry, so a panel with nothing wrong on it stays quiet. */
+    .info-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 15px;
+        height: 15px;
+        padding: 0;
+        flex-shrink: 0;
+        border: none;
+        border-radius: 50%;
+        background: transparent;
+        color: inherit;
+        opacity: 0.6;
+        cursor: pointer;
+    }
+    .info-badge:hover, .info-badge:focus-visible {
+        opacity: 1;
+        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
+    }
+    .info-badge svg { flex-shrink: 0; }
+    .info-badge.sev-warning { color: var(--vscode-editorWarning-foreground, #cca700); opacity: 1; }
+    .info-badge.sev-error { color: var(--vscode-editorError-foreground, #f14c4c); opacity: 1; }
+
+    /* The BUBBLE's own styles are not here. This block is interpolated into a styled.div, so
+       everything in it is scoped to that element - and the bubble is portalled to the document
+       body, outside it. It carries its own global styles instead; see InfoBadge.tsx. */
+
+    /* A slider that has one position worth returning to, marked at the middle of its track.
+       Drawn OVER the input rather than under it, because a range input paints its own track and
+       would bury the mark; the thumb covers it when it is parked there, which is the one moment
+       nobody needs to see it. */
+    .detent-track { position: relative; display: block; }
+    .detent-track > input[type=range] { width: 100%; }
+    .detent-track::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 2px;
+        height: 9px;
+        transform: translate(-50%, -50%);
+        border-radius: 1px;
+        background: var(--vscode-descriptionForeground, #999);
+        opacity: 0.55;
+        pointer-events: none;
+    }
+
+    /* A foldable group of controls, after BSI CX's step library: a small coloured heading, a count
+       where the number says something, and room between groups so the eye lands on a heading. */
+    .panel-section { display: flex; flex-direction: column; gap: 10px; }
+
+    /* The whole heading folds the group, not just the chevron - a 12px target beside a word that
+       plainly names the thing is a target people miss. Transparent and borderless: it is a heading
+       that happens to be pressable, not a button with a title in it. */
+    .panel-section-head {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        width: 100%;
+        padding: 0;
+        border: none;
+        background: transparent;
+        color: var(--vscode-textLink-foreground, #4daafc);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        text-align: left;
+        cursor: pointer;
+    }
+    .panel-section-head:hover { color: var(--vscode-textLink-activeForeground, #6fb3ff); }
+    .panel-section-head .codicon { font-size: 13px; opacity: 0.8; }
+    .panel-section-title { flex: 1; min-width: 0; }
+    /* To the far edge, quieter than the name: it reports, the name identifies. */
+    .panel-section-count {
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--vscode-descriptionForeground, #999);
+    }
+    .panel-section-body {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        /* Indented under its heading, so a fold reads as a group closing rather than as controls
+           disappearing from a flat list. */
+        padding-left: 2px;
+    }
+    .field-label .section-count { margin-left: auto; opacity: 0.85; }
+    /* The sentence under a control that says what it does. It is support, not content, so it is
+       quieter and tighter than the setting it explains. */
+    .field-note {
+        font-size: 0.9em;
+        line-height: 1.35;
+        color: var(--vscode-descriptionForeground, #999);
+    }
+    /* The same sentence, when it is telling the reader something is off rather than explaining
+       the control. Warning colour and no other change: it has to read as the same kind of text in
+       the same place, or it becomes an alert the eye has to deal with on every glance. */
+    .field-warn {
+        font-size: 0.9em;
+        line-height: 1.35;
+        color: var(--vscode-editorWarning-foreground, #cca700);
+    }
+    /* A colour well, not a form control. The browser renders a colour input as a wide bordered
+       button with a swatch inside it, which took a whole row for one colour.
+       No backticks in this file: it is one big template literal. */
+    .field input[type=color], .field-label input[type=color] {
+        margin-left: auto;
+        width: 28px;
+        height: 20px;
+        padding: 0;
+        flex-shrink: 0;
+        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: 3px;
+        background: none;
+        cursor: pointer;
+    }
+    .field input[type=range] { flex: 1; min-width: 0; }
     .check-field {
         display: flex;
         align-items: flex-start;
@@ -142,12 +274,50 @@ export const dockChromeCss = `
     .check-field input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
     .check-detail { opacity: 0.7; }
 
+    /* A one-of-N choice as joined buttons: the alternatives stay visible, and switching is one
+       press rather than open-then-pick. Segments share their borders, so the group reads as one
+       control rather than as a row of separate buttons. */
+    .mode-selector { display: inline-flex; width: 100%; }
+    .mode-selector button {
+        flex: 1;
+        min-width: 0;
+        padding: 3px 6px;
+        border: 1px solid var(--vscode-panel-border, #444);
+        border-right-width: 0;
+        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.18));
+        color: var(--vscode-foreground);
+        font-size: 0.9em;
+        line-height: 1.5;
+        cursor: pointer;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+    .mode-selector button:first-child { border-radius: 4px 0 0 4px; }
+    .mode-selector button:last-child { border-right-width: 1px; border-radius: 0 4px 4px 0; }
+    .mode-selector button:hover {
+        background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
+    }
+    .mode-selector button.active {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border-color: var(--vscode-button-background);
+    }
+    /* The neighbour's shared edge, so the selected segment is not outlined by the one before it. */
+    .mode-selector button.active + button { border-left-color: var(--vscode-button-background); }
+
     /* ── Buttons ───────────────────────────────────────────────────────── */
     .btn {
+        /* A row, so a button can carry a codicon beside its label without the two colliding. */
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
         padding: 4px 14px;
         border-radius: 4px;
-        border: 1px solid var(--vscode-button-border, transparent);
+        border: 1px solid var(--vscode-button-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.4)));
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
+        box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
         color: var(--vscode-button-secondaryForeground, #ccc);
         font-family: var(--vscode-font-family, sans-serif);
         font-size: var(--vscode-font-size, 13px);
@@ -159,6 +329,10 @@ export const dockChromeCss = `
     }
     .btn:hover:not(:disabled) { filter: brightness(1.1); }
     .btn:disabled { opacity: 0.5; cursor: default; }
+    /* For a button whose glyph IS the label - a transport control, say. The .icon-btn language is
+       for toolbars, where a row of borderless glyphs reads as a toolbar; standing alone in a
+       settings pane the same button reads as an ornament, because nothing says it can be pressed. */
+    .btn.compact { padding: 4px 9px; }
 
     /* ── Dialogs ───────────────────────────────────────────────────────── */
     .modal-backdrop {
@@ -525,6 +699,76 @@ export const dockOverviewCss = `
         display: flex;
         flex-direction: column;
         gap: 8px;
+
+        /* Capped and scrollable, or a foot that outgrows the panel simply runs off the bottom -
+           taking with it whatever control would have closed it again. That is not a squeeze on the
+           content above: flex-shrink 0 still keeps the foot at its natural size until it would
+           need more than half the dock. */
+        max-height: 55%;
+        overflow-y: auto;
     }
     .dock-overview > input[type=text] { width: 100%; }
+`;
+
+/**
+ * The rotary mode switch.
+ *
+ * Shared because the switch itself is shared: the story graph had it first and the model preview
+ * takes the same one, so "how this product switches modes" stays one implementation and one look.
+ * The icon sizing lives with it - it is part of the dial rather than of whatever hosts it.
+ */
+export const rotarySwitchCss = `
+    /* Glyphs sized WELL inside their circles. At 22px across, a 13px icon covers three fifths of
+       the face and the button stops reading as a round switch position - it reads as a smudge.
+       These ratios (18/40 in the readout, 11/24 on a position) leave a visible ring of ground. */
+    .rotary-center .codicon { font-size: 18px; }
+    .rotary-pos .codicon { font-size: 11px; }
+
+    /* Rotary mode switch - large clickable readout (cycles modes) with the three modes on an arc above. */
+    .rotary { position: relative; width: 108px; height: 80px; flex-shrink: 0; }
+    .rotary-center {
+        position: absolute;
+        left: 50%; top: 70%;
+        transform: translate(-50%, -50%);
+        width: 40px; height: 40px;
+        padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        border-radius: 50%;
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border: 2px solid var(--vscode-focusBorder);
+        cursor: pointer;
+        z-index: 1;
+    }
+    .rotary-center:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
+    .rotary-pos {
+        position: absolute;
+        left: 50%; top: 70%;
+        width: 24px; height: 24px;
+        padding: 0;
+        display: flex; align-items: center; justify-content: center;
+        border: none;
+        border-radius: 50%;
+        line-height: 1;
+        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
+        color: var(--vscode-button-secondaryForeground, #ccc);
+        cursor: pointer;
+        opacity: 0.6;
+    }
+    .rotary-pos:hover { opacity: 1; }
+    /* The active position is LIT, like the indicator lamp over a console switch - that is the feel
+       this control is after, and a merely tinted glyph does not read as a lamp.
+
+       The two shadows are what keep it from merging with the readout below it: a ring of the page's
+       own ground first, so there is a visible gap however close the two sit, then the glow. An
+       earlier attempt at a flat fill put two identical discs a few pixels apart and read as a
+       rendering fault; an outline landed a blue ring against the readout's blue border. */
+    .rotary-pos.active {
+        opacity: 1;
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        box-shadow:
+            0 0 0 2px var(--vscode-editor-background, #1f1f1f),
+            0 0 7px 1px var(--vscode-focusBorder, #0078d4);
+    }
 `;

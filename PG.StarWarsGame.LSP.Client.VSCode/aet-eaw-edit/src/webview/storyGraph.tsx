@@ -20,7 +20,9 @@ import {
 } from 'react';
 import {
     dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
+    rotarySwitchCss,
 } from './shared/dockChrome';
+import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
 import { RightDock } from './shared/RightDock';
 import { ProblemsPanel } from './shared/ProblemsPanel';
 import { FrameNotifier } from './storyGraph/frameNotifier';
@@ -3022,6 +3024,7 @@ const GlobalStyle = createGlobalStyle`
 
 const Shell = styled.div`
     ${dockChromeCss}
+    ${rotarySwitchCss}
 
     height: 100%;
     display: flex;
@@ -3134,37 +3137,6 @@ const Shell = styled.div`
     .rotary-center .codicon { font-size: 22px; }
     .rotary-pos .codicon { font-size: 13px; }
     .sim-head .codicon { font-size: 13px; vertical-align: -1px; }
-
-    /* Rotary mode switch - large clickable readout (cycles modes) with the three modes on an arc above. */
-    .rotary { position: relative; width: 100px; height: 72px; flex-shrink: 0; }
-    .rotary-center {
-        position: absolute;
-        left: 50%; top: 68%;
-        transform: translate(-50%, -50%);
-        width: 40px; height: 40px;
-        padding: 0;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 22px;
-        border-radius: 50%;
-        background: var(--vscode-button-background);
-        color: var(--vscode-button-foreground);
-        border: 2px solid var(--vscode-focusBorder);
-        z-index: 1;
-    }
-    .rotary-center:hover { background: var(--vscode-button-hoverBackground, var(--vscode-button-background)); }
-    .rotary-pos {
-        position: absolute;
-        left: 50%; top: 68%;
-        width: 22px; height: 22px;
-        padding: 0;
-        border-radius: 50%;
-        font-size: 13px;
-        line-height: 1;
-        background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-        opacity: 0.5;
-    }
-    .rotary-pos:hover { opacity: 0.9; }
-    .rotary-pos.active { opacity: 1; outline: 2px solid var(--vscode-focusBorder); }
 
     .resize-handle-w {
         position: absolute;
@@ -3827,7 +3799,13 @@ function App(): React.JSX.Element {
                                 title="Save - write all staged changes to the XML files"
                             ><span className="codicon codicon-save" />{pendingCount > 0 ? ` ${pendingCount}` : ''}</button>
                         ) : null}
-                        <RotaryModeSwitch mode={mode} onSelect={switchMode} available={availableModes} />
+                        <RotaryModeSwitch
+                            mode={mode}
+                            modes={STORY_MODES.filter(
+                                m => (m.id === 'edit' ? availableModes.edit
+                                    : m.id === 'simulate' ? availableModes.simulate : true))}
+                            onSelect={switchMode}
+                        />
                         <button
                             className={'icon-btn validate-btn header-right sev-' + severity}
                             onClick={() => { validateEdits(); }}
@@ -4066,66 +4044,16 @@ function SimLog(props: { state: StorySimStateDto; onClose: () => void }): React.
 }
 
 /**
- * The three editor modes on a "half-horizon" arc (angles in degrees, 0 = 3 o'clock, 90 = down): the
- * modes sit ABOVE the horizontal line running through the lower half of the large centre readout.
+ * The three editor modes on a "half-horizon" arc: they sit ABOVE the horizontal line through the
+ * lower half of the centre readout. Edit and Simulation are feature-flagged and a mode that is off
+ * is omitted entirely rather than shown disabled - there is nothing the user could do about it from
+ * here, and every request it makes would be refused server-side.
  */
-const ROTARY_MODES: { id: EditorMode; icon: string; label: string; angle: number }[] = [
-    { id: 'view', icon: 'eye', label: 'View', angle: 210 },          // upper-left
-    { id: 'edit', icon: 'edit', label: 'Edit', angle: 270 },          // top
-    { id: 'simulate', icon: 'play', label: 'Simulation', angle: 330 }, // upper-right
+const STORY_MODES: RotaryMode<EditorMode>[] = [
+    { id: 'view', icon: 'eye', label: 'View', angle: 210 },
+    { id: 'edit', icon: 'edit', label: 'Edit', angle: 270 },
+    { id: 'simulate', icon: 'play', label: 'Simulation', angle: 330 },
 ];
-
-/**
- * A rotary-switch-style mode selector: the active mode's icon reads out large in the centre, the
- * available modes arc above it like a half horizon, and clicking one "rotates" to it.
- *
- * Edit and Simulation are feature-flagged (both off by default), and a mode that is off is omitted
- * entirely rather than shown disabled - there is nothing the user could do about it from here, and
- * every request it makes would be refused server-side. Each mode keeps its fixed angle when others
- * are hidden, so View stays where the eye expects it.
- */
-function RotaryModeSwitch(props: {
-    mode: EditorMode; onSelect: (m: EditorMode) => void;
-    available: { edit: boolean; simulate: boolean };
-}): React.JSX.Element {
-    const enabled = ROTARY_MODES.filter(
-        m => (m.id === 'edit' ? props.available.edit
-            : m.id === 'simulate' ? props.available.simulate : true));
-    const active = enabled.find(m => m.id === props.mode) ?? enabled[0];
-    const radius = 34;
-    const order = enabled.map(m => m.id);
-    const cycle = (): void => {
-        const at = order.indexOf(props.mode);
-        props.onSelect(order[(at + 1) % order.length]);
-    };
-    return (
-        <div className="rotary">
-            {enabled.map(m => {
-                const rad = (m.angle * Math.PI) / 180;
-                const x = Math.cos(rad) * radius;
-                const y = Math.sin(rad) * radius;
-                return (
-                    <button
-                        key={m.id}
-                        className={'rotary-pos' + (m.id === props.mode ? ' active' : '')}
-                        style={{ transform: `translate(-50%, -50%) translate(${x}px, ${y}px)` }}
-                        title={m.label}
-                        onClick={() => props.onSelect(m.id)}
-                    ><span className={'codicon codicon-' + m.icon} /></button>
-                );
-            })}
-            <button
-                className="rotary-center"
-                title={order.length > 1
-                    ? `${active.label} - click to switch mode`
-                    : `${active.label} - the other modes are disabled in settings`}
-                onClick={cycle}
-            >
-                <span className={'codicon codicon-' + active.icon} />
-            </button>
-        </div>
-    );
-}
 
 const MINIMAP_H = 118;
 

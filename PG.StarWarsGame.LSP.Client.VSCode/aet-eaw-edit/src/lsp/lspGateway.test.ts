@@ -179,3 +179,54 @@ describe('LspGateway.notify', () => {
         assert.equal(await gateway.notify('aet/setWorkspaceSettings', {}), true);
     });
 });
+
+describe('LspGateway.whenReady', () => {
+    it('resolves at once when the server has already started', async () => {
+        const gateway = new LspGateway(() => answering({}));
+        gateway.markReady();
+
+        assert.equal(await gateway.whenReady(50), true);
+    });
+
+    /**
+     * The bug this exists for: a preview tab restored when the window opens resolves BEFORE the
+     * server has started, its scene request failed once, and nothing ever asked again - so the tab
+     * stayed blank until the file was closed and reopened by hand.
+     */
+    it('waits for a server that starts after the caller asked', async () => {
+        const gateway = new LspGateway(() => answering({}));
+
+        const waited = gateway.whenReady(5000);
+        setTimeout(() => { gateway.markReady(); }, 20);
+
+        assert.equal(await waited, true);
+    });
+
+    it('releases every caller waiting at once', async () => {
+        const gateway = new LspGateway(() => answering({}));
+
+        const all = Promise.all([gateway.whenReady(5000), gateway.whenReady(5000)]);
+        gateway.markReady();
+
+        assert.deepEqual(await all, [true, true]);
+    });
+
+    /**
+     * A server that never comes - the extension can be configured with the LSP off - must not leave
+     * the caller hanging for ever. It gives up and lets the caller report offline as it always did.
+     */
+    it('gives up rather than waiting for ever', async () => {
+        const gateway = new LspGateway(() => undefined);
+
+        assert.equal(await gateway.whenReady(20), false);
+    });
+
+    /** A restart puts it back to not-ready, or the next wait would sail past a stopped server. */
+    it('blocks again once the server has stopped', async () => {
+        const gateway = new LspGateway(() => undefined);
+        gateway.markReady();
+        gateway.markStopped();
+
+        assert.equal(await gateway.whenReady(20), false);
+    });
+});

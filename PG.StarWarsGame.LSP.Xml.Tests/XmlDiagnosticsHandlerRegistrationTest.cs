@@ -75,7 +75,10 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 107 → 108: IconAwaitingRepackHandler added - an Icon_Name whose art exists as a raw source
         // but is missing from the workspace mega texture, i.e. drawn but never repacked. Kept apart
         // from TextureFileExistenceHandler because the fix is a rebuild, not a drawing.
-        const int expectedHandlerCount = 108;
+        // 108 → 109: ModelTextureExistenceHandler added - the textures a model names INSIDE itself,
+        // which no XML tag mentions and nothing therefore validated. Reported against the tag that
+        // pulls the model in, because that is the only place in the document it can be anchored.
+        const int expectedHandlerCount = 109;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

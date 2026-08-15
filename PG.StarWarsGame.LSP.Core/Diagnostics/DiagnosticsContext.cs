@@ -18,7 +18,8 @@ public record DiagnosticsContext(
     GameIndex Index,
     string DocumentUri,
     string Locale,
-    IReadOnlySet<string>? IconsAwaitingRepack = null);
+    IReadOnlySet<string>? IconsAwaitingRepack = null,
+    Assets.IModelTextureIndex? ModelTextures = null);
 
 /// <summary>
 ///     Supplies the icons a workspace has drawn but not yet repacked.

@@ -11,7 +11,10 @@
 		"jsx": "react-jsx",
 		"strict": true,
 		"skipLibCheck": true,
-		"noEmit": true
+		"noEmit": true,
+		// The missing-texture marker is imported straight from resources/icons as a data URI.
+		// See the sibling alamo-engine-tools.d.png.ts for why a *.png wildcard cannot do it.
+		"allowArbitraryExtensions": true
 	},
 	"include": [
 		"./**/*"

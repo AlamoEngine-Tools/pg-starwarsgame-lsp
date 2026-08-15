@@ -1,24 +1,21 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Text;
 using PG.StarWarsGame.LSP.Assets.Projection;
+using static PG.StarWarsGame.LSP.Assets.Tests.Models.AloChunkFixture;
 
 namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 
 // ModelNameCatalog is the stable seam that unions a model's skeleton bones with its mesh names, since
 // the engine resolves any bone reference against either. Bones are supplied by the caller (the ALO
-// loader); mesh names are recovered by the deprecated AloMeshNameReader shim from the same bytes.
+// loader, which exposes none); mesh names come from AloModelReader, read without geometry.
 public sealed class ModelNameCatalogTest
 {
-    private const uint Mesh = 0x0400;
-    private const uint MeshName = 0x0401;
-    private const uint ContainerBit = 0x80000000;
 
     [Fact]
     public void ReadBoneReferenceTargets_UnionsBonesAndMeshNames()
     {
-        var alo = MeshChunk("HP02_LC_Blast");
+        var alo = Model("HP02_LC_Blast");
 
         var result = ModelNameCatalog.ReadBoneReferenceTargets(alo, _ => ["Root", "HP02_LC_Bone"]);
 
@@ -29,7 +26,7 @@ public sealed class ModelNameCatalogTest
     [Fact]
     public void ReadBoneReferenceTargets_KeepsBonesFirstAndInOrder()
     {
-        var alo = Concat(MeshChunk("mesh_a"), MeshChunk("mesh_b"));
+        var alo = Model("mesh_a", "mesh_b");
 
         var result = ModelNameCatalog.ReadBoneReferenceTargets(alo, _ => ["bone_1", "bone_2"]);
 
@@ -40,7 +37,7 @@ public sealed class ModelNameCatalogTest
     public void ReadBoneReferenceTargets_DropsMeshNamesAlreadyPresentAsBones_CaseInsensitively()
     {
         // On L1 station models the blast decal exists as BOTH a bone and a mesh; it must appear once.
-        var alo = Concat(MeshChunk("HP01_SHG_Blast"), MeshChunk("collision_com"));
+        var alo = Model("HP01_SHG_Blast", "collision_com");
 
         var result = ModelNameCatalog.ReadBoneReferenceTargets(alo,
             _ => ["Root", "hp01_shg_blast"]);
@@ -51,7 +48,7 @@ public sealed class ModelNameCatalogTest
     [Fact]
     public void ReadBoneReferenceTargets_DeduplicatesRepeatedMeshNames()
     {
-        var alo = Concat(MeshChunk("dup"), MeshChunk("dup"));
+        var alo = Model("dup", "dup");
 
         var result = ModelNameCatalog.ReadBoneReferenceTargets(alo, _ => ["root"]);
 
@@ -79,23 +76,20 @@ public sealed class ModelNameCatalogTest
 
     // ── fixtures ──────────────────────────────────────────────────────────────
 
-    private static byte[] MeshChunk(string meshName)
+    /// <summary>
+    ///     A structurally complete model carrying the named meshes and nothing else.
+    /// </summary>
+    /// <remarks>
+    ///     Whole models rather than loose mesh chunks: the reader behind this seam refuses a buffer
+    ///     that is not a real ALO, so a fixture made of bare mesh chunks would test the refusal path
+    ///     instead of the union these tests are about. The meshes carry no sub-meshes, which is legal
+    ///     and keeps the fixtures to the one thing they exercise - names.
+    /// </remarks>
+    private static byte[] Model(params string[] meshNames)
     {
-        var name = Encoding.ASCII.GetBytes(meshName);
-        var nameChunk = Chunk(MeshName, false, [.. name, 0x00]);
-        return Chunk(Mesh, true, nameChunk);
-    }
-
-    private static byte[] Chunk(uint type, bool container, byte[] body)
-    {
-        var size = (uint)body.Length | (container ? ContainerBit : 0u);
-        return [.. BitConverter.GetBytes(type), .. BitConverter.GetBytes(size), .. body];
-    }
-
-    private static byte[] Concat(params byte[][] parts)
-    {
-        var result = new List<byte>();
-        foreach (var p in parts) result.AddRange(p);
-        return [.. result];
+        return Concat(
+            Skeleton(Bone("ROOT", -1, true, Translation(0, 0, 0))),
+            Concat([.. meshNames.Select(n => Mesh(n, []))]),
+            Connections());
     }
 }

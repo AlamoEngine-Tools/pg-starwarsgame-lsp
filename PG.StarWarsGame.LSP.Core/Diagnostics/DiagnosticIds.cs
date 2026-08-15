@@ -152,6 +152,18 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId IconAwaitingRepack = new(DiagnosticGroup.Assets, 11);
 
+    /// <summary>
+    ///     A model resolves, but a texture it names inside itself does not.
+    ///     <para>
+    ///         Separate from <see cref="TextureFileExistence" />, which is about a texture the XML
+    ///         itself names: this one is reported against the tag that pulls the MODEL in, because
+    ///         that is the only place in the document the problem can be anchored to. The fix is
+    ///         also different - the reference lives in the .alo, so it is the art that has to
+    ///         change, not the line the warning appears on.
+    ///     </para>
+    /// </summary>
+    public static readonly DiagnosticId ModelTextureExistence = new(DiagnosticGroup.Assets, 12);
+
     // ── Localisation ──
     public static readonly DiagnosticId LocalisationKeyExistence = new(DiagnosticGroup.Localisation, 1);
     public static readonly DiagnosticId LocalisationKeyListExistence = new(DiagnosticGroup.Localisation, 2);

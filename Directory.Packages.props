@@ -20,6 +20,11 @@
         <PackageVersion Include="OmniSharp.Extensions.LanguageClient" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
         <PackageVersion Include="Semver" Version="3.0.0"/>
+        <!-- Writes the glTF/GLB the model preview ships to the webview. MIT, with a real net10.0
+             target. Chosen over hand-rolling the container because accessor, skin and animation
+             encoding is exactly the kind of spec detail worth not owning - and a .glb opens in any
+             external glTF viewer, which makes a geometry bug diagnosable without the renderer. -->
+        <PackageVersion Include="SharpGLTF.Toolkit" Version="1.0.6"/>
         <!-- Decodes the game's mega-texture and loose icon sources (TGA, and DDS which ImageSharp
              core never covered). MIT, no licence key, no build-time validation task. PNG encoding
              is hand-rolled over ZLibStream in Assets/Icons/PngWriter.cs rather than pulled from a

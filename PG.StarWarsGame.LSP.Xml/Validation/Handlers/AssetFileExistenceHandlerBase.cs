@@ -40,13 +40,11 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         var results = new List<XmlDiagnosticResult>();
         foreach (var se in Normalize(value))
         {
-            if (Exists(ctx.Index.AssetFiles, se))
+            if (AssetFileLookup.Resolves(
+                    ctx.Index.AssetFiles, se, AllowedExtensions, InterchangeableExtensions))
                 continue;
 
-            var alternates = AlternateNames(se).ToList();
-            if (alternates.Any(a => Exists(ctx.Index.AssetFiles, a)))
-                continue;
-
+            var alternates = AssetFileLookup.AlternateNames(se, InterchangeableExtensions).ToList();
             var alsoChecked = alternates.Count > 0
                 ? $" Also checked {string.Join(", ", alternates.Select(a => $"'{a}'"))} (the game treats these formats interchangeably)."
                 : string.Empty;
@@ -55,38 +53,6 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         }
 
         return results;
-    }
-
-    // The same name with each other interchangeable extension, when the value's own extension is
-    // part of the interchangeable set.
-    private IEnumerable<string> AlternateNames(string normalised)
-    {
-        var ext = Path.GetExtension(normalised);
-        if (string.IsNullOrEmpty(ext) ||
-            !InterchangeableExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
-            yield break;
-
-        foreach (var other in InterchangeableExtensions)
-            if (!other.Equals(ext, StringComparison.OrdinalIgnoreCase))
-                yield return normalised[..^ext.Length] + other;
-    }
-
-    private bool Exists(IAssetFileIndex index, string normalised)
-    {
-        // Exact relative-path match (e.g. "data/art/textures/foo.tga").
-        if (index.Contains(normalised))
-            return true;
-
-        // Bare filename or partial path (e.g. "foo.tga"): match any catalog entry of the right
-        // asset type whose path ends with "/<value>".
-        var suffix = "/" + normalised;
-        foreach (var ext in AllowedExtensions)
-        foreach (var path in index.GetByExtension(ext))
-            if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(path, normalised, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-        return false;
     }
 
     private static IEnumerable<string> Normalize(string raw)
