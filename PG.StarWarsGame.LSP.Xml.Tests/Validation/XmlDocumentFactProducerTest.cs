@@ -133,6 +133,34 @@ public sealed class XmlDocumentFactProducerTest
     }
 
     [Fact]
+    public void Duplicate_singleton_still_emits_a_value_fact_for_the_occurrence_the_game_keeps()
+    {
+        // A duplicate tag is a structural complaint about WHERE the value sits; it says nothing
+        // about whether the value is valid. Suppressing the value fact meant a duplicated tag also
+        // silently escaped every value check - a wrong enum, a bad float, a missing reference - so
+        // fixing the duplicate was the only way to discover the second, unrelated error.
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        var value = Assert.Single(facts.OfType<XmlTagValueFact>());
+        // The LAST one: earlier occurrences are dead weight the engine never reads, so validating
+        // them would report errors against text that has no effect on the game.
+        Assert.Equal("2.0", value.RawValue);
+    }
+
+    [Fact]
+    public void Duplicate_singleton_value_fact_points_at_the_value_not_the_tag()
+    {
+        const string xml = "<Root>\n<Max_Speed>1.0</Max_Speed>\n<Max_Speed>2.0</Max_Speed>\n</Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        var value = Assert.Single(facts.OfType<XmlTagValueFact>());
+        Assert.Equal(2, value.Line);
+        Assert.Equal("<Max_Speed>".Length, value.Column);
+        Assert.Equal("2.0".Length, value.Length);
+    }
+
+    [Fact]
     public void MultipleAllowed_tag_appearing_twice_does_not_emit_XmlDuplicateTagFact()
     {
         const string xml = "<Root><Multi_Tag>a</Multi_Tag><Multi_Tag>b</Multi_Tag></Root>";

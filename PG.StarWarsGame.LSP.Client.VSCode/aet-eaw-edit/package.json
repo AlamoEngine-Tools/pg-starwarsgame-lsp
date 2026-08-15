@@ -40,29 +40,24 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "aet-localisation",
-          "title": "EaWEdit: Localisation",
-          "icon": "resources/icons/alamo-engine-tools.png"
-        },
-        {
-          "id": "aet-story",
-          "title": "EaWEdit: Story",
+          "id": "aet-eaw-edit",
+          "title": "Empire at War Edit",
           "icon": "resources/icons/alamo-engine-tools.png"
         }
       ]
     },
     "views": {
-      "aet-localisation": [
+      "aet-eaw-edit": [
         {
           "id": "aet-eaw-edit.lsp.localisationNavigator",
-          "name": "Files",
+          "name": "Localisation Editor",          
+          "icon": "resources/icons/language-solid-full.svg",
           "when": "config.aet-eaw-edit.features.tools.localisation"
-        }
-      ],
-      "aet-story": [
+        },
         {
           "id": "aet-eaw-edit.lsp.storyNavigator",
-          "name": "Campaigns",
+          "name": "Campaign Editor",
+          "icon": "resources/icons/book-journal-whills-solid-full.svg",
           "when": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
         }
       ]

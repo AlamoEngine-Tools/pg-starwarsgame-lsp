@@ -118,12 +118,33 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             .Select(t => _schema.GetObjectType(t))
             .FirstOrDefault(t => t is not null);
 
-        if (typeDef?.NameTag is null) return [];
+        if (typeDef is null) return [];
 
         var symbols = new List<GameSymbol>();
         var rootContainer = doc.DocumentNode.ChildNodes
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
         if (rootContainer is null) return symbols;
+
+        // A SINGLETON type - no NameTag - has exactly one instance, so its type name is its id and
+        // the root element itself is the object. Without this, everything in GameConstants that is
+        // not enum-shaped (ShipNameTextFiles, the Encyclopedia_* geometry, the Corruption_*
+        // block) is unreachable through the index, and each consumer has to re-read the file off
+        // disk - losing mod-over-baseline layering in the process.
+        if (typeDef.NameTag is null)
+        {
+            // The registry says which types a FILE may hold; it does not prove the root element is
+            // one of them. Matching the name keeps a mistyped registry entry from inventing an
+            // object out of an unrelated document.
+            if (!string.Equals(rootContainer.Name, typeDef.TypeName, StringComparison.OrdinalIgnoreCase))
+                return symbols;
+
+            symbols.Add(new GameSymbol(
+                typeDef.TypeName, GameSymbolKind.XmlObject, typeDef.TypeName,
+                new FileOrigin(documentUri, rootContainer.Line - 1,
+                    XmlUtility.GetTagBracketColumn(rootContainer)),
+                null));
+            return symbols;
+        }
 
         foreach (var node in rootContainer.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
         {

@@ -83,6 +83,59 @@ public sealed class WorkspaceVariantTagSourceTest
         Assert.Contains(tags, t => t.TagName == "Mass" && t.Value == "5");
     }
 
+    /// <summary>
+    ///     A singleton object - GameConstants, AudioConstants - is keyed by its ROOT ELEMENT NAME,
+    ///     because it carries no <c>Name</c> attribute to key on.
+    /// </summary>
+    /// <remarks>
+    ///     The symbol alone is not enough: this map is what <see cref="EffectiveObjectResolver" />
+    ///     reads, and it used to skip every node without a Name attribute - which is every
+    ///     singleton root. Both halves are needed before a singleton's tags can be resolved.
+    /// </remarks>
+    [Fact]
+    public void TryGetTags_SingletonRootIsKeyedByItsElementName()
+    {
+        var (source, index, host, _) = Build();
+        host.AddOrUpdate(Uri,
+            "<GameConstants><ShipNameTextFiles>Star_Destroyer, Data\\SD.txt</ShipNameTextFiles>"
+            + "<Credits_Per_CP>50</Credits_Per_CP></GameConstants>", 1);
+        index.Current = IndexWith(("GameConstants", Uri, 1, 0));
+
+        var tags = source.TryGetTags("GameConstants");
+
+        Assert.NotNull(tags);
+        Assert.Contains(tags!, t => t.TagName == "ShipNameTextFiles"
+                                    && t.Value == "Star_Destroyer, Data\\SD.txt");
+        Assert.Contains(tags!, t => t.TagName == "Credits_Per_CP" && t.Value == "50");
+    }
+
+    [Fact]
+    public void TryGetTags_SingletonKeyIsCaseInsensitive()
+    {
+        // HAP lower-cases element names, while the symbol id comes from the schema's TypeName.
+        var (source, index, host, _) = Build();
+        host.AddOrUpdate(Uri, "<GameConstants><Credits_Per_CP>50</Credits_Per_CP></GameConstants>", 1);
+        index.Current = IndexWith(("GameConstants", Uri, 1, 0));
+
+        Assert.NotNull(source.TryGetTags("GAMECONSTANTS"));
+    }
+
+    /// <summary>
+    ///     Nested elements without a Name attribute must NOT become singleton keys - only the
+    ///     document's root. Otherwise every wrapper element in the game data would turn into a
+    ///     resolvable id.
+    /// </summary>
+    [Fact]
+    public void TryGetTags_NonRootElementWithoutNameIsNotKeyed()
+    {
+        var (source, index, host, _) = Build();
+        host.AddOrUpdate(Uri,
+            """<GameObjectFiles><Wrapper><SpaceUnit Name="V"><Hp>1</Hp></SpaceUnit></Wrapper></GameObjectFiles>""", 1);
+        index.Current = IndexWith(("Wrapper", Uri, 1, 0));
+
+        Assert.Null(source.TryGetTags("Wrapper"));
+    }
+
     [Fact]
     public void TryGetTags_FragmentPreservesOriginalCaseAndText()
     {

@@ -24,4 +24,15 @@ public sealed record WorkspaceConfiguration(
     ///     project last) - the registry scope for the story-dialog language service.
     /// </summary>
     public IReadOnlyList<string> StoryDialogRoots { get; init; } = [];
+
+    /// <summary>
+    ///     The root project's icon configuration, or <see langword="null" /> when it declares none.
+    /// </summary>
+    /// <remarks>
+    ///     Taken from the ROOT project only, not merged across layers, because a mega texture is not
+    ///     mergeable: whichever .mtd wins replaces the set wholesale rather than layering on top of a
+    ///     dependency's. Null means "use <see cref="Project.IconProjectSettings.Default" />" - the
+    ///     engine convention - rather than "no icons".
+    /// </remarks>
+    public Project.IconProjectSettings? Icons { get; init; }
 }

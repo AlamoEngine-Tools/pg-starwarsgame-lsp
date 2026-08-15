@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 
 import { GetEncyclopediaEntryResult } from './protocol';
 import { WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
+import { pickShipName } from './shipNamePick';
 
 /**
  * The in-game encyclopedia popup for one GameObject, beside the editor.
@@ -27,6 +28,16 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      * toggle stayed switched on, showing SP text under an MP label.
      */
     private _multiplayer = false;
+    /**
+     * The ship name drawn for each object, per object id.
+     *
+     * The engine picks at random, so there is no "correct" name to show - but re-picking on every
+     * response made the card reshuffle whenever anything refreshed it, which reads as flicker. The
+     * pick is therefore made once per object and kept for the panel's lifetime: stable while it is
+     * open, including across a webview reload when the tab is restored, and freshly drawn when the
+     * panel is closed and reopened, since the instance goes with it.
+     */
+    private readonly _shipNames = new Map<string, string>();
 
     private constructor(extensionUri: vscode.Uri) {
         super(extensionUri, {
@@ -111,7 +122,32 @@ export class EncyclopediaPanel extends WebviewPanelHost {
      * over a multiplayer body.
      */
     private _sendEntry(entry: GetEncyclopediaEntryResult): void {
-        this._send({ type: 'entry', entry, multiplayer: this._multiplayer });
+        this._send({
+            type: 'entry',
+            entry,
+            multiplayer: this._multiplayer,
+            shipName: this._drawShipName(entry),
+        });
+    }
+
+    /**
+     * The name this object is showing, drawn once and then kept - see {@link _shipNames}.
+     *
+     * Null for the overwhelming majority of objects, which have no pool, and for a pool whose file
+     * was missing or empty; the card then keeps the object's class line.
+     */
+    private _drawShipName(entry: GetEncyclopediaEntryResult): string | null {
+        const names = entry.shipNames?.names ?? [];
+        if (names.length === 0) { return null; }
+
+        const kept = this._shipNames.get(entry.objectId);
+        // Re-draw if the kept name is no longer in the pool - the author may have edited the file
+        // out from under us, and showing a name their data no longer contains would be a lie.
+        if (kept !== undefined && names.includes(kept)) { return kept; }
+
+        const drawn = pickShipName(names);
+        if (drawn !== null) { this._shipNames.set(entry.objectId, drawn); }
+        return drawn;
     }
 
     private _send(payload: unknown): void {

@@ -22,7 +22,8 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
         IEnumerable<ProjectableEntry> sfxEvents,
         string sourceManifestHash,
         IEnumerable<ProjectableEntry>? musicEvents = null,
-        IEnumerable<ProjectableEntry>? shadowBlobMaterials = null)
+        IEnumerable<ProjectableEntry>? shadowBlobMaterials = null,
+        IEnumerable<ProjectableEntry>? singletons = null)
     {
         var builder = ImmutableDictionary.CreateBuilder<string, GameSymbol>();
         var objectTags = ImmutableDictionary.CreateBuilder<string, ImmutableArray<BaselineTag>>(
@@ -70,6 +71,25 @@ public sealed class GameSymbolProjector(ISchemaProvider schema)
             var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, "ShadowBlobMaterial",
                 ResolveOrigin(entry.Location), null);
             builder[sym.Id] = sym;
+        }
+
+        // SINGLETONS - GameConstants, AudioConstants. A type declared with no `nameTag` has exactly
+        // one instance and no Name attribute, so its TYPE NAME is its id; the same rule the
+        // workspace parser applies, which is what lets a mod's own file shadow the base game's.
+        //
+        // Their TAGS are the reason this exists: a symbol alone would leave every value in the file
+        // as unreachable as before. GameConstants is where ShipNameTextFiles, the Encyclopedia_*
+        // geometry and the Corruption_* block live.
+        foreach (var entry in singletons ?? [])
+        {
+            var tags = entry.Tags ?? [];
+            // The classification IS the type name here - it must not go through the
+            // classification-to-PascalCase conversion, which would mangle it.
+            var sym = new GameSymbol(entry.Name, GameSymbolKind.XmlObject, entry.ClassificationName,
+                ResolveOrigin(entry.Location), null);
+            builder[sym.Id] = sym;
+            if (tags.Count > 0)
+                objectTags[entry.Name] = [.. tags];
         }
 
         return new BaselineIndex(builder.ToImmutable(), DateTimeOffset.UtcNow,

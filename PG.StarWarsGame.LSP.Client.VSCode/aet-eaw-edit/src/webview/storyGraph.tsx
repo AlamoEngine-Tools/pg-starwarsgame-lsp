@@ -18,7 +18,9 @@ import {
     CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
     useCallback, useEffect, useReducer, useRef, useState,
 } from 'react';
-import { dockBodyCss, dockChromeCss, dockOverviewCss, rightDockCss } from './shared/dockChrome';
+import {
+    dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
+} from './shared/dockChrome';
 import { RightDock } from './shared/RightDock';
 import { ProblemsPanel } from './shared/ProblemsPanel';
 import { FrameNotifier } from './storyGraph/frameNotifier';
@@ -3079,7 +3081,13 @@ const Shell = styled.div`
     }
 
     .body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
-    .canvas-area { flex: 1; position: relative; overflow: hidden; }
+    /* The canvas column: the graph, with the bottom panels under it. They sit INSIDE this column so
+       they border the dock rather than running underneath it - the dock is full height, the same
+       arrangement the localisation editors use (.grid-column there).
+       min-height: 0 is load-bearing - without it the canvas refuses to shrink below its content and
+       pushes the panels off the bottom. */
+    .canvas-column { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    .canvas-area { flex: 1; position: relative; overflow: hidden; min-height: 0; }
     .canvas { position: absolute; inset: 0; z-index: 1; }
 
     /* Zero-size anchor at the graph origin inside rete's transformed content holder: its absolutely
@@ -3108,18 +3116,9 @@ const Shell = styled.div`
 
     /* ── Right dock ─────────────────────────────────────────────────────── */
     ${rightDockCss}
-    /* The dial is always dead-centre; Save/Validate float over the sides so they never shift it. */
-    .dock-header {
-        position: relative;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 6px 8px;
-        min-height: 78px;
-        border-bottom: 1px solid var(--vscode-panel-border);
-    }
-    .dock-header .header-left { position: absolute; left: 8px; }
-    .dock-header .header-right { position: absolute; right: 8px; }
+    ${dockHeaderCss}
+    /* Tall enough for the rotary mode dial, which is this editor's alone. */
+    .dock-header { min-height: 78px; }
     ${dockBodyCss}
     ${dockOverviewCss}
     /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
@@ -3128,43 +3127,6 @@ const Shell = styled.div`
     .overview-tools { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
     .filters-below { display: flex; flex-direction: column; gap: 4px; }
     .filters-below select { width: 100%; }
-
-    /* Soft, icon-forward buttons: almost no chrome until hovered, the glyph does the talking. */
-    .icon-btn {
-        display: inline-flex;
-        align-items: center;
-        gap: 3px;
-        min-width: 26px;
-        justify-content: center;
-        padding: 5px 7px;
-        background: transparent;
-        border: none;
-        border-radius: 8px;
-        color: var(--vscode-foreground);
-        opacity: 0.72;
-        font-size: 14px;
-        line-height: 1;
-    }
-    .icon-btn:hover {
-        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
-        opacity: 1;
-    }
-    .icon-btn:disabled { opacity: 0.35; }
-    .icon-btn.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); opacity: 1; }
-    .icon-btn.sev-unvalidated { color: var(--vscode-foreground); opacity: 1; }
-    .icon-btn.sev-ok { color: var(--vscode-charts-green, #89d185); opacity: 1; }
-    .icon-btn.sev-warning { color: var(--vscode-charts-yellow, #cca700); opacity: 1; }
-    .icon-btn.sev-error { color: var(--vscode-errorForeground, #f14c4c); opacity: 1; }
-    /* Header controls read out at roughly VS Code activity-bar icon scale. */
-    .dock-header .icon-btn { font-size: 18px; padding: 6px 9px; }
-    .dock-header .icon-btn .codicon { font-size: 18px; }
-    /* Validate is an always-present soft pill, tinted with a hue of its own state colour. */
-    .validate-btn { border-radius: 14px; font-weight: 600; }
-    .validate-btn.sev-unvalidated { background: color-mix(in srgb, var(--vscode-foreground) 15%, transparent); }
-    .validate-btn.sev-ok { background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 14%, transparent); }
-    .validate-btn.sev-warning { background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 16%, transparent); }
-    .validate-btn.sev-error { background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 16%, transparent); }
-    .validate-btn:hover { filter: brightness(1.2); }
 
     /* Codicons inherit their button's colour (never coloured individually) and scale per context. */
     .codicon { font-size: 15px; vertical-align: middle; }
@@ -3204,15 +3166,6 @@ const Shell = styled.div`
     .rotary-pos:hover { opacity: 0.9; }
     .rotary-pos.active { opacity: 1; outline: 2px solid var(--vscode-focusBorder); }
 
-    .resize-handle-n {
-        position: absolute;
-        top: -3px;
-        left: 0;
-        height: 6px;
-        width: 100%;
-        cursor: ns-resize;
-        z-index: 2;
-    }
     .resize-handle-w {
         position: absolute;
         top: 0;
@@ -3222,8 +3175,7 @@ const Shell = styled.div`
         cursor: ew-resize;
         z-index: 2;
     }
-    .resize-handle-w:hover, .resize-handle-w:active,
-    .resize-handle-n:hover, .resize-handle-n:active {
+    .resize-handle-w:hover, .resize-handle-w:active {
         background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder));
     }
 
@@ -3278,27 +3230,19 @@ const Shell = styled.div`
     .sim-head { font-weight: bold; margin-bottom: 3px; }
 
     /* ── Bottom panels (full width) ────────────────────────────────────── */
+    ${problemsPanelCss}
     .bottom-panels { flex-shrink: 0; display: flex; flex-direction: column; }
-    /* Header row on a dismissable bottom panel (Problems / Simulation log). */
+    /* The simulation log shares the problems bar's title row, so its bar stays sticky over a long
+       scrolling log. The paddings are this editor's own measured values, kept deliberately: the
+       shared block carries the localisation grids' 2px/6px, and the two differ by a pixel or two
+       from a calibration that was done here. */
     .panel-bar {
         position: sticky;
         top: 0;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 1px 4px 2px;
         background: var(--vscode-sideBar-background);
+        padding: 1px 4px 2px;
     }
-    .panel-title { font-weight: bold; font-size: 11px; color: var(--vscode-descriptionForeground); }
-    .panel-close {
-        background: transparent;
-        border: none;
-        color: var(--vscode-descriptionForeground);
-        cursor: pointer;
-        padding: 0 4px;
-        flex-shrink: 0;
-    }
-    .panel-close:hover { background: transparent; color: var(--vscode-editor-foreground); }
+    .problem-row { padding: 1px 4px; }
     .sim-log-panel {
         position: relative;
         overflow-y: auto;
@@ -3330,25 +3274,10 @@ const Shell = styled.div`
         font-size: 12px;
         padding: 2px 4px;
     }
-    .problem-row {
-        display: flex;
-        gap: 6px;
-        align-items: center;
-        padding: 1px 4px;
-    }
-    .problem-row.clickable { cursor: pointer; }
-    .problem-row:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15)); }
     .problem-node {
         flex-shrink: 0;
         max-width: 180px;
         color: var(--vscode-descriptionForeground);
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-    .problem-msg {
-        flex: 1;
-        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -3846,6 +3775,7 @@ function App(): React.JSX.Element {
                 />
             ) : null}
             <div className="body">
+                <div className="canvas-column">
                 <div className="canvas-area">
                     {/* Screen-space canvases behind the nodes (.canvas is z-index 1), redrawn on pan/zoom. */}
                     <SwimlaneCanvas
@@ -3858,6 +3788,30 @@ function App(): React.JSX.Element {
                         onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
                     />
                     {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
+                </div>
+                <div className="bottom-panels">
+                    {showProblems && problems.length ? (
+                        <ProblemsBar
+                            problems={problems}
+                            onJump={id => editorRef.current?.centerNode(id)}
+                            onClose={() => setShowProblems(false)}
+                        />
+                    ) : null}
+                    {simState?.running && showSimLog ? (
+                        <SimLog state={simState} onClose={() => setShowSimLog(false)} />
+                    ) : null}
+                    <div className="legend">
+                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-disabledForeground, #888)' }} />Inactive</span>
+                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-blue, #3794ff)' }} />Waiting</span>
+                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-green, #89d185)' }} />Armed</span>
+                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-purple, #b180d7)' }} />Fired</span>
+                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-red, #f14c4c)' }} />Disabled</span>
+                        <span><span className="shape-diamond" /> OR</span>
+                        <span><span className="shape-circle" /> AND</span>
+                        <span>dashed = portal / tactical / untested</span>
+                        <span>drag socket to socket = prereq</span>
+                    </div>
+                </div>
                 </div>
                 <RightDock
                     initialWidth={paletteWidthMemo}
@@ -3949,29 +3903,6 @@ function App(): React.JSX.Element {
                         </div>
                     </>}
                 />
-            </div>
-            <div className="bottom-panels">
-                {showProblems && problems.length ? (
-                    <ProblemsBar
-                        problems={problems}
-                        onJump={id => editorRef.current?.centerNode(id)}
-                        onClose={() => setShowProblems(false)}
-                    />
-                ) : null}
-                {simState?.running && showSimLog ? (
-                    <SimLog state={simState} onClose={() => setShowSimLog(false)} />
-                ) : null}
-                <div className="legend">
-                    <span><span className="swatch" style={{ borderColor: 'var(--vscode-disabledForeground, #888)' }} />Inactive</span>
-                    <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-blue, #3794ff)' }} />Waiting</span>
-                    <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-green, #89d185)' }} />Armed</span>
-                    <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-purple, #b180d7)' }} />Fired</span>
-                    <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-red, #f14c4c)' }} />Disabled</span>
-                    <span><span className="shape-diamond" /> OR</span>
-                    <span><span className="shape-circle" /> AND</span>
-                    <span>dashed = portal / tactical / untested</span>
-                    <span>drag socket to socket = prereq</span>
-                </div>
             </div>
         </Shell>
     );

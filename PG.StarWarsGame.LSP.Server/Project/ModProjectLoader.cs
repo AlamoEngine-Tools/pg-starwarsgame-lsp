@@ -101,6 +101,7 @@ public sealed class ModProjectLoader
         };
 
         var localisation = ParseLocalisation(dto.Localisation, fileName);
+        var icons = ParseIcons(dto.Icons, fileName);
 
         var references = new List<ProjectReference>();
         foreach (var reference in dto.ProjectReferences ?? [])
@@ -115,7 +116,52 @@ public sealed class ModProjectLoader
             references.Add(new ProjectReference(NormalizePath(raw)));
         }
 
-        return new ModProjectFile(name, modinfo, directories, references, localisation);
+        return new ModProjectFile(name, modinfo, directories, references, localisation, icons);
+    }
+
+    // Absence means "use the engine convention", not "no icons" - unlike localisation there is a
+    // sensible default, so IconProjectSettings.Default covers a project that says nothing. A node
+    // that IS present is validated strictly: a half-configured icons block is a mistake worth
+    // reporting, not something to silently paper over.
+    private static IconProjectSettings? ParseIcons(IconsDto? dto, string fileName)
+    {
+        if (dto is null) return null;
+
+        var megaTexture = IconProjectSettings.ConventionalMegaTexture;
+        if (dto.MegaTexture is not null)
+        {
+            if (string.IsNullOrWhiteSpace(dto.MegaTexture))
+                throw new ModProjectLoadException(
+                    $"Could not load mod project '{fileName}': 'icons.megaTexture' must not be empty. " +
+                    "Omit it entirely to use the default " +
+                    $"'{IconProjectSettings.ConventionalMegaTexture}'.");
+
+            // It names a PAIR - foo.mtd and foo.tga - so an extension here is ambiguous about which
+            // half the author meant, and silently stripping it would hide a real misunderstanding.
+            var extension = System.IO.Path.GetExtension(dto.MegaTexture);
+            if (extension.Equals(".mtd", StringComparison.OrdinalIgnoreCase)
+                || extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+                throw new ModProjectLoadException(
+                    $"Could not load mod project '{fileName}': 'icons.megaTexture' must be given " +
+                    $"without a file extension (got '{dto.MegaTexture}'). It names both the .mtd " +
+                    "directory and the .tga atlas, e.g. " +
+                    $"\"megaTexture\": \"{IconProjectSettings.ConventionalMegaTexture}\".");
+
+            megaTexture = NormalizePath(dto.MegaTexture);
+        }
+
+        var sourceRoots = new List<string>();
+        foreach (var root in dto.SourceRoots ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(root))
+                throw new ModProjectLoadException(
+                    $"Could not load mod project '{fileName}': 'icons.sourceRoots' must not contain " +
+                    "empty entries.");
+
+            sourceRoots.Add(NormalizePath(root));
+        }
+
+        return new IconProjectSettings(megaTexture, sourceRoots);
     }
 
     private LocalisationProjectSettings? ParseLocalisation(LocalisationDto? dto, string fileName)
@@ -234,6 +280,13 @@ public sealed class ModProjectLoader
         public DirectoryMapDto? Directories { get; init; }
         public List<ProjectReferenceDto>? ProjectReferences { get; init; }
         public LocalisationDto? Localisation { get; init; }
+        public IconsDto? Icons { get; init; }
+    }
+
+    private sealed class IconsDto
+    {
+        public string? MegaTexture { get; init; }
+        public IReadOnlyList<string>? SourceRoots { get; init; }
     }
 
     private sealed class DirectoryMapDto

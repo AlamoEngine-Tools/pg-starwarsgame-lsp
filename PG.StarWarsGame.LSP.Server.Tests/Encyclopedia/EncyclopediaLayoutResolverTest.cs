@@ -111,8 +111,16 @@ public sealed class EncyclopediaLayoutResolverTest
     public void Resolve_NothingIndexed_UsesBaseGameIconScale()
     {
         // encyclopedia_icon's Size is "0.75 0.66", and the shipped comment says X is the scale of
-        // the icon in the unit header. The icon asset is 50px, so the header draws it at 37.5.
+        // the icon in the unit header.
         Assert.Equal(0.75d, Resolve(GameIndex.Empty, new FakeVariantTagSource()).IconScale);
+    }
+
+    [Fact]
+    public void Resolve_NothingIndexed_UsesBaseGameAbilityIconScale()
+    {
+        // The SAME tag's Y, which the shipped file comments as "Y is the scale of the ability
+        // icon". Both halves are real values; reading only X threw the ability scale away.
+        Assert.Equal(0.66d, Resolve(GameIndex.Empty, new FakeVariantTagSource()).AbilityIconScale);
     }
 
     [Fact]
@@ -122,7 +130,10 @@ public sealed class EncyclopediaLayoutResolverTest
         var source = new FakeVariantTagSource()
             .With("encyclopedia_icon", Tag("Size", "1.0 0.5"));
 
-        Assert.Equal(1.0d, Resolve(index, source).IconScale);
+        var layout = Resolve(index, source);
+
+        Assert.Equal(1.0d, layout.IconScale);
+        Assert.Equal(0.5d, layout.AbilityIconScale);
     }
 
     [Fact]
@@ -131,7 +142,82 @@ public sealed class EncyclopediaLayoutResolverTest
         var index = IndexWith("encyclopedia_icon");
         var source = new FakeVariantTagSource().With("encyclopedia_icon", Tag("Size", "big"));
 
-        Assert.Equal(0.75d, Resolve(index, source).IconScale);
+        var layout = Resolve(index, source);
+
+        Assert.Equal(0.75d, layout.IconScale);
+        // Falls back as a unit: a half-read pair would silently pair a stock X with a junk Y.
+        Assert.Equal(0.66d, layout.AbilityIconScale);
+    }
+
+    // ── the card's own texture names are data, not constants ─────────────────
+
+    [Fact]
+    public void Resolve_NothingIndexed_UsesBaseGameBackdropTexture()
+    {
+        // encyclopedia_back names its own backdrop, so the card must read the name rather than
+        // assume the shipped one - a mod that reskins the popup renames this tag.
+        Assert.Equal("e_background.tga",
+            Resolve(GameIndex.Empty, new FakeVariantTagSource()).BackdropTextureName);
+    }
+
+    [Fact]
+    public void Resolve_ModRenamesBackdrop_AdoptsModTexture()
+    {
+        var index = IndexWith("encyclopedia_back");
+        var source = new FakeVariantTagSource()
+            .With("encyclopedia_back", Tag("Blank_Texture_Name", "my_backdrop.tga"));
+
+        Assert.Equal("my_backdrop.tga", Resolve(index, source).BackdropTextureName);
+    }
+
+    // ── the faction switch ───────────────────────────────────────────────────
+
+    [Fact]
+    public void Resolve_NothingIndexed_UsesBaseGameFactionFrames()
+    {
+        // Icon_Alternate_Texture_Name is an indexed-alternates list, and on this component the
+        // index is the faction slot. The base game ships exactly two - there is no third entry and
+        // no Underworld frame in the atlas, so a two-way switch is the complete stock behaviour.
+        Assert.Equal(
+            ["i_tooltip_rebel_frame.tga", "i_tooltip_empire_frame.tga"],
+            Resolve(GameIndex.Empty, new FakeVariantTagSource()).FactionFrameTextureNames);
+    }
+
+    [Fact]
+    public void Resolve_ModShipsThreeFrames_AdoptsAllOfThem()
+    {
+        // Nothing caps the list at the base game's two. A mod adding a third faction adds a third
+        // entry, and the preview has to offer it.
+        var index = IndexWith("encyclopedia_back");
+        var source = new FakeVariantTagSource()
+            .With("encyclopedia_back", Tag("Icon_Alternate_Texture_Name", "a.tga b.tga c.tga"));
+
+        Assert.Equal(["a.tga", "b.tga", "c.tga"], Resolve(index, source).FactionFrameTextureNames);
+    }
+
+    [Fact]
+    public void Resolve_ModComponentOmitsFrames_KeepsBaseGamePair()
+    {
+        // Per-tag fallback, as everywhere else here: restating Size must not silently drop the
+        // faction frames the game would still draw.
+        var index = IndexWith("encyclopedia_back");
+        var source = new FakeVariantTagSource().With("encyclopedia_back", Tag("Size", "400 20"));
+
+        Assert.Equal(
+            ["i_tooltip_rebel_frame.tga", "i_tooltip_empire_frame.tga"],
+            Resolve(index, source).FactionFrameTextureNames);
+    }
+
+    [Fact]
+    public void Resolve_ModShipsOneFrame_DropsToSingleEntry()
+    {
+        // A one-entry list is a real authoring choice - one faction, one skin - and must not be
+        // padded back up to the shipped pair.
+        var index = IndexWith("encyclopedia_back");
+        var source = new FakeVariantTagSource()
+            .With("encyclopedia_back", Tag("Icon_Alternate_Texture_Name", "only.tga"));
+
+        Assert.Equal(["only.tga"], Resolve(index, source).FactionFrameTextureNames);
     }
 
     // ── alignment is encoded as presence ─────────────────────────────────────

@@ -20,6 +20,11 @@
         <PackageVersion Include="OmniSharp.Extensions.LanguageClient" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
         <PackageVersion Include="Semver" Version="3.0.0"/>
+        <!-- Decodes the game's mega-texture and loose icon sources (TGA, and DDS which ImageSharp
+             core never covered). MIT, no licence key, no build-time validation task. PNG encoding
+             is hand-rolled over ZLibStream in Assets/Icons/PngWriter.cs rather than pulled from a
+             library, so the icon pipeline carries no encoder dependency at all. -->
+        <PackageVersion Include="Pfim" Version="0.11.4"/>
         <PackageVersion Include="Serilog" Version="4.4.0"/>
         <PackageVersion Include="Serilog.Extensions.Logging" Version="10.0.0"/>
         <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1"/>
@@ -42,3 +47,5 @@
     </ItemGroup>
 
 </Project>
+
+

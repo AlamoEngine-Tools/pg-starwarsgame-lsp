@@ -7,8 +7,28 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>Shared context passed to every <see cref="IXmlDiagnosticsHandler" /> invocation.</summary>
+/// <param name="IconsAwaitingRepack">
+///     Icon base names (no extension) that exist as raw source images but are absent from the
+///     workspace's mega texture. Empty when the workspace ships no mega texture, since there is then
+///     nothing for the sources to be out of sync with. Optional so that every existing construction
+///     site, and every test, keeps working unchanged.
+/// </param>
 public record DiagnosticsContext(
     ISchemaProvider Schema,
     GameIndex Index,
     string DocumentUri,
-    string Locale);
+    string Locale,
+    IReadOnlySet<string>? IconsAwaitingRepack = null);
+
+/// <summary>
+///     Supplies the icons a workspace has drawn but not yet repacked.
+/// </summary>
+/// <remarks>
+///     Defined in Core so the Xml diagnostics pipeline can consume it without referencing the server
+///     project that builds the icon catalog.
+/// </remarks>
+public interface IIconRepackStatusProvider
+{
+    /// <summary>Base names awaiting a repack; empty when nothing is known or nothing is stale.</summary>
+    IReadOnlySet<string> IconsAwaitingRepack { get; }
+}

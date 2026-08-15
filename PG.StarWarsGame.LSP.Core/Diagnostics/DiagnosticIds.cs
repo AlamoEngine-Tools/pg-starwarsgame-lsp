@@ -144,6 +144,14 @@ public static class DiagnosticIds
     public static readonly DiagnosticId TextureFileExistence = new(DiagnosticGroup.Assets, 9);
     public static readonly DiagnosticId TextureFileFormat = new(DiagnosticGroup.Assets, 10);
 
+    /// <summary>
+    ///     An icon exists as a raw source image but is missing from the workspace's mega texture:
+    ///     drawn, but never repacked. Deliberately distinct from
+    ///     <see cref="TextureFileExistence" /> - the art is there and the fix is a rebuild, which is
+    ///     a different instruction from "this icon does not exist".
+    /// </summary>
+    public static readonly DiagnosticId IconAwaitingRepack = new(DiagnosticGroup.Assets, 11);
+
     // ── Localisation ──
     public static readonly DiagnosticId LocalisationKeyExistence = new(DiagnosticGroup.Localisation, 1);
     public static readonly DiagnosticId LocalisationKeyListExistence = new(DiagnosticGroup.Localisation, 2);

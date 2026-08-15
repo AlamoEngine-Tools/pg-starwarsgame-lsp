@@ -23,7 +23,9 @@ export function LocProblemsBar(props: {
     // The error count is only worth showing when it is not simply the total - "3 problems, 3
     // errors" says the same thing twice.
     const title = `Problems (${props.problems.length}${
-        errors > 0 && errors < props.problems.length ? `, ${errors} errors` : ''})`;
+        errors > 0 && errors < props.problems.length
+            ? `, ${errors} error${errors === 1 ? '' : 's'}`
+            : ''})`;
 
     return (
         <ProblemsPanel

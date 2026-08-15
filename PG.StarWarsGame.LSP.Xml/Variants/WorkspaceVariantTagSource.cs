@@ -76,6 +76,16 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
     private static void IndexDocument(string uri, ParsedXmlDocument parsed,
         Dictionary<string, IReadOnlyList<VariantTag>> map)
     {
+        // A SINGLETON object - GameConstants, AudioConstants - has no Name attribute, so its ROOT
+        // ELEMENT NAME is its id. Keyed here without consulting the schema: a stray entry is inert,
+        // because TryGetTags only reaches this map for an id the index already has a symbol for,
+        // and symbols for singletons are only emitted for registered singleton types.
+        // Root only - keying every unnamed element would turn every wrapper into a resolvable id.
+        var root = parsed.Html.DocumentNode.ChildNodes
+            .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        if (root is not null && GetNameAttribute(root) is null)
+            map.TryAdd(root.Name, CollectChildTags(root, uri, parsed.Text));
+
         foreach (var node in parsed.Html.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
         {

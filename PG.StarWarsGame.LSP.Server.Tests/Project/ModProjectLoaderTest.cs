@@ -4,6 +4,7 @@
 using System.Collections.Concurrent;
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -398,6 +399,136 @@ public sealed class ModProjectLoaderTest
         var model = loader.Load(ProjectPath);
 
         Assert.Null(model.Localisation);
+    }
+
+    // ── icons ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Load_IconsNode_IsParsed()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "icons": {
+                                "megaTexture": "data/art/textures/mt_mymod",
+                                "sourceRoots": ["data/art/textures/icons"]
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal("data/art/textures/mt_mymod", model.Icons!.MegaTexture);
+        Assert.Equal("data/art/textures/mt_mymod.mtd", model.Icons.MtdPath);
+        Assert.Equal("data/art/textures/mt_mymod.tga", model.Icons.TexturePath);
+        Assert.Equal(["data/art/textures/icons"], model.Icons.SourceRoots);
+    }
+
+    [Fact]
+    public void Load_IconsNode_PathsNormalizedToLowercaseForwardSlashes()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "icons": {
+                                "megaTexture": "Data\\Art\\Textures\\MT_MyMod",
+                                "sourceRoots": ["Data\\Art\\Icons"]
+                              }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal("data/art/textures/mt_mymod", model.Icons!.MegaTexture);
+        Assert.Equal(["data/art/icons"], model.Icons.SourceRoots);
+    }
+
+    // Absence is not "no icons" - the engine always looks in the same place, so the default applies.
+    [Fact]
+    public void Load_AbsentIconsNode_IsNull_AndDefaultSuppliesTheConvention()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "directories": { "xml": ["data/xml"] }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Null(model.Icons);
+        Assert.Equal("data/art/textures/mt_commandbar",
+            (model.Icons ?? IconProjectSettings.Default).MegaTexture);
+    }
+
+    [Fact]
+    public void Load_IconsNode_WithOnlySourceRoots_KeepsConventionalMegaTexture()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "icons": { "sourceRoots": ["data/art/icons"] }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var model = loader.Load(ProjectPath);
+
+        Assert.Equal(IconProjectSettings.ConventionalMegaTexture, model.Icons!.MegaTexture);
+        Assert.Equal(["data/art/icons"], model.Icons.SourceRoots);
+    }
+
+    // megaTexture names a PAIR, so an extension is ambiguous about which half was meant. Silently
+    // stripping it would hide a real misunderstanding of the format.
+    [Theory]
+    [InlineData("data/art/textures/mt_mymod.mtd")]
+    [InlineData("data/art/textures/mt_mymod.tga")]
+    [InlineData("data/art/textures/mt_mymod.TGA")]
+    public void Load_IconsNode_MegaTextureWithExtension_Throws(string megaTexture)
+    {
+        var json = $$"""
+                     {
+                       "modinfo": { "name": "Mod" },
+                       "icons": { "megaTexture": "{{megaTexture}}" }
+                     }
+                     """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("without a file extension", ex.Message);
+    }
+
+    [Fact]
+    public void Load_IconsNode_EmptyMegaTexture_Throws()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "icons": { "megaTexture": "  " }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("must not be empty", ex.Message);
+    }
+
+    [Fact]
+    public void Load_IconsNode_EmptySourceRootEntry_Throws()
+    {
+        const string json = """
+                            {
+                              "modinfo": { "name": "Mod" },
+                              "icons": { "sourceRoots": ["data/art/icons", ""] }
+                            }
+                            """;
+        var loader = Build(json, out _);
+
+        var ex = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+        Assert.Contains("must not contain empty entries", ex.Message);
     }
 
     // ── localisation.credits ─────────────────────────────────────────────────

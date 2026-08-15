@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
@@ -30,7 +30,10 @@ using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
+using PG.StarWarsGame.Files.MTD;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
+using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.ShipNames;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -258,8 +261,30 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IFileHelper>(),
                         sp.GetRequiredService<ILogger<BaselineLoader>>()));
 
+                // Icon preview. The MTD reader needs PG.Commons' CRC32 hashing, but do NOT register
+                // it here: SupportLocalisationBaseline below already reaches SupportDAT, which calls
+                // PetroglyphCommons.ContributeServices and TryAddSingleton<IHashingService>.
+                // Registering it again crashes the server at startup with "Hash provider with key
+                // 'CRC32' is already registered" - HashingService's constructor walks every
+                // IHashAlgorithmProvider it can see and rejects a duplicate key. Registration order
+                // is irrelevant to resolution, so SupportMTD can sit here regardless.
+                services.SupportMTD();
+                services.AddSingleton<IconPackLoader>(sp =>
+                    new IconPackLoader(
+                        sp.GetRequiredService<IHttpClientFactory>().CreateClient(nameof(IconPackLoader)),
+                        sp.GetRequiredService<IFileHelper>(),
+                        sp.GetRequiredService<ILogger<IconPackLoader>>()));
+                services.AddSingleton<IIconCatalogProvider, IconCatalogProvider>();
+                // Same instance behind both contracts: the Xml diagnostics pipeline consumes the
+                // Core-side interface, which is how it stays unaware of the server's icon catalog.
+                services.AddSingleton<IIconRepackStatusProvider>(sp =>
+                    sp.GetRequiredService<IIconCatalogProvider>());
+
+                services.AddSingleton<IShipNameCatalogProvider, ShipNameCatalogProvider>();
+
                 services.AddHttpClient(nameof(HttpSchemaProvider));
                 services.AddHttpClient(nameof(BaselineLoader));
+                services.AddHttpClient(nameof(IconPackLoader));
                 services.AddHttpClient("LuaSchema");
 
                 services.AddLuaLanguageServices();

@@ -249,4 +249,70 @@ public sealed class GameSymbolProjectorTest
         Assert.Empty(result.DynamicEnumValues);
         Assert.Empty(result.HardcodedEnumValues);
     }
+
+    // ── Singletons ───────────────────────────────────────────────────────────
+
+    private static readonly FakeSchemaProvider SchemaWithSingleton = new(
+        "CombatBonusAbility", "SFXEvent", "GameObjectType", "GameConstants");
+
+    private static ProjectableEntry Singleton(params BaselineTag[] tags)
+    {
+        return new ProjectableEntry("GameConstants", "GameConstants",
+            new XmlLocationInfo("DATA\\XML\\GAMECONSTANTS.XML", 1), tags);
+    }
+
+    /// <summary>
+    ///     A singleton is indexed under its own type name, matching what the workspace parser does,
+    ///     so a mod that ships no GameConstants.xml still resolves the base game's values.
+    /// </summary>
+    [Fact]
+    public void Project_Singleton_IsIndexedUnderItsTypeName()
+    {
+        var result = new GameSymbolProjector(SchemaWithSingleton)
+            .Project([], [], "hash", singletons: [Singleton(Tag("Credits_Per_CP", "50"))]);
+
+        var sym = result.Symbols["GameConstants"];
+        Assert.Equal("GameConstants", sym.Id);
+        Assert.Equal("GameConstants", sym.TypeName);
+        Assert.Equal(GameSymbolKind.XmlObject, sym.Kind);
+    }
+
+    /// <summary>
+    ///     The TAGS are the point - a symbol with no tags would leave every value in the file
+    ///     exactly as unreachable as before.
+    /// </summary>
+    [Fact]
+    public void Project_Singleton_CarriesItsTagsIntoObjectTags()
+    {
+        var result = new GameSymbolProjector(SchemaWithSingleton).Project([], [], "hash",
+            singletons: [Singleton(
+                Tag("ShipNameTextFiles", "Star_Destroyer, Data\\SD.txt"),
+                Tag("Credits_Per_CP", "50"))]);
+
+        var tags = result.ObjectTags["GameConstants"];
+        Assert.Contains(tags, t => t.TagName == "ShipNameTextFiles");
+        Assert.Contains(tags, t => t.TagName == "Credits_Per_CP");
+    }
+
+    /// <summary>
+    ///     The classification IS the type name for a singleton - it must not go through the
+    ///     PascalCase/underscore conversion that named objects use, which would mangle it.
+    /// </summary>
+    [Fact]
+    public void Project_Singleton_TypeNameIsNotPutThroughClassificationConversion()
+    {
+        var result = new GameSymbolProjector(SchemaWithSingleton)
+            .Project([], [], "hash", singletons: [Singleton(Tag("A", "1"))]);
+
+        Assert.Equal("GameConstants", result.Symbols["GameConstants"].TypeName);
+        Assert.False(result.Symbols.ContainsKey("GAME_CONSTANTS"));
+    }
+
+    [Fact]
+    public void Project_NoSingletons_LeavesTheBaselineUnchanged()
+    {
+        var result = Build().Project([], [], "hash");
+        Assert.Empty(result.Symbols);
+        Assert.Empty(result.ObjectTags);
+    }
 }

@@ -146,10 +146,31 @@ public sealed class XmlDocumentFactProducer(
                     .Select(n => n.Line)
                     .ToList();
                 var openLen = XmlUtility.GetOpeningTagLength(child);
+                var isLast = ReferenceEquals(child, group[^1]);
                 // Whole-element span so the Unnecessary grey-out covers the entire dead node.
                 var (endLine, endCol) = XmlUtility.GetElementEndPosition(child, text);
                 facts.Add(new XmlDuplicateTagFact(documentUri, line0, col0, openLen, tagDef, otherLines,
-                    ReferenceEquals(child, group[^1]), endLine, endCol));
+                    isLast, endLine, endCol));
+
+                // The duplicate is a complaint about WHERE the value sits and says nothing about
+                // whether it is valid, so the value still has to be checked - otherwise a
+                // duplicated tag silently escapes every value rule and the second, unrelated error
+                // only surfaces once the duplicate is fixed.
+                //
+                // Only the last occurrence, because that is the one the engine reads: reporting a
+                // bad enum on a line the game never looks at would be a complaint about dead text,
+                // and those lines are already greyed out as Unnecessary.
+                if (isLast)
+                {
+                    var duplicateValue = child.InnerText.Trim();
+                    if (!string.IsNullOrEmpty(duplicateValue))
+                    {
+                        var (dupLine, dupCol, dupLen) = XmlUtility.GetValuePosition(child, lineIndex);
+                        facts.Add(new XmlTagValueFact(
+                            documentUri, dupLine, dupCol, dupLen, tagDef, duplicateValue));
+                    }
+                }
+
                 WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
                 continue;
             }
