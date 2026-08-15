@@ -10,23 +10,35 @@ namespace PG.StarWarsGame.LSP.Assets.Icons;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         The engine hardcodes which icon each ability draws: <c>I_SA_*</c> occurs in exactly one
-///         file across a game install - the mega texture directory itself - so there is nothing in
-///         the data to read the mapping from. Most abilities happen to use <c>I_SA_&lt;TYPE&gt;</c>,
-///         which needs no table. The entries below are the ones that do not, confirmed against the
-///         running game rather than inferred, and recorded here because they cannot be derived.
+///         The engine hardcodes which icon each ability draws, and no <c>Unit_Ability</c> names its
+///         default icon in data, so there is nothing to read the mapping from. Most abilities happen
+///         to use <c>I_SA_&lt;TYPE&gt;</c>, which needs no table. The entries below are the ones that
+///         do not, recorded here because they cannot be derived.
 ///     </para>
 ///     <para>
 ///         Several are near-misses that would be tempting to guess and easy to get wrong:
 ///         <c>CAPTURE_VEHICLE</c> resolves to a PLURAL icon name, <c>FORCE_LIGHTNING</c> to an entry
 ///         Petroglyph misspelled as <c>FORCE_LIGHTING</c>, and <c>INVULNERABILITY</c> to
 ///         <c>EVASIVE_MANEUVERS</c>, which no naming rule would ever produce. Do not extend this
-///         table by pattern-matching; confirm against the game, as everything here was.
+///         table by pattern-matching.
 ///     </para>
 ///     <para>
-///         Not exhaustive. Nine ability types remain unmapped and are UNKNOWN rather than known to
-///         have no icon - see <c>docs/ability-icon-mapping.md</c>. Their slots fall back to the
-///         ability type as text.
+///         All but two were confirmed against the running game. The exceptions are
+///         <c>RADIOACTIVE_CONTAMINATE</c> and <c>TARGETED_REPAIR</c>, which are INFERRED from an
+///         orphan pairing: no <c>Unit_Ability</c> has type <c>CONTAMINATE</c> or
+///         <c>REPAIR_VEHICLE</c>, so those atlas entries belong to nothing, and these are the only
+///         contaminate- and repair-flavoured abilities that reach the command bar at all. Narrower
+///         than a name resemblance, but still not an observation - if either draws the wrong art in
+///         game, that is the pair to suspect.
+///     </para>
+///     <para>
+///         Not exhaustive: seven ability types remain unmapped. Six of them
+///         (<c>AREA_EFFECT_CONVERT</c>, <c>AREA_EFFECT_STUN</c>, <c>EJECT_VEHICLE_THIEF</c>,
+///         <c>FIRE_LOBBING_SUPERWEAPON</c>, <c>TARGETED_INVULNERABILITY</c>,
+///         <c>UNTARGETED_STICKY_BOMB</c>) carry no <c>GUI_Activated_Ability_Name</c> on any shipped
+///         instance, so they never reach the command bar and have NO icon to map - do not invent one.
+///         Only <c>SUPER_LASER</c> is genuinely unknown. See <c>docs/ability-icon-mapping.md</c>.
+///         Unmapped slots fall back to the ability type as text.
 ///     </para>
 /// </remarks>
 public static class AbilityIconNames
@@ -51,7 +63,11 @@ public static class AbilityIconNames
             ["REPLENISH_WINGMEN"] = "I_SA_COVER_ME.TGA",
             ["SPOILER_LOCK"] = "I_SA_S_FOIL_MODE.TGA",
             ["TARGETED_HACK"] = "I_SA_HACK_TURRET.TGA",
-            ["TURBO"] = "I_SA_POWER_TO_ENGINES.TGA"
+            ["TURBO"] = "I_SA_POWER_TO_ENGINES.TGA",
+
+            // INFERRED, not observed in game - see the third remark above before trusting these.
+            ["RADIOACTIVE_CONTAMINATE"] = "I_SA_CONTAMINATE.TGA",
+            ["TARGETED_REPAIR"] = "I_SA_REPAIR_VEHICLE.TGA"
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

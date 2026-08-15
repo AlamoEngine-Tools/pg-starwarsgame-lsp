@@ -91,6 +91,16 @@ public sealed record EncyclopediaAbility(
 ///     request so the panel can never draw one against a stale copy of the other.
 /// </param>
 /// <param name="Icon">The object's portrait, or <see langword="null" /> when none resolved.</param>
+/// <param name="ShipNames">
+///     The pool of individual ship names this object draws from, or <see langword="null" /> when it
+///     is not registered for them - which is nearly every object.
+///     <para>
+///         The server does NOT pick one. Which name to show is a presentation choice with a
+///         lifetime - the panel keeps its pick so the card does not reshuffle on every refresh -
+///         and a server that picked per request would fight that. <paramref name="UnitClass" />
+///         therefore always holds the object's real class line; the client substitutes.
+///     </para>
+/// </param>
 public sealed record GetEncyclopediaEntryResult(
     bool Found,
     string ObjectId,
@@ -105,7 +115,8 @@ public sealed record GetEncyclopediaEntryResult(
     IReadOnlyList<EncyclopediaReference> VulnerableTo,
     EncyclopediaLayout Layout,
     EncyclopediaIcon? Icon = null,
-    EncyclopediaChrome? Chrome = null
+    EncyclopediaChrome? Chrome = null,
+    EncyclopediaShipNames? ShipNames = null
 )
 {
     /// <summary>The answer for an unknown object, and for every request while the feature is off.</summary>
@@ -115,6 +126,25 @@ public sealed record GetEncyclopediaEntryResult(
             false, objectId, null, null, null, [], false, null, [], [], [], layout);
     }
 }
+
+/// <summary>
+///     The pool of individual ship names an object draws from, reported alongside the one that was
+///     drawn.
+/// </summary>
+/// <remarks>
+///     Wired up in GameConstants' <c>ShipNameTextFiles</c>. The engine picks a name and remembers
+///     which are spent so a fleet never repeats one; a preview has no campaign to remember for, so
+///     it simply picks - which is why the whole pool travels, letting the panel show what else the
+///     object could have been called.
+/// </remarks>
+/// <param name="SourcePath">The path as written in the tag.</param>
+/// <param name="FileFound">
+///     Whether the file was readable. Separates "wired up but the file is missing" - an authoring
+///     mistake - from "wired up and empty", which a bare count cannot express.
+/// </param>
+/// <param name="Names">Every name in the pool, in file order.</param>
+public sealed record EncyclopediaShipNames(
+    string SourcePath, bool FileFound, IReadOnlyList<string> Names);
 
 /// <summary>A resolved icon, ready for the client to drop straight into an <c>img</c> element.</summary>
 /// <param name="Name">The icon name as written in <c>Icon_Name</c>.</param>

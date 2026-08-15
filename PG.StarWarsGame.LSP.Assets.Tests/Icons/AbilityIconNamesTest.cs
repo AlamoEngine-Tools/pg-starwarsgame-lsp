@@ -20,6 +20,44 @@ public sealed class AbilityIconNamesTest
         Assert.Equal(expected, AbilityIconNames.For(type));
     }
 
+    /// <summary>
+    ///     The two entries derived from an orphan pairing rather than observed in game.
+    /// </summary>
+    /// <remarks>
+    ///     Kept as their own case so the distinction survives: no <c>Unit_Ability</c> has type
+    ///     <c>CONTAMINATE</c> or <c>REPAIR_VEHICLE</c>, so those atlas entries are unclaimed, and the
+    ///     only contaminate-flavoured and repair-flavoured abilities that reach the command bar at
+    ///     all are these two. That is a much narrower argument than name similarity, but it is still
+    ///     an inference - see section 6 of docs/ability-icon-mapping.md.
+    /// </remarks>
+    [Theory]
+    [InlineData("RADIOACTIVE_CONTAMINATE", "I_SA_CONTAMINATE.TGA")]
+    [InlineData("TARGETED_REPAIR", "I_SA_REPAIR_VEHICLE.TGA")]
+    public void For_ReturnsTheInferredOrphanPairing(string type, string expected)
+    {
+        Assert.Equal(expected, AbilityIconNames.For(type));
+    }
+
+    /// <summary>
+    ///     Ability types proven to never reach the command bar must NOT be given an icon.
+    /// </summary>
+    /// <remarks>
+    ///     None of these carries a <c>GUI_Activated_Ability_Name</c> on any instance in the shipped
+    ///     data, which is what binds an ability to a command-bar button - so the game never draws
+    ///     one, and inventing a mapping would put art where the game shows none.
+    /// </remarks>
+    [Theory]
+    [InlineData("AREA_EFFECT_CONVERT")]
+    [InlineData("AREA_EFFECT_STUN")]
+    [InlineData("EJECT_VEHICLE_THIEF")]
+    [InlineData("FIRE_LOBBING_SUPERWEAPON")]
+    [InlineData("TARGETED_INVULNERABILITY")]
+    [InlineData("UNTARGETED_STICKY_BOMB")]
+    public void For_ReturnsNullForAbilitiesThatNeverReachTheCommandBar(string type)
+    {
+        Assert.Null(AbilityIconNames.For(type));
+    }
+
     [Fact]
     public void For_IsCaseInsensitiveAndTrims()
     {
@@ -59,6 +97,6 @@ public sealed class AbilityIconNamesTest
     [Fact]
     public void All_ContainsEveryConfirmedException()
     {
-        Assert.Equal(18, AbilityIconNames.All.Count());
+        Assert.Equal(20, AbilityIconNames.All.Count());
     }
 }

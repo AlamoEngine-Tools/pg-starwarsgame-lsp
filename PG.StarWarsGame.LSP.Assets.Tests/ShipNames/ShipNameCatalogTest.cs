@@ -164,24 +164,4 @@ public sealed class ShipNameCatalogTest
         Assert.Equal(1, reads);
         Assert.Equal(["Allecto"], catalog.For("Generic_Star_Destroyer")!.Names);
     }
-
-    // ── picking a name ───────────────────────────────────────────────────────
-
-    [Fact]
-    public void PickName_AlwaysReturnsOneOfThePool()
-    {
-        // The game picks at random and remembers which are used. A preview has no campaign to
-        // remember anything for, so it just picks - but it must never invent a name.
-        var pool = new ShipNamePool("Data\\SD.txt", true, ["Allecto", "Devastator", "Tyrant"]);
-
-        for (var i = 0; i < 50; i++)
-            Assert.Contains(pool.PickName(new Random(i)), pool.Names);
-    }
-
-    [Fact]
-    public void PickName_EmptyPoolYieldsNull()
-    {
-        // Falls back to the class line rather than showing a blank where a name should be.
-        Assert.Null(new ShipNamePool("Data\\SD.txt", false, []).PickName(new Random(1)));
-    }
 }

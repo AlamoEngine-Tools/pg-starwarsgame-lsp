@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions;
@@ -33,6 +33,7 @@ using PG.StarWarsGame.LSP.Server.Suppression;
 using PG.StarWarsGame.Files.MTD;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
 using PG.StarWarsGame.LSP.Server.Icons;
+using PG.StarWarsGame.LSP.Server.ShipNames;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -278,6 +279,8 @@ public static class ServerConfigurator
                 // Core-side interface, which is how it stays unaware of the server's icon catalog.
                 services.AddSingleton<IIconRepackStatusProvider>(sp =>
                     sp.GetRequiredService<IIconCatalogProvider>());
+
+                services.AddSingleton<IShipNameCatalogProvider, ShipNameCatalogProvider>();
 
                 services.AddHttpClient(nameof(HttpSchemaProvider));
                 services.AddHttpClient(nameof(BaselineLoader));

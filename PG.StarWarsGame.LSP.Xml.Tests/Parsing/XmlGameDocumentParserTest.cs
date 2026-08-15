@@ -248,14 +248,63 @@ public sealed class XmlGameDocumentParserTest
         Assert.Empty(result.Symbols);
     }
 
+    /// <summary>
+    ///     A singleton type is indexed under its own type name.
+    /// </summary>
+    /// <remarks>
+    ///     This previously emitted NOTHING, on the reasoning that a type with no <c>Name</c>
+    ///     attribute has no id to key on. The consequence was that every non-enum value in
+    ///     GameConstants - <c>ShipNameTextFiles</c>, the <c>Encyclopedia_*_Offset</c> geometry, the
+    ///     <c>Corruption_Encyclopedia_*</c> block - was unreachable through the index, so anything
+    ///     needing one had to re-read the file off disk and lose mod layering in the process. A
+    ///     singleton has exactly one instance, so its type name IS its id.
+    /// </remarks>
     [Fact]
-    public async Task ParseAsync_Singleton_Type_With_No_NameTag_Emits_No_Symbol()
+    public async Task ParseAsync_Singleton_Type_With_No_NameTag_Emits_Symbol_Under_Its_Type_Name()
     {
         var schema = new FakeSchemaProvider();
         schema.AddType(Type("GameConstants", null)); // singleton: no Name attribute
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("gameconstants.xml", ["GameConstants"]);
 
-        var result = await Build(schema).ParseAsync("file:///f.xml",
+        var result = await Build(schema, registry).ParseAsync("file:///gameconstants.xml",
             "<GameConstants><Credits_Per_CP>50</Credits_Per_CP></GameConstants>", 1,
+            TestContext.Current.CancellationToken);
+
+        var sym = Assert.Single(result.Symbols);
+        Assert.Equal("GameConstants", sym.Id);
+        Assert.Equal(GameSymbolKind.XmlObject, sym.Kind);
+        Assert.Equal("GameConstants", sym.TypeName);
+        Assert.Equal("file:///gameconstants.xml", ((FileOrigin)sym.Origin).Uri);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Singleton_Emits_One_Symbol_Not_One_Per_Constant()
+    {
+        // The children are the constants themselves, not a collection of objects.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("GameConstants", null));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("gameconstants.xml", ["GameConstants"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///gameconstants.xml",
+            "<GameConstants><A>1</A><B>2</B><C>3</C></GameConstants>", 1,
+            TestContext.Current.CancellationToken);
+
+        Assert.Single(result.Symbols);
+    }
+
+    [Fact]
+    public async Task ParseAsync_Singleton_Root_Not_Matching_The_Registered_Type_Emits_No_Symbol()
+    {
+        // Guards against a mistyped registry entry inventing a GameConstants that is not one.
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("GameConstants", null));
+        var registry = new FakeFileTypeRegistry();
+        registry.Register("gameconstants.xml", ["GameConstants"]);
+
+        var result = await Build(schema, registry).ParseAsync("file:///gameconstants.xml",
+            "<SomethingElse><Credits_Per_CP>50</Credits_Per_CP></SomethingElse>", 1,
             TestContext.Current.CancellationToken);
 
         Assert.Empty(result.Symbols);

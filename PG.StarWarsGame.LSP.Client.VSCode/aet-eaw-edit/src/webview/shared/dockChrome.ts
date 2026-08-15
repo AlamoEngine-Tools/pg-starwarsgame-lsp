@@ -359,6 +359,163 @@ export const rightDockCss = `
     .resize-handle-w:hover { background: var(--vscode-sash-hoverBorder, #007fd4); }
 `;
 
+/**
+ * The dock's top level: the row that carries mode switches and the severity tag, and the buttons in
+ * it.
+ *
+ * Shared for the reason the rest of this file is. The story graph and the localisation grids had
+ * grown near-identical copies of all of this - the same class names, the same soft icon buttons, the
+ * same severity pill - differing only in ways nobody chose: one had `cursor: pointer` and the other
+ * did not, one knew about `sev-info` and the other did not. The severity tag in particular has to
+ * mean ONE thing across the extension, and it cannot if each editor tints it from its own rules.
+ *
+ * `min-height` is deliberately NOT here. It is the one part that legitimately differs - the story
+ * graph's header holds a rotary dial and needs 78px, a header with a button or two needs 34 - so
+ * each editor sets its own after interpolating this.
+ */
+export const dockHeaderCss = `
+    /* Whatever is centred stays dead-centre; the edge controls float over the sides so they can
+       never shift it. */
+    .dock-header {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 6px 8px;
+        border-bottom: 1px solid var(--vscode-panel-border, #444);
+    }
+    .dock-header .header-left { position: absolute; left: 8px; }
+    .dock-header .header-right { position: absolute; right: 8px; }
+
+    /* Soft, icon-forward buttons: almost no chrome until hovered, the glyph does the talking. */
+    .icon-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        min-width: 26px;
+        justify-content: center;
+        padding: 5px 7px;
+        background: transparent;
+        border: none;
+        border-radius: 8px;
+        color: var(--vscode-foreground, #ccc);
+        opacity: 0.72;
+        font-size: 14px;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .icon-btn:hover {
+        background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
+        opacity: 1;
+    }
+    .icon-btn:disabled { opacity: 0.35; cursor: default; }
+    .icon-btn.active {
+        background: var(--vscode-button-background, #0e639c);
+        color: var(--vscode-button-foreground, #fff);
+        opacity: 1;
+    }
+    .icon-btn.sev-unvalidated { color: var(--vscode-foreground, #ccc); opacity: 1; }
+    .icon-btn.sev-ok { color: var(--vscode-charts-green, #89d185); opacity: 1; }
+    .icon-btn.sev-info { color: var(--vscode-charts-blue, #3794ff); opacity: 1; }
+    .icon-btn.sev-warning { color: var(--vscode-charts-yellow, #cca700); opacity: 1; }
+    .icon-btn.sev-error { color: var(--vscode-errorForeground, #f14c4c); opacity: 1; }
+    /* Header controls read out at roughly VS Code activity-bar icon scale. */
+    .dock-header .icon-btn { font-size: 18px; padding: 6px 9px; }
+    .dock-header .icon-btn .codicon { font-size: 18px; }
+
+    /* The severity tag is an always-present soft pill, tinted with a hue of its own state colour.
+       Must stay after .icon-btn: same specificity, so order is what lets it win. */
+    .validate-btn { border-radius: 14px; font-weight: 600; }
+    .validate-btn.sev-unvalidated {
+        background: color-mix(in srgb, var(--vscode-foreground, #ccc) 15%, transparent);
+    }
+    .validate-btn.sev-ok {
+        background: color-mix(in srgb, var(--vscode-charts-green, #89d185) 14%, transparent);
+    }
+    .validate-btn.sev-info {
+        background: color-mix(in srgb, var(--vscode-charts-blue, #3794ff) 14%, transparent);
+    }
+    .validate-btn.sev-warning {
+        background: color-mix(in srgb, var(--vscode-charts-yellow, #cca700) 16%, transparent);
+    }
+    .validate-btn.sev-error {
+        background: color-mix(in srgb, var(--vscode-errorForeground, #f14c4c) 16%, transparent);
+    }
+    .validate-btn:hover { filter: brightness(1.2); }
+    .validate-btn:disabled:hover { filter: none; }
+`;
+
+/**
+ * The dismissable bar across the FOOT OF THE EDITOR that validation results appear in - the frame
+ * `ProblemsPanel` renders, and the rows inside it.
+ *
+ * Where these go is settled and is not a per-editor choice: the severity tag lives in the dock
+ * header, and pressing it opens a panel across the bottom of the editor, never a list inside the
+ * dock. `LocProblemsBar` records why, from having tried it the other way - the dock is narrow, so
+ * every message is truncated, and a list that appears and disappears there shoves the controls
+ * around it. Both existing editors had grown their own copy of these rules.
+ *
+ * Each editor still names and skins its own container (`.problems`, `.loc-problems`) - that is what
+ * the component's `className` prop is for - because how the bar sits in its editor's layout differs.
+ */
+export const problemsPanelCss = `
+    /* The panel is dragged by its top edge. Sits just outside it, so the grab area is not stolen
+       from the first row of content. */
+    .resize-handle-n {
+        position: absolute;
+        top: -3px;
+        left: 0;
+        height: 6px;
+        width: 100%;
+        cursor: ns-resize;
+        z-index: 2;
+    }
+    .resize-handle-n:hover, .resize-handle-n:active {
+        background: var(--vscode-sash-hoverBorder, var(--vscode-focusBorder, #007fd4));
+    }
+
+    .panel-bar {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 2px 4px;
+    }
+    .panel-title { font-weight: bold; font-size: 11px; color: var(--vscode-descriptionForeground, #999); }
+    .panel-close {
+        background: transparent;
+        border: none;
+        color: var(--vscode-descriptionForeground, #999);
+        cursor: pointer;
+        padding: 0 4px;
+        flex-shrink: 0;
+    }
+    .panel-close:hover { background: transparent; color: var(--vscode-editor-foreground, #ccc); }
+
+    /* The scrolling part: the title bar keeps its height and the rows take what is left. */
+    .problem-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 2px; }
+
+    .problem-row { display: flex; gap: 6px; align-items: center; padding: 1px 6px; }
+    /* Only where the row actually goes somewhere - a row that names nothing navigable must not
+       advertise a click, which is the same rule the ship-name list follows. */
+    .problem-row.clickable { cursor: pointer; }
+    .problem-row:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15)); }
+    .problem-row .codicon.sev-error { color: var(--vscode-errorForeground, #f14c4c); }
+    .problem-row .codicon.sev-warning { color: var(--vscode-charts-yellow, #cca700); }
+    .problem-row .codicon.sev-info { color: var(--vscode-charts-blue, #3794ff); }
+    /* The message takes the room the target label leaves, clamped to the row so a long one cannot
+       reflow the list - these are short and each row carries the full text as its tooltip. An
+       editor whose messages are prose rather than labels overrides white-space in its own sheet. */
+    .problem-msg {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+`;
+
 /** The dock foot, where the search and overview controls live. Shared for its breathing room. */
 export const dockOverviewCss = `
     .dock-overview {

@@ -186,6 +186,32 @@ export interface GetEncyclopediaEntryResult {
     icon?: EncyclopediaIcon | null;
     /** The card's own chrome from the mega texture, absent when none of it resolved. */
     chrome?: EncyclopediaChrome | null;
+    /**
+     * The pool of individual ship names this object draws from, absent when it is not registered
+     * for them - which is nearly every object. The SERVER does not pick one, so {@link unitClass}
+     * always holds the object's real class line - the panel picks and keeps its choice.
+     */
+    shipNames?: EncyclopediaShipNames | null;
+}
+
+/**
+ * An object's pool of individual ship names, wired up in GameConstants' `ShipNameTextFiles`.
+ *
+ * Objects listed there show a NAME where others show their class. The engine picks one and
+ * remembers which are spent so a fleet never repeats itself; a preview has no campaign to remember
+ * for, so it simply picks - which is why the whole pool travels and the panel can show what else
+ * the object could have been called.
+ */
+export interface EncyclopediaShipNames {
+    /** The path as written in the tag. */
+    sourcePath: string;
+    /**
+     * Whether the file was readable. Separates "wired up but the file is missing" - an authoring
+     * mistake worth showing - from "wired up and empty", which a bare count cannot express.
+     */
+    fileFound: boolean;
+    /** Every name in the pool, in file order. */
+    names: string[];
 }
 
 /**

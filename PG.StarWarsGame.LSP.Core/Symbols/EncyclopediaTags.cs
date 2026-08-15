@@ -44,6 +44,23 @@ public static class EncyclopediaTags
     /// </summary>
     public const string IconName = "Icon_Name";
 
+    /// <summary>
+    ///     The id the GameConstants singleton is indexed under.
+    /// </summary>
+    /// <remarks>
+    ///     A singleton has no <c>Name</c> attribute, so its type name is its id - see
+    ///     <c>XmlGameDocumentParser.CollectSymbolsFromRegistry</c>. Resolving it goes through the
+    ///     normal layered index, so a mod's own GameConstants.xml shadows the base game's for free.
+    /// </remarks>
+    public const string GameConstantsId = "GameConstants";
+
+    /// <summary>
+    ///     On GameConstants: a flat comma-separated <c>&lt;objectId&gt;, &lt;path&gt;</c> list
+    ///     mapping objects to their pool of individual ship names. An object listed here shows a
+    ///     name where others show their class.
+    /// </summary>
+    public const string ShipNameTextFiles = "ShipNameTextFiles";
+
     /// <summary>GameObject references whose own <see cref="TextId" /> supplies the label.</summary>
     public const string GoodAgainst = "Encyclopedia_Good_Against";
 

@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
@@ -26,6 +26,8 @@ using PG.StarWarsGame.LSP.Assets.Serialization;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Schema.Providers;
 using PG.StarWarsGame.LSP.Story.Discovery;
+// Aliased: BaselineTag would otherwise read ambiguously beside the engine's own XML tag types.
+using Tag = PG.StarWarsGame.LSP.Core.Symbols.BaselineTag;
 
 // ── Shared options ────────────────────────────────────────────────────────────
 
@@ -258,9 +260,57 @@ async Task<int> RunAsync(string enginePath, string? eawLayerPath, string outputF
 
     Console.WriteLine($"Shadow blob materials: {shadowBlobMaterials.Count} (direct-parsed stopgap)");
 
+    // ── Singletons (GameConstants) ──────────────────────────────────────────
+    //
+    // A singleton type is declared in the schema with no `nameTag`: one instance, no Name
+    // attribute, so its TYPE NAME is its id. The engine exposes no manager for these either, so
+    // this is the same direct-parse stopgap as the two blocks above.
+    //
+    // The TAGS are the whole point. GameConstants holds everything the enum extractor does NOT
+    // reach - ShipNameTextFiles, the Encyclopedia_* header geometry, the Corruption_* block - and
+    // without them a mod that ships no GameConstants.xml of its own falls back to nothing.
+    //
+    // AudioConstants is declared a singleton too but no such file ships (the audio settings live
+    // in Audio.xml), so only the files actually present are read.
+    // Reuses the GameConstants.xml text already read above rather than opening it a second time.
+    // A second singleton would want the same treatment against its own file.
+    var singletons = new List<ProjectableEntry>();
+    if (gameConstantsXml is not null)
+    {
+        const string typeName = "GameConstants";
+        const string vfsPath = "Data\\XML\\GameConstants.xml";
+        try
+        {
+            var root = XDocument.Parse(gameConstantsXml, LoadOptions.SetLineInfo).Root;
+            if (root is not null
+                && root.Name.LocalName.Equals(typeName, StringComparison.OrdinalIgnoreCase))
+            {
+                var tags = root.Elements().Select(child => new Tag(
+                    child.Name.LocalName,
+                    child.Value.Trim(),
+                    // Verbatim element, matching what the workspace tag source captures - sub-object
+                    // lists are read back out of the fragment.
+                    child.ToString(),
+                    child is IXmlLineInfo cli && cli.HasLineInfo() ? cli.LineNumber : 0)).ToList();
+
+                var rootLine = root is IXmlLineInfo rli && rli.HasLineInfo() ? rli.LineNumber : (int?)null;
+                singletons.Add(new ProjectableEntry(
+                    typeName, typeName, new XmlLocationInfo(vfsPath, rootLine), tags));
+            }
+        }
+        catch (XmlException ex)
+        {
+            Console.Error.WriteLine($"Warning: Failed to parse {vfsPath} for singleton tags: {ex.Message}");
+        }
+    }
+
+    Console.WriteLine($"Singletons: {singletons.Count} "
+                      + $"({singletons.Sum(s => s.Tags?.Count ?? 0)} tag(s), direct-parsed stopgap)");
+
     var schemaProvider = sp.GetService<ISchemaProvider>();
     var projector = new GameSymbolProjector(schemaProvider ?? new NullSchemaProvider());
-    var baseline = projector.Project(gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials);
+    var baseline = projector.Project(
+        gameObjects, sfxEvents, manifestHash, musicEvents, shadowBlobMaterials, singletons);
     Console.WriteLine($"Projected {baseline.Symbols.Count} symbol(s)");
 
     // ── MEG loading (EaW layer first, then engine layer) ──────────────────────

@@ -25,6 +25,7 @@ import {
     EncyclopediaImage, EncyclopediaLayout, EncyclopediaReference, EncyclopediaRgba,
     EncyclopediaTextStyle, GetEncyclopediaEntryResult,
 } from '../protocol/encyclopedia';
+import { cssFontStack } from './encyclopediaFonts';
 import { encyclopediaIconTitle } from './encyclopediaIconTitle';
 
 /**
@@ -49,23 +50,6 @@ import { encyclopediaIconTitle } from './encyclopediaIconTitle';
  */
 const POINT_TO_UNIT = 1.924;
 
-/**
- * The face the popup is measured in.
- *
- * `encyclopedia_text` says `Arial`, and Arial is provably not what the engine wraps with: the game
- * keeps "Skywalker trained under Jedi Master Yoda" on one line but breaks before "to become the
- * first of a new generation of", and in Arial the string it KEEPS is 1.6% *wider* than the one it
- * BREAKS - so no width can satisfy both. That holds for fractional/kerned measurement and for
- * GDI-style integer per-glyph advances at every size from 8px to 22px. Sweeping the common Windows
- * faces, Tahoma satisfies every break with a 1.5% margin, and it was the standard Windows UI font
- * of this game's era. Only Arial is remapped; a mod naming any other font gets what it asked for.
- */
-function cssFontStack(gameFontName: string): string {
-    const family = gameFontName.trim();
-    return /^arial$/i.test(family)
-        ? "'Tahoma', 'Verdana', sans-serif"
-        : `'${family}', 'Tahoma', sans-serif`;
-}
 
 /**
  * The unit icon, drawn 50 units square.

@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.ShipNames;
 using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
@@ -42,9 +43,12 @@ public sealed class GetEncyclopediaEntryHandler
     private readonly ISchemaProvider _schema;
     private readonly IVariantTagSource _tagSource;
 
+    private readonly IShipNameCatalogProvider? _shipNames;
+
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,
-        IIconCatalogProvider? icons = null, ModProjectReloadService? projects = null)
+        IIconCatalogProvider? icons = null, ModProjectReloadService? projects = null,
+        IShipNameCatalogProvider? shipNames = null)
     {
         _indexService = indexService;
         _schema = schema;
@@ -52,6 +56,7 @@ public sealed class GetEncyclopediaEntryHandler
         _config = config;
         _icons = icons;
         _projects = projects;
+        _shipNames = shipNames;
     }
 
     public async Task<GetEncyclopediaEntryResult> Handle(GetEncyclopediaEntryParams request,
@@ -81,6 +86,10 @@ public sealed class GetEncyclopediaEntryHandler
             .Select(key => new EncyclopediaLine(key, loca.GetValue(key)))
             .ToList();
 
+        // The pool an object draws its individual name from, if it is registered for one. NOT
+        // picked here - see EncyclopediaShipNames for why that is the client's call.
+        var shipNames = ResolveShipNames(resolver, effective.ObjectId);
+
         return new GetEncyclopediaEntryResult(
             true,
             effective.ObjectId,
@@ -95,7 +104,52 @@ public sealed class GetEncyclopediaEntryHandler
             ResolveReferences(resolver, loca, catalog, TagValue(effective, EncyclopediaTags.VulnerableTo)),
             layout,
             ResolveIcon(catalog, effective),
-            ResolveChrome(catalog, layout));
+            ResolveChrome(catalog, layout),
+            shipNames);
+    }
+
+    /// <summary>
+    ///     The object's ship-name pool and the name drawn from it, or <see langword="null" /> when it
+    ///     is not registered for custom names.
+    /// </summary>
+    /// <remarks>
+    ///     The wiring is read from the GameConstants SINGLETON through the same resolver the rest of
+    ///     the card uses, so a mod shipping its own GameConstants.xml shadows the base game's list
+    ///     without anything here knowing about layers.
+    /// </remarks>
+    private EncyclopediaShipNames? ResolveShipNames(EffectiveObjectResolver resolver, string objectId)
+    {
+        if (_shipNames is null)
+            return null;
+
+        var root = _projects?.LastWorkspaceRoots?.FirstOrDefault() ?? _config.Current.WorkspaceRoot;
+        if (string.IsNullOrEmpty(root))
+            return null;
+
+        try
+        {
+            var constants = resolver.Resolve(EncyclopediaTags.GameConstantsId);
+            if (!constants.Found)
+                return null;
+
+            var pool = _shipNames
+                .Get(root, TagValue(constants, EncyclopediaTags.ShipNameTextFiles))
+                .For(objectId);
+
+            return pool is null
+                ? null
+                : new EncyclopediaShipNames(pool.SourcePath, pool.FileFound, pool.Names);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            // The card is perfectly readable showing the class line; a broken name file must not
+            // cost the caller the whole entry.
+            return null;
+        }
     }
 
     /// <summary>
