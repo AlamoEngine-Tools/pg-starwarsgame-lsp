@@ -284,9 +284,47 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
  * the model and shows only its damage states.
  */
 export function isVisibleAt(extras: MaterialExtras, alt: number, lod: number): boolean {
-    if (extras.alamoHidden === true) {
-        return false;
-    }
+    return extras.alamoHidden !== true && isVisibleAtLevel(extras, alt, lod);
+}
+
+/**
+ * Whether this mesh is the model's SHIELD BUBBLE - the thing a shield ability reveals.
+ *
+ * By NAME, which the user chose: `shield`, or `shield_` and anything after it. The SHADER cannot
+ * decide it - measured on `Rv_moncalcruiser.alo`, which carries three meshes on `MeshShield.fx`:
+ * `shield`, `engines_big` and `engines_small`. Revealing on the shader lit the engines every time
+ * DEFEND was switched on.
+ *
+ * Nothing in the data declares which mesh a shield ability reveals, so this is a convention rather
+ * than a rule. A mesh that matches the name but is NOT on a shield shader still counts - the author
+ * named it, and their word wins - but it is worth telling them about; see
+ * {@link shieldMeshOffShader}.
+ */
+export function isShieldMesh(extras: MaterialExtras): boolean {
+    return /^shield(_|$)/i.test((extras.alamoMesh ?? '').trim());
+}
+
+/**
+ * A mesh the shield rules will reveal that is not actually on a shield shader.
+ *
+ * Not an error - the name is what decides, and the model may be doing something deliberate - but a
+ * shield bubble drawn with a hull shader will look like solid geometry rather than a field, and
+ * that is worth saying once rather than leaving the author to wonder.
+ */
+export function shieldMeshOffShader(extras: MaterialExtras): boolean {
+    return isShieldMesh(extras)
+        && !(extras.alamoShader ?? '').toLowerCase().includes('shield');
+}
+
+/**
+ * The LEVEL question alone: is this mesh part of the current damage and detail state?
+ *
+ * Without `alamoHidden`, which is a different question - "does the model draw this at all" - and
+ * one the row chain already asks through its own `inFile` link. Bundled together they made one flag
+ * gate a mesh TWICE, so an ability that talked the model into drawing its shield was still vetoed
+ * by the level link reading the same flag, and overriding one did nothing at all.
+ */
+export function isVisibleAtLevel(extras: MaterialExtras, alt: number, lod: number): boolean {
     if (extras.alamoAlt !== undefined && extras.alamoAlt !== alt) {
         return false;
     }

@@ -43,7 +43,7 @@ public sealed class DialogCodeActionHandlerTest
         {
             Range = new Range(line, 0, line, 5),
             Message = "unknown command",
-            Code = code is null ? null : new DiagnosticCode(code)
+            Code = code is null ? (DiagnosticCode?)null : new DiagnosticCode(code)
         };
 
         return new CodeActionParams

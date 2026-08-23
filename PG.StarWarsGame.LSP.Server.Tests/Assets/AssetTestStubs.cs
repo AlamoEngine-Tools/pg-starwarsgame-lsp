@@ -26,7 +26,7 @@ internal sealed class StubConfiguration(LspConfiguration current) : ILspConfigur
 
 internal sealed class StubProjects(WorkspaceConfiguration? config) : IModProjectReloadService
 {
-    public IReadOnlyList<string>? LastAssetRoots => config?.AssetRoots;
+    public IReadOnlyList<string>? LastAssetRoots => LastWorkspaceConfig?.AssetRoots;
     public WorkspaceConfiguration? LastWorkspaceConfig { get; } = config;
     public IReadOnlyList<string>? LastWorkspaceRoots => null;
 

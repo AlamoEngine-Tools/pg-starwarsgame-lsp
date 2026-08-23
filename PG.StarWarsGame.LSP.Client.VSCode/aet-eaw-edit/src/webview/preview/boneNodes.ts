@@ -134,3 +134,75 @@ export function treeKeyOf(mesh: THREE.Object3D): string {
 
     return typeof key === 'string' ? key : '';
 }
+
+/**
+ * The part roots that are not already inside another part root.
+ *
+ * A hardpoint's model is attached to a BONE of the hull, which puts its whole subtree inside the
+ * hull's own root. So walking every part root in turn reaches each mounted mesh twice - once on the
+ * way down through the hull and once again from the part itself. On the Star Destroyer that gave the
+ * model tree two rows sharing one id for every mesh of every mount, and did the material and
+ * wireframe work on that geometry twice over.
+ *
+ * Starting only from the outermost roots visits everything exactly once, and keeps working when a
+ * mount is itself mounted on another mount.
+ */
+export function outermostRoots(
+    roots: readonly THREE.Object3D[],
+): THREE.Object3D[] {
+    const all = new Set(roots);
+
+    return roots.filter(root => {
+        for (let at = root.parent; at !== null; at = at.parent) {
+            if (all.has(at)) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+}
+
+/**
+ * The exporter's Z-up-to-Y-up correction, to within float noise.
+ *
+ * Alamo is Z-up and glTF is Y-up, so `ModelGlbExporter` puts a -90-degree rotation about X on every
+ * model's `AlamoRoot`. Recognised by its SHAPE rather than by the node's name: a name test would
+ * quietly stop working the day the exporter renames it, and the whole point is to leave a root that
+ * does not carry the correction completely alone.
+ */
+function isRootCorrection(node: THREE.Object3D): boolean {
+    const m = node.matrix.elements;
+    const near = (a: number, b: number) => Math.abs(a - b) < 1e-5;
+
+    return near(m[0], 1) && near(m[1], 0) && near(m[2], 0)
+        && near(m[4], 0) && near(m[5], 0) && near(Math.abs(m[6]), 1)
+        && near(m[8], 0) && near(Math.abs(m[9]), 1) && near(m[10], 0)
+        && near(m[12], 0) && near(m[13], 0) && near(m[14], 0);
+}
+
+/**
+ * Cancels a part's own Z-up-to-Y-up correction, for a part being attached INSIDE another one.
+ *
+ * MEASURED on the shipped Star Destroyer: the hull and every hardpoint model carry the same
+ * `AlamoRoot` correction. A mount is parented to a BONE of the hull, which already sits below the
+ * hull's correction - so the mount's own copy applies the rotation a second time, and the model
+ * lands rolled 90 degrees in the green-blue plane. Mirrored hulls then make one bug read
+ * anticlockwise to port and clockwise to starboard, which is exactly how it was reported.
+ *
+ * Only the correction node is touched. Everything below it keeps the placement the file gave it -
+ * that is the model author's own word and none of our business.
+ */
+export function cancelRootCorrection(root: THREE.Object3D): void {
+    const carrier = isRootCorrection(root)
+        ? root
+        : root.children.find(isRootCorrection);
+
+    if (carrier === undefined) {
+        return;
+    }
+
+    carrier.matrix.identity();
+    carrier.matrix.decompose(carrier.position, carrier.quaternion, carrier.scale);
+    carrier.updateMatrixWorld(true);
+}

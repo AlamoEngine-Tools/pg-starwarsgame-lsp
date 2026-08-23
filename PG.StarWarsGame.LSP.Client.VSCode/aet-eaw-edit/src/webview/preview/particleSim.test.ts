@@ -629,6 +629,81 @@ describe('appearanceOf', () => {
         }
     });
 
+    /**
+     * `randomColors` ADDS, it does not scale.
+     *
+     * `ColorVarianceModifierPlugin::InitializeParticle` draws `GetRandom(m_min, m_max)` per channel
+     * with `m_min` zero, then `p->color = saturate(p->color + addition)`. Read as a multiplier -
+     * `1 - random() * randomColors` - it does the opposite of what the author asked for: a value
+     * meant to brighten some of the particles darkened all of them instead.
+     */
+    it('brightens a particle by the random colour rather than dimming it', () => {
+        const e = emitter({
+            tracks: [track('Red', [[0, 0.5], [1, 0.5]]), track('Green', [[0, 0.5], [1, 0.5]])],
+            properties: properties({ randomColors: { x: 0.4, y: 0.4, z: 0, w: 0 } }),
+        });
+
+        for (let seed = 1; seed < 40; seed++) {
+            const look = appearanceOf(spawnParticle(e, seededRandom(seed)), e);
+
+            assert.ok(look.r >= 0.5 - 1e-9, `darkened the track: ${look.r}`);
+            assert.ok(look.r <= 0.9 + 1e-9, `added more than declared: ${look.r}`);
+        }
+    });
+
+    it('saturates rather than running past white', () => {
+        const e = emitter({
+            tracks: [track('Red', [[0, 0.9], [1, 0.9]])],
+            properties: properties({ randomColors: { x: 1, y: 0, z: 0, w: 0 } }),
+        });
+
+        for (let seed = 1; seed < 20; seed++) {
+            assert.ok(appearanceOf(spawnParticle(e, seededRandom(seed)), e).r <= 1);
+        }
+    });
+
+    it('adds to ALPHA too, which is the channel a transparent sprite is read through', () => {
+        const e = emitter({
+            tracks: [track('Alpha', [[0, 0.2], [1, 0.2]])],
+            properties: properties({ randomColors: { x: 0, y: 0, z: 0, w: 0.5 } }),
+        });
+
+        const seen = new Set<number>();
+
+        for (let seed = 1; seed < 20; seed++) {
+            seen.add(appearanceOf(spawnParticle(e, seededRandom(seed)), e).a);
+        }
+
+        assert.ok([...seen].every(a => a >= 0.2 - 1e-9 && a <= 0.7 + 1e-9));
+        assert.ok(seen.size > 1, 'the alpha addition is not random at all');
+    });
+
+    /**
+     * `colorAddGrayscale` makes the addition MONOCHROME - one random value on every channel,
+     * alpha included: `addition.g = m_grayscale ? addition.r : GetRandom(...)`. Without it an
+     * emitter that asked for a brightness jitter got a colour jitter.
+     */
+    it('uses one random value on every channel when the addition is grayscale', () => {
+        const e = emitter({
+            tracks: [
+                track('Red', [[0, 0], [1, 0]]),
+                track('Green', [[0, 0], [1, 0]]),
+                track('Blue', [[0, 0], [1, 0]]),
+            ],
+            properties: properties({
+                randomColors: { x: 0.5, y: 0.5, z: 0.5, w: 0 },
+                colorAddGrayscale: true,
+            }),
+        });
+
+        for (let seed = 1; seed < 20; seed++) {
+            const look = appearanceOf(spawnParticle(e, seededRandom(seed)), e);
+
+            assert.ok(Math.abs(look.r - look.g) < 1e-9, `${look.r} vs ${look.g}`);
+            assert.ok(Math.abs(look.r - look.b) < 1e-9, `${look.r} vs ${look.b}`);
+        }
+    });
+
     it('defaults a missing channel to opaque white at full size', () => {
         const p = spawnParticle(emitter(), seededRandom(1));
 

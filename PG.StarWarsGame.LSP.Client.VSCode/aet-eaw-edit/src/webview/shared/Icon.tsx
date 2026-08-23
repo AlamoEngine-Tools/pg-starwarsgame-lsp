@@ -27,6 +27,7 @@ import {
     IconEye, IconEyeOff, IconFlame, IconGridDots, IconInfoCircle, IconLayoutGrid, IconMesh,
     IconPerspective, IconPhoto, IconPlayerPause, IconPlayerPlay, IconPlus,
     IconPlayerStop, IconPlayerTrackPrev, IconPolygon, IconRadar, IconRefresh, IconRepeat,
+    IconCrosshair,
     IconRuler, IconSettings, IconShadow, IconSparkles, IconStack2,
     IconSun, IconSunHigh, IconSunLow, IconTexture, IconTrash, IconWind, IconWorld, IconX,
     type IconProps,
@@ -71,6 +72,10 @@ const ICONS = {
 
     // A sweep of coverage from a point, which is what a weapon's firing arc is.
     arcs: IconRadar,
+
+    // The mark the game puts over something you can shoot at. A crosshair rather than a dot or a
+    // ring: it is the shape of the artwork it switches on.
+    target: IconCrosshair,
 
     // ── where you look from ───────────────────────────────────────────────────
     camera: IconCamera,

@@ -34,8 +34,8 @@ public sealed class PreviewParticleResolverTest
         string id, string? damageBone = null, string? engineBone = null,
         bool engineDeathHides = false)
     {
-        return new PreviewHardpoint(id, null, null, null, true, null, damageBone, null, null,
-            engineBone, null, null, engineDeathHides, null, null, null);
+        return new PreviewHardpoint(id, null, null, null, true, true, null, damageBone, null, null,
+            engineBone, null, null, engineDeathHides, null, null);
     }
 
     /// <summary>The Star Destroyer's shape: a damage bone with two smoke proxies hanging under it.</summary>
@@ -133,12 +133,15 @@ public sealed class PreviewParticleResolverTest
     [Fact]
     public void Resolve_TiesEngineGlowToTheHardpointThatHidesIt()
     {
-        // Engine_Particles works the same way round, and Engine_Death_Hide_Engine_Particles is what
-        // makes a destroyed engine hardpoint put its glow out.
+        // The bone the SHIPPED data actually names. All eleven Engine_Particles tags in foc say
+        // HP_E_MAINENGINES and nothing else - and on three of the four capital ships measured, no
+        // proxy hangs off that bone at all: the glow sits under the engine MESH. This test used to
+        // pass "engines_big" as the tag's value, a name the corpus never contains, so the join only
+        // ever worked against a fixture invented to make it work.
         var (bones, proxies) = Destroyer();
         var hardpoints = new List<PreviewHardpoint>
         {
-            Hardpoint("HP_Engine", engineBone: "engines_big", engineDeathHides: true)
+            Hardpoint("HP_Engine", engineBone: "HP_E_MainEngines", engineDeathHides: true)
         };
 
         var engines = PreviewParticleResolver.Resolve("hull", bones, proxies, hardpoints)
@@ -149,18 +152,56 @@ public sealed class PreviewParticleResolverTest
     }
 
     [Fact]
+    public void Resolve_TiesEngineGlowParentedToTheNamedBoneItself()
+    {
+        // The Mon Cal's mid engine IS parented to HP_E_MainEngines, unlike its other two. Both
+        // shapes are in the shipped models, so both have to join.
+        var (bones, proxies) = Destroyer();
+        bones.Add(Bone(bones.Count, "HP_E_MainEngines", 0));
+        bones.Add(Bone(bones.Count, "pe_moncalengines_mid", bones.Count - 1));
+        proxies.Add(Proxy("pe_moncalengines_mid", bones.Count - 1));
+
+        var hardpoints = new List<PreviewHardpoint>
+        {
+            Hardpoint("HP_Engine", engineBone: "HP_E_MainEngines", engineDeathHides: true)
+        };
+
+        var mid = PreviewParticleResolver.Resolve("hull", bones, proxies, hardpoints)
+            .Single(p => p.SystemRef == "pe_moncalengines_mid");
+
+        Assert.Equal(PreviewParticleGate.HardpointAlive, mid.Gate);
+    }
+
+    [Fact]
     public void Resolve_LeavesEngineGlowUngatedWhenDeathDoesNotHideIt()
     {
         var (bones, proxies) = Destroyer();
         var hardpoints = new List<PreviewHardpoint>
         {
-            Hardpoint("HP_Engine", engineBone: "engines_big")
+            Hardpoint("HP_Engine", engineBone: "HP_E_MainEngines")
         };
 
         var engines = PreviewParticleResolver.Resolve("hull", bones, proxies, hardpoints)
             .Single(p => p.SystemRef == "pe_stardestroyerengines");
 
         Assert.Equal(PreviewParticleGate.Always, engines.Gate);
+    }
+
+    [Fact]
+    public void Resolve_DoesNotClaimAnOrdinaryEffectAsAnEngineGlow()
+    {
+        // The engine-mesh convention must not swallow the damage smoke, which is joined by its own
+        // tag and would otherwise be switched on and off by the wrong mount.
+        var (bones, proxies) = Destroyer();
+        var hardpoints = new List<PreviewHardpoint>
+        {
+            Hardpoint("HP_Engine", engineBone: "HP_E_MainEngines", engineDeathHides: true)
+        };
+
+        var smoke = PreviewParticleResolver.Resolve("hull", bones, proxies, hardpoints)
+            .First(p => p.SystemRef == "p_hp_imperial_damage");
+
+        Assert.NotEqual(PreviewParticleGate.HardpointAlive, smoke.Gate);
     }
 
     [Fact]

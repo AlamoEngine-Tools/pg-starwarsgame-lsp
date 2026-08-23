@@ -13,6 +13,7 @@
 // trusts what it is handed: a missing field takes its default, a wrong one is refused, and nothing
 // throws. A preview that opens blank because of a bad string in a settings file has no way back.
 
+import { DEFAULT_ATTACKER, type Attacker } from './attacker';
 import { type CameraBinding } from './cameraBindings';
 import { type CameraPreset } from './cameraPresets';
 
@@ -182,6 +183,25 @@ export interface ViewerSettings {
     faction: string | null;
     customColour: string | null;
     cameraPreset: string;
+
+    /**
+     * The attacking weapon the reader has built, and the ones they have saved.
+     *
+     * TIER 1, and deliberately: a setting lives at the tier of the thing it describes, and a saved
+     * attacker describes the PERSON'S testing habits rather than the model on screen - you would not
+     * expect a "Broadside missile" preset to vanish when you open a different ship.
+     *
+     * The damage INFLICTED is not here. Destroyed mounts and drained pools reset on open, because
+     * the opening rules beat persistence: a fresh preview opens undamaged.
+     */
+    attacker: Attacker;
+    attackerPresets: AttackerPreset[];
+}
+
+/** A saved attacker, with a name to recall it by. */
+export interface AttackerPreset extends Attacker {
+    id: string;
+    name: string;
 }
 
 const WHITE: Colour = [1, 1, 1];
@@ -246,6 +266,8 @@ export const DEFAULT_VIEWER_SETTINGS: ViewerSettings = {
     faction: null,
     customColour: null,
     cameraPreset: 'threeQuarter',
+    attacker: DEFAULT_ATTACKER,
+    attackerPresets: [],
 };
 
 const BACKGROUNDS: BackgroundKind[] = ['flat', 'starfield', 'sky'];
@@ -374,7 +396,52 @@ export function viewerSettingsFrom(stored: unknown): ViewerSettings {
         faction: nullableString(raw.faction),
         customColour: nullableString(raw.customColour),
         cameraPreset: string_(raw.cameraPreset, DEFAULT_VIEWER_SETTINGS.cameraPreset),
+        attacker: attackerFrom(raw.attacker),
+        attackerPresets: attackerPresetsFrom(raw.attackerPresets),
     };
+}
+
+/**
+ * One stored attacker, field by field.
+ *
+ * Anything unreadable falls back to the default for THAT field rather than throwing: this blob is
+ * written by one build and read by another, and a string where a number was expected must cost the
+ * reader their weapon, not their whole room.
+ */
+function attackerFrom(stored: unknown): Attacker {
+    const raw = asRecord(stored);
+
+    return {
+        damage: number_(raw.damage, DEFAULT_ATTACKER.damage, { min: 0, max: 1_000_000 }),
+        damageType: string_(raw.damageType, DEFAULT_ATTACKER.damageType),
+        shield: boolean_(raw.shield, DEFAULT_ATTACKER.shield),
+        energy: boolean_(raw.energy, DEFAULT_ATTACKER.energy),
+        hitpoint: boolean_(raw.hitpoint, DEFAULT_ATTACKER.hitpoint),
+    };
+}
+
+/** The saved presets, dropping any that could not name themselves. */
+function attackerPresetsFrom(stored: unknown): AttackerPreset[] {
+    if (!Array.isArray(stored)) {
+        return [];
+    }
+
+    const presets: AttackerPreset[] = [];
+
+    for (const entry of stored) {
+        const raw = asRecord(entry);
+        const { id, name } = raw;
+
+        // A preset with no name is a blank row in the list, and one with no id cannot be recalled
+        // or deleted. Neither is worth keeping.
+        if (typeof id !== 'string' || id === '' || typeof name !== 'string' || name === '') {
+            continue;
+        }
+
+        presets.push({ id, name, ...attackerFrom(entry) });
+    }
+
+    return presets;
 }
 
 function windFrom(stored: unknown): Wind {

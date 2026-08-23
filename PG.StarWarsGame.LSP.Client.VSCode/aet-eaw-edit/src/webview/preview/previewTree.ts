@@ -55,6 +55,25 @@ export interface TreeItem {
     systemId?: string;
 }
 
+/**
+ * The row id a bone gets, and the skeleton index it carries.
+ *
+ * One owner for the format, minted here and read here. It was minted in the viewport and read back
+ * with a blind `slice(5)` in the panel - which is the shape `boneIds.ts` records this project
+ * paying for three times, and it silently yields `NaN` the moment a mesh row reaches the same
+ * handler.
+ */
+export function boneRowId(index: number): string {
+    return `bone:${index}`;
+}
+
+/** The skeleton index in a bone row's id, or null for a row that is not a bone. */
+export function boneIndexOfRow(id: string): number | null {
+    const tail = id.startsWith('bone:') ? id.slice('bone:'.length) : '';
+
+    return /^\d+$/.test(tail) ? Number.parseInt(tail, 10) : null;
+}
+
 /** A tree item with its children resolved. */
 export interface TreeNode extends TreeItem {
     children: TreeNode[];

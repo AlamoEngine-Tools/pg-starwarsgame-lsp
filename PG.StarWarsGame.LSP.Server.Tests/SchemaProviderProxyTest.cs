@@ -138,7 +138,11 @@ public sealed class SchemaProviderProxyTest
 
         public Task ReadyAsync => _tcs.Task;
 
-        public event EventHandler? SchemaRefreshed;
+        public event EventHandler? SchemaRefreshed
+        {
+            add { }
+            remove { }
+        }
 
         public XmlTagDefinition? GetTag(string tagName)
         {

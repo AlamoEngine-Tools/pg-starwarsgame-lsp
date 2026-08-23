@@ -6,7 +6,9 @@ import { describe, it } from 'node:test';
 
 import * as THREE from 'three';
 
-import { splitGeometryFromBone, stampTreeKeys, treeKeyOf } from './boneNodes';
+import {
+    cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,
+} from './boneNodes';
 
 /** A bone node that also carries geometry, with a child bone hanging off it. */
 function nebulonShaped(): { parent: THREE.Object3D; mesh: THREE.Mesh; child: THREE.Object3D } {
@@ -184,5 +186,125 @@ describe('stampTreeKeys', () => {
         stampTreeKeys(root, new Map([[4, new THREE.Object3D()]]), 'hull');
 
         assert.equal(treeKeyOf(loose), 'hull:4:0');
+    });
+});
+
+describe('outermostRoots', () => {
+    it('leaves a flat set of parts alone', () => {
+        const hull = new THREE.Object3D();
+        const loose = new THREE.Object3D();
+
+        assert.deepEqual(outermostRoots([hull, loose]), [hull, loose]);
+    });
+
+    it('drops a part that is already inside another one', () => {
+        // MEASURED on the real Star Destroyer: every hardpoint part is attached to a BONE of the
+        // hull, so it lives inside the hull's own root. Walking each part root in turn therefore
+        // visited every mounted mesh twice - once through the hull and once on its own - which gave
+        // the model tree two rows under one React key and made the parts list say everything twice.
+        const hull = new THREE.Object3D();
+        const bone = new THREE.Object3D();
+        const turret = new THREE.Object3D();
+
+        hull.add(bone);
+        bone.add(turret);
+
+        assert.deepEqual(outermostRoots([hull, turret]), [hull]);
+    });
+
+    it('does not care what order the parts arrive in', () => {
+        const hull = new THREE.Object3D();
+        const turret = new THREE.Object3D();
+        hull.add(turret);
+
+        assert.deepEqual(outermostRoots([turret, hull]), [hull]);
+    });
+
+    it('keeps a chain of mounts down to one walk', () => {
+        // A hardpoint may mount on another hardpoint's model. The outermost root reaches them all.
+        const hull = new THREE.Object3D();
+        const turret = new THREE.Object3D();
+        const barrel = new THREE.Object3D();
+
+        hull.add(turret);
+        turret.add(barrel);
+
+        assert.deepEqual(outermostRoots([hull, turret, barrel]), [hull]);
+    });
+
+    it('keeps a part whose ancestor is not itself a part', () => {
+        // The scene's own model root is not a part, so a part parented to it is still outermost.
+        const modelRoot = new THREE.Object3D();
+        const hull = new THREE.Object3D();
+        modelRoot.add(hull);
+
+        assert.deepEqual(outermostRoots([hull]), [hull]);
+    });
+});
+
+describe('cancelRootCorrection', () => {
+    /** The Z-up-to-Y-up matrix the exporter puts on every model's `AlamoRoot`. */
+    const correction = () => {
+        const node = new THREE.Object3D();
+        node.name = 'AlamoRoot';
+        node.matrixAutoUpdate = false;
+        node.matrix.set(
+            1, 0, 0, 0,
+            0, -4.371139e-8, 1, 0,
+            0, -1, -4.371139e-8, 0,
+            0, 0, 0, 1);
+        return node;
+    };
+
+    it('neutralises the correction on the node that carries it', () => {
+        // MEASURED: every GLB the exporter writes - hull AND hardpoint alike - carries the same
+        // -90-degree-about-X AlamoRoot. A mount parented to a hull BONE is already inside the
+        // hull's corrected space, so its own copy applies the rotation a SECOND time. That is the
+        // 90-degree roll in the green-blue plane, and mirrored hulls make it read anticlockwise to
+        // port and clockwise to starboard from one single bug.
+        const scene = new THREE.Object3D();
+        const alamo = correction();
+        scene.add(alamo);
+
+        cancelRootCorrection(scene);
+
+        assert.ok(alamo.matrix.equals(new THREE.Matrix4()));
+    });
+
+    it('finds the correction when it IS the root handed in', () => {
+        const alamo = correction();
+
+        cancelRootCorrection(alamo);
+
+        assert.ok(alamo.matrix.equals(new THREE.Matrix4()));
+    });
+
+    it('leaves a root that carries no correction alone', () => {
+        // Never guess at geometry: a model whose root is already identity must come through
+        // untouched rather than being rotated the other way to compensate.
+        const scene = new THREE.Object3D();
+        const plain = new THREE.Object3D();
+        plain.name = 'Root#0';
+        plain.position.set(1, 2, 3);
+        scene.add(plain);
+
+        cancelRootCorrection(scene);
+
+        assert.deepEqual(
+            [plain.position.x, plain.position.y, plain.position.z], [1, 2, 3]);
+    });
+
+    it('leaves everything below the correction where the file put it', () => {
+        // Only the correction is cancelled. A bone's own placement is the model's own word.
+        const scene = new THREE.Object3D();
+        const alamo = correction();
+        const bone = new THREE.Object3D();
+        bone.position.set(4, 5, 6);
+        alamo.add(bone);
+        scene.add(alamo);
+
+        cancelRootCorrection(scene);
+
+        assert.deepEqual([bone.position.x, bone.position.y, bone.position.z], [4, 5, 6]);
     });
 });

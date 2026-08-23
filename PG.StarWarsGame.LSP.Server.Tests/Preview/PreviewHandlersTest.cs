@@ -339,6 +339,134 @@ public sealed class PreviewHandlersTest
     }
 
     /// <summary>Serves the exact game-relative paths it was given.</summary>
+    // ── the particle endpoint ──────────────────────────────────────────────
+
+    [Fact]
+    public async Task GetParticleSystem_ResolvesAGameObjectToItsModel()
+    {
+        // `Death_Explosions` and `Debris_Attached_Particle` name a <Particle> OBJECT, not a file.
+        // Reading the name as a file is why no death explosion has ever played: the request went out
+        // for `Large_Explosion_Space_Empire.alo`, which does not exist anywhere.
+        var tags = new FakeVariantTagSource().With("Large_Explosion_Space_Empire",
+            Tag("Space_Model_Name", "p_explosion_empire_big00.alo"));
+
+        var result = await Particles(new StubAssets(), tags,
+            Sym("Large_Explosion_Space_Empire", "Particle")).Handle(
+            new GetParticleSystemParams { Name = "Large_Explosion_Space_Empire" },
+            CancellationToken.None);
+
+        Assert.Contains("p_explosion_empire_big00.alo", result.Error);
+    }
+
+    [Fact]
+    public async Task GetParticleSystem_FallsBackToTheLandModel()
+    {
+        // 12 of foc's particle objects declare only the land model. Nothing about a particle is
+        // theatre-specific, so a space request takes it rather than reporting nothing.
+        var tags = new FakeVariantTagSource().With("Ground_Puff",
+            Tag("Land_Model_Name", "p_smoke_small.alo"));
+
+        var result = await Particles(new StubAssets(), tags, Sym("Ground_Puff", "Particle")).Handle(
+            new GetParticleSystemParams { Name = "Ground_Puff" }, CancellationToken.None);
+
+        Assert.Contains("p_smoke_small.alo", result.Error);
+    }
+
+    [Fact]
+    public async Task GetParticleSystem_StillTakesABareFileName()
+    {
+        // The proxies name the asset directly, and that is most of the traffic. Resolving objects
+        // must not cost them anything.
+        var result = await Particles(new StubAssets(), new FakeVariantTagSource()).Handle(
+            new GetParticleSystemParams { Name = "pe_stardestroyerengines" }, CancellationToken.None);
+
+        Assert.Contains("pe_stardestroyerengines.alo", result.Error);
+    }
+
+    [Fact]
+    public async Task GetParticleSystem_CarriesTheObjectsScaleFactor()
+    {
+        // `Scale_Factor` sits on the base GameObjectType beside Mass and LOD_Bias
+        // (`DatabaseMapExport.xml`), so it is a general object RENDER SCALE rather than anything
+        // particle-specific - and nothing read it at all. Six shipped particle objects declare one:
+        // 20.0 on the four hero powerup effects, 2.0 on the two bombing-run explosions, so those six
+        // drew at a twentieth and a half of their intended size.
+        var tags = new FakeVariantTagSource().With("Empire_Bombing_Run_Explosion_Land",
+            Tag("Space_Model_Name", "p_explosion_thermal_empire.alo"),
+            Tag("Scale_Factor", "2.0"));
+
+        var result = await Particles(new StubAssets(), tags,
+            Sym("Empire_Bombing_Run_Explosion_Land", "Particle")).Handle(
+            new GetParticleSystemParams { Name = "Empire_Bombing_Run_Explosion_Land" },
+            CancellationToken.None);
+
+        Assert.Equal(2f, result.ScaleFactor);
+    }
+
+    [Fact]
+    public async Task GetParticleSystem_ScaleFactorIsOneWhenTheObjectDeclaresNone()
+    {
+        // 91 of the shipped particle objects write 1.0 explicitly and the rest write nothing.
+        var tags = new FakeVariantTagSource().With("Plain",
+            Tag("Space_Model_Name", "p_plain.alo"));
+
+        var result = await Particles(new StubAssets(), tags, Sym("Plain", "Particle")).Handle(
+            new GetParticleSystemParams { Name = "Plain" }, CancellationToken.None);
+
+        Assert.Equal(1f, result.ScaleFactor);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-3")]
+    [InlineData("not a number")]
+    public async Task GetParticleSystem_RefusesAScaleFactorThatWouldMakeTheSystemVanish(string raw)
+    {
+        // The reference guards the same way (`GameObjectCatalog.cpp`: reject non-finite and
+        // non-positive) - a zero or negative scale collapses the object instead of sizing it.
+        var tags = new FakeVariantTagSource().With("Odd",
+            Tag("Space_Model_Name", "p_odd.alo"), Tag("Scale_Factor", raw));
+
+        var result = await Particles(new StubAssets(), tags, Sym("Odd", "Particle")).Handle(
+            new GetParticleSystemParams { Name = "Odd" }, CancellationToken.None);
+
+        Assert.Equal(1f, result.ScaleFactor);
+    }
+
+    [Fact]
+    public async Task GetParticleSystem_ScaleFactorIsOneForABareAssetName()
+    {
+        // A model's proxy names the asset, and there is no object to carry a scale.
+        var result = await Particles(new StubAssets(), new FakeVariantTagSource()).Handle(
+            new GetParticleSystemParams { Name = "pe_stardestroyerengines" }, CancellationToken.None);
+
+        Assert.Equal(1f, result.ScaleFactor);
+    }
+
+    private static GetParticleSystemHandler Particles(
+        StubAssets assets, FakeVariantTagSource tags, params GameSymbol[] symbols)
+    {
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = symbols.ToImmutableDictionary(
+                s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase)
+        };
+
+        return new GetParticleSystemHandler(
+            assets, Config(), new FakeGameIndexService(index), new NullSchemaProvider(), tags);
+    }
+
+    private static VariantTag Tag(string name, string value)
+    {
+        return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
+    }
+
+    private static GameSymbol Sym(string id, string typeName)
+    {
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
+    }
+
     private sealed class StubAssets : IGameAssetResolver
     {
         private readonly Dictionary<string, (byte[] Bytes, string Resolved)> _files =

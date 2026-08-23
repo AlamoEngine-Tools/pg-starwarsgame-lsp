@@ -87,6 +87,8 @@ public sealed class XmlCompletionRegistryTest
     private sealed class FakeProvider(string name, bool canHandle, params ValueProposal[] proposals)
         : IXmlCompletionProvider
     {
+        public override string ToString() => name;
+
         public bool CanHandle(XmlTagDefinition tag)
         {
             return canHandle;

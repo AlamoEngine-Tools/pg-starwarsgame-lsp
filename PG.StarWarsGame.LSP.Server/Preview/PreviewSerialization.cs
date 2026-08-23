@@ -42,6 +42,9 @@ public sealed class PreviewEnumConverter : JsonConverter
         typeof(PreviewSceneKind),
         typeof(PreviewPartOrigin),
         typeof(PreviewParticleGate),
+        typeof(PreviewWeaponSource),
+        typeof(PreviewFirePointMode),
+        typeof(PreviewProjectileRender),
         typeof(AlamoSpawnShape),
         typeof(AlamoTrackInterpolation),
         typeof(AlamoTrackChannel),
@@ -72,6 +75,70 @@ public sealed class PreviewEnumConverter : JsonConverter
         JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
     {
         throw new NotSupportedException("The preview protocol only writes these enums.");
+    }
+}
+
+/// <summary>
+///     Writes a dictionary with its keys exactly as they were authored.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The LSP serializer camel-cases property names, and Newtonsoft's naming strategy processes
+///         dictionary KEYS along with them. That is right for a DTO's own fields and wrong for a map
+///         whose keys are game data: <c>HARD_POINT_WEAPON_LASER</c> went out as
+///         <c>harD_POINT_WEAPON_LASER</c> - the leading run of capitals lowercased and the rest left
+///         alone - so the client, which looks a type up by the hardpoint's own spelling, matched
+///         nothing and drew no reticle. Measured against a live server, not reasoned about.
+///     </para>
+///     <para>
+///         Per property rather than by turning <c>ProcessDictionaryKeys</c> off globally: this
+///         serializer carries the whole LSP protocol, and some of its maps are spec'd with the keys
+///         the strategy produces. <c>PreviewWireShapeTest.EveryDictionaryOnTheWire_KeepsItsKeys</c>
+///         is the structural guard that the next one does not get forgotten.
+///     </para>
+/// </remarks>
+public sealed class VerbatimKeyDictionaryConverter : JsonConverter
+{
+    /// <summary>The preview protocol is server-to-client only; nothing sends these back.</summary>
+    public override bool CanRead => false;
+
+    public override bool CanConvert(Type objectType)
+    {
+        ArgumentNullException.ThrowIfNull(objectType);
+
+        return typeof(System.Collections.IDictionary).IsAssignableFrom(objectType)
+               || objectType.GetInterfaces().Any(face => face.IsGenericType
+                   && face.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>));
+    }
+
+    public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        ArgumentNullException.ThrowIfNull(serializer);
+
+        if (value is null)
+        {
+            writer.WriteNull();
+            return;
+        }
+
+        writer.WriteStartObject();
+
+        foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)value)
+        {
+            // The key as the game data spells it. Everything below it still goes through the
+            // serializer, so a VALUE keeps the camel-cased field names the client reads.
+            writer.WritePropertyName(entry.Key.ToString() ?? string.Empty);
+            serializer.Serialize(writer, entry.Value);
+        }
+
+        writer.WriteEndObject();
+    }
+
+    public override object ReadJson(
+        JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+    {
+        throw new NotSupportedException("The preview protocol only writes these dictionaries.");
     }
 }
 

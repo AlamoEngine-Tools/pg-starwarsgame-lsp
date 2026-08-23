@@ -331,7 +331,8 @@ public sealed class GetStoryParamOptionsHandler(
             StoryReferenceTypes.EventName => events.Select(e => e.Name),
             StoryReferenceTypes.Branch => events
                 .Select(e => e.Branch)
-                .Where(b => !string.IsNullOrEmpty(b))!,
+                .Where(b => !string.IsNullOrEmpty(b))
+                .Select(b => b!),
             _ => model.Threads.Select(t => FileNameOf(t.DocumentUri))
         };
 

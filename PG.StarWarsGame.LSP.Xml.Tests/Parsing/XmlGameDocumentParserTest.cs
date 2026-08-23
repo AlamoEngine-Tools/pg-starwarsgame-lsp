@@ -525,6 +525,87 @@ public sealed class XmlGameDocumentParserTest
             lineText.Substring(reference.Column, reference.Length));
     }
 
+    // ── (damage type, clone) Death_Clone tuple tags ───────────────────────────
+
+    private static XmlTagDefinition DeathCloneTag()
+    {
+        // Mirrors the real schema: `Death_Clone` carries ValueType DeathCloneSpec and NO
+        // ReferenceKind, so neither of its two slots was visible to go-to-definition - the tag the
+        // user reached for on a Star Destroyer and found dead.
+        return new XmlTagDefinition
+        {
+            Tag = "Death_Clone", ValueType = XmlValueType.DeathCloneSpec, MultipleAllowed = true,
+        };
+    }
+
+    [Fact]
+    public async Task ParseAsync_DeathClone_EmitsObjectReferenceForTheCloneSlot()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        schema.AddTag(DeathCloneTag());
+
+        var result = await Build(schema).ParseAsync("file:///u.xml",
+            """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal, Star_Destroyer_Death_Clone</Death_Clone></SpaceUnit>""",
+            1, TestContext.Current.CancellationToken);
+
+        var clone = Assert.Single(result.References, r => r.ExpectedKind == GameSymbolKind.XmlObject);
+        Assert.Equal("Star_Destroyer_Death_Clone", clone.TargetId);
+
+        // By NAME: a death clone is an ordinary GameObjectType and the tag does not narrow it, so
+        // pinning a type here would only manufacture mismatches.
+        Assert.Null(clone.ExpectedTypeName);
+    }
+
+    [Fact]
+    public async Task ParseAsync_DeathClone_EmitsEnumReferenceForTheDamageType()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        schema.AddTag(DeathCloneTag());
+
+        var result = await Build(schema).ParseAsync("file:///u.xml",
+            """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal, Star_Destroyer_Death_Clone</Death_Clone></SpaceUnit>""",
+            1, TestContext.Current.CancellationToken);
+
+        Assert.Contains(result.References, r => r.TargetId == "enum:DamageType/Damage_Normal");
+    }
+
+    [Fact]
+    public async Task ParseAsync_DeathClone_RangeCoversOnlyTheCloneToken()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        schema.AddTag(DeathCloneTag());
+
+        const string xml =
+            """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal, Star_Destroyer_Death_Clone</Death_Clone></SpaceUnit>""";
+        var result = await Build(schema).ParseAsync("file:///u.xml", xml, 1,
+            TestContext.Current.CancellationToken);
+
+        var clone = Assert.Single(result.References, r => r.ExpectedKind == GameSymbolKind.XmlObject);
+
+        // One line, so the range indexes straight into it.
+        Assert.Equal(0, clone.Line);
+        Assert.Equal("Star_Destroyer_Death_Clone",
+            xml.Substring(clone.Column, clone.Length));
+    }
+
+    [Fact]
+    public async Task ParseAsync_DeathClone_WithOnlyOneSlot_RecordsNoCloneReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddType(Type("SpaceUnit"));
+        schema.AddTag(DeathCloneTag());
+
+        var result = await Build(schema).ParseAsync("file:///u.xml",
+            """<SpaceUnit Name="SD"><Death_Clone>Damage_Normal</Death_Clone></SpaceUnit>""",
+            1, TestContext.Current.CancellationToken);
+
+        // A half-written row is the handler's diagnostic to make, not a reference to invent.
+        Assert.DoesNotContain(result.References, r => r.ExpectedKind == GameSymbolKind.XmlObject);
+    }
+
     // ── (unit, count) UnitSpawnTable tuple tags ───────────────────────────────
 
     private static XmlTagDefinition UnitSpawnTag(string tag)

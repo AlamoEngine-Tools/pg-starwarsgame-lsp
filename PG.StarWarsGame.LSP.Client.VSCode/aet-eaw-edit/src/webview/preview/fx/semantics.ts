@@ -166,16 +166,40 @@ export function collectUniformTypes(source: string): Map<string, string> {
     const types = new Map<string, string>();
 
     for (const match of source.matchAll(
-        /^\s*uniform\s+([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*;/gm)) {
-        types.set(match[2], match[1]);
+        /^\s*uniform\s+([A-Za-z_][A-Za-z0-9_]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*(\[[^\]]*\])?\s*;/gm)) {
+        // The array suffix is KEPT. It was matched and thrown away, which left nothing to
+        // distinguish `mat4 m_sphFill[3]` from `mat4 m_world` - so `fitToUniform` had to guess from
+        // the value's length instead, and the guess is wrong whenever the value divides evenly by a
+        // narrower uniform's width. See its own comment.
+        types.set(match[2], match[1] + (match[3] ?? ''));
     }
 
     return types;
 }
 
+/**
+ * How many elements a declaration asks for: a count, or null when it will not say.
+ *
+ * Three answers, and the third is the one that matters. No suffix is a single value. `[12]` is
+ * twelve. **`[MAX_BONES]` is an array of unknown length** - the shipped skinning header declares
+ * `float4x3 m_skinMatrixArray[MAX_BONES]` and the define never resolves to a literal, so there is
+ * no count to fit to and the caller's value has to be passed through untouched. Reading that as
+ * "not an array" trimmed a four-bone skin palette to its first matrix, and every RSkin model
+ * rendered nothing at all.
+ */
+function arrayLengthOf(type: string | undefined): number | null {
+    const suffix = /\[([^\]]*)\]\s*$/.exec(type ?? '');
+
+    if (suffix === null) {
+        return 1;
+    }
+
+    return /^\s*\d+\s*$/.test(suffix[1]) ? Math.max(1, Number(suffix[1])) : null;
+}
+
 /** How many components one uniform of this type takes. Zero for anything not a number. */
 function widthOf(type: string | undefined): number {
-    switch (type) {
+    switch ((type ?? '').replace(/\[[^\]]*\]\s*$/, '')) {
         case 'float':
         case 'int':
         case 'bool':
@@ -212,17 +236,27 @@ export function fitToUniform(
         return [...value];
     }
 
-    if (width === 1) {
-        return value[0] ?? 0;
-    }
+    // An ARRAY takes every element the declaration asks for; a scalar array still needs its list.
+    const count = arrayLengthOf(type);
 
-    // An array of this type - `mat4 m_sphFill[3]` arrives as 48 numbers.
-    if (value.length > width && value.length % width === 0) {
+    // An array that will not say how long it is gets the value exactly as handed over.
+    if (count === null) {
         return [...value];
     }
 
-    const fitted = value.slice(0, width);
-    while (fitted.length < width) {
+    const wanted = width * count;
+
+    if (wanted === 1) {
+        return value[0] ?? 0;
+    }
+
+    // Trimmed and padded to exactly what the declaration wants, rather than guessed at from the
+    // value's own length. The guess was `value.length % width === 0`, and it read the Star
+    // Destroyer light strip's four-float `UVScrollRate` - every ALO vector parameter is stored as
+    // four floats - as an array of two `vec2`s, which GL refuses outright: "Only array uniforms may
+    // have count > 1". A refused upload leaves the uniform at zero with nothing said about it.
+    const fitted = value.slice(0, wanted);
+    while (fitted.length < wanted) {
         fitted.push(0);
     }
 

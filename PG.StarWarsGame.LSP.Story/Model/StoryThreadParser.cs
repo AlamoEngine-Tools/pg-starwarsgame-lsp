@@ -29,7 +29,7 @@ public static class StoryThreadParser
                                  n.Name.Equals("Event", StringComparison.OrdinalIgnoreCase)))
         {
             var nameAttribute = node.Attributes["Name"];
-            var name = nameAttribute?.Value.Trim();
+            var name = nameAttribute?.Value?.Trim();
             if (string.IsNullOrEmpty(name))
             {
                 problems.Add(new StoryParseProblem(RangeAt(document, node.StreamPosition, "<Event".Length),
@@ -102,7 +102,7 @@ public static class StoryThreadParser
         return new StoryEvent
         {
             Name = name,
-            NameRange = RangeAt(document, nameAttribute.ValueStartIndex, nameAttribute.Value.Length),
+            NameRange = RangeAt(document, nameAttribute.ValueStartIndex, nameAttribute.Value!.Length),
             Range = RangeAt(document, node.StreamPosition, node.OuterHtml.Length),
             EventType = eventType,
             EventFilter = eventFilter,

@@ -143,8 +143,26 @@ public sealed record GetParticleSystemParams : IRequest<GetParticleSystemResult>
 ///     particle state instead would mean thousands of positions at sixty frames a second over a
 ///     JSON-RPC channel, which is not a trade worth making for a preview.
 /// </remarks>
+/// <param name="ScaleFactor">
+///     The owning object's <c>Scale_Factor</c>, or 1 when the request named a bare asset or the
+///     object declares none.
+/// </param>
+/// <remarks>
+///     <para>
+///         A uniform RENDER SCALE on the object, not anything particle-specific:
+///         <c>DatabaseMapExport.xml</c> lists <c>Scale_Factor</c> on the base GameObjectType beside
+///         <c>Mass</c> and <c>LOD_Bias</c>, and the reference applies it as a uniform scale on the
+///         object's world matrix. So it scales where a particle spawns as well as how big it draws.
+///     </para>
+///     <para>
+///         Six shipped particle objects declare one and NOTHING read it: 20.0 on the four hero
+///         powerup effects (Veers, Piet, Replenish Wingmen, Weaken Enemy) and 2.0 on the two
+///         bombing-run explosions, so all six drew at a twentieth and a half of their size.
+///     </para>
+/// </remarks>
 public sealed record GetParticleSystemResult(
     AlamoParticleContent? System,
+    float ScaleFactor = 1f,
     string? Error = null);
 
 /// <summary>Request for one shader's source text.</summary>

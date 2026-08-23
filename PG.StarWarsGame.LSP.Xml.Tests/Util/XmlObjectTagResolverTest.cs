@@ -15,7 +15,8 @@ public sealed class XmlObjectTagResolverTest
     {
         var doc = new HtmlDocument();
         doc.LoadHtml("<n/>");
-        DummyNode = doc.DocumentNode.FirstChild;
+        DummyNode = doc.DocumentNode.FirstChild
+                    ?? throw new InvalidOperationException("The dummy document did not parse to a node.");
     }
 
     [Fact]

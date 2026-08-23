@@ -24,6 +24,9 @@ export interface SubjectCounts {
     animations: number;
     hardpoints: number;
     particles: number;
+    /** Weapon banks, wherever declared - a fighter's guns are on the unit, not on a mount. */
+    weapons: number;
+    abilities: number;
 }
 
 /** What the modes you are NOT in are currently doing. */
@@ -32,6 +35,8 @@ export interface ModeActivity {
     playing: string | null;
     destroyed: number;
     particleSystems: number;
+    /** Abilities switched on, which are holding their proxies visible. */
+    abilities: number;
 }
 
 /**
@@ -52,8 +57,11 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
         },
         { id: 'model', icon: 'package', label: 'Model', angle: 270 },
         {
+            // Everything the lens can act on, not only the mounts. It counted hardpoints alone
+            // until the lens grew weapons and abilities, which read 0 on a fighter that carries its
+            // guns on the unit itself - a dial position claiming a subject has nothing to see.
             id: 'gameplay', icon: 'zap', label: 'Gameplay', angle: 330,
-            count: counts.hardpoints,
+            count: counts.hardpoints + counts.weapons + counts.abilities,
         },
     ];
 }
@@ -83,6 +91,15 @@ export function otherModeChips(
         chips.push({
             mode: 'gameplay',
             text: `${activity.destroyed} hardpoint${activity.destroyed === 1 ? '' : 's'} destroyed`,
+        });
+    }
+
+    // An active ability is holding proxies on. Without this the state is invisible from every other
+    // lens, which is exactly what the chips exist to prevent.
+    if (mode !== 'gameplay' && activity.abilities > 0) {
+        chips.push({
+            mode: 'gameplay',
+            text: `${activity.abilities} abilit${activity.abilities === 1 ? 'y' : 'ies'} active`,
         });
     }
 

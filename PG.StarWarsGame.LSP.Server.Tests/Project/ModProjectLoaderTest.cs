@@ -103,8 +103,8 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal("My Awesome Mod", model.Modinfo.Name);
-        Assert.Equal("1.0.0", model.Modinfo.Version);
+        Assert.Equal("My Awesome Mod", model.Modinfo!.Name);
+        Assert.Equal("1.0.0", model.Modinfo!.Version);
         Assert.Equal(new[] { "data/xml" }, model.Directories.Xml);
         Assert.Equal(new[] { "data/scripts" }, model.Directories.Scripts);
         Assert.Single(model.ProjectReferences);
@@ -242,7 +242,7 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal("Mod", model.Modinfo.Name);
+        Assert.Equal("Mod", model.Modinfo!.Name);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal("Mod", model.Modinfo.Name);
+        Assert.Equal("Mod", model.Modinfo!.Name);
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        var custom = Assert.IsAssignableFrom<IDictionary<string, object>>(model.Modinfo.Custom);
+        var custom = Assert.IsAssignableFrom<IDictionary<string, object>>(model.Modinfo!.Custom);
         Assert.True(custom.ContainsKey("steamId"));
     }
 

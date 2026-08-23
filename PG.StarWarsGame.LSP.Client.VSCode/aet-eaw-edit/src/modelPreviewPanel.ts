@@ -279,6 +279,19 @@ export class ModelPreviewPanel extends WebviewPanelHost {
     private async sendGlb(message: WebviewMessage): Promise<void> {
         const modelReference = String(message.modelReference ?? '');
 
+        // A PASSIVE subject names its own clips on the request: a death clone and a piece of
+        // wreckage are their own models, and the scene's list describes the one that was opened.
+        // Sending the subject's list for them worked only by the accident that a clone's model is
+        // conventionally the hull's name plus a suffix, so its clip matched the hull's stem.
+        // EMPTY means "nothing of its own", not "bake nothing". `??` only falls back on null, so
+        // an empty list from an older server - or from a clone whose clips could not be enumerated -
+        // asked for a GLB with no animation at all, and a death clone with no clip plays no death.
+        // Before this field existed the scene's list was sent for everything and happened to carry
+        // the clone's clip, so narrowing it without this guard was strictly worse.
+        const own = Array.isArray(message.animations) && message.animations.length > 0
+            ? message.animations.map(name => String(name))
+            : null;
+
         const result = await this.lsp.request<GetModelGlbResult>('aet/getModelGlb', {
             modelReference,
             // An animation subject asks for its own clip. Anything else asks for every clip the
@@ -286,7 +299,7 @@ export class ModelPreviewPanel extends WebviewPanelHost {
             // none of them plays until the reader chooses one.
             animations: this.subject.kind === 'animation'
                 ? [this.subject.animationReference]
-                : this.sceneAnimations,
+                : own ?? this.sceneAnimations,
         });
 
         this.post({

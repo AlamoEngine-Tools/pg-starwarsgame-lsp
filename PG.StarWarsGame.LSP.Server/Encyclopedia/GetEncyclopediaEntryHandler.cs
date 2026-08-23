@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.ShipNames;
@@ -388,47 +389,27 @@ public sealed class GetEncyclopediaEntryHandler
     private static IReadOnlyList<EncyclopediaAbility> ResolveAbilities(
         EffectiveObject effective, IconCatalog? catalog)
     {
+        // Through the shared reader. This walked the block with its own HAP pass until the preview
+        // needed the same list, and two walkers is two places for "which child names the type" to
+        // drift apart.
         var fragment = effective.Tags.FirstOrDefault(t =>
                 string.Equals(t.TagName, EncyclopediaTags.UnitAbilitiesData,
                     StringComparison.OrdinalIgnoreCase))
             ?.Fragment;
-        if (string.IsNullOrWhiteSpace(fragment))
-            return [];
 
-        var doc = XmlUtility.CreateHtmlDocument(fragment);
-        if (!XmlUtility.TryGetRootNode(doc, out var root) || root is null)
-            return [];
+        return
+        [
+            .. UnitAbilityReader.Read(fragment).Select(ability =>
+            {
+                var alternateIconName = ability.Tag("Alternate_Icon_Name");
 
-        var abilities = new List<EncyclopediaAbility>();
-        foreach (var node in root.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element
-                                 && string.Equals(n.Name, "unit_ability",
-                                     StringComparison.OrdinalIgnoreCase)))
-        {
-            // Type is what a slot draws while icons are out of reach, so an entry without one has
-            // nothing to show - and letting it take a slot would displace the ability after it.
-            var type = ChildText(node, "type");
-            if (string.IsNullOrWhiteSpace(type))
-                continue;
-
-            var alternateIconName = ChildText(node, "alternate_icon_name");
-            abilities.Add(new EncyclopediaAbility(
-                type,
-                ChildText(node, "gui_activated_ability_name"),
-                alternateIconName,
-                ResolveAbilityIcon(catalog, type, alternateIconName)));
-        }
-
-        return abilities;
-    }
-
-    private static string? ChildText(HtmlNode parent, string lowercaseName)
-    {
-        var child = parent.ChildNodes.FirstOrDefault(n =>
-            n.NodeType == HtmlNodeType.Element
-            && string.Equals(n.Name, lowercaseName, StringComparison.OrdinalIgnoreCase));
-        var text = child?.InnerText.Trim();
-        return string.IsNullOrEmpty(text) ? null : text;
+                return new EncyclopediaAbility(
+                    ability.Type,
+                    ability.Tag("GUI_Activated_Ability_Name"),
+                    alternateIconName,
+                    ResolveAbilityIcon(catalog, ability.Type, alternateIconName));
+            })
+        ];
     }
 
     private static string? Translate(ILocalisationIndex loca, string? key)

@@ -6,7 +6,10 @@ import { describe, it } from 'node:test';
 
 import type { PreviewHardpoint, PreviewParticle } from '../../protocol/modelPreview';
 import { PREVIEW_PARTICLE_GATE } from '../../protocol/modelPreview';
-import { decalNames, destroyable, effectPlays, partHidden, playsOnOpen } from './damage';
+import {
+    collisionMeshNames, decalNames, destroyable, effectPlays,
+    hardpointGateAllows, partHidden, playsOnOpen,
+} from './damage';
 
 function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
     return {
@@ -15,6 +18,7 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
         type: null,
         attachBone: 'HP_F-L_Bone',
         isDestroyable: true,
+        isTargetable: true,
         health: 325,
         damageParticlesBone: 'HP_F-L_EmitDamage',
         damageDecalBone: 'HP_F-L_Blast',
@@ -25,7 +29,6 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
         engineDeathHidesEngineParticles: false,
         tooltipText: null,
         turret: null,
-        fire: null,
         ...over,
     };
 }
@@ -187,3 +190,79 @@ describe('playsOnOpen', () => {
         })), false);
     });
 });
+
+describe('collisionMeshNames', () => {
+    it('names the collision hull every hardpoint declares, lowercased for matching', () => {
+        // `Collision_Mesh` is set on 267 of foc's hardpoints. Most of the geometry it names is
+        // already hidden in the file - 186 of 187 - so this exists for the one that is not, and for
+        // a mod that ships its hulls visible.
+        const names = collisionMeshNames([
+            hardpoint({ id: 'HP_FL', collisionMeshBone: 'HP_F-L_Coll' }),
+            hardpoint({ id: 'HP_MC', collisionMeshBone: 'HP_M-C_Coll' }),
+        ]);
+
+        assert.deepEqual([...names].sort(), ['hp_f-l_coll', 'hp_m-c_coll']);
+    });
+
+    it('does not care whether the mount is intact', () => {
+        // Unlike a decal. A collision hull is never drawn in either state - the engine consumes it
+        // for hit testing and nothing else - so destroying the mount must not reveal it.
+        const intact = collisionMeshNames([hardpoint({ collisionMeshBone: 'HP_F-L_Coll' })]);
+
+        assert.equal(intact.has('hp_f-l_coll'), true);
+    });
+
+    it('leaves out a hardpoint that declares none', () => {
+        assert.equal(collisionMeshNames([hardpoint({ collisionMeshBone: null })]).size, 0);
+        assert.equal(collisionMeshNames([hardpoint({ collisionMeshBone: '' })]).size, 0);
+    });
+
+    it('leaves out a name that is really the mount ATTACH bone', () => {
+        // MEASURED on the eaw Star Destroyer: the tractor beam and the fighter bay both give
+        // `Collision_Mesh` the same value as `Attachment_Bone` - `HP_trac_bone` and `SPAWN_00`.
+        // Hiding those would prune the whole subtree hanging off the attach point, which is the
+        // mount itself, so a hardpoint that names its own attach bone is left alone.
+        const names = collisionMeshNames([
+            hardpoint({ id: 'HP_Trac', attachBone: 'HP_trac_bone', collisionMeshBone: 'HP_trac_bone' }),
+            hardpoint({ id: 'HP_Bay', attachBone: 'SPAWN_00', collisionMeshBone: 'spawn_00' }),
+        ]);
+
+        assert.equal(names.size, 0);
+    });
+});
+
+describe('hardpointGateAllows', () => {
+    const gated = (over: Partial<PreviewParticle> = {}): PreviewParticle => ({
+        id: 'p1', systemRef: 's', partId: 'hull', bone: 'b', boneIndex: 0,
+        gate: PREVIEW_PARTICLE_GATE.always, startsVisible: false, ...over,
+    });
+
+    it('ignores startsVisible, which is a DEFAULT rather than a permission', () => {
+        // An ability proxy ships switched off - that is what makes it an ability proxy - and
+        // `prs_at-aa_fx` on the real AT-AA carries `startsVisible: false`. Reading that as a veto
+        // meant no ability could ever light its own effect.
+        assert.equal(hardpointGateAllows(gated({ startsVisible: false }), new Set()), true);
+        assert.equal(hardpointGateAllows(gated({ startsVisible: true }), new Set()), true);
+    });
+
+    it('still refuses an effect whose mount is the wrong side of its gate', () => {
+        // The damage question is a different one from the default question, and it still applies:
+        // smoke that belongs to a destroyed mount must not appear because an ability is on.
+        const onDeath = gated({
+            gate: PREVIEW_PARTICLE_GATE.hardpointDestroyed, hardpointId: 'HP_Gun',
+        });
+
+        assert.equal(hardpointGateAllows(onDeath, new Set()), false);
+        assert.equal(hardpointGateAllows(onDeath, new Set(['HP_Gun'])), true);
+    });
+
+    it('still refuses an alive-gated effect once its mount is gone', () => {
+        const whileAlive = gated({
+            gate: PREVIEW_PARTICLE_GATE.hardpointAlive, hardpointId: 'HP_Gun',
+        });
+
+        assert.equal(hardpointGateAllows(whileAlive, new Set()), true);
+        assert.equal(hardpointGateAllows(whileAlive, new Set(['HP_Gun'])), false);
+    });
+});
+

@@ -253,10 +253,6 @@ describe('collectUniformTypes', () => {
         assert.equal(types.get('Shininess'), 'float');
     });
 
-    it('reads an array uniform by its element type', () => {
-        assert.equal(collectUniformTypes('uniform mat4 m_sphFill[3];').get('m_sphFill'), 'mat4');
-    });
-
     it('reads samplers, so they are never treated as numbers', () => {
         assert.equal(
             collectUniformTypes('uniform sampler2D BaseSampler;').get('BaseSampler'), 'sampler2D');
@@ -264,6 +260,13 @@ describe('collectUniformTypes', () => {
 
     it('ignores a plain global, which is not a uniform', () => {
         assert.equal(collectUniformTypes('vec3 notAUniform;').has('notAUniform'), false);
+    });
+
+    it('keeps the declared array length, which is the only thing that says it IS an array', () => {
+        // Discarded, the reader has to guess from the value's length, and the guess is wrong: four
+        // floats into a vec2 divides evenly and reads as two vec2s.
+        assert.equal(collectUniformTypes('uniform mat4 m_sphFill[3];').get('m_sphFill'), 'mat4[3]');
+        assert.equal(collectUniformTypes('uniform vec2 UVScrollRate;').get('UVScrollRate'), 'vec2');
     });
 });
 
@@ -286,10 +289,42 @@ describe('fitToUniform', () => {
         assert.deepEqual(fitToUniform([0.5, 0.25], 'vec4'), [0.5, 0.25, 0, 0]);
     });
 
-    it('leaves an array uniform whole, since its length is a multiple of the element', () => {
+    it('leaves an array uniform whole, to the length the declaration asks for', () => {
         const three = new Array(48).fill(1);
 
-        assert.equal((fitToUniform(three, 'mat4') as number[]).length, 48);
+        assert.equal((fitToUniform(three, 'mat4[3]') as number[]).length, 48);
+    });
+
+    it('truncates a four-component parameter down to a vec2 uniform', () => {
+        // The one the Star Destroyer's light strip tripped: the ALO stores every vector parameter
+        // as four floats, `MeshAdditive.fx` declares `float2 UVScrollRate`, and 4 divides by 2 - so
+        // the old length guess called it an array of two vec2s and GL refused the upload with
+        // "Only array uniforms may have count > 1".
+        assert.deepEqual(fitToUniform([1, 2, 3, 4], 'vec2'), [1, 2]);
+    });
+
+    it('pads an array that arrives short', () => {
+        assert.equal((fitToUniform([1, 2, 3], 'vec2[3]') as number[]).length, 6);
+    });
+
+    /**
+     * An array whose length is a #define is of UNKNOWN length, and must be left WHOLE.
+     *
+     * `AlamoEngineSkinning.fxh` declares `float4x3 m_skinMatrixArray[MAX_BONES]`, which translates
+     * to `mat4[MAX_BONES]` - the length never resolves to a literal. Read as "not an array" it
+     * trimmed a four-bone skin palette from 64 floats to 16, so every bone but the first collapsed
+     * to the origin and every RSkin model rendered NOTHING under translated shaders. The value the
+     * caller supplies is already the right shape; there is nothing here to fit it to.
+     */
+    it('leaves an array whole when its length is a symbol rather than a number', () => {
+        const palette = new Array(64).fill(1);
+
+        assert.equal((fitToUniform(palette, 'mat4[MAX_BONES]') as number[]).length, 64);
+    });
+
+    it('still trims a plain uniform that merely looks divisible', () => {
+        // The bug the array handling exists for: four floats into a vec2 is not two vec2s.
+        assert.deepEqual(fitToUniform([1, 2, 3, 4], 'vec2'), [1, 2]);
     });
 
     it('leaves a value alone when the type is unknown', () => {

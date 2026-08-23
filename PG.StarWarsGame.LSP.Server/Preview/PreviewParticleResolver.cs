@@ -143,7 +143,37 @@ public static class PreviewParticleResolver
         if (engineOwners.TryGetValue(parentBone, out var engine))
             return (PreviewParticleGate.HardpointAlive, engine);
 
+        // The engine MESH, for the models whose glow does not hang off the tagged bone at all.
+        if (IsEngineMeshBone(parentBone) && engineOwners.Count > 0)
+            return (PreviewParticleGate.HardpointAlive, engineOwners.Values.First());
+
         return (PreviewParticleGate.Always, null);
+    }
+
+    /// <summary>
+    ///     Whether a bone is the engine geometry a glow proxy hangs off.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         INFERRED FROM THE MODELS, not told to us by anyone who owns the engine, and worth
+    ///         confirming. Every one of the eleven <c>Engine_Particles</c> tags in foc names
+    ///         <c>HP_E_MAINENGINES</c>, and on three of the four capital ships measured, nothing at
+    ///         all is parented to that bone - the glow sits under a mesh instead:
+    ///         <c>pe_stardestroyerengines</c> under <c>engines_big</c>, <c>pe_nebulonengines</c>
+    ///         under <c>engines</c>, <c>PE_Corvetteengines</c> under <c>engines</c>. The Mon Cal
+    ///         carries both shapes at once - <c>pe_moncalengines_mid</c> IS under the tagged bone,
+    ///         while its big and small engines are under <c>engines_big</c> and
+    ///         <c>engines_small</c> - which is why both joins are needed rather than one replacing
+    ///         the other.
+    ///     </para>
+    ///     <para>
+    ///         Only ever consulted when the subject HAS an engine hardpoint that hides its glow, so
+    ///         a model with no engine mount keeps its effects ungated whatever its bones are called.
+    ///     </para>
+    /// </remarks>
+    private static bool IsEngineMeshBone(string bone)
+    {
+        return bone.StartsWith("engines", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

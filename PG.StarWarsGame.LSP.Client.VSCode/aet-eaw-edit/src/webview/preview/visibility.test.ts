@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-    clearedForPlayback, restingClip, resolveRow, setRow, subtreeFacts, toggleRow,
-    type RowFacts, type RowOverride,
+    clearedForPlayback, deathClip, effectFacts, restingClip, resolveRow, setRow, subtreeFacts,
+    toggleRow, type RowFacts, type RowOverride, damageMeshFacts,
 } from './visibility';
 
 const facts = (over: Partial<RowFacts> = {}): RowFacts =>
@@ -325,5 +325,113 @@ describe('restingClip', () => {
 
     it('does not mistake a name that merely contains the word', () => {
         assert.equal(restingClip(['ev_probe_idlewalk_00']), 'ev_probe_idlewalk_00');
+    });
+});
+
+describe('deathClip', () => {
+    it('picks the clip that says die', () => {
+        assert.equal(deathClip(['rv_moncalcruiser_d_idle_00', 'rv_moncalcruiser_d_die_00']),
+            'rv_moncalcruiser_d_die_00');
+    });
+
+    it('falls back to the only clip there is', () => {
+        // The host hands the server every clip the SCENE found, so a death clone's list is not
+        // guaranteed to name its own death - and having geometry play nothing is worse than
+        // playing the one thing it shipped.
+        assert.equal(deathClip(['rv_moncalcruiser_d_00']), 'rv_moncalcruiser_d_00');
+    });
+
+    it('has nothing to play when the model ships no clip at all', () => {
+        assert.equal(deathClip([]), undefined);
+    });
+
+    it('takes the same one every time when several match', () => {
+        const clips = ['b_die_01', 'a_die_00'];
+
+        assert.equal(deathClip(clips), deathClip([...clips].reverse()));
+    });
+
+    it('does not mistake a name that merely contains the letters', () => {
+        // `died` and `diego` both carry `die` and neither is a death clip; the word has to stand on
+        // its own between separators, which is how the exporter writes an action.
+        assert.equal(deathClip(['ev_x_diehard_00', 'ev_x_attack_00']), 'ev_x_attack_00');
+    });
+});
+
+describe('effectFacts, an effect answers to its own bone', () => {
+    /**
+     * Alamo has NO visibility inheritance. `RenderObject::Render` draws a submesh when
+     * `GetBoneVisibility(mesh.bone)` says so - that bone's own track, never a parent's - and a
+     * particle proxy is spawned and killed on `GetVisibleEvent`/`GetInvisibleEvent` of
+     * `proxy.bone->index` alone.
+     *
+     * The Nebulon-B's death clip proves the authoring assumes it: `p_explosion_big00#12` is keyed
+     * ON for exactly the one frame its parent `Busted_00#11` is keyed OFF. Under inheritance that
+     * frame is unreachable and the blast covering the chunk can never be expressed.
+     */
+    it('ignores an ancestor the MODEL hides', () => {
+        const chunk = effectFacts(facts({ ancestorHidden: 'Busted_00', ancestorHiddenAuthored: 'Busted_00' }));
+
+        assert.deepEqual(resolveRow(chunk),
+            { visible: true, because: 'file', authored: true });
+    });
+
+    /**
+     * The reader is the exception, and it is not a claim about the model. A bone row in the tree is
+     * a subtree switch - unticking a chunk has to take its effects off screen too, or the tick
+     * looks broken - so a hide that only the READER placed still reaches down.
+     */
+    it('still answers to an ancestor the READER hid', () => {
+        const unticked = effectFacts(facts({ ancestorHidden: 'Busted_00' }));
+
+        assert.deepEqual(resolveRow(unticked),
+            { visible: false, because: 'ancestor:Busted_00', authored: true });
+    });
+
+    /** Everything below the ancestor links is the effect's own business and is left alone. */
+    it('keeps its own clip, level and rule answers', () => {
+        assert.equal(resolveRow(effectFacts(facts({ animated: false }))).visible, false);
+        assert.equal(resolveRow(effectFacts(facts({ gated: true }))).visible, false);
+        assert.equal(resolveRow(effectFacts(facts({ inFile: false }))).visible, false);
+    });
+});
+
+describe('damageMeshFacts, a damage decal answers to the damage rule', () => {
+    /**
+     * Told by the user 2026-08-26, and the shipped art agrees: a mesh the XML names as a
+     * hardpoint's `Damage_Decal` is off while the mount is whole and on once it is destroyed. The
+     * FILE cannot be what says so - measured over the material extras, **0 of 8** `_Blast` meshes
+     * on the Star Destroyer and **0 of 26** on the Executor are marked hidden, so every scorch mark
+     * says "draw me" and an undamaged hull would wear all of them.
+     *
+     * So the rule is the bottom of the chain here, exactly as `gateVisible` is for a particle
+     * proxy. `Damage_Particles` and `Engine_Particles` are the same question and already take this
+     * route - the second one inverted, on while the hardpoint lives.
+     */
+    it('is drawn when the damage state calls for it, whatever the file says', () => {
+        assert.deepEqual(resolveRow(damageMeshFacts(facts({ inFile: false }), true)),
+            { visible: true, because: 'file', authored: true });
+    });
+
+    it('is not drawn while the mount is whole, whatever the file says', () => {
+        assert.deepEqual(resolveRow(damageMeshFacts(facts({ inFile: true }), false)),
+            { visible: false, because: 'file', authored: false });
+    });
+
+    /**
+     * The LEVEL gate is left alone. A decal tagged for another ALT or LOD is not part of this
+     * configuration at all, which is a different statement from "this mount is undamaged" - and
+     * folding the damage rule into `gated`, as this used to, made the tooltip blame the level for a
+     * damage decision.
+     */
+    it('still loses to a level that gates it off', () => {
+        assert.deepEqual(resolveRow(damageMeshFacts(facts({ gated: true }), true)),
+            { visible: false, because: 'level', authored: false });
+    });
+
+    /** And the clip still beats it, like every other row: a playing clip is the model as authored. */
+    it('still loses to a playing clip', () => {
+        assert.equal(
+            resolveRow(damageMeshFacts(facts({ animated: false }), true)).visible, false);
     });
 });

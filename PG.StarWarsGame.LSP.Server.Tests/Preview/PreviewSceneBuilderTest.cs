@@ -19,6 +19,68 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </remarks>
 public sealed class PreviewSceneBuilderTest
 {
+    [Fact]
+    public void BuildForObject_CarriesTheSubjectsAffiliation()
+    {
+        // Which faction's fallback colour applies when no team tint does. 772 shipped objects
+        // declare one; nothing read it.
+        var index = Index([Sym("Xwing", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Xwing",
+            Tag("Space_Model_Name", "hull.alo"), Tag("Affiliation", "Rebel"));
+
+        Assert.Equal("Rebel", Builder(index, tags, "hull.alo").BuildForObject("Xwing").Affiliation);
+    }
+
+    [Fact]
+    public void BuildForObject_TakesTheFirstOfSeveralAffiliations()
+    {
+        // 29 of the 775 name more than one - `Neutral, Rebel, Empire` on the capturable structures.
+        // The first is the primary; a unit cannot wear two fallback colours at once.
+        var index = Index([Sym("Pad", "GroundStructure")]);
+        var tags = new FakeVariantTagSource().With("Pad",
+            Tag("Space_Model_Name", "hull.alo"), Tag("Affiliation", " Neutral, Rebel, Empire "));
+
+        Assert.Equal("Neutral", Builder(index, tags, "hull.alo").BuildForObject("Pad").Affiliation);
+    }
+
+    [Fact]
+    public void BuildForObject_LeavesTheAffiliationNullWhenTheObjectDeclaresNone()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").Affiliation);
+    }
+
+    [Fact]
+    public void BuildForObject_CarriesTheSubjectsOwnNoColorizationColour()
+    {
+        // The colour a unit wears when NO faction colour applies - which the user's word is the
+        // usual case, since faction colour is a skirmish thing. 25 shipped objects declare one and
+        // it is object-specific: a TIE is 75,75,75 whoever owns it, an indigenous Bantha is
+        // 128,101,79, and ten of the 25 write pure white, which is the identity for the
+        // `Colorization` multiply - "leave my texture alone".
+        var index = Index([Sym("TIE_Fighter", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("TIE_Fighter",
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("No_Colorization_Color", "75, 75, 75, 255"));
+
+        var scene = Builder(index, tags, "hull.alo").BuildForObject("TIE_Fighter");
+
+        Assert.Equal(new PreviewRgba(75, 75, 75, 255), scene.NoColorizationColor);
+    }
+
+    [Fact]
+    public void BuildForObject_LeavesTheNoColorizationColourNullWhenTheObjectDeclaresNone()
+    {
+        // Absent is NOT white: the client falls back on its own, and inventing a colour here would
+        // stop it telling "declared untinted" from "said nothing".
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").NoColorizationColor);
+    }
+
     private static GameSymbol Sym(string id, string typeName, string? variantBaseId = null)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
@@ -206,12 +268,11 @@ public sealed class PreviewSceneBuilderTest
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Gun"))
             .With("HP_Gun", Tag("Fire_Bone_A", "FP_00"));
 
-        var fire = Builder(index, tags, "hull.alo").BuildForObject("Ship").Hardpoints[0].Fire;
+        var weapon = Assert.Single(Builder(index, tags, "hull.alo").BuildForObject("Ship").Weapons);
 
-        Assert.NotNull(fire);
-        Assert.Equal(["FP_00"], fire.Bones);
-        Assert.Null(fire.ConeWidthDegrees);
-        Assert.Null(fire.Range);
+        Assert.Equal(["FP_00"], weapon.FireBones);
+        Assert.Null(weapon.ConeWidthDegrees);
+        Assert.Null(weapon.Range);
     }
 
     // ── particle systems ──────────────────────────────────────────────────────
@@ -371,7 +432,7 @@ public sealed class PreviewSceneBuilderTest
             .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_Hull"))
             .With("HP_Hull", Tag("Attachment_Bone", "HP_00"));
 
-        Assert.Null(Builder(index, tags, "hull.alo").BuildForObject("Ship").Hardpoints[0].Fire);
+        Assert.Empty(Builder(index, tags, "hull.alo").BuildForObject("Ship").Weapons);
     }
 
     [Fact]
@@ -551,69 +612,5 @@ public sealed class PreviewSceneBuilderTest
         Assert.Equal(PreviewPartOrigin.Hull, part.Origin);
         Assert.True(part.Resolved);
         Assert.Empty(scene.Problems);
-    }
-
-    /// <summary>Resolves only the asset names it was handed, from the model directory.</summary>
-    private sealed class FakeAssets(params string[] resolvable) : IGameAssetResolver
-    {
-        private readonly HashSet<string> _resolvable =
-            new(resolvable.Select(r => "Data/Art/Models/" + r), StringComparer.OrdinalIgnoreCase);
-
-        private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>
-        ///     Gives one asset a real root chunk, so classification has something to read.
-        /// </summary>
-        public FakeAssets WithRootChunk(string name, uint chunkType)
-        {
-            _content["Data/Art/Models/" + name] = BitConverter.GetBytes(chunkType);
-            return this;
-        }
-
-        public GameAssetTiers Tiers => new(1, false, false, 0);
-
-        public GameAssetLocation? Locate(string gameRelativePath)
-        {
-            return _resolvable.Contains(gameRelativePath)
-                ? new GameAssetLocation(gameRelativePath, gameRelativePath, GameAssetTier.Workspace)
-                : null;
-        }
-
-        public byte[]? Read(string gameRelativePath)
-        {
-            if (Locate(gameRelativePath) is null)
-                return null;
-
-            return _content.GetValueOrDefault(gameRelativePath, EmptyModel);
-        }
-
-        /// <summary>
-        ///     The smallest thing <see cref="AloModelReader" /> accepts: a skeleton declaring no bones.
-        /// </summary>
-        /// <remarks>
-        ///     Every test that makes an asset resolvable means "a normal model is here", and the builder
-        ///     both classifies by root chunk and parses for proxies. A four-byte stub passed the first
-        ///     and failed the second, which showed up as a spurious warning in an unrelated test.
-        /// </remarks>
-        private static byte[] EmptyModel
-        {
-            get
-            {
-                // Bone count: a fixed 128-byte record whose first uint32 is the count.
-                var boneCount = new byte[8 + BoneCountChunkSize];
-                BitConverter.GetBytes(0x201u).CopyTo(boneCount, 0);
-                BitConverter.GetBytes((uint)BoneCountChunkSize).CopyTo(boneCount, 4);
-
-                var skeleton = new byte[8 + boneCount.Length];
-                BitConverter.GetBytes(0x200u).CopyTo(skeleton, 0);
-                // High bit marks a container.
-                BitConverter.GetBytes((uint)boneCount.Length | 0x80000000u).CopyTo(skeleton, 4);
-                boneCount.CopyTo(skeleton, 8);
-
-                return skeleton;
-            }
-        }
-
-        private const int BoneCountChunkSize = 128;
     }
 }

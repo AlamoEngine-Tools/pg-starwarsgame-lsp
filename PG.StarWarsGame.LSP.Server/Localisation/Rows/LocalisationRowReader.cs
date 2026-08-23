@@ -167,8 +167,9 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
             .Elements(ns + "Translation")
             .Select(e => e.Attribute("Language")?.Value)
             .Where(l => !string.IsNullOrEmpty(l))
+            .Select(l => l!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList()!;
+            .ToList();
 
         var rows = new List<LocRowDto>();
         foreach (var element in elements)

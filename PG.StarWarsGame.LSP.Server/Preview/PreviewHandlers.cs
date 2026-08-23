@@ -1,11 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Assets;
 
@@ -33,11 +36,12 @@ public sealed class GetPreviewSceneHandler(
                 assets.Tiers)));
 
         if (!string.IsNullOrWhiteSpace(request.ObjectId))
-            return Task.FromResult(new GetPreviewSceneResult(builder.BuildForObject(request.ObjectId)));
+            return Task.FromResult(new GetPreviewSceneResult(
+                WithReticleIcons(builder.BuildForObject(request.ObjectId))));
 
         if (!string.IsNullOrWhiteSpace(request.AnimationReference))
-            return Task.FromResult(new GetPreviewSceneResult(
-                builder.BuildForAnimation(request.AnimationReference)));
+            return Task.FromResult(
+                new GetPreviewSceneResult(builder.BuildForAnimation(request.AnimationReference)));
 
         if (!string.IsNullOrWhiteSpace(request.ModelReference))
             return Task.FromResult(new GetPreviewSceneResult(
@@ -45,6 +49,33 @@ public sealed class GetPreviewSceneHandler(
 
         return Task.FromResult(new GetPreviewSceneResult(PreviewScene.NotFound(
             string.Empty, "No object, model or animation was named.", assets.Tiers)));
+    }
+
+    /// <summary>
+    ///     Decodes the reticle art the scene names, as <c>data:image/png;base64,...</c> URIs.
+    /// </summary>
+    /// <remarks>
+    ///     Done here rather than in the builder so the builder stays free of the asset resolver's
+    ///     tier chain. Only the icons the subject's own hardpoint types name are resolved - five
+    ///     families at most in the base game, not all fifteen files. A scene reads perfectly well
+    ///     without reticles, so a name that resolves nowhere leaves the map in place with no image
+    ///     rather than raising a problem.
+    /// </remarks>
+    private PreviewScene WithReticleIcons(PreviewScene scene)
+    {
+        if (scene.Reticles is not { } reticles || reticles.ByType.Count == 0)
+            return scene;
+
+        var names = reticles.ByType.Values
+            .SelectMany(states => new[]
+            {
+                states.Enemy, states.EnemyTracked, states.Friendly, states.FriendlyTracked,
+                states.FriendlyRepairing, states.FriendlyDisabled, states.FriendlyDisabledTracked
+            })
+            .Where(name => !string.IsNullOrEmpty(name))
+            .Select(name => name!);
+
+        return scene with { Reticles = reticles with { Icons = PreviewReticleIcons.Resolve(assets, names) } };
     }
 }
 
@@ -319,20 +350,44 @@ public sealed class GetShaderSourceHandler(
     }
 }
 
+/// <summary>
+///     One particle system's geometry, by asset name or by the name of the object that owns it.
+/// </summary>
+/// <remarks>
+///     Both shapes arrive, and only one of them used to work. A model's particle PROXY names the
+///     asset - <c>pe_stardestroyerengines</c> - and that is most of the traffic. But
+///     <c>Death_Explosions</c> and <c>Debris_Attached_Particle</c> name a <c>&lt;Particle&gt;</c>
+///     GAME OBJECT, which then names the asset in its own <c>Space_Model_Name</c>. Reading those as
+///     file names asked for <c>Large_Explosion_Space_Empire.alo</c>, which exists nowhere, so no
+///     death explosion has ever played - on a hardpoint or on the wreckage it sheds.
+/// </remarks>
 public sealed class GetParticleSystemHandler(
     IGameAssetResolver assets,
-    ILspConfigurationProvider config)
+    ILspConfigurationProvider config,
+    IGameIndexService indexService,
+    ISchemaProvider schema,
+    IVariantTagSource tagSource)
     : IJsonRpcRequestHandler<GetParticleSystemParams, GetParticleSystemResult>
 {
     public Task<GetParticleSystemResult> Handle(
         GetParticleSystemParams request, CancellationToken cancellationToken)
     {
         if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetParticleSystemResult(null, "The model preview is turned off."));
+            return Task.FromResult(
+                new GetParticleSystemResult(null, Error: "The model preview is turned off."));
 
-        var name = PreviewModelReference.Normalise(request.Name);
+        // Resolved ONCE: the object carries both the asset name and the render scale, and looking it
+        // up twice would resolve the whole variant chain twice for one request.
+        var owner = ObjectBehind(request.Name);
+        var name = PreviewModelReference.Normalise(
+            (owner is null ? null : Tag(owner, "Space_Model_Name") ?? Tag(owner, "Land_Model_Name"))
+            ?? request.Name);
+
         if (string.IsNullOrEmpty(name))
-            return Task.FromResult(new GetParticleSystemResult(null, "No particle system was named."));
+            return Task.FromResult(
+                new GetParticleSystemResult(null, Error: "No particle system was named."));
+
+        var scale = ScaleFactorOf(owner);
 
         // A proxy names the system without an extension; particle systems are .alo like models.
         if (!Path.HasExtension(name))
@@ -340,18 +395,65 @@ public sealed class GetParticleSystemHandler(
 
         var bytes = assets.Read(PreviewModelReference.ModelPath(name));
         if (bytes is null)
-            return Task.FromResult(new GetParticleSystemResult(null,
+            return Task.FromResult(new GetParticleSystemResult(null, scale,
                 $"Particle system '{name}' was not found. {assets.Tiers.Explain()}"));
 
         try
         {
-            return Task.FromResult(new GetParticleSystemResult(AloParticleReader.Read(bytes)));
+            return Task.FromResult(
+                new GetParticleSystemResult(AloParticleReader.Read(bytes), scale));
         }
         catch (AloFormatException e)
         {
-            return Task.FromResult(new GetParticleSystemResult(null,
+            return Task.FromResult(new GetParticleSystemResult(null, scale,
                 $"'{name}' could not be read: {e.Message}"));
         }
+    }
+
+    /// <summary>
+    ///     The game object a name stands for, or null when the name is not one.
+    /// </summary>
+    /// <remarks>
+    ///     An unknown name resolves to nothing and is left exactly as it came in - a bare asset name
+    ///     is the other legitimate caller, and must cost nothing. The caller reads the model as
+    ///     space first and land as the fallback: a particle is not theatre-specific, and a dozen of
+    ///     foc's particle objects declare only the land model.
+    /// </remarks>
+    private EffectiveObject? ObjectBehind(string? objectId)
+    {
+        if (string.IsNullOrWhiteSpace(objectId) || Path.HasExtension(objectId.Trim()))
+            return null;
+
+        return new EffectiveObjectResolver(indexService.Current, schema, tagSource)
+            .Resolve(objectId.Trim());
+    }
+
+    /// <summary>
+    ///     The object's uniform render scale, defaulting to 1.
+    /// </summary>
+    /// <remarks>
+    ///     Guarded exactly as the reference guards it (<c>GameObjectCatalog.cpp</c>): anything
+    ///     non-finite or non-positive falls back to 1, because a zero or negative scale collapses
+    ///     the object rather than sizing it. The variant chain is already walked by the resolver.
+    /// </remarks>
+    private static float ScaleFactorOf(EffectiveObject? effective)
+    {
+        if (effective is null || Tag(effective, "Scale_Factor") is not { } raw)
+            return 1f;
+
+        return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
+            && float.IsFinite(value) && value > 0f
+                ? value
+                : 1f;
+    }
+
+    private static string? Tag(EffectiveObject effective, string tagName)
+    {
+        var value = effective.Tags
+            .FirstOrDefault(t => string.Equals(t.TagName, tagName, StringComparison.OrdinalIgnoreCase))
+            ?.Value.Trim();
+
+        return string.IsNullOrEmpty(value) ? null : value;
     }
 }
 

@@ -68,7 +68,7 @@ public sealed class SchemaBootstrapper : ISchemaBootstrapper
 
         ISchemaProvider realProvider;
         if (isLocal)
-            realProvider = new LocalFileSchemaProvider(src.LocalPath, _fileSystem, _localLogger);
+            realProvider = new LocalFileSchemaProvider(src.LocalPath!, _fileSystem, _localLogger);
         else
             realProvider = new HttpSchemaProvider(
                 _httpClientFactory.CreateClient(nameof(HttpSchemaProvider)), src.Url, _cache, _httpLogger);

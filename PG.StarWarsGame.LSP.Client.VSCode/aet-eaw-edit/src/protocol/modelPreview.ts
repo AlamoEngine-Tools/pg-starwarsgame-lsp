@@ -69,17 +69,327 @@ export interface PreviewPart {
     resolved: boolean;
 }
 
+/** Where a weapon is declared. Mirrors the C# `PreviewWeaponSource`. */
+export const PREVIEW_WEAPON_SOURCE = {
+    hardpoint: 'Hardpoint',
+    unit: 'Unit',
+} as const;
+
+/** How the engine picks which fire point a shot leaves from. Mirrors `PreviewFirePointMode`. */
+export const PREVIEW_FIRE_POINT_MODE = {
+    /** Each bone in turn, one per volley. What every shipped mount does. */
+    cycleBones: 'CycleBones',
+    /** Any random point along the line between the fire bones. */
+    randomAlongLine: 'RandomAlongLine',
+} as const;
+
 /**
- * A hardpoint's firing arc.
+ * One weapon bank: everything needed to draw its arc and describe its cadence.
  *
- * Every measurement is nullable and absent means *not declared* - which is NOT the same as zero. A
- * capital ship's arcs reach 2000 units, so the client draws these on demand rather than by default.
+ * One list for both cases, because the arc used to live on the hardpoint and a fighter - whose
+ * armament sits on the unit itself - could therefore never have one.
+ *
+ * Every measurement is nullable and absent means *not declared*, which is NOT the same as zero. A
+ * capital ship's arcs reach 2000 units, so these are drawn on demand rather than by default.
+ *
+ * NOTE: a fire bone aims along its local **X**, not the Y that reads as forward. Taking Y puts a
+ * Star Destroyer's port guns astern and its starboard guns forward - mirrored hulls make that
+ * mistake look right on one side. Go through the shared aim helper, never the raw bone matrix.
  */
-export interface PreviewFireArc {
-    bones: string[];
+export interface PreviewWeapon {
+    /** `hardpoint:<id>`, or `bank:A` for a unit weapon. */
+    id: string;
+    /** See {@link PREVIEW_WEAPON_SOURCE}. */
+    source: string;
+    /** Set only when `source` is Hardpoint. */
+    hardpointId?: string | null;
+    label: string;
+    fireBones: string[];
+    /** See {@link PREVIEW_FIRE_POINT_MODE}. */
+    firePointMode: string;
+    /** Forces the shot straight down the bone rather than anywhere in the cone. */
+    firesForward: boolean;
+    projectileType?: string | null;
+    damage?: number | null;
+    damageType?: string | null;
+    range?: number | null;
+    minRange?: number | null;
     coneWidthDegrees?: number | null;
     coneHeightDegrees?: number | null;
-    range?: number | null;
+    /**
+     * How far a shot may stray from the aim point, per TARGET CATEGORY. Empty when none is declared.
+     *
+     * `<Fire_Inaccuracy_Distance> Fighter, 30.0 </...>` is a REPEATED, per-category row and every one
+     * of the 1017 in the shipped tree carries exactly those two fields. It was a single `number`
+     * here and read as one on the server, which cannot parse `Fighter, 30.0` - so it had never once
+     * arrived non-null.
+     */
+    inaccuracy: PreviewInaccuracy[];
+    pulseCount?: number | null;
+    pulseDelaySeconds?: number | null;
+    rechargeSeconds?: number | null;
+    /** The `Fire_When_*` gates that are set; a mount cannot fire in a state absent from this. */
+    fireModes: string[];
+    turret?: PreviewTurret | null;
+    fireSfxEvent?: string | null;
+}
+
+/** How the engine puts a projectile on screen. Mirrors `PreviewProjectileRender`. */
+export const PREVIEW_PROJECTILE_RENDER = {
+    /** Drawn from its `.alo`. */
+    model: 'Model',
+    /**
+     * Drawn by the engine as a textured quad.
+     *
+     * NOT exclusive with naming a model - 40 of foc's 63 custom-rendered projectiles carry one
+     * anyway - so the flag decides how it draws and `modelFile` travels regardless.
+     */
+    customQuad: 'CustomQuad',
+} as const;
+
+/**
+ * One projectile a weapon on this subject fires.
+ *
+ * Resolved through `Variant_Of_Existing_Type`, which matters here more than almost anywhere else: a
+ * bolt typically declares only its model, colour and damage, while speed, reach and every damage
+ * switch come from the generic template it varies.
+ *
+ * The three `does*Damage` switches decide what a hit touches. One that does only hitpoint damage
+ * BYPASSES the shield rather than being stopped by it.
+ */
+export interface PreviewProjectile {
+    id: string;
+    /** See {@link PREVIEW_PROJECTILE_RENDER}. */
+    render: string;
+    modelFile?: string | null;
+    width?: number | null;
+    length?: number | null;
+    /** `n,m` into the bolt atlas. */
+    textureSlot?: string | null;
+    laserColor?: string | null;
+    speed?: number | null;
+    maxFlightDistance?: number | null;
+    /** 0 for a straight bolt; above 0 it tracks. */
+    maxRateOfTurn?: number | null;
+    damage?: number | null;
+    damageType?: string | null;
+    category?: string | null;
+    doesShieldDamage: boolean;
+    doesEnergyDamage: boolean;
+    doesHitpointDamage: boolean;
+    blastAreaDamage?: number | null;
+    blastAreaRange?: number | null;
+    /** How many objects one blast may damage. Declared twice in the whole of foc. */
+    blastAreaMaxVictims?: number | null;
+    /**
+     * Whether blast damage falls off with distance instead of being flat inside the range.
+     *
+     * Ten projectiles in foc set it, always with `blastAreaDropoffTiers` of 3, 4 or 5. The other 53
+     * with a blast area apply their full damage anywhere inside the radius.
+     */
+    blastAreaDropoff: boolean;
+    /** How many concentric bands the falloff is quantised into. */
+    blastAreaDropoffTiers?: number | null;
+    detonationParticles?: string | null;
+    shieldAbsorbParticles?: string | null;
+    detonateSfxEvent?: string | null;
+}
+
+/**
+ * The icons one hardpoint type shows in each of its targeting states.
+ *
+ * Seven states, though on every shipped type the disabled pair reuses the plain and tracked art, so
+ * a family resolves to three files rather than seven. A mod may give them separate art.
+ */
+export interface PreviewReticleStates {
+    enemy?: string | null;
+    enemyTracked?: string | null;
+    friendly?: string | null;
+    friendlyTracked?: string | null;
+    friendlyRepairing?: string | null;
+    friendlyDisabled?: string | null;
+    friendlyDisabledTracked?: string | null;
+}
+
+/**
+ * What the game draws over a targetable hardpoint.
+ *
+ * Two levels on purpose: `byType` names an ICON per state, and `icons` maps those names to data
+ * URIs. Thirteen hardpoint types share five artwork families in the base game, so inlining the PNG
+ * per type would send the same image up to four times.
+ *
+ * `screenSize` is `0.03` in both shipped trees. What it is a fraction OF is not settled - screen
+ * height is the obvious reading.
+ */
+export interface PreviewReticles {
+    byType: Record<string, PreviewReticleStates>;
+    /** Icon name to `data:image/png;base64,...`. Empty when no icon catalog was available. */
+    icons: Record<string, string>;
+    enemyScreenSize?: number | null;
+    friendlyScreenSize?: number | null;
+}
+
+/**
+ * What this subject leaves behind when it dies, and what killed it decides which one.
+ *
+ * `<Death_Clone> Damage_Type, Object_Id </...>` - 345 rows in foc, 134 in eaw. The damage type is
+ * what ties this to the attacker panel: the weapon you build decides which clone the target leaves.
+ *
+ * `playsIdle` is `Should_Death_Clone_Play_Idle`, a Boolean on the OBJECT rather than a field on the
+ * row, so it reads the same on every clone. 28 shipped uses, all true - and worth knowing that it
+ * asks for an idle the clone models do not appear to carry: of eaw's 44 clone objects with a model,
+ * 42 ship only a `_die` clip and none ships an idle.
+ */
+export interface PreviewDeathClone {
+    /** The damage type that produces this clone, or absent when the row named none. */
+    damageType?: string | null;
+    objectId: string;
+    /** The clone's own tactical model, or absent when the clone is not defined. */
+    modelFile?: string | null;
+    playsIdle: boolean;
+    /**
+     * The clips of the CLONE'S OWN model, by file name.
+     *
+     * Its own, because the scene's list describes the SUBJECT. That a clone ever played at all was
+     * an accident of naming - a clone's model is conventionally the hull's name plus a suffix, so
+     * its `_die_00.ala` matched the hull's stem and rode along in the hull's list. A clone named
+     * anything else got no clip whatsoever.
+     */
+    animations: string[];
+    /**
+     * The proxies the clone's own model carries - the explosions, the fire smoke and the debris
+     * trails that ARE the death. Never reached the client before at all.
+     *
+     * Their `partId` names the CLONE OBJECT, not a part in the scene: the server cannot know what
+     * the client will call the instance it loads, so this is a descriptor of a MODEL and the client
+     * rewrites the ids when it puts one in the scene.
+     */
+    particles: PreviewParticle[];
+}
+
+/**
+ * One stat an ability multiplies while it is active.
+ *
+ * `<Mod_Multiplier> SPEED_MULTIPLIER, 0.8f </...>` - 316 uses over 9 kinds in foc. This is the whole
+ * of what a stat-only ability does: DEFEND declares no proxy, no bone, no particle and no clip.
+ */
+export interface PreviewAbilityModifier {
+    stat: string;
+    factor: number;
+}
+
+/**
+ * One ability the subject declares, and what it drives on the model.
+ *
+ * 68 ability types exist over the two trees and MOST DRIVE NOTHING visible - SPREAD_OUT and HUNT
+ * are orders, not effects - so an ability with no bone, no particle and no clip is the common case
+ * and is reported plainly rather than hidden.
+ *
+ * `proxyNames` are the particle proxies bound to this ability by their name PREFIX (`PPTW_`,
+ * `PTE_`, `PRS_`, `PAS_`, `PEM_`, `PGW_`). The prefix is a hint, not a rule: a proxy is bound only
+ * when the object also declares the type it names, and the rest are reported as unbound effects at
+ * `info` - normal authoring, not a problem.
+ */
+export interface PreviewAbility {
+    type: string;
+    guiName?: string | null;
+    ownerAttachmentBone?: string | null;
+    particleEffect?: string | null;
+    rechargeSeconds?: number | null;
+    expirationSeconds?: number | null;
+    proxyNames: string[];
+    /** The clip this plays on activation, when the model ships one. Both sides are optional. */
+    deployClip?: string | null;
+    undeployClip?: string | null;
+    /** The stats it multiplies while active. For many abilities this is all they do. */
+    modifiers: PreviewAbilityModifier[];
+}
+
+/**
+ * What a hit on the previewed subject has to get through.
+ *
+ * The subject on stage is the TARGET. The attacker is a weapon the reader builds in the panel, so
+ * everything defensive travels with the scene and everything offensive is theirs to type.
+ *
+ * The armor axis of `Damage_To_Armor_Mod` is fixed by the target - one `Armor_Type` and one
+ * `Shield_Armor_Type` - so only those two columns are sent rather than all 2426 rows. The damage
+ * axis is not, because the reader picks it, which is why `damageTypes` carries the whole list.
+ *
+ * A damage type ABSENT from either factor map is **1.0**, not zero. The shipped table names barely
+ * half of its 4293 possible pairs.
+ */
+export interface PreviewTargetDefence {
+    /**
+     * Whether any behaviour list names `SHIELDED`. Without it the shield is not in play at all,
+     * whatever `shieldPoints` says.
+     */
+    isShielded: boolean;
+    armorType?: string | null;
+    shieldArmorType?: string | null;
+    shieldPoints?: number | null;
+    tacticalHealth?: number | null;
+    energyCapacity?: number | null;
+    /**
+     * The summed `Health` of every destructible hardpoint, or absent where there are none.
+     *
+     * A unit with hardpoints cannot be targeted itself and dies when its last mount does, so this
+     * is the pool that actually drains. Sent alongside `tacticalHealth` rather than replacing it -
+     * the two disagree in the shipped data (2000 against 4075 on the Star Destroyer) and nobody
+     * knows how the engine reconciles them.
+     */
+    hardpointHealthTotal?: number | null;
+    /** Damage type to factor, against the target's `Armor_Type`. Absent means 1.0. */
+    hullFactors: Record<string, number>;
+    /** Damage type to factor, against the target's `Shield_Armor_Type`. Absent means 1.0. */
+    shieldFactors: Record<string, number>;
+    /** Every damage type the tree declares - 81 in foc - for the attacker panel's picker. */
+    damageTypes: string[];
+}
+
+/** Three floats as the XML writes them, for a direction or an axis of spin. */
+export interface PreviewVector3 {
+    x: number;
+    y: number;
+    z: number;
+}
+
+/**
+ * The wreckage a hardpoint sheds when it is destroyed.
+ *
+ * A `Death_Breakoff_Prop` names a `SpaceProp` with its own model and a DEBRIS behaviour, so a
+ * destroyed mount tumbles away burning rather than simply vanishing. Listed once per distinct prop:
+ * mirrored mounts share one, and a copy each would instantiate the same wreck twice.
+ */
+export interface PreviewBreakoffProp {
+    id: string;
+    modelRef?: string | null;
+    /** False when the prop is named but not defined - worth surfacing, so it is still listed. */
+    resolved: boolean;
+    movementVector?: PreviewVector3 | null;
+    facingRotateVector?: PreviewVector3 | null;
+    minLifetimeSeconds?: number | null;
+    maxLifetimeSeconds?: number | null;
+    attachedParticle?: string | null;
+    deathExplosions?: string | null;
+    removeUponDeath: boolean;
+    /** The clips of the PROP'S OWN model. See {@link PreviewDeathClone.animations}. */
+    animations: string[];
+    /**
+     * The proxies the prop's own model carries - a burning piece of debris trails its own fire, and
+     * `attachedParticle` is a second, separate effect the XML names.
+     * See {@link PreviewDeathClone.particles} for how to read their `partId`.
+     */
+    particles: PreviewParticle[];
+}
+
+/** How far a shot at one target category may stray from the aim point. */
+export interface PreviewInaccuracy {
+    /**
+     * The engine's own target bucket - Fighter, Bomber, Transport, Corvette, Frigate, Capital and
+     * Super on the space side; Infantry, Vehicle and Structure on the land side.
+     */
+    category: string;
+    distance: number;
 }
 
 /** A turret hardpoint's rest pose and how far it may swing. Absent when it is not a turret. */
@@ -106,6 +416,8 @@ export interface PreviewHardpoint {
     type?: string | null;
     attachBone?: string | null;
     isDestroyable: boolean;
+    /** Whether the game lets a player target this mount. Decides whether a reticle is drawn. */
+    isTargetable: boolean;
     health?: number | null;
     damageParticlesBone?: string | null;
     damageDecalBone?: string | null;
@@ -116,15 +428,16 @@ export interface PreviewHardpoint {
     engineDeathHidesEngineParticles: boolean;
     tooltipText?: string | null;
     turret?: PreviewTurret | null;
-    fire?: PreviewFireArc | null;
 }
 
 /**
  * A faction's colours.
  *
- * `color` is the team tint, applied to the `Colorization` shader parameter and `FC_`-prefixed
- * meshes. `noColorizationColor` is a different mechanism - it blends into white pixels of the hull
- * texture's alpha channel - which is why both travel.
+ * `color` is the team tint - a SKIRMISH thing, and the one fed to the `Colorization` shader
+ * parameter when a faction colour applies. `noColorizationColor` is the faction's fallback for when
+ * none does, the same value in the same parameter rather than a second mechanism: the effects
+ * declare exactly one colourisation uniform. An OBJECT may override it with its own - see
+ * {@link PreviewScene.noColorizationColor}, which is what the preview reads.
  */
 export interface PreviewFaction {
     name: string;
@@ -223,6 +536,57 @@ export interface PreviewScene {
     subject: string;
     parts: PreviewPart[];
     hardpoints: PreviewHardpoint[];
+    /**
+     * Every weapon on the subject, wherever it is declared - a mount or the unit itself.
+     *
+     * Never absent, may be empty: roughly half the hardpoints in the shipped trees are shield
+     * generators, docking bays and the like, which carry no armament at all.
+     */
+    weapons: PreviewWeapon[];
+    /** The wreckage the subject's hardpoints shed, one entry per distinct prop. */
+    breakoffProps: PreviewBreakoffProp[];
+    /** Targeting reticles for the hardpoint types this subject mounts. Absent for a bare model. */
+    reticles?: PreviewReticles | null;
+    /** The projectiles this subject's weapons name. Never absent, may be empty. */
+    projectiles: PreviewProjectile[];
+    /** What a hit on this subject has to get through. Absent for a bare model. */
+    defence?: PreviewTargetDefence | null;
+    /** The abilities this subject declares, in document order. Never absent, may be empty. */
+    abilities: PreviewAbility[];
+    /** What this subject leaves behind when it dies. Never absent, may be empty. */
+    deathClones: PreviewDeathClone[];
+    /**
+     * The explosion the SUBJECT sets off when it dies - its own `Death_Explosions`.
+     *
+     * Not a hardpoint's and not a breakoff prop's; both of those travel on their own records. This
+     * one goes off where the ship was.
+     */
+    deathExplosions?: string | null;
+    /**
+     * Every projectile the tree defines, by name.
+     *
+     * The attacker panel picks from ALL of them - you are building a weapon to fire AT the subject,
+     * so its own armament is the wrong list. Names only: 212 in eaw, and resolving each through the
+     * variant chain on every scene open would cost more than the list is worth.
+     */
+    projectileCatalog: string[];
+    /**
+     * The colour the subject wears when NO faction colour applies. Absent when it declares none.
+     *
+     * The usual case rather than the exception: faction colour is a SKIRMISH thing. 25 shipped
+     * objects declare one and it is per-object - a TIE Fighter is `75,75,75` whoever owns it, an
+     * indigenous Bantha is `128,101,79`, and ten write pure white, which is the identity for the
+     * multiply and means "leave my texture alone".
+     */
+    noColorizationColor?: PreviewRgba | null;
+    /**
+     * The faction this subject belongs to, or absent when it names none.
+     *
+     * Whose `noColorizationColor` applies when the subject declares none of its own - which is 748
+     * of the 772 shipped objects that name an affiliation. The FIRST of several: 29 tags name more
+     * than one, and a unit cannot wear two fallback colours.
+     */
+    affiliation?: string | null;
     factions: PreviewFaction[];
     problems: PreviewProblem[];
     /** The cameras the subject's own model declares. Empty for the 87% that carry none. */
@@ -587,6 +951,15 @@ export interface GetParticleSystemParams {
 
 export interface GetParticleSystemResult {
     system?: AlamoParticleContent | null;
+    /**
+     * The owning object's `Scale_Factor`, a uniform render scale. Absent or 1 for a bare asset name.
+     *
+     * `DatabaseMapExport.xml` lists it on the base GameObjectType beside `Mass` and `LOD_Bias`, and
+     * the reference applies it as a uniform scale on the object's world matrix - so it scales where
+     * a particle spawns as well as how big it draws. Six shipped particle objects declare one: 20.0
+     * on the four hero powerup effects, 2.0 on the two bombing-run explosions.
+     */
+    scaleFactor?: number | null;
     error?: string | null;
 }
 

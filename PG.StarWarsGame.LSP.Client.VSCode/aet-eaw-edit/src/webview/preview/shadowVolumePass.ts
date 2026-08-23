@@ -369,6 +369,37 @@ export class ShadowVolumePass {
         this.refreshDrawn();
     }
 
+    /**
+     * Gives up one authored volume, for geometry leaving a scene that is still standing.
+     *
+     * Not {@link clear}: a piece of wreckage reaching the end of its lifetime and a death clone
+     * removed by a repair both take their geometry with them while the hull beside them keeps its
+     * shadow. Holding the source afterwards would keep the whole disposed subtree alive through
+     * `bySource`, and the counting meshes would go on being drawn against buffers that have been
+     * freed.
+     */
+    remove(source: THREE.Mesh): void {
+        const meshes = this.bySource.get(source);
+
+        if (meshes === undefined) {
+            return;
+        }
+
+        for (const mesh of meshes) {
+            mesh.removeFromParent();
+        }
+
+        this.drawn.length = 0;
+        this.bySource.delete(source);
+        this.uncounted.delete(source);
+
+        for (const siblings of this.bySource.values()) {
+            this.drawn.push(...siblings);
+        }
+
+        this.refreshDrawn();
+    }
+
     /** `visible` is the product of the two gates, and only this writes it. */
     private refreshDrawn(): void {
         for (const [source, meshes] of this.bySource) {

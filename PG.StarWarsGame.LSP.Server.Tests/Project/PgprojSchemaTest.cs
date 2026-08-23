@@ -147,7 +147,7 @@ public sealed class PgprojSchemaTest
 
     private static string DescribeErrors(string file, EvaluationResults result)
     {
-        var lines = result.Details
+        var lines = (result.Details ?? [])
             .Where(d => d.Errors is { Count: > 0 })
             .SelectMany(d => d.Errors!.Select(e => $"  at {d.InstanceLocation} [{e.Key}]: {e.Value}"));
         return $"'{file}' does not validate against pgproj.schema.json:\n{string.Join("\n", lines)}";

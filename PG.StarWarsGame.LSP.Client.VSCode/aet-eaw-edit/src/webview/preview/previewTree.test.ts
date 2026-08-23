@@ -5,7 +5,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-    buildTree, defaultCollapsed, effectPlacement, filterTree, meshPlacement, selectionAfterClick,
+    boneIndexOfRow, boneRowId, buildTree, defaultCollapsed, effectPlacement, filterTree,
+    meshPlacement, selectionAfterClick,
     toggleTargets, visibleTreeRows,
     withDescendants, type TreeItem, type TreeKind,
 } from './previewTree';
@@ -382,5 +383,22 @@ describe('effectPlacement', () => {
 
     it('never merges into a root', () => {
         assert.deepEqual(effectPlacement(0, roots, named('Root', 'Root')), { childOf: 0 });
+    });
+});
+
+describe('a bone row id', () => {
+    it('round-trips the skeleton index it carries', () => {
+        assert.equal(boneRowId(4), 'bone:4');
+        assert.equal(boneIndexOfRow(boneRowId(4)), 4);
+        assert.equal(boneIndexOfRow(boneRowId(0)), 0);
+    });
+
+    it('is nothing for a row that is not a bone', () => {
+        // A mesh row and a merged proxy row both reach the same click handler. Reading `bone:` off
+        // one of those with a blind slice gave `NaN`, which then selected nothing and lit no label.
+        assert.equal(boneIndexOfRow('mesh:4:1'), null);
+        assert.equal(boneIndexOfRow('bone:'), null);
+        assert.equal(boneIndexOfRow('bone:x'), null);
+        assert.equal(boneIndexOfRow(''), null);
     });
 });

@@ -45,7 +45,7 @@ public sealed class SuppressDiagnosticCodeActionProviderTest
         {
             Range = new LspRange(new Position(line, 4), new Position(line, 13)),
             Message = "asset missing",
-            Code = code is null ? null : code
+            Code = code is null ? (DiagnosticCode?)null : new DiagnosticCode(code)
         };
         return new XmlCodeActionContext(DocumentUri.From(Uri), diagnostic);
     }

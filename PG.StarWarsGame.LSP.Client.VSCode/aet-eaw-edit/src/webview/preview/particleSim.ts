@@ -68,7 +68,15 @@ export interface Particle {
     /** Randomised multiplier applied on top of the scale track. */
     scaleJitter: number;
     /** Fixed at birth, for emitters whose colour varies per particle. */
-    tint: { r: number; g: number; b: number };
+    /**
+     * The per-particle colour ADDITION, fixed at birth. `randomColors`, and it brightens.
+     *
+     * `ColorVarianceModifierPlugin` draws `GetRandom(0, randomColors)` per channel and applies
+     * `saturate(color + addition)` - alpha included, which is what a transparent sprite is read
+     * through. This used to be a multiplier, `1 - random() * randomColors`, which did the opposite
+     * of what the author asked for: a value meant to brighten some particles dimmed all of them.
+     */
+    addition: { r: number; g: number; b: number; a: number };
     /**
      * The normalised direction this particle was born in, within the emitter's own volume.
      *
@@ -381,12 +389,38 @@ export function spawnParticle(
         // Only ever SHRINKS: `GetRandom(1.0f - randomScalePerc, 1.0f)`. A symmetric jitter would
         // let sprites grow past the size the author set.
         scaleJitter: 1 - random() * properties.randomScalePercent,
-        tint: {
-            r: 1 - random() * properties.randomColors.x,
-            g: 1 - random() * properties.randomColors.y,
-            b: 1 - random() * properties.randomColors.z,
-        },
+        addition: colourAddition(properties, random),
     };
+}
+
+/**
+ * The colour a particle is born brighter by.
+ *
+ * `colorAddGrayscale` makes it MONOCHROME - one draw reused on every channel, alpha included:
+ * `addition.g = m_grayscale ? addition.r : GetRandom(m_min.g, m_max.g)`. Without it an emitter
+ * asking for a brightness jitter got a colour jitter instead.
+ */
+function colourAddition(
+    properties: AlamoEmitter['properties'], random: () => number,
+): { r: number; g: number; b: number; a: number } {
+    const max = properties.randomColors;
+    const red = random() * max.x;
+
+    if (properties.colorAddGrayscale) {
+        return { r: red, g: red, b: red, a: red };
+    }
+
+    return {
+        r: red,
+        g: random() * max.y,
+        b: random() * max.z,
+        a: random() * max.w,
+    };
+}
+
+/** Clamped to the unit range, as every one of the engine's colour writes is. */
+function saturate(value: number): number {
+    return Math.min(1, Math.max(0, value));
 }
 
 /**
@@ -543,10 +577,10 @@ export function appearanceOf(particle: Particle, emitter: AlamoEmitter): Particl
     };
 
     return {
-        r: channel('Red', 1) * particle.tint.r,
-        g: channel('Green', 1) * particle.tint.g,
-        b: channel('Blue', 1) * particle.tint.b,
-        a: channel('Alpha', 1),
+        r: saturate(channel('Red', 1) + particle.addition.r),
+        g: saturate(channel('Green', 1) + particle.addition.g),
+        b: saturate(channel('Blue', 1) + particle.addition.b),
+        a: saturate(channel('Alpha', 1) + particle.addition.a),
         // HALF the scale track. Both references agree and neither says so out loud: the editor
         // builds its quad at `baseScale * scaleSample / 2` (`EmitterInstance.cpp:538`), and
         // alo-viewer turns the same track into a size plugin at `value / 2`

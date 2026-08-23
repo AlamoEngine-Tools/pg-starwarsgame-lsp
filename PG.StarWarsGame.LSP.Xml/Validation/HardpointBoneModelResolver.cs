@@ -41,9 +41,22 @@ public sealed class HardpointBoneModelResolver
     // the hull in only a handful. So it resolves against hull UNION Model_To_Attach - valid on either.
     private static readonly string[] HullOrAttachedBoneTags = ["Collision_Mesh"];
 
-    // Only the tactical models are checked. Galactic_Model_Name and the destroyed models are excluded on
-    // purpose: a starbase's low-detail galactic mesh legitimately lacks the HP bones.
-    private static readonly string[] MountingObjectModelTags =
+    /// <summary>
+    ///     The tags that name an object's TACTICAL model.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Galactic_Model_Name</c> and the destroyed models are excluded on purpose: a
+    ///         starbase's low-detail galactic mesh legitimately lacks the HP bones, so checking it
+    ///         would produce phantom problems.
+    ///     </para>
+    ///     <para>
+    ///         Public because "does this object have a model at all" is asked outside this resolver
+    ///         too - the preview-unit code lens gates on it. One owner, so a fourth tag reaches every
+    ///         reader.
+    ///     </para>
+    /// </remarks>
+    public static readonly string[] MountingObjectModelTags =
         ["Space_Model_Name", "Land_Model_Name", "Model_Name"];
 
     private const string ModelToAttachTag = "Model_To_Attach";

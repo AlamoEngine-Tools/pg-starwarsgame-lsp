@@ -5,7 +5,9 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-    collectTextureNames, debugColour, isVisibleAt, numericParams, resolveMaterial, textureParam,
+    collectTextureNames, debugColour, isShieldMesh, isVisibleAt, isVisibleAtLevel, numericParams,
+    resolveMaterial, shieldMeshOffShader,
+    textureParam,
     type MaterialExtras,
     castsShadowMap,
 } from './materials';
@@ -431,5 +433,77 @@ describe('shadow volumes take over from the shadow map', () => {
     it('never casts from an additive or alpha pass', () => {
         // A glow has no silhouette worth casting, and an alpha card would cast its whole quad.
         assert.equal(castsShadowMap({ hasVolumes: false, hidden: false, blend: 'additive' }), false);
+    });
+});
+
+describe('isVisibleAtLevel', () => {
+    it('asks ONLY about the damage and detail level', () => {
+        // `alamoHidden` is a different question - "does the model draw this at all" - and it is
+        // asked separately, by the row chain's `inFile` link. Bundling the two here meant an
+        // ability that talked the model into drawing its shield was still vetoed by the level link
+        // reading the same flag. One flag, two gates, and overriding one did nothing.
+        assert.equal(isVisibleAtLevel({ alamoHidden: true }, 0, 0), true);
+    });
+
+    it('still gates on ALT and LOD', () => {
+        assert.equal(isVisibleAtLevel({ alamoAlt: 1 }, 0, 0), false);
+        assert.equal(isVisibleAtLevel({ alamoAlt: 1 }, 1, 0), true);
+        assert.equal(isVisibleAtLevel({ alamoLod: 2 }, 0, 0), false);
+        assert.equal(isVisibleAtLevel({ alamoLod: 2 }, 0, 2), true);
+    });
+
+    it('is what isVisibleAt asks once the hidden flag has passed', () => {
+        // The two stay in step by construction: isVisibleAt is the hidden check plus this.
+        assert.equal(isVisibleAt({ alamoAlt: 1 }, 1, 0), isVisibleAtLevel({ alamoAlt: 1 }, 1, 0));
+        assert.equal(isVisibleAt({ alamoLod: 3 }, 0, 0), isVisibleAtLevel({ alamoLod: 3 }, 0, 0));
+    });
+});
+
+describe('isShieldMesh', () => {
+    it('takes the mesh the author NAMED shield, whatever shader it is on', () => {
+        // The user's rule: the name decides. Nothing in the data declares which mesh a shield
+        // ability reveals, and the author naming it `shield` is the clearest word there is.
+        assert.equal(isShieldMesh({ alamoMesh: 'shield', alamoShader: 'MeshShield.fx' }), true);
+        assert.equal(isShieldMesh({ alamoMesh: 'Shield_01', alamoShader: 'MeshBumpSpecular.fx' }), true);
+    });
+
+    it('leaves ENGINE GLOW on the same shader alone', () => {
+        // MEASURED on `Rv_moncalcruiser.alo`: three meshes carry MeshShield.fx - `shield`,
+        // `engines_big` and `engines_small`. Deciding on the shader lit the engines whenever DEFEND
+        // was switched on, which is not what the ability does.
+        assert.equal(
+            isShieldMesh({ alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx' }), false);
+        assert.equal(
+            isShieldMesh({ alamoMesh: 'engines_small', alamoShader: 'MeshShield.fx' }), false);
+    });
+
+    it('does not take a mesh that merely CONTAINS the word', () => {
+        // `HP_Shield_Generator` is a hardpoint housing - hull geometry that must not vanish and
+        // reappear with an ability. The name has to START with it.
+        assert.equal(isShieldMesh({ alamoMesh: 'HP_Shield_Generator' }), false);
+        assert.equal(isShieldMesh({ alamoMesh: 'deflector_shield' }), false);
+    });
+
+    it('says no with no name at all', () => {
+        assert.equal(isShieldMesh({}), false);
+    });
+});
+
+describe('shieldMeshOffShader', () => {
+    it('flags a shield mesh that is not on a shield shader', () => {
+        // Not an error - the name decides and the author may mean it - but a bubble drawn with a
+        // hull shader reads as solid geometry rather than a field, which is worth saying once.
+        assert.equal(
+            shieldMeshOffShader({ alamoMesh: 'shield', alamoShader: 'MeshBumpSpecular.fx' }), true);
+    });
+
+    it('says nothing about a shield mesh that IS on one', () => {
+        assert.equal(
+            shieldMeshOffShader({ alamoMesh: 'shield', alamoShader: 'MeshShield.fx' }), false);
+    });
+
+    it('says nothing about a mesh that is not a shield at all', () => {
+        assert.equal(
+            shieldMeshOffShader({ alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx' }), false);
     });
 });

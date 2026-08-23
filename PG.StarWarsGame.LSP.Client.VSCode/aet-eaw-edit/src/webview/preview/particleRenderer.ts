@@ -157,6 +157,11 @@ export function blendingFor(mode: string): ParticleBlend {
                 ...base,
                 alphaGated: true,
                 alphaTest: mode === 'Bump' ? BUMP_ALPHA_REF : 0,
+                // The one blended mode the engine lets write depth - `PrimParticleBumpAlpha.fx`
+                // declares `ZWriteEnable = true` where every other Prim shader turns it off. It
+                // can afford to, because it is alpha TESTED at `AlphaRef = 8`, so the depth it
+                // writes belongs to the solid part of the sprite rather than to its whole quad.
+                depthWrite: mode === 'Bump',
                 blendSrc: THREE.SrcAlphaFactor,
                 blendDst: THREE.OneMinusSrcAlphaFactor,
                 blendSrcAlpha: THREE.OneFactor,
@@ -466,6 +471,8 @@ class EmitterRenderer {
         texture: THREE.Texture | null,
         /** The geometry this emitter is born from, when it emits from a mesh rather than a shape. */
         private readonly emissionMesh: EmissionMesh | null = null,
+        /** The owning object's uniform render scale. See {@link ParticleSystemInstance}. */
+        private readonly scaleFactor = 1,
     ) {
         this.clock = new SpawnClock(emitter);
 
@@ -778,16 +785,20 @@ class EmitterRenderer {
             const particle = this.particles[i];
             const look = appearanceOf(particle, this.emitter);
 
-            this.offsets[i * 3] = particle.position.x;
-            this.offsets[i * 3 + 1] = particle.position.y;
-            this.offsets[i * 3 + 2] = particle.position.z;
+            // The object's uniform scale, applied to the POSITION and the SIZE together, which is
+            // what a scale on the world matrix does. It has to be here rather than on the system's
+            // node because the billboard path adds the half-extent in VIEW space, after the model
+            // matrix - a node scale would move every particle without resizing any of it.
+            this.offsets[i * 3] = particle.position.x * this.scaleFactor;
+            this.offsets[i * 3 + 1] = particle.position.y * this.scaleFactor;
+            this.offsets[i * 3 + 2] = particle.position.z * this.scaleFactor;
 
             this.colors[i * 3] = look.r;
             this.colors[i * 3 + 1] = look.g;
             this.colors[i * 3 + 2] = look.b;
 
             this.alphas[i] = look.a;
-            this.sizes[i] = look.size;
+            this.sizes[i] = look.size * this.scaleFactor;
             this.rotations[i] = look.rotation;
             this.frames[i] = look.frame;
 
@@ -833,12 +844,23 @@ class EmitterRenderer {
 }
 
 /**
+ * Why a system's emitters are being held.
+ *
+ *   `clip`     - the animation's visibility track says this proxy's moment has not come.
+ *   `part`     - the part it is anchored on is off screen, so nobody could watch it burn.
+ *   `released` - it has been taken out of the scene and is finishing what it already threw.
+ */
+export type EmissionHold = 'clip' | 'part' | 'released';
+
+/**
  * One running particle system.
  *
- * Hung off a bone so the tree owns it and hiding a limb hides its effects - but NOT simulated in
- * that bone's space. The group's own transform is cancelled out every frame (see `frameOf`), so the
- * particles live in the model's space and following the bone becomes something the file decides
- * rather than something parenting imposes.
+ * Anchored on a bone, never parented to one. The bone is read as DATA - where to spawn, how fast
+ * the emitter is travelling - and the particles live in the model's space, so following the bone
+ * is something the file decides rather than something parenting imposes. Hanging the group off the
+ * bone said the same thing about the simulation, but it also handed the effect to the bone's
+ * subtree: three prunes a hidden subtree, and an Alamo visibility track hides the very chunk whose
+ * destruction the blast covers. See {@link attachTo}.
  */
 export class ParticleSystemInstance {
     readonly root = new THREE.Group();
@@ -849,14 +871,28 @@ export class ParticleSystemInstance {
     private previous: THREE.Vector3 | null = null;
 
     /**
-     * Whether the emitters may spawn this step.
+     * The bone whose motion the emitters read, or null for a system standing on its own.
      *
-     * Switched off when the animation hides the proxy bone this system hangs from - which is how
-     * Alamo times an effect to a clip, and what 2285 of the shipped visibility tracks are for.
-     * Only SPAWNING stops: the particles already in the air step and die as they would have, so an
-     * effect that switches off trails away rather than vanishing mid-flight.
+     * Not the root's parent, deliberately - see the class comment. Held as a plain reference, so
+     * nothing about the bone except its matrix reaches the simulation.
      */
-    private emitting = true;
+    private anchor: THREE.Object3D | null = null;
+
+    /**
+     * Why the emitters may not spawn - one entry per reason, from whoever placed it.
+     *
+     * A SET rather than a flag, because the reasons are independent and their owners do not know
+     * about each other. The clip holds a proxy whose moment has not come; hiding the part a system
+     * hangs off holds it too; releasing a system to finish holds it for good. With one boolean the
+     * last writer won, and `applyEmitterGating` - which runs every frame and resolved "the clip
+     * says nothing about this" to TRUE - re-armed the emitters of a part that had just been hidden.
+     *
+     * Only SPAWNING stops either way: the particles already in the air step and die as they would
+     * have, so a held effect trails away rather than vanishing mid-flight. That is what
+     * `Engine::KillParticleSystem` does with `leaveParticles`, and what `RenderObject::KillProxy`
+     * does through `Detach` when a proxy's own bone goes invisible.
+     */
+    private readonly holds = new Set<EmissionHold>();
 
     /** Emitters another emitter spawns, which must not also run a clock of their own. */
     private readonly dependent = new Set<number>();
@@ -881,6 +917,16 @@ export class ParticleSystemInstance {
          * Null for a system standing on its own, which is already its own frame of reference.
          */
         private readonly space: THREE.Object3D | null = null,
+        /**
+         * The owning object's <c>Scale_Factor</c>, a uniform render scale.
+         *
+         * `DatabaseMapExport.xml` lists it on the base GameObjectType beside `Mass` and `LOD_Bias`,
+         * and the reference applies it as a uniform scale on the object's world matrix - so it
+         * scales where a particle spawns as well as how big it draws. Six shipped particle objects
+         * declare one: 20.0 on the four hero powerup effects, 2.0 on the two bombing-run
+         * explosions. Nothing read it, so all six drew at a fraction of their size.
+         */
+        scaleFactor = 1,
     ) {
         system.emitters.forEach((emitter, index) => {
             // A distinct stream per emitter, seeded from the index: two emitters of one system must
@@ -889,7 +935,8 @@ export class ParticleSystemInstance {
                 emitter,
                 seededRandom(seed + index * 7919),
                 textures.get(emitter.colorTexture.toLowerCase()) ?? null,
-                emissionMesh);
+                emissionMesh,
+                scaleFactor);
 
             this.emitters.push(renderer);
             this.root.add(renderer.mesh);
@@ -927,6 +974,17 @@ export class ParticleSystemInstance {
     /** True once every emitter has finished and its last particle has died. */
     get exhausted(): boolean {
         return this.emitters.every(emitter => emitter.exhausted);
+    }
+
+    /**
+     * True once nothing this system threw is still in the air.
+     *
+     * NOT {@link exhausted}, which also asks whether the emitter has finished - and a continuous
+     * emitter never finishes. For a system that has been told to stop spawning, "finished" will
+     * never come, so what decides when it can be disposed is simply whether anything is left.
+     */
+    get empty(): boolean {
+        return this.emitters.every(emitter => emitter.live.length === 0);
     }
 
     /** The emitters in file order. Names repeat - p_explosion_huge01 has three called "debre". */
@@ -1006,16 +1064,63 @@ export class ParticleSystemInstance {
         }
     }
 
-    /** Lets the emitters spawn, or holds them. Live particles are unaffected either way. */
-    setEmitting(emitting: boolean): void {
-        this.emitting = emitting;
+    /**
+     * Places or lifts ONE reason to hold the emitters. Live particles are unaffected either way.
+     *
+     * Lifting a reason says only that this caller no longer objects - every other hold still
+     * stands. Nothing here is a permission to spawn.
+     */
+    hold(reason: EmissionHold, held: boolean): void {
+        if (held) {
+            this.holds.add(reason);
+        } else {
+            this.holds.delete(reason);
+        }
+    }
+
+    /** Whether anything is currently holding the emitters, and what. */
+    get heldBy(): EmissionHold[] {
+        return [...this.holds];
+    }
+
+    /**
+     * Names the bone this system is anchored on.
+     *
+     * The caller parents {@link root} to the SIMULATION SPACE and says which bone the effect
+     * belongs to here. Two things follow from the split. The bone's transform is cancelled out of
+     * the simulation either way - that was already true - but now no ancestor of the bone can take
+     * the effect off screen with it, which is what an explosion covering a chunk that is being
+     * hidden needs, and what {@link ParticleSystemInstance.detach} then relies on.
+     */
+    attachTo(anchor: THREE.Object3D | null): void {
+        this.anchor = anchor;
+
+        // A fresh reference point. Carrying the old one across would read the whole distance
+        // between two bones as one step's movement and fling every linked particle.
+        this.previous = null;
+    }
+
+    /** The bone this system is anchored on, for the callers that describe where an effect sits. */
+    get anchorNode(): THREE.Object3D | null {
+        return this.anchor;
+    }
+
+    /**
+     * Cuts the system loose from its bone, leaving everything it has thrown exactly where it is.
+     *
+     * For a system that has been removed but whose particles are allowed to finish: it no longer
+     * belongs to anything, and going on reading a bone that is about to be disposed would report
+     * its last stale matrix as motion.
+     */
+    detach(): void {
+        this.attachTo(null);
     }
 
     /**
      * Whether the emitters may spawn this step.
      *
-     * TWO gates, resolved here rather than by two writers of one flag: the clip's, which
-     * `setEmitting` carries, and being drawn at all. A system nobody can see is not running - the
+     * Every gate resolved HERE rather than by several writers of one flag: the reasons in
+     * {@link holds}, and being drawn at all. A system nobody can see is not running - the
      * reader's tick, the effects master, the level gate and the quiet-on-open rule all hold an
      * effect back by not drawing it, and an emitter that goes on firing behind that is spending its
      * life where nobody can watch it. For a burst that is fatal: `p_explosion_empire_atat00` was
@@ -1025,7 +1130,7 @@ export class ParticleSystemInstance {
      * a held system starts from its first frame rather than resuming somewhere in the middle.
      */
     private get spawning(): boolean {
-        return this.emitting && this.root.visible;
+        return this.holds.size === 0 && this.root.visible;
     }
 
     update(dt: number, view: THREE.Matrix4 | null = null, wind?: AlamoVector3): void {
@@ -1098,42 +1203,56 @@ export class ParticleSystemInstance {
     }
 
     /**
-     * Takes the bone's transform out of the simulation, and reports what the bone is doing.
+     * Puts the group in the simulation's space, and reports what the anchor bone is doing.
      *
-     * Two jobs, together because they are the same matrices. The group is a CHILD of the bone, so
-     * its own transform is overwritten with whatever cancels the bone out - after which the local
-     * coordinates the emitters write are the model's coordinates, and a particle that should be
-     * left behind can be. What the bone is doing then becomes ordinary data the emitters can act
-     * on: where to spawn, how far to carry a linked particle, what speed to hand a newborn one.
+     * Two jobs, together because they are the same matrices. The group's own transform is
+     * overwritten with whatever cancels its parent out, after which the local coordinates the
+     * emitters write are the simulation space's coordinates and a particle that should be left
+     * behind can be. Where the group actually hangs is then immaterial - it is the ANCHOR that
+     * says what the effect is following, as ordinary data the emitters act on: where to spawn, how
+     * far to carry a linked particle, what speed to hand a newborn one.
      */
     private frameOf(dt: number, view: THREE.Matrix4 | null): EmitterFrame {
         const parent = this.root.parent;
+        const space = this.space;
 
-        if (parent === null || this.space === null) {
-            // A system standing on its own, or one not yet attached. Its own space is the only one
-            // there is, and nothing is moving relative to anything.
-            this.root.updateWorldMatrix(true, false);
+        if (space !== null && parent !== null) {
+            // Read fresh: the animation mixer has already moved the bones this frame, but their
+            // world matrices are only recomputed at render time.
+            parent.updateWorldMatrix(true, false);
+            space.updateWorldMatrix(true, false);
+
+            this.root.matrixAutoUpdate = false;
+            this.root.matrix.copy(parent.matrixWorld).invert().multiply(space.matrixWorld);
+            this.root.matrixWorldNeedsUpdate = true;
+        }
+
+        // Where the emitters' coordinates are read: the space when there is one, and otherwise the
+        // group itself, which is then its own frame of reference.
+        const simulation = space ?? this.root;
+        const anchor = this.anchor;
+
+        if (anchor === null) {
+            // A system standing on its own, or one cut loose to finish. Nothing is moving relative
+            // to anything, and the frame is simply where the simulation space stands.
+            simulation.updateWorldMatrix(true, false);
+            this.frame.matrix.identity();
+            this.frame.rotation.identity();
             this.frame.delta.set(0, 0, 0);
             this.frame.velocity.set(0, 0, 0);
-            this.viewFrom(this.root, view);
-            this.root.getWorldPosition(GROUND_SCRATCH);
+            this.viewFrom(simulation, view);
+            simulation.getWorldPosition(GROUND_SCRATCH);
             this.frame.groundY = -GROUND_SCRATCH.y;
 
             return this.frame;
         }
 
-        // Read fresh: the animation mixer has already moved the bones this frame, but their world
-        // matrices are only recomputed at render time.
-        parent.updateWorldMatrix(true, false);
-        this.space.updateWorldMatrix(true, false);
+        anchor.updateWorldMatrix(true, false);
+        simulation.updateWorldMatrix(true, false);
 
-        const toSpace = SPACE_SCRATCH.copy(this.space.matrixWorld).invert();
+        const toSpace = SPACE_SCRATCH.copy(simulation.matrixWorld).invert();
 
-        this.root.matrixAutoUpdate = false;
-        this.root.matrix.copy(parent.matrixWorld).invert().multiply(this.space.matrixWorld);
-        this.root.matrixWorldNeedsUpdate = true;
-
-        this.frame.matrix.multiplyMatrices(toSpace, parent.matrixWorld);
+        this.frame.matrix.multiplyMatrices(toSpace, anchor.matrixWorld);
         this.frame.rotation.setFromMatrix4(this.frame.matrix);
 
         MOTION_SCRATCH.setFromMatrixPosition(this.frame.matrix);
@@ -1151,11 +1270,11 @@ export class ParticleSystemInstance {
         this.previous.copy(MOTION_SCRATCH);
         this.frame.velocity.copy(this.frame.delta).divideScalar(Math.max(dt, 1e-6));
 
-        this.viewFrom(this.space, view);
+        this.viewFrom(simulation, view);
 
         // Where the scene's ground plane falls in the space the particles live in - it is the
         // SCENE's ground a falling particle lands on, not the model's own height.
-        this.space.getWorldPosition(GROUND_SCRATCH);
+        simulation.getWorldPosition(GROUND_SCRATCH);
         this.frame.groundY = -GROUND_SCRATCH.y;
 
         return this.frame;

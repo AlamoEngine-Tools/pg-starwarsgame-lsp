@@ -2,6 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Numerics;
+using System.Reflection;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Server.Assets;
@@ -145,6 +147,91 @@ public sealed class PreviewWireShapeTest
         Assert.True(missing.Count == 0,
             "These enums cross the wire but PreviewEnumConverter does not handle them, so they "
             + $"serialise as ordinals: {string.Join(", ", missing)}");
+    }
+
+    [Fact]
+    public void DictionaryKeys_CrossTheWireExactlyAsAuthored()
+    {
+        // MEASURED against a live server 2026-08-23: the reticle map arrived keyed
+        // `harD_POINT_WEAPON_LASER`, because the LSP serializer's camel-case naming strategy
+        // processes dictionary KEYS as well as property names. The client looks the type up by the
+        // hardpoint's own `HARD_POINT_WEAPON_LASER`, so every lookup missed and no reticle could
+        // ever be drawn - silently, since an absent mapping is a legitimate state.
+        //
+        // The icon names are the same defect one level down: `byType` names an icon VERBATIM while
+        // `icons` is keyed by the mangled form, so the two halves of the same reply disagree.
+        var reticles = new PreviewReticles(
+            new Dictionary<string, PreviewReticleStates>
+            {
+                ["HARD_POINT_WEAPON_LASER"] = new("I_Hard_Point_Reticle_Weapons",
+                    null, null, null, null, null, null)
+            },
+            new Dictionary<string, string> { ["I_Hard_Point_Reticle_Weapons"] = "data:image/png;base64,AA" },
+            0.03f, 0.03f);
+
+        var json = SerializeAsResponse(reticles);
+
+        Assert.NotNull(json["byType"]?["HARD_POINT_WEAPON_LASER"]);
+        Assert.NotNull(json["icons"]?["I_Hard_Point_Reticle_Weapons"]);
+    }
+
+    [Fact]
+    public void EveryDictionaryOnTheWire_KeepsItsKeys()
+    {
+        // Structural, like the enum guard above and for the same reason: the next dictionary added
+        // to a preview DTO would be mangled in exactly the same way, and nothing about the reply
+        // would look wrong.
+        var unguarded = ReachableDictionaries(
+                typeof(GetPreviewSceneResult),
+                typeof(GetModelGlbResult),
+                typeof(GetParticleSystemResult),
+                typeof(GetModelTextureResult))
+            .Where(property => property.GetCustomAttributes(typeof(JsonConverterAttribute), true)
+                .OfType<JsonConverterAttribute>()
+                .All(attribute => attribute.ConverterType != typeof(VerbatimKeyDictionaryConverter)))
+            .Select(property => $"{property.DeclaringType?.Name}.{property.Name}")
+            .Order()
+            .ToList();
+
+        Assert.True(unguarded.Count == 0,
+            "These dictionaries cross the wire without [JsonConverter(typeof("
+            + "VerbatimKeyDictionaryConverter))], so the camel-case naming strategy rewrites their "
+            + $"keys: {string.Join(", ", unguarded)}");
+    }
+
+    /// <summary>Every dictionary-typed property reachable from these result types.</summary>
+    private static HashSet<PropertyInfo> ReachableDictionaries(params Type[] roots)
+    {
+        var seen = new HashSet<Type>();
+        var found = new HashSet<PropertyInfo>();
+        var queue = new Queue<Type>(roots);
+
+        while (queue.Count > 0)
+        {
+            var type = Unwrap(queue.Dequeue());
+
+            if (!seen.Add(type)
+                || type.Namespace?.StartsWith("PG.StarWarsGame", StringComparison.Ordinal) != true)
+                continue;
+
+            foreach (var property in type.GetProperties())
+            {
+                if (IsDictionary(property.PropertyType))
+                    found.Add(property);
+
+                queue.Enqueue(property.PropertyType);
+            }
+        }
+
+        return found;
+    }
+
+    private static bool IsDictionary(Type type)
+    {
+        return type.IsGenericType
+               && (type.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>)
+                   || type.GetGenericTypeDefinition() == typeof(IDictionary<,>)
+                   || type.GetGenericTypeDefinition() == typeof(Dictionary<,>));
     }
 
     /// <summary>Every enum reachable from these result types by public property or record field.</summary>

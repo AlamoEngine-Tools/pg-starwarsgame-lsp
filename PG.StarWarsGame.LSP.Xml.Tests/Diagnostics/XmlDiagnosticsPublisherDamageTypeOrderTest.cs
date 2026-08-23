@@ -249,9 +249,23 @@ file sealed class StubStoryFactProducer2 : IStoryFactProducer
 file sealed class StubIndexService2 : IGameIndexService
 {
     public GameIndex Current => GameIndex.Empty;
-    public event Action<GameIndex>? IndexChanged;
-    public event Action<ILocalisationIndex>? LocalisationChanged;
-    public event Action<GameIndex>? DynamicEnumChanged;
+    public event Action<GameIndex>? IndexChanged
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action<ILocalisationIndex>? LocalisationChanged
+    {
+        add { }
+        remove { }
+    }
+
+    public event Action<GameIndex>? DynamicEnumChanged
+    {
+        add { }
+        remove { }
+    }
 
     public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
     {

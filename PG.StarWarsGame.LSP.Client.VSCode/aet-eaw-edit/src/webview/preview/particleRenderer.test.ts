@@ -77,6 +77,17 @@ describe('blendingFor', () => {
         assert.equal(blendingFor('Additive').alphaTest, 0);
     });
 
+    /**
+     * `PrimParticleBumpAlpha.fx` is the one blended mode that declares `ZWriteEnable = true`.
+     *
+     * It can afford to: it is alpha TESTED at `AlphaRef = 8`, so what it writes depth for is the
+     * part of the sprite that is actually solid. 21 emitters use it.
+     */
+    it('writes depth for the bump mode, which is the one blended mode that does', () => {
+        assert.equal(blendingFor('Bump').depthWrite, true);
+        assert.equal(blendingFor('Transparent').depthWrite, false);
+    });
+
     it('never writes depth, whatever the mode', () => {
         // Sprites are unsorted and translucent; writing depth makes them cut holes in each other.
         for (const mode of ['Additive', 'Transparent', 'Inverse', 'StencilDarken', 'Heat']) {
@@ -86,13 +97,24 @@ describe('blendingFor', () => {
 });
 
 describe('following the emitter', () => {
-    /** A system hung off a bone inside a model, which is the shape every attached effect has. */
-    function rig(over: Partial<AlamoEmitterProperties>): {
+    /**
+     * A system anchored on a bone inside a model, which is the shape every attached effect has.
+     *
+     * The root hangs off the SPACE, not off the bone: the bone is motion data the emitters read,
+     * never a parent whose visibility could take the effect with it. See `attachTo`.
+     */
+    function rig(over: Partial<AlamoEmitterProperties>, piece?: THREE.Object3D): {
         bone: THREE.Object3D; instance: ParticleSystemInstance;
     } {
         const space = new THREE.Object3D();
         const bone = new THREE.Object3D();
-        space.add(bone);
+
+        if (piece === undefined) {
+            space.add(bone);
+        } else {
+            space.add(piece);
+            piece.add(bone);
+        }
 
         const system = testSystem([emitter({
             name: 'trail',
@@ -100,10 +122,43 @@ describe('following the emitter', () => {
         })]);
 
         const instance = new ParticleSystemInstance('test', system, new Map(), 1, null, space);
-        bone.add(instance.root);
+        space.add(instance.root);
+        instance.attachTo(bone);
 
         return { bone, instance };
     }
+
+    /** What three asks before it draws anything: the object and every ancestor of it. */
+    function drawn(object: THREE.Object3D): boolean {
+        for (let at: THREE.Object3D | null = object; at !== null; at = at.parent) {
+            if (!at.visible) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * The Nebulon-B's blast, and the reason the anchor is not the parent.
+     *
+     * `p_explosion_big00#12` is a proxy bone hanging under `Busted_00#11` - the very chunk whose
+     * breaking up it exists to cover - and the death clip hides that chunk on the frame the blast
+     * fires. three prunes a hidden subtree, so the explosion vanished with the piece: one frame of
+     * 91 particles, then nothing. In the engine those particles are world-space and outlive the
+     * emitter's parent outright.
+     */
+    it('keeps drawing when the piece its bone belongs to is hidden', () => {
+        const piece = new THREE.Object3D();
+        const { instance } = rig({}, piece);
+
+        instance.update(0.5);
+        assert.ok(instance.emitterParticles(0).length > 0, 'nothing was thrown');
+
+        piece.visible = false;
+
+        assert.equal(drawn(instance.root), true);
+    });
 
     /**
      * Spawns a few, moves the bone a known distance, then reports where the ALREADY-LIVING ones
@@ -196,7 +251,8 @@ describe('following the emitter', () => {
         })]);
 
         const instance = new ParticleSystemInstance('test', system, new Map(), 1, null, space);
-        bone.add(instance.root);
+        space.add(instance.root);
+        instance.attachTo(bone);
         instance.update(0.5);
 
         const born = instance.emitterParticles(0)[0];
@@ -239,7 +295,8 @@ describe('object-space acceleration', () => {
         })]);
 
         const instance = new ParticleSystemInstance('test', system, new Map(), 1, null, space);
-        bone.add(instance.root);
+        space.add(instance.root);
+        instance.attachTo(bone);
 
         for (let step = 0; step < 6; step++) {
             instance.update(0.1);
@@ -487,7 +544,7 @@ describe('emission gating', () => {
      */
     it('spawns nothing while emission is switched off', () => {
         const instance = running();
-        instance.setEmitting(false);
+        instance.hold('clip', true);
 
         instance.update(0.5);
 
@@ -504,7 +561,7 @@ describe('emission gating', () => {
         const born = instance.emitterParticles(0).length;
         assert.ok(born > 0, 'nothing spawned to begin with');
 
-        instance.setEmitting(false);
+        instance.hold('clip', true);
         instance.update(0.1);
 
         assert.equal(instance.emitterParticles(0).length, born);
@@ -512,12 +569,53 @@ describe('emission gating', () => {
 
     it('spawns again once emission comes back', () => {
         const instance = running();
-        instance.setEmitting(false);
+        instance.hold('clip', true);
         instance.update(0.5);
-        instance.setEmitting(true);
+        instance.hold('clip', false);
         instance.update(0.5);
 
         assert.ok(instance.emitterParticles(0).length > 0);
+    });
+
+    /**
+     * The defect a wholesale `setEmitting(true)` caused, in its own right.
+     *
+     * More than one thing can want an effect held, and they do not know about each other. The clip
+     * holds a proxy whose moment has not come; hiding the part a system hangs off holds it too. But
+     * `applyEmitterGating` runs EVERY frame and, with no clip playing, resolved "the clip says
+     * nothing" to `setEmitting(true)` - so it re-armed the emitters of a part that had been hidden,
+     * one frame after they were held. `stopAnimation` did the same for the whole scene.
+     *
+     * A default is not a permission: a link with no opinion must decline, not vote yes.
+     */
+    it('stays held while a second reason still stands', () => {
+        const instance = running();
+
+        instance.hold('part', true);
+        instance.hold('clip', true);
+
+        // The clip stops having an opinion. The part is still hidden, so nothing may spawn.
+        instance.hold('clip', false);
+        instance.update(0.5);
+
+        assert.equal(instance.emitterParticles(0).length, 0, 'the part hold was overridden');
+
+        // And when the last reason goes, it runs again.
+        instance.hold('part', false);
+        instance.update(0.5);
+
+        assert.ok(instance.emitterParticles(0).length > 0, 'never resumed');
+    });
+
+    /** Releasing a hold nobody placed is not a decision either - it must not start anything. */
+    it('is unmoved by a hold that was never placed', () => {
+        const instance = running();
+
+        instance.hold('part', true);
+        instance.hold('clip', false);
+        instance.update(0.5);
+
+        assert.equal(instance.emitterParticles(0).length, 0);
     });
 
     it('emits by default, since most systems are never gated', () => {
@@ -613,5 +711,58 @@ describe('emission gating', () => {
         instance.update(0.1);
 
         assert.equal(instance.emitterParticles(0).length, born);
+    });
+});
+
+describe('the owning object Scale_Factor', () => {
+    /**
+     * `Scale_Factor` sits on the base GameObjectType beside `Mass` and `LOD_Bias`
+     * (`DatabaseMapExport.xml`), and the reference applies it as a uniform scale on the object's
+     * WORLD MATRIX - so it scales where a particle spawns as well as how big it draws. Six shipped
+     * particle objects declare one, 20.0 on the four hero powerup effects and 2.0 on the two
+     * bombing-run explosions, and nothing read it at all.
+     *
+     * NOT a scale on the system's node: the billboard path adds the sprite's half-extent in VIEW
+     * space, after the model matrix (`mvPosition.xy += spun * iSize`), so a node scale would move
+     * every particle without resizing any of it.
+     */
+    const drawn = (scaleFactor?: number): { offsets: number[]; sizes: number[] } => {
+        const system = testSystem([emitter({
+            properties: properties({ particlesPerSecond: 40, lifetime: 100 }),
+        })]);
+
+        const instance = new ParticleSystemInstance(
+            'p', system, new Map(), 1, null, null, scaleFactor);
+
+        instance.update(0.5);
+
+        const mesh = instance.root.children[0] as THREE.Mesh;
+        const live = instance.emitterParticles(0).length;
+
+        return {
+            offsets: [...(mesh.geometry.getAttribute('iOffset').array as Float32Array)]
+                .slice(0, live * 3),
+            sizes: [...(mesh.geometry.getAttribute('iSize').array as Float32Array)].slice(0, live),
+        };
+    };
+
+    it('scales where a particle is and how big it draws, by the same amount', () => {
+        // The same seed, so the two runs differ only by the factor.
+        const plain = drawn(1);
+        const scaled = drawn(20);
+
+        assert.ok(plain.sizes.length > 0, 'nothing was drawn to compare');
+        assert.deepEqual(
+            scaled.sizes.map(s => +(s / 20).toFixed(4)),
+            plain.sizes.map(s => +s.toFixed(4)));
+        assert.deepEqual(
+            scaled.offsets.map(o => +(o / 20).toFixed(3)),
+            plain.offsets.map(o => +o.toFixed(3)));
+    });
+
+    it('leaves a system that declares none exactly as it was', () => {
+        // 101 of the 107 shipped particle objects declare 1.0 or nothing, so this is the path that
+        // must not move.
+        assert.deepEqual(drawn(undefined), drawn(1));
     });
 });

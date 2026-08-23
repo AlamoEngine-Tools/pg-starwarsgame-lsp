@@ -52,7 +52,8 @@ import {
     ancestorsOf, type BoneAttachment, type FlatBone, type LabelMode,
 } from './preview/skeleton';
 import {
-    buildTree, defaultCollapsed, filterTree, selectionAfterClick, toggleTargets, visibleTreeRows, withDescendants,
+    boneIndexOfRow, buildTree, defaultCollapsed, filterTree, selectionAfterClick, toggleTargets,
+    visibleTreeRows, withDescendants,
     type TreeItem, type TreeKind,
 } from './preview/previewTree';
 import { PreviewViewport, type PresetView, type ViewportStats } from './preview/viewport';
@@ -61,7 +62,7 @@ import {
     rotarySwitchCss,
 } from './shared/dockChrome';
 import { ProblemsPanel } from './shared/ProblemsPanel';
-import { parseHex, teamColour, toHex } from './preview/colour';
+import { affiliationColour, colorizationFor, parseHex, toHex } from './preview/colour';
 import { reviewFactionColour, type ColourFinding } from './preview/colourUsability';
 import { translateEffect } from './preview/fx/effect';
 import { lightBearing } from './preview/lightBearing';
@@ -72,15 +73,57 @@ import {
 } from './preview/cameraPresets';
 import { bindingFor, type CameraBinding, type PreviewSubject } from './preview/cameraBindings';
 import { CAPTURE_SIZES, captureFileName, captureSize } from './preview/capture';
-import { VIEWPORT_BACKGROUND } from './preview/viewport';
-import { hasProgrammableShader, parseFxManifest, selectTechnique } from './preview/fx/fxParser';
+import { BREAKOFF_ATTACHMENT, VIEWPORT_BACKGROUND } from './preview/viewport';
+import { parseFxManifest, selectTechnique } from './preview/fx/fxParser';
 import { materialStateFrom } from './preview/fx/renderState';
-import { decalNames, effectPlaysNow, partHidden } from './preview/damage';
+import {
+    collisionMeshNames, decalNames, effectPlaysNow,
+    hardpointGateAllows, partHidden,
+} from './preview/damage';
+import { passiveEffectPlaysNow, passiveEffects } from './preview/passiveSubject';
 import type { DefinedLevels } from './preview/levels';
+import type { PreviewBreakoffProp } from '../protocol/modelPreview';
+
+/**
+ * Marks a GLB request as WRECKAGE rather than a scene part.
+ *
+ * The reply echoes `partId` and nothing else identifying, so the key rides on it. A breakoff added
+ * as a part would be framed as if it were the subject and would never be cleaned up.
+ */
+const BREAKOFF_PART = 'breakoff:';
+
+/**
+ * The part id a death clone's model is loaded under.
+ *
+ * Prefixed like the breakoff props so the GLB handler can tell it from a scene part - the reply
+ * carries only the id it was asked with, and a clone added as an ordinary part would be framed as
+ * though it were the subject.
+ */
+const DEATH_CLONE_PART = 'deathclone:';
+
+/** Prefix for the persistent effect a piece of wreckage trails, so it can be stopped by key. */
+const WRECK_EFFECT = 'wreckfire:';
 import {
     describeGate, groupState, particleGroups, type GroupState, type ParticleGroup,
 } from './preview/particleScene';
 import { defaultMode, otherModeChips, previewModes, type PreviewMode } from './preview/previewMode';
+import {
+    allBankIds, bankTitle, boneRowIndex, fireBoneTitle, visibleArcs, weaponRows,
+} from './preview/weaponRows';
+import {
+    reticleMarks, reticleScreenSize, type ReticleState,
+} from './preview/reticles';
+import {
+    DAMAGE_SWITCHES, DEFAULT_ATTACKER, armorFactor, attackerFromProjectile, fireBlast, poolRows,
+    projectileChoices, resolveHit, type Attacker, type Pools,
+} from './preview/attacker';
+import {
+    abilityAllows, abilityClaims, abilityProxies, abilityRows, clipFor, shieldRevealed,
+} from './preview/abilityRows';
+import { cloneForDamage, deathCloneRows, turretSweeps } from './preview/deathClone';
+import { breakoffAnchor, breakoffFor, type BreakoffAnchor } from './preview/breakoff';
+import { hullPool, unitDestroyed, unitTargetable } from './preview/unitPool';
+import { blastVictims, candidatesFrom } from './preview/blast';
 import { actionOf, groupAnimations } from './preview/animationNames';
 import { ModeSelector, type ModeOption } from './shared/ModeSelector';
 import { RotaryModeSwitch } from './shared/RotaryModeSwitch';
@@ -89,6 +132,7 @@ import {
     colourFromHex, hexFromColour, viewerSettingsFrom, DEFAULT_LIGHTS, DEFAULT_VIEWER_SETTINGS,
     LIGHT_LABELS, LIGHT_NAMES, type DirectionalName, type DirectionalSetting, type LightRig,
     type BackgroundKind, type Wind,
+    type AttackerPreset,
 } from './preview/viewerSettings';
 import { RightDock } from './shared/RightDock';
 
@@ -685,6 +729,22 @@ const Shell = styled.div`
         background: var(--vscode-focusBorder);
     }
 
+    /* The targeting marks. Shares the label layer, so it inherits pointer-events: none and the
+       clipping - a reticle must never swallow the drag that orbits the camera. Sized in JS, from
+       the fraction of the screen the game declares, so nothing here sets a width. */
+    .reticle-mark {
+        position: absolute;
+        top: 0;
+        left: 0;
+        /* The ICON is a mask and the colour is the background, so the mark can be tinted by the
+           mount's health - the game runs it bright green through yellow and orange to red, and an
+           <img> cannot be recoloured. Both properties are set from JS per mark. */
+        mask-repeat: no-repeat;
+        -webkit-mask-repeat: no-repeat;
+        mask-size: contain;
+        -webkit-mask-size: contain;
+    }
+
     /* A deep skeleton indents far enough that nowrap rows widened the WHOLE panel: the dock's
        min-content width won over its set width, .body grew past the window, and the canvas stretched
        to 1400px inside an 1100px viewport. min-width: 0 lets the dock hold its size; the tree scrolls
@@ -875,16 +935,46 @@ const Shell = styled.div`
         -webkit-box-orient: vertical;
         overflow: hidden;
     }
+    /* Indented to sit under the name rather than under its checkbox, and clipped to one line: a
+       hardpoint's detail is a bone and a hitpoint count, which fits. */
     .part-list li .detail {
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-    }
-    /* Indented to sit under the name rather than under its checkbox. */
-    .part-list li .detail {
         padding-left: 21px;
         font-size: 0.9em;
         color: var(--vscode-descriptionForeground);
+    }
+    /* A weapon's is four separate facts - reach, cone, cadence, damage - and clipping them at the
+       dock's width ended the row on "3 sho...", which says nothing about the cadence it is there
+       to state. Wrapping costs a line; clipping costs the answer. */
+    .part-list li .detail.wraps {
+        white-space: normal;
+        overflow: visible;
+    }
+    /* Under the name, like the detail, and compact enough that two fire bones share a line. */
+    .part-list li .bone-picks { padding-left: 21px; margin-top: 3px; }
+    /* A count that can be pressed. Same type as the count beside it so the header does not jump
+       when a selection appears, but with an affordance so it reads as the way out. */
+    .section-count.as-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 3px;
+        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.4));
+        border-radius: 9px;
+        padding: 0 5px;
+        background: none;
+        color: inherit;
+        font: inherit;
+        cursor: pointer;
+    }
+    .section-count.as-button:hover { background: var(--vscode-list-hoverBackground); }
+    /* A picked bone is boxed on the model, so its button carries the same weight as the active
+       segment of a mode selector - it is a current state, not an action waiting to be taken. */
+    .btn.selected {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+        border-color: var(--vscode-button-background);
     }
 
     .stat-row {
@@ -1234,6 +1324,8 @@ function ModelPreview(): React.JSX.Element {
         setSkeletonOn(room.skeleton);
         setLabelMode(room.boneLabels as LabelMode);
         setFireArcs(room.fireArcs);
+        setAttacker(room.attacker);
+        setAttackerPresets(room.attackerPresets);
         setTranslatedOn(room.effectShaders);
         setParticlesOn(room.particles);
         setParticleSpeed(room.particleSpeed);
@@ -1448,8 +1540,26 @@ function ModelPreview(): React.JSX.Element {
      * p_hp_imperial_damage, and fetching that twenty times is twenty round trips for one answer.
      */
     const systemsRef = useRef(new Map<string, AlamoParticleContent>());
+
+    /**
+     * Each system's owning object `Scale_Factor`, keyed like {@link systemsRef}.
+     *
+     * A uniform render scale on the whole system. Only a `<Particle>` GAME OBJECT can carry one - a
+     * model's proxy names the asset directly and gets 1 - so it is keyed by the name that was
+     * ASKED for, which is the object's where there is one.
+     */
+    const systemScalesRef = useRef(new Map<string, number>());
     const pendingRef = useRef<PreviewParticle[]>([]);
     const requestedSystemsRef = useRef(new Set<string>());
+
+    /**
+     * The effects belonging to a PASSIVE subject, by id.
+     *
+     * They answer to their own model rather than to the subject's opening and damage rules - see
+     * `passiveEffectPlaysNow` - and this is how the one place that decides whether an effect draws
+     * tells them apart.
+     */
+    const passiveEffectIdsRef = useRef(new Set<string>());
 
     /** Shaders already asked for, so a ten-part unit does not request its shared effect ten times. */
     const requestedShadersRef = useRef(new Set<string>());
@@ -1474,8 +1584,22 @@ function ModelPreview(): React.JSX.Element {
      */
     const [anyShaderSource, setAnyShaderSource] = useState(false);
 
-    /** Death explosions asked for but not yet delivered, to play the moment they arrive. */
-    const explosionsRef = useRef<{ id: string; system: string }[]>([]);
+    /**
+     * Effects asked for but not yet delivered, to play the moment they arrive.
+     *
+     * The attachment travels with the request because the two callers want different ones: a
+     * mount's death explosion goes off at its bone on the hull, and a wreck's goes off at the
+     * WRECK, which by then has drifted a long way from the mount it left.
+     */
+    const explosionsRef = useRef<{
+        id: string;
+        system: string;
+        /** Absent for an effect that belongs to the scene rather than to any one part. */
+        partId: string | undefined;
+        bone?: string;
+        /** A trailing fire lasts as long as the debris; a blast plays once. */
+        once: boolean;
+    }[]>([]);
 
     /**
      * Draw with the effects' own translated shaders, rather than the archetype reading of them.
@@ -1533,6 +1657,75 @@ function ModelPreview(): React.JSX.Element {
 
     const [fireArcs, setFireArcs] = useState(false);
 
+    const [reticlesOn, setReticlesOn] = useState(false);
+
+    /**
+     * The weapon the reader has built, and the ones they have saved.
+     *
+     * Tier 1 - it describes their testing habits, not this model - so both are restored from the
+     * stored room and written back by the one effect that owns Tier 1.
+     */
+    /**
+     * The abilities the reader has switched on.
+     *
+     * Tier 2 - it describes what you are looking at right now, so it resets with the subject. The
+     * proxies it holds off ride the ordinary effect gate, which means a held burst does NOT burn
+     * its life away and come back exhausted.
+     */
+    const [activeAbilities, setActiveAbilities] = useState<ReadonlySet<string>>(new Set());
+
+    /** Whether the turrets are swinging through the traverse their XML declares. */
+    const [turretSweep, setTurretSweep] = useState(false);
+
+    const [attacker, setAttacker] = useState<Attacker>(DEFAULT_ATTACKER);
+    const [attackerPresets, setAttackerPresets] =
+        useState<AttackerPreset[]>([]);
+    const [presetName, setPresetName] = useState('');
+    const [projectileSearch, setProjectileSearch] = useState('');
+
+    /** A projectile picked from the catalogue whose values are not on the wire yet. */
+    const [projectileNote, setProjectileNote] = useState<string | null>(null);
+
+    /**
+     * The projectile the built weapon was filled FROM, if any.
+     *
+     * Remembered separately from the weapon's own numbers because the blast area belongs to the
+     * projectile and has no field in the panel: damage and damage type are things the reader edits,
+     * a blast radius is a property of the bolt they picked. Cleared when the subject changes.
+     */
+    const [attackerProjectile, setAttackerProjectile] = useState<string | null>(null);
+
+    /**
+     * What is left of the target, and of each mount.
+     *
+     * Tier 2 at most: a fresh preview opens undamaged, because the opening rules beat persistence.
+     * `null` means the scene has said nothing yet.
+     */
+    const [pools, setPools] = useState<Pools | null>(null);
+    const [mountHealth, setMountHealth] = useState<Record<string, number | null>>({});
+    const [fireTarget, setFireTarget] = useState('hull');
+
+    /**
+     * Which of the seven targeting states the marks are drawn in.
+     *
+     * Enemy is where it opens: it is what you see looking at somebody else's ship, which is the
+     * case a modder is checking. Tier 2 at most - it describes what you are inspecting right now,
+     * not a habit - so it resets with the subject rather than being stored.
+     */
+    // Fixed. The tracked twin comes from HOVERING a mark, which is what the game does, so there is
+    // no state to choose - see the note in the Hardpoints section. The other four states
+    // (friendly, repairing, disabled and its tracked form) have no way in at present.
+    const reticleState: ReticleState = 'enemy';
+
+    /**
+     * Weapon banks the reader has switched off.
+     *
+     * The banks that are OFF rather than the ones that are on, so a subject with a hundred mounts
+     * opens showing all of them without the panel having to enumerate a hundred ids first - and so
+     * the master pill can be flipped without losing which banks were picked.
+     */
+    const [hiddenBanks, setHiddenBanks] = useState<ReadonlySet<string>>(new Set());
+
     /** Empty means the model's own colours; otherwise the faction whose tint is applied. */
     const [faction, setFaction] = useState('');
     const [customColour, setCustomColour] = useState<string | null>(null);
@@ -1556,12 +1749,32 @@ function ModelPreview(): React.JSX.Element {
      * Geometry and effects arrive asynchronously, so a part or system landing after a hardpoint was
      * destroyed has to see the current state rather than the one captured when the handler was made.
      */
+    /**
+     * Wreckage waiting on its model to arrive.
+     *
+     * Same shape as the death-explosion queue beside it, and for the same reason: the GLB is asked
+     * for at the moment of destruction, and the debris is spawned when it lands.
+     */
+    const breakoffsRef = useRef<{
+        id: string; prop: PreviewBreakoffProp; at: BreakoffAnchor;
+    }[]>([]);
+
     const destroyedRef = useRef<ReadonlySet<string>>(destroyed);
     destroyedRef.current = destroyed;
 
     /** Same reason as {@link destroyedRef}: the message handler outlives any one scene. */
     const sceneRef = useRef<PreviewScene | null>(scene);
     sceneRef.current = scene;
+
+    /**
+     * Same reason again, for the ability decider.
+     *
+     * A system attaching after an ability was switched on has to see the CURRENT set, or it lands
+     * with the visibility the scene had when the handler was made.
+     */
+    const abilityProxyIdsRef = useRef<ReadonlyMap<string, string[]>>(new Map());
+
+    const activeAbilitiesRef = useRef<ReadonlySet<string>>(new Set());
 
     /**
      * The bulk switches this scene offers, derived from it rather than stored.
@@ -1658,6 +1871,18 @@ function ModelPreview(): React.JSX.Element {
         // white" and "some checkboxes do nothing" both went a long time without a cause.
         (window as unknown as { aetDebugViewport?: unknown }).aetDebugViewport = viewport;
 
+        // The end of a piece of wreckage. `Death_Explosions` fires where it FINISHED - the
+        // viewport keeps an empty marker there for exactly this - and the fire it was trailing
+        // stops with it, which is the one thing an explosion does not do on its own.
+        viewport.onBreakoffExpired = (key, prop): void => {
+            viewport.removeParticleSystem(`${WRECK_EFFECT}${key}`);
+            dropPassiveEffects(`${BREAKOFF_ATTACHMENT}${key}`);
+
+            playEffect(
+                `explosion:${key}:${Date.now()}`, prop.deathExplosions ?? '',
+                `${BREAKOFF_ATTACHMENT}${key}`, undefined, true);
+        };
+
         // Clicking a joint selects it in the tree; selecting in the tree highlights the joint. One
         // selection, two ways in, so neither view can disagree with the other about what is chosen.
         viewport.onBoneSelected = index => {
@@ -1677,6 +1902,7 @@ function ModelPreview(): React.JSX.Element {
 
         // Orbiting leaves the preset behind, so the preset stops claiming to be where you are.
         viewport.onCameraMoved = () => setCameraView(null);
+        viewport.onReticleClicked = id => selectHardpoint(id);
 
         const observer = new ResizeObserver(() => viewport.resize());
         observer.observe(canvasRef.current);
@@ -1811,6 +2037,100 @@ function ModelPreview(): React.JSX.Element {
         }
     }, []);
 
+    /**
+     * Whether one effect should be drawing right now.
+     *
+     * THE one answer, because there are two callers - the pass below and `attachPending`, which
+     * runs later when a system's data finally lands. They disagreed once: `attachPending` set
+     * visibility from the damage rules alone and clobbered the ability decision made moments
+     * earlier, so an ability's proxy was drawing before anyone switched it on. Two writers of one
+     * flag is the same defect the effect-row work already paid for.
+     */
+    const effectDrawsNow = useCallback((particle: PreviewParticle): boolean => {
+        const proxies = abilityProxyIdsRef.current;
+
+        // A passive subject's effect answers to its own model and to nothing here. Neither of the
+        // rules below is about it: the opening rule is about the first moment of a preview, and a
+        // death clone has none - it exists because the ship died, and its explosions ARE the death.
+        if (passiveEffectIdsRef.current.has(particle.id)) {
+            return passiveEffectPlaysNow(particle);
+        }
+
+        // The engine glow going out with its mount is NOT decided here. It arrives already gated:
+        // the server joins the glow proxy to the engine hardpoint and marks it `HardpointAlive`,
+        // and `hardpointGateAllows` below is what reads that. A second rule here, matching the
+        // mount's `Engine_Particles` bone against the proxy's own bone name, was the same
+        // one-flag-two-gates mistake as the shield mesh - and it never matched anything on any
+        // shipped ship, because the join is on the proxy's PARENT.
+
+        // An ability REPLACES the quiet-on-open rule for the proxies it claims, rather than being
+        // ANDed with it. The opening rules hold every non-engine effect back - rightly, on open -
+        // but they are about the first moment, not a permanent veto, and ANDing them left an
+        // activated ability changing nothing at all. The damage rules still apply either way.
+        if (abilityClaims(particle.id, proxies)) {
+            return hardpointGateAllows(particle, destroyedRef.current)
+                && abilityAllows(particle.id, proxies, activeAbilitiesRef.current);
+        }
+
+        return effectPlaysNow(particle, destroyedRef.current);
+    }, []);
+
+    /**
+     * Queues a passive subject's own effects, once its geometry is on the way.
+     *
+     * Through the SAME pending queue every other effect uses, which is what stage 3 of the
+     * multi-subject work bought: the descriptor is re-homed onto the part that was loaded and then
+     * there is nothing special about it. A death clone's explosions and a burning wreck's fire
+     * trail could not be shown at all before, because nothing on the wire described them.
+     */
+    const queuePassiveEffects = useCallback(
+        (particles: readonly PreviewParticle[], partId: string): void => {
+            if (particles.length === 0) {
+                return;
+            }
+
+            const placed = passiveEffects(particles, partId);
+
+            for (const particle of placed) {
+                passiveEffectIdsRef.current.add(particle.id);
+            }
+
+            pendingRef.current = [...pendingRef.current, ...placed];
+
+            // One request per distinct system, however many proxies call for it - and a wreck's
+            // are usually the ship's own, so most come back off the cache immediately.
+            for (const name of new Set(placed.map(particle => particle.systemRef))) {
+                if (requestedSystemsRef.current.has(name.toLowerCase())) {
+                    continue;
+                }
+
+                requestedSystemsRef.current.add(name.toLowerCase());
+                vscode.postMessage({ type: 'requestParticleSystem', name });
+            }
+        }, []);
+
+    /**
+     * Takes a passive subject's effects away with it.
+     *
+     * A wreck reaching the end of its lifetime and a clone removed by a repair both take their
+     * geometry, and an effect left behind would go on burning at a part that no longer exists.
+     */
+    const dropPassiveEffects = useCallback((partId: string): void => {
+        const mine = `${partId}#`;
+
+        for (const id of [...passiveEffectIdsRef.current]) {
+            if (!id.startsWith(mine)) {
+                continue;
+            }
+
+            passiveEffectIdsRef.current.delete(id);
+            viewportRef.current?.removeParticleSystem(id);
+        }
+
+        pendingRef.current = pendingRef.current.filter(
+            particle => !particle.id.startsWith(mine));
+    }, []);
+
     /** Attaches every pending particle whose system and part have both arrived. */
     const attachPending = useCallback((): void => {
         const viewport = viewportRef.current;
@@ -1832,10 +2152,10 @@ function ModelPreview(): React.JSX.Element {
                 alt: particle.alt ?? null,
                 lod: particle.lod ?? null,
                 altDecreaseStayHidden: particle.altDecreaseStayHidden ?? false,
-            }, particle.boneIndex);
+            }, particle.boneIndex,
+            systemScalesRef.current.get(particle.systemRef.toLowerCase()) ?? 1);
 
-            viewport.setParticleSystemVisible(
-                particle.id, effectPlaysNow(particle, destroyedRef.current));
+            viewport.setParticleSystemVisible(particle.id, effectDrawsNow(particle));
         }
 
         pendingRef.current = stillWaiting;
@@ -1850,7 +2170,154 @@ function ModelPreview(): React.JSX.Element {
         for (const name of viewport.particleTextureNames()) {
             vscode.postMessage({ type: 'requestTexture', name });
         }
-    }, [refreshStats]);
+    }, [refreshStats, effectDrawsNow]);
+
+    /**
+     * Switches one weapon bank's arc on or off.
+     *
+     * Stores the banks that are OFF, so the set is empty on a fresh subject however many mounts it
+     * carries, and an id the reader never touched needs no entry at all.
+     */
+    const setBankArcs = useCallback((id: string, on: boolean): void => {
+        setHiddenBanks(current => {
+            if (current.has(id) !== on) {
+                return current;
+            }
+
+            const next = new Set(current);
+            if (on) {
+                next.delete(id);
+            } else {
+                next.add(id);
+            }
+
+            return next;
+        });
+    }, []);
+
+    /**
+     * Points at a bone from somewhere that is not the tree.
+     *
+     * Sets exactly what a tree click sets - the row selection that draws the box, and the bone the
+     * labels highlight - so a muzzle picked off a weapon row and the same bone picked in the tree
+     * are one state rather than two that can disagree.
+     */
+    /**
+     * Asks the host for everything the geometry now loaded needs in order to be DRAWN.
+     *
+     * Textures are asked for only once the geometry that samples them exists, so nothing is fetched
+     * for a part that failed to load. Effects are fetched once each; a missing one is normal and
+     * simply leaves the archetype material in place.
+     *
+     * Shared by every path that puts geometry in the scene rather than written out at the one that
+     * came first. A wreck arriving is the same question as a hardpoint arriving, and the breakoff
+     * path having its own early return - and so no textures - was only visible as a black shape.
+     */
+    const requestMaterialAssets = useCallback((viewport: PreviewViewport): void => {
+        for (const name of collectTextureNames(viewport.materialExtras())) {
+            vscode.postMessage({ type: 'requestTexture', name });
+        }
+
+        for (const shader of viewport.shaderNames()) {
+            if (!requestedShadersRef.current.has(shader.toLowerCase())) {
+                requestedShadersRef.current.add(shader.toLowerCase());
+                vscode.postMessage({ type: 'requestShader', name: shader });
+            }
+        }
+    }, []);
+
+    /**
+     * Picks the mount a targeting mark stands for, or lets it go.
+     *
+     * Aims the attacker at it, which is what the marks are FOR - they show what can be shot - and
+     * selects its attachment bone so the viewport boxes it too.
+     *
+     * A second click on the same mark clears both again, exactly as a second click on a tree row or
+     * a bone label does. Anything that can be selected has to be UN-selectable from the same
+     * control: the first build only ever selected, so once a mark had been clicked there was no way
+     * back to an unselected ship without going hunting in the tree.
+     */
+    const selectHardpoint = useCallback((hardpointId: string): void => {
+        const bone = sceneRef.current?.hardpoints.find(h => h.id === hardpointId)?.attachBone;
+        const rowId = bone === null || bone === undefined
+            ? undefined
+            : boneRowIndex(viewportRef.current?.treeItems() ?? []).get(bone.toLowerCase());
+
+        setFireTarget(current => {
+            const isSame = current === hardpointId;
+
+            // The bone selection travels WITH the target - one press, one meaning - so it is
+            // settled here rather than by a second reducer that could disagree about which mount
+            // is current.
+            if (isSame) {
+                setSelected(new Set());
+                setAnchor(null);
+                setSelectedBone(null);
+            } else if (rowId !== undefined) {
+                setSelected(new Set([rowId]));
+                setAnchor(rowId);
+                setSelectedBone(boneIndexOfRow(rowId));
+            }
+
+            return isSame ? 'hull' : hardpointId;
+        });
+    }, []);
+
+    const selectBoneRow = useCallback((rowId: string | undefined): void => {
+        if (rowId === undefined) {
+            return;
+        }
+
+        // A second press on the same bone clears it, exactly as a second click on its tree row
+        // does. Anything that can be selected has to be un-selectable from the same control.
+        setSelected(current => {
+            if (current.size === 1 && current.has(rowId)) {
+                setAnchor(null);
+                setSelectedBone(null);
+                return new Set();
+            }
+
+            setAnchor(rowId);
+            setSelectedBone(boneIndexOfRow(rowId));
+            return new Set([rowId]);
+        });
+    }, []);
+
+    /**
+     * Plays a named effect at an attachment, fetching it first if it is not in hand.
+     *
+     * The single route to a gameplay effect. Both callers used to have their own copy of the
+     * have-it / ask-for-it dance and only one of them had the "play it when it lands" half, which
+     * is why a wreck named its trailing fire and its death blast and showed neither.
+     */
+    const playEffect = useCallback((
+        id: string, name: string, partId: string | undefined, bone: string | undefined,
+        once: boolean,
+    ): void => {
+        if (name === '') {
+            return;
+        }
+
+        const system = systemsRef.current.get(name.toLowerCase());
+
+        if (system === undefined) {
+            // Fetched now and played on arrival; an effect nothing referenced until this moment is
+            // not worth loading up front for every hardpoint on a capital ship.
+            explosionsRef.current.push({ id, system: name, partId, bone, once });
+            vscode.postMessage({ type: 'requestParticleSystem', name });
+            return;
+        }
+
+        const viewport = viewportRef.current;
+
+        const scale = systemScalesRef.current.get(name.toLowerCase()) ?? 1;
+
+        if (once) {
+            viewport?.playOnce(id, system, partId, bone, scale);
+        } else {
+            viewport?.addParticleSystem(id, system, partId, bone, undefined, undefined, scale);
+        }
+    }, []);
 
     /**
      * Destroys or repairs one hardpoint.
@@ -1879,23 +2346,40 @@ function ModelPreview(): React.JSX.Element {
         }
 
         const hardpoint = scene?.hardpoints.find(h => h.id === id);
-        const explosion = hardpoint?.deathExplosionParticles ?? '';
-        if (explosion === '') {
-            return;
+
+        // The wreckage the mount sheds. 167 of foc's 355 hardpoints name one; the server has
+        // resolved them since H1 and nothing read them, so a destroyed mount used to just vanish.
+        const prop = hardpoint === undefined
+            ? null
+            : breakoffFor(hardpoint, scene?.breakoffProps ?? []);
+
+        if (hardpoint !== undefined && prop !== null
+            && !(viewportRef.current?.hasBreakoff(id) ?? false)) {
+            // Fetched on demand: a capital ship names a dozen distinct props and almost none of
+            // them is ever dropped in a given session.
+            // Resolved HERE, where the hardpoint is in hand, and carried whole: which node a wreck
+            // is dropped on is a decision about the hardpoint, not about the scene graph.
+            breakoffsRef.current.push({
+                id, prop,
+                at: breakoffAnchor('hull', hardpoint),
+            });
+
+            // The key rides on `partId`, which the host echoes back verbatim. The reply carries no
+            // model name, and a breakoff must not be mistaken for a scene part - see the handler.
+            vscode.postMessage({
+                type: 'requestGlb',
+                modelReference: prop.modelRef,
+                partId: `${BREAKOFF_PART}${id}`,
+                // ITS OWN clips, not the subject's. A prop's model shares nothing with the hull's
+                // name, so the scene's list would never have held one of them.
+                animations: prop.animations ?? [],
+            });
         }
 
-        const system = systemsRef.current.get(explosion.toLowerCase());
-        if (system === undefined) {
-            // Fetched now and played on arrival; a system nothing referenced until this moment is
-            // not worth loading up front for every hardpoint on a capital ship.
-            explosionsRef.current.push({ id, system: explosion });
-            vscode.postMessage({ type: 'requestParticleSystem', name: explosion });
-            return;
-        }
-
-        viewportRef.current?.playOnce(
-            `explosion:${id}:${Date.now()}`, system, 'hull', hardpoint?.attachBone ?? undefined);
-    }, [scene]);
+        playEffect(
+            `explosion:${id}:${Date.now()}`, hardpoint?.deathExplosionParticles ?? '',
+            'hull', hardpoint?.attachBone ?? undefined, true);
+    }, [scene, playEffect]);
 
     /** Destroys or repairs every mount the XML allows to be destroyed. */
     const destroyAll = useCallback((isDestroyed: boolean): void => {
@@ -1964,6 +2448,11 @@ function ModelPreview(): React.JSX.Element {
                 setCollapsed(new Set());
                 setEmitters([]);
                 setHiddenEmitters(new Set());
+                setHiddenBanks(new Set());
+                setActiveAbilities(new Set());
+                setProjectileSearch('');
+                setProjectileNote(null);
+                setTurretSweep(false);
                 setAlt(0);
                 setLod(0);
                 lodChosenRef.current = false;
@@ -1981,6 +2470,8 @@ function ModelPreview(): React.JSX.Element {
                     animations: 0,
                     hardpoints: message.scene.hardpoints.length,
                     particles: message.scene.particles.length,
+                    weapons: message.scene.weapons.length,
+                    abilities: message.scene.abilities?.length ?? 0,
                 }));
 
                 // Where this subject was left earlier in the session. Applied AFTER the reset above,
@@ -1997,6 +2488,7 @@ function ModelPreview(): React.JSX.Element {
                     foldedRef.current = true;
                 }
                 systemsRef.current.clear();
+                systemScalesRef.current.clear();
                 requestedSystemsRef.current.clear();
                 requestedShadersRef.current.clear();
                 // Defensive: a server older than this client sends no particles at all, and
@@ -2004,6 +2496,8 @@ function ModelPreview(): React.JSX.Element {
                 // geometry included, for the sake of an effects list.
                 const particles = message.scene.particles ?? [];
                 pendingRef.current = [...particles];
+                // The old subject's wrecks are gone with it, and so are the ids they were keyed by.
+                passiveEffectIdsRef.current.clear();
 
                 refreshStats();
 
@@ -2067,6 +2561,78 @@ function ModelPreview(): React.JSX.Element {
                     return;
                 }
 
+                // Wreckage waiting on this model, if any. Handled BEFORE the part path, because a
+                // breakoff GLB carries no partId and would otherwise be added as a scene part
+                // called `undefined` and framed as if it were the subject.
+                if (message.partId.startsWith(BREAKOFF_PART)) {
+                    const key = message.partId.slice(BREAKOFF_PART.length);
+                    const pending = breakoffsRef.current.find(entry => entry.id === key);
+
+                    breakoffsRef.current = breakoffsRef.current.filter(
+                        entry => entry.id !== key);
+
+                    if (pending !== undefined) {
+                        await viewport.addBreakoff(pending.id, glb, pending.at, pending.prop);
+
+                        // The fire the piece trails. Attached to the WRECK, not to the mount it
+                        // came off: 86 of the 90 shipped props name one, and every one of them was
+                        // being ignored, so debris tumbled away cold.
+                        playEffect(
+                            `${WRECK_EFFECT}${pending.id}`,
+                            pending.prop.attachedParticle ?? '',
+                            `${BREAKOFF_ATTACHMENT}${pending.id}`, undefined, false);
+
+                        // And the effects the prop's MODEL carries, which are a separate thing
+                        // from `Debris_Attached_Particle` above - the XML names one, the ALO
+                        // carries however many the artist pinned to its bones.
+                        queuePassiveEffects(pending.prop.particles ?? [],
+                            `${BREAKOFF_ATTACHMENT}${pending.id}`);
+
+                        // Debris needs its textures and its shaders like any other geometry. The
+                        // first build returned here instead, so a wreck was drawn on a bare
+                        // archetype material with no map bound at all - a black shape tumbling out
+                        // of the gap, which is exactly how it looked. A prop model is usually a
+                        // piece of the hull it fell off, so most of these are already decoded and
+                        // arrive back immediately.
+                        requestMaterialAssets(viewport);
+                    }
+
+                    return;
+                }
+
+                // The wreck the ship leaves behind. Loaded as its own part; the hull it replaces
+                // was already hidden by the death watch that asked for this, since the ship dies
+                // whether or not a clone answers.
+                if (message.partId.startsWith(DEATH_CLONE_PART)) {
+                    // Its own PASSIVE SUBJECT - a wreck is a replacement subject, not another piece
+                    // of the ship being previewed, and the active subject's hardpoint answers must
+                    // not reach it by mesh name.
+                    await viewport.addPart(message.partId, glb, undefined, undefined,
+                        { subjectId: message.partId });
+
+                    // The explosions, the fire smoke and the debris trails the clone's own model
+                    // carries - eight of them on the Star Destroyer's wreck, and not one reached
+                    // the client until its descriptor carried them.
+                    queuePassiveEffects(
+                        sceneRef.current?.deathClones?.find(
+                            c => `${DEATH_CLONE_PART}${c.objectId}` === message.partId)
+                            ?.particles ?? [],
+                        message.partId);
+
+                    requestMaterialAssets(viewport);
+
+                    // FETCHED EARLY, held hidden. Asking for it at the moment of death left a
+                    // visible gap between the ship going and the wreck arriving - a capital ship's
+                    // clone is three megabytes. Shown and started by the death watch.
+                    if (deadRef.current) {
+                        viewport.startDeathClip(message.partId);
+                    } else {
+                        viewport.setPartHidden(message.partId, true);
+                    }
+
+                    return;
+                }
+
                 await viewport.addPart(
                     message.partId, glb,
                     message.attachToPartId ?? undefined, message.attachBone ?? undefined);
@@ -2080,23 +2646,20 @@ function ModelPreview(): React.JSX.Element {
 
                 refreshStats();
 
-                // Textures are asked for only once the geometry that samples them exists, so nothing
-                // is fetched for a part that failed to load.
-                for (const name of collectTextureNames(viewport.materialExtras())) {
-                    vscode.postMessage({ type: 'requestTexture', name });
-                }
-
-                // The effects this geometry names. Each is fetched once; a missing one is normal and
-                // simply leaves the archetype material in place.
-                for (const shader of viewport.shaderNames()) {
-                    if (!requestedShadersRef.current.has(shader.toLowerCase())) {
-                        requestedShadersRef.current.add(shader.toLowerCase());
-                        vscode.postMessage({ type: 'requestShader', name: shader });
-                    }
-                }
+                requestMaterialAssets(viewport);
 
                 // This part's bones now exist, so anything waiting to hang off them can attach.
                 attachPending();
+
+                // And whatever STILL has nowhere to hang. `attachmentFor` draws a bone it cannot
+                // find at the owning model's origin and says nothing, which hid two separate
+                // misplacement bugs; the list is recomputed, so a part that lands later drops off
+                // it by itself.
+                for (const problem of viewport.unresolvedAttachments()) {
+                    setProblems(current => current.some(p => p.message === problem)
+                        ? current
+                        : [...current, { severity: 'warning', message: problem }]);
+                }
 
                 return;
             }
@@ -2136,7 +2699,16 @@ function ModelPreview(): React.JSX.Element {
                 }
 
                 // A particle file opened directly is its own subject and hangs off nothing.
-                if (pendingRef.current.length === 0 && !requestedSystemsRef.current.has(
+                //
+                // Anything WAITING on this system says it is not that: a death explosion and a
+                // wreck's trailing fire are both asked for by name at the moment they are needed,
+                // and neither is in the scene's proxy list. Without the third test they took this
+                // branch - so the blast was parented to the scene root instead of to the thing
+                // that blew up, and it called `frameAll`, yanking the camera off the subject.
+                const awaited = explosionsRef.current.some(
+                    pending => pending.system.toLowerCase() === message.name.toLowerCase());
+
+                if (!awaited && pendingRef.current.length === 0 && !requestedSystemsRef.current.has(
                     message.name.toLowerCase())) {
                     viewport.addParticleSystem(message.name, system);
                     viewport.frameAll();
@@ -2156,6 +2728,8 @@ function ModelPreview(): React.JSX.Element {
                 }
 
                 systemsRef.current.set(message.name.toLowerCase(), system);
+                systemScalesRef.current.set(
+                    message.name.toLowerCase(), message.result.scaleFactor ?? 1);
 
                 // A death explosion asked for at the moment of destruction plays as soon as it lands.
                 const waiting = explosionsRef.current
@@ -2165,12 +2739,20 @@ function ModelPreview(): React.JSX.Element {
                     explosionsRef.current = explosionsRef.current.filter(
                         pending => !waiting.includes(pending));
 
-                    for (const pending of waiting) {
-                        const bone = sceneRef.current?.hardpoints
-                            .find(h => h.id === pending.id)?.attachBone ?? undefined;
+                    // The scale that arrived with THIS system, not a lookup: an effect asked for
+                    // before its system landed takes the same route as one asked for after, and
+                    // the two disagreeing is exactly how a wreck's fire came back unscaled.
+                    const scale = message.result.scaleFactor ?? 1;
 
-                        viewport.playOnce(
-                            `explosion:${pending.id}:${Date.now()}`, system, 'hull', bone);
+                    for (const pending of waiting) {
+                        if (pending.once) {
+                            viewport.playOnce(
+                                pending.id, system, pending.partId, pending.bone, scale);
+                        } else {
+                            viewport.addParticleSystem(
+                                pending.id, system, pending.partId, pending.bone,
+                                undefined, undefined, scale);
+                        }
                     }
                 }
 
@@ -2208,6 +2790,8 @@ function ModelPreview(): React.JSX.Element {
                 setSkeletonOn(room.skeleton);
                 setLabelMode(room.boneLabels as LabelMode);
                 setFireArcs(room.fireArcs);
+        setAttacker(room.attacker);
+        setAttackerPresets(room.attackerPresets);
                 setTranslatedOn(room.effectShaders);
                 setParticlesOn(room.particles);
                 setParticleSpeed(room.particleSpeed);
@@ -2245,15 +2829,12 @@ function ModelPreview(): React.JSX.Element {
                     viewport.applyShaderState(message.name, materialStateFrom(pass));
                 }
 
-                if (technique !== null && !hasProgrammableShader(technique)) {
-                    // Eleven of the shipped effects are render state and nothing else. Worth knowing
-                    // that the plain look is the effect, not a failure to read it.
-                    setProblems(current => [...current, {
-                        severity: 'info',
-                        message: `'${message.name}' sets render state only, so there is no shader `
-                            + 'to translate.',
-                    }]);
-                }
+                // Eleven of the shipped effects are render state and nothing else - `MeshAlpha.fx`
+                // among them, whose two programmable techniques are commented out in the file. That
+                // used to be reported as an info problem per effect. It is a true statement about
+                // the DATA that the reader can do nothing with, and eleven of them crowd out the
+                // problems that mean something; the translated count in the dock already says how
+                // much of the model draws with its own shaders.
 
                 // A header may have arrived after the effect that wanted it, so every effect still
                 // waiting is retried whenever anything new lands.
@@ -2381,6 +2962,58 @@ function ModelPreview(): React.JSX.Element {
         viewportRef.current?.setSkeletonVisible(skeletonOn);
     }, [skeletonOn]);
 
+    /**
+     * Which particle ids each ability drives.
+     *
+     * Resolved from proxy BONE NAMES to ids here, once: the server binds by name, and a name is not
+     * an identity - a Star Destroyer carries twenty proxies sharing one.
+     */
+    const abilityProxyIds = useMemo(
+        () => abilityProxies(scene?.abilities ?? [], scene?.particles ?? []),
+        [scene?.abilities, scene?.particles]);
+
+    const abilities = useMemo(
+        () => abilityRows(scene?.abilities ?? [], abilityProxyIds),
+        [scene?.abilities, abilityProxyIds]);
+
+    // Kept in step for the decider, which the message handler reads through refs.
+    abilityProxyIdsRef.current = abilityProxyIds;
+    activeAbilitiesRef.current = activeAbilities;
+
+    /**
+     * Switches one ability on or off.
+     *
+     * Its proxies follow through the effect pass above; the CLIP is fired here, because it is an
+     * event rather than a state - replaying the deploy on every re-render would leave a model
+     * permanently deploying, which is the same shape as the death-explosion rule beside it.
+     */
+    const setAbilityActive = useCallback((type: string, on: boolean): void => {
+        setActiveAbilities(current => {
+            if (current.has(type) === on) {
+                return current;
+            }
+
+            const next = new Set(current);
+            if (on) {
+                next.add(type);
+            } else {
+                next.delete(type);
+            }
+
+            return next;
+        });
+
+        const declared = scene?.abilities?.find(a => a.type === type);
+        const clip = declared === undefined ? null : clipFor(declared, on);
+
+        // 25 models ship a deploy and only 23 the matching undeploy, so a missing clip is ordinary:
+        // the ability still switches, it simply has no animation for that direction.
+        if (clip !== null) {
+            setAnimation(clip);
+        }
+    }, [scene]);
+
+
     useEffect(() => {
         const viewport = viewportRef.current;
         if (viewport === null || scene === null) {
@@ -2399,15 +3032,331 @@ function ModelPreview(): React.JSX.Element {
             decalNames(scene.hardpoints, new Set(scene.hardpoints.map(h => h.id))),
             decalNames(scene.hardpoints, destroyed));
 
+        // Never shown in either damage state, so this takes no `destroyed` and does not change with
+        // it - it is set here because this is the pass that owns hardpoint-driven visibility.
+        viewport.setCollisionMeshes(collisionMeshNames(scene.hardpoints));
+
+
+        // The ordinary effect rules AND the ability decider. Through the same call as every other
+        // effect deliberately: a held proxy then rides the emission gate, so its burst does not
+        // burn away unseen and come back exhausted the moment the ability is switched on.
+        // The shield mesh is the one piece of GEOMETRY an ability reveals - DEFEND shows it, and
+        // the mesh ships hidden, so nothing else would ever bring it up.
+        viewport.setShieldRevealed(shieldRevealed(activeAbilities));
+
         for (const particle of scene.particles ?? []) {
-            viewport.setParticleSystemVisible(particle.id, effectPlaysNow(particle, destroyed));
+            viewport.setParticleSystemVisible(particle.id, effectDrawsNow(particle));
         }
 
         // Both the tree and the group switches read out of the systems that just changed, so this
         // is all it takes to bring the dock along. Destroying a mount lights its smoke and every row
         // that names it says so.
         setTreeItems(viewport.treeItems() ?? []);
-    }, [destroyed, scene]);
+    }, [destroyed, scene, abilityProxyIds, activeAbilities, effectDrawsNow]);
+
+    /**
+     * Everything the target has left, rebuilt whenever the scene changes.
+     *
+     * TIER 2 - it resets on open, because the opening rules beat persistence and a fresh preview
+     * opens undamaged. Rebuilt from the scene rather than carried, so a subject that declares no
+     * pools at all reads as zero rather than as the last ship's numbers.
+     */
+    useEffect(() => {
+        setPools({
+            shield: scene?.defence?.shieldPoints ?? 0,
+            hull: scene?.defence?.tacticalHealth ?? 0,
+            energy: scene?.defence?.energyCapacity ?? 0,
+        });
+
+        setMountHealth(Object.fromEntries(
+            (scene?.hardpoints ?? []).map(h => [h.id, h.health ?? null])));
+
+        setFireTarget('hull');
+        setAttackerProjectile(null);
+        requestedClonesRef.current.clear();
+    }, [scene]);
+
+    /** Whether the subject has been finished off, and by which clone. */
+    const [unitDead, setUnitDead] = useState(false);
+
+    /**
+     * Puts the scene back the way it was before the subject died.
+     *
+     * The inverse of the death watch, in ONE place: the ship's parts come back, the wreck and
+     * everything hanging off it goes, and the clone is forgotten so it is fetched again. Forgetting
+     * it is what lets the death play a second time - the request is guarded against asking twice,
+     * and that guard outlived the wreck it was about.
+     *
+     * The re-fetch is not a cost at the moment of death: the prefetch runs on `unitDead` going
+     * false, so the wreck is back on the shelf long before anything can kill the ship again.
+     */
+    const restoreFromDeath = useCallback((): void => {
+        const viewport = viewportRef.current;
+        if (viewport === null) {
+            return;
+        }
+
+        for (const part of sceneRef.current?.parts ?? []) {
+            viewport.setPartHidden(part.id, false);
+        }
+
+        for (const clone of sceneRef.current?.deathClones ?? []) {
+            dropPassiveEffects(`${DEATH_CLONE_PART}${clone.objectId}`);
+            viewport.removePart(`${DEATH_CLONE_PART}${clone.objectId}`);
+        }
+
+        requestedClonesRef.current.clear();
+    }, [dropPassiveEffects]);
+
+    /** Read by the glb handler, which has to know whether a clone arriving is already needed. */
+    const deadRef = useRef(false);
+
+    useEffect(() => {
+        deadRef.current = unitDead;
+    }, [unitDead]);
+
+    /** Clone models already asked for, so a damage-type change does not re-fetch one. */
+    const requestedClonesRef = useRef(new Set<string>());
+
+    /**
+     * Fetches the wreck this weapon would leave, BEFORE it is needed.
+     *
+     * The death clone is the one piece of geometry whose arrival is watched - the ship vanishes and
+     * the reader waits for the wreck. A capital ship's clone is three megabytes, so asking for it at
+     * the moment of death shows as a gap. Asked for as soon as the damage type says which one it
+     * would be, and held hidden by the glb handler until the death watch wants it.
+     *
+     * Re-runs on a damage-type change, because that changes the answer; each model is asked once.
+     */
+    useEffect(() => {
+        // `unitDead` is a dependency so this runs again when the ship comes BACK: the restore has
+        // just forgotten the clone, and this is what puts it on the shelf ready for the next death.
+        const clone = cloneForDamage(scene?.deathClones ?? [], attacker.damageType);
+        const model = clone?.modelFile ?? '';
+
+        if (clone === null || model === '') {
+            return;
+        }
+
+        const partId = `${DEATH_CLONE_PART}${clone.objectId}`;
+
+        if (requestedClonesRef.current.has(partId)) {
+            return;
+        }
+
+        requestedClonesRef.current.add(partId);
+        vscode.postMessage({
+            type: 'requestGlb', modelReference: model, partId,
+            // ITS OWN clips. That a clone ever played at all was an accident of naming: its model
+            // is conventionally the hull's name plus a suffix, so its `_die_00.ala` matched the
+            // hull's stem and rode along in the subject's list.
+            animations: clone.animations ?? [],
+        });
+    }, [scene, attacker.damageType, unitDead]);
+
+    /**
+     * Kills the unit when its last destructible mount dies.
+     *
+     * The rule as the user gave it: a unit with hardpoints cannot be targeted itself, and it dies
+     * when ALL of them are dead - untargetable ones included. The game warns about untargetable
+     * but destructible, and at least two mods use the combination deliberately, so a mount the
+     * reticles never offered still has to die before the ship does.
+     *
+     * An EVENT, like the hardpoint death explosion: it belongs to the moment the last mount goes,
+     * not to the state of being dead, so it fires from the transition rather than from a render.
+     */
+    useEffect(() => {
+        const dead = unitDestroyed(scene?.hardpoints ?? [], destroyed);
+
+        if (!dead) {
+            // Coming BACK from death, and only on the transition. This is the exact inverse of what
+            // the branch below does, and it lives here so that EVERY route back runs it - the
+            // attacker panel's Repair, the Hardpoints section's `Repair all`, or the reader simply
+            // un-ticking one mount. `Repair all` is `destroyAll(false)` and nothing else, so with
+            // the restore living in `repairTarget` it put the mounts back and left the ship hidden
+            // under its own wreck, with the wreck's clip clamped at its last frame - after which no
+            // death ever played again.
+            if (unitDead) {
+                restoreFromDeath();
+            }
+
+            setUnitDead(false);
+            return;
+        }
+
+        if (unitDead) {
+            return;
+        }
+
+        setUnitDead(true);
+
+        // What the SHIP itself sets off. Its own `Death_Explosions`, which is a third thing from a
+        // hardpoint's and a breakoff prop's - it goes off where the ship was, so it hangs off the
+        // scene rather than off any part. It has to: every part is about to be hidden, and three
+        // prunes a hidden subtree, effects included.
+        playEffect(
+            `deathblast:${Date.now()}`, scene?.deathExplosions ?? '',
+            undefined, undefined, true);
+
+        // The ship is GONE, and that does not wait on a wreck being authored for this damage type.
+        // The engine swaps the death clone in for the hull, so the hull goes either way - a clone
+        // that does not match the damage type means nothing replaces it, not that it survives.
+        for (const part of scene?.parts ?? []) {
+            viewportRef.current?.setPartHidden(part.id, true);
+        }
+
+        // Which wreck it leaves depends on what KILLED it, which is the weapon in the attacker
+        // panel - so the clone follows the damage type set there.
+        const clone = cloneForDamage(scene?.deathClones ?? [], attacker.damageType);
+
+        if (clone?.modelFile === null || clone?.modelFile === undefined) {
+            return;
+        }
+
+        // Usually already here and waiting: the prefetch below asks for it as soon as the damage
+        // type says which one it would be. Showing it is all that is left.
+        const partId = `${DEATH_CLONE_PART}${clone.objectId}`;
+
+        viewportRef.current?.setPartHidden(partId, false);
+        viewportRef.current?.startDeathClip(partId);
+    }, [scene, destroyed, unitDead, attacker.damageType, playEffect, restoreFromDeath]);
+
+    /**
+     * The unit's hull bar, and whether it can be shot at at all.
+     *
+     * Derived rather than stored: it is a VIEW of the mount healths, and a second copy would drift
+     * from them the first time anything else changed a mount.
+     */
+    const hull = useMemo(
+        () => hullPool(scene?.defence, scene?.hardpoints ?? [], mountHealth, destroyed),
+        [scene, mountHealth, destroyed]);
+
+    /**
+     * Whether the ship itself is a legal target.
+     *
+     * False as soon as it has a destructible mount: the engine offers the mounts and nothing else,
+     * so "The ship" would be aiming at something no weapon can reach. Disabled rather than removed
+     * - the reader needs to see that the choice exists and why it is not available.
+     */
+    const shipTargetable = useMemo(
+        () => unitTargetable(scene?.hardpoints ?? []), [scene]);
+
+    /**
+     * Fires the configured weapon at whatever is selected.
+     *
+     * The arithmetic lives in `attacker.ts`; this only routes the answer. A mount reaching zero is
+     * handed to the destruction path that already exists, so a shot that kills a mount hides its
+     * model, shows its decal, plays its explosion once and drops its breakoff prop - none of which
+     * is new here.
+     */
+    const fire = useCallback(() => {
+        const defence = scene?.defence;
+        const current = pools;
+
+        if (defence === null || defence === undefined || current === null) {
+            return;
+        }
+
+        if (fireTarget === 'hull') {
+            setPools(resolveHit(attacker, defence, current));
+            return;
+        }
+
+        // Who this shot reaches. A projectile with no blast area damages exactly one mount, which
+        // is the overwhelming majority - 63 of foc's 173 projectiles declare a blast at all.
+        const chosen = (scene?.projectiles ?? [])
+            .find(p => p.id === attackerProjectile) ?? null;
+
+        const positions = Object.fromEntries((scene?.hardpoints ?? []).map(mount => [
+            mount.id,
+            viewportRef.current?.bonePosition(
+                mount.partId ?? undefined, mount.attachBone ?? undefined) ?? null,
+        ]));
+
+        const hits = chosen === null
+            ? [{ id: fireTarget, directDamage: attacker.damage, blastDamage: 0, tier: null }]
+            : blastVictims(
+                { ...chosen, damage: attacker.damage },
+                fireTarget, candidatesFrom(positions, fireTarget), destroyed);
+
+        const result = fireBlast(attacker, defence, current, hits, mountHealth);
+
+        setPools(result.pools);
+        setMountHealth(result.mountHealth);
+
+        for (const id of result.destroyed) {
+            setHardpointDestroyed(id, true);
+        }
+    }, [attacker, attackerProjectile, scene, pools, mountHealth, fireTarget, destroyed,
+        setHardpointDestroyed]);
+
+    /** Puts the target back together without touching the weapon you built. */
+    const repairTarget = useCallback(() => {
+        // The mounts are back, so the wreckage they shed goes with them.
+        viewportRef.current?.clearBreakoffs();
+        breakoffsRef.current = [];
+
+        // The wreck and the hidden ship are NOT this function's to put back. The death watch owns
+        // that, because `Repair all` never comes through here at all - see `restoreFromDeath`.
+
+        setPools({
+            shield: scene?.defence?.shieldPoints ?? 0,
+            hull: scene?.defence?.tacticalHealth ?? 0,
+            energy: scene?.defence?.energyCapacity ?? 0,
+        });
+        setMountHealth(Object.fromEntries(
+            (scene?.hardpoints ?? []).map(h => [h.id, h.health ?? null])));
+    }, [scene]);
+
+    /**
+     * The weapon banks, as both the dock and the viewport see them.
+     *
+     * One derivation feeding both. Building the dock's rows and the viewport's cones separately is
+     * what let a hardpoint's arc keep hanging in the air after the mount it belongs to had been
+     * blown off - two readings of the same damage state, and only one of them updated.
+     */
+    const weapons = useMemo(
+        () => weaponRows(
+            { weapons: scene?.weapons ?? [], hardpoints: scene?.hardpoints ?? [] }, destroyed),
+        [scene?.weapons, scene?.hardpoints, destroyed]);
+
+    /**
+     * Every turret that can actually be swung, from BOTH places one can be declared.
+     *
+     * The AT-AA's is on its unit WEAPON and it has no hardpoints at all, so reading mounts alone
+     * found nothing to sweep on the very unit this exists for.
+     */
+    const sweepable = useMemo(
+        () => turretSweeps(
+            (scene?.hardpoints ?? []).map(h => ({
+                id: h.id, partId: h.partId ?? 'hull', turret: h.turret,
+            })),
+            weapons.map(w => ({ id: w.id, partId: w.partId, turret: w.turret }))),
+        [scene, weapons]);
+
+    /** Shield meshes the model names but does not shade as shields. Recomputed with the rows. */
+    const shieldOffShader = useMemo(
+        // Keyed on the ROWS: they are rebuilt whenever a part loads or the chain re-runs, which is
+        // exactly when the answer can change. The viewport ref is deliberately not a dependency -
+        // it never changes identity.
+        () => viewportRef.current?.shieldMeshesOffShader() ?? [],
+        [treeItems]);
+
+    /**
+     * Every bank starts OFF, and the stage pill switches the lot together.
+     *
+     * The user's rule. The measured reason: the Nebulon B's four mounts each declare 175 by 160
+     * degrees, so drawing them at once fills the viewport however right the geometry is.
+     *
+     * Keyed on the SUBJECT, not on the weapon rows: those are rebuilt whenever `destroyed` changes
+     * too, so keying on them meant shooting a mount silently switched every arc off.
+     */
+    useEffect(() => {
+        setHiddenBanks(allBankIds(weapons));
+    }, [scene]);
+
+    /** Which tree row each of the hull's own bones is, for the fire-bone buttons on a row. */
+    const boneRows = useMemo(() => boneRowIndex(treeItems), [treeItems]);
 
     useEffect(() => {
         const viewport = viewportRef.current;
@@ -2415,26 +3364,27 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
-        // Every fire bone of every hardpoint that declares an arc. A hardpoint with no cone tags is
-        // skipped rather than drawn as a zero-length stub.
-        viewport.setFireArcs((scene?.hardpoints ?? []).flatMap(hardpoint => {
-            const fire = hardpoint.fire;
-            if (fire === null || fire === undefined || (fire.range ?? 0) <= 0) {
-                return [];
-            }
+        // Which cones exist is decided in one place, `weaponRows`, off the same rows the dock is
+        // showing - so a bank switched off in the dock, and a mount that has been shot away, are
+        // the same answer in both. Weapons live on the scene rather than on the hardpoint, so a
+        // unit-mounted bank draws through exactly this path too.
+        viewport.setFireArcs(visibleArcs(weapons, fireArcs, hiddenBanks));
 
-            return fire.bones.map(bone => ({
-                partId: hardpoint.partId ?? 'hull',
-                bone,
-                widthDegrees: fire.coneWidthDegrees ?? 0,
-                heightDegrees: fire.coneHeightDegrees ?? 0,
-                range: fire.range ?? 0,
-            }));
-        }));
-
+        // Still set, though the list above is already empty when the master is off: the capture
+        // path hides the arcs for a screenshot and puts them back afterwards, and it restores
+        // through this flag.
         viewport.setFireArcsVisible(fireArcs);
 
         // Turrets sit where the XML says they rest, rather than wherever the model was exported.
+        // Only the turrets that declare a traverse, and only while the reader has asked. A turret
+        // with no extents is left at its rest angle - inventing a swing would claim a reach the
+        // unit has not got.
+        // Every bone a weapon fires from, so the selected-bone triad can arrow its aim axis.
+        viewport.setFireBones(new Set(
+            weapons.flatMap(row => row.fireBones).map(bone => bone.toLowerCase())));
+
+        viewport.setTurretSweep(!turretSweep ? [] : sweepable);
+
         viewport.setTurretRestAngles((scene?.hardpoints ?? []).flatMap(hardpoint => {
             const turret = hardpoint.turret;
             const bone = turret?.turretBone ?? '';
@@ -2448,14 +3398,43 @@ function ModelPreview(): React.JSX.Element {
                     restAngleDegrees: turret.restAngle,
                 }];
         }));
-    }, [scene, stats, fireArcs]);
+    }, [scene, stats, fireArcs, hiddenBanks, weapons, turretSweep, sweepable]);
+
+    /**
+     * The targeting marks, and how big the game would draw them.
+     *
+     * Depends on `stats` for the same reason the arcs do: the parts a mark is centred on are not
+     * there until the geometry has loaded, and a mark anchored on a part that does not exist yet is
+     * silently dropped.
+     */
+    useEffect(() => {
+        const viewport = viewportRef.current;
+        if (viewport === null) {
+            return;
+        }
+
+        // The mount health goes in so each mark can be tinted by how worn its mount is.
+        const marks = reticlesOn
+            ? reticleMarks(
+                scene?.hardpoints ?? [], scene?.reticles, reticleState, destroyed, mountHealth)
+            : [];
+
+        viewport.setReticles(marks, reticleScreenSize(scene?.reticles, reticleState));
+    }, [scene, stats, reticlesOn, reticleState, destroyed, mountHealth]);
 
     useEffect(() => {
         const chosen = customColour !== null
             ? parseHex(customColour)
             : scene?.factions.find(f => f.name === faction)?.color ?? null;
 
-        viewportRef.current?.setColorization(chosen === null ? null : teamColour(chosen));
+        // With no faction picked the subject wears its OWN uncoloured colour, and failing that its
+        // faction's: team colour is a skirmish thing, so this is what the unit looks like most of
+        // the time. Only 24 of the 772 objects that name an affiliation carry a colour of their
+        // own, so the fallback is what actually reaches most of them.
+        viewportRef.current?.setColorization(colorizationFor(
+            chosen,
+            scene?.noColorizationColor,
+            affiliationColour(scene?.factions ?? [], scene?.affiliation)));
     }, [faction, customColour, scene, stats]);
 
     useEffect(() => {
@@ -2595,6 +3574,8 @@ function ModelPreview(): React.JSX.Element {
                 skeleton: skeletonOn,
                 boneLabels: labelMode,
                 fireArcs,
+                attacker,
+                attackerPresets,
                 effectShaders: translatedOn,
                 particles: particlesOn,
                 particleSpeed,
@@ -2611,7 +3592,7 @@ function ModelPreview(): React.JSX.Element {
         });
     }, [grid, floor, floorLevel, wireframe, heatOn, heatDebug, bloom, drawDistance, lights, wind,
         cameraPresets, cameraBindings, folded, background, cameraView, skeletonOn, labelMode,
-        fireArcs,
+        fireArcs, attacker, attackerPresets,
         translatedOn, particlesOn, particleSpeed, faction, customColour]);
 
     /**
@@ -2782,8 +3763,23 @@ function ModelPreview(): React.JSX.Element {
             }]
             : [];
 
-        return [...problems, ...fromColour, ...fromShaders];
-    }, [problems, colourFindings, translatedOn, anyShaderSource]);
+        // A shield bubble the model names but does not draw with a shield shader. The NAME is what
+        // decides which mesh a shield ability reveals - the author's word - so this corrects
+        // nothing; it just says once that the thing will read as solid geometry rather than a
+        // field.
+        const fromShield = shieldOffShader.length === 0
+            ? []
+            : [{
+                severity: 'warning',
+                message: `${shieldOffShader.join(', ')} ${shieldOffShader.length === 1
+                    ? 'is named as a shield mesh but is not' : 'are named as shield meshes but are '
+                        + 'not'} drawn with a shield shader, so ${shieldOffShader.length === 1
+                    ? 'it' : 'they'} will look like solid geometry rather than a field.`,
+                hardpointId: null,
+            }];
+
+        return [...problems, ...fromColour, ...fromShaders, ...fromShield];
+    }, [problems, colourFindings, translatedOn, anyShaderSource, shieldOffShader]);
 
     const severity = worstSeverity(notices);
     const problemWord = notices.length === 1 ? 'note' : 'notes';
@@ -2836,14 +3832,49 @@ function ModelPreview(): React.JSX.Element {
     // about this model - so it sits at the end of the strip where arriving and leaving cannot move
     // the three permanent pills beside it.
     if (mode === 'gameplay') {
-        const anyArc = scene?.hardpoints.some(h => h.fire !== null && h.fire !== undefined) ?? false;
+        // Whether anything can be DRAWN, not whether the subject is armed. A weapon that declares
+        // no reach has no cone, so a pill that lit up for it would switch on nothing at all.
+        const drawable = weapons.filter(row => row.arcs.length > 0);
+        const anyArc = drawable.length > 0;
+        const shown = drawable.filter(row => !row.destroyed && !hiddenBanks.has(row.id)).length;
 
         overlays.push({
-            id: 'arcs', label: 'Arcs', icon: 'arcs', on: fireArcs && anyArc, set: setFireArcs,
+            // All or nothing: the pill IS the banks, so pressing it writes every one of them and
+            // the list below is for refining afterwards. It does not preserve a previous selection
+            // across a press - that is the point of an all-or-nothing master.
+            id: 'arcs', label: 'Arcs', icon: 'arcs', on: fireArcs && anyArc,
+            set: (on: boolean) => {
+                setFireArcs(on);
+                setHiddenBanks(on ? new Set() : allBankIds(weapons));
+            },
             disabled: !anyArc,
-            title: anyArc
-                ? 'The firing arc each weapon hardpoint declares'
-                : 'No hardpoint on this model declares a firing arc.',
+            title: !anyArc
+                ? 'Nothing on this model declares a firing arc.'
+                : shown === drawable.length
+                    ? `The firing arc each weapon declares - ${drawable.length} bank`
+                        + `${drawable.length === 1 ? '' : 's'}.`
+                    : `The firing arcs, ${shown} of ${drawable.length} bank`
+                        + `${drawable.length === 1 ? '' : 's'} switched on in the Weapons list.`,
+        });
+
+        // Whether a mark can be DRAWN, which is a different question from whether the subject has
+        // targetable mounts: the art resolves out of the game's texture directory, so a workspace
+        // with no game directory configured gets the map and no images. Saying so on the pill beats
+        // a switch that lights up and changes nothing.
+        const targetable = (scene?.hardpoints ?? []).filter(h => h.isTargetable).length;
+        const anyReticle = reticleMarks(
+            scene?.hardpoints ?? [], scene?.reticles, reticleState, new Set()).length > 0;
+
+        overlays.push({
+            id: 'reticles', label: 'Reticles', icon: 'target',
+            on: reticlesOn && anyReticle, set: setReticlesOn,
+            disabled: !anyReticle,
+            title: anyReticle
+                ? `What the game draws over a mount you can shoot at - ${targetable} targetable.`
+                : targetable === 0
+                    ? 'Nothing on this model can be targeted.'
+                    : 'The reticle art could not be read. Point the extension at your game '
+                      + 'directory and the marks appear.',
         });
     }
 
@@ -2973,6 +4004,7 @@ function ModelPreview(): React.JSX.Element {
         setLod(current => levels.lod.length > 0 ? levels.lod[levels.lod.length - 1] : current);
         setDestroyed(new Set());
         setHiddenEmitters(new Set());
+        setHiddenBanks(new Set());
         setTreeItems(viewportRef.current?.treeItems() ?? []);
     }, [levels]);
 
@@ -4050,6 +5082,8 @@ function ModelPreview(): React.JSX.Element {
                                         animations: animations.length,
                                         hardpoints: scene.hardpoints.length,
                                         particles: scene.particles.length,
+                                        weapons: scene.weapons.length,
+                                        abilities: abilities.length,
                                     })}
                                     onSelect={setMode}
                                 />
@@ -4099,11 +5133,24 @@ function ModelPreview(): React.JSX.Element {
                             <div className="dock-section">
                                 <div className="dock-section-title">
                                     Model tree
-                                    <span className="section-count">
-                                        {selected.size > 0
-                                            ? `${selected.size} selected`
-                                            : treeRows.length}
-                                    </span>
+                                    {/* The way OUT of a selection. Escape has always cleared it and
+                                        clicking the row again does now, but neither is visible -
+                                        the reader's complaint was that there was no obvious way
+                                        back, and a count that does nothing was the only thing on
+                                        screen saying a selection existed. */}
+                                    {selected.size > 0 ? (
+                                        <button
+                                            className="section-count as-button"
+                                            title="Clear the selection (Escape, or click the row
+                                                again)"
+                                            onClick={clearSelection}
+                                        >
+                                            {selected.size} selected
+                                            <Icon name="close" size={11} />
+                                        </button>
+                                    ) : (
+                                        <span className="section-count">{treeRows.length}</span>
+                                    )}
                                 </div>
 
                                 <ul className="bone-tree">
@@ -4122,6 +5169,19 @@ function ModelPreview(): React.JSX.Element {
                                                 : `${node.name}
 ${becauseText(node.because)}`}
                                             onClick={event => {
+                                                // Clicking the row that is ALREADY the whole
+                                                // selection clears it. There was no other way out
+                                                // of a selection at all - the box and the axes
+                                                // stayed until you picked something else.
+                                                const plain = !(event.ctrlKey || event.metaKey)
+                                                    && !event.shiftKey;
+
+                                                if (plain && selected.size === 1
+                                                    && selected.has(node.id)) {
+                                                    clearSelection();
+                                                    return;
+                                                }
+
                                                 const after = selectionAfterClick(
                                                     treeRows, selected, anchor, node.id, {
                                                         ctrl: event.ctrlKey || event.metaKey,
@@ -4131,7 +5191,7 @@ ${becauseText(node.because)}`}
                                                 setAnchor(after.anchor);
 
                                                 if (node.kind === 'bone') {
-                                                    setSelectedBone(Number(node.id.slice(5)));
+                                                    setSelectedBone(boneIndexOfRow(node.id));
                                                 }
                                             }}
                                         >
@@ -4424,13 +5484,490 @@ ${becauseText(node.because)}`}
                             </div>
                         )}
 
-                        {mode === 'gameplay' && (scene?.hardpoints.length ?? 0) === 0 && (
+                        {/* Nothing to say only when the subject is unarmed, unmounted AND unable.
+                            A fighter carries its guns on the unit itself and declares no hardpoints
+                            at all, and telling it there is nothing here would be wrong twice. */}
+                        {mode === 'gameplay' && (scene?.hardpoints.length ?? 0) === 0
+                            && weapons.length === 0 && abilities.length === 0 && (
                             <div className="dock-section">
                                 <div className="dock-section-title">Gameplay</div>
                                 <div className="field-note">
-                                    This subject declares no hardpoints, so there is nothing to
-                                    destroy and no damage effects to drive.
+                                    This subject declares no weapons, no hardpoints and no
+                                    abilities, so there is nothing to destroy and no damage effects
+                                    to drive.
                                 </div>
+                            </div>
+                        )}
+
+                        {mode === 'gameplay' && abilities.length > 0 && (
+                            <div className="dock-section">
+                                <div className="dock-section-title">
+                                    Abilities
+                                    <span className="section-count">{abilities.length}</span>
+                                </div>
+
+                                {/* Every ability is listed, including the ones that drive nothing.
+                                    Most of the 68 types are ORDERS - SPREAD_OUT, HUNT - and what a
+                                    unit can do is worth reading even when the answer is "nothing you
+                                    can see here". Their switch is disabled and says why, rather than
+                                    being absent or doing nothing when pressed. */}
+                                <ul className="part-list">
+                                    {abilities.map(ability => (
+                                        <li key={ability.type} title={ability.type}>
+                                            {/* A switch only where there IS something to switch.
+                                                DEFEND changes weapon delay, regen and speed and
+                                                shows nothing at all - a disabled control there read
+                                                as a broken ability rather than an invisible one, so
+                                                it gets its modifiers spelled out instead. */}
+                                            {ability.drivesSomething ? (
+                                                <label
+                                                    className="field-label"
+                                                    title={ability.title}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={activeAbilities.has(ability.type)}
+                                                        onChange={e => setAbilityActive(
+                                                            ability.type, e.target.checked)}
+                                                    />
+                                                    <span className="part-name">
+                                                        {ability.label}
+                                                    </span>
+                                                </label>
+                                            ) : (
+                                                <span
+                                                    className="part-name no-switch"
+                                                    title={ability.title}
+                                                >
+                                                    {ability.label}
+                                                </span>
+                                            )}
+                                            <span className="detail wraps">
+                                                {ability.label !== ability.type
+                                                    && `${ability.type} - `}
+                                                {ability.detail}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {/* The panel is INVERTED against the rest of the lens: everything else here
+                            describes the subject, and this describes a weapon you build to shoot it
+                            with. The heading says so, because a reader who assumes these are the
+                            ship's own numbers would read every field backwards. */}
+                        {mode === 'gameplay' && scene?.defence !== null
+                            && scene?.defence !== undefined && (
+                            <div className="dock-section">
+                                <div className="dock-section-title">
+                                    Attacker
+                                    <span className="section-count">
+                                        {scene.defence.isShielded ? 'shielded' : 'unshielded'}
+                                    </span>
+                                </div>
+
+                                <div className="field-note">
+                                    The model on stage is the TARGET. Build a weapon here and fire
+                                    it at the ship or at one mount.
+                                </div>
+
+                                <div className="field">
+                                    <span className="field-label">Damage</span>
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={attacker.damage}
+                                        onChange={e => setAttacker(current => ({
+                                            ...current,
+                                            damage: Number(e.target.value),
+                                        }))}
+                                    />
+                                </div>
+
+                                <div className="field">
+                                    <span className="field-label">
+                                        Damage type
+                                        <span className="section-count">
+                                            x{armorFactor(
+                                                attacker.shield && scene.defence.isShielded
+                                                    ? scene.defence.shieldFactors
+                                                    : scene.defence.hullFactors,
+                                                attacker.damageType)}
+                                        </span>
+                                    </span>
+                                    <select
+                                        value={attacker.damageType}
+                                        onChange={e => setAttacker(current => ({
+                                            ...current, damageType: e.target.value,
+                                        }))}
+                                        title="The factor beside this is what the table says against
+                                            this target's armor. A pair the table does not name is
+                                            1.0, which is over half of them."
+                                    >
+                                        {/* The reader's own value first when the tree does not
+                                            declare it - a preset saved against another mod must not
+                                            silently become whatever happens to sort first. */}
+                                        {!scene.defence.damageTypes.includes(attacker.damageType)
+                                            && (
+                                            <option value={attacker.damageType}>
+                                                {attacker.damageType} (not in this tree)
+                                            </option>
+                                        )}
+                                        {scene.defence.damageTypes.map(type => (
+                                            <option key={type} value={type}>{type}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                {/* The three switches a projectile carries. They decide entirely
+                                    what a hit touches - see `attacker.ts` for the four rules. */}
+                                <div className="view-row">
+                                    {DAMAGE_SWITCHES.map(({ id, label, title }) => (
+                                        <label key={id} className="field-label" title={title}>
+                                            <input
+                                                type="checkbox"
+                                                checked={attacker[id]}
+                                                onChange={e => setAttacker(current => ({
+                                                    ...current, [id]: e.target.checked,
+                                                }))}
+                                            />
+                                            {label}
+                                        </label>
+                                    ))}
+                                </div>
+
+                                {/* Disabled rather than absent when the subject fires nothing: a
+                                    control that comes and goes reads as a feature that does. */}
+                                {/* EVERY projectile in the tree, not the handful this subject
+                                    fires - you are building a weapon to shoot AT it, so its own
+                                    armament is the wrong list. 105 of them, so the search is the
+                                    way through rather than an optional extra. */}
+                                <div className="field">
+                                    <span className="field-label">
+                                        Fill from a projectile
+                                        <span className="section-count">
+                                            {scene.projectileCatalog?.length ?? 0}
+                                        </span>
+                                    </span>
+                                    <input
+                                        type="text"
+                                        placeholder="Search projectiles"
+                                        value={projectileSearch}
+                                        onChange={e => setProjectileSearch(e.target.value)}
+                                    />
+                                    <select
+                                        value=""
+                                        size={6}
+                                        disabled={(scene.projectileCatalog?.length ?? 0) === 0}
+                                        onChange={e => {
+                                            const picked = e.target.value;
+                                            const bolt = scene.projectiles
+                                                ?.find(p => p.id === picked);
+
+                                            if (bolt !== undefined) {
+                                                // A COPY. Edits afterwards stick.
+                                                setAttacker(attackerFromProjectile(bolt, attacker));
+                                                // Except the blast area, which has no field to edit
+                                                // and is read off the bolt when the shot resolves.
+                                                setAttackerProjectile(bolt.id);
+                                                setProjectileNote(null);
+                                            } else if (picked !== '') {
+                                                // Only the ones this subject fires arrive resolved;
+                                                // the rest are names until they are fetched, so the
+                                                // panel says so rather than filling in silence.
+                                                setProjectileNote(picked);
+                                            }
+                                        }}
+                                    >
+                                        {projectileChoices(
+                                            scene.projectileCatalog ?? [], projectileSearch)
+                                            .map(name => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
+                                    </select>
+                                    {projectileNote !== null && (
+                                        <span className="field-note">
+                                            {projectileNote} is not one this subject fires, so its
+                                            values are not loaded yet. Pick one of its own to fill
+                                            from, or set the fields by hand.
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Presets are TIER 1: they describe the reader's testing habits,
+                                    not this model, so they live in globalState beside the camera
+                                    presets and survive opening a different ship. */}
+                                <div className="field">
+                                    <span className="field-label">
+                                        Saved weapons
+                                        <span className="section-count">
+                                            {attackerPresets.length}
+                                        </span>
+                                    </span>
+                                    <select
+                                        value=""
+                                        disabled={attackerPresets.length === 0}
+                                        onChange={e => {
+                                            const saved = attackerPresets
+                                                .find(p => p.id === e.target.value);
+
+                                            if (saved !== undefined) {
+                                                const { id, name, ...weapon } = saved;
+                                                setAttacker(weapon);
+                                            }
+                                        }}
+                                        title={attackerPresets.length === 0
+                                            ? 'Name a configuration below to save it here.'
+                                            : 'Loads a saved weapon into the fields above.'}
+                                    >
+                                        <option value="">Recall a weapon...</option>
+                                        {attackerPresets.map(saved => (
+                                            <option key={saved.id} value={saved.id}>
+                                                {saved.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <span className="view-row">
+                                    <input
+                                        type="text"
+                                        placeholder="Name this weapon"
+                                        value={presetName}
+                                        onChange={e => setPresetName(e.target.value)}
+                                    />
+                                    <button
+                                        className="btn compact"
+                                        disabled={presetName.trim() === ''}
+                                        title={presetName.trim() === ''
+                                            ? 'Give the weapon a name to save it.'
+                                            : 'Saves these values under that name, for any subject'}
+                                        onClick={() => {
+                                            const name = presetName.trim();
+
+                                            setAttackerPresets(current => [
+                                                // Saving over a name REPLACES it. Two rows reading
+                                                // the same thing is worse than losing the old one,
+                                                // which is what the reader just asked for anyway.
+                                                ...current.filter(p => p.name !== name),
+                                                { ...attacker, id: `atk-${Date.now()}`, name },
+                                            ]);
+                                            setPresetName('');
+                                        }}
+                                    >
+                                        <Icon name="save" />
+                                        Save
+                                    </button>
+                                    <button
+                                        className="btn compact"
+                                        disabled={attackerPresets.length === 0}
+                                        title="Removes every saved weapon"
+                                        onClick={() => setAttackerPresets([])}
+                                    >
+                                        <Icon name="remove" />
+                                        Clear
+                                    </button>
+                                </span>
+
+                                <div className="field">
+                                    <span className="field-label">Fire at</span>
+                                    <select
+                                        value={fireTarget}
+                                        onChange={e => setFireTarget(e.target.value)}
+                                    >
+                                        <option value="hull" disabled={!shipTargetable}>
+                                            {shipTargetable
+                                                ? 'The ship'
+                                                : 'The ship - not targetable, it has hardpoints'}
+                                        </option>
+                                        {(scene.hardpoints ?? []).map(hardpoint => (
+                                            <option key={hardpoint.id} value={hardpoint.id}>
+                                                {hardpoint.id}
+                                                {hardpoint.health === null
+                                                    || hardpoint.health === undefined
+                                                    ? ' (no health)'
+                                                    : ` (${mountHealth[hardpoint.id] ?? 0} hp)`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <span className="view-row">
+                                    <button
+                                        className="btn primary"
+                                        title="Resolve one hit against the target"
+                                        onClick={fire}
+                                    >
+                                        <Icon name="effects" />
+                                        Fire
+                                    </button>
+                                    <button
+                                        className="btn"
+                                        title="Refill every pool and put the mounts back, without
+                                            touching the weapon you built"
+                                        onClick={() => { repairTarget(); destroyAll(false); }}
+                                    >
+                                        <Icon name="reset" />
+                                        Repair target
+                                    </button>
+                                </span>
+
+                                {/* What is left. Named pools rather than one health bar, because
+                                    which one a weapon drains is the entire question this panel
+                                    exists to answer. */}
+                                <ul className="part-list">
+                                    {poolRows(scene.defence, pools, hull).map(row => (
+                                        <li key={row.id} title={row.title}>
+                                            <span className="part-name">{row.label}</span>
+                                            <span className="detail">{row.detail}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {mode === 'gameplay' && (scene?.deathClones?.length ?? 0) > 0 && (
+                            <div className="dock-section">
+                                <div className="dock-section-title">
+                                    Death clone
+                                    <span className="section-count">
+                                        {scene?.deathClones?.length}
+                                    </span>
+                                </div>
+
+                                {/* Which one you get depends on what KILLED it, which is the weapon
+                                    built in the Attacker panel above - so the marked row follows the
+                                    damage type set there rather than being a static list. */}
+                                <div className="field-note">
+                                    What this leaves behind. The marked row is what your current
+                                    damage type would produce.
+                                </div>
+
+                                <ul className="part-list">
+                                    {deathCloneRows(scene?.deathClones ?? [], attacker.damageType)
+                                        .map(row => (
+                                        <li
+                                            key={`${row.label}:${row.objectId}`}
+                                            className={row.selected ? 'selected' : undefined}
+                                            title={row.objectId}
+                                        >
+                                            <span className="part-name">
+                                                {row.selected && <Icon name="check" />}
+                                                {row.label}
+                                            </span>
+                                            <span className="detail wraps">{row.detail}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
+                        {mode === 'gameplay' && weapons.length > 0 && (
+                            <div className="dock-section">
+                                <div className="dock-section-title">
+                                    Weapons
+                                    <span className="section-count">{weapons.length}</span>
+                                </div>
+
+                                {/* The middle of the three levels. The pill on the stage is the
+                                    master and a fire bone is the individual thing you can point at;
+                                    this is the bank, which is the unit a modder actually thinks in.
+                                    It says what the master is doing rather than letting a tick
+                                    change nothing on screen, which reads as a broken control. */}
+                                <div className="field-note">
+                                    {fireArcs
+                                        ? 'Arcs are on. Untick a bank to leave its cone out.'
+                                        : 'Arcs are off on the stage, so nothing is drawn yet - '
+                                          + 'these ticks decide what appears when you switch '
+                                          + 'them on.'}
+                                </div>
+
+                                {/* Turrets live on WEAPONS at least as often as on mounts - the
+                                    AT-AA's is on its bank and it has no hardpoints at all - so the
+                                    control belongs here rather than in the Hardpoints section,
+                                    which is absent on exactly that unit. Disabled, not hidden,
+                                    when nothing declares a traverse. */}
+                                <span className="view-row">
+                                    <button
+                                        className={'btn' + (turretSweep ? ' selected' : '')}
+                                        disabled={sweepable.length === 0}
+                                        title={sweepable.length === 0
+                                            ? 'Nothing on this subject declares a turret traverse.'
+                                            : `Swing ${sweepable.length} turret`
+                                              + `${sweepable.length === 1 ? '' : 's'} through the `
+                                              + 'traverse its XML declares, so you can see the '
+                                              + 'reach rather than read the number'}
+                                        onClick={() => setTurretSweep(on => !on)}
+                                    >
+                                        <Icon name="loop" />
+                                        Sweep turrets
+                                    </button>
+                                </span>
+
+                                <ul className="part-list">
+                                    {weapons.map(row => {
+                                        const drawable = row.arcs.length > 0;
+                                        const detail = [row.reach, row.cone, row.cadence,
+                                            row.damage].filter(text => text !== null);
+
+                                        return (
+                                            <li key={row.id} title={row.id}>
+                                                <label className="field-label">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={drawable && !row.destroyed
+                                                            && !hiddenBanks.has(row.id)}
+                                                        disabled={!drawable || row.destroyed}
+                                                        onChange={e => setBankArcs(
+                                                            row.id, e.target.checked)}
+                                                        title={bankTitle(row)}
+                                                    />
+                                                    <span className="part-name">{row.name}</span>
+                                                </label>
+                                                <span className="detail wraps">
+                                                    {row.label !== row.name
+                                                        && `${row.label} - `}
+                                                    {detail.length === 0
+                                                        ? 'no measurements declared'
+                                                        : detail.join(' - ')}
+                                                    {row.projectileId !== null
+                                                        && ` - fires ${row.projectileId}`}
+                                                </span>
+
+                                                {/* The third level. A muzzle is a bone on the
+                                                    model, so pointing at one selects it exactly as
+                                                    clicking its row in the model tree does - same
+                                                    box, same label. A hardpoint's own fire bone
+                                                    lives on the MOUNTED model rather than the hull,
+                                                    which this tree does not carry, so its button is
+                                                    disabled and says why. */}
+                                                <span className="view-row bone-picks">
+                                                    {row.fireBones.map((bone, index) => {
+                                                        const rowId = boneRows.get(
+                                                            bone.toLowerCase());
+
+                                                        return (
+                                                            <button
+                                                                key={`${bone}#${index}`}
+                                                                className={'btn compact'
+                                                                    + (rowId !== undefined
+                                                                        && selected.has(rowId)
+                                                                        ? ' selected' : '')}
+                                                                disabled={rowId === undefined}
+                                                                title={fireBoneTitle(bone, rowId !== undefined)}
+                                                                onClick={() => selectBoneRow(rowId)}
+                                                            >
+                                                                <Icon name="skeleton" />
+                                                                {bone}
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
                             </div>
                         )}
 
@@ -4439,6 +5976,15 @@ ${becauseText(node.because)}`}
                                 <div className="dock-section-title">
                                     Hardpoints
                                     <span className="section-count">{scene?.hardpoints.length}</span>
+                                </div>
+
+                                {/* No state picker. The game shows the TRACKED art under the
+                                    cursor, so hovering a mark is the honest way to see it - a
+                                    seven-way dropdown asked the reader to name a state instead of
+                                    just pointing at the thing. Clicking one picks the mount. */}
+                                <div className="field-note">
+                                    Hover a targeting mark to see its tracked art; click one to aim
+                                    the attacker at that mount.
                                 </div>
 
                                 {(scene?.hardpoints.some(h => h.isDestroyable) ?? false) && (
@@ -4500,6 +6046,7 @@ ${becauseText(node.because)}`}
                             playing: animation,
                             destroyed: destroyed.size,
                             particleSystems: scene?.particles.length ?? 0,
+                            abilities: activeAbilities.size,
                         }).map(chip => (
                             <button
                                 key={chip.mode}
@@ -4700,56 +6247,6 @@ ${becauseText(node.because)}`}
                                         </select>
                                     </div>
                                 )}
-                            </>
-                        )}
-
-                        {(emitters.length > 0 || groups.length > 0) && mode === 'gameplay' && (
-                            <>
-                                {/* Effect playback, not model playback - and only in Gameplay,
-                                    where the effects are the subject. On the model lens a transport
-                                    bar and a speed dial that silently meant "particles only" read
-                                    as controls for the model, which they never were. */}
-                                <div className="field">
-                                    <span className="field-label">Effects</span>
-                                    <span className="view-row">
-                                        <button
-                                            className="btn compact"
-                                            title={particlesPaused
-                                                ? 'Resume the simulation'
-                                                : 'Hold the simulation where it is'}
-                                            onClick={() => setParticlesPaused(current => !current)}
-                                        >
-                                            <Icon name={particlesPaused ? 'play' : 'pause'} />
-                                        </button>
-                                        <button
-                                            className="btn compact"
-                                            title="Replay from nothing. A burst emitter's whole point
-                                                is its first half second, which cannot be rewound to."
-                                            onClick={() => viewportRef.current?.restartParticles()}
-                                        >
-                                            <Icon name="restart" />
-                                        </button>
-                                    </span>
-                                </div>
-
-                                <div className="field">
-                                    <span className="field-label">
-                                        Effect speed
-                                        <span className="section-count">
-                                            {particleSpeed.toFixed(2)}x
-                                        </span>
-                                    </span>
-                                    <input
-                                        type="range"
-                                        min="0"
-                                        max="2"
-                                        step="0.05"
-                                        value={particleSpeed}
-                                        onChange={e => setParticleSpeed(Number(e.target.value))}
-                                        title="Particle time only. The model's own animation keeps its
-                                            own rate, so a slowed plume can still sit on a moving hull."
-                                    />
-                                </div>
                             </>
                         )}
 

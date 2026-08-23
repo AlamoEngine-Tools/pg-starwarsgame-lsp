@@ -76,3 +76,60 @@ describe('which volumes count', () => {
         assert.equal(pass.active, true);
     });
 });
+
+describe('dropping one part of the scene', () => {
+    const volumeMesh = (name: string): THREE.Mesh => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        mesh.name = name;
+        return mesh;
+    };
+
+    it('drops the counting meshes of a volume whose part has gone', () => {
+        // Geometry that comes and goes inside a scene: a piece of wreckage reaches the end of its
+        // lifetime, a death clone is removed by a repair. `clear` is not the answer for either -
+        // the rest of the scene is still standing and still needs its shadow.
+        const pass = new ShadowVolumePass();
+        const source = volumeMesh('wreck_shadow');
+        pass.add(source);
+
+        pass.remove(source);
+
+        assert.equal(pass.active, false);
+        assert.equal(source.children.length, 0);
+    });
+
+    it('leaves every other volume counting', () => {
+        const pass = new ShadowVolumePass();
+        const going = volumeMesh('wreck_shadow');
+        const staying = volumeMesh('hull_shadow');
+        pass.add(going);
+        pass.add(staying);
+
+        pass.remove(going);
+
+        assert.equal(pass.active, true);
+        assert.equal(staying.children.length, 2);
+    });
+
+    it('forgets that a removed volume was gated off', () => {
+        // Otherwise the mesh is held by `uncounted` for the life of the scene, which is a leak of
+        // the whole disposed subtree hanging off it.
+        const pass = new ShadowVolumePass();
+        const source = volumeMesh('wreck_shadow');
+        pass.add(source);
+        pass.setCounting(source, false);
+
+        pass.remove(source);
+        pass.add(source);
+
+        assert.equal(pass.active, true);
+    });
+
+    it('ignores a mesh it never adopted', () => {
+        const pass = new ShadowVolumePass();
+        pass.add(volumeMesh('hull_shadow'));
+
+        assert.doesNotThrow(() => pass.remove(volumeMesh('stranger')));
+        assert.equal(pass.active, true);
+    });
+});
