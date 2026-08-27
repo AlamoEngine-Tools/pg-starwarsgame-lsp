@@ -25,6 +25,7 @@ import {
 import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
 import { RightDock } from './shared/RightDock';
 import { ProblemsPanel } from './shared/ProblemsPanel';
+import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
 import { labelLayout, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
@@ -539,16 +540,6 @@ function applyOptimistic(payload: Record<string, unknown>): void {
 
 /** AND-junction node ids embed their owner event and group index: `{eventNodeId}#g{index}`. */
 const andJunctionId = /^(.*)#g(\d+)$/;
-
-/**
- * elk auto-arrange options - Event nodes are full-blueprint-style forms, several times taller
- * than plain boxes; the default spacing crowded them together enough to overlap.
- */
-const ARRANGE_OPTIONS = {
-    'elk.direction': 'RIGHT',
-    'elk.spacing.nodeNode': '60',
-    'elk.layered.spacing.nodeNodeBetweenLayers': '90',
-};
 
 // Below this zoom level a large graph shows the cheap LOD overview (LodOverview) instead of mounting
 // real rete nodes. Small graphs fit-to-screen at a higher zoom and never hit it, so they mount
