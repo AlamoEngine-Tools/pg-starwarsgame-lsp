@@ -19,4 +19,8 @@ public sealed class TextureFileExistenceHandler : AssetFileExistenceHandlerBase
     // The engine resolves a texture by basename across both formats: TGA wins when both exist,
     // otherwise it silently falls back to the DDS (and vice versa). Only both-missing is real.
     protected override IReadOnlyList<string> InterchangeableExtensions => [".tga", ".dds"];
+
+    // GUI art - unit and ability icons, cursors, encyclopedia chrome - ships INSIDE a mega texture
+    // rather than as a file, so the file lookup alone declared perfectly good art missing.
+    protected override bool ResolvesFromMegaTexture => true;
 }

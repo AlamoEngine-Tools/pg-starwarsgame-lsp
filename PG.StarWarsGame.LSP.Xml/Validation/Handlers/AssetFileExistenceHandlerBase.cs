@@ -28,6 +28,16 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
     /// </summary>
     protected virtual IReadOnlyList<string> InterchangeableExtensions => [];
 
+    /// <summary>
+    ///     Whether art packed into a mega texture satisfies this reference.
+    /// </summary>
+    /// <remarks>
+    ///     Off by default, and deliberately narrow. A mega texture holds GUI art and nothing else,
+    ///     so excusing a model, a sound or a map because a <c>.mtd</c> happens to name something
+    ///     similar would turn a real missing-asset warning into silence.
+    /// </remarks>
+    protected virtual bool ResolvesFromMegaTexture => false;
+
     protected sealed override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ReferenceKind != TargetKind)
@@ -42,6 +52,12 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         {
             if (AssetFileLookup.Resolves(
                     ctx.Index.AssetFiles, se, AllowedExtensions, InterchangeableExtensions))
+                continue;
+
+            // Only now, with the file lookup already failed, is it worth asking the mega textures.
+            // Unresolved references are the rare case, so the cost of opening a .mtd is paid on the
+            // path that was about to warn rather than on every reference in the document.
+            if (ResolvesFromMegaTexture && ctx.IconNames?.Contains(se) == true)
                 continue;
 
             var alternates = AssetFileLookup.AlternateNames(se, InterchangeableExtensions).ToList();

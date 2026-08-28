@@ -30,8 +30,14 @@ import {
 import { ProblemsPanel } from './shared/ProblemsPanel';
 import { RightDock } from './shared/RightDock';
 
+import { initPanelLayout } from './shared/panelLayoutBridge';
+
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
+
+// Reads the dock and drawer sizes the host seeded into the page, and reports
+// every drag back to it. Must run before anything measures itself.
+initPanelLayout(vscode);
 
 /**
  * Zoom range.
@@ -49,7 +55,6 @@ const clampZoom = (z: number): number =>
 
 // Module-level so a remount - the webview reloads when its tab is restored - keeps the dock width,
 // the same way the localisation grid does.
-let dockWidthMemo = 220;
 
 const Shell = styled.div`
     ${dockChromeCss}
@@ -298,7 +303,7 @@ function App(): React.JSX.Element {
                 {noticesOpen && notices.length > 0 && (
                     <ProblemsPanel
                         className="encyclopedia-problems"
-                        memoKey="encyclopedia"
+                        memoKey="encyclopedia.problems"
                         defaultHeight={120}
                         title={noticeTitle}
                         onClose={() => setNoticesOpen(false)}
@@ -320,10 +325,10 @@ function App(): React.JSX.Element {
             </div>
 
             <RightDock
-                initialWidth={dockWidthMemo}
+                memoKey="encyclopedia.dock"
+                initialWidth={220}
                 minWidth={180}
                 maxWidth={420}
-                onWidthChange={w => { dockWidthMemo = w; }}
                 header={<>
                     <span className="header-title" title={entry?.objectId}>{title}</span>
                     <button

@@ -476,6 +476,29 @@ public sealed record PreviewDeathClone(
     public IReadOnlyList<PreviewParticle> Particles { get; init; } = Particles ?? [];
 }
 
+/// <param name="GuiName">
+///     The ability's <c>GUI_Activated_Ability_Name</c>: NOT display text, but the name of a
+///     <c>SpecialAbility</c> block defined elsewhere in the XML. Carried so the lens can offer a jump
+///     to that definition; 39% of shipped abilities declare one, and an ability without it never
+///     reaches the command bar at all.
+/// </param>
+/// <param name="Name">
+///     What the command bar calls this ability, already localised. From
+///     <c>Alternate_Name_Text</c> when the instance overrides it, otherwise the
+///     <c>TEXT_TOOLTIP_ABILITY_&lt;TYPE&gt;_NAME</c> convention. Null when neither resolves, which
+///     for a shipped ability means the mod has replaced the text without providing it.
+/// </param>
+/// <param name="Description">
+///     The tooltip text, already localised, resolved the same way from
+///     <c>Alternate_Description_Text</c> or <c>TEXT_TOOLTIP_ABILITY_&lt;TYPE&gt;_DESCRIPTION</c>.
+/// </param>
+/// <param name="IconDataUri">
+///     The command-bar icon as a <c>data:image/png;base64,...</c> URI, or null when nothing could be
+///     asserted about it. A declared-but-missing icon carries the missing-art placeholder here AND
+///     raises a problem, because that is what the engine would draw. Same shape as the reticle icons
+///     beside it. The atlas slot is 26x26 - draw it near native size rather than blown up, which is
+///     how the game itself shows it.
+/// </param>
 public sealed record PreviewAbility(
     string Type,
     string? GuiName,
@@ -486,7 +509,10 @@ public sealed record PreviewAbility(
     IReadOnlyList<string> ProxyNames,
     string? DeployClip,
     string? UndeployClip,
-    IReadOnlyList<PreviewAbilityModifier> Modifiers);
+    IReadOnlyList<PreviewAbilityModifier> Modifiers,
+    string? Name = null,
+    string? Description = null,
+    string? IconDataUri = null);
 
 public sealed record PreviewTargetDefence(
     bool IsShielded,

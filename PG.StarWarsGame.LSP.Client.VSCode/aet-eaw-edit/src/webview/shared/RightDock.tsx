@@ -16,6 +16,7 @@
 import { ReactNode } from 'react';
 
 import { useEdgeResize } from '../useEdgeResize';
+import { readPanelSize, writePanelSize } from './panelLayout';
 
 export interface RightDockProps {
     /** Pinned above the scrolling content - mode switches, save/validate, whatever the editor needs. */
@@ -31,23 +32,33 @@ export interface RightDockProps {
     /** A strip at the foot, below the scroll - filters and overviews live here. */
     overview?: ReactNode;
 
+    /**
+     * Identifies this dock's remembered width, as `<surface>.dock`. Each editor keeps its own -
+     * the story graph's palette and the preview's inspector are different questions.
+     *
+     * Omit it and the dock still works; it just forgets, which is what every editor did before.
+     */
+    memoKey?: string;
+
     initialWidth?: number;
     minWidth?: number;
     maxWidth?: number;
-    /**
-     * Called with each new width. Webviews are remounted when their tab is restored, so a caller
-     * that wants the dock to keep its size across that has to remember it somewhere outside React.
-     */
+    /** Called with each new width, for a caller that wants to react to the drag itself. */
     onWidthChange?: (width: number) => void;
 }
 
 export function RightDock({
-    header, content, overview,
+    header, content, overview, memoKey,
     initialWidth = 260, minWidth = 180, maxWidth = 560, onWidthChange,
 }: RightDockProps): React.JSX.Element {
     // 'w': dragging left grows a dock pinned to the right edge.
     const { size, handleProps } = useEdgeResize(
-        initialWidth, minWidth, maxWidth, 'w', onWidthChange ?? (() => { /* not persisted */ }));
+        memoKey === undefined ? initialWidth : readPanelSize(memoKey, initialWidth),
+        minWidth, maxWidth, 'w',
+        width => {
+            if (memoKey !== undefined) { writePanelSize(memoKey, width); }
+            onWidthChange?.(width);
+        });
 
     return (
         <div className="right-dock" style={{ width: size }}>

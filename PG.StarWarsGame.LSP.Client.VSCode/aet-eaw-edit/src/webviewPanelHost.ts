@@ -15,6 +15,8 @@
 
 import * as vscode from 'vscode';
 
+import { readPanelLayout, savePanelSize } from './panelLayoutStorage';
+
 /** What makes one panel different from another. */
 export interface WebviewPanelSpec {
     /**
@@ -106,11 +108,23 @@ export abstract class WebviewPanelHost {
             vscode.Uri.joinPath(extensionUri, 'out', 'codicons', 'codicon.css'));
 
         this.panel.webview.html = buildHtml(
-            scriptUri, codiconUri, this.panel.webview.cspSource, spec.bodyStyle, spec.allowBlobImages);
+            scriptUri, codiconUri, this.panel.webview.cspSource, spec.bodyStyle, spec.allowBlobImages,
+            readPanelLayout());
 
         this.onDidDispose = this.panel.onDidDispose;
-        this.panel.webview.onDidReceiveMessage(
-            (msg: WebviewMessage) => void this.onMessage(msg));
+        this.panel.webview.onDidReceiveMessage((msg: WebviewMessage) => {
+            // Handled here for every editor at once. A dock width is the base class's business -
+            // no subclass has an opinion about it, and five identical cases in five switches is
+            // exactly the duplication this class exists to prevent.
+            if (msg.type === 'setPanelLayout') {
+                const { key, value } = msg as { key?: unknown; value?: unknown };
+                if (typeof key === 'string' && typeof value === 'number') {
+                    savePanelSize(key, value);
+                }
+                return;
+            }
+            void this.onMessage(msg);
+        });
     }
 
     /** Handles one message from the webview. */
@@ -191,9 +205,24 @@ export function panelSetKey(filePaths: string[]): string {
     return filePaths.map(panelKey).sort().join('|');
 }
 
+/**
+ * Escapes a value for a double-quoted HTML attribute.
+ *
+ * The stored layout is carried in the markup rather than an inline script, so it has to be safe as
+ * markup. Keys come from our own components today, but a stored blob is data from disk and one that
+ * closed the attribute would rewrite the page.
+ */
+function escapeAttribute(value: string): string {
+    return value
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function buildHtml(
     scriptUri: vscode.Uri, codiconUri: vscode.Uri, cspSource: string, bodyStyle?: string,
-    allowBlobImages = false,
+    allowBlobImages = false, panelLayout: Record<string, number> = {},
 ): string {
     // A bundled script, so script-src is the extension origin rather than 'unsafe-inline' - which
     // is what the old sidebar webview needed, having its JS inlined as a template literal.
@@ -212,7 +241,7 @@ ${bodyStyle}
 </style>` : ''}
 </head>
 <body>
-<div id="root"></div>
+<div id="root" data-panel-layout="${escapeAttribute(JSON.stringify(panelLayout))}"></div>
 <script src="${scriptUri}"></script>
 </body>
 </html>`;

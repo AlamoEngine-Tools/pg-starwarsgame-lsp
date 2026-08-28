@@ -20,6 +20,7 @@ import { ModelPreviewEditorProvider } from './modelPreviewEditor';
 import { ModelPreviewPanel } from './modelPreviewPanel';
 import { offerShaderSources, shaderDirectory } from './shaderSources';
 import { initDialogGeometryStorage } from './dialogGeometryStorage';
+import { initPanelLayoutStorage } from './panelLayoutStorage';
 import { initViewerSettingsStorage } from './viewerSettingsStorage';
 import { LocalisationEditorPanel } from './localisationEditorPanel';
 import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
@@ -566,6 +567,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 	// The preview's room settings follow the person rather than the project, so globalState.
 	initViewerSettingsStorage(context.globalState);
+
+	// Same reasoning: how wide you like a dock is a property of your screen and your habits,
+	// not of the mod you have open.
+	initPanelLayoutStorage(context.globalState);
 
 	localisationNavigatorProvider = new LocalisationNavigatorViewProvider(lsp);
 	context.subscriptions.push(

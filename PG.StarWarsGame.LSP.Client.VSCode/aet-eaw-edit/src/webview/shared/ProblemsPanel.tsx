@@ -11,14 +11,9 @@
 // it was dragged to. That had been written twice, down to the class names.
 
 import { useEdgeResize } from '../useEdgeResize';
+import { readPanelSize, writePanelSize } from './panelLayout';
 
-/**
- * Heights the user has dragged to, by panel.
- *
- * Module-level so a remount keeps the size - closing and reopening the bar is not a request to
- * forget how tall it was. Keyed, so the two panels do not shove each other around.
- */
-const heights: Record<string, number> = {};
+
 
 export function ProblemsPanel(props: {
     /** The editor's own class for this bar; each skins it in its own stylesheet. */
@@ -31,9 +26,12 @@ export function ProblemsPanel(props: {
     onClose: () => void;
     children: React.ReactNode;
 }): React.JSX.Element {
+    // Closing and reopening the bar is not a request to forget how tall it was, and neither is
+    // closing the tab: the size now outlives the window, keyed so the two panels never shove each
+    // other around.
     const { size: height, handleProps } = useEdgeResize(
-        heights[props.memoKey] ?? props.defaultHeight, 60, 420, 'n',
-        value => { heights[props.memoKey] = value; });
+        readPanelSize(props.memoKey, props.defaultHeight), 60, 420, 'n',
+        value => { writePanelSize(props.memoKey, value); });
 
     return (
         <div className={props.className} style={{ height }}>

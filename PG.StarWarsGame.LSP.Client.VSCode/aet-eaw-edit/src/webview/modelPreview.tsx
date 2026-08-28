@@ -136,8 +136,14 @@ import {
 } from './preview/viewerSettings';
 import { RightDock } from './shared/RightDock';
 
+import { initPanelLayout } from './shared/panelLayoutBridge';
+
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
+
+// Reads the dock and drawer sizes the host seeded into the page, and reports
+// every drag back to it. Must run before anything measures itself.
+initPanelLayout(vscode);
 
 /** Messages the panel host sends in. */
 type HostMessage =
@@ -213,8 +219,6 @@ const GEOMETRY_TABLES: readonly { id: GeometryTable; label: string; title: strin
 const NOTHING_DRAWN = 'This model has no visible mesh at the current damage and detail level. '
     + 'Every sub-mesh is either tagged for another level, hidden in the file, or on a hidden bone.';
 
-/** Remembered for the session so the dock does not snap back on every reload. */
-let dockWidthMemo = 260;
 
 const Shell = styled.div`
     ${dockChromeCss}
@@ -4974,7 +4978,7 @@ function ModelPreview(): React.JSX.Element {
                     {problemsOpen && notices.length > 0 && (
                         <ProblemsPanel
                             className="preview-problems"
-                            memoKey="modelPreview"
+                            memoKey="modelPreview.problems"
                             defaultHeight={140}
                             title={`Problems (${notices.length})`}
                             onClose={() => setProblemsOpen(false)}
@@ -4997,10 +5001,10 @@ function ModelPreview(): React.JSX.Element {
                 </div>
 
                 <RightDock
-                    initialWidth={dockWidthMemo}
+                    memoKey="modelPreview.dock"
+                    initialWidth={260}
                     minWidth={200}
                     maxWidth={460}
-                    onWidthChange={w => { dockWidthMemo = w; }}
                     header={<>
                         {/* The graph's layout exactly: one button anchored left where its save sits,
                             the dial alone in the centred slot, one anchored right. The preview has

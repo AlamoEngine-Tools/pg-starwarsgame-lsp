@@ -17,11 +17,17 @@ import { LocRow } from '../loc/locRow';
 import { useDebounced, VALIDATE_DEBOUNCE_MS } from './useDebounced';
 import { worstSeverity } from './validateState';
 
+import { initPanelLayout } from '../shared/panelLayoutBridge';
+
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 
 // Acquired once for the whole webview: calling it twice throws, so this module owns it and
 // everything else posts through `post`.
 const vscode = acquireVsCodeApi();
+
+// Reads the dock and drawer sizes the host seeded into the page, and reports
+// every drag back to it. Must run before anything measures itself.
+initPanelLayout(vscode);
 
 /** Sends a message to the panel hosting this webview. */
 export function post(message: unknown): void {

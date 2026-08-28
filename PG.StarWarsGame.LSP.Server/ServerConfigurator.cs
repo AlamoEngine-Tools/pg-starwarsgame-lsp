@@ -295,6 +295,16 @@ public static class ServerConfigurator
                 services.AddSingleton<IIconRepackStatusProvider>(sp =>
                     sp.GetRequiredService<IIconCatalogProvider>());
 
+                // One place that answers "the icon catalog for the workspace I have open". Three
+                // features wanted it and each had grown its own copy; one of those copies carried
+                // a DI bug that made every project-configured icon path fall back silently.
+                services.AddSingleton<IWorkspaceIconCatalog, WorkspaceIconCatalog>();
+
+                // "Is this texture packed into a mega texture?", for the XML diagnostics. Same
+                // Core-side seam as the two above, and a thin adapter over the catalog itself so the
+                // editor and the preview can never disagree about whether a piece of art exists.
+                services.AddSingleton<IIconNameIndex, IconCatalogNameIndex>();
+
                 services.AddSingleton<IShipNameCatalogProvider, ShipNameCatalogProvider>();
 
                 // Model preview asset resolution. SupportMEG sits alongside SupportMTD above and is

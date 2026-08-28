@@ -30,7 +30,7 @@ export function LocProblemsBar(props: {
     return (
         <ProblemsPanel
             className="loc-problems"
-            memoKey="loc"
+            memoKey="localisation.problems"
             defaultHeight={120}
             title={title}
             onClose={props.onClose}

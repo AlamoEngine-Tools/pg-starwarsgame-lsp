@@ -50,8 +50,15 @@ import {
     StoryParamOptionDto, StoryParamSchemaDto, StorySimStateDto,
 } from '../protocol';
 
+import { readPanelSize, writePanelSize } from './shared/panelLayout';
+import { initPanelLayout } from './shared/panelLayoutBridge';
+
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
+
+// Reads the dock and drawer sizes the host seeded into the page, and reports
+// every drag back to it. Must run before anything measures itself.
+initPanelLayout(vscode);
 
 // The wire shapes come from ../protocol - one declaration shared with the extension host that
 // forwards them. The copy that used to sit here had already drifted from the host'"'"'s: it carried
@@ -3777,10 +3784,10 @@ function App(): React.JSX.Element {
                 </div>
                 </div>
                 <RightDock
-                    initialWidth={paletteWidthMemo}
+                    memoKey="storyGraph.dock"
+                    initialWidth={300}
                     minWidth={210}
                     maxWidth={520}
-                    onWidthChange={v => { paletteWidthMemo = v; }}
                     header={<>
                         {mode === 'edit' ? (
                             <button
@@ -3877,12 +3884,8 @@ function App(): React.JSX.Element {
     );
 }
 
-/** Session-remembered chrome sizes, so a re-mount (mode switch, sim restart) keeps the choice. */
-// Same default as the localisation editors' dock, and the same resize range - the two docks hold
-// the same kind of thing (a titled grid of tiles over a search block) and looked subtly unlike each
-// other only because this number was picked separately.
-let paletteWidthMemo = 300;
-let simBarHeightMemo = 140;
+/** The sim log opens this tall until the reader drags it somewhere else. */
+const SIM_LOG_DEFAULT_HEIGHT = 140;
 
 /**
  * Pointer-capture drag resizing for one panel edge. `axis` maps pointer movement to growth:
@@ -3906,7 +3909,7 @@ function ProblemsBar(props: {
     return (
         <ProblemsPanel
             className="problems"
-            memoKey="storyGraph"
+            memoKey="storyGraph.problems"
             defaultHeight={150}
             title={`Problems (${props.problems.length})`}
             onClose={props.onClose}
@@ -4019,7 +4022,8 @@ function SimControls(props: { state: StorySimStateDto }): React.JSX.Element {
 /** The simulation step log - full-width bottom panel (VS Code-style), resizable by its top edge. */
 function SimLog(props: { state: StorySimStateDto; onClose: () => void }): React.JSX.Element {
     const { size: height, handleProps } = useEdgeResize(
-        simBarHeightMemo, 60, 320, 'n', v => { simBarHeightMemo = v; });
+        readPanelSize('storyGraph.simLog', SIM_LOG_DEFAULT_HEIGHT), 60, 320, 'n',
+        v => { writePanelSize('storyGraph.simLog', v); });
     return (
         <div className="sim-log-panel" style={{ height }}>
             <div className="resize-handle-n" title="Drag to resize" {...handleProps} />

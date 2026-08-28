@@ -6,6 +6,8 @@ using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Assets.Icons;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Xml.Util;
@@ -205,7 +207,13 @@ public sealed class PreviewSceneBuilder(
     }
 
     /// <summary>A scene for a GameObject: its tactical model plus everything its XML mounts on it.</summary>
-    public PreviewScene BuildForObject(string objectId)
+    /// <param name="icons">
+    ///     The project's icon catalog, for the ability rows' command-bar art. Optional and resolved
+    ///     by the CALLER because building one is async and may decode a mega texture, which is not
+    ///     something a synchronous scene build should be doing; a scene without it simply carries no
+    ///     ability icons.
+    /// </param>
+    public PreviewScene BuildForObject(string objectId, IconCatalog? icons = null)
     {
         var index = indexService.Current;
         var resolver = new EffectiveObjectResolver(index, schema, tagSource);
@@ -276,7 +284,8 @@ public sealed class PreviewSceneBuilder(
             // neighbour often enough to be dangerous - it did, once.
             Defence: Defence(effective, hardpoints),
             Abilities: Abilities(effective, particles,
-                AnimationsFor(animationSource ?? hull ?? string.Empty), problems),
+                AnimationsFor(animationSource ?? hull ?? string.Empty), problems,
+                icons, index.Localisation),
             DeathClones: DeathClones(resolver, effective, problems),
             DeathExplosions: Tag(effective, "Death_Explosions"),
             ProjectileCatalog: ProjectileCatalog(),
@@ -364,7 +373,9 @@ public sealed class PreviewSceneBuilder(
         EffectiveObject effective,
         IReadOnlyList<PreviewParticle> particles,
         IReadOnlyList<string> animations,
-        List<PreviewProblem> problems)
+        List<PreviewProblem> problems,
+        IconCatalog? icons = null,
+        ILocalisationIndex? localisation = null)
     {
         var declared = UnitAbilityReader.Read(Fragment(effective, EncyclopediaTags.UnitAbilitiesData));
 
@@ -382,7 +393,8 @@ public sealed class PreviewSceneBuilder(
         var abilities = new List<PreviewAbility>();
 
         foreach (var ability in declared)
-            abilities.Add(new PreviewAbility(
+        {
+            var row = new PreviewAbility(
                 ability.Type,
                 ability.Tag("GUI_Activated_Ability_Name"),
                 ability.Tag("Owner_Attachment_Bone"),
@@ -392,7 +404,20 @@ public sealed class PreviewSceneBuilder(
                 bound.For(ability.Type),
                 animations.FirstOrDefault(IsDeploy),
                 animations.FirstOrDefault(IsUndeploy),
-                Modifiers(ability)));
+                Modifiers(ability));
+
+            // The Alternate_* trio is read here and not carried on the DTO: they are localisation
+            // KEYS and an icon NAME, none of which the client can do anything with. What it wants is
+            // the resolved text and the pixels.
+            abilities.Add(PreviewAbilityText.Fill(
+                row,
+                ability.Tag("Alternate_Name_Text"),
+                ability.Tag("Alternate_Icon_Name"),
+                icons,
+                localisation,
+                problems,
+                ability.Tag("Alternate_Description_Text")));
+        }
 
         return abilities;
     }

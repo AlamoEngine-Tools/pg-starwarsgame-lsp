@@ -12,6 +12,8 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Assets;
 
+using PG.StarWarsGame.LSP.Server.Icons;
+
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
 /// <summary>Serves the assembled scene description.</summary>
@@ -23,32 +25,37 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 public sealed class GetPreviewSceneHandler(
     PreviewSceneBuilder builder,
     IGameAssetResolver assets,
-    ILspConfigurationProvider config)
+    ILspConfigurationProvider config,
+    IWorkspaceIconCatalog? icons = null)
     : IJsonRpcRequestHandler<GetPreviewSceneParams, GetPreviewSceneResult>
 {
-    public Task<GetPreviewSceneResult> Handle(
+    public async Task<GetPreviewSceneResult> Handle(
         GetPreviewSceneParams request, CancellationToken cancellationToken)
     {
         if (!config.Current.Features.Tools.ModelPreview)
-            return Task.FromResult(new GetPreviewSceneResult(PreviewScene.NotFound(
+            return new GetPreviewSceneResult(PreviewScene.NotFound(
                 request.ObjectId ?? request.ModelReference ?? string.Empty,
                 "The model preview is turned off (aet-eaw-edit.features.tools.modelPreview).",
-                assets.Tiers)));
+                assets.Tiers));
 
         if (!string.IsNullOrWhiteSpace(request.ObjectId))
-            return Task.FromResult(new GetPreviewSceneResult(
-                WithReticleIcons(builder.BuildForObject(request.ObjectId))));
+        {
+            // Only an object has ability rows to put icons on, so only this path pays for the
+            // catalog - opening a bare .alo or an .ala never touches it.
+            var catalog = icons is null ? null : await icons.GetAsync(cancellationToken);
+            return new GetPreviewSceneResult(
+                WithReticleIcons(builder.BuildForObject(request.ObjectId, catalog)));
+        }
 
         if (!string.IsNullOrWhiteSpace(request.AnimationReference))
-            return Task.FromResult(
-                new GetPreviewSceneResult(builder.BuildForAnimation(request.AnimationReference)));
+            return new GetPreviewSceneResult(builder.BuildForAnimation(request.AnimationReference));
 
         if (!string.IsNullOrWhiteSpace(request.ModelReference))
-            return Task.FromResult(new GetPreviewSceneResult(
-                builder.BuildForModel(PreviewModelReference.Normalise(request.ModelReference))));
+            return new GetPreviewSceneResult(
+                builder.BuildForModel(PreviewModelReference.Normalise(request.ModelReference)));
 
-        return Task.FromResult(new GetPreviewSceneResult(PreviewScene.NotFound(
-            string.Empty, "No object, model or animation was named.", assets.Tiers)));
+        return new GetPreviewSceneResult(PreviewScene.NotFound(
+            string.Empty, "No object, model or animation was named.", assets.Tiers));
     }
 
     /// <summary>
