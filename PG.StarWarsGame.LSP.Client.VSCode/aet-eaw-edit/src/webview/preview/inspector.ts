@@ -259,7 +259,8 @@ function meshPanel(source: MeshInspection, detail?: ModelDetail): InspectorPanel
         // "Untagged" and "level 0" are different statements about the file, and a defaulted 0 would
         // read as the author having pinned the mesh to the undamaged state.
         text('Damage state', extras.alamoAlt === undefined ? 'none' : String(extras.alamoAlt)),
-        text('Detail', extras.alamoLod === undefined ? 'none' : String(extras.alamoLod)),
+        text('LOD', extras.alamoLod === undefined ? 'none' : String(extras.alamoLod),
+            'Level of detail the sub-mesh is tagged for. 0 is the lowest in EaW.'),
         { label: 'Triangles', value: count(source.triangleCount), kind: 'number' },
         { label: 'Vertices', value: count(source.vertexCount), kind: 'number' },
     ];
@@ -362,7 +363,7 @@ function bonePanel(source: BoneInspection, detail?: ModelDetail): InspectorPanel
 
     const sections: InspectorSection[] = [{ title: 'Bone', rows }];
 
-    // A proxy is a bone with a role - the attachment point a particle system hangs off. The
+    // A proxy is a bone with a role - the attachment point a particle system is attached to. The
     // exporter writes none of this into the glTF, so it is unreadable without the server.
     if (proxy !== undefined) {
         sections.push({
@@ -371,7 +372,8 @@ function bonePanel(source: BoneInspection, detail?: ModelDetail): InspectorPanel
                 text('Name', proxy.name),
                 text('Visible', proxy.visible ? 'yes' : 'no'),
                 text('Damage state', proxy.alt === null ? 'none' : String(proxy.alt)),
-                text('Detail', proxy.lod === null ? 'none' : String(proxy.lod)),
+                text('LOD', proxy.lod === null ? 'none' : String(proxy.lod),
+                    'Level of detail the effect is tagged for. 0 is the lowest in EaW.'),
                 text('Stays hidden when repaired', proxy.altDecreaseStayHidden ? 'yes' : 'no',
                     'When set, dropping back to a lower damage state leaves this effect off rather '
                     + 'than restoring it.'),

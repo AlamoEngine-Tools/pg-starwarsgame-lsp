@@ -24,7 +24,7 @@ export interface SubjectCounts {
     animations: number;
     hardpoints: number;
     particles: number;
-    /** Weapon banks, wherever declared - a fighter's guns are on the unit, not on a mount. */
+    /** Weapon weapons, wherever declared - a fighter's guns are on the unit, not on a hardpoint. */
     weapons: number;
     abilities: number;
 }
@@ -57,7 +57,7 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
         },
         { id: 'model', icon: 'package', label: 'Model', angle: 270 },
         {
-            // Everything the lens can act on, not only the mounts. It counted hardpoints alone
+            // Everything the lens can act on, not only the hardpoints. It counted hardpoints alone
             // until the lens grew weapons and abilities, which read 0 on a fighter that carries its
             // guns on the unit itself - a dial position claiming a subject has nothing to see.
             id: 'gameplay', icon: 'zap', label: 'Gameplay', angle: 330,
@@ -75,6 +75,49 @@ export function previewModes(counts: SubjectCounts): RotaryMode<PreviewMode>[] {
  */
 export function defaultMode(sceneKind: string, _counts: SubjectCounts): PreviewMode {
     return sceneKind === 'Animation' ? 'animation' : 'model';
+}
+
+/**
+ * Whether this lens draws the gameplay ANNOTATIONS - firing cones and targeting marks.
+ *
+ * The soft switch above is about what is RUNNING: a clip keeps playing and an ability keeps holding
+ * its proxies on while you hop into another lens, because stopping them would make the switch a
+ * destructive act. An annotation is not running. It is a drawing over the model saying what the
+ * game does with it, it belongs to the lens that can switch it off, and Model mode has no such
+ * control - so cones latched on in Gameplay stayed on the hull with nothing to press. That is the
+ * lens exception to disable-don't-hide: a control absent because you are looking through a
+ * different lens is exactly what a lens is for.
+ *
+ * The pills were already gated this way; only the DRAWING was not, which is the whole of the fault.
+ */
+export function drawsAnnotations(mode: PreviewMode): boolean {
+    return mode === 'gameplay';
+}
+
+/** The Model lens's own state, which is what its Reset puts back. */
+export interface ModelState {
+    /** The ALT level on screen. 0 is where a model opens. */
+    alt: number;
+    /** Whether the LOD is the highest the model defines - the LAST one, since Alamo counts up. */
+    lodIsHighest: boolean;
+    hiddenEmitters: number;
+    /** How many rows the reader has overridden by hand. */
+    rowOverrides: number;
+}
+
+/**
+ * Whether the MODEL has been moved off the state it opened in.
+ *
+ * Deliberately blind to what the Gameplay lens has done. A destroyed hardpoint and a hidden firing
+ * arc are that lens's to undo, and folding them in here is what made the Model tree's Reset clear
+ * `hiddenWeapons` - which revealed every firing arc on the hull, in a lens with no control to put
+ * them away again.
+ */
+export function modelTouched(state: ModelState): boolean {
+    return state.alt !== 0
+        || !state.lodIsHighest
+        || state.hiddenEmitters > 0
+        || state.rowOverrides > 0;
 }
 
 /** One chip per other mode that has something running, in dial order. */

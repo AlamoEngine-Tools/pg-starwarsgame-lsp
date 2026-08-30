@@ -160,6 +160,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageStageNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();
 
         // Shared parse source: one HAP parse per (document, content) reused by indexing,
@@ -244,6 +245,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
         services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
         services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
+        services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();

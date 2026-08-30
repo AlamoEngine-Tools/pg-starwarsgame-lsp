@@ -73,11 +73,21 @@ describe('deathCloneRows', () => {
         assert.deepEqual(rows.map(r => r.selected), [false, true, false]);
     });
 
-    it('says what each row leaves behind', () => {
+    /**
+     * A row is a MAPPING, not a paragraph.
+     *
+     * The user, on the old rows: *"way too verbose... it's a death clone by damage type display...
+     * all the user needs to know is which damage type causes which death clone, all the prose all
+     * the weird descriptions can go."* So the row carries the damage type and the object it names,
+     * and the card puts one on each line. The model file and the idle flag are properties OF that
+     * object, reachable through the jump, not facts about the mapping.
+     */
+    it('carries the damage type and the object it names, and nothing else', () => {
         const rows = deathCloneRows(CLONES, 'Damage_Normal');
 
-        assert.match(rows[0].detail, /EV_SD_D\.ALO/);
-        assert.match(rows[1].detail, /plays its idle/i);
+        assert.equal(rows[0].label, 'Damage_Normal');
+        assert.equal(rows[0].objectId, CLONES[0].objectId);
+        assert.equal('detail' in rows[0], false);
     });
 
     it('marks a clone that is not defined rather than showing a blank row', () => {
@@ -86,7 +96,11 @@ describe('deathCloneRows', () => {
             [{ damageType: 'Damage_Normal', objectId: 'Missing', modelFile: null, playsIdle: false, animations: [], particles: [] }],
             'Damage_Normal');
 
-        assert.match(rows[0].detail, /not defined|no model/i);
+        assert.equal(rows[0].resolved, false);
+    });
+
+    it('counts a clone that names a model as resolved', () => {
+        assert.equal(deathCloneRows(CLONES, 'Damage_Normal')[0].resolved, true);
     });
 
     it('labels the catch-all row as what it is', () => {
@@ -151,10 +165,10 @@ describe('turretSweeps', () => {
     };
 
     it('finds a turret declared on a UNIT WEAPON, not only on a hardpoint', () => {
-        // MEASURED on the live AT-AA: its turret is `bank:A` with B_Turret_Base / B_Missile_Launcher
+        // MEASURED on the live AT-AA: its turret is `weapon:A` with B_Turret_Base / B_Missile_Launcher
         // at 360 by 45, and it has NO hardpoints at all. Reading hardpoints alone found nothing to
         // sweep on the very unit the feature exists for.
-        const sweeps = turretSweeps([], [{ id: 'bank:A', partId: 'hull', turret: extents }]);
+        const sweeps = turretSweeps([], [{ id: 'weapon:A', partId: 'hull', turret: extents }]);
 
         assert.equal(sweeps.length, 1);
         assert.equal(sweeps[0].turretBone, 'B_Turret_Base');
@@ -162,15 +176,15 @@ describe('turretSweeps', () => {
         assert.equal(sweeps[0].partId, 'hull');
     });
 
-    it('finds one declared on a hardpoint, on that mount s own part', () => {
+    it('finds one declared on a hardpoint, on that hardpoint s own part', () => {
         const sweeps = turretSweeps(
             [{ id: 'HP_Gun', partId: 'hp:HP_Gun', turret: extents }], []);
 
         assert.equal(sweeps[0].partId, 'hp:HP_Gun');
     });
 
-    it('lists one turret ONCE when both a mount and its weapon name it', () => {
-        // A hardpoint weapon carries the mount's turret too, so the naive union sweeps the same bone
+    it('lists one turret ONCE when both a hardpoint and its weapon name it', () => {
+        // A hardpoint weapon carries the hardpoint's turret too, so the naive union sweeps the same bone
         // twice - and the second pass fights the first.
         const sweeps = turretSweeps(
             [{ id: 'HP_Gun', partId: 'hp:HP_Gun', turret: extents }],
@@ -189,5 +203,35 @@ describe('turretSweeps', () => {
         // declares neither would claim a reach it has not got.
         assert.deepEqual(turretSweeps(
             [{ id: 'HP', partId: 'hull', turret: { turretBone: 'B_Turret' } }], []), []);
+    });
+});
+
+describe('turretSweeps, keyed back to what declared them', () => {
+    /**
+     * The sweep is a per-hardpoint control now, so a sweep has to say which one it came from.
+     *
+     * It was one button swinging every turret on the hull at once - which on a ship whose
+     * hardpoints declare different extents is a control that cannot say what it will do.
+     */
+    it('carries the id of the hardpoint or weapon that declared it', () => {
+        const sweeps = turretSweeps([{
+            id: 'HP_Turret',
+            partId: 'HP_Turret',
+            turret: { turretBone: 'Turret_01', rotateExtentDegrees: 180 },
+        }], []);
+
+        assert.equal(sweeps.length, 1);
+        assert.equal(sweeps[0].id, 'HP_Turret');
+    });
+
+    it('keeps the id of whichever source won when two name the same bone', () => {
+        // A hardpoint and the weapon on it can both declare the turret. They are de-duplicated by
+        // part and bone, and the surviving entry must still name a source the panel can match.
+        const sweeps = turretSweeps(
+            [{ id: 'HP_Turret', partId: 'p', turret: { turretBone: 'T', rotateExtentDegrees: 90 } }],
+            [{ id: 'weapon:A', partId: 'p', turret: { turretBone: 'T', rotateExtentDegrees: 90 } }]);
+
+        assert.equal(sweeps.length, 1);
+        assert.equal(sweeps[0].id, 'HP_Turret');
     });
 });

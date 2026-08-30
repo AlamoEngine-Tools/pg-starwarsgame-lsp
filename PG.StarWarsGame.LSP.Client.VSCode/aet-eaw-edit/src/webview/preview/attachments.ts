@@ -1,12 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// What to say when something asks to hang off a bone that is not there.
+// What to say when something asks to attach to a bone that is not there.
 //
 // `Viewport.attachmentFor` answers the part's root for a bone it cannot find, and the model root
-// for a part it cannot find. Both are the right thing to DRAW - a mount at the hull's origin is
+// for a part it cannot find. Both are the right thing to DRAW - a hardpoint at the hull's origin is
 // recoverable, a crash is not - and both are silent, which is the problem. Two separate bugs in one
-// session were hidden by them: hardpoint fire cones resolving on the mounted model instead of the
+// session were hidden by them: hardpoint fire cones resolving on the attached model instead of the
 // hull, and reticles piling up at the origin.
 //
 // Kept out of the viewport so the wording has tests without a GPU in the room.
@@ -42,13 +42,13 @@ export function attachmentProblem(
     request: AttachmentRequest, found: AttachmentFound,
 ): string | null {
     if (!found.part) {
-        return `'${request.partId}' has not loaded, so nothing can hang off ${describe(request)}.`;
+        return `'${request.partId}' has not loaded, so nothing can attach to ${describe(request)}.`;
     }
 
     if (request.bone !== undefined && !found.bone) {
         return `'${request.partId}' has no bone '${request.bone}'`
             + `${request.boneIndex === undefined ? '' : ` (index ${request.boneIndex})`}`
-            + ', so nothing can hang off it.';
+            + ', so nothing can attach to it.';
     }
 
     return null;

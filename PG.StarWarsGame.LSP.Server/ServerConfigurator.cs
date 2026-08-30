@@ -31,6 +31,7 @@ using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
+using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
 using PG.StarWarsGame.Files.MEG;
@@ -145,6 +146,7 @@ public static class ServerConfigurator
             .WithHandler<GetSubMeshGeometryHandler>()
             .WithHandler<GetModelTextureHandler>()
             .WithHandler<GetParticleSystemHandler>()
+            .WithHandler<GetProjectileHandler>()
             .WithHandler<GetShaderSourceHandler>()
             .WithHandler<GetStoryPlotsHandler>()
             .WithHandler<GetStoryGraphHandler>()
@@ -152,6 +154,7 @@ public static class ServerConfigurator
             .WithHandler<GetStorySchemaHandler>()
             .WithHandler<GetStoryParamOptionsHandler>()
             .WithHandler<ResolveStoryReferenceHandler>()
+            .WithHandler<ResolveReferenceHandler>()
             .WithHandler<GetStoryDiagnosticsHandler>()
             .WithHandler<ExecuteStoryCommandHandler>()
             .WithHandler<ApplyStoryCommandBatchHandler>()
@@ -305,6 +308,12 @@ public static class ServerConfigurator
                 // editor and the preview can never disagree about whether a piece of art exists.
                 services.AddSingleton<IIconNameIndex, IconCatalogNameIndex>();
 
+                // "Where is this name defined?", for panels that hold a name and nothing else - a
+                // webview row has no document and no offset, so textDocument/definition cannot
+                // answer it. Ungated: this was the story editor's private lookup until the preview's
+                // ability rows needed the same jump.
+                services.AddSingleton<IDefinitionLocator, DefinitionLocator>();
+
                 services.AddSingleton<IShipNameCatalogProvider, ShipNameCatalogProvider>();
 
                 // Model preview asset resolution. SupportMEG sits alongside SupportMTD above and is
@@ -353,6 +362,15 @@ public static class ServerConfigurator
                         sp.GetRequiredService<IGameIndexService>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
                         sp.GetRequiredService<ILogger<LocalisationIndexChangedNotifier>>()));
+
+                // Tells an open model preview the tree it was built from has moved on. Same shape
+                // as the notifier above; see PreviewSceneChangeNotifier for why it is driven by the
+                // index rather than off a watcher in the client.
+                services.AddSingleton<Preview.PreviewSceneChangeNotifier>(sp =>
+                    new Preview.PreviewSceneChangeNotifier(
+                        sp.GetRequiredService<IGameIndexService>(),
+                        method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
+                        sp.GetRequiredService<ILogger<Preview.PreviewSceneChangeNotifier>>()));
 
                 // GameHoverHandler routes by extension to one of these providers. Registered as
                 // interfaces only so DryIoc does not see them as competing IHoverHandler
@@ -425,6 +443,7 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
                 server.Services.GetRequiredService<StoryGraphChangeNotifier>();
+                server.Services.GetRequiredService<Preview.PreviewSceneChangeNotifier>();
                 var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
                 var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
                 var reload = server.Services.GetRequiredService<IModProjectReloadService>();

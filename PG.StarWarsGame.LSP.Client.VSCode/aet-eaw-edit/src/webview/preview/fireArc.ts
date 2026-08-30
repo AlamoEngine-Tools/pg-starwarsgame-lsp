@@ -13,7 +13,7 @@ export type Point = [number, number, number];
  * assumed: across every `FP_` bone of `Ev_stardestroyer.alo`, the bone's local X axis has a positive
  * dot with the direction away from the hull (0.30 to 0.93) while Z is ~0.01 - guns that fire
  * horizontally, forward. Y is the lateral axis, which is why its sign flips between the port and
- * starboard mounts.
+ * starboard hardpoints.
  *
  * The rim lies on a SPHERE of radius `range`, not on a plane at that distance. That distinction is
  * the whole shape of the thing: the plane reading is `range * tan(halfAngle)`, and the Nebulon B
@@ -21,14 +21,18 @@ export type Point = [number, number, number];
  * 25000 units across. A firing arc is every DIRECTION within the half-angle, out to the range - so
  * every rim point is exactly `range` from the muzzle, and nothing runs away as the arc widens.
  *
- * Elliptical: `Fire_Cone_Width` opens it across Y and `Fire_Cone_Height` across Z, so a turret with
- * a wide traverse and little elevation still reads as the flat fan it actually is.
+ * `Fire_Cone_Width` opens it across Y and `Fire_Cone_Height` across Z, so a turret with a wide
+ * traverse and little elevation reads as the flat fan it actually is.
+ *
+ * Both tags are FULL angles in degrees. The engine halves them itself - `Fire_Cone_Width / 2.0` -
+ * and tests the two axes SEPARATELY, which makes the shape a rectangular pyramid rather than a
+ * cone of any kind. See {@link coneDirection}.
  */
 export function fireConePoints(
     widthDegrees: number, heightDegrees: number, range: number, segments: number,
 ): { apex: Point; rim: Point[] } {
-    const halfWidth = halfAngle(widthDegrees);
-    const halfHeight = halfAngle(heightDegrees);
+    const halfWidth = halfYaw(widthDegrees);
+    const halfHeight = halfElevation(heightDegrees);
 
     const rim: Point[] = [];
 
@@ -45,30 +49,70 @@ export function fireConePoints(
 /**
  * One direction on the cone, `ring` of the way out from the axis at `around` azimuth.
  *
- * The off-axis angle traces an ELLIPSE, and it is the angle that is elliptical rather than any
- * distance. Getting that wrong is what made the arcs Pringles: yawing by `halfWidth * cos` and then
- * pitching by `halfHeight * sin` ADDS the two offsets, so a point a quarter of the way round a
- * 175-by-160 arc sat about 118 degrees off axis - past both half-angles, and past the right angle
- * that would keep it in front of the muzzle at all. The rim bulged backwards twice per turn.
+ * A SPHERICAL RECTANGLE - bounded by two meridians and two parallels - because that is exactly what
+ * the engine tests. It transforms the target into the fire bone's frame, reduces the offset to two
+ * angles, and checks each against its own half-angle independently:
  *
- * Solving the ellipse for the off-axis angle instead bounds it by the LARGER half-angle everywhere,
- * which is the defining property of the shape: the arc is exactly as wide as it says it is on each
- * axis, and no wider anywhere in between.
+ * ```c
+ * target_z =  atan2(y, x)                  // yaw
+ * target_y = -atan2(z, sqrt(x*x + y*y))    // elevation, sign-flipped
+ *
+ * if (target_z > Fire_Cone_Width  / 2.0) return false;
+ * if (target_y > Fire_Cone_Height / 2.0) return false;
+ * ```
+ *
+ * **The elevation denominator is the HORIZONTAL distance, not x.** That one detail decides the
+ * shape: it makes the vertical limit a parallel of latitude rather than a plane, so the region is a
+ * lat-long rectangle on the sphere and the natural parameterisation is the spherical one below.
+ * Reading it as `atan2(z, x)` instead builds a rectangular pyramid, which is a different solid -
+ * wrong everywhere off the vertical plane, and wider in elevation than the engine allows.
+ *
+ * Two consequences, both visible. The tags are FULL angles: the engine halves them right there. And
+ * the CORNERS reach both limits at once - a 90-by-90 arc admits a direction 60 degrees off axis
+ * (`acos(cos45 * cos45)`), where a shape trading one angle against the other stops at 45.
+ *
+ * This shape has had two wrong ancestors, and neither mistake is this one:
+ *
+ * - An ELLIPSE, which traded the angles against each other. Near the diagonal of a 175-by-160 arc
+ *   it put elevation past the declared limit, so it drew directions the engine rejects while
+ *   refusing corners it accepts.
+ * - A PRINGLE, from yawing by `halfWidth * cos` and then pitching by `halfHeight * sin`. That ADDS
+ *   two angular offsets and sent the rim behind the muzzle twice per turn.
+ *
+ * Nothing here can wrap or run away: the parameterisation is angles on a sphere throughout, so a
+ * 360-degree traverse is a full ring rather than something needing a clamp.
  */
 function coneDirection(
     halfWidth: number, halfHeight: number, ring: number, around: number,
 ): [number, number, number] {
-    const across = Math.cos(around) / Math.max(halfWidth, MIN_HALF_ANGLE);
-    const up = Math.sin(around) / Math.max(halfHeight, MIN_HALF_ANGLE);
+    const cos = Math.cos(around);
+    const sin = Math.sin(around);
 
-    // The polar equation of an ellipse, in the angular domain.
-    const offAxis = ring / Math.hypot(across, up);
+    // How far the rectangle's border lies at this azimuth - its polar radius. `min` is what makes
+    // it a rectangle rather than a rounded shape: whichever limit is reached FIRST stops the ray,
+    // which is the same "either check may reject" the engine applies.
+    const toSide = Math.abs(cos) < MIN_HALF_ANGLE
+        ? Infinity
+        : Math.max(halfWidth, MIN_HALF_ANGLE) / Math.abs(cos);
+    const toTop = Math.abs(sin) < MIN_HALF_ANGLE
+        ? Infinity
+        : Math.max(halfHeight, MIN_HALF_ANGLE) / Math.abs(sin);
 
-    // +X tilted `offAxis` away from the axis, in the plane the azimuth picks out.
+    const radius = ring * Math.min(toSide, toTop);
+    const yaw = radius * cos;
+    const elevation = radius * sin;
+
+    // Spherical coordinates about the bone's +X axis: yaw is the azimuth, elevation the latitude.
+    // Unit length by construction, which is what puts every rim point exactly `range` from the
+    // muzzle once the caller scales it - a firing arc is every DIRECTION within the limits out to
+    // the range, and the rim belongs on a sphere rather than on a plane at that distance.
+    //
+    // Read it back and you get the engine's own pair: `atan2(y, x) === yaw` and
+    // `atan2(z, hypot(x, y)) === elevation`.
     return [
-        Math.cos(offAxis),
-        Math.sin(offAxis) * Math.cos(around),
-        Math.sin(offAxis) * Math.sin(around),
+        Math.cos(elevation) * Math.cos(yaw),
+        Math.cos(elevation) * Math.sin(yaw),
+        Math.sin(elevation),
     ];
 }
 
@@ -76,17 +120,27 @@ function coneDirection(
 const MIN_HALF_ANGLE = 1e-6;
 
 /**
- * Half of a cone angle, in radians.
+ * Half the declared traverse, in radians, capped at a half-turn.
  *
- * Clamped just short of a half-turn rather than of a right angle. The old right-angle clamp existed
- * only because the planar reading's `tan` blew up there; on a sphere nothing does, and clamping at
- * 90 would have quietly halved the Nebulon B's declared 175-degree arc.
+ * A full turn is the real limit of an azimuth and 11 shipped hardpoints declare exactly 360, so this
+ * caps at 180 a side rather than at the 89.5 the old `tan` build needed. Nothing blows up on a
+ * sphere.
  */
-function halfAngle(degrees: number): number {
-    const half = (Math.max(0, degrees) / 2) * (Math.PI / 180);
-    const limit = (179 * Math.PI) / 360;
+function halfYaw(degrees: number): number {
+    return Math.min((Math.max(0, degrees) / 2) * (Math.PI / 180), Math.PI);
+}
 
-    return Math.min(half, limit);
+/**
+ * Half the declared elevation, in radians, capped just short of the pole.
+ *
+ * 90 degrees a side IS the whole sky above and below; going past it would fold the arc back over
+ * itself. Stopping fractionally short keeps the cap a surface rather than a degenerate point, and
+ * no shipped hardpoint declares more than 180 total anyway.
+ */
+function halfElevation(degrees: number): number {
+    const limit = (179.9 * Math.PI) / 360;
+
+    return Math.min((Math.max(0, degrees) / 2) * (Math.PI / 180), limit);
 }
 
 /**
@@ -105,7 +159,7 @@ function halfAngle(degrees: number): number {
  *
  * And scaled AGAIN by the width, because a length that suits one arc drowns another. A 20-degree
  * cone is a spike and can be long; a 160-degree one is very nearly a dome, and at the same length
- * it simply encloses the camera - which is what six of the Star Destroyer's banks did, leaving one
+ * it simply encloses the camera - which is what six of the Star Destroyer's weapons did, leaving one
  * orange field with the ship lost somewhere inside it. The wide ones are pulled in until the reader
  * can stand outside and see the hull they belong to.
  *
@@ -130,7 +184,7 @@ export function drawnConeRange(
  * near-hemispherical widths capital ships declare.
  */
 function spanFactor(widthDegrees: number, heightDegrees: number): number {
-    const widest = Math.max(halfAngle(widthDegrees), halfAngle(heightDegrees));
+    const widest = Math.max(halfYaw(widthDegrees), halfElevation(heightDegrees));
     const from = Math.PI / 12;
     const to = Math.PI / 2;
 
@@ -166,8 +220,8 @@ export function fireConeSurface(
         return [];
     }
 
-    const halfWidth = halfAngle(widthDegrees);
-    const halfHeight = halfAngle(heightDegrees);
+    const halfWidth = halfYaw(widthDegrees);
+    const halfHeight = halfElevation(heightDegrees);
 
     const at = (ring: number, around: number): [number, number, number] => {
         const [x, y, z] = coneDirection(halfWidth, halfHeight, ring, around);
@@ -235,8 +289,8 @@ export function fireConeOutline(
         return [];
     }
 
-    const halfWidth = halfAngle(widthDegrees);
-    const halfHeight = halfAngle(heightDegrees);
+    const halfWidth = halfYaw(widthDegrees);
+    const halfHeight = halfElevation(heightDegrees);
 
     const at = (around: number): [number, number, number] => {
         const [x, y, z] = coneDirection(halfWidth, halfHeight, 1, around);
@@ -251,8 +305,9 @@ export function fireConeOutline(
         positions.push(...at(i * step), ...at(((i + 1) % segments) * step));
     }
 
-    // Spread evenly rather than placed on the two axes: on an elliptical arc the axes are where the
-    // shape is least interesting, and four ribs at the quarters happen to land on them anyway.
+    // Spread evenly rather than placed on the two axes. Four ribs at the quarters land on the axes
+    // anyway, and the axes are the least informative places to draw one - the CORNERS are where
+    // this shape says something a rounder one would not.
     for (let i = 0; i < ribs; i++) {
         positions.push(0, 0, 0, ...at((i / ribs) * Math.PI * 2));
     }

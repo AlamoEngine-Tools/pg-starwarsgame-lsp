@@ -96,6 +96,57 @@ public sealed class ModelGlbExporterTest
             ]);
     }
 
+    /// <summary>
+    ///     The same volume plus one vertex that ONLY ever appears in a zero-area face.
+    /// </summary>
+    /// <remarks>
+    ///     This is the shape 222 sub-meshes across 105 shipped models actually have - always a
+    ///     handful, 6 or 12 - and it used to cost the whole sub-mesh. `Ub_palace.alo` carries 6 such
+    ///     vertices among 4433 and lost 4435 of its 6075 shadow faces to them.
+    /// </remarks>
+    private static byte[] ShadowVolumeWithOrphanSubMesh()
+    {
+        var toward = new Vector3(0, 0, 1);
+        var away = new Vector3(0, 0, -1);
+        var a = new Vector3(-1, 0, 0);
+        var b = new Vector3(1, 0, 0);
+
+        return SubMesh("MeshShadowVolume.fx", "alD3dVertNU2",
+            [
+                MasterVertex(a, toward, new Vector2(0, 0)),
+                MasterVertex(b, toward, new Vector2(1, 0)),
+                MasterVertex(new Vector3(0, 1, 0), toward, new Vector2(0, 1)),
+
+                MasterVertex(b, away, new Vector2(1, 0)),
+                MasterVertex(a, away, new Vector2(0, 0)),
+                MasterVertex(new Vector3(0, -1, 0), away, new Vector2(0, 1)),
+
+                // The orphan: it sits on `a` and is named by nothing but the dead face below, so no
+                // triangle the builder keeps can ever report where it landed.
+                MasterVertex(a, new Vector3(0, 1, 0), new Vector2(0, 0))
+            ],
+            [
+                0, 1, 2,
+                3, 4, 5,
+
+                0, 1, 3,
+                0, 3, 4,
+
+                // Zero-area - corners 0 and 6 share a position - and the only user of vertex 6.
+                0, 6, 1
+            ]);
+    }
+
+    private static byte[] ShadowVolumeWithOrphanModel()
+    {
+        return Concat(
+            Skeleton(
+                Bone("ROOT", -1, true, Translation(0, 0, 0)),
+                Bone("HULL_BONE", 0, true, Translation(0, 0, 0))),
+            Mesh("SHADOW", [ShadowVolumeWithOrphanSubMesh()]),
+            Connections(connections: [Connection(0, 1)]));
+    }
+
     private static byte[] ShadowVolumeModel()
     {
         return Concat(
@@ -137,6 +188,24 @@ public sealed class ModelGlbExporterTest
             .ToList();
 
         Assert.Equal(2, atB.Distinct().Count());
+    }
+
+    [Fact]
+    public void Export_RestoresWhatItCanWhenOneVertexCannotBePlaced()
+    {
+        // The restore used to be ALL OR NOTHING: one vertex it could not locate and the whole
+        // sub-mesh was left as the mesh builder made it. That gave up 183940 zero-area faces across
+        // 222 sub-meshes in 105 shipped models - `Ub_palace.alo` lost 4435 of 6075 to SIX such
+        // vertices, and its shadow volume tore open.
+        //
+        // Four of the five faces here name only placeable vertices, so four come back. The fifth
+        // names the orphan and is still dropped - skipping a face is not a guess, whereas emitting
+        // one with an index we do not know would draw a triangle to whatever sits at zero.
+        var gltf = Roundtrip(ShadowVolumeWithOrphanModel());
+
+        var primitive = Assert.Single(Assert.Single(gltf.LogicalMeshes).Primitives);
+
+        Assert.Equal(4, primitive.GetTriangleIndices().Count());
     }
 
     [Fact]
@@ -469,11 +538,18 @@ public sealed class ModelGlbExporterTest
         Assert.Equal(2f / 30f, clip.Duration, 4);
     }
 
+    /// <summary>
+    ///     A track binds by INDEX, not by name.
+    /// </summary>
+    /// <remarks>
+    ///     This assertion used to run the other way. The user reported that the identical-skeleton
+    ///     rule fires all over the BASE GAME, on units whose animations play correctly in the engine
+    ///     - so the engine binds by index and refusing a name disagreement was costing real clips
+    ///     their motion. A disagreement is now reported against the object as information instead.
+    /// </remarks>
     [Fact]
-    public void Export_IgnoresAnAnimationTrackNamingADifferentBone()
+    public void Export_DrivesTheBoneAtThatIndexEvenWhenTheNameDisagrees()
     {
-        // 50 shipped animations sit beside a model they were not authored against. The bone must keep
-        // its rest pose rather than be driven by another skeleton's motion.
         var alo = Concat(
             Skeleton(
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
@@ -487,6 +563,29 @@ public sealed class ModelGlbExporterTest
                     [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
 
         var gltf = Roundtrip(alo, ("mismatched", ala));
+
+        Assert.NotEmpty(gltf.LogicalAnimations.SelectMany(a => a.Channels));
+    }
+
+    /// <summary>
+    ///     An index past the end of the skeleton is still refused - there is no node to drive.
+    /// </summary>
+    [Fact]
+    public void Export_IgnoresAnAnimationTrackBeyondTheSkeleton()
+    {
+        var alo = Concat(
+            Skeleton(
+                Bone("ROOT", -1, true, Translation(0, 0, 0)),
+                Bone("TURRET", 0, true, Translation(0, 0, 0))),
+            Mesh("HULL", [TriangleSubMesh()]),
+            Connections(connections: [Connection(0, 1)]));
+
+        var ala = AlaChunkFixture.AnimationV1(2, 30f,
+            AlaChunkFixture.BoneV1("MUZZLE", 9,
+                translationSamples:
+                    [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
+
+        var gltf = Roundtrip(alo, ("beyond", ala));
 
         Assert.Empty(gltf.LogicalAnimations.SelectMany(a => a.Channels));
     }
@@ -522,7 +621,7 @@ public sealed class ModelGlbExporterTest
     /// <remarks>
     ///     662 of the 1363 shipped animations hide at least one bone, across 4052 bone tracks, and
     ///     2285 of those tracks are particle proxies - so the dominant use is timing an effect to the
-    ///     motion. The rancor's death explosion hangs off <c>P_ATST_Die</c>, hidden for all 61 frames
+    ///     motion. The rancor's death explosion is attached to <c>P_ATST_Die</c>, hidden for all 61 frames
     ///     of <c>attack_00</c> and visible for 35 of the 61 frames of <c>die_00</c>. Dropping the
     ///     track meant every one of those fired from the first frame of every clip.
     /// </remarks>
@@ -571,8 +670,16 @@ public sealed class ModelGlbExporterTest
     ///     Same rule as the motion tracks: a track naming a bone this skeleton does not have is an
     ///     animation authored against a different model, and must not reach into this one.
     /// </summary>
+    /// <summary>
+    ///     A visibility track binds by index too, and is filed under the MODEL's name for that bone.
+    /// </summary>
+    /// <remarks>
+    ///     The key is a glTF NODE name, and the nodes are named after the skeleton being exported. A
+    ///     borrowed clip that disagrees about what bone 1 is called would, under its own spelling,
+    ///     produce a key naming no node at all - a track the client reads and can never apply.
+    /// </remarks>
     [Fact]
-    public void Export_IgnoresAVisibilityTrackNamingADifferentBone()
+    public void Export_FilesAVisibilityTrackUnderTheModelsNameForThatBone()
     {
         var alo = Concat(
             Skeleton(
@@ -586,9 +693,8 @@ public sealed class ModelGlbExporterTest
 
         var gltf = Roundtrip(alo, ("mismatched", ala));
 
-        // With nothing left to drive, the clip is not written at all - which is the same outcome as
-        // an ignored motion track, and equally correct.
-        Assert.DoesNotContain(gltf.LogicalAnimations, clip => Visibility(clip) is not null);
+        var bones = Visibility(Assert.Single(gltf.LogicalAnimations))!["bones"]!.AsObject();
+        Assert.Equal(["TURRET#1"], bones.Select(pair => pair.Key));
     }
 
     /// <summary>

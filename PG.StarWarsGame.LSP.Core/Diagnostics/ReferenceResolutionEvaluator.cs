@@ -23,7 +23,7 @@ public static class ReferenceResolutionEvaluator
 
         if (resolved is null)
             return (XmlDiagnosticSeverity.Error,
-                $"Cannot resolve reference '{displayId}': no object with this name exists in the workspace.");
+                $"Cannot resolve reference '{displayId}': No object with this name exists in the workspace.");
 
         if (expectedTypeName is null)
             return null;
@@ -42,7 +42,7 @@ public static class ReferenceResolutionEvaluator
             return null;
 
         return (XmlDiagnosticSeverity.Error,
-            $"Type mismatch for '{displayId}': expected '{expectedTypeName}' but found '{resolved.TypeName}'.");
+            $"Type mismatch for '{displayId}': Expected '{expectedTypeName}' but found '{resolved.TypeName}'.");
     }
 
     /// <summary>

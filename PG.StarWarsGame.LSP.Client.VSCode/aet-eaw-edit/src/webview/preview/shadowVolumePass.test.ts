@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import * as THREE from 'three';
 
-import { ShadowVolumePass, volumeReach } from './shadowVolumePass';
+import { ShadowVolumePass, shadowTintReach, volumeReach } from './shadowVolumePass';
 
 describe('volumeReach', () => {
     it('extrudes far enough to clear the model', () => {
@@ -113,7 +113,7 @@ describe('dropping one part of the scene', () => {
 
     it('forgets that a removed volume was gated off', () => {
         // Otherwise the mesh is held by `uncounted` for the life of the scene, which is a leak of
-        // the whole disposed subtree hanging off it.
+        // the whole disposed subtree attached to it.
         const pass = new ShadowVolumePass();
         const source = volumeMesh('wreck_shadow');
         pass.add(source);
@@ -131,5 +131,32 @@ describe('dropping one part of the scene', () => {
 
         assert.doesNotThrow(() => pass.remove(volumeMesh('stranger')));
         assert.equal(pass.active, true);
+    });
+});
+
+// Where the shadow COLOUR can be seen, which is what decides whether its control is dead.
+//
+// The reported fault: the swatch is disabled. It was gated on the floor alone - "with no floor there
+// is nothing to catch a shadow" - and that is only half true. `setShadowColour` drives two things:
+// the ground catcher's opacity AND the stencil darken, and the stencil darken tints the hull's own
+// self-shadowing whether or not there is any ground under it. So on a model with an authored volume
+// in Game mode, the colour applied and the control was dead anyway.
+describe('shadowTintReach', () => {
+    it('reaches the ground when the floor is on', () => {
+        assert.equal(shadowTintReach(true, false), 'ground');
+    });
+
+    it('reaches the model when the stencil pass is casting', () => {
+        // No floor at all. The darken multiplies the hull itself, which is the half that was missed.
+        assert.equal(shadowTintReach(false, true), 'model');
+    });
+
+    it('reaches both when both are on', () => {
+        assert.equal(shadowTintReach(true, true), 'both');
+    });
+
+    it('reaches nothing with no floor and nothing casting', () => {
+        // The one case where the control is honestly dead - and the only one it should refuse in.
+        assert.equal(shadowTintReach(false, false), 'none');
     });
 });

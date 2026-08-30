@@ -192,4 +192,70 @@ public sealed class PreviewDeathCloneTest
     {
         Assert.Null(Scene(Tag("Space_Model_Name", "hull.alo")).DeathExplosions);
     }
+
+    /// <summary>
+    ///     Spinning away: the automated death clone for a unit that declares none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The user's own account of the mechanic: a boolean tag, and where the unit has no death
+    ///         clone it keeps going along its current vector at its current speed, corkscrewing, and
+    ///         explodes at the end.
+    ///     </para>
+    ///     <para>
+    ///         Measured over both trees: <b>34 objects declare it and every one says Yes. NOT ONE of
+    ///         the 34 also declares a Death_Clone</b>, which is the rule holding in the data. All 34
+    ///         declare <c>Max_Speed</c>. The engine's own parameter table
+    ///         (<c>DatabaseMapExport.xml</c>) names five tags in the family, not one - the chance,
+    ///         the time, its own explosion and a start sound - so none of this is guessed.
+    ///     </para>
+    ///     <para>
+    ///         Read off the TAG rather than the locomotor. The 34 are not only fighters - they
+    ///         include a <c>GroundVehicle</c> and a <c>LandBombingUnit</c> - and no shipped object
+    ///         declares the tag without meaning it.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void SpinAway_IsReadWithItsTimeChanceAndExplosion()
+    {
+        var scene = Scene(
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Spin_Away_On_Death", "Yes"),
+            Tag("Spin_Away_On_Death_Time", "2.0f"),
+            Tag("Spin_Away_On_Death_Chance", "0.2"),
+            Tag("Spin_Away_On_Death_Explosion", "Small_Explosion_Space"),
+            Tag("Max_Speed", "4.5"));
+
+        var spin = scene.SpinAway;
+
+        Assert.NotNull(spin);
+        Assert.Equal(2.0f, spin!.TimeSeconds);
+        Assert.Equal(0.2f, spin.Chance);
+        Assert.Equal("Small_Explosion_Space", spin.Explosion);
+        Assert.Equal(4.5f, spin.MaxSpeed);
+    }
+
+    /// <summary>
+    ///     The <c>f</c> suffix is in the shipped files - 31 write <c>2.0f</c> and 3 write
+    ///     <c>1.0f</c>. Reading it as a plain float drops every one of them to the default.
+    /// </summary>
+    [Fact]
+    public void SpinAway_ReadsTheFloatSuffixTheFilesActuallyWrite()
+    {
+        var scene = Scene(
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Spin_Away_On_Death", "Yes"),
+            Tag("Spin_Away_On_Death_Time", " 1.0f "));
+
+        Assert.Equal(1.0f, scene.SpinAway!.TimeSeconds);
+    }
+
+    [Fact]
+    public void SpinAway_IsAbsentWhereTheTagIsOffOrMissing()
+    {
+        Assert.Null(Scene(Tag("Space_Model_Name", "hull.alo")).SpinAway);
+        Assert.Null(Scene(
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Spin_Away_On_Death", "No")).SpinAway);
+    }
 }

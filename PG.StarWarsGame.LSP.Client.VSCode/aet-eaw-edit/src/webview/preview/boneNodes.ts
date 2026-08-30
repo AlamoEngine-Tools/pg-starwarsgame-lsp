@@ -37,7 +37,19 @@ export function splitGeometryFromBone(mesh: THREE.Mesh, meshName?: string): THRE
     bone.position.copy(mesh.position);
     bone.quaternion.copy(mesh.quaternion);
     bone.scale.copy(mesh.scale);
-    bone.visible = mesh.visible;
+
+    // ALWAYS VISIBLE. It used to take the mesh's visibility, and that is the one thing this split
+    // exists to prevent: a hardpoint's model is parented to its attachment BONE, three prunes a
+    // hidden subtree, and so a bone that went invisible took every turret mounted on it with it.
+    // The engine says the same from its own side - an attached thing does not inherit its host's
+    // visibility, and hiding a bone's geometry is a statement about GEOMETRY.
+    //
+    // The incoming value is dropped rather than moved to the mesh, because the mesh is reset to
+    // drawn below and the gate decides after. glTF has no per-node visibility, so the loader hands
+    // everything over visible and this is unreachable through it today: the invariant is being made
+    // true rather than a bug being watched. Anything that hides a bone-and-mesh node before the
+    // split would have hit it.
+    bone.visible = true;
 
     // The glTF node's extras describe the BONE, not its geometry - `alamoBillboard` is a field of
     // the `0x206` bone chunk. They go with the identity they belong to; the mesh starts clean and
@@ -58,6 +70,8 @@ export function splitGeometryFromBone(mesh: THREE.Mesh, meshName?: string): THRE
     mesh.position.set(0, 0, 0);
     mesh.quaternion.identity();
     mesh.scale.set(1, 1, 1);
+
+    // Starts DRAWN; the level gate and the reader's own overrides decide after. Unchanged.
     mesh.visible = true;
 
     // The mesh's OWN name, not the bone's. Leaving it as `<bone>#<index>` would leave a second node
@@ -79,7 +93,7 @@ export function splitGeometryFromBone(mesh: THREE.Mesh, meshName?: string): THRE
  * cannot do the job either: `Ai_rancor` carries two sub-meshes called `Crusher#0`, and one row
  * would drive both.
  *
- * So: the part, the bone the mesh hangs off, and its position among that bone's meshes. Traversal
+ * So: the part, the bone the mesh is attached to, and its position among that bone's meshes. Traversal
  * order is fixed for a given file, which is what makes the last part stable rather than arbitrary.
  */
 export function stampTreeKeys(
@@ -139,13 +153,13 @@ export function treeKeyOf(mesh: THREE.Object3D): string {
  * The part roots that are not already inside another part root.
  *
  * A hardpoint's model is attached to a BONE of the hull, which puts its whole subtree inside the
- * hull's own root. So walking every part root in turn reaches each mounted mesh twice - once on the
+ * hull's own root. So walking every part root in turn reaches each attached mesh twice - once on the
  * way down through the hull and once again from the part itself. On the Star Destroyer that gave the
- * model tree two rows sharing one id for every mesh of every mount, and did the material and
+ * model tree two rows sharing one id for every mesh of every hardpoint, and did the material and
  * wireframe work on that geometry twice over.
  *
  * Starting only from the outermost roots visits everything exactly once, and keeps working when a
- * mount is itself mounted on another mount.
+ * hardpoint is itself attached on another hardpoint.
  */
 export function outermostRoots(
     roots: readonly THREE.Object3D[],
@@ -185,8 +199,8 @@ function isRootCorrection(node: THREE.Object3D): boolean {
  * Cancels a part's own Z-up-to-Y-up correction, for a part being attached INSIDE another one.
  *
  * MEASURED on the shipped Star Destroyer: the hull and every hardpoint model carry the same
- * `AlamoRoot` correction. A mount is parented to a BONE of the hull, which already sits below the
- * hull's correction - so the mount's own copy applies the rotation a second time, and the model
+ * `AlamoRoot` correction. A hardpoint is parented to a BONE of the hull, which already sits below the
+ * hull's correction - so the hardpoint's own copy applies the rotation a second time, and the model
  * lands rolled 90 degrees in the green-blue plane. Mirrored hulls then make one bug read
  * anticlockwise to port and clockwise to starboard, which is exactly how it was reported.
  *

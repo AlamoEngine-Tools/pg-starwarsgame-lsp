@@ -42,7 +42,7 @@ export interface LspRequestSender {
     sendRequest<T>(method: string, params: unknown): Promise<T>;
 }
 
-export const SERVER_NOT_RUNNING = 'EaWEdit LSP: server is not running.';
+export const SERVER_NOT_RUNNING = 'EaWEdit LSP: Server is not running.';
 
 /**
  * The LSP method behind `ExecuteCommandRequest.type`.

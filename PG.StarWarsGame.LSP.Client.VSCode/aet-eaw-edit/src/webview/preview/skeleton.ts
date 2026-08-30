@@ -19,14 +19,14 @@ export interface FlatBone {
     visible: boolean;
 }
 
-/** Something that hangs off a bone. */
+/** Something attached to a bone. */
 export interface BoneAttachment {
     kind: 'mesh' | 'hardpoint';
     label: string;
     /**
      * The mesh's own identity, for the visibility toggle. Meshes only.
      *
-     * The three.js uuid rather than the name: an assembled unit mounts the same turret model eight
+     * The three.js uuid rather than the name: an assembled unit carries the same turret model eight
      * times, so `<MeshName>#<index>` is shared between eight different meshes and a name-keyed
      * toggle switches all of them at once.
      */
@@ -68,7 +68,7 @@ export function alamoBoneName(nodeName: string): { name: string; index: number }
  * Builds the forest.
  *
  * A parent index outside the list, or one pointing forward, is treated as a root rather than
- * dropped: the bone still exists and still anchors whatever hangs off it, and losing it from the
+ * dropped: the bone still exists and still anchors whatever is attached to it, and losing it from the
  * tree would hide geometry that is plainly on screen.
  */
 export function buildBoneTree(
@@ -115,7 +115,7 @@ function setDepth(node: BoneNode, depth: number): void {
  *
  * Ancestors are kept so a match stays reachable and its place in the hierarchy is still readable -
  * a flat list of matches would answer "which bones" but not "where". Descendants are dropped: typing
- * `HP_` should give the hardpoint bones, not also the twenty damage proxies hanging off them.
+ * `HP_` should give the hardpoint bones, not also the twenty damage proxies attached to them.
  */
 export function filterBones(roots: readonly BoneNode[], query: string): BoneNode[] {
     const needle = query.trim().toLowerCase();
@@ -184,14 +184,17 @@ export function visibleRows(
  * projected positions and cannot be decided here.
  */
 export function labelCandidates(
-    bones: readonly FlatBone[], mode: LabelMode, selected: number | null,
+    bones: readonly FlatBone[], mode: LabelMode, selected: ReadonlySet<number>,
 ): Set<number> {
     if (mode === 'none') {
         return new Set();
     }
 
+    // A SET, because the panel selects several at once - two fire bones, a shift-run in the tree.
+    // It took one index, so a selection of three was labelled once and the other two read as
+    // unselected.
     if (mode === 'selected') {
-        return selected === null ? new Set() : new Set([selected]);
+        return new Set(selected);
     }
 
     return new Set(bones.map(bone => bone.index));

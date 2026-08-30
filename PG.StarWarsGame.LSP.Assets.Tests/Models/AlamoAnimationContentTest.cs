@@ -84,6 +84,51 @@ public sealed class AlamoAnimationContentTest
         Assert.Equal(expected, animation.WhyNotModel(model) is null);
     }
 
+    /// <summary>
+    ///     Whether the clip can be APPLIED at all, which is a weaker question than whether it pairs.
+    /// </summary>
+    /// <remarks>
+    ///     Reported by the user: "'X' takes its animations from 'Y.alo', but that model's skeleton
+    ///     differs" fires all over the BASE GAME, on units that animate perfectly well in the engine.
+    ///     So an identical skeleton is not what the engine requires, and treating a name disagreement
+    ///     as fatal dropped clips the game plays.
+    ///
+    ///     An index past the end of the bone list is different in kind: there is no node to drive, so
+    ///     the track cannot be written whatever anyone decides about names.
+    /// </remarks>
+    [Fact]
+    public void FitsSkeleton_WithADifferentNameAtThatIndex_IsStillPlayable()
+    {
+        var animation = Animation((1, "B_Arm"));
+
+        Assert.True(animation.FitsSkeleton(["Root", "B_Body"]));
+        Assert.False(animation.MatchesModel(["Root", "B_Body"]));
+    }
+
+    [Fact]
+    public void FitsSkeleton_ForABoneBeyondTheList_IsFalse()
+    {
+        Assert.False(Animation((7, "Muzzleflash")).FitsSkeleton(["Root", "B_Body"]));
+    }
+
+    [Fact]
+    public void FitsSkeleton_ForANegativeIndex_IsFalse()
+    {
+        Assert.False(Animation((-1, "Root")).FitsSkeleton(["Root", "B_Body"]));
+    }
+
+    [Fact]
+    public void FitsSkeleton_WhenEveryBoneLinesUp_IsTrue()
+    {
+        Assert.True(Animation((0, "Root"), (1, "B_Body")).FitsSkeleton(["Root", "B_Body"]));
+    }
+
+    [Fact]
+    public void FitsSkeleton_WithoutAModel_Throws()
+    {
+        Assert.Throws<ArgumentNullException>(() => Animation((0, "Root")).FitsSkeleton(null!));
+    }
+
     [Fact]
     public void WhyNotModel_WithoutAModel_Throws()
     {

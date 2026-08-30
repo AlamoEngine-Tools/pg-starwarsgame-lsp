@@ -27,18 +27,44 @@ export const dockChromeCss = `
     /* ── Sections ──────────────────────────────────────────────────────── */
     .dock-section { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
     .dock-section:last-child { margin-bottom: 0; }
+    /* No opacity. It multiplies with everything inside, and descriptionForeground already carries
+       alpha of its own in the shipped themes - a count at 0.75 inside a heading at 0.65 measured
+       2.53:1 against the dock, which is what the reader saw as "nigh invisible with a default
+       visual studio dark skin". Uppercase, 11px and 600 is what makes this read as a heading; the
+       muted colour finishes it. The opacity only made it unreadable. */
     .dock-section-title {
         font-size: 11px;
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        opacity: 0.65;
         color: var(--vscode-descriptionForeground, #999);
         display: flex;
         align-items: center;
         gap: 4px;
     }
-    .dock-section-title .section-count { margin-left: auto; font-weight: normal; opacity: 0.75; }
+
+    /* A VALUE, not a label - it is the one thing in the heading someone reads a number off, so it
+       takes the ordinary foreground rather than the heading's muted one. */
+    .dock-section-title .section-count {
+        margin-left: auto;
+        font-weight: normal;
+        color: var(--vscode-foreground, #ccc);
+    }
+
+    /* The right-hand end of a heading: chips, the count, and the section's own button, packed
+       against the edge in a fixed order.
+
+       ONE auto margin, and it lives here. Two of them - the count's and a chip's - split the free
+       space between them, so a chip appearing shoved the count 88 pixels to the left and the thing
+       the reader was looking at moved out from under their eye. Wrapped, the group grows leftwards
+       and everything already in it stays exactly where it was. */
+    .dock-section-title .title-end {
+        margin-left: auto;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .dock-section-title .title-end .section-count { margin-left: 0; }
 
     /* ── Tiles ─────────────────────────────────────────────────────────── */
     /* Fixed size, not fluid. A grid that resizes its tiles as the dock is dragged means every tile
@@ -85,8 +111,6 @@ export const dockChromeCss = `
     .dock-tile[draggable="true"] { cursor: grab; }
     .dock-tile[draggable="true"]:active { cursor: grabbing; }
     .dock-tile .codicon, .dock-tile .tile-glyph { font-size: 18px; line-height: 1; opacity: 0.85; }
-    /* A tile carrying a badge has three stacked things in it, so its label gets one line; without
-       one it can have two. Either way the tile is the same height and nothing is cut off. */
     /* A tile carrying a badge has three stacked things in it, so its label gets one line; without
        one it can have two. Either way the tile is the same height and nothing is cut off. */
     .dock-tile.with-badge .tile-label { -webkit-line-clamp: 1; }
@@ -251,7 +275,12 @@ export const dockChromeCss = `
     }
     /* A colour well, not a form control. The browser renders a colour input as a wide bordered
        button with a swatch inside it, which took a whole row for one colour.
-       No backticks in this file: it is one big template literal. */
+       No backticks in this file: it is one big template literal.
+
+       NEVER put one inside a .field-label. The label carries opacity 0.7, and opacity composites
+       the WHOLE SUBTREE as a group - a swatch cannot opt back out with an opacity of its own, so it
+       renders a colour that is not the one stored. Measured: a stored #ffffff drew as #bdbdbd. Put
+       the label and the well side by side in a .view-row instead. */
     .field input[type=color], .field-label input[type=color] {
         margin-left: auto;
         width: 28px;
@@ -293,6 +322,17 @@ export const dockChromeCss = `
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    /* A segment that cannot be chosen. It had no disabled styling at all, so the model's own
+       camera on a model that carries none looked exactly like the four presets beside it - offered,
+       pressable, and doing nothing. Disable-don't-hide only works if disabled is visible. */
+    .mode-selector button:disabled {
+        opacity: 0.4;
+        cursor: default;
+    }
+    .mode-selector button:disabled:hover {
+        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.18));
+    }
+
     .mode-selector button:first-child { border-radius: 4px 0 0 4px; }
     .mode-selector button:last-child { border-right-width: 1px; border-radius: 0 4px 4px 0; }
     .mode-selector button:hover {
@@ -497,8 +537,12 @@ export const dockChromeCss = `
  */
 export const dockBodyCss = `
     /* scrollbar-gutter keeps the usable width the same whether the dock is scrolling or not, so the
-       tile grid does not re-flow the moment content grows past the fold. */
-    .dock-content { scrollbar-gutter: stable; }
+       tile grid does not re-flow the moment content grows past the fold.
+
+       both-edges as well, because the scrollbar sits INSIDE the padding box: with the gutter on one
+       side only, 8px of padding put every section 8px from the left edge and 8 + 15 = 23px from the
+       right, so the whole dock read as sitting a scrollbar's width left of centre. It does. */
+    .dock-content { scrollbar-gutter: stable both-edges; }
 `;
 
 /**
@@ -518,6 +562,9 @@ export const rightDockCss = `
         border-left: 1px solid var(--vscode-panel-border);
         background: var(--vscode-sideBar-background);
     }
+    /* The gutter is set in dockBodyCss, which is interpolated after this one and would win anyway.
+       One owner: this rule declaring it too was how it came to be set twice with different values,
+       and the losing declaration was the one carrying the fix. */
     .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
     .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
     /* Sits just outside the dock's left edge, so the grab area is not stolen from its content. */
@@ -582,6 +629,21 @@ export const dockHeaderCss = `
     .icon-btn:hover {
         background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.15));
         opacity: 1;
+    }
+    /* An ACTION rather than a state.
+
+       The icon-btn language is a toolbar's: borderless until hovered, and .active fills it in. That is
+       right for something that LATCHES, and wrong for something that fires and returns - standing
+       in a band beside controls that latch, a bare glyph reads as a switch that happens to be off.
+       A resting border is what says press me. */
+    .icon-btn.as-action {
+        background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.14));
+        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        opacity: 1;
+    }
+    .icon-btn.as-action:hover:not(:disabled) {
+        background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.28));
+        border-color: var(--vscode-focusBorder, #007fd4);
     }
     .icon-btn:disabled { opacity: 0.35; cursor: default; }
     .icon-btn.active {
@@ -666,6 +728,36 @@ export const problemsPanelCss = `
         flex-shrink: 0;
     }
     .panel-close:hover { background: transparent; color: var(--vscode-editor-foreground, #ccc); }
+
+    /* The view filter, beside the count it qualifies.
+
+       margin-left auto on the CLOSE button instead of the bar's space-between, so the filter
+       sits with the title rather than drifting to the middle: it reads as part of the count, not
+       as a second action competing with Close. */
+    .panel-filter {
+        background: transparent;
+        border: none;
+        color: var(--vscode-descriptionForeground, #999);
+        cursor: pointer;
+        padding: 0 6px;
+        margin-left: 8px;
+        font-size: 11px;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .panel-filter:hover:not(:disabled) {
+        background: transparent;
+        color: var(--vscode-editor-foreground, #ccc);
+    }
+    /* On, and therefore hiding something. Coloured because this is the state a reader has to be
+       able to notice without going looking - it is why the table is shorter than they expect. */
+    .panel-filter.active { color: var(--vscode-charts-blue, #3794ff); }
+    /* Nothing to act on. Kept, not removed - see the panel's own note. */
+    .panel-filter:disabled { opacity: 0.4; cursor: default; }
+
+    .panel-bar .panel-close { margin-left: auto; }
 
     /* The scrolling part: the title bar keeps its height and the rows take what is left. */
     .problem-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 2px; }
@@ -770,5 +862,177 @@ export const rotarySwitchCss = `
         box-shadow:
             0 0 0 2px var(--vscode-editor-background, #1f1f1f),
             0 0 7px 1px var(--vscode-focusBorder, #0078d4);
+    }
+`;
+
+/**
+ * The item inspector: what the selected row IS, and its bulk geometry tables.
+ *
+ * Shared because the inspector is its own editor tab and the preview still hosts the same rows -
+ * the same definition lists, the same tables, the same swatch. Copying it would make "what a mesh's
+ * facts look like" two stylesheets, which is the drift this file exists to prevent. A host that
+ * needs more room than a dock allows overrides the caps in its own sheet rather than forking these.
+ */
+export const inspectorCss = `
+    /* What the selected row actually IS, read out of the file.
+
+       A definition list rather than a table: the rows are label/value pairs of wildly different
+       lengths - a shader name runs past the column a triangle count needs - and a table would set
+       one column width for both. The label column is fixed and the value takes the rest, so the
+       labels line up while a long value wraps under itself instead of widening the panel. */
+    .inspect-group + .inspect-group { margin-top: 10px; }
+
+    .inspect-title {
+        font-size: 0.85em;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        opacity: 0.75;
+        margin-bottom: 4px;
+    }
+
+    .inspect-rows {
+        display: grid;
+        grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr);
+        gap: 3px 8px;
+        margin: 0;
+    }
+
+    .inspect-rows dt {
+        opacity: 0.75;
+        /* A label is a fixed vocabulary; truncating one loses nothing the reader cannot guess. */
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Values are the author's own data, so they wrap rather than truncate - a texture name that
+       ends in "...", or a vector missing its last component, is exactly the detail being looked up. */
+    .inspect-rows dd {
+        margin: 0;
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    /* Numbers and vectors line up digit for digit; names read as text. */
+    .inspect-rows dd.number, .inspect-rows dd.vector, .inspect-rows dd.colour {
+        font-variant-numeric: tabular-nums;
+    }
+
+    .inspect-rows dd.texture { font-family: var(--vscode-editor-font-family, monospace); }
+
+    /* Four rows of four, laid out as the author authored them. Preformatted rather than line-break
+       elements, so a narrow dock cannot re-wrap the rows into something that is no longer a matrix. */
+    .inspect-rows dd.matrix {
+        white-space: pre;
+        overflow-x: auto;
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 0.92em;
+        line-height: 1.35;
+    }
+
+    /* The bulk tables, as a tabbed box: a strip of tabs sitting ON the panel they open, which is
+       what a reader already knows how to use. It was a mode selector over a paged table, an
+       arrangement built for a 320px flyout where a hundred rows at a time was all that would fit.
+
+       Wraps, because three tabs ending in "Bone mapping" reach the edge of a narrow host. */
+    .geometry-tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin: 4px 0 0;
+    }
+
+    .geometry-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 12px;
+        border: 1px solid transparent;
+        border-bottom: none;
+        border-radius: 3px 3px 0 0;
+        background: none;
+        color: var(--vscode-descriptionForeground, #999);
+        font: inherit;
+        cursor: pointer;
+    }
+    .geometry-tab:hover:not(:disabled) { background: var(--vscode-list-hoverBackground); }
+    .geometry-tab:disabled { opacity: 0.4; cursor: default; }
+
+    /* The open tab joins the panel below it: same border, and no line between the two. */
+    .geometry-tab.open {
+        border-color: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        background: var(--vscode-editorWidget-background, #202020);
+        color: var(--vscode-foreground, #ccc);
+        margin-bottom: -1px;
+        padding-bottom: 5px;
+    }
+
+    .geometry-tab .section-count {
+        margin-left: 0;
+        opacity: 0.75;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .geometry-panel {
+        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: 0 3px 3px 3px;
+        overflow: hidden;
+    }
+
+    /* A vertex row is ten columns wide and the list is however long the sub-mesh is, so the table
+       scrolls in BOTH directions inside itself and its host keeps its shape. The height is set by
+       whoever mounts it - a dock and a full editor tab want very different amounts of it. */
+    .geometry-scroll {
+        overflow: auto;
+        max-height: 40vh;
+    }
+
+    .geometry-table {
+        border-collapse: collapse;
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 0.88em;
+        font-variant-numeric: tabular-nums;
+        white-space: nowrap;
+    }
+
+    .geometry-table th, .geometry-table td { padding: 2px 8px; text-align: right; }
+
+    /* Names read left; every other column is a number. */
+    .geometry-table td:last-child, .geometry-table th:last-child { text-align: left; }
+
+    .geometry-table thead th {
+        position: sticky;
+        top: 0;
+        background: var(--vscode-editorWidget-background, #202020);
+        opacity: 0.95;
+        font-weight: 600;
+        text-align: right;
+    }
+
+    .geometry-table tbody tr:nth-child(even) {
+        background: color-mix(in srgb, currentColor 4%, transparent);
+    }
+
+    /* How much of the table is in hand. The rows arrive in pages either way - the server caps a
+       request at 500 - and a reader several thousand rows down wants to know whether the end they
+       are looking at is the table's end or merely today's. */
+    .geometry-foot {
+        padding: 3px 8px;
+        border-top: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        color: var(--vscode-descriptionForeground, #999);
+        font-size: 0.88em;
+        font-variant-numeric: tabular-nums;
+    }
+
+    .inspect-swatch {
+        display: inline-block;
+        width: 0.8em;
+        height: 0.8em;
+        margin-right: 5px;
+        vertical-align: -1px;
+        border-radius: 2px;
+        /* Over a border rather than inside it: a border would eat into the colour being judged. */
+        outline: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
+        outline-offset: -1px;
     }
 `;

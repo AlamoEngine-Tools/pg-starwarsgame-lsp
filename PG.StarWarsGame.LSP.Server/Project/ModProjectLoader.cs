@@ -62,7 +62,7 @@ public sealed class ModProjectLoader
         }
 
         if (dto is null)
-            throw new ModProjectLoadException($"Could not load mod project '{fileName}': the file is empty.");
+            throw new ModProjectLoadException($"Could not load mod project '{fileName}': The file is empty.");
 
         ThrowIfLegacyLocalisationShape(text, fileName);
 

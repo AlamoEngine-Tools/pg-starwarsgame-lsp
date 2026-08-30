@@ -10,10 +10,11 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 ///     pass it on to a collaborator whose schema-dependent behaviour is covered by that
 ///     collaborator's own tests.
 ///
-///     Not sealed, and <see cref="GetTag" /> is virtual: a test that needs the resolver to see ONE
-///     tag's real schema mode - <c>Death_Clone</c> is merge plus multipleAllowed, and reporting no
-///     schema makes the resolver collapse it - overrides that alone rather than restating the whole
-///     interface.
+///     Not sealed, and <see cref="GetTag" /> and <see cref="GetObjectType" /> are virtual: a test
+///     that needs the resolver to see ONE tag's real schema mode - <c>Death_Clone</c> is merge plus
+///     multipleAllowed, and reporting no schema makes the resolver collapse it - or that needs a
+///     handful of type names to be recognised as real object types, overrides that alone rather than
+///     restating the whole interface.
 /// </summary>
 internal class NullSchemaProvider : ISchemaProvider
 {
@@ -33,7 +34,7 @@ internal class NullSchemaProvider : ISchemaProvider
         return [];
     }
 
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    public virtual GameObjectTypeDefinition? GetObjectType(string typeName)
     {
         return null;
     }

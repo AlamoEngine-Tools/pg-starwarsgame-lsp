@@ -65,6 +65,7 @@ async function main() {
       'src/webview/creditsPreview.tsx',
       'src/webview/encyclopediaPreview.tsx',
       'src/webview/modelPreview.tsx',
+      'src/webview/modelInspector.tsx',
     ],
     bundle: true,
     format: 'iife',

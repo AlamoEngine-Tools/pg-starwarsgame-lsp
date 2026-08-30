@@ -39,9 +39,9 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
 }
 
 describe('breakoffFor', () => {
-    it('finds the prop a destroyed mount names', () => {
+    it('finds the prop a destroyed hardpoint names', () => {
         // 167 of foc's 355 hardpoints name one, 147 distinct. Until now the name travelled and
-        // nothing on the client read it, so destroying a mount dropped nothing at all.
+        // nothing on the client read it, so destroying a hardpoint dropped nothing at all.
         assert.equal(breakoffFor(hardpoint(), [PROP])?.id, PROP.id);
     });
 
@@ -51,7 +51,7 @@ describe('breakoffFor', () => {
                 [PROP])?.id, PROP.id);
     });
 
-    it('is nothing for a mount that names none', () => {
+    it('is nothing for a hardpoint that names none', () => {
         // 188 of the 355 do not, and they simply vanish - which is what the engine does too.
         assert.equal(breakoffFor(hardpoint({ deathBreakoffProp: null }), [PROP]), null);
     });
@@ -67,7 +67,7 @@ describe('breakoffFor', () => {
 describe('breakoffLifetime', () => {
     it('takes the midpoint of the range the prop declares', () => {
         // The engine randomises between the two. A preview picks the middle instead: a debris field
-        // that lasted a different time on every run would make two looks at the same mount
+        // that lasted a different time on every run would make two looks at the same hardpoint
         // disagree, and there is nothing to be learned from the dice.
         assert.equal(breakoffLifetime(PROP), 20);
     });
@@ -137,7 +137,7 @@ describe('breakoffPose', () => {
     });
 
     it('sits still where the prop declares no motion', () => {
-        // A prop with no vectors is debris that simply stays where the mount was, which is a
+        // A prop with no vectors is debris that simply stays where the hardpoint was, which is a
         // perfectly ordinary thing to author.
         const still = { ...PROP, movementVector: null, facingRotateVector: null };
         const pose = breakoffPose(still, 5);
@@ -146,7 +146,7 @@ describe('breakoffPose', () => {
         assert.deepEqual(pose.rotation, { x: 0, y: 0, z: 0 });
     });
 
-    it('is at the mount at the moment it breaks off', () => {
+    it('is at the hardpoint at the moment it breaks off', () => {
         const pose = breakoffPose(PROP, 0);
 
         assert.deepEqual(pose.offset, { x: 0, y: 0, z: 0 });
@@ -156,28 +156,28 @@ describe('breakoffPose', () => {
 
 describe('breakoffAnchor, where the wreck is dropped', () => {
     /**
-     * The mount is already standing on the hull bone this hardpoint names, so its ROOT is that
-     * place by construction - and asking for the bone by NAME inside the mount is what went wrong.
+     * The hardpoint is already standing on the hull bone this hardpoint names, so its ROOT is that
+     * place by construction - and asking for the bone by NAME inside the hardpoint is what went wrong.
      *
      * An Executor hardpoint model carries a copy of the WHOLE hull skeleton: 228 nodes, including
      * `HP_L_Trb00_Bone` itself. So the name resolved a second time, inside a part already standing
      * on that bone, and the offset was applied twice - `HP_EXECUTOR_LEFT_TURBO_00` dropped its
-     * wreck 2093 units from the mount it came off. A Star Destroyer's mount carries 22 nodes and no
+     * wreck 2093 units from the hardpoint it came off. A Star Destroyer's hardpoint carries 22 nodes and no
      * such bone, so the lookup missed and the silent fallback happened to give the right answer:
      * the error is invisible on every ship whose parts do not carry the hull's bones, and grows
      * with the bone's distance from the origin.
      */
-    it('drops it on the MOUNT itself, never on a bone name inside the mount', () => {
+    it('drops it on the HARDPOINT itself, never on a bone name inside the hardpoint', () => {
         assert.deepEqual(breakoffAnchor('hull', hardpoint()), { partId: 'hp:HP_FL' });
     });
 
     /**
-     * With no mount there is nothing standing there, so the hull's own bone is the place. 32 of
+     * With no hardpoint there is nothing standing there, so the hull's own bone is the place. 32 of
      * foc's hardpoints are like this - a tractor beam or a fighter bay names a bone and no model.
      *
      * By NAME only, because `PreviewHardpoint` carries no bone index: repeated bone names would
      * still take the first. That is a gap in the DESCRIPTOR rather than here, and it is narrower
-     * than it was - a hardpoint WITH a mount no longer resolves a name at all.
+     * than it was - a hardpoint WITH a hardpoint no longer resolves a name at all.
      */
     it('falls back to the hull bone for a hardpoint with no model', () => {
         assert.deepEqual(
@@ -185,7 +185,7 @@ describe('breakoffAnchor, where the wreck is dropped', () => {
             { partId: 'hull', bone: 'HP_F-L_BONE' });
     });
 
-    /** A hardpoint naming neither a mount nor a bone leaves the hull itself, which is recoverable. */
+    /** A hardpoint naming neither a hardpoint nor a bone leaves the hull itself, which is recoverable. */
     it('leaves the hull for a hardpoint naming no bone either', () => {
         assert.deepEqual(
             breakoffAnchor('hull', hardpoint({ partId: null, attachBone: undefined })),

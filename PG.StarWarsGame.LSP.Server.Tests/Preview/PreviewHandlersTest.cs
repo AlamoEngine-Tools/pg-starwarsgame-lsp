@@ -134,10 +134,25 @@ public sealed class PreviewHandlersTest
         Assert.Equal<byte[]>([0x67, 0x6C, 0x54, 0x46], bytes[..4]);
     }
 
+    /// <summary>
+    ///     A clip whose bone NAMES disagree is kept - it binds by index.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         This assertion used to be <c>Assert.Empty</c>. The user reported that the
+    ///         identical-skeleton rule fires all over the BASE GAME, on units whose animations play
+    ///         correctly in the engine, so refusing a name disagreement was costing real clips.
+    ///     </para>
+    ///     <para>
+    ///         The pairing is deliberately permissive now, and this test says so out loud: a rancor
+    ///         idle is plainly not a Star Destroyer's clip, and it is loaded anyway. What keeps that
+    ///         from happening in practice is the CALLER - <c>AnimationsFor</c> only ever offers clips
+    ///         whose filename is prefixed by the model's own stem.
+    ///     </para>
+    /// </remarks>
     [Fact]
-    public async Task GetModelGlb_DropsAnAnimationThatDoesNotMatchTheSkeleton()
+    public async Task GetModelGlb_KeepsAnAnimationWhoseBoneNamesDisagree()
     {
-        // Ordinary data, not an error: shipped animations sit beside models they do not belong to.
         var model = FindModel("Ev_stardestroyer.alo");
         var animation = FindModel("Ai_rancor_idle_00.ala");
         if (model is null || animation is null)
@@ -157,20 +172,53 @@ public sealed class PreviewHandlersTest
             CancellationToken.None);
 
         Assert.NotNull(result.Glb);
+        Assert.Single(result.Animations);
+    }
+
+    /// <summary>
+    ///     A clip reaching past the end of the bone list is still refused.
+    /// </summary>
+    /// <remarks>
+    ///     The one half of the old rule that is not a strictness setting: there is no node to drive
+    ///     past the end of the array, so the track cannot be written whatever anyone decides about
+    ///     names. `Nb_basepad.alo` carries three bones; the rancor drives far more.
+    /// </remarks>
+    [Fact]
+    public async Task GetModelGlb_DropsAnAnimationReachingPastTheSkeleton()
+    {
+        var model = FindModel("Nb_basepad.alo");
+        var animation = FindModel("Ai_rancor_idle_00.ala");
+        if (model is null || animation is null)
+            Assert.Skip("No extracted game tree found.");
+
+        var assets = new StubAssets()
+            .With("Data/Art/Models/Nb_basepad.alo", File.ReadAllBytes(model))
+            .With("Data/Art/Models/Ai_rancor_idle_00.ala", File.ReadAllBytes(animation));
+        var handler = new GetModelGlbHandler(assets, Config(), NullLogger<GetModelGlbHandler>.Instance);
+
+        var result = await handler.Handle(
+            new GetModelGlbParams
+            {
+                ModelReference = "Nb_basepad.alo",
+                Animations = ["Ai_rancor_idle_00.ala"]
+            },
+            CancellationToken.None);
+
+        Assert.NotNull(result.Glb);
         Assert.Empty(result.Animations);
     }
 
     /// <summary>
-    ///     A dropped clip says which one it was and what did not line up.
+    ///     A skeleton disagreement is said out loud, whether the clip was kept or dropped.
     /// </summary>
     /// <remarks>
-    ///     Dropping is right - shipped animations sit beside models they were not authored against -
-    ///     but doing it in silence leaves no way to tell a clip that was rejected from one that was
-    ///     never there. The reason names the bone, so a reader can see at once whether to suspect
-    ///     the model or the animation.
+    ///     Silence leaves no way to tell a clip that was rejected from one that was never there, and
+    ///     now that a disagreeing clip is KEPT there is a second thing worth saying: it will play,
+    ///     and the bones it moves may not be the ones it was authored to move. Either way the reason
+    ///     names the bone, so a reader can see whether to suspect the model or the animation.
     /// </remarks>
     [Fact]
-    public async Task GetModelGlb_SaysWhyItDroppedAnAnimation()
+    public async Task GetModelGlb_SaysWhenAnAnimationDisagreesWithTheSkeleton()
     {
         var model = FindModel("Ev_stardestroyer.alo");
         var animation = FindModel("Ai_rancor_idle_00.ala");
@@ -383,6 +431,43 @@ public sealed class PreviewHandlersTest
         Assert.Contains("pe_stardestroyerengines.alo", result.Error);
     }
 
+    [Theory]
+    [InlineData("p_smoke_small_thin_ALT2", "p_smoke_small_thin.alo")]
+    [InlineData("p_electricalstatic_ALT1", "p_electricalstatic.alo")]
+    [InlineData("p_blink_white_ALT0", "p_blink_white.alo")]
+    [InlineData("p_smoke_tiny01_LOD1", "p_smoke_tiny01.alo")]
+    [InlineData("p_fire_small01_ALT3_LOD0", "p_fire_small01.alo")]
+    [InlineData("p_fire_small01_LOD0_ALT3", "p_fire_small01.alo")]
+    [InlineData("p_smoke_small_thin_ALT2.alo", "p_smoke_small_thin.alo")]
+    public async Task GetParticleSystem_StripsTheLevelSuffixTheEngineStrips(
+        string proxyName, string expected)
+    {
+        // A proxy carries its damage stage in its NAME, and the asset is filed under the bare name:
+        // `p_smoke_small_thin_ALT2` is not a file, `p_smoke_small_thin.alo` is. The engine strips the
+        // suffix at the load site - `ObjectTemplate.cpp` walks `_ALT` and `_LOD` out of the name
+        // before `Assets::LoadParticleSystem` - so every level-tagged effect in the corpus was asking
+        // for a file that does not exist. 152 shipped models carry 206 such names between them.
+        var result = await Particles(new StubAssets(), new FakeVariantTagSource()).Handle(
+            new GetParticleSystemParams { Name = proxyName }, CancellationToken.None);
+
+        Assert.Contains(expected, result.Error);
+    }
+
+    [Theory]
+    [InlineData("p_alterac")]
+    [InlineData("p_lodestone")]
+    [InlineData("p_smoke_ALT")]
+    [InlineData("p_smoke_LODGE")]
+    public async Task GetParticleSystem_LeavesANameThatOnlyLooksLevelTagged(string proxyName)
+    {
+        // The marker counts only where DIGITS follow it, which is the same rule `ParseName` uses to
+        // read the level - a suffix with nothing numeric after it is part of the name.
+        var result = await Particles(new StubAssets(), new FakeVariantTagSource()).Handle(
+            new GetParticleSystemParams { Name = proxyName }, CancellationToken.None);
+
+        Assert.Contains($"{proxyName}.alo", result.Error);
+    }
+
     [Fact]
     public async Task GetParticleSystem_CarriesTheObjectsScaleFactor()
     {
@@ -441,6 +526,66 @@ public sealed class PreviewHandlersTest
             new GetParticleSystemParams { Name = "pe_stardestroyerengines" }, CancellationToken.None);
 
         Assert.Equal(1f, result.ScaleFactor);
+    }
+
+    // The catalogue offers every projectile in the tree - 105 of them, measured - but filling the
+    // weapon from one only ever worked for the handful the SUBJECT fires, because those are the only
+    // ones the scene resolves. Everything else printed "not loaded yet", which is why the picker read
+    // as broken and the list as incomplete. This is the round trip that fills the rest.
+    [Fact]
+    public async Task GetProjectile_ResolvesOneByIdWithItsDamageValues()
+    {
+        var tags = new FakeVariantTagSource().With("Proj_Ion_Cannon",
+            Tag("Projectile_Damage", "250"),
+            Tag("Damage_Type", "Damage_Ion"),
+            Tag("Projectile_Does_Shield_Damage", "Yes"),
+            Tag("Projectile_Does_Hitpoint_Damage", "No"));
+
+        var result = await Projectiles(tags, Sym("Proj_Ion_Cannon", "Projectile")).Handle(
+            new GetProjectileParams { Name = "Proj_Ion_Cannon" }, CancellationToken.None);
+
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Projectile);
+        Assert.Equal("Proj_Ion_Cannon", result.Projectile!.Id);
+        Assert.Equal(250, result.Projectile.Damage);
+        Assert.Equal("Damage_Ion", result.Projectile.DamageType);
+        Assert.True(result.Projectile.DoesShieldDamage);
+        Assert.False(result.Projectile.DoesHitpointDamage);
+    }
+
+    [Fact]
+    public async Task GetProjectile_SaysSoForAnIdTheProjectDoesNotDefine()
+    {
+        // Better than an empty weapon: a name the tree does not carry is the reader's own typo or a
+        // mod that moved, and silently filling zeroes would look like the projectile does nothing.
+        var result = await Projectiles(new FakeVariantTagSource()).Handle(
+            new GetProjectileParams { Name = "Proj_Nowhere" }, CancellationToken.None);
+
+        Assert.Null(result.Projectile);
+        Assert.NotNull(result.Error);
+    }
+
+    [Fact]
+    public async Task GetProjectile_RefusesAnEmptyName()
+    {
+        var result = await Projectiles(new FakeVariantTagSource()).Handle(
+            new GetProjectileParams { Name = "  " }, CancellationToken.None);
+
+        Assert.Null(result.Projectile);
+        Assert.NotNull(result.Error);
+    }
+
+    private static GetProjectileHandler Projectiles(
+        FakeVariantTagSource tags, params GameSymbol[] symbols)
+    {
+        var index = GameIndex.Empty with
+        {
+            WorkspaceDefinitions = symbols.ToImmutableDictionary(
+                s => s.Id, s => ImmutableArray.Create(s), StringComparer.OrdinalIgnoreCase)
+        };
+
+        return new GetProjectileHandler(
+            Config(), new FakeGameIndexService(index), new NullSchemaProvider(), tags);
     }
 
     private static GetParticleSystemHandler Particles(

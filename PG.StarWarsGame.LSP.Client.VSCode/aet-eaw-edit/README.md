@@ -329,7 +329,7 @@ The baseline is a pre-built snapshot of all vanilla EaW and FoC game objects and
 
 ### Feature flags
 
-Every language feature can be independently enabled or disabled. All flags default to `true` except the three still-in-development capabilities noted below. **Changing any feature-flag setting automatically restarts the language server.**
+Every language feature can be independently enabled or disabled. Defaults are given per flag in the tables below; the still-in-development capabilities are marked. **Changing a feature-flag setting the language server reads automatically restarts it.** The editor-side flags say so in their own note and take effect at once.
 
 XML:
 
@@ -387,6 +387,16 @@ Cross-language tools:
 | `aet-eaw-edit.features.tools.storyEditor` | `false` | The story navigator and the story graph panel, in read-only View mode. Builds on `aet-eaw-edit.features.story.discovery` _(work in progress)_ |
 | `aet-eaw-edit.features.tools.storyEditing` | `false` | Edit mode in the story graph panel: staging, previewing, validating, and writing story changes. Without it the panel is read-only and Edit is not offered by the mode switch. Builds on `aet-eaw-edit.features.tools.storyEditor` _(work in progress)_ |
 | `aet-eaw-edit.features.tools.variants` | `true` | Variant-inheritance tooling: the Show Effective Object command and its code lens |
+
+Preview and encyclopedia:
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.features.tools.modelPreview` | `true` | The 3D model preview: opening an `.alo` shows the model, and a GameObject can be previewed with its hardpoints mounted. Models that ship with the game are only reachable once `aet-eaw-edit.lsp.source.baseGameDirectory` is set |
+| `aet-eaw-edit.features.tools.encyclopedia` | `true` | The encyclopedia popup preview: the _Preview Encyclopedia Popup_ command and its code lens |
+| `aet-eaw-edit.features.preview.energyPool` | `false` | The energy pool in the model preview: its bar under the ability bar, its row in the target readout, and the `Projectile_Does_Energy_Damage` switch on the attacker. **Off on purpose** - the energy mechanic is implemented in the engine and works, but the shipped game disables it and offers no interface for it, so nothing you author against it is visible to a player unless you have enabled it yourself |
+
+> `aet-eaw-edit.features.preview.energyPool` is read by the editor rather than the language server. It takes effect immediately in any preview already open, and needs no restart. `Energy_Capacity` and `Projectile_Does_Energy_Damage` are read from your files either way - the setting decides only whether the preview shows them.
 
 > The localisation views follow `aet-eaw-edit.features.tools.localisation` alone. Feature flags are read at startup, so restart the server after changing it.
 

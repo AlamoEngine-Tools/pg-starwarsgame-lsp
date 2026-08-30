@@ -137,7 +137,7 @@ export const Shell = styled.div`
     }
     .column-flyout {
         /* Fixed, not absolute: the header scrolls inside .grid-area, which clips whatever reaches
-           past its edge - and this hangs off the rightmost cell. Placed from the gear's viewport
+           past its edge - and this is anchored to the rightmost cell. Placed from the gear's viewport
            box when it opens. */
         position: fixed;
         z-index: 25;
@@ -153,7 +153,7 @@ export const Shell = styled.div`
         font-weight: normal;
         white-space: nowrap;
     }
-    /* The flyout hangs off a header cell, so it sits inside .grid and inherits the rule that
+    /* The flyout is anchored to a header cell, so it sits inside .grid and inherits the rule that
        stretches every input in the table to fill its cell. On a checkbox that reserves the whole
        row and pushes the language name out past the flyout's edge - which is how this ended up
        looking like a column of checkboxes with the names floating over the dock beside them.

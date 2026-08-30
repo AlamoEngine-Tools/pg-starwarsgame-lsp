@@ -5,7 +5,7 @@
 //
 // An emitter's `emitFromMesh` says where its particles are born, and only one of the four values is
 // the shape volume every emitter here used to assume. The other three read the geometry the system
-// hangs off, which is what turns ONE particle system into many emission points - a Nebulon-B's
+// is attached to, which is what turns ONE particle system into many emission points - a Nebulon-B's
 // engine wash coming off every vertex of the engine mesh rather than a single puff at its origin.
 //
 // Ported from `CreatorPlugins.cpp:520-590` (`MeshCreatorBase::InitializeParticle`) and the rate

@@ -17,7 +17,7 @@ export interface LocColumnMenuProps {
  */
 export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
     // Viewport coordinates, taken when the menu opens. The flyout is pinned to the viewport rather
-    // than hung off the gear: the header scrolls inside `.grid-area`, which clips anything reaching
+    // than anchored to the gear: the header scrolls inside `.grid-area`, which clips anything reaching
     // past its edge - and the gear is at the far right, so an absolutely positioned flyout had its
     // labels cut off and showed a column of checkboxes with nothing beside them. Same reason the
     // row menu and the drop indicator are fixed.

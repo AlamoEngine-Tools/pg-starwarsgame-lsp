@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Server.Abilities;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -21,7 +22,7 @@ public enum PreviewParticleGate
     HardpointAlive
 }
 
-/// <summary>One particle system hanging off a bone of a loaded part.</summary>
+/// <summary>One particle system attached to a bone of a loaded part.</summary>
 /// <param name="Id">Unique within the scene. Proxy names repeat, so the name alone will not do.</param>
 /// <param name="SystemRef">The particle system to fetch, as the proxy names it.</param>
 /// <param name="PartId">The part whose skeleton carries the bone.</param>
@@ -36,6 +37,17 @@ public enum PreviewParticleGate
 /// <param name="AltDecreaseStayHidden">
 ///     Keeps the effect hidden while the damage state is winding DOWN. This is the repair asymmetry:
 ///     fire lit on the way to destruction should not flicker back on as a hardpoint is repaired.
+/// </param>
+/// <param name="ClaimsAbility">
+///     The ability this proxy's BONE NAME claims by its prefix, or null for the 5404 that claim
+///     nothing. See <see cref="AbilityProxyPrefix" />.
+///     <para>
+///         A claim is not a binding. The object has to declare the type as well, and when it does
+///         not the engine simply never shows the effect - <c>Tartan_Patrol_Cruiser</c> declares
+///         POWER_TO_WEAPONS and carries <c>Pte_tartanengine_lrg</c> for a TURBO it does not have.
+///         Carried on the wire because the client is where visibility is decided, and without it an
+///         unbound engine proxy fell through to the ordinary path and lit up on open.
+///     </para>
 /// </param>
 public sealed record PreviewParticle(
     string Id,
@@ -53,10 +65,11 @@ public sealed record PreviewParticle(
     bool StartsVisible,
     int? Alt = null,
     int? Lod = null,
-    bool AltDecreaseStayHidden = false);
+    bool AltDecreaseStayHidden = false,
+    string? ClaimsAbility = null);
 
 /// <summary>
-///     Works out which particle system hangs off which bone, and what switches it on.
+///     Works out which particle system is attached to which bone, and what switches it on.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -123,7 +136,11 @@ public static class PreviewParticleResolver
                 proxy.IsVisible,
                 proxy.Alt,
                 proxy.Lod,
-                proxy.AltDecreaseStayHidden));
+                proxy.AltDecreaseStayHidden,
+
+                // Off the BONE, as `AbilityProxyPrefix.Bind` reads it - a proxy may name a system
+                // that carries no prefix while riding a bone that does.
+                AbilityProxyPrefix.AbilityFor(bone.Name)));
         }
 
         return particles;
@@ -143,7 +160,7 @@ public static class PreviewParticleResolver
         if (engineOwners.TryGetValue(parentBone, out var engine))
             return (PreviewParticleGate.HardpointAlive, engine);
 
-        // The engine MESH, for the models whose glow does not hang off the tagged bone at all.
+        // The engine MESH, for the models whose glow is not attached to the tagged bone at all.
         if (IsEngineMeshBone(parentBone) && engineOwners.Count > 0)
             return (PreviewParticleGate.HardpointAlive, engineOwners.Values.First());
 
@@ -151,7 +168,7 @@ public static class PreviewParticleResolver
     }
 
     /// <summary>
-    ///     Whether a bone is the engine geometry a glow proxy hangs off.
+    ///     Whether a bone is the engine geometry a glow proxy is attached to.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -168,7 +185,7 @@ public static class PreviewParticleResolver
     ///     </para>
     ///     <para>
     ///         Only ever consulted when the subject HAS an engine hardpoint that hides its glow, so
-    ///         a model with no engine mount keeps its effects ungated whatever its bones are called.
+    ///         a model with no engine hardpoint keeps its effects ungated whatever its bones are called.
     ///     </para>
     /// </remarks>
     private static bool IsEngineMeshBone(string bone)

@@ -3,7 +3,7 @@
 
 // Geometry that turns to face something.
 //
-// A bone can declare that whatever hangs off it always points at the camera, the light or the wind -
+// A bone can declare that whatever is attached to it always points at the camera, the light or the wind -
 // `AlamoBillboardType`, from the `0x206` bone chunk. It is rare: 22598 of the 22866 bones in the
 // shipped models declare nothing, and the 268 that do are mostly sky domes and the planet cards on
 // the galactic map. Trees are NOT among them - their foliage is real geometry, and the one
@@ -116,4 +116,29 @@ function yawTowards(direction: THREE.Vector3): THREE.Quaternion {
     BASIS.makeBasis(right, BILLBOARD_UP, FLATTENED);
 
     return new THREE.Quaternion().setFromRotationMatrix(BASIS);
+}
+
+/**
+ * The LOCAL rotation a billboarded node's geometry needs, so that its world rotation becomes the
+ * billboard applied ON TOP OF whatever the node already had.
+ *
+ * The engine composes it that way - `ObjectTemplate::DoBillboard` does
+ * `world = m_billboardZLight * world`, turning the existing world matrix rather than replacing it.
+ * This used to assign the billboard as the child's world rotation outright, which silently discarded
+ * the exporter's Z-up-to-Y-up root correction.
+ *
+ * That cost every tree its shadow. `W_tree_alien_00_hi`'s SHADOW card is 50 units of local Z, which
+ * the root correction stands up into world Y; a bare yaw laid it flat instead, so the extruded
+ * volume ran from world Y 0 down to -145.5 - entirely at or below the floor. No shadow above ground,
+ * and geometry below it. Measured: the same card composes to world Y `[-0.2, 50]` this way.
+ *
+ * `boneWorld` is the node's own world rotation, so the conjugation cancels it on the way in and
+ * restores it on the way out: `boneWorld * local` comes to `billboard * boneWorld`.
+ */
+export function billboardLocalRotation(
+    boneWorld: THREE.Quaternion,
+    billboard: THREE.Quaternion,
+    out: THREE.Quaternion,
+): THREE.Quaternion {
+    return out.copy(boneWorld).invert().multiply(billboard).multiply(boneWorld);
 }

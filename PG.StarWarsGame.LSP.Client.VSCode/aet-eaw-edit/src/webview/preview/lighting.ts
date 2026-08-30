@@ -22,7 +22,7 @@ export const DEFAULT_LIGHT_AZIMUTH_DEGREES = 45;
  *
  * Not straight overhead. A light directly above a model flattens every horizontal surface into one
  * value and drops the shadow into a puddle under the hull, which is the one place it tells you
- * nothing - a raking light is what makes panel lines and hardpoint mounts read.
+ * nothing - a raking light is what makes panel lines and hardpoint edges read.
  */
 export const DEFAULT_LIGHT_ELEVATION_DEGREES = 45;
 

@@ -124,3 +124,48 @@ describe('materialStateFrom', () => {
         assert.equal(materialStateFrom(pass({ alpharef: '128' })).alphaTest, null);
     });
 });
+
+// MODULATE2X doubles the modulated colour, and it is the fixed-function half of the same statement
+// the programmable path makes as `texel.rgb * In.Diff * 2.0f`. Four shipped effects have no
+// programmable technique at all - their shaders are commented out and the live one sets
+// `VertexShader = NULL` - so nothing was doubling anything for them, and `MeshAlpha.fx` alone is
+// worn by 286 models / 1282 sub-meshes across foc, every one drawing at half its intended brightness.
+describe('materialStateFrom: the fixed-function colour scale', () => {
+    const ffPass = (states: Record<string, string>): FxPass => ({ name: 'p0', states });
+
+    it('doubles a fixed-function stage 0 that asks for MODULATE2X', () => {
+        assert.equal(materialStateFrom(ffPass({ 'colorop[0]': 'MODULATE2X' })).colourScale, 2);
+    });
+
+    it('leaves an ordinary MODULATE alone', () => {
+        assert.equal(materialStateFrom(ffPass({ 'colorop[0]': 'MODULATE' })).colourScale, 1);
+    });
+
+    it('leaves a pass that names no stage op alone', () => {
+        assert.equal(materialStateFrom(ffPass({ zwriteenable: 'false' })).colourScale, 1);
+    });
+
+    it('is case-insensitive, like every other state read', () => {
+        assert.equal(materialStateFrom(ffPass({ 'colorop[0]': 'modulate2x' })).colourScale, 2);
+    });
+
+    // D3D ignores the texture stages entirely once a pixel shader is bound, and the translated HLSL
+    // does its own doubling - so honouring the declaration here would double it twice.
+    it('ignores the stage op when the pass has a programmable shader', () => {
+        assert.equal(materialStateFrom({
+            name: 'p0', states: { 'colorop[0]': 'MODULATE2X' }, pixelShader: 'ps_main',
+        }).colourScale, 1);
+    });
+
+    it('ignores it for a vertex-shader-only pass too', () => {
+        assert.equal(materialStateFrom({
+            name: 'p0', states: { 'colorop[0]': 'MODULATE2X' }, vertexShader: 'vs_main',
+        }).colourScale, 1);
+    });
+
+    // Only stage 0 is read. A later stage modulates against what earlier stages produced, and
+    // folding that into one scalar would be inventing a number rather than reading one.
+    it('does not read a later stage as if it were the first', () => {
+        assert.equal(materialStateFrom(ffPass({ 'colorop[1]': 'MODULATE2X' })).colourScale, 1);
+    });
+});

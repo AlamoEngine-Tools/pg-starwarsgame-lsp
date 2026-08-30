@@ -79,7 +79,7 @@ export async function offerShaderSources(
 
     if (hasShaderSources(configured)) {
         void vscode.window.showInformationMessage(
-            `EaWEdit: base shader sources found in "${configured!}".`);
+            `EaWEdit: Base shader sources found in "${configured!}".`);
         return;
     }
 
@@ -90,7 +90,7 @@ export async function offerShaderSources(
         : ['Download now', 'Open download page', 'Choose folder'];
 
     const choice = await vscode.window.showInformationMessage(
-        `EaWEdit: the preview can use the base game's shader sources for a closer match. `
+        `EaWEdit: The preview can use the base game's shader sources for a closer match. `
         + `${SHADER_LICENCE_NOTE} They are fetched from Petroglyph's own published download and `
         + 'checked against a pinned SHA-256.',
         ...choices,
@@ -129,7 +129,7 @@ export async function offerShaderSources(
 
     if (!hasShaderSources(directory)) {
         void vscode.window.showWarningMessage(
-            `EaWEdit: no .fx files found in "${directory}". `
+            `EaWEdit: No .fx files found in "${directory}". `
             + 'Pick the folder the archive extracted to.');
         return;
     }
@@ -140,7 +140,7 @@ export async function offerShaderSources(
         'aet-eaw-edit.shaders.directory', directory, vscode.ConfigurationTarget.Global);
 
     void vscode.window.showInformationMessage(
-        'EaWEdit: base shader sources set. Reload the window to pick them up.');
+        'EaWEdit: Base shader sources set. Reload the window to pick them up.');
 }
 
 /** Where a fetched copy is kept: the extension's own storage, not the workspace. */
@@ -165,7 +165,7 @@ export async function downloadShaderSources(
 
     return vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: 'EaWEdit: base shader sources',
+        title: 'EaWEdit: Base shader sources',
         cancellable: true,
     }, async (progress, token) => {
         progress.report({ message: 'downloading...' });
@@ -181,7 +181,7 @@ export async function downloadShaderSources(
             // Offline, a proxy that needs configuring, DNS, TLS - all land here, and the message is
             // the only thing the reader has to go on.
             void vscode.window.showErrorMessage(
-                `EaWEdit: could not download the shader sources from ${url}. `
+                `EaWEdit: Could not download the shader sources from ${url}. `
                 + `${error instanceof Error ? error.message : String(error)} `
                 + 'If you are behind a proxy, set it in VS Code\'s proxy settings, or download the '
                 + 'archive yourself and use "Choose folder".');
@@ -193,7 +193,7 @@ export async function downloadShaderSources(
         const checked = checkArchive(bytes, SHADER_ARCHIVE_SHA256, SHADER_ARCHIVE_BYTES);
         if (!checked.ok) {
             void vscode.window.showErrorMessage(
-                `EaWEdit: the shader archive was not what was expected - ${checked.problem}. `
+                `EaWEdit: The shader archive was not what was expected - ${checked.problem}. `
                 + 'Nothing has been written.');
             return false;
         }
@@ -206,7 +206,7 @@ export async function downloadShaderSources(
             written = await extractShaders(bytes, directory);
         } catch (error) {
             void vscode.window.showErrorMessage(
-                `EaWEdit: could not unpack the shader archive. `
+                `EaWEdit: Could not unpack the shader archive. `
                 + `${error instanceof Error ? error.message : String(error)}`);
             return false;
         }

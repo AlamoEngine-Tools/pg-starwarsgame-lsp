@@ -22,6 +22,27 @@ export interface TextureBindings {
     gloss?: string;
 }
 
+/**
+ * The cutoff each alpha-TESTED effect declares, by shader name.
+ *
+ * Measured across the shipped effects: exactly three enable alpha testing, and these are the values
+ * their own render state carries. They are here rather than read from the shader because the shader
+ * is usually absent - see `MaterialSpec.alphaTest`.
+ *
+ * `AlphaRef` is written in HEX in every one of them, which has caught this codebase before:
+ * `parseFloat('0x00000080')` stops at the `x` and returns 0, a cutoff that discards nothing.
+ *
+ * Alpha TESTED is not alpha BLENDED. `Tree.fx` declares `AlphaBlendEnable = FALSE` with
+ * `ZWriteEnable = TRUE`, so it stays opaque and keeps its depth writes; only the cutoff is added.
+ * Its `_ALAMO_RENDER_PHASE = "Transparent"` annotation is about draw ORDER, not about blending.
+ */
+const ALPHA_TESTED: ReadonlyMap<string, number> = new Map([
+    ['tree.fx', 0x80 / 255],
+    ['grass.fx', 0x08 / 255],
+    // Used by no shipped model, but it declares one and costs nothing to honour.
+    ['blobstencilmasked.fx', 0x80 / 255],
+]);
+
 /** What to draw, and why. */
 export interface MaterialSpec {
     /**
@@ -46,6 +67,16 @@ export interface MaterialSpec {
      * additive blend already is, that draws the whole quad as a grey rectangle.
      */
     lit: boolean;
+    /**
+     * Alpha below which a fragment is discarded, or null for the effects that test nothing.
+     *
+     * Carried by the ARCHETYPE because the base shaders are Petroglyph's and are never shipped:
+     * without the reader's own copy nothing calls `applyShaderState`, so the render state the effect
+     * declares never arrives and this is the only place the cutoff can come from. `Tree.fx` without
+     * it draws its foliage as solid slabs.
+     */
+    alphaTest: number | null;
+
     /** Which rule matched, for the material inspector and for diagnosing a wrong-looking model. */
     archetype: string;
 }
@@ -115,14 +146,48 @@ const TEXTURE_SLOTS: Record<keyof TextureBindings, string[]> = {
  */
 const FACTION_COLOUR_PREFIX = 'fc_';
 
-/** Reads a `param:<name>` value, case-insensitively, as a string. */
+/**
+ * Whether a texture parameter names an actual FILE, rather than the format's empty placeholder.
+ *
+ * The format spells "no texture here" two ways: an absent value, and the literal word `None`. That
+ * word is the only placeholder the shipped trees use - 184 occurrences across 84 models, on
+ * `NormalTexture` (171), `CloudNormalTexture` (6), `GlossTexture` (5) and `BaseTexture` (2) - and
+ * read as a file name it becomes a request for a texture called "None". It can never resolve: it
+ * counts against the loading cover, is reported as a missing texture, and on the two `BaseTexture`
+ * cases paints the missing-texture marker over the mesh.
+ *
+ * The bare word only. A real file called `none_at_all.tga` is a texture like any other.
+ *
+ * Shared because there are TWO readers of these parameters - the binding and the request list - and
+ * fixing only the first left the host still being asked for "None".
+ */
+function namesATexture(value: string): boolean {
+    const written = value.trim();
+
+    return written.length > 0 && written.toLowerCase() !== 'none';
+}
+
+/**
+ * Reads a `param:<name>` value, case-insensitively, as a string.
+ *
+ * An EMPTY slot answers undefined - see `namesATexture` for the two ways the format spells empty.
+ */
 export function textureParam(extras: MaterialExtras, name: string): string | undefined {
     const wanted = `param:${name}`.toLowerCase();
 
     for (const [key, value] of Object.entries(extras)) {
-        if (key.toLowerCase() === wanted && typeof value === 'string' && value.length > 0) {
-            return value;
+        if (key.toLowerCase() !== wanted || typeof value !== 'string') {
+            continue;
         }
+
+        // `continue`, not `return`: the original kept looking past an empty value, and two extras
+        // keys differing only in case are distinct properties. Unlikely from our own exporter, but
+        // this is not the place to narrow that.
+        if (!namesATexture(value)) {
+            continue;
+        }
+
+        return value;
     }
 
     return undefined;
@@ -221,6 +286,10 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
     // any shader at all. Both are in the shipped data, so checking only one misses half the cases.
     const colorize = shader.includes('colorize') || mesh.startsWith(FACTION_COLOUR_PREFIX);
 
+    // The three effects that discard fragments rather than blending them. Looked up by NAME because
+    // the shader itself is usually not reachable - see `MaterialSpec.alphaTest`.
+    const alphaTest = ALPHA_TESTED.get(shader) ?? null;
+
     // The shader first, where there is one that says so.
     const marked = NON_VISUAL.find(([token]) => shader.includes(token));
 
@@ -233,7 +302,7 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
     if (marked !== undefined || namedCollision) {
         return {
             hidden: true, blend: 'opaque', depthWrite: false, textures, colorize: false,
-            lit: false, archetype: marked?.[1] ?? 'collision',
+            lit: false, alphaTest, archetype: marked?.[1] ?? 'collision',
         };
     }
 
@@ -241,14 +310,14 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
         // Additive glows are drawn on top of the hull and must not occlude anything behind them.
         return {
             hidden: false, blend: 'additive', depthWrite: false, textures, colorize,
-            lit: false, archetype: 'additive',
+            lit: false, alphaTest, archetype: 'additive',
         };
     }
 
     if (shader.includes('shield')) {
         return {
             hidden: false, blend: 'additive', depthWrite: false, textures, colorize,
-            lit: false, archetype: 'shield',
+            lit: false, alphaTest, archetype: 'shield',
         };
     }
 
@@ -258,7 +327,7 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
         // the outline of its cut-out standing in front of whatever is drawn next.
         return {
             hidden: false, blend: 'alpha', depthWrite: false, textures, colorize,
-            lit: true, archetype: 'alpha',
+            lit: true, alphaTest, archetype: 'alpha',
         };
     }
 
@@ -272,6 +341,7 @@ export function resolveMaterial(extras: MaterialExtras): MaterialSpec {
         textures,
         colorize,
         lit: true,
+        alphaTest,
         archetype: shader.length > 0 ? 'opaque' : 'unknown',
     };
 }
@@ -302,6 +372,25 @@ export function isVisibleAt(extras: MaterialExtras, alt: number, lod: number): b
  */
 export function isShieldMesh(extras: MaterialExtras): boolean {
     return /^shield(_|$)/i.test((extras.alamoMesh ?? '').trim());
+}
+
+/**
+ * Whether this mesh is the model's STEALTH SHELL - the thing a cloak ability swaps the hull for.
+ *
+ * By NAME, like the shield, and for the same reason: nothing in the data declares it. Measured over
+ * all 3340 shipped models - nine carry one, and every one is called `stealth` or `stealth_LOD<n>`.
+ * Three of the nine ship the LOD variants (`Ui_tyber`, `Ui_tyber_in_jail`, `Ui_urai_fen`), so the
+ * suffix has to pass here and be gated by the ordinary level rules afterwards.
+ *
+ * The shader cannot decide it either: the shell is on `MeshShield.fx` for the four ships and
+ * `RSkinAdditive.fx` for the five characters, and both of those draw plenty of other things.
+ *
+ * `stealth`, not `cloak`. Five models carry a mesh named some form of `cloak` - Vader, Palpatine,
+ * Obi-Wan, Yoda, the sand people - and on every one of them it is a GARMENT. A test loose enough to
+ * catch those would strip five heroes the first time anything went near the stealth rules.
+ */
+export function isStealthMesh(extras: MaterialExtras): boolean {
+    return /^stealth(_|$)/i.test((extras.alamoMesh ?? '').trim());
 }
 
 /**
@@ -358,7 +447,7 @@ export function collectTextureNames(materials: Iterable<MaterialExtras>): string
 
         for (const [key, value] of Object.entries(extras)) {
             if (key.toLowerCase().startsWith('param:') && typeof value === 'string'
-                && value.length > 0 && !numeric.has(key.slice('param:'.length))) {
+                && namesATexture(value) && !numeric.has(key.slice('param:'.length))) {
                 names.add(value);
             }
         }

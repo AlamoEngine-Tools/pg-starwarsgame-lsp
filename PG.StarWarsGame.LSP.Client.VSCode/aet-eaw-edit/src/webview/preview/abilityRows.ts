@@ -18,10 +18,42 @@ import type { PreviewAbility, PreviewParticle } from '../../protocol/modelPrevie
 export interface AbilityRow {
     /** The `Type`, which is what binds a proxy and what a modder searches for. */
     type: string;
-    /** What the row is called: the GUI name when there is one, the type otherwise. */
+    /**
+     * What the row is called: the command bar's own words when they resolve, the type otherwise.
+     *
+     * NOT `guiName` - that names a `SpecialAbility` block and is an identifier, not display text.
+     * Labelling with it put `Corvette_Turbo_Ability` where the reader expects "Turbo Boost", and
+     * since 39% of shipped abilities carry the tag, that was the common case rather than the edge.
+     */
     label: string;
+    /** The tooltip the game shows, when the project ships the text. */
+    description: string | null;
+    /**
+     * The command-bar icon, ready to draw. Null means nothing could be asserted about it - draw no
+     * slot rather than a placeholder, since the server already sends the placeholder (and a
+     * problem) for an icon that IS named and missing.
+     */
+    iconDataUri: string | null;
+    /**
+     * The `SpecialAbility` this ability names, for a jump to where it is defined. Null when it
+     * names none, which is most of them - the row simply offers nothing to click then.
+     */
+    definition: string | null;
     detail: string;
     proxyCount: number;
+    /**
+     * The `SpecialAbility` block this names - an IDENTIFIER, never display text.
+     *
+     * Carried so the info flyout can show it. It is on 39% of shipped abilities and it is what a
+     * jump resolves; putting it where a name belongs is what once wrote `Corvette_Turbo_Ability`
+     * over a button the reader expected to say "Turbo Boost".
+     */
+    guiName: string | null;
+    rechargeSeconds: number | null;
+    expirationSeconds: number | null;
+    particleEffect: string | null;
+    ownerAttachmentBone: string | null;
+    modifiers: readonly { stat: string; factor: number }[];
     deployClip: string | null;
     undeployClip: string | null;
     /**
@@ -104,7 +136,7 @@ export function abilityAllows(
  * an activated ability changing nothing at all. Found on the live AT-AA, where MISSILE_SHIELD's
  * `prs_at-aa_fx` stayed dark however many times its row was ticked.
  *
- * The damage rules still apply on top - a proxy gated to a destroyed mount does not come back just
+ * The damage rules still apply on top - a proxy gated to a destroyed hardpoint does not come back just
  * because an ability is on.
  */
 export function abilityClaims(
@@ -117,6 +149,39 @@ export function abilityClaims(
     }
 
     return false;
+}
+
+/**
+ * Effects the unit can never show, because it does not declare the ability their name claims.
+ *
+ * The game hides these; it simply never has anything to switch them on. We drew them, and on an
+ * engine-named proxy the quiet-on-open rule lets an effect play from the first frame - so
+ * `Tartan_Patrol_Cruiser` opened with its TURBO engines burning for a TURBO it does not declare.
+ *
+ * This is a VETO, not a default: no state, no reader tick and no ability can turn one of these on.
+ * That makes it the one rule in the chain that comes first. Contrast {@link abilityAllows}, which
+ * is about a bound effect waiting for its ability - a different question with a different answer.
+ *
+ * Rare by design: 39 proxies over both shipped trees carry a prefix at all, against 5404 that do
+ * not, and a proxy claiming nothing is never unbound.
+ */
+export function unboundEffectIds(
+    abilities: readonly PreviewAbility[], particles: readonly PreviewParticle[],
+): Set<string> {
+    // Case-insensitive both ways: `Ev_acclamator` writes `power_to_weapons` in lower case, and the
+    // proxy names are written both ways too - `pptw_2mtank` beside `PTE_Corvetteengines`.
+    const declared = new Set(abilities.map(a => a.type.trim().toUpperCase()));
+    const unbound = new Set<string>();
+
+    for (const particle of particles) {
+        const claim = particle.claimsAbility?.trim().toUpperCase();
+
+        if (claim !== undefined && claim !== '' && !declared.has(claim)) {
+            unbound.add(particle.id);
+        }
+    }
+
+    return unbound;
 }
 
 /**
@@ -137,6 +202,42 @@ export function revealsShield(abilityType: string): boolean {
     return SHIELD_ABILITIES.has(abilityType.trim().toUpperCase());
 }
 
+/**
+ * Ability types that CLOAK the unit: the stealth shell is drawn and nothing else is.
+ *
+ * A table rather than a name test, and the two members do not share a word - which is the whole
+ * argument for the table. `TIE_Phantom`, `Vengeance_Frigate`, `Tyber_Zann` and `Urai_Fen` declare
+ * STEALTH; `Luke_Skywalker_Jedi` declares FORCE_CLOAK and carries the same `stealth` mesh. Reading
+ * the mesh's own name for the ability would have left Luke's shell dead.
+ *
+ * Unlike the shield, the shell ships VISIBLE - every one of the nine does - so a model with one was
+ * drawing its cloak over its hull from the first frame, permanently, which is what the reader saw
+ * on the Vengeance. See {@link isStealthMesh}.
+ */
+const STEALTH_ABILITIES = new Set(['STEALTH', 'FORCE_CLOAK']);
+
+/** Whether this ability type cloaks the unit. */
+export function revealsStealth(abilityType: string): boolean {
+    return STEALTH_ABILITIES.has(abilityType.trim().toUpperCase());
+}
+
+/**
+ * Whether the unit is cloaked right now, and so drawing nothing but its stealth shell.
+ *
+ * False is the permanent answer for a unit that declares no cloak at all, which is what keeps the
+ * shell off `Tyber_Zann_Prisoner` - he uses Tyber's model and declares no abilities - and off
+ * `W_mousedroid`, a prop no unit declares anything for.
+ */
+export function stealthed(active: ReadonlySet<string>): boolean {
+    for (const type of active) {
+        if (revealsStealth(type)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 /** Whether any active ability is currently holding the shield mesh visible. */
 export function shieldRevealed(active: ReadonlySet<string>): boolean {
     for (const type of active) {
@@ -148,9 +249,54 @@ export function shieldRevealed(active: ReadonlySet<string>): boolean {
     return false;
 }
 
+/**
+ * The rows one ability speaks for.
+ *
+ * Every channel an ability drives enters the visibility chain at the BOTTOM of it, as the model's
+ * own word: a proxy's `gateVisible` and the shield and shell meshes' `inFile` are all read by the
+ * `file` link. The reader sits four links above that. So a single tick on one of these rows outranks
+ * the ability permanently - the switch still fires, the chain still ignores it, and there is no way
+ * back short of resetting the whole model. That is the defect this exists to fix.
+ *
+ * The answer is the same one a clip already gets: switching an ability TAKES ITS OWN ROWS BACK, the
+ * way starting a clip takes the whole model back (`clearedForPlayback`). A clip may be global
+ * because it resets the pose; an ability may not, because it is one statement about a handful of
+ * rows and the reader's word on everything else still stands.
+ */
+export interface AbilityOwnership {
+    /** The particle systems this ability drives. */
+    systemIds: readonly string[];
+    /** Whether it speaks for the model's shield mesh. */
+    shieldMesh: boolean;
+    /** Whether it speaks for the model's stealth shell. */
+    stealthShell: boolean;
+}
+
+/** What switching one ability takes back from the reader. */
+export function abilityOwnership(
+    type: string, proxies: ReadonlyMap<string, string[]>,
+): AbilityOwnership {
+    return {
+        systemIds: proxies.get(type) ?? [],
+        shieldMesh: revealsShield(type),
+        stealthShell: revealsStealth(type),
+    };
+}
+
 /** The clip to play for a change of state, or null when the model ships none for that direction. */
 export function clipFor(ability: PreviewAbility, activating: boolean): string | null {
-    return (activating ? ability.deployClip : ability.undeployClip) ?? null;
+    const declared = (activating ? ability.deployClip : ability.undeployClip) ?? '';
+
+    // The XML names a FILE; the mixer holds the clip under its STEM. Measured on the X-Wing: the
+    // ability declares `rv_xwing_deploy_00.ala` and the loaded glTF animation is called
+    // `rv_xwing_deploy_00`, so `Viewport.play` looked the clip up by a name no clip has and found
+    // nothing - silently, which is why the panel went on reporting one as playing.
+    //
+    // Only an `.ala` comes off, rather than everything after the last dot: nothing guarantees a mod
+    // writes the extension at all, and a name that merely contains a dot must survive intact.
+    const stem = declared.replace(/\.ala$/i, '').trim();
+
+    return stem === '' ? null : stem;
 }
 
 /** A row per declared ability, in document order. */
@@ -168,10 +314,23 @@ export function abilityRows(
             || (ability.ownerAttachmentBone ?? '') !== ''
             || (ability.particleEffect ?? '') !== '';
 
+        const definition = (ability.guiName ?? '').trim();
+
         return {
             type: ability.type,
-            label: (ability.guiName ?? '') === '' ? ability.type : ability.guiName!,
+            label: (ability.name ?? '').trim() === '' ? ability.type : ability.name!.trim(),
+            description: (ability.description ?? '').trim() === '' ? null : ability.description!,
+            iconDataUri: (ability.iconDataUri ?? '') === '' ? null : ability.iconDataUri!,
+            definition: definition === '' ? null : definition,
             detail: detailOf(ability, proxyCount, deployClip, undeployClip),
+            guiName: (ability.guiName ?? '') === '' ? null : ability.guiName!,
+            rechargeSeconds: ability.rechargeSeconds ?? null,
+            expirationSeconds: ability.expirationSeconds ?? null,
+            particleEffect: (ability.particleEffect ?? '') === '' ? null : ability.particleEffect!,
+            ownerAttachmentBone: (ability.ownerAttachmentBone ?? '') === ''
+                ? null
+                : ability.ownerAttachmentBone!,
+            modifiers: ability.modifiers ?? [],
             proxyCount,
             deployClip,
             undeployClip,
@@ -242,4 +401,83 @@ function statLabel(stat: string): string {
 /** A number as a person writes it: the XML's `60.0000` is `60`. */
 function num(value: number): string {
     return Number.parseFloat(value.toFixed(4)).toString();
+}
+
+/**
+ * What the row's Definition button promises, in both of its states.
+ *
+ * The button stays on every row and goes disabled where the ability names nothing, so the title is
+ * the whole of the explanation for why it will not act. Naming the TYPE in that case matters: the
+ * reader is looking at a list of twenty rows and needs to know which one is being talked about.
+ */
+export function gotoDefinitionTitle(row: AbilityRow): string {
+    return row.definition === null
+        ? `${row.type} names no ability block, so there is nothing to open`
+        : `Open where ${row.definition} is defined`;
+}
+
+/**
+ * The whole of what an ability key on the command bar can say about itself.
+ *
+ * The bar draws an ICON and nothing else - that is what makes it a command bar rather than a list -
+ * so the tooltip is the only place the name, the tooltip text and the effect tally appear. It is
+ * three lines rather than a sentence because they answer three different questions: what is this,
+ * what does the game say it does, and what will pressing it show me.
+ *
+ * A key that drives nothing is DISABLED and gets a fourth line saying why: {@link AbilityRow.title}
+ * carries "drives nothing on this model - it is an order, not an effect". A dead control that
+ * cannot explain itself is worse than no control. A key that does drive something needs no such
+ * line: its detail already says what, and pressing it shows you.
+ */
+export function abilityBarTitle(row: AbilityRow): string {
+    const head = row.label === row.type ? row.type : `${row.label} (${row.type})`;
+    const lines = [head];
+
+    if (row.description !== null) {
+        lines.push(row.description);
+    }
+
+    // The TALLY, not the action wording - `title` says "Show what X drives", which the icon being
+    // pressable already says, while `detail` is the answer: "2 effects, 60s recharge".
+    lines.push(row.detail);
+
+    if (!row.drivesSomething) {
+        lines.push(row.title);
+    }
+
+    return lines.join('\n');
+}
+
+/**
+ * What the FILE says about an ability, as labelled rows for its info flyout.
+ *
+ * The card's face carries what the GAME tells a player - the icon, the localised name and its
+ * description. Everything here is the other half: the numbers and the names a modder checks against
+ * their own XML. They used to run together into one paragraph under the description, so the
+ * reader's own prose and the measurements had no seam between them.
+ *
+ * Pairs, so the order is part of it, and nothing the file does not declare.
+ */
+export function abilityFacts(row: AbilityRow): [string, string][] {
+    const seconds = (value: number | null): string | null =>
+        value === null ? null : `${value}s`;
+
+    const rows: [string, string | null][] = [
+        ['Recharge', seconds(row.rechargeSeconds)],
+        ['Lasts', seconds(row.expirationSeconds)],
+        ['Defined by', row.guiName],
+        ['Effect', row.particleEffect],
+        ['On bone', row.ownerAttachmentBone],
+        ['Effects driven', row.proxyCount === 0 ? null : String(row.proxyCount)],
+        ['Deploy clip', row.deployClip],
+        ['Undeploy clip', row.undeployClip],
+        // As the game writes them - `speed x0.8` - so a reader can match the line against the XML
+        // without translating it first.
+        ['Modifiers', row.modifiers.length === 0
+            ? null
+            : row.modifiers.map(m => `${m.stat.toLowerCase()} x${m.factor}`).join(', ')],
+    ];
+
+    return rows.filter((entry): entry is [string, string] =>
+        entry[1] !== null && entry[1] !== undefined && entry[1] !== '');
 }

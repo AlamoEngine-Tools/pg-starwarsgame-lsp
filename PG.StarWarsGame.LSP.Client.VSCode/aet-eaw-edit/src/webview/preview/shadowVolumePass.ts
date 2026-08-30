@@ -41,6 +41,35 @@ const OBJECT_LIGHT = new THREE.Vector3();
  */
 export const EXTRUSION_RADII = 4;
 
+/** Where the one shadow colour can actually be seen. */
+export type ShadowTintReach = 'ground' | 'model' | 'both' | 'none';
+
+/**
+ * What the shadow colour reaches right now, which is what decides whether its control is live.
+ *
+ * Alamo has ONE shadow colour and it multiplies. Two things here carry it, not one:
+ *
+ *   - the ground catcher, a plane under the model, which only exists while the FLOOR is on;
+ *   - the stencil darken, which multiplies the hull's own self-shadowing and needs no ground at all.
+ *
+ * The control used to be gated on the floor alone, with a tooltip saying there was nothing to catch
+ * a shadow without it. Half true, and it disabled a live control: a model with an authored shadow
+ * volume, in Game mode, tints its own hull with the floor switched off. Its own info badge said so.
+ *
+ * Only the last case is honestly dead, and that is the only one the control should refuse in.
+ */
+export function shadowTintReach(floor: boolean, stencilCasting: boolean): ShadowTintReach {
+    if (floor && stencilCasting) {
+        return 'both';
+    }
+
+    if (floor) {
+        return 'ground';
+    }
+
+    return stencilCasting ? 'model' : 'none';
+}
+
 /**
  * How far the volume reaches for a model of this size.
  *

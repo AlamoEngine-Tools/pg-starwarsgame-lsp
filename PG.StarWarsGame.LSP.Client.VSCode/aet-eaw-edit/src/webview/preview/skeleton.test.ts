@@ -62,7 +62,7 @@ describe('buildBoneTree', () => {
         assert.equal(roots[0].children.find(c => c.name === 'Engine_Glow')!.visible, false);
     });
 
-    it('attaches what hangs off a bone', () => {
+    it('attaches what is attached to a bone', () => {
         const attachments = new Map<number, BoneAttachment[]>([
             [1, [{ kind: 'hardpoint', label: 'HP_SD_Weapon_FL' }]],
         ]);
@@ -74,7 +74,7 @@ describe('buildBoneTree', () => {
     });
 
     /**
-     * A bone whose parent index is nonsense still exists and still anchors whatever hangs off it.
+     * A bone whose parent index is nonsense still exists and still anchors whatever is attached to it.
      * Dropping it would hide geometry that is plainly on screen, so it becomes a root instead.
      */
     it('treats an impossible parent as a root rather than losing the bone', () => {
@@ -111,7 +111,7 @@ describe('filterBones', () => {
     });
 
     /**
-     * Typing HP_ should give the hardpoint bones, not also the twenty damage proxies hanging off
+     * Typing HP_ should give the hardpoint bones, not also the twenty damage proxies attached to
      * them - the subtree is what the user is filtering away.
      */
     it('drops the children of a match', () => {
@@ -169,19 +169,19 @@ describe('visibleRows', () => {
 
 describe('labelCandidates', () => {
     it('labels nothing when off', () => {
-        assert.equal(labelCandidates(DESTROYER, 'none', 3).size, 0);
+        assert.equal(labelCandidates(DESTROYER, 'none', new Set([3])).size, 0);
     });
 
     it('labels only the selection', () => {
-        assert.deepEqual([...labelCandidates(DESTROYER, 'selected', 3)], [3]);
+        assert.deepEqual([...labelCandidates(DESTROYER, 'selected', new Set([3]))], [3]);
     });
 
     it('labels nothing in selected mode with no selection', () => {
-        assert.equal(labelCandidates(DESTROYER, 'selected', null).size, 0);
+        assert.equal(labelCandidates(DESTROYER, 'selected', new Set()).size, 0);
     });
 
     it('labels every bone when asked for all', () => {
-        assert.equal(labelCandidates(DESTROYER, 'all', null).size, DESTROYER.length);
+        assert.equal(labelCandidates(DESTROYER, 'all', new Set()).size, DESTROYER.length);
     });
 });
 
@@ -200,5 +200,30 @@ describe('ancestorsOf', () => {
         const cyclic = [bone(0, 'A', 1), bone(1, 'B', 0)];
 
         assert.ok(ancestorsOf(cyclic, 0).length <= cyclic.length + 1);
+    });
+});
+
+describe('labelCandidates, over a selection of several', () => {
+    const bones = [
+        { index: 0, name: 'Root' }, { index: 1, name: 'A' }, { index: 2, name: 'B' },
+    ] as never;
+
+    it('names every selected bone, not only one of them', () => {
+        // The panel selects several at once - two fire bones, a shift-run in the tree - and one
+        // label for a selection of three says the other two are not selected.
+        assert.deepEqual(
+            [...labelCandidates(bones, 'selected', new Set([1, 2]))].sort(), [1, 2]);
+    });
+
+    it('names none when nothing is selected', () => {
+        assert.equal(labelCandidates(bones, 'selected', new Set()).size, 0);
+    });
+
+    it('still names everything in `all`, whatever is selected', () => {
+        assert.equal(labelCandidates(bones, 'all', new Set([1])).size, 3);
+    });
+
+    it('names nothing in `none`', () => {
+        assert.equal(labelCandidates(bones, 'none', new Set([1, 2])).size, 0);
     });
 });

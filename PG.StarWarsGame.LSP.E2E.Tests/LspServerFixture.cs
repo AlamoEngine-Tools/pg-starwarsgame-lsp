@@ -94,6 +94,74 @@ public class LspServerFixture : IAsyncLifetime
     public event Action<PublishDiagnosticsParams>? DiagnosticsReceived;
 
     /// <summary>
+    ///     Completes on the first <c>publishDiagnostics</c> for <paramref name="uri" /> that
+    ///     satisfies <paramref name="wanted" />, or returns null after <paramref name="timeout" />.
+    /// </summary>
+    /// <remarks>
+    ///     Needed wherever a document is published REPEATEDLY. The workspace scan republishes open
+    ///     documents as it goes, so "the next publish for this file" is very often not the one the
+    ///     test caused - a test that takes the first one passes or fails on timing rather than on
+    ///     behaviour.
+    /// </remarks>
+    public async Task<PublishDiagnosticsParams?> WaitForDiagnosticsAsync(
+        DocumentUri uri, Func<PublishDiagnosticsParams, bool> wanted, TimeSpan timeout)
+    {
+        var tcs = new TaskCompletionSource<PublishDiagnosticsParams>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var uriStr = uri.ToString();
+
+        void Handler(PublishDiagnosticsParams p)
+        {
+            if (!string.Equals(p.Uri.ToString(), uriStr, StringComparison.OrdinalIgnoreCase)) return;
+            if (!wanted(p)) return;
+            tcs.TrySetResult(p);
+        }
+
+        DiagnosticsReceived += Handler;
+        try
+        {
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(timeout));
+            return completed == tcs.Task ? await tcs.Task : null;
+        }
+        finally
+        {
+            DiagnosticsReceived -= Handler;
+        }
+    }
+
+    /// <summary>
+    ///     Fired on every <c>aet/previewSceneChanged</c> push.
+    ///     <para>
+    ///         Worth observing from a test rather than trusting: a notification can be correctly
+    ///         implemented and never actually reach the client. That is precisely what happened with
+    ///         <c>didChangeWatchedFiles</c>, where zero ever arrived and nothing noticed for months.
+    ///     </para>
+    /// </summary>
+    public event Action? PreviewSceneChanged;
+
+    /// <summary>
+    ///     Completes on the first <c>aet/previewSceneChanged</c>, or returns false after
+    ///     <paramref name="timeout" />.
+    /// </summary>
+    public async Task<bool> WaitForPreviewSceneChangedAsync(TimeSpan timeout)
+    {
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        void Handler() => tcs.TrySetResult(true);
+
+        PreviewSceneChanged += Handler;
+        try
+        {
+            var completed = await Task.WhenAny(tcs.Task, Task.Delay(timeout));
+            return completed == tcs.Task;
+        }
+        finally
+        {
+            PreviewSceneChanged -= Handler;
+        }
+    }
+
+    /// <summary>
     ///     Returns a task that completes with the first <c>publishDiagnostics</c> notification
     ///     for <paramref name="uri" />, or faults with <see cref="TaskCanceledException" />
     ///     after <paramref name="timeout" />.
@@ -201,6 +269,9 @@ public class LspServerFixture : IAsyncLifetime
             _scanStartedTcs.TrySetResult();
             _scanCompleteTcs.TrySetResult();
         });
+        // Same reason as above - registered before From() returns, so a push that lands during
+        // startup is not missed. Parameterless: this notification carries none.
+        options.OnNotification("aet/previewSceneChanged", () => PreviewSceneChanged?.Invoke());
         // Route all incoming publishDiagnostics through the fixture so tests can await
         // them without fighting OmniSharp's dynamic-registration limitations.
         options.OnPublishDiagnostics(p =>

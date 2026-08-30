@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { boxRoots, rowsInBox } from './selectionBox';
+import { boxRoots, boxTargetFor, rowsInBox } from './selectionBox';
 
 //   Root
 //   +- Hull
@@ -68,5 +68,39 @@ describe('rowsInBox', () => {
         const looped = new Map<string, string | null>([['a', 'b'], ['b', 'a']]);
 
         assert.deepEqual(rowsInBox('a', looped).sort(), ['a', 'b']);
+    });
+});
+
+describe('boxTargetFor', () => {
+    /**
+     * What a selected HARDPOINT's box should enclose.
+     *
+     * Not its attach bone's subtree, which is what it used to be and which is wrong in both
+     * directions at once. Measured: the Executor's left turbolaser boxed 227 x 63 x 2211 on a 5094
+     * hull - the turret's own meshes plus seven empty fire-point bones strung down the ship - while
+     * the Nebulon-B's boxed 7 x 7 x 7, a fallback marker, because its attach bone carries no
+     * geometry at all.
+     */
+    it('outlines the model a hardpoint attaches, when it has one', () => {
+        assert.deepEqual(
+            boxTargetFor('hp:HP_Turbolaser', new Set(['hull', 'hp:HP_Turbolaser'])),
+            { kind: 'part', id: 'hp:HP_Turbolaser' });
+    });
+
+    it('falls back to the attach bone when the hardpoint attaches no model', () => {
+        // 137 of foc's 355 hardpoints name no Model_To_Attach. A small cube on the bone is the
+        // honest mark for those - there is no outline to draw.
+        assert.deepEqual(boxTargetFor(null, new Set(['hull'])), { kind: 'bone' });
+    });
+
+    it('falls back to the bone while the part has not loaded yet', () => {
+        // Geometry arrives one part at a time. Boxing a part that is not in the scene would draw
+        // nothing, which reads as a selection that did not take.
+        assert.deepEqual(
+            boxTargetFor('hp:HP_Turbolaser', new Set(['hull'])), { kind: 'bone' });
+    });
+
+    it('treats an empty part id as no part', () => {
+        assert.deepEqual(boxTargetFor('', new Set(['hull'])), { kind: 'bone' });
     });
 });

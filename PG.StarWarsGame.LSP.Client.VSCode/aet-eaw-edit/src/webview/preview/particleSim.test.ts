@@ -350,7 +350,7 @@ describe('stepParticle', () => {
          * The ground is the SCENE's, not the emitter's.
          *
          * `particle.position` is relative to the system's root, which is parented to a bone - so
-         * testing `y < 0` put the ground wherever that bone happened to be. An emitter mounted 50
+         * testing `y < 0` put the ground wherever that bone happened to be. An emitter attached 50
          * units up a hull had its dirt vanish the instant it was thrown, 50 units in the air, and
          * one attached below the origin let it fall through the floor. `groundY` is that offset,
          * expressed in the same local space the particle lives in.

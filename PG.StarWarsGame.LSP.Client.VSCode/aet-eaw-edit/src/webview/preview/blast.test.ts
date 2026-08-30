@@ -38,7 +38,7 @@ function projectile(over: Partial<PreviewProjectile> = {}): PreviewProjectile {
     };
 }
 
-const MOUNTS = [
+const HARDPOINTS = [
     { id: 'target', distance: 0 },
     { id: 'near', distance: 20 },
     { id: 'mid', distance: 60 },
@@ -48,15 +48,15 @@ const MOUNTS = [
 describe('blastVictims', () => {
     it('hits ONLY the target when the projectile has no blast area', () => {
         // The overwhelming majority - 63 of foc's projectiles declare one, out of 173.
-        const hits = blastVictims(projectile(), 'target', MOUNTS);
+        const hits = blastVictims(projectile(), 'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.id), ['target']);
         assert.equal(hits[0].blastDamage, 0);
     });
 
-    it('hits every mount inside the range', () => {
+    it('hits every hardpoint inside the range', () => {
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', MOUNTS);
+            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.id), ['target', 'near', 'mid']);
     });
@@ -64,7 +64,7 @@ describe('blastVictims', () => {
     it('applies FULL blast damage everywhere inside a flat blast', () => {
         // 53 of the 63 declare no dropoff at all, so flat is the normal case.
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', MOUNTS);
+            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.blastDamage), [30, 30, 30]);
     });
@@ -74,7 +74,7 @@ describe('blastVictims', () => {
         // Projectile_Damage 0.0 with a blast of 40, so a target taking only the direct number
         // would take nothing at all from a weapon that is plainly meant to hurt.
         const hits = blastVictims(
-            projectile({ damage: 50, blastAreaDamage: 30, blastAreaRange: 100 }), 'target', MOUNTS);
+            projectile({ damage: 50, blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
 
         assert.equal(hits[0].directDamage, 50);
         assert.equal(hits[0].blastDamage, 30);
@@ -84,7 +84,7 @@ describe('blastVictims', () => {
     it('caps the victims where the projectile says so, nearest first', () => {
         const hits = blastVictims(
             projectile({ blastAreaDamage: 30, blastAreaRange: 100, blastAreaMaxVictims: 2 }),
-            'target', MOUNTS);
+            'target', HARDPOINTS);
 
         assert.deepEqual(hits.map(h => h.id), ['target', 'near']);
     });
@@ -117,9 +117,9 @@ describe('blastVictims', () => {
         assert.equal(hits[2].blastDamage, 30);
     });
 
-    it('ignores a mount already destroyed', () => {
+    it('ignores a hardpoint already destroyed', () => {
         const hits = blastVictims(
-            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', MOUNTS,
+            projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS,
             new Set(['near']));
 
         assert.deepEqual(hits.map(h => h.id), ['target', 'mid']);
@@ -157,7 +157,7 @@ describe('candidatesFrom', () => {
         c: { x: 0, y: 0, z: 200 },
     };
 
-    it('measures every mount from the one that was hit', () => {
+    it('measures every hardpoint from the one that was hit', () => {
         const from = candidatesFrom(positions, 'a');
 
         assert.deepEqual(from, [
@@ -167,8 +167,8 @@ describe('candidatesFrom', () => {
         ]);
     });
 
-    it('leaves out a mount whose bone never loaded', () => {
-        // A mount with no position cannot be measured, and guessing zero would put it at the
+    it('leaves out a hardpoint whose bone never loaded', () => {
+        // A hardpoint with no position cannot be measured, and guessing zero would put it at the
         // epicentre of every blast.
         const from = candidatesFrom({ ...positions, d: null }, 'a');
 
@@ -177,5 +177,45 @@ describe('candidatesFrom', () => {
 
     it('is empty when the target itself has no position', () => {
         assert.deepEqual(candidatesFrom(positions, 'missing'), []);
+    });
+});
+
+describe('blastVictims, when nothing can be located', () => {
+    const bomb: PreviewProjectile = {
+        id: 'Proj_Bomb', render: 'Model', damage: 100, damageType: 'Damage_Default',
+        doesShieldDamage: false, doesEnergyDamage: false, doesHitpointDamage: true,
+        blastAreaDamage: 40, blastAreaRange: 300, blastAreaDropoff: false,
+    };
+
+    /**
+     * The target is hit whatever the candidate list says.
+     *
+     * `candidatesFrom` returns an EMPTY list when the target's own bone position is unknown - a
+     * part whose geometry has not loaded, or a hardpoint with no attachment bone. Every shot goes
+     * through here now that the attacker carries its own blast, so an empty list used to mean the
+     * shot simply vanished: no direct damage, no blast, nothing said. This file's own rule already
+     * read "the target is always included, even if it somehow sits outside its own blast radius",
+     * and that was only true while it happened to be in the list.
+     */
+    it('still hits the target when the candidate list is empty', () => {
+        const hits = blastVictims(bomb, 'HP_A', []);
+
+        assert.equal(hits.length, 1);
+        assert.equal(hits[0].id, 'HP_A');
+        assert.equal(hits[0].directDamage, 100);
+        assert.equal(hits[0].blastDamage, 40);
+    });
+
+    it('still hits the target when the list holds only other things', () => {
+        const hits = blastVictims(bomb, 'HP_A', [{ id: 'HP_B', distance: 50 }]);
+
+        assert.deepEqual(hits.map(h => h.id).sort(), ['HP_A', 'HP_B']);
+        assert.equal(hits.find(h => h.id === 'HP_A')!.directDamage, 100);
+    });
+
+    it('does not hit the target twice when it IS in the list', () => {
+        const hits = blastVictims(bomb, 'HP_A', [{ id: 'HP_A', distance: 0 }]);
+
+        assert.equal(hits.filter(h => h.id === 'HP_A').length, 1);
     });
 });

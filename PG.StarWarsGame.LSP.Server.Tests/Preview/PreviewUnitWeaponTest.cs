@@ -25,7 +25,9 @@ public sealed class PreviewUnitWeaponTest
         var weapon = Assert.Single(Fighter().Weapons);
 
         Assert.Equal(PreviewWeaponSource.Unit, weapon.Source);
-        Assert.Equal("bank:A", weapon.Id);
+        // `weapon:`, not `bank:`. "Bank" is not the game's word for this and it is not free of
+        // meaning either - <Bank_Turn_Angle> is a real tag about how a ship rolls in a turn.
+        Assert.Equal("weapon:A", weapon.Id);
         Assert.Null(weapon.HardpointId);
 
         Assert.Equal(450f, weapon.Range);

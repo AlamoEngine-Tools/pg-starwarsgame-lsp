@@ -1,7 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// One tree for everything the model is made of: bones, the meshes hanging off them, and the
+// One tree for everything the model is made of: bones, the meshes attached to them, and the
 // particle systems attached to them.
 //
 // Not three panels. A mesh's origin IS a bone and a particle system is attached to one, so the skeleton is
@@ -10,6 +10,8 @@
 // own them (every mesh of a skinned model lands on the one bone they all share).
 //
 // Kept free of three.js so the whole shape - nesting, filtering, selection - is testable.
+
+import { type VisibilityLink } from './visibility';
 
 /** What a row stands for. The filter chips are exactly these. */
 export type TreeKind = 'bone' | 'mesh' | 'particle';
@@ -28,7 +30,7 @@ export interface TreeItem {
     id: string;
     kind: TreeKind;
     name: string;
-    /** The id of the bone this hangs off, or null for a root. */
+    /** The id of the bone this is attached to, or null for a root. */
     parentId: string | null;
     visible: boolean;
     /** Hidden by the shader or the current damage/detail level rather than by hand. */
@@ -42,6 +44,15 @@ export interface TreeItem {
      * left a reader with a black scene and a list of ticks and nothing to go on.
      */
     because?: string;
+
+    /**
+     * The same answer typed, which is what the row's EYE reads - see `rowEye.ts`.
+     *
+     * The eye has to know whether the decision was this row's own or came from above it, because
+     * only the first kind is something it can change. `because` is written for a person and must
+     * not be parsed for that.
+     */
+    decidedBy?: VisibilityLink;
 
     /**
      * The scene id of the effect this row carries, when it carries one.
@@ -78,13 +89,24 @@ export function boneIndexOfRow(id: string): number | null {
 export interface TreeNode extends TreeItem {
     children: TreeNode[];
     depth: number;
+
+    /**
+     * Kept only to reach a match below it, rather than matching the filter itself.
+     *
+     * Set by {@link filterTree} and absent everywhere else, since an unfiltered tree is all
+     * matches. The row draws itself recessive when it is true: an ancestor retained for the
+     * hierarchy's sake used to render exactly like the thing being looked for, and filtering to
+     * effects on a model whose effects are switched off - greyed and italic - made the scaffolding
+     * the louder half of the list.
+     */
+    scaffold?: boolean;
 }
 
 /** Where a mesh belongs: folded into a bone's own row, or listed as a child of one. */
 export type MeshPlacement = { merge: number } | { childOf: number };
 
 /**
- * Decides whether a mesh IS its bone, or merely hangs off it.
+ * Decides whether a mesh IS its bone, or is merely attached to it.
  *
  * By NAME, because that is the model author's statement that the two are one thing: the ALO gives a
  * rigid sub-mesh the same name as the bone that is its origin. Collapsing those into one row is
@@ -111,7 +133,7 @@ export function meshPlacement(
 }
 
 /**
- * Decides whether an effect IS its bone, or merely hangs off it.
+ * Decides whether an effect IS its bone, or is merely attached to it.
  *
  * Same rule as a mesh's, and for the same reason: a particle PROXY is a bone named after the effect
  * it carries, so the name is the author saying the two are one thing. `p_atat_die` the bone and
@@ -227,28 +249,45 @@ export interface TreeFilter {
  * a bone retained only to hold a matching mesh does not then drag in its other children. That is
  * what makes filtering to `particle` show the handful of bones that carry one rather than the whole
  * skeleton.
+ *
+ * **The kind is a FILTER; the text is a SEARCH, and they are not the same thing.**
+ *
+ * A row whose kind is unticked never appears, wherever it sits. A text HIT still shows what is
+ * inside it, because finding a bone by name and then being shown nothing of it is not a search.
+ *
+ * Those two were one rule before, and a match kept ALL of its children unfiltered: a bone that
+ * survived a Bones-only filter dragged its particles in with it, icon and all, which was reported
+ * as "they have the icon for a particle but don't get filtered". The reasoning had been that a
+ * match's children are the CONTENTS of what was found - true of the search half, and never true of
+ * the kind half.
  */
 export function filterTree(roots: readonly TreeNode[], filter: TreeFilter): TreeNode[] {
     const needle = filter.text.trim().toLowerCase();
 
-    const keep = (node: TreeNode): TreeNode | null => {
-        const children = node.children
-            .map(keep)
-            .filter((child): child is TreeNode => child !== null);
+    // `wanted` false inside a text hit: its contents are what was searched for, so they do not each
+    // have to carry the word themselves. The KIND is asked either way.
+    const keep = (node: TreeNode, wanted: boolean): TreeNode | null => {
+        const kindOk = filter.kinds.has(node.kind);
+        const matches = kindOk && (!wanted || node.name.toLowerCase().includes(needle));
 
-        const matches = filter.kinds.has(node.kind)
-            && (needle === '' || node.name.toLowerCase().includes(needle));
+        const children = node.children
+            .map(child => keep(child, wanted && !matches))
+            .filter((child): child is TreeNode => child !== null);
 
         if (!matches && children.length === 0) {
             return null;
         }
 
-        // A match keeps its own children; an ancestor kept only for a descendant shows just the
-        // path down to it.
-        return { ...node, children: matches ? node.children : children };
+        // An ancestor kept only for a descendant shows just the path down to it, and says so - see
+        // `TreeNode.scaffold`. A match's own children are left unmarked: they are the contents of
+        // what was found rather than a path to it, and dimming them would hide the very thing the
+        // filter turned up.
+        return { ...node, scaffold: !matches, children };
     };
 
-    return roots.map(keep).filter((node): node is TreeNode => node !== null);
+    return roots
+        .map(node => keep(node, needle !== ''))
+        .filter((node): node is TreeNode => node !== null);
 }
 
 /** A row as drawn, with the twisty state the caller needs. */
@@ -263,6 +302,11 @@ export interface TreeRow {
  *
  * Collapsed by exception rather than by default: a skeleton is usually shallow, and hiding it behind
  * twisties on open makes the tree useless at a glance.
+ *
+ * SCAFFOLDING is never folded, whatever the collapsed set says. Such a row exists for one reason -
+ * the match below it - so honouring a fold there hides the match and leaves a row whose whole
+ * purpose has become invisible. A filtered Star Destroyer showed 2 of its 22 effect rows and
+ * eighteen bones, which is a filter that looks broken.
  */
 export function visibleTreeRows(
     roots: readonly TreeNode[], collapsed: ReadonlySet<string>,
@@ -270,7 +314,7 @@ export function visibleTreeRows(
     const rows: TreeRow[] = [];
 
     const walk = (node: TreeNode): void => {
-        const expanded = !collapsed.has(node.id);
+        const expanded = node.scaffold === true || !collapsed.has(node.id);
         rows.push({ node, expandable: node.children.length > 0, expanded });
 
         if (expanded) {
@@ -285,6 +329,23 @@ export function visibleTreeRows(
     }
 
     return rows;
+}
+
+/**
+ * One id in or out of a selection, leaving the rest alone.
+ *
+ * What a ctrl-click does in the tree, and what the weapon rows' fire-bone buttons needed and did
+ * not have: they replaced the selection outright, so a weapon with two fire points could never
+ * have both of them boxed at once.
+ */
+export function toggleSelected(selected: ReadonlySet<string>, id: string): Set<string> {
+    const next = new Set(selected);
+
+    if (!next.delete(id)) {
+        next.add(id);
+    }
+
+    return next;
 }
 
 /**
@@ -317,12 +378,7 @@ export function selectionAfterClick(
     }
 
     if (modifiers.ctrl) {
-        const next = new Set(selected);
-        if (!next.delete(clicked)) {
-            next.add(clicked);
-        }
-
-        return { selected: next, anchor: clicked };
+        return { selected: toggleSelected(selected, clicked), anchor: clicked };
     }
 
     // The last one standing lets go. A selection draws a box in the viewport, so there has to be a
@@ -354,7 +410,7 @@ export function toggleTargets(selected: ReadonlySet<string>, clicked: string): s
  *
  * A tree row that hides itself and leaves its children on screen is not behaving like a tree.
  * Hiding a limb has to take the limb with it - which for a skeleton is the whole point, since the
- * geometry hanging off a bone is what the reader wants gone.
+ * geometry attached to a bone is what the reader wants gone.
  */
 export function withDescendants(
     roots: readonly TreeNode[], ids: readonly string[],

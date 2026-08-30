@@ -42,7 +42,7 @@ function heightWord(elevation: number): string {
     }
 
     if (elevation < 25) {
-        // The band that makes panel lines and hardpoint mounts read, and the one worth naming.
+        // The band that makes panel lines and hardpoint edges read, and the one worth naming.
         return 'raking';
     }
 

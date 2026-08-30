@@ -1,17 +1,17 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// The wreckage a mount sheds when it is shot off.
+// The wreckage a hardpoint sheds when it is shot off.
 //
 // 167 of foc's 355 hardpoints name a `Death_Breakoff_Prop`, 147 distinct - each a SpaceProp with its
 // own model and debris behaviour. The server has resolved them since H1; nothing on the client read
-// them, so destroying a mount made it vanish and drop nothing.
+// them, so destroying a hardpoint made it vanish and drop nothing.
 //
 // Kept free of three.js so the motion can be read against the XML it comes from.
 
 import type { PreviewBreakoffProp, PreviewHardpoint, PreviewVector3 } from '../../protocol/modelPreview';
 
-/** Where a piece of debris is, relative to the mount it came off. */
+/** Where a piece of debris is, relative to the hardpoint it came off. */
 export interface BreakoffPose {
     offset: PreviewVector3;
     /** Degrees about each axis. */
@@ -29,16 +29,16 @@ export interface BreakoffAnchor {
 /**
  * Where a destroyed hardpoint's wreckage is dropped.
  *
- * On the MOUNT, whenever the hardpoint has one. The mount part is already standing on the hull bone
- * the hardpoint names, so its root is that place by construction - and the wreck is the mount's
- * replacement, so "where the mount was" is literally the question being asked.
+ * On the HARDPOINT, whenever the hardpoint has one. The hardpoint part is already standing on the hull bone
+ * the hardpoint names, so its root is that place by construction - and the wreck is the hardpoint's
+ * replacement, so "where the hardpoint was" is literally the question being asked.
  *
- * Asking for the bone by NAME inside the mount is what this replaces, and it was wrong in a way
+ * Asking for the bone by NAME inside the hardpoint is what this replaces, and it was wrong in a way
  * that only one kind of model reveals. An Executor hardpoint model carries a copy of the WHOLE hull
  * skeleton - 228 nodes, `HP_L_Trb00_Bone` among them - so the name resolved a SECOND time, inside a
  * part already standing on that bone, and the offset was applied twice:
- * `HP_EXECUTOR_LEFT_TURBO_00` dropped its wreck 2093 units from the mount it came off, on a hull
- * whose bones are thousands of units from the origin. A Star Destroyer's mount carries 22 nodes and
+ * `HP_EXECUTOR_LEFT_TURBO_00` dropped its wreck 2093 units from the hardpoint it came off, on a hull
+ * whose bones are thousands of units from the origin. A Star Destroyer's hardpoint carries 22 nodes and
  * no such bone, so the lookup MISSED and the silent fallback - the part's own root - happened to be
  * the right answer. The bug was invisible on every ship whose parts do not carry the hull's bones,
  * and its size is the bone's distance from the origin.
@@ -50,7 +50,7 @@ export function breakoffAnchor(
         return { partId: hardpoint.partId };
     }
 
-    // No mount model - 32 of foc's hardpoints are like this, a tractor beam or a fighter bay that
+    // No hardpoint model - 32 of foc's hardpoints are like this, a tractor beam or a fighter bay that
     // names a bone and nothing to stand on it. Then the hull's own bone is the place.
     return hardpoint.attachBone === null || hardpoint.attachBone === undefined
         ? { partId: hullPartId }
@@ -58,7 +58,7 @@ export function breakoffAnchor(
 }
 
 /**
- * The prop a destroyed mount drops, or null when it drops nothing.
+ * The prop a destroyed hardpoint drops, or null when it drops nothing.
  *
  * Null for the 188 hardpoints that name none - they simply vanish, which is what the engine does -
  * and for one whose prop is named but never defined. The scene still LISTS an unresolved prop, so
@@ -87,7 +87,7 @@ const DEFAULT_LIFETIME_SECONDS = 20;
  *
  * The MIDPOINT of the declared range. The engine randomises between the two ends; a preview picks
  * the middle instead, because a debris field that lasted a different time on every run would make
- * two looks at the same mount disagree, and there is nothing to be learned from the dice.
+ * two looks at the same hardpoint disagree, and there is nothing to be learned from the dice.
  */
 export function breakoffLifetime(prop: PreviewBreakoffProp): number {
     const min = prop.minLifetimeSeconds ?? null;
@@ -133,7 +133,7 @@ const FRAMES_PER_SECOND = 1 / ALAMO_FRAME_SECONDS;
  * DOWNWARD slid sideways instead, and one told to tumble end over end spun about the wrong axis.
  * The same turn is what `accelerationIn` exists for on the particle side.
  *
- * A prop declaring no vector simply stays where the mount was, which is ordinary authoring.
+ * A prop declaring no vector simply stays where the hardpoint was, which is ordinary authoring.
  */
 export function breakoffPose(prop: PreviewBreakoffProp, seconds: number): BreakoffPose {
     const frames = seconds * FRAMES_PER_SECOND;

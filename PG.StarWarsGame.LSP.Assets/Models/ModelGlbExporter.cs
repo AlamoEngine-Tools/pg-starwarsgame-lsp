@@ -192,7 +192,7 @@ public static class ModelGlbExporter
     ///     <para>
     ///         Not optional data. 662 of the 1363 shipped animations hide at least one bone, across
     ///         4052 bone tracks, and 2285 of those tracks are particle proxies - so the dominant use
-    ///         is timing an effect to the motion. The rancor's death explosion hangs off
+    ///         is timing an effect to the motion. The rancor's death explosion is attached to
     ///         <c>P_ATST_Die</c>, hidden for all 61 frames of <c>attack_00</c> and visible for 35 of
     ///         the 61 frames of <c>die_00</c>. Dropping the track fires every one of them from frame
     ///         zero of every clip.
@@ -229,16 +229,14 @@ public static class ModelGlbExporter
                 if (bone.BoneIndex < 0 || bone.BoneIndex >= model.Bones.Count)
                     continue;
 
-                // Same rule the motion tracks follow: a track naming a bone this skeleton does not
-                // have belongs to a different model and must not reach into this one.
-                if (!string.Equals(model.Bones[bone.BoneIndex].Name, bone.Name,
-                        StringComparison.OrdinalIgnoreCase))
-                    continue;
-
                 if (bone.Frames.All(frame => frame.Visible))
                     continue;
 
-                bones[$"{bone.Name}#{bone.BoneIndex}"] =
+                // Keyed on the MODEL's name for that bone, never the clip's. These keys are glTF
+                // NODE names, and the nodes are named after the skeleton being exported - so where a
+                // borrowed clip disagrees about what bone 12 is called, the clip's spelling would
+                // name no node at all and the track would be silently unreadable.
+                bones[$"{model.Bones[bone.BoneIndex].Name}#{bone.BoneIndex}"] =
                     string.Concat(bone.Frames.Select(frame => frame.Visible ? '1' : '0'));
             }
 
@@ -301,14 +299,14 @@ public static class ModelGlbExporter
 
         foreach (var bone in animation.Bones)
         {
+            // The index is a hard limit - there is no node to drive past the end of the array - but
+            // the NAME is not. A track whose name disagrees with the model's bone used to be skipped
+            // here, on the reasoning that it belongs to a different skeleton. The user reported that
+            // the units doing this animate perfectly well in the base game, so the engine plainly
+            // binds by index and the strict rule was costing real clips their motion. It binds by
+            // index here too now; a disagreement is reported against the OBJECT, where a reader can
+            // act on it, rather than silently freezing the bone.
             if (bone.BoneIndex < 0 || bone.BoneIndex >= nodes.Length)
-                continue;
-
-            // A track whose name disagrees with the model's bone is an animation authored against a
-            // different skeleton - 50 shipped animations are in that position. Skipping the track is
-            // right: the bone keeps its rest pose instead of being driven by someone else's motion.
-            if (!string.Equals(model.Bones[bone.BoneIndex].Name, bone.Name,
-                    StringComparison.OrdinalIgnoreCase))
                 continue;
 
             var node = nodes[bone.BoneIndex];
@@ -436,13 +434,26 @@ public static class ModelGlbExporter
     }
 
     /// <summary>
-    ///     The file's whole index list in the builder's numbering, or <see langword="null" /> when
-    ///     some vertex never turned up in a triangle the builder kept.
+    ///     The file's index list in the builder's numbering, minus any face naming a vertex that
+    ///     never turned up in a triangle the builder kept, or <see langword="null" /> when that
+    ///     leaves nothing at all.
     /// </summary>
     /// <remarks>
-    ///     Null rather than a guess. Restoring a face that names a vertex we cannot place would
-    ///     draw a triangle between whatever happened to sit at index zero, which is far worse than
-    ///     leaving the sub-mesh as the builder made it.
+    ///     <para>
+    ///         A face is skipped rather than guessed at. Emitting one that names a vertex we cannot
+    ///         place would draw a triangle to whatever happens to sit at index zero, which is far
+    ///         worse than not drawing it.
+    ///     </para>
+    ///     <para>
+    ///         But skipping is PER FACE. This used to give up on the whole sub-mesh at the first
+    ///         unplaceable vertex, on the reasoning that every vertex of a degenerate edge quad is
+    ///         also a corner of one of the two real faces the quad joins - true of most models and
+    ///         not of all. Measured across the shipped trees: <b>222 sub-meshes in 105 models</b>
+    ///         carry a vertex used by nothing but zero-area faces, always just a handful of them,
+    ///         and the all-or-nothing rule threw away <b>183940 faces</b> to keep them company.
+    ///         <c>Ub_palace.alo</c> lost 4435 of its shadow volume's 6075 faces to SIX such
+    ///         vertices, so the volume tore open along every silhouette edge.
+    ///     </para>
     /// </remarks>
     private static IReadOnlyList<int>? Faces(AlamoSubMesh subMesh, IReadOnlyList<int> welded)
     {
@@ -451,12 +462,12 @@ public static class ModelGlbExporter
         foreach (var (a, b, c) in Triangles(subMesh))
         {
             if (welded[a] == Unmapped || welded[b] == Unmapped || welded[c] == Unmapped)
-                return null;
+                continue;
 
             indices.AddRange([welded[a], welded[b], welded[c]]);
         }
 
-        return indices;
+        return indices.Count == 0 ? null : indices;
     }
 
     private static IMeshBuilder<MaterialBuilder> BuildRigid<TGeometry>(

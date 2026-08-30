@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { defaultMode, otherModeChips, previewModes } from './previewMode';
+import {
+    defaultMode, drawsAnnotations, modelTouched, otherModeChips, previewModes,
+} from './previewMode';
 
 const SUBJECT = { animations: 3, hardpoints: 10, particles: 4, weapons: 6, abilities: 2 };
 
@@ -97,7 +99,7 @@ describe('otherModeChips', () => {
 
 describe('what the Gameplay dial counts', () => {
     it('counts everything the lens can act on, not just hardpoints', () => {
-        // The lens grew: it holds weapons, mounts and abilities now. Counting only hardpoints read
+        // The lens grew: it holds weapons, hardpoints and abilities now. Counting only hardpoints read
         // 0 on a fighter that carries its guns on the unit itself and has three abilities.
         const dial = previewModes({ animations: 0, hardpoints: 2, particles: 0, weapons: 4, abilities: 3 })
             .find(m => m.id === 'gameplay');
@@ -136,5 +138,46 @@ describe('the soft-switch chips', () => {
             { playing: null, destroyed: 0, particleSystems: 0, abilities: 1 });
 
         assert.match(chips[0].text, /1 ability\b/);
+    });
+});
+
+describe('drawsAnnotations', () => {
+    it('draws the cones and marks only in the lens that owns them', () => {
+        assert.equal(drawsAnnotations('gameplay'), true);
+    });
+
+    it('draws neither in Model mode, which has no control for them', () => {
+        // The reported fault: arcs latched on in Gameplay kept drawing after the lens changed, and
+        // Model mode offers no pill to switch them off - so the reader was left with cones over a
+        // hull and nothing to press. A cone is not part of the asset; it is a fact about what the
+        // game does with it.
+        assert.equal(drawsAnnotations('model'), false);
+    });
+
+    it('draws neither in Animation mode either', () => {
+        assert.equal(drawsAnnotations('animation'), false);
+    });
+});
+
+describe('modelTouched', () => {
+    const rest = { alt: 0, lodIsHighest: true, hiddenEmitters: 0, rowOverrides: 0 };
+
+    it('is quiet on a model still as it opened', () => {
+        assert.equal(modelTouched(rest), false);
+    });
+
+    it('lights up for each thing the Model lens`s Reset puts back', () => {
+        assert.equal(modelTouched({ ...rest, alt: 1 }), true);
+        assert.equal(modelTouched({ ...rest, lodIsHighest: false }), true);
+        assert.equal(modelTouched({ ...rest, hiddenEmitters: 2 }), true);
+        assert.equal(modelTouched({ ...rest, rowOverrides: 1 }), true);
+    });
+
+    it('says nothing about what the Gameplay lens has done', () => {
+        // A destroyed hardpoint and a hidden firing arc belong to the lens that can undo them. The
+        // Model tree's Reset used to clear both, which is how pressing it in Model mode revealed
+        // every firing arc on the hull - a thing Model mode cannot even switch off.
+        assert.deepEqual(Object.keys(rest).sort(),
+            ['alt', 'hiddenEmitters', 'lodIsHighest', 'rowOverrides']);
     });
 });

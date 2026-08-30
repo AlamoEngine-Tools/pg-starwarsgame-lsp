@@ -123,7 +123,7 @@
     "commands": [
       {
         "command": "aet-eaw-edit.lsp.debug.forceStartup",
-        "title": "EaWEdit: Forces LSP Startup.",
+        "title": "EaWEdit: Force LSP Startup",
         "when": "inDebugMode"
       },
       {
@@ -409,23 +409,21 @@
             "scope": "machine-overridable",
             "when": "aet-eaw-edit.modVerify.enabled"
           },
-          "aet-eaw-edit.modVerify.baseGameDirectory": {
+          "aet-eaw-edit.lsp.source.baseGameDirectory": {
             "order": 1500,
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "The path to the base game **Star Wars: Empire at War**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
-            "scope": "machine-overridable",
-            "when": "aet-eaw-edit.modVerify.enabled"
+            "markdownDescription": "Install directory of **Star Wars: Empire at War**.\n\nAssets that ship with the game - models, textures, the string table - are only reachable once this is set. The extension never searches for an install.",
+            "scope": "machine-overridable"
           },
-          "aet-eaw-edit.modVerify.expansionDirectory": {
+          "aet-eaw-edit.lsp.source.expansionDirectory": {
             "order": 1600,
             "type": "string",
             "default": "",
             "format": "uri-reference",
-            "markdownDescription": "The path to the expansion pack **Star Wars: Empire at War: Forces of Corruption**'s install directory. If not provided, the extension will try to find a valid install but exit if none can be found.",
-            "scope": "machine-overridable",
-            "when": "aet-eaw-edit.modVerify.enabled"
+            "markdownDescription": "Install directory of **Star Wars: Empire at War: Forces of Corruption**.\n\nSearched alongside `#aet-eaw-edit.lsp.source.baseGameDirectory#` for assets that ship with the game.",
+            "scope": "machine-overridable"
           },
           "aet-eaw-edit.lsp.devMode.enabled": {
             "order": 1700,
@@ -473,7 +471,7 @@
             "order": 1401,
             "type": "string",
             "default": "",
-            "markdownDescription": "Full path to `ParticleEditor.exe`.\n\nAs with `#aet-eaw-edit.tools.aloViewerExecutable#`: the preview does not edit, and this is where editing happens."
+            "markdownDescription": "Full path to `ParticleEditor.exe`.\n\nThe preview is read-only; this is the tool the *Open in Particle Editor* button hands the current subject to. Left empty, the button reports that nothing is configured - the extension never searches for an install."
           }
         }
       },
@@ -679,6 +677,12 @@
             "default": true,
             "markdownDescription": "Enables the 3D model preview: opening an `.alo` shows the model, and a GameObject can be previewed with its hardpoints mounted.\n\nModels that ship with the game are only reachable once `#aet-eaw-edit.lsp.source.baseGameDirectory#` is set - the extension never searches for an install.\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.preview.energyPool": {
+            "order": 2155,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Shows the energy pool in the model preview: its bar under the ability bar, its row in the target readout, and the `Projectile_Does_Energy_Damage` switch on the attacker.\n\n**Off by default on purpose.** The energy mechanic is implemented in the engine and works, but the shipped game disables it and offers no interface for it, so nothing you author against it will be visible to a player unless you have enabled it yourself. Turn this on only if you know that is what you want.\n\nThis setting affects the preview only. `Energy_Capacity` and `Projectile_Does_Energy_Damage` are read from your files either way."
+          },
           "aet-eaw-edit.shaders.directory": {
             "order": 2160,
             "type": "string",
@@ -693,7 +697,7 @@
             "default": "",
             "format": "uri",
             "scope": "machine-overridable",
-            "markdownDescription": "Overrides where *Set Up Base Shader Sources* sends you, for proxies, mirrors and air-gapped machines.\n\nEmpty uses Petroglyph's own published download."
+            "markdownDescription": "Download location for *Set Up Base Shader Sources*. For proxies, mirrors and air-gapped machines.\n\nLeave empty to use Petroglyph's published download."
           }
         }
       }
@@ -729,7 +733,7 @@
     "watch:tsc": "tsc -p ./ --noEmit --watch",
     "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\"",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
+    "lint": "node scripts/lint-styled-css.js && eslint src",
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
   },

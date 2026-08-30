@@ -30,7 +30,7 @@ describe('passiveEffects', () => {
     });
 
     it('gives each one an id unique to this instance', () => {
-        // The same prop can be dropped by two mirrored mounts at once. Keeping the descriptor's own
+        // The same prop can be dropped by two mirrored hardpoints at once. Keeping the descriptor's own
         // ids would have the second instance's effects collide with the first's.
         const left = passiveEffects([particle(), particle()], 'wreck:HP_Weapon_FL');
         const right = passiveEffects([particle(), particle()], 'wreck:HP_Weapon_FR');

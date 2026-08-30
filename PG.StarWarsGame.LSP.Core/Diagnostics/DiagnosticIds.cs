@@ -197,6 +197,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId SquadronOffsetsMismatch = new(DiagnosticGroup.CrossTag, 8);
     public static readonly DiagnosticId PlanetModeMissingMode = new(DiagnosticGroup.CrossTag, 9);
 
+    /// <summary>
+    ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
+    ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
+    ///     reported inside the preview.
+    /// </summary>
+    public static readonly DiagnosticId DamageStageNotOnModel = new(DiagnosticGroup.CrossTag, 10);
+
     // ── Variants ──
     public static readonly DiagnosticId VariantAdditiveMerge = new(DiagnosticGroup.Variants, 1);
     public static readonly DiagnosticId VariantCycle = new(DiagnosticGroup.Variants, 2);
@@ -250,4 +257,99 @@ public static class DiagnosticIds
 
     /// <summary>A suppression directive that names no diagnostic at all.</summary>
     public static readonly DiagnosticId SuppressionNoRules = new(DiagnosticGroup.Suppression, 2);
+
+    // ── Preview ──
+    // What the model preview found while assembling a subject. Keyed by problem KIND rather than
+    // by the site that reports it: two places report "this .alo would not parse", and a reader
+    // silencing that is silencing one thing, not two.
+
+    /// <summary>The subject asked for does not resolve to anything at all.</summary>
+    public static readonly DiagnosticId PreviewSubjectNotFound = new(DiagnosticGroup.Preview, 1);
+
+    /// <summary>A model file the subject names is not in the project or the game data.</summary>
+    public static readonly DiagnosticId PreviewModelNotFound = new(DiagnosticGroup.Preview, 2);
+
+    /// <summary>
+    ///     A file that is neither an Alamo model nor a particle system. A renamed or truncated file
+    ///     looks exactly like this.
+    /// </summary>
+    public static readonly DiagnosticId PreviewNotAModel = new(DiagnosticGroup.Preview, 3);
+
+    /// <summary>A model that is there but could not be read.</summary>
+    public static readonly DiagnosticId PreviewModelUnreadable = new(DiagnosticGroup.Preview, 4);
+
+    /// <summary>The subject inherits in a cycle, so the assembled scene may be incomplete.</summary>
+    public static readonly DiagnosticId PreviewInheritanceCycle = new(DiagnosticGroup.Preview, 5);
+
+    /// <summary>The object declares no tactical model, so there is nothing to draw.</summary>
+    public static readonly DiagnosticId PreviewNoTacticalModel = new(DiagnosticGroup.Preview, 6);
+
+    /// <summary>A hardpoint is mounted but defined nowhere.</summary>
+    public static readonly DiagnosticId PreviewHardpointNotDefined = new(DiagnosticGroup.Preview, 7);
+
+    /// <summary>A hardpoint's attached model is not there.</summary>
+    public static readonly DiagnosticId PreviewHardpointModelNotFound =
+        new(DiagnosticGroup.Preview, 8);
+
+    /// <summary>A hardpoint names no attachment bone, so it sits at the hull's origin.</summary>
+    public static readonly DiagnosticId PreviewHardpointNoBone = new(DiagnosticGroup.Preview, 9);
+
+    /// <summary>A hardpoint attaches to a bone the hull does not have.</summary>
+    public static readonly DiagnosticId PreviewHardpointBoneMissing =
+        new(DiagnosticGroup.Preview, 10);
+
+    /// <summary>A death clone is named by the object but defined nowhere.</summary>
+    public static readonly DiagnosticId PreviewDeathCloneNotDefined =
+        new(DiagnosticGroup.Preview, 11);
+
+    /// <summary>A breakoff prop is named but defined nowhere, so the hardpoint vanishes.</summary>
+    public static readonly DiagnosticId PreviewBreakoffPropNotDefined =
+        new(DiagnosticGroup.Preview, 12);
+
+    /// <summary>A projectile is fired by the object but defined nowhere.</summary>
+    public static readonly DiagnosticId PreviewProjectileNotDefined =
+        new(DiagnosticGroup.Preview, 13);
+
+    /// <summary>An effect names an ability by its prefix that the object does not declare.</summary>
+    public static readonly DiagnosticId PreviewUnboundAbilityEffect =
+        new(DiagnosticGroup.Preview, 14);
+
+    /// <summary>GameConstants maps no targeting reticle for a hardpoint type the object mounts.</summary>
+    public static readonly DiagnosticId PreviewNoReticleForType = new(DiagnosticGroup.Preview, 15);
+
+    /// <summary>An animation override whose skeleton differs from the hull's. Informational: the
+    /// clips still play, bound by bone index.</summary>
+    public static readonly DiagnosticId PreviewAnimationSkeletonMismatch =
+        new(DiagnosticGroup.Preview, 16);
+
+    /// <summary>A WEAPON behaviour whose model declares no MuzzleA bone to fire from.</summary>
+    public static readonly DiagnosticId PreviewNoMuzzleBones = new(DiagnosticGroup.Preview, 17);
+
+    /// <summary>An ability icon that is in neither the mega texture nor the loose icon sources.</summary>
+    public static readonly DiagnosticId PreviewAbilityIconNotFound =
+        new(DiagnosticGroup.Preview, 18);
+
+    /// <summary>
+    ///     A TARGETABLE hardpoint naming no <c>Attachment_Bone</c>, which the engine attaches to the
+    ///     screen root - so it can never be hit, and the unit can never be destroyed.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id rather than a severity bump on
+    ///     <see cref="PreviewHardpointNoBone" />: an author suppressing "this hardpoint is placed
+    ///     sloppily" must not thereby silence "this unit cannot be killed".
+    /// </remarks>
+    public static readonly DiagnosticId PreviewTargetableHardpointNoBone =
+        new(DiagnosticGroup.Preview, 19);
+
+    /// <summary>
+    ///     The object declares a damage stage in <c>Land_Damage_Alternates</c> that nothing in its
+    ///     model is tagged for, so the stage exists but the unit does not change when it is reached.
+    /// </summary>
+    /// <remarks>
+    ///     One direction only. A model MAY tag more stages than the XML uses - that is an asset
+    ///     carrying more than this object asks of it, exactly like a <c>PTE_</c> effect on a unit
+    ///     with no TURBO or a stealth shell on a unit with no cloak - and it is never reported.
+    /// </remarks>
+    public static readonly DiagnosticId PreviewDamageStageNotInModel =
+        new(DiagnosticGroup.Preview, 20);
 }

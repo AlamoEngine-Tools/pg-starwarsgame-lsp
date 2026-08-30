@@ -6,7 +6,9 @@ import { describe, it } from 'node:test';
 
 import * as THREE from 'three';
 
-import { billboardTypeOf, billboardRotation, BILLBOARD_FACING, BILLBOARD_UP } from './billboards';
+import {
+    billboardLocalRotation, billboardTypeOf, billboardRotation, BILLBOARD_FACING, BILLBOARD_UP,
+} from './billboards';
 
 /** Where the quad's face points once `rotation` has been applied to it. */
 function facing(rotation: THREE.Quaternion): THREE.Vector3 {
@@ -122,5 +124,56 @@ describe('billboardRotation', () => {
         const rotation = billboardRotation('ZAxisWind', camera, light, new THREE.Vector3());
 
         assert.ok(rotation.angleTo(new THREE.Quaternion()) < 1e-6);
+    });
+});
+
+// The engine PRE-MULTIPLIES the billboard onto whatever world matrix the node already had -
+// `world = m_billboardZLight * world` in `ObjectTemplate::DoBillboard`. The preview replaced that
+// world rotation outright, which silently threw away the exporter's Z-up-to-Y-up root correction.
+//
+// It cost every tree its shadow. `W_tree_alien_00_hi`'s SHADOW card is 50 units of local Z, which
+// the root correction stands up into world Y; forcing the world rotation to a bare yaw laid it flat
+// instead, so the extruded volume ran from world Y 0 down to -145.5 - entirely at or below the
+// floor. Nothing to darken above ground, and a shadow below it.
+describe('billboardLocalRotation', () => {
+    /** The Z-up to Y-up correction the exporter puts on the model root: -90 degrees about X. */
+    const rootCorrection = (): THREE.Quaternion => new THREE.Quaternion()
+        .setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+
+    const yaw = (radians: number): THREE.Quaternion => new THREE.Quaternion()
+        .setFromAxisAngle(BILLBOARD_UP, radians);
+
+    /** Where a local vector ends up once the bone and the computed local rotation are composed. */
+    const world = (bone: THREE.Quaternion, local: THREE.Quaternion, v: THREE.Vector3): THREE.Vector3 =>
+        v.clone().applyQuaternion(local).applyQuaternion(bone);
+
+    it('keeps the standing card standing', () => {
+        // The card's height is its local +Z. Through the root correction alone that is world +Y,
+        // and the billboard must not take it out of the vertical.
+        const bone = rootCorrection();
+        const local = billboardLocalRotation(bone, yaw(Math.PI / 2), new THREE.Quaternion());
+
+        const up = world(bone, local, new THREE.Vector3(0, 0, 1));
+
+        assert.ok(Math.abs(up.y - 1) < 1e-6, `local +Z should stand up, got ${JSON.stringify(up)}`);
+    });
+
+    it('still turns the card about the vertical', () => {
+        // A quarter turn has to actually move it, or the billboard is doing nothing.
+        const bone = rootCorrection();
+        const at0 = billboardLocalRotation(bone, yaw(0), new THREE.Quaternion());
+        const at90 = billboardLocalRotation(bone, yaw(Math.PI / 2), new THREE.Quaternion());
+
+        const a = world(bone, at0, new THREE.Vector3(1, 0, 0));
+        const b = world(bone, at90, new THREE.Vector3(1, 0, 0));
+
+        assert.ok(a.distanceTo(b) > 1, `${JSON.stringify(a)} vs ${JSON.stringify(b)}`);
+    });
+
+    it('is the billboard itself when the node has no rotation of its own', () => {
+        const local = billboardLocalRotation(
+            new THREE.Quaternion(), yaw(Math.PI / 3), new THREE.Quaternion());
+
+        assert.ok(local.angleTo(yaw(Math.PI / 3)) < 1e-6);
     });
 });

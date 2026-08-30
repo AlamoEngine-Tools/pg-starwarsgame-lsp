@@ -13,16 +13,16 @@
 
 import type { PreviewProjectile } from '../../protocol/modelPreview';
 
-/** A mount and how far it is from where the shot landed, in engine units. */
+/** A hardpoint and how far it is from where the shot landed, in engine units. */
 export interface BlastCandidate {
     id: string;
     distance: number;
 }
 
-/** One mount caught by a shot, and what it takes. */
+/** One hardpoint caught by a shot, and what it takes. */
 export interface BlastHit {
     id: string;
-    /** `Projectile_Damage`. Only ever non-zero for the mount actually aimed at. */
+    /** `Projectile_Damage`. Only ever non-zero for the hardpoint actually aimed at. */
     directDamage: number;
     /** `Projectile_Blast_Area_Damage`, after any tier falloff. */
     blastDamage: number;
@@ -57,7 +57,16 @@ export function blastVictims(
 
     const tiers = projectile.blastAreaDropoff ? projectile.blastAreaDropoffTiers ?? null : null;
 
-    const caught = candidates
+    // The target, whether or not anything could be LOCATED. `candidatesFrom` returns an empty list
+    // when the target's own bone position is unknown - a part whose geometry has not loaded, a
+    // hardpoint with no attachment bone - and every shot comes through here now that the attacker
+    // carries its own blast. Without this, such a shot vanished: no direct damage, no blast, and
+    // nothing on screen to say why. The rule above already said the target is always included.
+    const withTarget = candidates.some(c => c.id === targetId)
+        ? candidates
+        : [{ id: targetId, distance: 0 }, ...candidates];
+
+    const caught = withTarget
         .filter(c => c.id === targetId || (c.distance <= range && !destroyed.has(c.id)))
         .sort((a, b) => a.distance - b.distance)
         .map(c => ({
@@ -110,9 +119,9 @@ export interface Point3 {
 }
 
 /**
- * Every mount, measured from the one that was hit.
+ * Every hardpoint, measured from the one that was hit.
  *
- * A mount with no position is left out entirely rather than defaulted to the origin - an unloaded
+ * A hardpoint with no position is left out entirely rather than defaulted to the origin - an unloaded
  * bone placed at zero would sit at the epicentre of every blast and take full damage from all of
  * them. If the TARGET has no position there is nothing to measure from, so nothing is caught.
  */

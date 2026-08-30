@@ -5,7 +5,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { uniformSourceFor, type AlamoMatrix } from './semantics';
-import { engineLight, neutralHarmonics, uniformValue, type AlamoFrame } from './uniforms';
+import {
+    engineLight, probeDiffuse, sphericalHarmonics, uniformValue,
+    type AlamoFrame, type ProbeLight,
+} from './uniforms';
 
 const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
@@ -34,7 +37,8 @@ const FRAME: AlamoFrame = {
     lightScale: [1, 1, 1, 1],
     time: 12.5,
     resolution: [800, 600, 0, 0],
-    sphericalHarmonics: neutralHarmonics([0.2, 0.2, 0.2]),
+    sphericalHarmonics: sphericalHarmonics([], [0.2, 0.2, 0.2]),
+    sphericalHarmonicsFill: sphericalHarmonics([], [0.05, 0.05, 0.05]),
     skinMatrices: [1, 2, 3],
 };
 
@@ -158,35 +162,17 @@ describe('the wind', () => {
 });
 
 describe('the spherical-harmonic probe', () => {
-    // The effects read their ambient from an SH probe, and the value shipped in the header is a
-    // PLACEHOLDER environment, not a neutral one: its constant terms are R 0.7379, G 0.4108,
-    // B 0.5165. Leaving it in gave every translated model a mauve cast. In game the engine supplies
-    // the real scene's harmonics; a model viewer has no scene, so it supplies a neutral one.
-    it('supplies a neutral probe rather than leaving the header placeholder', () => {
-        const value = valueFor('SPH_LIGHT_ALL');
+    // The effects take their diffuse lighting from an SH probe, and the value shipped in the
+    // header is a PLACEHOLDER environment: its constant terms are R 0.7379, G 0.4108, B 0.5165.
+    // Leaving it in gave every translated model a mauve cast. The viewport supplies the rig's own
+    // probe over the top, which is what `sphericalHarmonics` builds.
+    it('supplies both sets rather than leaving the header placeholder', () => {
+        for (const semantic of ['SPH_LIGHT_ALL', 'SPH_LIGHT_FILL']) {
+            const value = valueFor(semantic);
 
-        assert.notEqual(value, undefined);
-        assert.equal((value as number[]).length, 48);
-    });
-
-    it('encodes a constant, so every normal receives the same ambient', () => {
-        // `dot(n4, n4 * M)` collapses to M[3][3] when nothing else is set, whatever the normal is.
-        const value = valueFor('SPH_LIGHT_FILL') as number[];
-
-        for (let channel = 0; channel < 3; channel++) {
-            const matrix = value.slice(channel * 16, channel * 16 + 16);
-
-            assert.equal(matrix[15], FRAME.ambient[0], `channel ${channel} constant`);
-            assert.deepEqual(matrix.slice(0, 15), new Array(15).fill(0),
-                `channel ${channel} should carry nothing but the constant`);
+            assert.notEqual(value, undefined, semantic);
+            assert.equal((value as number[]).length, 48, semantic);
         }
-    });
-
-    it('is grey, which is the whole point', () => {
-        const value = valueFor('SPH_LIGHT_ALL') as number[];
-
-        assert.equal(value[15], value[31]);
-        assert.equal(value[31], value[47]);
     });
 });
 
@@ -220,14 +206,146 @@ describe('engineLight', () => {
     });
 });
 
-describe('neutralHarmonics', () => {
-    it('answers with the ambient the rig asks for, per channel', () => {
+const lit = (
+    toLight: [number, number, number],
+    colour: [number, number, number] = [1, 1, 1],
+    intensity = 1,
+): ProbeLight => ({ toLight, colour, intensity });
+
+const UP: [number, number, number] = [0, 1, 0];
+const DOWN: [number, number, number] = [0, -1, 0];
+const SIDE: [number, number, number] = [1, 0, 0];
+
+describe('sphericalHarmonics', () => {
+    it('answers the ambient for every normal when nothing is lit', () => {
         // Per channel, because the engine's ambient is a colour and a tinted one is the difference
         // between a cool shadowed side and a grey one.
-        const probe = neutralHarmonics([0.2, 0.1, 0.05]);
+        const probe = sphericalHarmonics([], [0.2, 0.1, 0.05]);
 
-        assert.equal(probe[15], 0.2);
-        assert.equal(probe[31], 0.1);
-        assert.equal(probe[47], 0.05);
+        for (const normal of [UP, DOWN, SIDE]) {
+            assert.deepEqual(probeDiffuse(probe, normal), [0.2, 0.1, 0.05]);
+        }
+    });
+
+    it('is symmetric, so which way it is flattened cannot matter', () => {
+        // The uniform is uploaded as a mat4 and the shader reads it with `mul(m, n4)`, which is
+        // row-major in HLSL and column-major in GLSL. That question only has teeth for an
+        // asymmetric matrix - this one never is, and the test says so rather than a comment.
+        const probe = sphericalHarmonics([lit([0.3, 0.8, -0.5])], [0.1, 0.1, 0.1]);
+
+        for (let channel = 0; channel < 3; channel++) {
+            const at = (row: number, col: number) => probe[channel * 16 + row * 4 + col];
+
+            for (let row = 0; row < 4; row++) {
+                for (let col = row + 1; col < 4; col++) {
+                    assert.equal(at(row, col), at(col, row), `element ${row},${col}`);
+                }
+            }
+        }
+    });
+
+    it('is brightest on the face turned towards the light', () => {
+        const probe = sphericalHarmonics([lit(UP)], [0, 0, 0]);
+
+        const facing = probeDiffuse(probe, UP)[0];
+        const away = probeDiffuse(probe, DOWN)[0];
+        const edge = probeDiffuse(probe, SIDE)[0];
+
+        assert.ok(facing > edge, `facing ${facing} should beat edge ${edge}`);
+        assert.ok(edge > away, `edge ${edge} should beat away ${away}`);
+    });
+
+    it('reaches about the light own strength where the normal points at it', () => {
+        // A nine-term probe is a band-limited cosine lobe, so it overshoots the delta light it
+        // stands for by a few percent and never quite reaches zero behind it. Both are the
+        // approximation, not a mistake - but the peak has to land ON the light's value, because
+        // that is the whole scale of the picture.
+        const probe = sphericalHarmonics([lit(UP, [1, 1, 1], 0.5)], [0, 0, 0]);
+        const peak = probeDiffuse(probe, UP)[0];
+
+        assert.ok(Math.abs(peak - 0.5) < 0.05, `peak was ${peak}`);
+    });
+
+    it('keeps the channels apart', () => {
+        const probe = sphericalHarmonics([lit(UP, [1, 0, 0])], [0, 0, 0]);
+        const [r, g, b] = probeDiffuse(probe, UP);
+
+        assert.ok(r > 0.9, `red was ${r}`);
+        assert.equal(g, 0);
+        assert.equal(b, 0);
+    });
+
+    it('scales with the light intensity', () => {
+        const full = probeDiffuse(sphericalHarmonics([lit(UP)], [0, 0, 0]), UP)[0];
+        const half = probeDiffuse(sphericalHarmonics([lit(UP, [1, 1, 1], 0.5)], [0, 0, 0]), UP)[0];
+
+        assert.ok(Math.abs(full / 2 - half) < 1e-9, `${full} halved is not ${half}`);
+    });
+
+    it('adds the lights and the ambient rather than choosing between them', () => {
+        const withAmbient = probeDiffuse(sphericalHarmonics([lit(UP)], [0.1, 0.1, 0.1]), UP)[0];
+        const without = probeDiffuse(sphericalHarmonics([lit(UP)], [0, 0, 0]), UP)[0];
+
+        assert.ok(Math.abs(withAmbient - without - 0.1) < 1e-9);
+    });
+
+    it('sums the rig, so two lights from the same side beat one', () => {
+        const one = probeDiffuse(sphericalHarmonics([lit(UP)], [0, 0, 0]), UP)[0];
+        const two = probeDiffuse(sphericalHarmonics([lit(UP), lit(UP)], [0, 0, 0]), UP)[0];
+
+        assert.ok(Math.abs(two - one * 2) < 1e-9);
+    });
+
+    it('ignores a light with no direction rather than emitting NaN', () => {
+        const probe = sphericalHarmonics([lit([0, 0, 0])], [0.1, 0.1, 0.1]);
+
+        assert.deepEqual(probeDiffuse(probe, UP), [0.1, 0.1, 0.1]);
+    });
+
+    it('matches the engine composition for a single light overhead', () => {
+        // Hand-computed from the Stanford irradiance matrix, so this pins the constants rather
+        // than restating the implementation: a unit white light straight up projects to
+        // L00 0.282095, L1-1 0.488603, L20 -0.315392, L22 -0.546274 and nothing else.
+        const probe = sphericalHarmonics([lit(UP)], [0, 0, 0]);
+        const at = (row: number, col: number) => probe[row * 4 + col];
+
+        assert.ok(Math.abs(at(0, 0) - -0.234376) < 1e-5, `_11 ${at(0, 0)}`);
+        assert.ok(Math.abs(at(1, 1) - 0.234376) < 1e-5, `_22 ${at(1, 1)}`);
+        assert.ok(Math.abs(at(2, 2) - -0.234376) < 1e-5, `_33 ${at(2, 2)}`);
+        assert.ok(Math.abs(at(1, 3) - 0.25) < 1e-5, `_24 ${at(1, 3)}`);
+        assert.ok(Math.abs(at(3, 3) - 0.328127) < 1e-5, `_44 ${at(3, 3)}`);
+    });
+
+    it('lights the shaded side of the default rig, which a flat probe never did', () => {
+        // The regression this port exists for. Every mesh shader takes its ENTIRE diffuse term
+        // from this probe - `MeshAlpha.fx:53` has no separate N.L - so a probe holding nothing but
+        // the ambient rendered the whole corpus at a flat 0.1 grey, and the reader reported the
+        // scene as far too dark. The engine's own rig is a 0.5 sun and two 0.5 blue fills.
+        const sun = lit(UP, [1, 1, 1], 0.5);
+        const fill = lit([0, -0.17, -0.98], [0.25, 0.25, 0.5], 0.5);
+        const probe = sphericalHarmonics([sun, fill], [0.1, 0.1, 0.1]);
+
+        assert.ok(probeDiffuse(probe, UP)[0] > 0.5, 'the lit side is still dark');
+    });
+});
+
+describe('the fill probe', () => {
+    it('is the same maths over the fills alone', () => {
+        // `m_sphFill` is what the engine hands the shaders that want the sun excluded, and it is
+        // the same call over lights 1 and 2. Reading `m_sphAll` for both would light a surface the
+        // artist asked to keep out of the sun.
+        const sun = lit(UP, [1, 1, 1], 4);
+        const fill = lit(SIDE, [0.25, 0.25, 0.5], 0.5);
+
+        const all = sphericalHarmonics([sun, fill], [0.1, 0.1, 0.1]);
+        const fills = sphericalHarmonics([fill], [0.1, 0.1, 0.1]);
+
+        assert.ok(probeDiffuse(all, UP)[0] > probeDiffuse(fills, UP)[0] + 3);
+    });
+
+    it('is what SPH_LIGHT_FILL reads, and SPH_LIGHT_ALL reads the other', () => {
+        assert.deepEqual(valueFor('SPH_LIGHT_ALL'), FRAME.sphericalHarmonics);
+        assert.deepEqual(valueFor('SPH_LIGHT_FILL'), FRAME.sphericalHarmonicsFill);
+        assert.notDeepEqual(FRAME.sphericalHarmonics, FRAME.sphericalHarmonicsFill);
     });
 });

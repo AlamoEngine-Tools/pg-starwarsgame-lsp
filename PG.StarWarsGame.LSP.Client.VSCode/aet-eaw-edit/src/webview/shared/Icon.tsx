@@ -23,16 +23,21 @@ import {
     IconAdjustments, IconAlertTriangle, IconArrowBackUp, IconAxisX, IconBone, IconBox,
     IconCamera, IconCheck, IconCircleX,
     IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleOff, IconClipboardCopy,
-    IconCloudDownload, IconCube, IconDeviceFloppy, IconExternalLink,
-    IconEye, IconEyeOff, IconFlame, IconGridDots, IconInfoCircle, IconLayoutGrid, IconMesh,
-    IconPerspective, IconPhoto, IconPlayerPause, IconPlayerPlay, IconPlus,
-    IconPlayerStop, IconPlayerTrackPrev, IconPolygon, IconRadar, IconRefresh, IconRepeat,
-    IconCrosshair,
-    IconRuler, IconSettings, IconShadow, IconSparkles, IconStack2,
+    IconCloudDownload, IconCube, IconDeviceFloppy, IconExternalLink, IconFileCode,
+    IconEye, IconEyeClosed, IconEyeDotted, IconFlame, IconGridDots, IconHeartBroken,
+    IconInfoCircle,
+    IconLayoutGrid, IconMesh,
+    IconPerspective, IconPhoto, IconPlayerPause, IconPlayerPlay, IconPlayerSkipBack,
+    IconPlayerSkipForward, IconPlayerTrackNext, IconPlayerTrackPrev, IconPlus,
+    IconPlayerStop, IconPolygon, IconRadar, IconRefresh, IconRepeat,
+    IconCrosshair, IconTargetArrow, IconTool, IconHistory,
+    IconRuler, IconSearch, IconSettings, IconShadow, IconSparkles, IconStack2,
     IconSun, IconSunHigh, IconSunLow, IconTexture, IconTrash, IconWind, IconWorld, IconX,
     type IconProps,
 } from '@tabler/icons-react';
 import { type ComponentType } from 'react';
+
+import { codiconFor } from './iconSource';
 
 /**
  * What the preview can draw, by meaning.
@@ -51,7 +56,11 @@ const ICONS = {
     effects: IconFlame,
     texture: IconTexture,
     detail: IconStack2,
-    damage: IconCircleOff,
+
+    // A break, not a prohibition. This was a crossed-out circle, which is the glyph for OFF - and
+    // it was the same glyph the faction palette uses for "no team tint", where it is right. Seen
+    // side by side on a rendered panel, the damage slider read as a disabled control.
+    damage: IconHeartBroken,
 
     // ── the room ──────────────────────────────────────────────────────────────
     // A globe, not an aperture: this opens the settings for the ROOM the model stands in, and an
@@ -77,6 +86,19 @@ const ICONS = {
     // ring: it is the shape of the artwork it switches on.
     target: IconCrosshair,
 
+    // FIRING at it, which is a different thing from the mark drawn over it: `target` is the mark,
+    // this is the act. A target with an arrow struck into it, so the two do not read alike sitting
+    // in the same corner of the stage.
+    fire: IconTargetArrow,
+
+    // Putting it back together. A wrench, not the undo arrow it used to borrow - undo is a
+    // reversal of what YOU did, and repairing a hull is a thing done TO the model.
+    repair: IconTool,
+
+    // What has already happened, in order. Not a plain list: the log is a RECORD of shots, and the
+    // clock face says the order is the point of it.
+    log: IconHistory,
+
     // ── where you look from ───────────────────────────────────────────────────
     camera: IconCamera,
     axes: IconAxisX,
@@ -84,18 +106,38 @@ const ICONS = {
     frame: IconLayoutGrid,
 
     // ── plain actions ─────────────────────────────────────────────────────────
+    // The absence of a choice, where a choice is normally shown - the faction palette's swatch for
+    // no team tint at all. Distinct from `hidden`, which is about whether a thing is DRAWN.
+    none: IconCircleOff,
+    // The tree row's three states, which are Blender's - see `preview/rowEye.ts`. `inherited` is
+    // the one that needed a third glyph: a row undrawn because something ABOVE it is hidden, which
+    // this control cannot change. A dotted eye reads as an answer nobody asserted, which is exactly
+    // what it is.
     visible: IconEye,
-    hidden: IconEyeOff,
+    inherited: IconEyeDotted,
+    hidden: IconEyeClosed,
     details: IconInfoCircle,
     warning: IconAlertTriangle,
     error: IconCircleX,
+    // Narrowing a list to what you are looking for. Not `measure` and not `details` - this one is
+    // about what is SHOWN, and the two beside it are about reading one thing closely.
+    search: IconSearch,
     settings: IconSettings,
     tune: IconAdjustments,
     measure: IconRuler,
     play: IconPlayerPlay,
     pause: IconPlayerPause,
     stop: IconPlayerStop,
-    rewind: IconPlayerTrackPrev,
+
+    // The transport, spelled the way a CD player spells it - which is the reader's own reference,
+    // and the only vocabulary these four have. A clip is a TRACK and a frame is a position within
+    // it, so the double-arrow pair steps between clips and the single-arrow pair runs to an end of
+    // the one playing. "Last frame" used to draw a bare play triangle, which is the same glyph as
+    // Play and so said the opposite of what it did.
+    previousClip: IconPlayerTrackPrev,
+    firstFrame: IconPlayerSkipBack,
+    lastFrame: IconPlayerSkipForward,
+    nextClip: IconPlayerTrackNext,
     restart: IconRefresh,
     loop: IconRepeat,
     reset: IconArrowBackUp,
@@ -107,14 +149,15 @@ const ICONS = {
     check: IconCheck,
     download: IconCloudDownload,
     open: IconExternalLink,
+
+    // Jumping to where a name is DECLARED, which is not the same as `open` - that one is an
+    // external link and means "hand this to another application". Drawn as the EDITOR's own
+    // go-to-file, because the story graph already draws it that way and one action must not look
+    // like two. `iconSource` routes it; the entry stays here so the meaning is still listed.
+    definition: IconFileCode,
     expanded: IconChevronDown,
     collapsed: IconChevronRight,
 
-    // A PAIR, for paging through a table. Not the same names as the tree's twisty: those say
-    // "folded or unfolded" and these say "back or forward", and a table that borrowed the twisty's
-    // chevron would be claiming to expand something.
-    previous: IconChevronLeft,
-    next: IconChevronRight,
     bounds: IconBox,
 } satisfies Record<string, ComponentType<IconProps>>;
 
@@ -131,6 +174,20 @@ export interface IconProps_ {
 }
 
 export function Icon({ name, size = 16 }: IconProps_): React.JSX.Element {
+    // An EDITOR action keeps the editor's own glyph - see `iconSource`. Only the domain icons are
+    // Tabler's, because those are the ones codicons has not got.
+    const codicon = codiconFor(name);
+
+    if (codicon !== null) {
+        return (
+            <span
+                className={`codicon codicon-${codicon}`}
+                style={{ fontSize: size }}
+                aria-hidden="true"
+            />
+        );
+    }
+
     const Glyph = ICONS[name];
 
     // `currentColor` and aria-hidden are the two things that make an icon behave: it takes the

@@ -8,3 +8,4 @@ export {
     attributeFor, collectSamplerTextures, collectSemantics, collectUniformDefaults, uniformSourceFor,
 } from './semantics';
 export { translateEffect } from './effect';
+export { materialStateFrom } from './renderState';

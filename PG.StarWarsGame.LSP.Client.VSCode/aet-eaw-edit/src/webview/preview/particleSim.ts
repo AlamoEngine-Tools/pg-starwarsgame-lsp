@@ -474,9 +474,9 @@ export function stepParticle(
     particle.position.y += particle.velocity.y * dt;
     particle.position.z += particle.velocity.z * dt;
 
-    // `groundY`, not zero. Particle positions are relative to the system's root, which hangs off a
+    // `groundY`, not zero. Particle positions are relative to the system's root, which is attached to a
     // bone, so a bare `y < 0` puts the ground at whatever height that bone sits at - the dirt of an
-    // explosion mounted up a hull vanished in mid-air the moment it was thrown.
+    // explosion partway up a hull vanished in mid-air the moment it was thrown.
     if (properties.groundBehavior !== 'None' && particle.position.y < groundY) {
         applyGround(particle, properties.groundBehavior, properties.bounciness, groundY);
     }

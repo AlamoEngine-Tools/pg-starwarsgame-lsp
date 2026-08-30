@@ -5,9 +5,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import {
-    collectTextureNames, debugColour, isShieldMesh, isVisibleAt, isVisibleAtLevel, numericParams,
-    resolveMaterial, shieldMeshOffShader,
-    textureParam,
+    collectTextureNames, debugColour, isShieldMesh, isStealthMesh, isVisibleAt, isVisibleAtLevel,
+    numericParams, resolveMaterial, shieldMeshOffShader, textureParam,
     type MaterialExtras,
     castsShadowMap,
 } from './materials';
@@ -489,6 +488,40 @@ describe('isShieldMesh', () => {
     });
 });
 
+describe('isStealthMesh', () => {
+    // Measured over all 3340 shipped models: nine carry one, and every one is named `stealth` or
+    // `stealth_LOD<n>` in one case or another - `Ev_tie_phantom`, `Ri_skywalker`, `Uv_vengeance`,
+    // `Ui_tyber`, `Ui_tyber_in_jail`, `Ui_urai_fen`, `Uv_f9tztransport`,
+    // `Uv_kraytclassdestroyer_tyber`, `W_mousedroid`.
+    it('takes the shell by the name the models use', () => {
+        assert.equal(isStealthMesh({ alamoMesh: 'stealth' }), true);
+        assert.equal(isStealthMesh({ alamoMesh: 'Stealth' }), true);
+    });
+
+    it('takes the LOD variants, which three of the nine ship', () => {
+        // Tyber and Urai Fen carry `Stealth_LOD0/1/2`, so the suffix has to pass the name test and
+        // then be gated by the ordinary LOD rules like any other mesh.
+        assert.equal(isStealthMesh({ alamoMesh: 'Stealth_LOD0' }), true);
+        assert.equal(isStealthMesh({ alamoMesh: 'stealth_LOD2' }), true);
+    });
+
+    it('leaves a CLOAK alone, which is a garment and not this', () => {
+        // The trap a looser test falls into. Vader, Palpatine, Obi-Wan, Yoda and the sand people
+        // all carry a `cloak` mesh, and it is clothing - hiding the hull behind it would strip
+        // five heroes the moment anything went near the stealth rules.
+        for (const name of ['Cloak', 'EI_Palpatine_cloak', 'RI_ObiCloak', 'NI_SandPeople_CLoak',
+            'Shadow_Cloak']) {
+            assert.equal(isStealthMesh({ alamoMesh: name }), false, name);
+        }
+    });
+
+    it('needs the whole word, not a prefix of one', () => {
+        assert.equal(isStealthMesh({ alamoMesh: 'stealthy_bits' }), false);
+        assert.equal(isStealthMesh({ alamoMesh: 'basemesh' }), false);
+        assert.equal(isStealthMesh({}), false);
+    });
+});
+
 describe('shieldMeshOffShader', () => {
     it('flags a shield mesh that is not on a shield shader', () => {
         // Not an error - the name decides and the author may mean it - but a bubble drawn with a
@@ -505,5 +538,96 @@ describe('shieldMeshOffShader', () => {
     it('says nothing about a mesh that is not a shield at all', () => {
         assert.equal(
             shieldMeshOffShader({ alamoMesh: 'engines_big', alamoShader: 'MeshShield.fx' }), false);
+    });
+});
+
+// The base shaders are Petroglyph's and are NEVER shipped with the extension, so unless the reader
+// has fetched their own copy every mesh keeps its archetype - and the archetype is picked by NAME
+// token. "tree" contains none of additive/shield/alpha, so `Tree.fx` fell through to plain opaque
+// with no cutoff and its foliage drew as SOLID GREEN SLABS. That is the reported missing leaves.
+//
+// Measured from the shipped effects: exactly three enable alpha testing - `Tree.fx` at 0x80,
+// `Grass.fx` at 0x08, and `BlobStencilMasked.fx` at 0x80 (used by no shipped model).
+describe('resolveMaterial: the alpha-TESTED effects', () => {
+    it('gives Tree.fx the cutoff its own render state declares', () => {
+        const spec = resolveMaterial({ alamoShader: 'Tree.fx' });
+
+        assert.ok(spec.alphaTest !== null && Math.abs(spec.alphaTest - 0x80 / 255) < 1e-6,
+            `${spec.alphaTest}`);
+    });
+
+    // Alpha TESTED, not blended: `AlphaBlendEnable = FALSE` and `ZWriteEnable = TRUE`. Reading the
+    // effect's `_ALAMO_RENDER_PHASE = "Transparent"` as a blend would sort the foliage against the
+    // hull and drop its depth writes, which is a different wrong picture.
+    it('leaves Tree.fx opaque and writing depth', () => {
+        const spec = resolveMaterial({ alamoShader: 'Tree.fx' });
+
+        assert.equal(spec.blend, 'opaque');
+        assert.equal(spec.depthWrite, true);
+    });
+
+    it('gives Grass.fx its own much lower cutoff', () => {
+        const spec = resolveMaterial({ alamoShader: 'Grass.fx' });
+
+        assert.ok(spec.alphaTest !== null && Math.abs(spec.alphaTest - 0x08 / 255) < 1e-6,
+            `${spec.alphaTest}`);
+    });
+
+    it('asks for no cutoff on an effect that declares none', () => {
+        assert.equal(resolveMaterial({ alamoShader: 'MeshBumpColorize.fx' }).alphaTest, null);
+        assert.equal(resolveMaterial({ alamoShader: 'MeshAlpha.fx' }).alphaTest, null);
+    });
+});
+
+// `None` is the model format's own way of saying a texture slot is EMPTY, and it is the only
+// placeholder the shipped trees use: 184 occurrences across 84 models - NormalTexture 171,
+// CloudNormalTexture 6, GlossTexture 5 and BaseTexture 2. Read as a file name it becomes a request
+// for a texture called "None", which can never resolve; it counts against the loading cover, shows
+// up as a problem, and on the two BaseTexture cases paints the missing-texture marker.
+describe('textureParam: the None placeholder', () => {
+    it('reads a real texture name', () => {
+        assert.equal(
+            textureParam({ 'param:BaseTexture': 'W_Tree_Alien00.TGA' }, 'BaseTexture'),
+            'W_Tree_Alien00.TGA');
+    });
+
+    it('treats None as an empty slot', () => {
+        assert.equal(textureParam({ 'param:NormalTexture': 'None' }, 'NormalTexture'), undefined);
+    });
+
+    it('does not care how None is spelled', () => {
+        // The format is inconsistent about casing everywhere else it is read, so this is too.
+        assert.equal(textureParam({ 'param:NormalTexture': 'none' }, 'NormalTexture'), undefined);
+        assert.equal(textureParam({ 'param:NormalTexture': ' NONE ' }, 'NormalTexture'), undefined);
+    });
+
+    // A real file that merely STARTS with those letters is not a placeholder. Only the bare word is.
+    it('keeps a real texture whose name begins with none', () => {
+        assert.equal(
+            textureParam({ 'param:BaseTexture': 'none_at_all.tga' }, 'BaseTexture'),
+            'none_at_all.tga');
+    });
+
+    // The REQUEST list is a second reader of the same parameters, with its own copy of the
+    // emptiness rule - so fixing only `textureParam` left the host still being asked for "None".
+    it('never asks the host for a texture called None', () => {
+        const names = collectTextureNames([{
+            alamoShader: 'Tree.fx',
+            'param:BaseTexture': 'W_Tree_Alien00.TGA',
+            'param:NormalTexture': 'None',
+        }]);
+
+        assert.deepEqual(names, ['W_Tree_Alien00.TGA']);
+    });
+
+    it('binds no normal map when the slot says None', () => {
+        const spec = resolveMaterial({
+            alamoShader: 'MeshBumpColorize.fx',
+            'param:BaseTexture': 'hull.tga',
+            'param:NormalTexture': 'None',
+        });
+
+        assert.equal(spec.textures.base, 'hull.tga');
+        assert.equal(spec.textures.normal, undefined);
     });
 });

@@ -883,7 +883,7 @@ export class ParticleSystemInstance {
      *
      * A SET rather than a flag, because the reasons are independent and their owners do not know
      * about each other. The clip holds a proxy whose moment has not come; hiding the part a system
-     * hangs off holds it too; releasing a system to finish holds it for good. With one boolean the
+     * is attached to holds it too; releasing a system to finish holds it for good. With one boolean the
      * last writer won, and `applyEmitterGating` - which runs every frame and resolved "the clip
      * says nothing about this" to TRUE - re-armed the emitters of a part that had just been hidden.
      *
@@ -908,7 +908,7 @@ export class ParticleSystemInstance {
          * The geometry the system is attached to, for the emitters that emit from a mesh.
          *
          * Supplied by the caller rather than looked up here, because only the viewport knows which
-         * bone the system hangs off and what geometry that bone carries.
+         * bone the system is attached to and what geometry that bone carries.
          */
         emissionMesh: EmissionMesh | null = null,
         /**

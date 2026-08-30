@@ -121,6 +121,30 @@ public sealed record GetSubMeshGeometryResult(
     PreviewSubMeshGeometry? Page,
     string? Error = null);
 
+/// <summary>Request for one projectile's values, by object id.</summary>
+/// <remarks>
+///     The scene carries only the projectiles the SUBJECT fires, because those are what its weapons
+///     name. The attacker panel offers the whole tree - you are building a weapon to shoot AT the
+///     subject, so its own armament is the wrong list - and everything outside that handful had no
+///     way to be resolved. This is it.
+/// </remarks>
+[Method("aet/getProjectile", Direction.ClientToServer)]
+public sealed record GetProjectileParams : IRequest<GetProjectileResult>
+{
+    /// <summary>The projectile's object id, as the catalogue lists it.</summary>
+    public string Name { get; init; } = string.Empty;
+}
+
+/// <summary>Result of <c>aet/getProjectile</c>.</summary>
+/// <remarks>
+///     <see cref="Error" /> rather than an empty projectile when the id resolves to nothing: filling
+///     the panel with zeroes would read as a projectile that does no damage, which is a different
+///     and worse answer than "this project does not define it".
+/// </remarks>
+public sealed record GetProjectileResult(
+    PreviewProjectile? Projectile,
+    string? Error = null);
+
 /// <summary>Request for one particle system's emitter description.</summary>
 [Method("aet/getParticleSystem", Direction.ClientToServer)]
 public sealed record GetParticleSystemParams : IRequest<GetParticleSystemResult>

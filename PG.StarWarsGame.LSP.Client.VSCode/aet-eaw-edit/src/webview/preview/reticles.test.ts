@@ -7,7 +7,7 @@ import { describe, it } from 'node:test';
 import type { PreviewHardpoint, PreviewReticles } from '../../protocol/modelPreview';
 
 import {
-    RETICLE_STATES, healthColour, reticleMarks, reticleSizePx, trackedStateOf,
+    RETICLE_STATES, healthColour, reticleFor, reticleMarks, reticleSizePx, trackedStateOf,
 } from './reticles';
 
 const RETICLES: PreviewReticles = {
@@ -70,13 +70,13 @@ describe('reticleMarks', () => {
         assert.deepEqual(reticleMarks([hardpoint()], mangled, 'enemy', new Set()), []);
     });
 
-    it('draws nothing over a mount the game will not let you target', () => {
+    it('draws nothing over a hardpoint the game will not let you target', () => {
         // 97 of foc's hardpoints say Is_Targetable No.
         assert.deepEqual(
             reticleMarks([hardpoint({ isTargetable: false })], RETICLES, 'enemy', new Set()), []);
     });
 
-    it('draws nothing over a mount that has been shot away', () => {
+    it('draws nothing over a hardpoint that has been shot away', () => {
         assert.deepEqual(
             reticleMarks([hardpoint()], RETICLES, 'enemy',
                 new Set(['HP_Star_Destroyer_Weapon_FL'])), []);
@@ -92,7 +92,7 @@ describe('reticleMarks', () => {
         assert.equal(mark.bone, 'HP_F-L_BONE');
     });
 
-    it('carries how worn the mount is, for the colour', () => {
+    it('carries how worn the hardpoint is, for the colour', () => {
         const marks = reticleMarks(
             [hardpoint({ health: 400 })], RETICLES, 'enemy', new Set(),
             { HP_Star_Destroyer_Weapon_FL: 100 });
@@ -100,14 +100,14 @@ describe('reticleMarks', () => {
         assert.equal(marks[0].healthFraction, 0.25);
     });
 
-    it('has no health fraction for a mount that declares none', () => {
+    it('has no health fraction for a hardpoint that declares none', () => {
         // 210 of foc's hardpoints declare no Health, and they never wear down.
         assert.equal(
             reticleMarks([hardpoint({ health: null })], RETICLES, 'enemy', new Set())[0]
                 .healthFraction, null);
     });
 
-    it('falls back to the hull bone for a mount that attaches no model', () => {
+    it('falls back to the hull bone for a hardpoint that attaches no model', () => {
         // 137 hardpoints name no Model_To_Attach - the tractor beam and the fighter bay among them -
         // and their attach bone is a bone of the hull.
         const marks = reticleMarks(
@@ -134,7 +134,7 @@ describe('reticleMarks', () => {
 
     it('skips a name the server could not decode', () => {
         // Icons are absent when no game directory is configured. The map still arrives, so the
-        // client must not draw a broken image over every mount.
+        // client must not draw a broken image over every hardpoint.
         const noArt: PreviewReticles = { ...RETICLES, icons: {} };
 
         assert.deepEqual(reticleMarks([hardpoint()], noArt, 'enemy', new Set()), []);
@@ -180,7 +180,7 @@ describe('reticleSizePx', () => {
 });
 
 describe('healthColour', () => {
-    it('runs green to red as the mount is worn down', () => {
+    it('runs green to red as the hardpoint is worn down', () => {
         // The game's own ramp, as the user gave it: bright green at full health through yellow and
         // orange to red at nothing left.
         assert.equal(healthColour(1), '#3cd63c');
@@ -197,7 +197,7 @@ describe('healthColour', () => {
         assert.equal(orange, '#e08a20');
     });
 
-    it('is green for a mount that declares no health at all', () => {
+    it('is green for a hardpoint that declares no health at all', () => {
         // 210 of foc's hardpoints declare none. They cannot be worn down, so they are never
         // anything but whole - showing them red would report damage that cannot happen.
         assert.equal(healthColour(null), '#3cd63c');
@@ -237,5 +237,66 @@ describe('the tracked art on a mark', () => {
         const mark = reticleMarks([engine], RETICLES, 'enemy', new Set())[0];
 
         assert.equal(mark.trackedUri, mark.iconUri);
+    });
+});
+
+describe('reticleFor', () => {
+    const reticles = {
+        byType: { HARD_POINT_WEAPON_LASER: { enemy: 'I_RET_LASER' } },
+        icons: { I_RET_LASER: 'data:image/png;base64,AAAA' },
+    };
+
+    it('finds the art a hardpoint TYPE resolves to', () => {
+        // Two levels on purpose: thirteen hardpoint types share five artwork families, so the type
+        // names an icon and the icon names the pixels.
+        assert.equal(reticleFor(reticles, 'HARD_POINT_WEAPON_LASER'), 'data:image/png;base64,AAAA');
+    });
+
+    it('is null for a type the catalog does not cover', () => {
+        assert.equal(reticleFor(reticles, 'HARD_POINT_SHIELD'), null);
+    });
+
+    it('is null when there is no catalog at all', () => {
+        // A workspace with no game directory gets the map and no images, and a scene is perfectly
+        // usable without them - so this is a quiet absence, not a problem to report.
+        assert.equal(reticleFor(undefined, 'HARD_POINT_WEAPON_LASER'), null);
+    });
+
+    it('is null for a hardpoint that declares no type', () => {
+        assert.equal(reticleFor(reticles, null), null);
+    });
+});
+
+describe('healthColour, banded in quarters', () => {
+    /**
+     * Four colours, four equal bands, switching at 75, 50 and 25 percent.
+     *
+     * It used to pick the NEAREST of four stops written at 1, 0.66, 0.33 and 0, which put the
+     * switches at 83, 50 and 17 percent - bands the reader cannot predict and nothing in the game
+     * asks for. The colours are the user's; the thresholds were ours and were arbitrary.
+     */
+    it('is green down to three quarters', () => {
+        assert.equal(healthColour(1), '#3cd63c');
+        assert.equal(healthColour(0.76), '#3cd63c');
+    });
+
+    it('is yellow from three quarters down to a half', () => {
+        assert.equal(healthColour(0.75), '#d6d63c');
+        assert.equal(healthColour(0.51), '#d6d63c');
+    });
+
+    it('is orange from a half down to a quarter', () => {
+        assert.equal(healthColour(0.5), '#e08a20');
+        assert.equal(healthColour(0.26), '#e08a20');
+    });
+
+    it('is red at a quarter and below', () => {
+        assert.equal(healthColour(0.25), '#e02020');
+        assert.equal(healthColour(0), '#e02020');
+    });
+
+    it('clamps rather than running off either end', () => {
+        assert.equal(healthColour(2), '#3cd63c');
+        assert.equal(healthColour(-1), '#e02020');
     });
 });

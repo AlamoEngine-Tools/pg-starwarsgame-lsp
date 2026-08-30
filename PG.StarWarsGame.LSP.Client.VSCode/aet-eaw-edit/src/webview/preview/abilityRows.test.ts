@@ -7,20 +7,106 @@ import { describe, it } from 'node:test';
 import type { PreviewAbility, PreviewParticle } from '../../protocol/modelPreview';
 
 import {
-    abilityAllows, abilityClaims, abilityProxies, abilityRows, clipFor, revealsShield,
-    shieldRevealed,
+    abilityAllows, abilityBarTitle, abilityClaims, abilityFacts, abilityOwnership, abilityProxies,
+    abilityRows, clipFor, gotoDefinitionTitle, revealsShield, revealsStealth, shieldRevealed,
+    stealthed,
+    unboundEffectIds,
 } from './abilityRows';
 
 function ability(over: Partial<PreviewAbility> = {}): PreviewAbility {
     return { type: 'TURBO', proxyNames: [], modifiers: [], ...over };
 }
 
-function particle(id: string, bone: string): PreviewParticle {
+function particle(id: string, bone: string, claimsAbility?: string): PreviewParticle {
     return {
         id, systemRef: `${bone}.alo`, partId: 'hull', bone, boneIndex: 0,
-        gate: 'Always', startsVisible: true,
+        gate: 'Always', startsVisible: true, claimsAbility,
     };
 }
+
+describe('revealsStealth', () => {
+    it('takes both types the shipped units declare', () => {
+        // A table and not a name test, because the two do not share a word. `TIE_Phantom`,
+        // `Vengeance_Frigate`, `Tyber_Zann` and `Urai_Fen` declare STEALTH; `Luke_Skywalker_Jedi`
+        // declares FORCE_CLOAK and carries the same `stealth` mesh. Guessing from the name would
+        // have left Luke permanently wearing his cloak shell.
+        assert.equal(revealsStealth('STEALTH'), true);
+        assert.equal(revealsStealth('FORCE_CLOAK'), true);
+    });
+
+    it('leaves the other abilities alone', () => {
+        for (const type of ['DEFEND', 'MISSILE_SHIELD', 'TURBO', 'SPREAD_OUT']) {
+            assert.equal(revealsStealth(type), false, type);
+        }
+    });
+
+    it('reads a type however it is cased', () => {
+        assert.equal(revealsStealth(' stealth '), true);
+    });
+});
+
+describe('stealthed', () => {
+    it('is on while any active ability cloaks the unit', () => {
+        assert.equal(stealthed(new Set(['STEALTH'])), true);
+        assert.equal(stealthed(new Set(['SELF_DESTRUCT', 'STEALTH'])), true);
+        assert.equal(stealthed(new Set(['FORCE_CLOAK'])), true);
+    });
+
+    it('is off when nothing is cloaking it', () => {
+        // Which is the state a unit that cannot cloak at all is permanently in - and that is what
+        // keeps the shell off `Tyber_Zann_Prisoner`, who uses Tyber's model and declares nothing.
+        assert.equal(stealthed(new Set()), false);
+        assert.equal(stealthed(new Set(['DEFEND', 'TURBO'])), false);
+    });
+});
+
+describe('unboundEffectIds', () => {
+    // The Tartan, which is the shipped case: `Tartan_Patrol_Cruiser` declares POWER_TO_WEAPONS and
+    // its model carries `pptw_ptwsa` for it plus two `Pte_tartanengine_*` for a TURBO it does not
+    // have. The engine never shows those two; we did.
+    const TARTAN = [
+        particle('pptw', 'pptw_ptwsa', 'POWER_TO_WEAPONS'),
+        particle('lrg', 'Pte_tartanengine_lrg', 'TURBO'),
+        particle('sml', 'Pte_tartanengine_sml', 'TURBO'),
+        particle('glow', 'p_engine_glow'),
+    ];
+
+    it('names the effects whose ability the unit never declares', () => {
+        const unbound = unboundEffectIds([ability({ type: 'POWER_TO_WEAPONS' })], TARTAN);
+
+        assert.deepEqual([...unbound].sort(), ['lrg', 'sml']);
+    });
+
+    it('leaves an effect alone once the unit declares its ability', () => {
+        const unbound = unboundEffectIds(
+            [ability({ type: 'POWER_TO_WEAPONS' }), ability({ type: 'TURBO' })], TARTAN);
+
+        assert.equal(unbound.size, 0);
+    });
+
+    it('binds nothing when the unit declares no abilities at all', () => {
+        // The case an unbound effect is most likely to be a real mistake in, and the one a
+        // `declared.length > 0` guard would quietly skip.
+        const unbound = unboundEffectIds([], TARTAN);
+
+        assert.deepEqual([...unbound].sort(), ['lrg', 'pptw', 'sml']);
+    });
+
+    it('never touches an ordinary effect', () => {
+        // 5404 proxies claim nothing against 39 that do. A claim of null is not an unbound claim.
+        for (const declared of [[], [ability({ type: 'TURBO' })]]) {
+            assert.equal(unboundEffectIds(declared, TARTAN).has('glow'), false);
+        }
+    });
+
+    it('matches the ability type without regard to case', () => {
+        // `Ev_acclamator` writes `power_to_weapons` in lower case, and the proxy names are written
+        // both ways too - `pptw_2mtank` beside `PTE_Corvetteengines`.
+        const unbound = unboundEffectIds([ability({ type: 'power_to_weapons' })], TARTAN);
+
+        assert.equal(unbound.has('pptw'), false);
+    });
+});
 
 describe('abilityProxies', () => {
     it('resolves a proxy BONE NAME to the particle ids on it', () => {
@@ -86,18 +172,81 @@ describe('abilityAllows', () => {
     });
 });
 
+describe('abilityOwnership', () => {
+    const proxies = abilityProxies([
+        ability({ type: 'TURBO', proxyNames: ['PTE_X'] }),
+        ability({ type: 'POWER_TO_WEAPONS', proxyNames: ['PPTW_Y'] }),
+    ], [particle('p1', 'PTE_X'), particle('p2', 'PPTW_Y'), particle('p3', 'p_smoke')]);
+
+    it('names the systems the ability itself drives', () => {
+        assert.deepEqual(abilityOwnership('TURBO', proxies).systemIds, ['p1']);
+    });
+
+    it('leaves another ability`s systems alone', () => {
+        // The claim is what switching this ability takes back from the reader, so it has to be
+        // exactly this ability's rows. Taking back everything would undo a mesh the reader hid for
+        // an unrelated reason - which is the global `clearRowOverrides` a clip does, and a clip
+        // has the excuse of resetting the whole pose.
+        const claimed = abilityOwnership('TURBO', proxies).systemIds;
+
+        assert.equal(claimed.includes('p2'), false);
+        assert.equal(claimed.includes('p3'), false);
+    });
+
+    it('claims the shield mesh for DEFEND, which drives no proxy at all', () => {
+        // DEFEND declares no proxy, no bone, no particle and no clip: revealing the shield mesh is
+        // the whole of what it shows. Its claim is the mesh or it is nothing.
+        const claim = abilityOwnership('DEFEND', proxies);
+
+        assert.equal(claim.shieldMesh, true);
+        assert.deepEqual(claim.systemIds, []);
+    });
+
+    it('claims the stealth shell for both types that cloak', () => {
+        assert.equal(abilityOwnership('STEALTH', proxies).stealthShell, true);
+        assert.equal(abilityOwnership('FORCE_CLOAK', proxies).stealthShell, true);
+    });
+
+    it('claims nothing for an ability that drives nothing on this model', () => {
+        const claim = abilityOwnership('SPREAD_OUT', proxies);
+
+        assert.deepEqual(claim.systemIds, []);
+        assert.equal(claim.shieldMesh, false);
+        assert.equal(claim.stealthShell, false);
+    });
+});
+
 describe('clipFor', () => {
     const deploying = ability({
         deployClip: 'ev_at-aa_deploy_00.ala',
         undeployClip: 'ev_at-aa_undeploy_00.ala',
     });
 
+    // The XML names a FILE and the mixer holds STEMS. Measured on the X-Wing: the ability declares
+    // `rv_xwing_deploy_00.ala` and the loaded glTF clip is called `rv_xwing_deploy_00`, so the
+    // viewport's `clips.find(c => c.name === name)` missed every single time - and missed SILENTLY,
+    // which is why the panel went on reporting a clip that was never running.
     it('plays the deploy clip when the ability is switched on', () => {
-        assert.equal(clipFor(deploying, true), 'ev_at-aa_deploy_00.ala');
+        assert.equal(clipFor(deploying, true), 'ev_at-aa_deploy_00');
     });
 
     it('plays the undeploy clip when it is switched off', () => {
-        assert.equal(clipFor(deploying, false), 'ev_at-aa_undeploy_00.ala');
+        assert.equal(clipFor(deploying, false), 'ev_at-aa_undeploy_00');
+    });
+
+    it('takes the extension off however it was written', () => {
+        assert.equal(clipFor(ability({ deployClip: 'A_Deploy_00.ALA' }), true), 'A_Deploy_00');
+    });
+
+    it('leaves a name that is already a stem alone', () => {
+        // Nothing guarantees a mod writes the extension, and stripping a suffix that is not there
+        // must not eat part of the name.
+        assert.equal(clipFor(ability({ deployClip: 'rv_xwing_deploy_00' }), true),
+            'rv_xwing_deploy_00');
+    });
+
+    it('only takes off an ALA extension, not any trailing dot', () => {
+        assert.equal(clipFor(ability({ deployClip: 'weird.name_00' }), true), 'weird.name_00');
     });
 
     it('plays nothing when the model ships no clip for that direction', () => {
@@ -106,22 +255,62 @@ describe('clipFor', () => {
         // rather than replaying the deploy backwards or throwing.
         const oneWay = ability({ deployClip: 'x_deploy_00.ala', undeployClip: null });
 
-        assert.equal(clipFor(oneWay, true), 'x_deploy_00.ala');
+        assert.equal(clipFor(oneWay, true), 'x_deploy_00');
         assert.equal(clipFor(oneWay, false), null);
         assert.equal(clipFor(ability(), true), null);
+        assert.equal(clipFor(ability({ deployClip: '   ' }), true), null);
     });
 });
 
 describe('abilityRows', () => {
-    it('names a row by its GUI name when it has one, and its type otherwise', () => {
+    it('names a row the way the command bar does, and its type otherwise', () => {
         const rows = abilityRows([
+            ability({ type: 'TURBO', name: 'Turbo Boost' }),
+            ability({ type: 'SPREAD_OUT' }),
+        ], new Map());
+
+        assert.deepEqual(rows.map(r => r.label), ['Turbo Boost', 'SPREAD_OUT']);
+        // The TYPE is always kept: it is what binds a proxy and what a modder searches for.
+        assert.deepEqual(rows.map(r => r.type), ['TURBO', 'SPREAD_OUT']);
+    });
+
+    it('never labels a row with the symbol GUI_Activated_Ability_Name points at', () => {
+        // That tag names a SpecialAbility BLOCK, not display text. Using it as the label put an
+        // identifier where the reader expects the words the game shows - and it is present on 39%
+        // of abilities, so it was the common case.
+        const rows = abilityRows(
+            [ability({ type: 'TURBO', guiName: 'Corvette_Turbo_Ability' })], new Map());
+
+        assert.equal(rows[0].label, 'TURBO');
+    });
+
+    it('carries the localised description and the command-bar icon through', () => {
+        const rows = abilityRows([ability({
+            name: 'Turbo Boost',
+            description: 'Briefly increases speed.',
+            iconDataUri: 'data:image/png;base64,AAA',
+        })], new Map());
+
+        assert.equal(rows[0].description, 'Briefly increases speed.');
+        assert.equal(rows[0].iconDataUri, 'data:image/png;base64,AAA');
+    });
+
+    it('offers a jump only for an ability that names a definition', () => {
+        // The name is a reference, and resolving it is the server's job - the row only carries it
+        // so the panel knows whether there is anything to offer.
+        const [named, unnamed] = abilityRows([
             ability({ type: 'TURBO', guiName: 'Corvette_Turbo_Ability' }),
             ability({ type: 'SPREAD_OUT' }),
         ], new Map());
 
-        assert.deepEqual(rows.map(r => r.label), ['Corvette_Turbo_Ability', 'SPREAD_OUT']);
-        // The TYPE is always kept: it is what binds a proxy and what a modder searches for.
-        assert.deepEqual(rows.map(r => r.type), ['TURBO', 'SPREAD_OUT']);
+        assert.equal(named.definition, 'Corvette_Turbo_Ability');
+        assert.equal(unnamed.definition, null);
+    });
+
+    it('ignores a blank GUI name rather than offering a jump to nothing', () => {
+        // The shipped data writes the tag empty in places - Groundvehicles.xml has one with only
+        // whitespace between the tags.
+        assert.equal(abilityRows([ability({ guiName: '  ' })], new Map())[0].definition, null);
     });
 
     it('marks a row that drives nothing on the model', () => {
@@ -256,5 +445,95 @@ describe('shieldRevealed', () => {
     it('is off with none of them active', () => {
         assert.equal(shieldRevealed(new Set()), false);
         assert.equal(shieldRevealed(new Set(['TURBO'])), false);
+    });
+});
+
+describe('gotoDefinitionTitle', () => {
+    it('says what will open', () => {
+        const [row] = abilityRows(
+            [ability({ type: 'TURBO', guiName: 'Corvette_Turbo_Ability' })], new Map());
+
+        assert.match(gotoDefinitionTitle(row), /Corvette_Turbo_Ability/);
+    });
+
+    it('says WHY it cannot, rather than leaving a dead control unexplained', () => {
+        // The button stays on the row when there is nothing to open - a control that came and went
+        // per row would teach nobody it exists - so the title is the whole of the explanation.
+        const [row] = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+
+        assert.match(gotoDefinitionTitle(row), /SPREAD_OUT/);
+        assert.match(gotoDefinitionTitle(row), /nothing to open/i);
+    });
+});
+
+describe('abilityBarTitle', () => {
+    it('leads with the words the game uses, keeping the type in reach', () => {
+        // The bar draws an ICON, so the tooltip is the only place the name appears at all. The
+        // type stays because it is what binds a proxy and what a modder searches for.
+        const [row] = abilityRows(
+            [ability({ type: 'LUCKY_SHOT', name: 'Lucky Shot' })], new Map());
+
+        assert.match(abilityBarTitle(row), /^Lucky Shot \(LUCKY_SHOT\)/);
+    });
+
+    it('does not repeat the type when that is all the row has', () => {
+        const [row] = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+
+        assert.equal(abilityBarTitle(row).split('\n')[0], 'SPREAD_OUT');
+    });
+
+    it('carries the description and what the ability drives', () => {
+        const [row] = abilityRows([ability({
+            type: 'LUCKY_SHOT', name: 'Lucky Shot',
+            description: 'A shot with a huge damage bonus.',
+            proxyNames: ['PTE_X'],
+        })], new Map([['LUCKY_SHOT', ['p1', 'p2']]]));
+
+        const title = abilityBarTitle(row);
+        assert.match(title, /huge damage bonus/);
+        assert.match(title, /2 effects/);
+    });
+
+    it('says an order drives nothing, since its key is disabled and must explain itself', () => {
+        const [row] = abilityRows([ability({ type: 'SPREAD_OUT' })], new Map());
+
+        assert.match(abilityBarTitle(row), /nothing on this model/i);
+    });
+});
+
+const row = (over: Partial<PreviewAbility>) =>
+    abilityRows([ability(over)], new Map())[0];
+
+describe('abilityFacts', () => {
+    /**
+     * The card's split: what the GAME tells a player, and what the FILE says.
+     *
+     * They were one joined sentence under the name - "2 effects - on HP_Bone - speed x0.8 - 60s
+     * recharge" - sitting directly beneath the localised description, so the reader's own prose and
+     * the modder's measurements ran together into one paragraph with no seam.
+     */
+    it('is a LIST of labelled values, like the hardpoint card`s', () => {
+        const facts = abilityFacts(row({ rechargeSeconds: 60, expirationSeconds: 15 }));
+
+        assert.ok(facts.every(pair => pair.length === 2), 'label and value');
+        assert.ok(facts.some(([label]) => /recharge/i.test(label)));
+        assert.ok(facts.some(([label]) => /last|expir/i.test(label)));
+    });
+
+    it('names the SpecialAbility block, which is an identifier and not display text', () => {
+        // guiName is on 39% of shipped abilities and is what a jump resolves. It belongs in the
+        // facts, never as the card's title - that mistake is what put Corvette_Turbo_Ability where
+        // the reader expected "Turbo Boost".
+        const facts = abilityFacts(row({ guiName: 'Executor_Tractor_Beam_Attack_Ability' }));
+
+        assert.ok(facts.some(([, value]) => value === 'Executor_Tractor_Beam_Attack_Ability'));
+    });
+
+    it('omits what the file does not declare', () => {
+        assert.deepEqual(abilityFacts(row({})).filter(([, value]) => value === ''), []);
+    });
+
+    it('says nothing at all for an ability that declares nothing', () => {
+        assert.deepEqual(abilityFacts(row({})), []);
     });
 });

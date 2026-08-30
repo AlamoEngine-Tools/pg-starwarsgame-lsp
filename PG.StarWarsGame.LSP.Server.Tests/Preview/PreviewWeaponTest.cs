@@ -10,7 +10,7 @@ using PG.StarWarsGame.LSP.Server.Preview;
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 
 /// <summary>
-///     One weapon list, whatever the weapon hangs off.
+///     One weapon list, wherever the weapon is declared.
 /// </summary>
 /// <remarks>
 ///     The arc used to live on <see cref="PreviewHardpoint" />, which meant a fighter - whose

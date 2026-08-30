@@ -51,6 +51,38 @@ public sealed class PreviewAbilityTextSmokeTest(LspServerFixture fixture) : ICla
         Assert.Equal("Boost Shield Power", defend.Name);
         Assert.NotNull(defend.Description);
         Assert.Contains("shield", defend.Description, StringComparison.OrdinalIgnoreCase);
+
+        // The icon comes the other way entirely - I_SA_DEFEND out of the workspace's mega texture,
+        // decoded to PNG - so it is the half of the row the text assertions say nothing about.
+        Assert.NotNull(defend.IconDataUri);
+        Assert.StartsWith("data:image/png;base64,", defend.IconDataUri);
+    }
+
+    /// <summary>
+    ///     An ability that names a definition, which is what the row's jump acts on.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Red_Squadron_Container</c>'s <c>LUCKY_SHOT</c> carries
+    ///     <c>GUI_Activated_Ability_Name</c>, and the shipped file writes it with whitespace around
+    ///     the value. The row has to hand the client something resolvable;
+    ///     <c>aet/resolveReference</c> - covered by its own smoke test - turns it into a position.
+    /// </remarks>
+    [Fact]
+    public async Task AbilityRow_CarriesTheDefinitionItNames()
+    {
+        RequireWorkspace();
+        await WaitForScanAsync();
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+        var result = await fixture.Client.SendRequest(
+            new GetPreviewSceneParams { ObjectId = "Red_Squadron_Container" }, cts.Token);
+
+        var lucky = result.Scene.Abilities.FirstOrDefault(a =>
+            string.Equals(a.Type, "LUCKY_SHOT", StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(lucky);
+
+        Assert.Equal("Red_Squadron_Lucky_Shot", lucky.GuiName?.Trim());
+        Assert.Equal("Lucky Shot", lucky.Name);
     }
 
     private static void RequireWorkspace()

@@ -5,7 +5,7 @@
 //
 // A death clone and a piece of wreckage are their own models, not further pieces of the one being
 // previewed. The server describes each as a MODEL - it cannot know what the client will call the
-// instance it loads, and the same prop can be dropped by two mirrored mounts at once - so the
+// instance it loads, and the same prop can be dropped by two mirrored hardpoints at once - so the
 // descriptor is re-homed onto the part here.
 //
 // Kept free of three.js so the rules can be read against the XML they come from.
@@ -17,7 +17,7 @@ import type { PreviewParticle } from '../../protocol/modelPreview';
  *
  * Both halves of the identity are rewritten. `partId` is where the effect hangs, which only the
  * client knows; `id` has to be unique across the whole scene, and a wreck's descriptor ids are the
- * MODEL's - two mounts shedding the same prop would collide on every one of them.
+ * MODEL's - two hardpoints shedding the same prop would collide on every one of them.
  */
 export function passiveEffects(
     particles: readonly PreviewParticle[], partId: string,

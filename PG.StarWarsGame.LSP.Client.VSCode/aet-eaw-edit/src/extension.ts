@@ -17,11 +17,13 @@ import {
 import { CreditsPreviewPanel } from './creditsPreviewPanel';
 import { EncyclopediaPanel } from './encyclopediaPanel';
 import { ModelPreviewEditorProvider } from './modelPreviewEditor';
+import { ModelInspectorPanel } from './modelInspectorPanel';
 import { ModelPreviewPanel } from './modelPreviewPanel';
 import { offerShaderSources, shaderDirectory } from './shaderSources';
 import { initDialogGeometryStorage } from './dialogGeometryStorage';
 import { initPanelLayoutStorage } from './panelLayoutStorage';
 import { initViewerSettingsStorage } from './viewerSettingsStorage';
+import { initProjectSettingsStorage } from './projectSettingsStorage';
 import { LocalisationEditorPanel } from './localisationEditorPanel';
 import { LocalisationNavigatorViewProvider, LocTreeItem } from './localisationNavigatorViewProvider';
 import { LspGateway } from './lsp/lspGateway';
@@ -144,10 +146,10 @@ class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvid
 		if (!outcome.ok) {
 			return outcome.reason === 'offline'
 				? '<!-- EaWEdit: LSP server is not running. -->'
-				: `<!-- EaWEdit: failed to resolve effective object '${objectId}': ${outcome.message} -->`;
+				: `<!-- EaWEdit: Failed to resolve effective object '${objectId}' - ${outcome.message} -->`;
 		}
 		if (!outcome.value.found) {
-			return `<!-- EaWEdit: no object named '${objectId}' was found in the workspace. -->`;
+			return `<!-- EaWEdit: No object named '${objectId}' was found in the workspace. -->`;
 		}
 		return effectiveObjectBanner(objectId) + outcome.value.xml;
 	}
@@ -201,6 +203,23 @@ function createTraceChannel(name: string): vscode.LogOutputChannel {
 
 function cfg(section: string) {
 	return vscode.workspace.getConfiguration(`aet-eaw-edit.${section}`);
+}
+
+/**
+ * A game install directory, from the setting that declares it or the one that used to.
+ *
+ * These were declared as `aet-eaw-edit.modVerify.*` and read as `aet-eaw-edit.lsp.source.*`, so
+ * setting either did nothing: the server was never given a game path, and every asset that ships
+ * with the game stayed unreachable. The declaration has moved to the key the reader asks for - the
+ * one the model preview's own description already pointed at.
+ *
+ * The old key is still read so that anyone who set it gets the behaviour they were promised, rather
+ * than a silent no-op turning into a silently ignored setting.
+ */
+function gameDirectory(name: 'baseGameDirectory' | 'expansionDirectory'): string | undefined {
+	return cfg('lsp.source').get<string>(name)
+		|| cfg('modVerify').get<string>(name)
+		|| undefined;
 }
 
 /**
@@ -336,7 +355,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		serverArgs = waitForDebugger
 			? ['run', '--project', projectPath, '--', '--wait-for-debugger']
 			: ['run', '--project', projectPath];
-		logLine(`Dev mode: starting from source - ${serverExe} ${serverArgs.join(' ')}`);
+		logLine(`Dev mode: Starting from source - ${serverExe} ${serverArgs.join(' ')}`);
 	} else {
 		const serverPath = cfg('lsp').get<string>('executable')!;
 		// .dll → framework-dependent: launch via `dotnet <path>`.
@@ -385,10 +404,10 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		traceOutputChannel: traceChannel,
 		initializationOptions: {
 			workspaceRoot:     vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
-			baseGamePath:      cfg('lsp.source').get<string>('baseGameDirectory') || undefined,
+			baseGamePath:      gameDirectory('baseGameDirectory'),
 			// The user's own copy of the base shader SOURCES; never shipped with this extension.
 			shaderPath:        shaderDirectory(),
-			expansionGamePath: cfg('lsp.source').get<string>('expansionDirectory') || undefined,
+			expansionGamePath: gameDirectory('expansionDirectory'),
 			locale:            cfg('lsp').get<string>('locale', 'en'),
 			// The game's language, not this extension's. `locale` above sets the language the server
 			// writes its own hover text and diagnostics in; this one picks the string table.
@@ -410,7 +429,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 
 				const keyName = (args[0] as string | undefined) ?? '';
 				if (!keyName) {
-					vscode.window.showWarningMessage('EaWEdit: no localisation key name provided.');
+					vscode.window.showWarningMessage('EaWEdit: No localisation key name provided.');
 					return;
 				}
 
@@ -418,14 +437,14 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 					'aet/getLocalisationProjects');
 				if (!fetched.ok) {
 					vscode.window.showWarningMessage(
-						'EaWEdit: could not fetch localisation projects from server.');
+						'EaWEdit: Could not fetch localisation projects from server.');
 					return;
 				}
 				const projects = fetched.value.projects ?? [];
 
 				if (!projects.length) {
 					vscode.window.showWarningMessage(
-						"EaWEdit: no localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.");
+						"EaWEdit: No localisation projects found. Use 'EaWEdit: Initialise Localisation Project from Baseline' first.");
 					return;
 				}
 
@@ -458,7 +477,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 	lspClient.registerFeature(new ForceStaticCapabilitiesFeature());
 
 	if (statusItem) {
-		statusItem.text = '$(loading~spin) EaWEdit LSP: starting...';
+		statusItem.text = '$(loading~spin) EaWEdit LSP: Starting...';
 		statusItem.show();
 	}
 
@@ -481,8 +500,8 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		logLine(`Server version reported: ${serverVersion ?? '(none)'}`);
 		if (serverVersion !== REQUIRED_SERVER_VERSION) {
 			const msg = serverVersion
-				? `EaWEdit: server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Some features may not work correctly.`
-				: `EaWEdit: the server did not report a version. Download version ${REQUIRED_SERVER_VERSION} from the releases page.`;
+				? `EaWEdit: Server version ${serverVersion} does not match the expected version ${REQUIRED_SERVER_VERSION}. Some features may not work correctly.`
+				: `EaWEdit: The server did not report a version. Download version ${REQUIRED_SERVER_VERSION} from the releases page.`;
 			void vscode.window.showWarningMessage(msg, 'Download').then(choice => {
 				if (choice === 'Download') {
 					void vscode.env.openExternal(vscode.Uri.parse(RELEASES_URL));
@@ -505,7 +524,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		lspClient = undefined;
 		lsp.markStopped();
 		if (statusItem) {
-			statusItem.text = '$(error) EaWEdit LSP: failed to start';
+			statusItem.text = '$(error) EaWEdit LSP: Failed to start';
 		}
 		void vscode.window.showErrorMessage(
 			'EaWEdit: LSP server failed to start. Check the EaWEdit output channel for details.',
@@ -549,6 +568,14 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 	lspClient.onNotification('aet/storySimChanged', (params: StorySimChangedParams) => {
 		StoryGraphPanel.simChanged(params.campaign);
 	});
+
+	lspClient.onNotification('aet/previewSceneChanged', () => {
+		// Every open preview asks; the ones whose scene did not actually change drop the answer.
+		// The server cannot say which previews an edit touches - a scene is assembled from a
+		// variant chain, its hardpoints, their models and their weapons, and none of that is
+		// tracked back to the files it came from.
+		ModelPreviewPanel.refreshAll();
+	});
 }
 
 async function stopLspClient(): Promise<void> {
@@ -566,7 +593,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	initDialogGeometryStorage(context.workspaceState);
 
 	// The preview's room settings follow the person rather than the project, so globalState.
+	// The preview's PROJECT settings do not - the weapon bench, the faction and its colour all name
+	// things out of the mod's own tree - so they go to workspaceState beside the dialog geometry.
 	initViewerSettingsStorage(context.globalState);
+	initProjectSettingsStorage(context.workspaceState);
 
 	// Same reasoning: how wide you like a dock is a property of your screen and your habits,
 	// not of the mod you have open.
@@ -601,7 +631,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				// clicking a credits group ended up offering unrelated .dat translation files.
 				if (arg !== undefined && arg.project === undefined) {
 					vscode.window.showWarningMessage(
-						'EaWEdit: that node groups several files rather than being one. '
+						'EaWEdit: That node groups several files rather than being one. '
 						+ 'Open one of the files under it.');
 					return;
 				}
@@ -656,7 +686,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			async (arg?: LocTreeItem) => {
 				const filePath = arg?.project?.filePath;
 				if (!filePath) {
-					vscode.window.showWarningMessage('EaWEdit: no localisation file selected.');
+					vscode.window.showWarningMessage('EaWEdit: No localisation file selected.');
 					return;
 				}
 				await vscode.window.showTextDocument(
@@ -742,7 +772,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			async (arg?: LocTreeItem) => {
 				const filePath = arg?.project?.filePath;
 				if (!filePath) {
-					vscode.window.showWarningMessage('EaWEdit: no localisation file selected.');
+					vscode.window.showWarningMessage('EaWEdit: No localisation file selected.');
 					return;
 				}
 				if (!lsp.requireRunning()) { return; }
@@ -756,7 +786,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 					return;
 				}
 				vscode.window.showInformationMessage(
-					`EaWEdit: exported ${result.writtenFiles.length} DAT file(s).`);
+					`EaWEdit: Exported ${result.writtenFiles.length} DAT ${result.writtenFiles.length === 1 ? 'file' : 'files'}.`);
 			})
 	);
 
@@ -783,7 +813,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
 				const campaigns = result.campaigns ?? [];
 				if (!campaigns.length) {
-					vscode.window.showInformationMessage('EaWEdit: no story campaigns found in this workspace.');
+					vscode.window.showInformationMessage('EaWEdit: No story campaigns found in this workspace.');
 					return;
 				}
 				campaign = await vscode.window.showQuickPick(campaigns.map(c => c.name), {
@@ -926,7 +956,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 				'aet/getRootLocalisationConfig');
 			if (!config.ok) {
 				vscode.window.showWarningMessage(
-					'EaWEdit LSP: could not query the project\'s localisation config.');
+					'EaWEdit LSP: Could not query the project\'s localisation config.');
 				return;
 			}
 			const rootConfig = config.value;
@@ -1225,5 +1255,6 @@ export async function deactivate(): Promise<void> {
 	CreditsPreviewPanel.disposeAll();
 	EncyclopediaPanel.disposeAll();
 	ModelPreviewPanel.disposeAll();
+	ModelInspectorPanel.disposeAll();
 	await stopLspClient();
 }

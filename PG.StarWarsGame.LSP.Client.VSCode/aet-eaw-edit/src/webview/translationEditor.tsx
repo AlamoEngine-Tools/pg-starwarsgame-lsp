@@ -655,7 +655,7 @@ function AddTranslationDialog(props: {
                         it is still there when the language list has been scrolled past it. */}
                     <p className="modal-footnote">
                         <span className="codicon codicon-info" aria-hidden="true" />
-                        Languages you leave empty stay empty.
+                        Languages left empty stay empty.
                     </p>
                     <button type="button" onClick={props.onCancel}>Cancel</button>
                     <button type="submit" className="primary" disabled={error !== null}>Add</button>

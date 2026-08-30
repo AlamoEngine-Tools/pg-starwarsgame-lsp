@@ -28,6 +28,7 @@ import {
     dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
 } from './shared/dockChrome';
 import { ProblemsPanel } from './shared/ProblemsPanel';
+import { problemLook } from './shared/problemLook';
 import { RightDock } from './shared/RightDock';
 
 import { initPanelLayout } from './shared/panelLayoutBridge';
@@ -313,7 +314,7 @@ function App(): React.JSX.Element {
                                 <div key={notice.message} className="problem-row">
                                     <span
                                         className={'codicon sev-' + notice.severity + ' codicon-'
-                                            + (notice.severity === 'warning' ? 'warning' : 'info')}
+                                            + problemLook(notice.severity).icon}
                                         aria-hidden="true"
                                     />
                                     <span className="problem-msg">{notice.message}</span>

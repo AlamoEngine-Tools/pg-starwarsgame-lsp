@@ -59,7 +59,7 @@ export interface PreviewRgba {
 export interface PreviewPart {
     id: string;
     modelRef: string;
-    /** The part this hangs off, or absent for the root. */
+    /** The part this is attached to, or absent for the root. */
     attachToPartId?: string | null;
     /** The bone on that part, or absent to sit at its origin. */
     attachBone?: string | null;
@@ -77,14 +77,14 @@ export const PREVIEW_WEAPON_SOURCE = {
 
 /** How the engine picks which fire point a shot leaves from. Mirrors `PreviewFirePointMode`. */
 export const PREVIEW_FIRE_POINT_MODE = {
-    /** Each bone in turn, one per volley. What every shipped mount does. */
+    /** Each bone in turn, one per volley. What every shipped hardpoint does. */
     cycleBones: 'CycleBones',
     /** Any random point along the line between the fire bones. */
     randomAlongLine: 'RandomAlongLine',
 } as const;
 
 /**
- * One weapon bank: everything needed to draw its arc and describe its cadence.
+ * One weapon: everything needed to draw its arc and describe its cadence.
  *
  * One list for both cases, because the arc used to live on the hardpoint and a fighter - whose
  * armament sits on the unit itself - could therefore never have one.
@@ -97,7 +97,7 @@ export const PREVIEW_FIRE_POINT_MODE = {
  * mistake look right on one side. Go through the shared aim helper, never the raw bone matrix.
  */
 export interface PreviewWeapon {
-    /** `hardpoint:<id>`, or `bank:A` for a unit weapon. */
+    /** `hardpoint:<id>`, or `weapon:A` for a unit weapon. */
     id: string;
     /** See {@link PREVIEW_WEAPON_SOURCE}. */
     source: string;
@@ -128,7 +128,7 @@ export interface PreviewWeapon {
     pulseCount?: number | null;
     pulseDelaySeconds?: number | null;
     rechargeSeconds?: number | null;
-    /** The `Fire_When_*` gates that are set; a mount cannot fire in a state absent from this. */
+    /** The `Fire_When_*` gates that are set; a hardpoint cannot fire in a state absent from this. */
     fireModes: string[];
     turret?: PreviewTurret | null;
     fireSfxEvent?: string | null;
@@ -292,7 +292,26 @@ export interface PreviewAbilityModifier {
  */
 export interface PreviewAbility {
     type: string;
+    /**
+     * The `SpecialAbility` block this ability names - a jump target, NOT display text. Use `name`
+     * for what to show the reader.
+     */
     guiName?: string | null;
+    /**
+     * What the command bar calls it, already localised: the instance's `Alternate_Name_Text` when
+     * it declares one, otherwise the `TEXT_TOOLTIP_ABILITY_<TYPE>_NAME` convention. Null when
+     * neither resolves - fall back to `type`, which is always there.
+     */
+    name?: string | null;
+    /** The tooltip text, resolved the same way. */
+    description?: string | null;
+    /**
+     * The command-bar icon as a `data:image/png;base64,...` URI. Null when nothing could be
+     * asserted about it, in which case draw no slot rather than a placeholder - the server already
+     * distinguishes the two, and a declared-but-missing icon arrives here AS the placeholder with a
+     * problem beside it. The atlas slot is 26x26; draw it near native size, as the game does.
+     */
+    iconDataUri?: string | null;
     ownerAttachmentBone?: string | null;
     particleEffect?: string | null;
     rechargeSeconds?: number | null;
@@ -332,7 +351,7 @@ export interface PreviewTargetDefence {
     /**
      * The summed `Health` of every destructible hardpoint, or absent where there are none.
      *
-     * A unit with hardpoints cannot be targeted itself and dies when its last mount does, so this
+     * A unit with hardpoints cannot be targeted itself and dies when its last hardpoint does, so this
      * is the pool that actually drains. Sent alongside `tacticalHealth` rather than replacing it -
      * the two disagree in the shipped data (2000 against 4075 on the Star Destroyer) and nobody
      * knows how the engine reconciles them.
@@ -357,8 +376,8 @@ export interface PreviewVector3 {
  * The wreckage a hardpoint sheds when it is destroyed.
  *
  * A `Death_Breakoff_Prop` names a `SpaceProp` with its own model and a DEBRIS behaviour, so a
- * destroyed mount tumbles away burning rather than simply vanishing. Listed once per distinct prop:
- * mirrored mounts share one, and a copy each would instantiate the same wreck twice.
+ * destroyed hardpoint tumbles away burning rather than simply vanishing. Listed once per distinct prop:
+ * mirrored hardpoints share one, and a copy each would instantiate the same wreck twice.
  */
 export interface PreviewBreakoffProp {
     id: string;
@@ -416,7 +435,7 @@ export interface PreviewHardpoint {
     type?: string | null;
     attachBone?: string | null;
     isDestroyable: boolean;
-    /** Whether the game lets a player target this mount. Decides whether a reticle is drawn. */
+    /** Whether the game lets a player target this hardpoint. Decides whether a reticle is drawn. */
     isTargetable: boolean;
     health?: number | null;
     damageParticlesBone?: string | null;
@@ -426,6 +445,15 @@ export interface PreviewHardpoint {
     deathExplosionParticles?: string | null;
     deathBreakoffProp?: string | null;
     engineDeathHidesEngineParticles: boolean;
+    /**
+     * The `Tooltip_Text` tag verbatim, which is a localisation KEY. 422 objects write one.
+     *
+     * Kept beside the resolved {@link tooltipText}: the key is what the author wrote and what they
+     * would search their own files for; the text is what a player reads.
+     */
+    tooltipKey?: string | null;
+
+    /** What {@link tooltipKey} resolves to, or absent when it resolves to nothing. */
     tooltipText?: string | null;
     turret?: PreviewTurret | null;
 }
@@ -439,6 +467,12 @@ export interface PreviewHardpoint {
  * declare exactly one colourisation uniform. An OBJECT may override it with its own - see
  * {@link PreviewScene.noColorizationColor}, which is what the preview reads.
  */
+/** One band of the damage table: the health fraction it tops out at, and the stage inside it. */
+export interface PreviewDamageBand {
+    threshold: number;
+    stage: number;
+}
+
 export interface PreviewFaction {
     name: string;
     color?: PreviewRgba | null;
@@ -467,6 +501,14 @@ export interface PreviewProblem {
     severity: string;
     message: string;
     hardpointId?: string | null;
+    /**
+     * The diagnostic id, as `aetswg-014-0007`.
+     *
+     * Opaque here: the server owns the format and sends it already rendered. Absent on a finding
+     * the CLIENT made - those describe what the viewport could resolve at an instant, so they have
+     * no file, no position and no id. See `problemTag`.
+     */
+    diagnosticId?: string | null;
 }
 
 /**
@@ -489,7 +531,7 @@ export interface PreviewAssetTiers {
  * destruction, faction tint, particle toggles - locally. Nothing round-trips when a slider moves.
  */
 /**
- * One particle system hanging off a bone of a loaded part.
+ * One particle system attached to a bone of a loaded part.
  *
  * A model carries its effects as proxies - a named particle system pinned to a bone. Nothing in the
  * XML names a proxy: the hardpoint names a HULL bone through `Damage_Particles`, and the smoke is
@@ -528,6 +570,48 @@ export interface PreviewParticle {
      * lit on the way to destruction does not flicker back on as a hardpoint is repaired.
      */
     altDecreaseStayHidden?: boolean;
+    /**
+     * The ability this proxy's BONE NAME claims by its prefix, or absent for the 5404 that claim
+     * nothing.
+     *
+     * A claim is not a binding. The unit has to declare the type as well, and when it does not the
+     * game simply never shows the effect - `Tartan_Patrol_Cruiser` declares POWER_TO_WEAPONS and
+     * carries `Pte_tartanengine_lrg` for a TURBO it does not have. See {@link unboundEffectIds}.
+     */
+    claimsAbility?: string | null;
+}
+
+/**
+ * The automated death clone: a unit that declares none keeps flying and comes apart.
+ *
+ * `Spin_Away_On_Death` and its four companions. Measured over both shipped trees: 34 objects declare
+ * it, all `Yes`, and **not one of them also declares a `Death_Clone`** - so it really is the
+ * substitute rather than an extra. Absent where the object does not declare it.
+ */
+export interface PreviewSpinAway {
+    /**
+     * `Spin_Away_On_Death_Time`, in seconds. 31 shipped objects write `2.0f` and 3 write `1.0f` -
+     * the `f` suffix is in the files and the server parses it off.
+     */
+    timeSeconds: number;
+
+    /**
+     * `Spin_Away_On_Death_Chance`, 0 to 1. Shipped values are 0.2 and 0.4.
+     *
+     * The preview does NOT roll this - it always spins and reads the chance out instead. A tool
+     * pressed to see a thing has to show the thing, and one death in five looks like a broken
+     * button the other four times.
+     */
+    chance: number;
+
+    /** `Spin_Away_On_Death_Explosion` - its own, fired at the end, not `Death_Explosions`. */
+    explosion?: string | null;
+
+    /**
+     * `Max_Speed`. **Per FRAME, not per second** - the engine runs at 30Hz, so 4.5 here is 135 units
+     * a second. All 34 spin-away objects declare one.
+     */
+    maxSpeed: number;
 }
 
 export interface PreviewScene {
@@ -537,7 +621,7 @@ export interface PreviewScene {
     parts: PreviewPart[];
     hardpoints: PreviewHardpoint[];
     /**
-     * Every weapon on the subject, wherever it is declared - a mount or the unit itself.
+     * Every weapon on the subject, wherever it is declared - a hardpoint or the unit itself.
      *
      * Never absent, may be empty: roughly half the hardpoints in the shipped trees are shield
      * generators, docking bays and the like, which carry no armament at all.
@@ -555,6 +639,8 @@ export interface PreviewScene {
     abilities: PreviewAbility[];
     /** What this subject leaves behind when it dies. Never absent, may be empty. */
     deathClones: PreviewDeathClone[];
+    /** How it comes apart when it leaves nothing behind. Absent unless the object declares it. */
+    spinAway?: PreviewSpinAway | null;
     /**
      * The explosion the SUBJECT sets off when it dies - its own `Death_Explosions`.
      *
@@ -587,6 +673,25 @@ export interface PreviewScene {
      * than one, and a unit cannot wear two fallback colours.
      */
     affiliation?: string | null;
+    /**
+     * The damage stages the object DECLARES, from `Land_Damage_Alternates`, ascending.
+     *
+     * Sent because the client cannot derive them: it reads ALT levels off the loaded geometry, and
+     * a stage need not touch the geometry - it may be only an explosion and a sound. 35 shipped
+     * structures declare the lone stage `3`, which no model tag mentions. Empty for every space
+     * unit; the trio is a ground-structure convention.
+     */
+    damageStages: number[];
+    /**
+     * The damage table in WRITTEN order, or empty where the object declares none usable.
+     *
+     * What drives the stage in Gameplay. The thresholds are the upper and LOWER bound of each
+     * stage: `1, 0.66, 0.33, 0` against `0, 1, 2, 3` means 100% > h > 66% is ALT0, 66% > h > 33% is
+     * ALT1, 33% > h > 0% is ALT2, then ALT3. Kept as ordered PAIRS because `damageStages` is sorted
+     * and de-duplicated - the right shape for "which stages exist" and useless for "which stage at
+     * what health". See `stageForHull`.
+     */
+    damageTable: PreviewDamageBand[];
     factions: PreviewFaction[];
     problems: PreviewProblem[];
     /** The cameras the subject's own model declares. Empty for the 87% that carry none. */
@@ -618,9 +723,13 @@ export interface PreviewScene {
      * The model whose animation set applies, when it is not the hull's own.
      *
      * `Land_Model_Anim_Override_Name` and its space counterpart hand a unit another model's
-     * animations, which the engine can only do because the two skeletons are identical. The clips are
-     * therefore named after the OVERRIDE model - look for them under this name, not the hull's, or a
-     * unit that animates in game will appear to have no animations at all.
+     * animations. The clips are named after the OVERRIDE model - look for them under this name, not
+     * the hull's, or a unit that animates in game will appear to have no animations at all.
+     *
+     * The two skeletons need NOT be identical: 12 of the 29 shipped override pairs differ, and the
+     * units animate correctly in the engine, which binds the tracks by bone index. Where the two
+     * disagree about what a bone is called, a clip drives whatever sits at that index - reported
+     * against the object as information, never as a reason to drop the clip.
      */
     animationSource?: string | null;
 }
@@ -947,6 +1056,20 @@ export interface AlamoParticleContent {
 export interface GetParticleSystemParams {
     /** The system name as a model proxy writes it; the extension is optional. */
     name: string;
+}
+
+/**
+ * Result of `aet/getProjectile` - one projectile resolved by id.
+ *
+ * The scene carries only what the SUBJECT fires. The attacker panel offers the whole tree, because
+ * you are building a weapon to shoot at the subject rather than reading its own armament, so
+ * everything outside that handful is fetched on demand through this.
+ */
+export interface GetProjectileResult {
+    projectile?: PreviewProjectile | null;
+    /** Set when the id resolves to nothing. Better than a projectile of zeroes, which reads as one
+     *  that does no damage. */
+    error?: string | null;
 }
 
 export interface GetParticleSystemResult {

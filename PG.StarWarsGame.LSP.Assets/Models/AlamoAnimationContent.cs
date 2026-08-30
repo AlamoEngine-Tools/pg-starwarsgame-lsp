@@ -87,6 +87,33 @@ public sealed record AlamoAnimationContent(
     }
 
     /// <summary>
+    ///     Whether this animation can be APPLIED to a skeleton, whatever its bones are called there.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A weaker question than <see cref="MatchesModel" />, and the one that decides whether a
+    ///         clip is playable. The user reported that the identical-skeleton rule fires all over the
+    ///         BASE GAME - on units that animate perfectly well in the engine - so an exact name match
+    ///         is not what the engine requires, and enforcing it dropped clips the game plays.
+    ///     </para>
+    ///     <para>
+    ///         An index past the end of the bone list is different in kind: there is no node to drive,
+    ///         so the track cannot be written whatever anyone decides about names. That is a hard
+    ///         limit rather than a strictness setting, and it stays.
+    ///     </para>
+    ///     <para>
+    ///         Use <see cref="MatchesModel" /> where the job is to CHOOSE which model a loose clip
+    ///         belongs to - there, a name disagreement is the evidence that settles it.
+    ///     </para>
+    /// </remarks>
+    public bool FitsSkeleton(IReadOnlyList<string> modelBoneNames)
+    {
+        ArgumentNullException.ThrowIfNull(modelBoneNames);
+
+        return Bones.All(bone => bone.BoneIndex >= 0 && bone.BoneIndex < modelBoneNames.Count);
+    }
+
+    /// <summary>
     ///     Why this animation does not pair with a model, or <see langword="null" /> when it does.
     /// </summary>
     /// <remarks>

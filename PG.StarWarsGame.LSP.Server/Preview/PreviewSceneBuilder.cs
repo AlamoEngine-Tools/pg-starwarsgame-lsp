@@ -12,6 +12,7 @@ using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -76,7 +77,7 @@ public sealed class PreviewSceneBuilder(
 
         var problems = new List<PreviewProblem>();
         if (!resolved)
-            problems.Add(new PreviewProblem("error",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelNotFound, "error",
                 $"Model '{modelReference}' was not found. {assets.Tiers.Explain()}"));
 
         var kind = PreviewSceneKind.Model;
@@ -88,9 +89,9 @@ public sealed class PreviewSceneBuilder(
                     break;
 
                 case AloFileKind.Unknown:
-                    problems.Add(new PreviewProblem("error",
-                        $"'{modelReference}' is not an Alamo model or particle system - its first "
-                        + "chunk is neither. A renamed or truncated file looks exactly like this."));
+                    problems.Add(new PreviewProblem(DiagnosticIds.PreviewNotAModel, "error",
+                        $"'{modelReference}' is not an Alamo model or particle system: Its root chunk id is "
+                        + "neither. The file may be renamed or truncated."));
                     break;
             }
 
@@ -137,7 +138,7 @@ public sealed class PreviewSceneBuilder(
         }
         catch (AloFormatException e)
         {
-            problems.Add(new PreviewProblem("warning",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelUnreadable, "warning",
                 $"'{modelReference}' could not be read for its cameras: {e.Message}"));
             return [];
         }
@@ -224,7 +225,7 @@ public sealed class PreviewSceneBuilder(
 
         var problems = new List<PreviewProblem>();
         if (effective.Cyclic)
-            problems.Add(new PreviewProblem("error",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewInheritanceCycle, "error",
                 $"'{objectId}' inherits in a cycle through '{effective.CycleObjectId}'; " +
                 "the assembled scene may be incomplete."));
 
@@ -239,7 +240,7 @@ public sealed class PreviewSceneBuilder(
         var hull = bones.DeclaredModels(effective.ObjectId).FirstOrDefault(m => !string.IsNullOrEmpty(m));
 
         if (hull is null)
-            problems.Add(new PreviewProblem("error",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoTacticalModel, "error",
                 $"'{effective.ObjectId}' declares no tactical model, so there is nothing to draw."));
         else
             parts.Add(new PreviewPart("hull", hull, null, null, PreviewPartOrigin.Hull, null,
@@ -255,8 +256,12 @@ public sealed class PreviewSceneBuilder(
 
         var animationSource = ResolveAnimationOverride(effective, hull, problems);
 
+        // Read once: the scene carries it and the check below compares against it.
+        var stages = DamageStages(effective);
+        ReportUntaggedStages(effective.ObjectId, hull, stages, problems);
+
         if (hull is not null && !parts[0].Resolved)
-            problems.Add(new PreviewProblem("error",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelNotFound, "error",
                 $"Model '{hull}' was not found. {assets.Tiers.Explain()}"));
 
         // Every part, not just the hull: a turret carries its own muzzle flashes and engine glow.
@@ -287,12 +292,59 @@ public sealed class PreviewSceneBuilder(
                 AnimationsFor(animationSource ?? hull ?? string.Empty), problems,
                 icons, index.Localisation),
             DeathClones: DeathClones(resolver, effective, problems),
+            SpinAway: SpinAway(effective),
             DeathExplosions: Tag(effective, "Death_Explosions"),
             ProjectileCatalog: ProjectileCatalog(),
             // What it wears when no faction colour applies, which is most of the time - its own
             // colour first, and whose fallback to use when it declares none.
             NoColorizationColor: Colour(effective, "No_Colorization_Color"),
-            Affiliation: FirstToken(Tag(effective, "Affiliation")));
+            Affiliation: FirstToken(Tag(effective, "Affiliation")),
+            DamageStages: stages,
+            DamageTable: DamageTable(effective));
+    }
+
+    /// <summary>
+    ///     Reports a declared damage stage the hull's model tags nothing for.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Read off <see cref="GameIndex.ModelBones" /> - bones UNION mesh names - rather than
+    ///         from a fresh read of the file, so this and the XML validator's own version of the
+    ///         check answer from the same source and cannot disagree about one object. The catalogue
+    ///         holds no PROXY names, which measures out as no loss: of the 149 shipped models
+    ///         carrying an ALT-tagged proxy, not one tags a level that no bone or mesh also tags.
+    ///     </para>
+    ///     <para>
+    ///         The HULL only. A hardpoint mount is its own render object and the declaration belongs
+    ///         to the unit; none of the six shipped objects this fires on carries a hardpoint
+    ///         anyway, so widening it to the parts would buy nothing and let a turret answer for a
+    ///         stage the hull is missing.
+    ///     </para>
+    ///     <para>
+    ///         Silent when the model is not catalogued at all. That is undecidable rather than
+    ///         wrong, and the warning would be about the index rather than about the file.
+    ///     </para>
+    /// </remarks>
+    private void ReportUntaggedStages(
+        string objectId, string? hull, IReadOnlyList<int> stages, List<PreviewProblem> problems)
+    {
+        if (hull is null || stages.Count == 0)
+            return;
+
+        if (!indexService.Current.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
+            return;
+
+        var missing = ModelLevelTag.StagesNotTagged(stages, ModelLevelTag.AltLevelsIn(names));
+        if (missing.Count == 0)
+            return;
+
+        var which = missing.Count == 1
+            ? $"stage {missing[0]}"
+            : $"stages {string.Join(", ", missing)}";
+
+        problems.Add(new PreviewProblem(DiagnosticIds.PreviewDamageStageNotInModel, "warning",
+            $"'{objectId}' declares damage {which}, which nothing in '{hull}' is tagged for. "
+            + "The unit reaches that state and does not change."));
     }
 
     /// <summary>
@@ -327,8 +379,8 @@ public sealed class PreviewSceneBuilder(
             {
                 // A real mistake, unlike an unbound ability effect: the wreck simply never appears
                 // and the game says nothing about it.
-                problems.Add(new PreviewProblem("warning",
-                    $"Death clone '{row[1]}' is named by this object but is not defined anywhere."));
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewDeathCloneNotDefined, "warning",
+                    $"Death clone '{row[1]}' is not defined in this project."));
                 clones.Add(new PreviewDeathClone(Blank(row[0]), row[1], null, playsIdle));
                 continue;
             }
@@ -386,7 +438,7 @@ public sealed class PreviewSceneBuilder(
             particles.Select(particle => particle.Bone), declared.Select(a => a.Type));
 
         foreach (var (ability, names) in bound.Unbound)
-            problems.Add(new PreviewProblem("info",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewUnboundAbilityEffect, "info",
                 $"{string.Join(", ", names)} names {ability} by its prefix, but this object "
                 + "declares no such ability - the effect is unbound."));
 
@@ -506,7 +558,7 @@ public sealed class PreviewSceneBuilder(
         var armor = Tag(effective, "Armor_Type");
         var shieldArmor = Tag(effective, "Shield_Armor_Type");
 
-        // Only the mounts that can actually die. An indestructible one can never be part of a
+        // Only the hardpoints that can actually die. An indestructible one can never be part of a
         // death, so counting its health would put a floor under the bar that nothing could remove.
         var destructible = hardpoints.Where(h => h.IsDestroyable).ToList();
 
@@ -613,7 +665,7 @@ public sealed class PreviewSceneBuilder(
             var at = symbols.FirstOrDefault()?.VariantBaseId;
 
             // Bounded by the object count: a mod can write a variant cycle, and the preview reports
-            // one rather than hanging on it.
+            // one rather than being attached to it.
             for (var hops = 0; !string.IsNullOrEmpty(at) && hops < 64; hops++)
             {
                 if (declared.Contains(at))
@@ -668,7 +720,13 @@ public sealed class PreviewSceneBuilder(
     }
 
     /// <summary>Resolves a list of projectile ids, skipping repeats.</summary>
-    private static List<PreviewProjectile> ProjectilesFor(
+    /// <remarks>
+    ///     Internal rather than private because <c>aet/getProjectile</c> resolves one on demand for
+    ///     the attacker panel, which offers the whole tree and not just what this subject fires. The
+    ///     twenty-odd tags below are the definition of what a projectile IS to the preview, and a
+    ///     second reader of them would be free to drift.
+    /// </remarks>
+    internal static List<PreviewProjectile> ProjectilesFor(
         EffectiveObjectResolver resolver,
         IEnumerable<string> ids,
         List<PreviewProblem> problems)
@@ -681,8 +739,8 @@ public sealed class PreviewSceneBuilder(
             var effective = resolver.Resolve(id);
             if (!effective.Found)
             {
-                problems.Add(new PreviewProblem("warning",
-                    $"Projectile '{id}' is fired by this object but is not defined anywhere."));
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewProjectileNotDefined, "warning",
+                    $"Projectile '{id}' is not defined in this project."));
                 continue;
             }
 
@@ -751,9 +809,9 @@ public sealed class PreviewSceneBuilder(
             if (map.ForType(type) is { } states)
                 byType[type] = states;
             else
-                problems.Add(new PreviewProblem("info",
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoReticleForType, "info",
                     $"GameConstants maps no targeting reticle for hardpoint type '{type}', so the " +
-                    "game draws nothing over those mounts."));
+                    "game draws nothing over those hardpoints."));
 
         return new PreviewReticles(byType, new Dictionary<string, string>(),
             map.EnemyScreenSize, map.FriendlyScreenSize);
@@ -763,7 +821,7 @@ public sealed class PreviewSceneBuilder(
     ///     The wreckage this subject's hardpoints shed, one entry per DISTINCT prop.
     /// </summary>
     /// <remarks>
-    ///     Mirrored mounts share a prop - the Star Destroyer's four weapon batteries pair up - so this
+    ///     Mirrored hardpoints share a prop - the Star Destroyer's four weapon batteries pair up - so this
     ///     is deduplicated rather than emitted per hardpoint, which would have the client instantiate
     ///     the same wreck twice.
     /// </remarks>
@@ -784,15 +842,15 @@ public sealed class PreviewSceneBuilder(
             var effective = resolver.Resolve(id);
             if (!effective.Found)
             {
-                problems.Add(new PreviewProblem("warning",
-                    $"Hardpoint breakoff prop '{id}' is named but not defined anywhere, so the " +
-                    "mount will vanish instead of breaking off."));
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewBreakoffPropNotDefined, "warning",
+                    $"Breakoff prop '{id}' is not defined in this project, so the hardpoint will " +
+                    "vanish instead of breaking off."));
                 props.Add(new PreviewBreakoffProp(id, null, false, null, null, null, null, null,
                     null, false));
                 continue;
             }
 
-            // A breakoff prop is space debris; a ground mount names none, so the land tag is not
+            // A breakoff prop is space debris; a ground hardpoint names none, so the land tag is not
             // consulted here.
             var model = Tag(effective, "Space_Model_Name");
 
@@ -858,13 +916,37 @@ public sealed class PreviewSceneBuilder(
         if (stem.Length == 0)
             return [];
 
+        var index = indexService.Current;
+
+        // Every OTHER model whose name also starts this one's - the variants that would otherwise
+        // have their clips taken. `Rv_gargantuan_dc` beside `Rv_gargantuan` is the shipped case.
+        var longer = index.ModelBones.Keys
+            .Select(Path.GetFileNameWithoutExtension)
+            .Where(other => other is not null
+                            && other.Length > stem.Length
+                            && other.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase))
+            .Select(other => other! + "_")
+            .ToList();
+
         return
         [
-            .. indexService.Current.AssetFiles
+            .. index.AssetFiles
                 .GetByExtension(".ala")
                 .Select(Path.GetFileName)
                 .Where(name => name is not null
-                    && name.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase))
+                    && name.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase)
+                    // The LONGEST model name that prefixes a clip owns it, which is the rule
+                    // `BuildForAnimation` already uses coming the other way. Without it a hull
+                    // collects its own death clone's clips - `rv_gargantuan_` prefixes
+                    // `rv_gargantuan_dc_die_00` - and since a clip binds by INDEX and carries
+                    // VISIBILITY tracks, the clone's clip switched off whichever hull bones sat at
+                    // the indices its own skeleton hides. Two of the Gargantuan's turrets were
+                    // mounted on those bones and went with them.
+                    //
+                    // Harmless only while the strict name check dropped such a clip downstream.
+                    // Relaxing that check to bind by index is what made this reachable.
+                    && !longer.Any(other =>
+                        name.StartsWith(other, StringComparison.OrdinalIgnoreCase)))
                 .Select(name => name!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Order(StringComparer.OrdinalIgnoreCase)
@@ -897,7 +979,7 @@ public sealed class PreviewSceneBuilder(
     ///     A passive subject - a death clone, a piece of wreckage - reads its own model through here
     ///     with NO owning hardpoints. The gate joins a proxy to the hardpoint whose
     ///     <c>Damage_Particles</c> bone is its parent, and that is a fact about the SUBJECT's
-    ///     skeleton; a clone has its own, so nothing on it may be claimed by a mount of the ship it
+    ///     skeleton; a clone has its own, so nothing on it may be claimed by a hardpoint of the ship it
     ///     replaces. Everything it carries plays whenever it is on screen, which is what the death
     ///     of a ship is.
     /// </remarks>
@@ -920,7 +1002,7 @@ public sealed class PreviewSceneBuilder(
         catch (AloFormatException e)
         {
             // The geometry request will fail the same way and say so; this only costs the effects.
-            problems.Add(new PreviewProblem("warning",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewModelUnreadable, "warning",
                 $"'{modelRef}' could not be read for its particle effects: {e.Message}"));
             return [];
         }
@@ -930,10 +1012,20 @@ public sealed class PreviewSceneBuilder(
     ///     The model whose animations this object actually plays, or null when it uses its own.
     /// </summary>
     /// <remarks>
-    ///     The override borrows another model's animation set, which the engine can only do because
-    ///     the skeletons match - true of every one of the 20 shipped land overrides. A mismatch is
-    ///     therefore a real authoring error and is reported: the game would play the wrong bones, and
-    ///     nothing else in the toolchain checks it.
+    ///     <para>
+    ///         The override borrows another model's animation set. This used to insist the two
+    ///         skeletons be IDENTICAL and report a difference as a warning, on the reasoning that the
+    ///         engine could not otherwise bind the tracks. The user reported that the message fires
+    ///         all over the BASE GAME, on units that animate correctly in the engine - so the rule
+    ///         was simply wrong, and the clips are loaded and bound by index either way.
+    ///     </para>
+    ///     <para>
+    ///         It is still reported, as INFORMATION rather than a warning: where the two skeletons
+    ///         disagree about what a bone is called, the clip drives whatever sits at that index, and
+    ///         a reader watching a model move oddly deserves to know that is possible. What the exact
+    ///         engine rule is - the user's guess is that the animated bones need only share a tree -
+    ///         is not settled, and nothing here claims it is.
+    ///     </para>
     /// </remarks>
     private string? ResolveAnimationOverride(
         EffectiveObject effective, string? hull, List<PreviewProblem> problems)
@@ -955,10 +1047,11 @@ public sealed class PreviewSceneBuilder(
         // Only compare when both are catalogued; an unknown model is already reported elsewhere.
         if (!hullBones.IsDefaultOrEmpty && !overrideBones.IsDefaultOrEmpty
             && !hullBones.SequenceEqual(overrideBones, StringComparer.OrdinalIgnoreCase))
-            problems.Add(new PreviewProblem("warning",
-                $"'{effective.ObjectId}' takes its animations from '{override_}', but that model's "
-                + $"skeleton differs from '{hull}' ({overrideBones.Length} bones against "
-                + $"{hullBones.Length}). The override only works on an identical skeleton."));
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewAnimationSkeletonMismatch, "info",
+                $"'{effective.ObjectId}' takes its animations from '{override_}', whose skeleton "
+                + $"differs from '{hull}' ({overrideBones.Length} bones against "
+                + $"{hullBones.Length}). The clips play, bound by bone index - where the two "
+                + "skeletons disagree, a clip drives whatever bone sits at that index."));
 
         return override_;
     }
@@ -984,8 +1077,8 @@ public sealed class PreviewSceneBuilder(
         var effective = resolver.Resolve(hardpointId);
         if (!effective.Found)
         {
-            problems.Add(new PreviewProblem("warning",
-                $"Hardpoint '{hardpointId}' is mounted but not defined anywhere.", hardpointId));
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointNotDefined, "warning",
+                $"Hardpoint '{hardpointId}' is mounted but not defined in this project.", hardpointId));
             return;
         }
 
@@ -1004,20 +1097,38 @@ public sealed class PreviewSceneBuilder(
                 PreviewPartOrigin.Hardpoint, hardpointId, resolved));
 
             if (!resolved)
-                problems.Add(new PreviewProblem("warning",
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointModelNotFound, "warning",
                     $"Hardpoint '{hardpointId}' attaches model '{model}', which was not found.",
                     hardpointId));
         }
 
+        var isTargetable = EngineBoolean.IsTrue(Tag(effective, "Is_Targetable"));
+
+        // A hardpoint with no attachment bone goes to the SCREEN root, not to the object's root -
+        // told by the user, not measured here. That is bad placement for a hardpoint nobody shoots
+        // at, and fatal for one they do: it cannot be hit, and a unit dies only once every
+        // targetable hardpoint is destroyed, so the whole unit becomes indestructible.
+        //
+        // Two findings rather than one, because they differ in what the author has to do about
+        // them and in what suppressing them would cost.
         if (string.IsNullOrEmpty(attachBone))
-            problems.Add(new PreviewProblem("warning",
-                $"Hardpoint '{hardpointId}' names no {AttachmentBoneTag}, so it sits at the hull's origin.",
-                hardpointId));
+            problems.Add(isTargetable
+                ? new PreviewProblem(DiagnosticIds.PreviewTargetableHardpointNoBone, "error",
+                    $"Hardpoint '{hardpointId}' is targetable but names no {AttachmentBoneTag}, so "
+                    + "the engine attaches it to the screen root. It can never be hit, and the unit "
+                    + "can never be destroyed.",
+                    hardpointId)
+                : new PreviewProblem(DiagnosticIds.PreviewHardpointNoBone, "warning",
+                    $"Hardpoint '{hardpointId}' names no {AttachmentBoneTag}, so the engine "
+                    + "attaches it to the screen root rather than to the model.",
+                    hardpointId));
         else if (hull is not null &&
                  !HardpointBoneModelResolver.ModelHasBone(indexService.Current, hull, attachBone))
-            problems.Add(new PreviewProblem("warning",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointBoneMissing, "warning",
                 $"Hardpoint '{hardpointId}' attaches to bone '{attachBone}', which model '{hull}' " +
                 "does not have.", hardpointId));
+
+        var tooltipKey = Tag(effective, "Tooltip_Text");
 
         hardpoints.Add(new PreviewHardpoint(
             hardpointId,
@@ -1025,7 +1136,7 @@ public sealed class PreviewSceneBuilder(
             Tag(effective, "Type"),
             attachBone,
             EngineBoolean.IsTrue(Tag(effective, "Is_Destroyable")),
-            EngineBoolean.IsTrue(Tag(effective, "Is_Targetable")),
+            isTargetable,
             Number(effective, "Health"),
             Tag(effective, "Damage_Particles"),
             Tag(effective, "Damage_Decal"),
@@ -1034,7 +1145,13 @@ public sealed class PreviewSceneBuilder(
             Tag(effective, "Death_Explosion_Particles"),
             Tag(effective, "Death_Breakoff_Prop"),
             EngineBoolean.IsTrueUnlessDenied(Tag(effective, "Engine_Death_Hide_Engine_Particles")),
-            Tag(effective, "Tooltip_Text"),
+            tooltipKey,
+            // Resolved here rather than left to the client, which has no text index at all. The
+            // localisation index matches case-insensitively, and the shipped files are not
+            // consistent about the case they write - so the preview must not be stricter.
+            tooltipKey is null
+                ? null
+                : indexService.Current.Localisation.GetValue(tooltipKey),
             Turret(effective)));
 
         if (Weapon(effective, hardpointId) is { } weapon)
@@ -1077,21 +1194,21 @@ public sealed class PreviewSceneBuilder(
             return null;
 
         var turret = UnitTurret(effective);
-        var bones = MuzzleBank(hull, turret);
+        var bones = MuzzleBones(hull, turret);
 
         if (bones.Count == 0)
         {
-            problems.Add(new PreviewProblem("warning",
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewNoMuzzleBones, "warning",
                 $"'{effective.ObjectId}' has a WEAPON behaviour but its model declares no " +
-                "MuzzleA bones, so the engine has no fire point to put a projectile at."));
+                "MuzzleA bones, so the engine has no muzzle to fire from."));
             return null;
         }
 
         return new PreviewWeapon(
-            "bank:A",
+            "weapon:A",
             PreviewWeaponSource.Unit,
             null,
-            "Muzzle bank A",
+            "Muzzle A",
             bones,
             // Randomize_Between_Fire_Bones is a HardPoint parameter and is not on GameObjectType at
             // all, so this case has no other branch.
@@ -1153,7 +1270,7 @@ public sealed class PreviewSceneBuilder(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         The A bank only. <c>MuzzleB</c> is a naming convention rather than something the engine
+    ///         The A bones only. <c>MuzzleB</c> is a naming convention rather than something the engine
     ///         consumes for this case, and <c>MuzzleC</c> is a single bone on <c>Rv_bwing.alo</c> in
     ///         the whole corpus.
     ///     </para>
@@ -1165,7 +1282,7 @@ public sealed class PreviewSceneBuilder(
     ///         conventions overlap on exactly that unit.
     ///     </para>
     /// </remarks>
-    private IReadOnlyList<string> MuzzleBank(string? hull, PreviewTurret? turret)
+    private IReadOnlyList<string> MuzzleBones(string? hull, PreviewTurret? turret)
     {
         if (string.IsNullOrEmpty(hull) ||
             !indexService.Current.ModelBones.TryGetValue(ModelBoneKey.From(hull), out var names))
@@ -1195,6 +1312,90 @@ public sealed class PreviewSceneBuilder(
                    CultureInfo.InvariantCulture, out var number)
             ? number
             : int.MaxValue;
+    }
+
+    /// <summary>
+    ///     The damage stages an object declares, ascending and unique.
+    /// </summary>
+    /// <remarks>
+    ///     Non-numeric entries are dropped rather than reported. This column sits beside
+    ///     <c>Land_Damage_SFX</c>, which uses the literal <c>null</c> as its "no sound" placeholder.
+    ///     What the preview needs from THIS column is which stages exist.
+    ///     <para>
+    ///         The looseness is in the SFX column alone, and worth stating precisely because it used
+    ///         to read as a reason to distrust the whole table: measured over foc with XML comments
+    ///         stripped, 42 objects declare an SFX count that disagrees with their alternates - but
+    ///         <c>Land_Damage_Thresholds</c> disagrees in ZERO of the 219. The threshold pairing is
+    ///         sound, which is what lets <see cref="DamageTable" /> rely on it.
+    ///     </para>
+    /// </remarks>
+    private static IReadOnlyList<int> DamageStages(EffectiveObject effective)
+    {
+        var raw = Tag(effective, "Land_Damage_Alternates");
+        if (string.IsNullOrWhiteSpace(raw))
+            return [];
+
+        var stages = new SortedSet<int>();
+        foreach (var token in raw.Split(
+                     ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if (int.TryParse(token, out var stage) && stage >= 0)
+                stages.Add(stage);
+
+        return [.. stages];
+    }
+
+    /// <summary>
+    ///     The damage table as ordered bands, or empty when the object declares none usable.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The pairing is POSITIONAL, so this keeps the written order and does not sort or
+    ///         de-duplicate anything - a stage may legitimately appear in more than one band.
+    ///     </para>
+    ///     <para>
+    ///         Empty rather than salvaged when the two columns disagree in length. Inventing an
+    ///         alignment would put the wrong mesh on screen at the wrong health, which is worse than
+    ///         leaving the reader the manual slider. Measured over foc with XML comments stripped:
+    ///         219 objects declare the table and the two columns NEVER disagree, so this guard is an
+    ///         invariant being held rather than a case being handled. (The "42 objects declare
+    ///         counts that do not match" beside <see cref="DamageStages" /> is about
+    ///         <c>Land_Damage_SFX</c>, a different column.)
+    ///     </para>
+    /// </remarks>
+    private static IReadOnlyList<PreviewDamageBand> DamageTable(EffectiveObject effective)
+    {
+        var stages = Numbers<int>(Tag(effective, "Land_Damage_Alternates"), int.TryParse);
+        var thresholds = Numbers<float>(Tag(effective, "Land_Damage_Thresholds"), float.TryParse);
+
+        if (stages.Count == 0 || stages.Count != thresholds.Count)
+            return [];
+
+        return [.. stages.Select((stage, at) => new PreviewDamageBand(thresholds[at], stage))];
+    }
+
+    private delegate bool ParseNumber<T>(string written, out T value);
+
+    /// <summary>
+    ///     Every entry of a comma-separated list that parses, in written order.
+    /// </summary>
+    /// <remarks>
+    ///     A non-numeric entry is DROPPED rather than skipped-with-a-hole, which is the same rule
+    ///     <see cref="DamageStages" /> uses. It also means a table carrying one is caught by the
+    ///     length check above and discarded whole, which is the safe direction for a positional
+    ///     pairing.
+    /// </remarks>
+    private static List<T> Numbers<T>(string? raw, ParseNumber<T> parse)
+    {
+        var found = new List<T>();
+        if (string.IsNullOrWhiteSpace(raw))
+            return found;
+
+        foreach (var token in raw.Split(
+                     ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if (parse(token, out var value))
+                found.Add(value);
+
+        return found;
     }
 
     /// <summary>The first entry of a comma-separated list, or null when there is none.</summary>
@@ -1284,7 +1485,7 @@ public sealed class PreviewSceneBuilder(
         return rows;
     }
 
-    /// <summary>The <c>Fire_When_*</c> gates this mount sets.</summary>
+    /// <summary>The <c>Fire_When_*</c> gates this hardpoint sets.</summary>
     private static IReadOnlyList<string> FireModes(EffectiveObject effective)
     {
         return FireModeTags
@@ -1390,6 +1591,62 @@ public sealed class PreviewSceneBuilder(
             .Where(token => token.Length > 0)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+    }
+
+    /// <summary>
+    ///     How the subject comes apart when it declares no death clone, or null where it does not.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Read off the TAG, not the locomotor. The 34 shipped objects that declare it are not
+    ///         only fighters - they include a <c>GroundVehicle</c> and a <c>LandBombingUnit</c> - and
+    ///         no shipped object declares it without meaning it, so the tag is the whole condition.
+    ///     </para>
+    ///     <para>
+    ///         The four numbers all come out of the file. Only the corkscrew itself is invented, and
+    ///         that is the client's business - nothing in any file describes it.
+    ///     </para>
+    /// </remarks>
+    private static PreviewSpinAway? SpinAway(EffectiveObject effective)
+    {
+        if (!IsYes(Tag(effective, "Spin_Away_On_Death")))
+            return null;
+
+        return new PreviewSpinAway(
+            // 2.0 where the file is silent: 31 of the 34 write exactly that, so it is the corpus's
+            // own answer rather than a number picked to fill a gap.
+            Float(Tag(effective, "Spin_Away_On_Death_Time")) ?? 2.0f,
+            Float(Tag(effective, "Spin_Away_On_Death_Chance")) ?? 0f,
+            Tag(effective, "Spin_Away_On_Death_Explosion"),
+            Float(Tag(effective, "Max_Speed")) ?? 0f);
+    }
+
+    /// <summary>A boolean as the files write it. 34 of 34 spell this one <c>Yes</c>.</summary>
+    private static bool IsYes(string? value)
+    {
+        return value is not null
+            && (value.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                || value.Equals("1", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    ///     A float as the files write it, <c>f</c> suffix and all.
+    /// </summary>
+    /// <remarks>
+    ///     The suffix is not a curiosity: 31 shipped objects write <c>2.0f</c> and 3 write
+    ///     <c>1.0f</c>, so a plain parse drops every spin time in the game to its default. Invariant
+    ///     culture, because the files are written with a point whatever the reader's locale is.
+    /// </remarks>
+    private static float? Float(string? value)
+    {
+        var text = value?.Trim().TrimEnd('f', 'F');
+
+        return string.IsNullOrEmpty(text)
+            ? null
+            : float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var parsed)
+                ? parsed
+                : null;
     }
 
     private static string? Tag(EffectiveObject effective, string tagName)

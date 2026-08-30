@@ -87,7 +87,7 @@ public sealed class PreviewSceneParticleTest
 
         var claimed = scene.Particles.Where(p => p.HardpointId == "HP_SD_Weapon_FL").ToList();
 
-        // Two proxies hang under each EmitDamage bone; only the one hardpoint is declared here.
+        // Two proxies are attached to each EmitDamage bone; only the one hardpoint is declared here.
         Assert.Equal(2, claimed.Count);
         Assert.All(claimed, p => Assert.Equal("p_hp_imperial_damage", p.SystemRef));
         Assert.All(claimed, p => Assert.Equal(PreviewParticleGate.HardpointDestroyed, p.Gate));

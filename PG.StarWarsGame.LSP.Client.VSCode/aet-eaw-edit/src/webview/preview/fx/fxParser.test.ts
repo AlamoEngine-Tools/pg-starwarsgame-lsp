@@ -377,4 +377,33 @@ technique t0 { pass p { VertexShader = NULL; PixelShader = NULL; } }
         assert.equal(pass.vertexShader, undefined);
         assert.equal(pass.pixelShader, undefined);
     });
+
+    // A fixed-function pass says what it draws with through INDEXED texture-stage state, and the
+    // state reader only ever matched bare identifiers - so `ColorOp[0]` matched nothing at all and
+    // every stage op was dropped on the floor. That is what left MODULATE2X unimplemented.
+    it('records an indexed texture-stage state', () => {
+        const pass = parseFxManifest(`
+technique t0 { pass p {
+    ColorOp[0]=MODULATE2X;
+    ColorArg1[0]=TEXTURE;
+    AlphaOp[0]=MODULATE;
+    ColorOp[1]=DISABLE;
+} }
+`).techniques[0].passes[0];
+
+        assert.equal(pass.states['colorop[0]'], 'MODULATE2X');
+        assert.equal(pass.states['colorarg1[0]'], 'TEXTURE');
+        assert.equal(pass.states['alphaop[0]'], 'MODULATE');
+        assert.equal(pass.states['colorop[1]'], 'DISABLE');
+    });
+
+    it('keeps reading unindexed state beside the indexed kind', () => {
+        const pass = parseFxManifest(`
+technique t0 { pass p { ZWriteEnable=false; ColorOp[0]=MODULATE2X; CullMode=NONE; } }
+`).techniques[0].passes[0];
+
+        assert.equal(pass.states.zwriteenable, 'false');
+        assert.equal(pass.states.cullmode, 'NONE');
+        assert.equal(pass.states['colorop[0]'], 'MODULATE2X');
+    });
 });

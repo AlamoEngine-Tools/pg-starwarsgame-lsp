@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -90,7 +91,7 @@ public static class PreviewAbilityText
             // marker, so the row does too - and unlike the ambiguous case below, this one IS the
             // author's to fix, so it is reported rather than passed over in silence.
             case AbilityIconOutcome.DeclaredButMissing:
-                problems.Add(new PreviewProblem("warning",
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewAbilityIconNotFound, "warning",
                     $"Ability {ability.Type} names icon '{alternateIconName}', which is not in this "
                     + "project's mega texture or icon sources. The game will draw missing art."));
                 return DataUri(FallbackIcon.Png);

@@ -52,7 +52,7 @@ describe('partHidden', () => {
         assert.equal(partHidden('hp:HP_Weapon', [hardpoint()], new Set(['HP_Weapon'])), true);
     });
 
-    it('leaves an intact hardpoint mounted', () => {
+    it('leaves an intact hardpoint attached', () => {
         assert.equal(partHidden('hp:HP_Weapon', [hardpoint()], new Set()), false);
     });
 
@@ -100,7 +100,7 @@ describe('effectPlays', () => {
 describe('decalNames', () => {
     it('names the blast decal of every destroyed hardpoint', () => {
         // Damage_Decal names a mesh that shares its bone's name, and the file ships it VISIBLE - the
-        // game hides it until the mount is blown off, so the preview has to do the same.
+        // game hides it until the hardpoint is blown off, so the preview has to do the same.
         const names = decalNames([hardpoint()], new Set(['HP_Weapon']));
 
         assert.deepEqual([...names], ['hp_f-l_blast']);
@@ -204,9 +204,9 @@ describe('collisionMeshNames', () => {
         assert.deepEqual([...names].sort(), ['hp_f-l_coll', 'hp_m-c_coll']);
     });
 
-    it('does not care whether the mount is intact', () => {
+    it('does not care whether the hardpoint is intact', () => {
         // Unlike a decal. A collision hull is never drawn in either state - the engine consumes it
-        // for hit testing and nothing else - so destroying the mount must not reveal it.
+        // for hit testing and nothing else - so destroying the hardpoint must not reveal it.
         const intact = collisionMeshNames([hardpoint({ collisionMeshBone: 'HP_F-L_Coll' })]);
 
         assert.equal(intact.has('hp_f-l_coll'), true);
@@ -217,11 +217,11 @@ describe('collisionMeshNames', () => {
         assert.equal(collisionMeshNames([hardpoint({ collisionMeshBone: '' })]).size, 0);
     });
 
-    it('leaves out a name that is really the mount ATTACH bone', () => {
+    it('leaves out a name that is really the hardpoint ATTACH bone', () => {
         // MEASURED on the eaw Star Destroyer: the tractor beam and the fighter bay both give
         // `Collision_Mesh` the same value as `Attachment_Bone` - `HP_trac_bone` and `SPAWN_00`.
-        // Hiding those would prune the whole subtree hanging off the attach point, which is the
-        // mount itself, so a hardpoint that names its own attach bone is left alone.
+        // Hiding those would prune the whole subtree attached to the attach point, which is the
+        // hardpoint itself, so a hardpoint that names its own attach bone is left alone.
         const names = collisionMeshNames([
             hardpoint({ id: 'HP_Trac', attachBone: 'HP_trac_bone', collisionMeshBone: 'HP_trac_bone' }),
             hardpoint({ id: 'HP_Bay', attachBone: 'SPAWN_00', collisionMeshBone: 'spawn_00' }),
@@ -245,9 +245,9 @@ describe('hardpointGateAllows', () => {
         assert.equal(hardpointGateAllows(gated({ startsVisible: true }), new Set()), true);
     });
 
-    it('still refuses an effect whose mount is the wrong side of its gate', () => {
+    it('still refuses an effect whose hardpoint is the wrong side of its gate', () => {
         // The damage question is a different one from the default question, and it still applies:
-        // smoke that belongs to a destroyed mount must not appear because an ability is on.
+        // smoke that belongs to a destroyed hardpoint must not appear because an ability is on.
         const onDeath = gated({
             gate: PREVIEW_PARTICLE_GATE.hardpointDestroyed, hardpointId: 'HP_Gun',
         });
@@ -256,7 +256,7 @@ describe('hardpointGateAllows', () => {
         assert.equal(hardpointGateAllows(onDeath, new Set(['HP_Gun'])), true);
     });
 
-    it('still refuses an alive-gated effect once its mount is gone', () => {
+    it('still refuses an alive-gated effect once its hardpoint is gone', () => {
         const whileAlive = gated({
             gate: PREVIEW_PARTICLE_GATE.hardpointAlive, hardpointId: 'HP_Gun',
         });

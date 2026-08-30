@@ -229,9 +229,13 @@ function parsePass(name: string, body: string): FxPass {
         }
     }
 
+    // The optional `[n]` is the TEXTURE STAGE. A fixed-function pass says what it draws with
+    // entirely through indexed state - `ColorOp[0]=MODULATE2X;` - and a key pattern of bare
+    // identifiers matched none of it, so every stage op was silently dropped.
     for (const match of body.matchAll(
-        /\b([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\(?\s*([A-Za-z0-9_.]+)\s*\)?\s*;/g)) {
-        const key = match[1].toLowerCase();
+        /\b([A-Za-z_][A-Za-z0-9_]*(?:\s*\[\s*\d+\s*\])?)\s*=\s*\(?\s*([A-Za-z0-9_.]+)\s*\)?\s*;/g)) {
+        // Whitespace inside the brackets is stripped so one written form is one key.
+        const key = match[1].toLowerCase().replace(/\s+/g, '');
 
         // The shader assignments are read above. A bare `VertexShader = NULL;` matches this pattern
         // too, and letting it through would file a shader name where a blend factor belongs.

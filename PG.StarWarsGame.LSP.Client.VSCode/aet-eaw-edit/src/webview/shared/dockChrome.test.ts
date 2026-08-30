@@ -60,6 +60,48 @@ describe('dockChromeCss', () => {
     });
 
     /**
+     * The heading and its count were 0.65 and 0.75 opacity, MULTIPLIED - and over
+     * `descriptionForeground`, which carries alpha of its own in the shipped themes. Measured in
+     * the harness the count landed at 2.53:1 against the dock, which is what the reader saw as
+     * "nigh invisible with a default visual studio dark skin".
+     *
+     * The muted COLOUR is what makes a heading a heading here; it is uppercase, 11px and 600 as
+     * well. The opacity on top of that only made it unreadable.
+     */
+    it('does not stack opacity on a section heading', () => {
+        const title = dockChromeCss.match(/\.dock-section-title\s*\{[^}]*\}/)?.[0] ?? '';
+
+        // `assert.notMatch` does not survive the test bundle's interop shim, though `match` does.
+        assert.equal(/opacity/.test(title), false, title);
+        assert.match(title, /color:\s*var\(--vscode-descriptionForeground/);
+    });
+
+    /**
+     * A count is a VALUE - the one thing in the heading someone reads a number off - so it gets the
+     * ordinary foreground rather than the heading's muted one.
+     */
+    it('gives a section count a readable colour of its own', () => {
+        assert.match(dockChromeCss,
+            /\.dock-section-title \.section-count\s*\{[^}]*color:\s*var\(--vscode-foreground/);
+        const count =
+            dockChromeCss.match(/\.dock-section-title \.section-count\s*\{[^}]*\}/)?.[0] ?? '';
+
+        assert.equal(/opacity/.test(count), false, count);
+    });
+
+    /**
+     * TWO elements each carrying `margin-left: auto` split the free space between them, so the
+     * count shifted 88 pixels left the moment a selection chip appeared beside it. One auto margin,
+     * on a wrapper, and everything inside packs against the edge in a fixed order.
+     */
+    it('gives the end of a section heading ONE auto margin', () => {
+        assert.match(dockChromeCss,
+            /\.dock-section-title \.title-end\s*\{[^}]*margin-left:\s*auto/);
+        assert.match(dockChromeCss,
+            /\.dock-section-title \.title-end \.section-count\s*\{[^}]*margin-left:\s*0/);
+    });
+
+    /**
      * `.field-note` was in the markup of six settings with no rule anywhere for it, so every
      * explanatory sentence rendered at full body weight and drowned the control it described.
      */

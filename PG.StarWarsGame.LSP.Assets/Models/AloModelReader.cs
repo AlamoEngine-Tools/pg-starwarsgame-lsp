@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Numerics;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using static PG.StarWarsGame.LSP.Assets.Models.AloChunkStream;
 
 namespace PG.StarWarsGame.LSP.Assets.Models;
@@ -695,26 +696,14 @@ public static class AloModelReader
     ///     Recovers the <c>_ALT&lt;n&gt;</c> and <c>_LOD&lt;n&gt;</c> levels encoded in a mesh or proxy
     ///     name. A suffix with no digits after it counts as absent, matching the engine.
     /// </summary>
+    /// <remarks>
+    ///     The rule itself lives in <see cref="ModelLevelTag" />: the preview's particle endpoint and
+    ///     the damage-stage checks read the same tags off names that never pass through this reader,
+    ///     and a second copy of it here would be free to drift from them.
+    /// </remarks>
     private static (int? Alt, int? Lod) ParseAltLod(string name)
     {
-        return (LevelAfter(name, "_ALT"), LevelAfter(name, "_LOD"));
-    }
-
-    private static int? LevelAfter(string name, string marker)
-    {
-        var at = name.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
-        if (at < 0)
-            return null;
-
-        var start = at + marker.Length;
-        var end = start;
-        while (end < name.Length && char.IsAsciiDigit(name[end]))
-            end++;
-
-        if (end == start)
-            return null;
-
-        return int.TryParse(name.AsSpan(start, end - start), out var value) ? Math.Max(0, value) : null;
+        return (ModelLevelTag.AltOf(name), ModelLevelTag.LodOf(name));
     }
 
     private static Vector2 ReadVector2(byte[] bytes, int offset)

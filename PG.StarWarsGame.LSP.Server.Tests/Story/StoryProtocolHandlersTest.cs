@@ -11,6 +11,7 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Story;
+using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -430,8 +431,8 @@ public sealed class StoryProtocolHandlersTest
     private static ResolveStoryReferenceHandler ResolveHandler(
         FiringIndexService index, bool storyEditor = true)
     {
-        return new ResolveStoryReferenceHandler(index, new ProtocolSchemaProvider(),
-            Config(storyEditor));
+        return new ResolveStoryReferenceHandler(
+            new DefinitionLocator(index, new ProtocolSchemaProvider()), Config(storyEditor));
     }
 
     [Fact]

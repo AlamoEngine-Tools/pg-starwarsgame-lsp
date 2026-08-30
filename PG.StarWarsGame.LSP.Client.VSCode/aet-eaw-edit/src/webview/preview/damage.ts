@@ -4,7 +4,7 @@
 // What a destroyed hardpoint looks like.
 //
 // This is the part no standalone tool can do: AloViewer sees one .alo and knows nothing about the
-// XML, so it cannot say which smoke belongs to which mount. Every rule here is read off the
+// XML, so it cannot say which smoke belongs to which hardpoint. Every rule here is read off the
 // hardpoint's own tags, never guessed:
 //
 //   destroyed
@@ -19,7 +19,7 @@ import { PREVIEW_PARTICLE_GATE, type PreviewHardpoint } from '../../protocol/mod
 /** The ids of the hardpoints currently blown off. */
 export type Destroyed = ReadonlySet<string>;
 
-/** Whether a mounted part should be hidden, because the hardpoint holding it is gone. */
+/** Whether an attached part should be hidden, because the hardpoint holding it is gone. */
 export function partHidden(
     partId: string, hardpoints: readonly PreviewHardpoint[], destroyed: Destroyed,
 ): boolean {
@@ -58,13 +58,13 @@ export function effectPlays(particle: EffectGate, destroyed: Destroyed): boolean
 }
 
 /**
- * The DAMAGE half of the question alone: is the mount this effect belongs to on the right side of
+ * The DAMAGE half of the question alone: is the hardpoint this effect belongs to on the right side of
  * its gate?
  *
  * Without the `startsVisible` default, which is a different question. An ability proxy - and
  * `prs_at-aa_fx` on the real AT-AA is one - ships `startsVisible: false`, so reading that as a veto
  * meant no ability could ever light its own effect however many times its row was ticked. The
- * damage gate still applies either way: smoke that belongs to a destroyed mount must not appear
+ * damage gate still applies either way: smoke that belongs to a destroyed hardpoint must not appear
  * just because an ability is on.
  */
 export function hardpointGateAllows(particle: EffectGate, destroyed: Destroyed): boolean {
@@ -86,7 +86,7 @@ export function hardpointGateAllows(particle: EffectGate, destroyed: Destroyed):
  *
  * `Damage_Decal` names a mesh that shares its bone's name - measured on `Ev_stardestroyer.alo`,
  * where `HP_F-L_Blast` is both. The file ships those meshes VISIBLE, so the engine must hide them
- * until the mount is destroyed; the preview starts them hidden for the same reason.
+ * until the hardpoint is destroyed; the preview starts them hidden for the same reason.
  */
 export function decalNames(
     hardpoints: readonly PreviewHardpoint[], destroyed: Destroyed,
@@ -116,8 +116,8 @@ export function decalNames(
  * from a name.
  *
  * A hardpoint that gives `Collision_Mesh` the same value as its `Attachment_Bone` is skipped. Two of
- * the eaw Star Destroyer's mounts do exactly that - `HP_trac_bone` and `SPAWN_00` - and hiding an
- * attach bone would prune the whole subtree standing on it, which is the mount.
+ * the eaw Star Destroyer's hardpoints do exactly that - `HP_trac_bone` and `SPAWN_00` - and hiding an
+ * attach bone would prune the whole subtree standing on it, which is the hardpoint.
  */
 export function collisionMeshNames(
     hardpoints: readonly PreviewHardpoint[],
@@ -149,7 +149,7 @@ export function destroyable(hardpoints: readonly PreviewHardpoint[]): PreviewHar
 export interface OpeningEffect extends EffectGate {
     /** The particle system's name, e.g. `p_engine_glow_small`. */
     systemRef: string;
-    /** The bone it hangs off. */
+    /** The bone it is attached to. */
     bone: string;
     /** Damage state the proxy is tagged for, from its `_ALT<n>` suffix, or null when untagged. */
     alt?: number | null;
@@ -162,7 +162,7 @@ export interface OpeningEffect extends EffectGate {
  *
  * A bare `.alo` has no XML behind it, so no hardpoint gates its engines and every proxy arrives as
  * `Always`. The naming is a firm convention in the shipped data - proxies are `p_engine_*` and the
- * bones they hang off are `ENGINE*` - and it is the only signal left for the commonest case there
+ * bones they are attached to are `ENGINE*` - and it is the only signal left for the commonest case there
  * is, a fighter opened on its own.
  */
 const ENGINE_NAME = /engine/i;

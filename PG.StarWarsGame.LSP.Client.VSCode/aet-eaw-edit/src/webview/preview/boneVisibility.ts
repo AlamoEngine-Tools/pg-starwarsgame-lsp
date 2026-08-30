@@ -5,7 +5,7 @@
 //
 // An Alamo animation can switch a bone off per frame, and half the shipped corpus does: 662 of the
 // 1363 animations hide at least one bone, across 4052 bone tracks. 2285 of those tracks are particle
-// proxies, so the dominant use is TIMING AN EFFECT - the rancor's death explosion hangs off
+// proxies, so the dominant use is TIMING AN EFFECT - the rancor's death explosion is attached to
 // `P_ATST_Die`, which is hidden for all 61 frames of `attack_00` and visible for 35 of the 61 frames
 // of `die_00`. Ignore the track and every effect on the model fires from frame zero of every clip,
 // which is what the preview used to do.

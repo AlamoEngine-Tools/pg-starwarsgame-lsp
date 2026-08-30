@@ -9,7 +9,7 @@
 // testable without one.
 //
 // The Nebulon-B is the case that drove this: `pe_nebulonengines` is `EveryVertex` at 2 a second,
-// hung off an empty proxy bone whose parent carries the engine block. Read literally it is two
+// attached to an empty proxy bone whose parent carries the engine block. Read literally it is two
 // puffs a second at a point; read as the engine means it, it is the whole engine wash.
 
 import * as THREE from 'three';

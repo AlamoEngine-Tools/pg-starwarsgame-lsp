@@ -95,14 +95,30 @@ export interface RowFacts {
     ancestorHiddenAuthored?: string;
 }
 
+/**
+ * Which link of the chain settled a row.
+ *
+ * The typed half of `because`. It exists because the tree's eye has to know whether the decision was
+ * this row's own - the reader, the clip, the level, the file - or came from ABOVE it, since only the
+ * first kind is something the eye can change. Reading that out of `because` would mean parsing a
+ * string written for a person, which is the shape `boneIds.ts` records this project paying for three
+ * times.
+ */
+export type VisibilityLink =
+    'master' | 'ancestor' | 'you' | 'animation' | 'level' | 'idle' | 'file';
+
 /** Whether the row is drawn, and the rule that settled it. */
 export interface Resolution {
     visible: boolean;
 
+    /** Which link decided. */
+    decidedBy: VisibilityLink;
+
     /**
-     * Which link decided: `master:<id>`, `ancestor:<name>`, `you`, `animation`, `level` or `file`.
+     * The same answer for a person: `master:<id>`, `ancestor:<name>`, `you`, `animation`, `level`,
+     * `idle` or `file`.
      *
-     * Written for a person to read in a tooltip, not parsed anywhere.
+     * Written for a tooltip, never parsed - `decidedBy` is what code asks.
      */
     because: string;
 
@@ -140,33 +156,33 @@ function decide(
     // statement: "no effects at all" outranks "not this limb".
     for (const master of facts.masters) {
         if (!master.on) {
-            return { visible: false, because: `master:${master.id}` };
+            return { visible: false, decidedBy: 'master', because: `master:${master.id}` };
         }
     }
 
     if (facts.ancestorHidden !== undefined) {
-        return { visible: false, because: `ancestor:${facts.ancestorHidden}` };
+        return { visible: false, decidedBy: 'ancestor', because: `ancestor:${facts.ancestorHidden}` };
     }
 
     if (override !== undefined) {
-        return { visible: override === 'shown', because: 'you' };
+        return { visible: override === 'shown', decidedBy: 'you', because: 'you' };
     }
 
     if (facts.animated !== undefined) {
-        return { visible: facts.animated, because: 'animation' };
+        return { visible: facts.animated, decidedBy: 'animation', because: 'animation' };
     }
 
     if (facts.gated) {
-        return { visible: false, because: 'level' };
+        return { visible: false, decidedBy: 'level', because: 'level' };
     }
 
     // Below the level gate on purpose: a mesh tagged for another damage or detail state is not part
     // of this one whatever the idle clip has to say about it.
     if (facts.resting !== undefined) {
-        return { visible: facts.resting, because: 'idle' };
+        return { visible: facts.resting, decidedBy: 'idle', because: 'idle' };
     }
 
-    return { visible: facts.inFile, because: 'file' };
+    return { visible: facts.inFile, decidedBy: 'file', because: 'file' };
 }
 
 /**
@@ -219,11 +235,11 @@ export interface OverrideChange {
  * off and is exactly the row worth ticking, so clearing it would leave it invisible.
  */
 export function toggleRow(
-    rowId: string, descendantIds: readonly string[], effective: boolean,
+    rowId: string, descendantIds: readonly string[], effective: boolean, authored: boolean,
 ): OverrideChange[] {
     // From what the reader can SEE, never from a stored flag. The old tree computed the next state
     // from a value it was not the one writing, which is why the tick stuck.
-    return setRow(rowId, descendantIds, !effective);
+    return setRow(rowId, descendantIds, !effective, authored);
 }
 
 /**
@@ -240,15 +256,28 @@ export function toggleRow(
  * while Show hid them.
  */
 export function setRow(
-    rowId: string, descendantIds: readonly string[], visible: boolean,
+    rowId: string, descendantIds: readonly string[], visible: boolean, authored: boolean,
 ): OverrideChange[] {
-    const override: RowOverride = visible ? 'shown' : 'hidden';
+    // Stored only where it DISAGREES with the model - `authored` is what this row would do if the
+    // reader had never touched it. Asking for what the model already does is not a statement, it is
+    // the absence of one, and writing it down anyway is what made a tick permanent: an override
+    // outranks the animation, the level and the file for good, so one tick on an ability's effect
+    // row broke that ability's switch until the whole model was reset.
+    //
+    // This is the way BACK, and it is what gives the tree's eye its third state - see `rowEye`. It
+    // takes nothing away: a shadow volume is gated off, so asking for it genuinely disagrees and is
+    // stored, which is the row worth ticking in the first place.
+    const override: RowOverride | null =
+        visible === authored ? null : visible ? 'shown' : 'hidden';
 
     return [
         { row: rowId, override },
+        // The subtree is unchanged: hiding an arm hides the hand explicitly, and showing it clears
+        // them so each child goes back to whatever the chain says. Only the CLICKED row is the
+        // reader making a statement about one thing.
         ...descendantIds.map(row => ({
             row,
-            override: override === 'hidden' ? 'hidden' as const : null,
+            override: visible ? null : 'hidden' as const,
         })),
     ];
 }
@@ -285,11 +314,17 @@ export function becauseText(because: string): string {
         return `Hidden with ${because.slice('ancestor:'.length)}, above it`;
     }
 
+    // One clause each. These are read standing over a row in a tree that can be a hundred deep,
+    // so anything that needs a second sentence is not going to be read at all - "Set by hand.
+    // Reset puts it back" spent half its length advertising a button that is already on screen.
+    // `idle` is NOT the rest pose. The rest pose is the model with nothing driving the skeleton;
+    // this is the model's own idle clip running and its visibility track deciding the row, which is
+    // why it reads as a sibling of `animation` rather than as a pose.
     switch (because) {
-        case 'you': return 'Set by hand. Reset puts it back';
-        case 'idle': return 'As the model s idle animation leaves it - how it stands at rest';
+        case 'you': return 'Set by hand';
+        case 'idle': return 'Set by the idle animation';
         case 'animation': return 'Set by the animation playing';
-        case 'level': return 'Not part of the current damage or detail level';
+        case 'level': return 'Not in this damage or detail level';
         default: return 'As the model draws it';
     }
 }
@@ -306,7 +341,7 @@ export function becauseText(because: string): string {
  *
  * The AT-AT is the case that proved it. Its particle proxies are bones named after the effect they
  * carry, each with a marker mesh of the same name that the file marks hidden. Merged into one row,
- * the mesh's flag pruned the bone's subtree, and the effect hanging off that bone was vetoed by an
+ * the mesh's flag pruned the bone's subtree, and the effect attached to that bone was vetoed by an
  * ancestor it could not see - so every fire, smoke and explosion proxy on the model was dark and no
  * amount of ticking brought one back.
  */

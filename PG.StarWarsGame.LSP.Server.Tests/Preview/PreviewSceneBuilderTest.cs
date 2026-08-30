@@ -15,7 +15,7 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// <remarks>
 ///     Modelled on <c>Generic_Star_Destroyer</c>, which is the reference case for the whole feature -
 ///     10 hardpoints, 8 of them with a <c>Model_To_Attach</c>, each naming an <c>HP_*_EmitDamage</c>
-///     bone that the hull's damage proxies hang off.
+///     bone that the hull's damage proxies are attached to.
 /// </remarks>
 public sealed class PreviewSceneBuilderTest
 {
@@ -341,6 +341,61 @@ public sealed class PreviewSceneBuilderTest
             scene.Animations.Order());
     }
 
+    /// <summary>
+    ///     A clip belongs to the LONGEST model name that prefixes it, not to every model that does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Found from a user's log. `Rv_gargantuan.alo` was being handed
+    ///         `Rv_gargantuan_dc_die_00.ala` - the DEATH CLONE's clip - because `rv_gargantuan_`
+    ///         prefixes it, even though `Rv_gargantuan_dc.alo` exists and owns it.
+    ///     </para>
+    ///     <para>
+    ///         That was harmless only while the strict name check dropped it downstream. Once clips
+    ///         bind by INDEX, a foreign clip is applied for real - and an `.ala` carries VISIBILITY
+    ///         tracks, so it switched off whichever hull bones happened to sit at the indices its
+    ///         own skeleton hides. Two of the Gargantuan's turrets were mounted on those bones and
+    ///         vanished with them.
+    ///     </para>
+    ///     <para>
+    ///         Longest-stem-wins is the rule <c>BuildForAnimation</c> already uses for the reverse
+    ///         lookup; it simply was not applied going this way.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForModel_LeavesAVariantsClipsToTheVariant()
+    {
+        var index = Index([], new Dictionary<string, string[]>
+            {
+                ["rv_gargantuan.alo"] = ["Root"],
+                ["rv_gargantuan_dc.alo"] = ["Root"]
+            })
+            with
+            {
+                AssetFiles = MergedAssetFileIndex.Merge([], [
+                    "data/art/models/rv_gargantuan_die_00.ala",
+                    "data/art/models/rv_gargantuan_idle_00.ala",
+                    "data/art/models/rv_gargantuan_dc_die_00.ala",
+                    "data/art/models/rv_gargantuan_dc_idle_00.ala"
+                ])
+            };
+
+        var hull = Builder(index, new FakeVariantTagSource(), "rv_gargantuan.alo")
+            .BuildForModel("rv_gargantuan.alo");
+
+        Assert.Equal(
+            ["rv_gargantuan_die_00.ala", "rv_gargantuan_idle_00.ala"],
+            hull.Animations.Order());
+
+        // And the clone still gets its own.
+        var clone = Builder(index, new FakeVariantTagSource(), "rv_gargantuan_dc.alo")
+            .BuildForModel("rv_gargantuan_dc.alo");
+
+        Assert.Equal(
+            ["rv_gargantuan_dc_die_00.ala", "rv_gargantuan_dc_idle_00.ala"],
+            clone.Animations.Order());
+    }
+
     [Fact]
     public void BuildForModel_ListsNoAnimationsWhenTheCatalogueHasNone()
     {
@@ -390,12 +445,18 @@ public sealed class PreviewSceneBuilderTest
             Builder(index, tags, "hull.alo").BuildForObject("Fighter").AnimationSource);
     }
 
+    /// <summary>
+    ///     A differing skeleton is INFORMATION, not a warning.
+    /// </summary>
+    /// <remarks>
+    ///     This used to assert a warning, on the reasoning that the engine could only swap animation
+    ///     sets between identical skeletons. The user reported the message firing all over the BASE
+    ///     GAME, on units that animate correctly in the engine - so the rule was wrong. The clips are
+    ///     loaded and bound by index; the note survives only to explain an oddly moving model.
+    /// </remarks>
     [Fact]
-    public void BuildForObject_WarnsWhenTheOverrideSkeletonDoesNotMatch()
+    public void BuildForObject_NotesWhenTheOverrideSkeletonDiffers()
     {
-        // The engine can only swap animation sets because the skeletons are identical - true of every
-        // one of the 20 shipped land overrides. A mismatch plays the wrong bones, and nothing else in
-        // the toolchain checks it.
         var index = Index(
             [Sym("Trooper", "GroundUnit")],
             new Dictionary<string, string[]>
@@ -412,7 +473,8 @@ public sealed class PreviewSceneBuilderTest
 
         Assert.Equal("ni_ewok.alo", scene.AnimationSource);
         Assert.Contains(scene.Problems,
-            p => p.Severity == "warning" && p.Message.Contains("skeleton"));
+            p => p.Severity == "info" && p.Message.Contains("skeleton"));
+        Assert.DoesNotContain(scene.Problems, p => p.Severity == "warning");
     }
 
     [Fact]

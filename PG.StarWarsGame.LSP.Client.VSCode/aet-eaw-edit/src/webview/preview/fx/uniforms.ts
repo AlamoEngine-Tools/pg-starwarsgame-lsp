@@ -37,8 +37,16 @@ export interface AlamoFrame {
     /** Seconds since the preview opened. */
     time: number;
     resolution: [number, number, number, number];
-    /** The ambient probe the effects read, as three 4x4 matrices flattened to 48 numbers. */
+    /**
+     * The whole rig as a light probe, three 4x4 matrices flattened to 48 numbers.
+     *
+     * `m_sphAll` to the shaders. This is not an ambient term with the lights added on top - for
+     * every mesh effect it IS the diffuse lighting, all of it. `MeshAlpha.fx:53` has no N.L
+     * anywhere in it.
+     */
     sphericalHarmonics: readonly number[];
+    /** The same, over the two fills alone. `m_sphFill`, for surfaces kept out of the sun. */
+    sphericalHarmonicsFill: readonly number[];
     /** The bone palette for this mesh, or null when it is not skinned. */
     skinMatrices: ArrayLike<number> | null;
     /** The weather the reader set. One wind, read by the foliage shaders and by the particles. */
@@ -77,28 +85,139 @@ function windVector(of: 'bend' | 'grass', time: number, wind: Wind): number[] {
         : [x, 0, z, wind.speed];
 }
 
+/** One directional light of the rig, in the terms the probe projects it from. */
+export interface ProbeLight {
+    /** Unit direction TO the light, in the scene's world space. */
+    toLight: readonly [number, number, number];
+    colour: readonly [number, number, number];
+    intensity: number;
+}
+
 /**
- * A spherical-harmonic probe that answers the same ambient for every normal.
- *
- * The effects read their ambient through `dot(n4, n4 * m_sph[c])` with `n4 = (normal, 1)`. Setting
- * nothing but the matrix's last element collapses that to the element itself, whatever the normal -
- * so this is a flat grey environment expressed in the form the shaders expect.
- *
- * It replaces the probe shipped in the header, which is a PLACEHOLDER environment rather than a
- * neutral one: its constant terms are R 0.7379, G 0.4108, B 0.5165, and leaving it in gave every
- * translated model a mauve cast. The engine supplies the real scene's harmonics; a model viewer has
- * no scene to supply, so it supplies nothing rather than someone else's sky.
+ * The irradiance constants of Ramamoorthi and Hanrahan, "An Efficient Representation for Irradiance
+ * Environment Maps" - which is the paper the engine's own `SphericalHarmonics.cpp` cites.
  */
-export function neutralHarmonics(ambient: readonly [number, number, number]): number[] {
+const SH_C1 = 0.429043;
+const SH_C2 = 0.511664;
+const SH_C3 = 0.743125;
+const SH_C4 = 0.886227;
+const SH_C5 = 0.247708;
+
+/**
+ * The nine real spherical harmonics at a direction, in the paper's order and its sign convention.
+ *
+ * Deliberately NOT the Direct3D convention, which is what `SphericalHarmonics.cpp` calls through
+ * `D3DXSHEvalDirection`. The two differ by the Condon-Shortley phase: D3DX negates the four odd-m
+ * functions, the paper does not, and the matrix composed below is the paper's. Feeding D3DX's
+ * coefficients into the paper's matrix rotates the whole probe 180 degrees in azimuth - and that is
+ * exactly what the engine's own `m_direction * Vector3(1,1,-1)` puts back, under a comment about
+ * handedness. Two cancelling sign errors land on the right answer; one of them written down is
+ * easier to keep right, so this evaluates the paper's basis at the direction TO the light and is
+ * numerically identical to the engine for every rig.
+ */
+function shBasis(x: number, y: number, z: number): number[] {
+    return [
+        0.282095,
+        0.488603 * y,
+        0.488603 * z,
+        0.488603 * x,
+        1.092548 * x * y,
+        1.092548 * y * z,
+        0.315392 * (3 * z * z - 1),
+        1.092548 * x * z,
+        0.546274 * (x * x - y * y),
+    ];
+}
+
+/**
+ * The rig as a light probe, in the form the engine's shaders read.
+ *
+ * A port of `SphericalHarmonics::Calculate_Matrices`: project each light onto nine coefficients per
+ * channel, compose them into the paper's three irradiance matrices, and add the ambient to the
+ * constant term. The shaders then read it with `dot(n4, mul(m_sph[c], n4))`, `n4 = (normal, 1)`.
+ *
+ * What this replaces answered the same flat ambient for every normal - only the matrix's last
+ * element was set, which collapses that dot product to the element itself. That was a stand-in for
+ * the header's shipped probe, a PLACEHOLDER sky with constant terms R 0.7379 G 0.4108 B 0.5165 that
+ * gave every translated model a mauve cast. Neutral was the right instinct and the wrong answer:
+ * these shaders have no other diffuse term, so a flat probe renders the entire corpus at the
+ * ambient's own value - 0.1 grey on the engine's default rig - with no shading in it at all. Six
+ * times too dark on the lit side, and the reader saw it immediately.
+ *
+ * Nine terms is a band-limited cosine lobe, so the probe overshoots a delta light by about six per
+ * cent and does not quite reach zero behind it. Both are the approximation the engine ships, not
+ * something to correct.
+ */
+export function sphericalHarmonics(
+    lights: readonly ProbeLight[],
+    ambient: readonly [number, number, number],
+): number[] {
+    const projection = [new Array<number>(9).fill(0), new Array<number>(9).fill(0),
+        new Array<number>(9).fill(0)];
+
+    for (const light of lights) {
+        const [x, y, z] = light.toLight;
+        const length = Math.sqrt(x * x + y * y + z * z);
+
+        // A light with no direction is not a dark light, it is an undefined one - projecting it
+        // would spread NaN through all 48 numbers and black the whole scene out.
+        if (!(length > 0)) {
+            continue;
+        }
+
+        const basis = shBasis(x / length, y / length, z / length);
+
+        for (let channel = 0; channel < 3; channel++) {
+            // `colour * colour.a` in the engine's own terms: the rig's colour times its brightness.
+            const weight = light.colour[channel] * light.intensity;
+
+            for (let term = 0; term < 9; term++) {
+                projection[channel][term] += weight * basis[term];
+            }
+        }
+    }
+
     const probe: number[] = [];
 
-    for (const channel of ambient) {
-        const matrix = new Array<number>(16).fill(0);
-        matrix[15] = channel;
-        probe.push(...matrix);
+    for (let channel = 0; channel < 3; channel++) {
+        const l = projection[channel];
+
+        // Symmetric, every time - so the row-major matrix written here and the column-major one
+        // GLSL uploads are the same sixteen numbers, and `mul(m, n4)` cannot read it the wrong way.
+        probe.push(
+            SH_C1 * l[8], SH_C1 * l[4], SH_C1 * l[7], SH_C2 * l[3],
+            SH_C1 * l[4], -SH_C1 * l[8], SH_C1 * l[5], SH_C2 * l[1],
+            SH_C1 * l[7], SH_C1 * l[5], SH_C3 * l[6], SH_C2 * l[2],
+            SH_C2 * l[3], SH_C2 * l[1], SH_C2 * l[2],
+            SH_C4 * l[0] - SH_C5 * l[6] + ambient[channel]);
     }
 
     return probe;
+}
+
+/**
+ * What a shader would read off the probe for one normal.
+ *
+ * The vertex shaders' own expression, `dot(n4, mul(m_sph[c], n4))`, so a test can ask what the
+ * picture will be rather than what the coefficients are.
+ */
+export function probeDiffuse(
+    probe: readonly number[],
+    normal: readonly [number, number, number],
+): [number, number, number] {
+    const n = [normal[0], normal[1], normal[2], 1];
+
+    return [0, 1, 2].map(channel => {
+        let total = 0;
+
+        for (let row = 0; row < 4; row++) {
+            for (let col = 0; col < 4; col++) {
+                total += n[row] * probe[channel * 16 + row * 4 + col] * n[col];
+            }
+        }
+
+        return total;
+    }) as [number, number, number];
 }
 
 /**
@@ -191,7 +310,7 @@ export function uniformValue(source: UniformSource, frame: AlamoFrame): UniformV
             return frame.skinMatrices ?? undefined;
 
         case 'sphericalHarmonics':
-            return frame.sphericalHarmonics;
+            return source.set === 'fill' ? frame.sphericalHarmonicsFill : frame.sphericalHarmonics;
 
         // Everything below is engine state a model preview has none of, and whose shipped default
         // is a sensible answer - fog and fade switch themselves off, the wind sits still.

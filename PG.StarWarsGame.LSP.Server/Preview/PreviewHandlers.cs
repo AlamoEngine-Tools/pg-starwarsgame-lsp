@@ -7,6 +7,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -15,6 +16,52 @@ using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Icons;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
+
+/// <summary>
+///     Resolves ONE projectile by id, for the attacker panel's "fill from a projectile".
+/// </summary>
+/// <remarks>
+///     <para>
+///         The panel offers every projectile in the tree - 105 of them in the shipped data - because
+///         the reader is building a weapon to fire AT the subject, so the subject's own armament is
+///         the wrong list. But only what the subject fires travels with the scene, so picking any of
+///         the rest filled nothing and said "not loaded yet". That is the reported fault, and it also
+///         made the catalogue look incomplete: measured, it holds all 105.
+///     </para>
+///     <para>
+///         Resolution is <see cref="PreviewSceneBuilder.ProjectilesFor" />, the same reader the scene
+///         uses, so a projectile filled on demand and one that arrived with the scene cannot differ.
+///     </para>
+/// </remarks>
+public sealed class GetProjectileHandler(
+    ILspConfigurationProvider config,
+    IGameIndexService indexService,
+    ISchemaProvider schema,
+    IVariantTagSource tagSource)
+    : IJsonRpcRequestHandler<GetProjectileParams, GetProjectileResult>
+{
+    public Task<GetProjectileResult> Handle(
+        GetProjectileParams request, CancellationToken cancellationToken)
+    {
+        if (!config.Current.Features.Tools.ModelPreview)
+            return Task.FromResult(
+                new GetProjectileResult(null, "The model preview is turned off."));
+
+        var id = request.Name?.Trim() ?? string.Empty;
+        if (id.Length == 0)
+            return Task.FromResult(new GetProjectileResult(null, "No projectile was named."));
+
+        // The problems the builder would have raised are collected and dropped: this is a request
+        // for ONE projectile and the caller wants an answer about it, not a scene's problem list.
+        var problems = new List<PreviewProblem>();
+        var resolver = new EffectiveObjectResolver(indexService.Current, schema, tagSource);
+        var found = PreviewSceneBuilder.ProjectilesFor(resolver, [id], problems).FirstOrDefault();
+
+        return Task.FromResult(found is null
+            ? new GetProjectileResult(null, $"Projectile '{id}' is not defined in this project.")
+            : new GetProjectileResult(found));
+    }
+}
 
 /// <summary>Serves the assembled scene description.</summary>
 /// <remarks>
@@ -172,14 +219,28 @@ public sealed class GetModelGlbHandler(
             try
             {
                 var animation = AlaAnimationReader.Read(bytes);
-                var mismatch = animation.WhyNotModel(boneNames);
 
-                if (mismatch is null)
+                // FITS, not MATCHES. Requiring an identical skeleton dropped clips the base game
+                // plays: a unit that borrows another model's animation set does so across skeletons
+                // that differ, and the engine binds by index regardless. What cannot be recovered is
+                // a track reaching past the end of the bone list - there is no node to drive.
+                if (animation.FitsSkeleton(boneNames))
+                {
                     clips.Add((Path.GetFileNameWithoutExtension(name), animation));
+
+                    // Still worth saying: the clip will play, and the bones it moves may not be the
+                    // ones it was authored to move.
+                    if (animation.WhyNotModel(boneNames) is { } disagreement)
+                        logger.LogInformation(
+                            "Animation {Animation} plays on {Model} across a differing skeleton: "
+                            + "{Reason}", name, reference, disagreement);
+                }
                 else
+                {
                     logger.LogInformation(
-                        "Animation {Animation} does not pair with {Model}: {Reason}",
-                        name, reference, mismatch);
+                        "Animation {Animation} cannot be played on {Model}: {Reason}",
+                        name, reference, animation.WhyNotModel(boneNames));
+                }
             }
             catch (AloFormatException e)
             {
@@ -386,9 +447,13 @@ public sealed class GetParticleSystemHandler(
         // Resolved ONCE: the object carries both the asset name and the render scale, and looking it
         // up twice would resolve the whole variant chain twice for one request.
         var owner = ObjectBehind(request.Name);
-        var name = PreviewModelReference.Normalise(
+
+        // A proxy names its system with its own damage stage still attached - `p_smoke_small_thin_ALT2`
+        // - and the asset is filed under the bare name. Stripped AFTER the object lookup, so a
+        // <Particle> object is still found by the name it was actually asked for.
+        var name = PreviewModelReference.StripLevelSuffix(PreviewModelReference.Normalise(
             (owner is null ? null : Tag(owner, "Space_Model_Name") ?? Tag(owner, "Land_Model_Name"))
-            ?? request.Name);
+            ?? request.Name));
 
         if (string.IsNullOrEmpty(name))
             return Task.FromResult(
@@ -496,5 +561,34 @@ public static class PreviewModelReference
     public static string ModelPath(string reference)
     {
         return ModelDirectory + Normalise(reference);
+    }
+
+    /// <summary>
+    ///     Removes the <c>_ALT&lt;n&gt;</c> and <c>_LOD&lt;n&gt;</c> tags a PROXY name carries, leaving
+    ///     the asset name the effect is actually filed under.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         A proxy carries its damage stage and detail level in its own name, and the particle
+    ///         system it names is filed without them: <c>p_smoke_small_thin_ALT2</c> is a proxy,
+    ///         <c>p_smoke_small_thin.alo</c> is the file. The engine strips the tags at the load site -
+    ///         <c>ObjectTemplate.cpp</c> walks <c>_ALT</c> and <c>_LOD</c> out of the name before
+    ///         <c>Assets::LoadParticleSystem</c> - so without this every level-tagged effect asks for a
+    ///         file that exists nowhere. 152 shipped models carry 206 such names between them.
+    ///     </para>
+    ///     <para>
+    ///         Every occurrence, either marker, in either order: <c>p_fire_small01_ALT3_LOD0</c> is a
+    ///         real shape. A marker with no digits after it is part of the name and is left alone,
+    ///         which is the rule the reader uses to decide there is no level there at all.
+    ///     </para>
+    ///     <para>
+    ///         Only ever applied to a proxy name. No shipped asset in either tree has a level tag in
+    ///         its real file name, so this cannot take a name away from a file that has one - but a
+    ///         model reference out of the XML is an authored file name and has no business here.
+    ///     </para>
+    /// </remarks>
+    public static string StripLevelSuffix(string? reference)
+    {
+        return ModelLevelTag.Strip(reference);
     }
 }

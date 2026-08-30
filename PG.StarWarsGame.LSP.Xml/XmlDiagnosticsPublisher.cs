@@ -56,6 +56,10 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ISchemaProvider _schema;
     private readonly IXmlHardpointFactProducer? _hardpointProducer;
 
+    // Null in the test convenience constructors, like the hardpoint producer beside it. The
+    // damage-stage diagnostic then simply never fires.
+    private readonly IXmlDamageStageFactProducer? _damageStageProducer;
+
     // Null in the test convenience constructors and whenever no workspace icon catalog exists;
     // the icon-repack diagnostic then simply never fires.
     private readonly IIconRepackStatusProvider? _iconRepack;
@@ -96,6 +100,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryChainProblemStore storyChainProblems,
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         IXmlHardpointFactProducer hardpointProducer,
+        IXmlDamageStageFactProducer damageStageProducer,
         ServerOptions? options = null,
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
@@ -105,7 +110,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics, hardpointProducer, iconRepack: iconRepack,
+            storyGraphDiagnostics, hardpointProducer, damageStageProducer, iconRepack: iconRepack,
             modelTextures: modelTextures, iconNames: iconNames)
     {
     }
@@ -131,6 +136,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryChainProblemStore? storyChainProblems = null,
         IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
         IXmlHardpointFactProducer? hardpointProducer = null,
+        IXmlDamageStageFactProducer? damageStageProducer = null,
         IGlobalSuppressionStore? globalSuppressions = null,
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
@@ -141,6 +147,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _modelTextures = modelTextures;
         _iconNames = iconNames;
         _hardpointProducer = hardpointProducer;
+        _damageStageProducer = damageStageProducer;
         _configProvider = configProvider;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
@@ -190,6 +197,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
         if (_hardpointProducer is not null)
             facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index));
+        if (_damageStageProducer is not null)
+            facts.AddRange(_damageStageProducer.Produce(canonicalUri, parsed, index));
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(parsed, uri));
 
@@ -223,7 +232,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     /// <summary>
     ///     Whether an element is an "object" for <c>aetswg:suppress-object</c> - the same test the
-    ///     fact producer uses to decide what a tag hangs off: its name resolves to a schema object
+    ///     fact producer uses to decide what a tag belongs to: its name resolves to a schema object
     ///     type, in either the source or PascalCase spelling.
     /// </summary>
     private bool IsObjectNode(HtmlNode node)

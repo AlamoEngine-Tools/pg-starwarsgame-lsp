@@ -35,6 +35,17 @@ export interface FxMaterialState {
     cull: FxCull;
     /** Alpha below which fragments are discarded, or null when alpha testing is off. */
     alphaTest: number | null;
+    /**
+     * What the FIXED-FUNCTION first texture stage multiplies its result by: 2 for a `*2X` op, 1
+     * otherwise.
+     *
+     * The `MODULATE2X` family doubles the modulated colour, and it is the same statement the
+     * programmable path makes in HLSL as `texel.rgb * In.Diff * 2.0f`. Four shipped effects have no
+     * programmable technique at all - their shaders sit inside a block comment and the live
+     * technique sets `VertexShader = NULL` - so for those the declaration here is the ONLY place the
+     * doubling is written down. `MeshAlpha.fx` alone is worn by 286 models and 1282 sub-meshes.
+     */
+    colourScale: number;
 }
 
 /**
@@ -113,6 +124,24 @@ function readBlend(states: Record<string, string>): FxBlend {
 }
 
 /**
+ * How much the first texture stage scales its result, for a pass that has no shader.
+ *
+ * Direct3D ignores the texture stages entirely once a pixel shader is bound, so a programmable pass
+ * reports 1 whatever its stage state says - the translated HLSL does its own doubling, and honouring
+ * the declaration as well would double it twice.
+ *
+ * Stage 0 only. A later stage modulates against what the ones before it produced, and folding that
+ * chain into a single scalar would be inventing a number rather than reading one.
+ */
+function colourScaleFrom(pass: FxPass): number {
+    if (pass.vertexShader !== undefined || pass.pixelShader !== undefined) {
+        return 1;
+    }
+
+    return /2X$/.test(readEnum(pass.states, 'colorop[0]') ?? '') ? 2 : 1;
+}
+
+/**
  * The material state one pass asks for.
  *
  * Defaults follow Direct3D's own: depth testing and writing on, depth compare LESSEQUAL, back faces
@@ -138,5 +167,6 @@ export function materialStateFrom(pass: FxPass): FxMaterialState {
         cull: CULL_MODES[readEnum(states, 'cullmode') ?? ''] ?? 'back',
         // AlphaRef is 0-255 in D3D; renderers want 0-1.
         alphaTest: alphaTestOn ? (Number.isFinite(alphaRef) ? alphaRef / 255 : 0.5) : null,
+        colourScale: colourScaleFrom(pass),
     };
 }

@@ -10,7 +10,7 @@ import {
     cancelRootCorrection, outermostRoots, splitGeometryFromBone, stampTreeKeys, treeKeyOf,
 } from './boneNodes';
 
-/** A bone node that also carries geometry, with a child bone hanging off it. */
+/** A bone node that also carries geometry, with a child bone attached to it. */
 function nebulonShaped(): { parent: THREE.Object3D; mesh: THREE.Mesh; child: THREE.Object3D } {
     const parent = new THREE.Object3D();
 
@@ -85,13 +85,21 @@ describe('splitGeometryFromBone', () => {
         assert.deepEqual(after.child.matrixWorld.toArray(), childBefore.toArray());
     });
 
-    it('carries the node`s visibility over to the bone', () => {
+    /**
+     * The bone does NOT inherit the node's visibility - it used to, and that was the wrong half.
+     *
+     * A hardpoint's model is parented to its attachment BONE and three prunes a hidden subtree, so a
+     * bone that went invisible took every turret mounted on it with it while the geometry that was
+     * meant to be hidden carried on drawing. The mesh's own reset is unchanged: it starts drawn and
+     * the gate decides after.
+     */
+    it('leaves the bone visible whatever the node said, and starts the mesh drawn', () => {
         const { mesh } = nebulonShaped();
         mesh.visible = false;
 
         const bone = splitGeometryFromBone(mesh, 'COLLISION');
 
-        assert.equal(bone.visible, false, 'a hidden bone node became visible');
+        assert.equal(bone.visible, true, 'a hidden node hid the bone, and its mounts with it');
         assert.equal(mesh.visible, true, 'the mesh should start drawn; gating decides after');
     });
 
@@ -146,7 +154,7 @@ describe('stampTreeKeys', () => {
      * different value every load, which is what stopped a hidden mesh being restorable; a NAME
      * cannot do it either, because `Ai_rancor` carries two sub-meshes called `Crusher#0`.
      */
-    it('keys a mesh by the bone it hangs off and its place on it', () => {
+    it('keys a mesh by the bone it is attached to and its place on it', () => {
         const { root, bones, meshes } = rigged();
 
         stampTreeKeys(root, bones, 'hull');
@@ -178,7 +186,7 @@ describe('stampTreeKeys', () => {
     });
 
     /** A mesh under no bone at all still needs a key, or its row cannot be switched. */
-    it('falls back to the lowest bone for a mesh that hangs off none', () => {
+    it('falls back to the lowest bone for a mesh attached to none', () => {
         const root = new THREE.Object3D();
         const loose = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshBasicMaterial());
         root.add(loose);
@@ -200,7 +208,7 @@ describe('outermostRoots', () => {
     it('drops a part that is already inside another one', () => {
         // MEASURED on the real Star Destroyer: every hardpoint part is attached to a BONE of the
         // hull, so it lives inside the hull's own root. Walking each part root in turn therefore
-        // visited every mounted mesh twice - once through the hull and once on its own - which gave
+        // visited every attached mesh twice - once through the hull and once on its own - which gave
         // the model tree two rows under one React key and made the parts list say everything twice.
         const hull = new THREE.Object3D();
         const bone = new THREE.Object3D();
@@ -220,8 +228,8 @@ describe('outermostRoots', () => {
         assert.deepEqual(outermostRoots([turret, hull]), [hull]);
     });
 
-    it('keeps a chain of mounts down to one walk', () => {
-        // A hardpoint may mount on another hardpoint's model. The outermost root reaches them all.
+    it('keeps a chain of hardpoints down to one walk', () => {
+        // A hardpoint may hardpoint on another hardpoint's model. The outermost root reaches them all.
         const hull = new THREE.Object3D();
         const turret = new THREE.Object3D();
         const barrel = new THREE.Object3D();
@@ -258,7 +266,7 @@ describe('cancelRootCorrection', () => {
 
     it('neutralises the correction on the node that carries it', () => {
         // MEASURED: every GLB the exporter writes - hull AND hardpoint alike - carries the same
-        // -90-degree-about-X AlamoRoot. A mount parented to a hull BONE is already inside the
+        // -90-degree-about-X AlamoRoot. A hardpoint parented to a hull BONE is already inside the
         // hull's corrected space, so its own copy applies the rotation a SECOND time. That is the
         // 90-degree roll in the green-blue plane, and mirrored hulls make it read anticlockwise to
         // port and clockwise to starboard from one single bug.
@@ -306,5 +314,82 @@ describe('cancelRootCorrection', () => {
         cancelRootCorrection(scene);
 
         assert.deepEqual([bone.position.x, bone.position.y, bone.position.z], [4, 5, 6]);
+    });
+});
+
+describe('splitGeometryFromBone, and what a mount hangs on', () => {
+    /**
+     * The BONE stays visible; the GEOMETRY carries the visibility.
+     *
+     * It was the other way round - the bone took the mesh's visibility and the mesh was forced
+     * visible - which inverts the one thing this split exists to protect. A hardpoint's model is
+     * parented to its attachment bone, and three prunes a hidden subtree: a bone that goes invisible
+     * takes every turret mounted on it with it, while the geometry that was meant to be hidden
+     * carries on drawing.
+     *
+     * The project's own rule says the same thing from the engine's side - an attached thing does not
+     * inherit its host's visibility. Hiding a bone's geometry is a statement about GEOMETRY.
+     */
+    it('leaves the bone visible whatever the node arrived as', () => {
+        const mesh = new THREE.Mesh();
+        mesh.name = 'HP_turret_back_00_BONE#14';
+        mesh.visible = false;
+
+        const bone = splitGeometryFromBone(mesh, 'backturret');
+
+        assert.equal(bone.visible, true);
+    });
+
+    /** And a mount under it survives, which is the whole point. */
+    it('keeps a model mounted on the bone on screen', () => {
+        const mesh = new THREE.Mesh();
+        mesh.name = 'HP_turret_back_00_BONE#14';
+        mesh.visible = false;
+
+        const bone = splitGeometryFromBone(mesh, 'backturret');
+
+        const turret = new THREE.Object3D();
+        bone.add(turret);
+
+        let shown = turret.visible;
+        for (let at: THREE.Object3D | null = turret.parent; at !== null && shown; at = at.parent) {
+            shown = at.visible;
+        }
+
+        assert.equal(shown, true);
+    });
+});
+
+describe('a mount on a hidden host', () => {
+    /**
+     * The Gargantuan's two missing turrets, in one assertion.
+     *
+     * The model tree showed the whole attached turret - its base, its barrel, its collision mesh -
+     * as CHILDREN of a hull node that was itself a hidden mesh, and turning that row on brought the
+     * turret back. Three prunes a hidden subtree, so a mount on a hidden node is gone whatever its
+     * own state says.
+     *
+     * Splitting the node is what makes it mountable: the geometry keeps the hiding, the bone that
+     * holds the mount does not.
+     */
+    it('survives once the host node has been split', () => {
+        const host = new THREE.Mesh();
+        host.name = 'hp_turret_back_00_BONE#14';
+
+        const bone = splitGeometryFromBone(host, 'backturret');
+
+        // What `applyMaterial` does to a mesh tagged alamoHidden, AFTER the split.
+        host.visible = false;
+
+        const turret = new THREE.Object3D();
+        bone.add(turret);
+
+        let shown = turret.visible;
+        for (let at: THREE.Object3D | null = turret.parent; at !== null && shown; at = at.parent) {
+            shown = at.visible;
+        }
+
+        assert.equal(shown, true, 'hiding the host geometry took the mount with it');
+        assert.equal(host.visible, false, 'the geometry should still be the thing that hides');
     });
 });

@@ -38,12 +38,12 @@ export const RETICLE_STATES: readonly { id: ReticleState; label: string }[] = [
 export interface ReticleMark {
     hardpointId: string;
     /**
-     * The part the ATTACHMENT BONE belongs to - the hull for a mount whose bone is the hull's.
+     * The part the ATTACHMENT BONE belongs to - the hull for a hardpoint whose bone is the hull's.
      *
-     * The bone, not the mounted model's centre. Two reasons, and the second is the one that bit:
+     * The bone, not the attached model's centre. Two reasons, and the second is the one that bit:
      * the game draws the mark on the attachment bone, and centring on the part meant asking
      * three.js for a whole part's bounding box per mark per tick, which walks every vertex of the
-     * geometry. Ten mounts at twelve ticks a second made the viewport crawl.
+     * geometry. Ten hardpoints at twelve ticks a second made the viewport crawl.
      */
     partId: string;
     /** The attachment bone to hang the mark on. */
@@ -52,7 +52,7 @@ export interface ReticleMark {
     type: string;
     iconUri: string;
     /**
-     * The TRACKED art for the same mount, shown while the pointer is over it.
+     * The TRACKED art for the same hardpoint, shown while the pointer is over it.
      *
      * The game swaps to it when you put your cursor on a target, so hovering is the honest way to
      * see it - which is what replaced the seven-way dropdown that used to pick a state by hand.
@@ -60,19 +60,19 @@ export interface ReticleMark {
      */
     trackedUri: string;
     /**
-     * What is left of this mount, 0 to 1, or null when it declares no health.
+     * What is left of this hardpoint, 0 to 1, or null when it declares no health.
      *
      * The game colours the mark by it - see {@link healthColour} - so a reader can see at a glance
-     * which mounts are nearly gone without reading a list.
+     * which hardpoints are nearly gone without reading a list.
      */
     healthFraction: number | null;
 }
 
 /**
- * The colour the game draws a reticle in, by how much of the mount is left.
+ * The colour the game draws a reticle in, by how much of the hardpoint is left.
  *
  * Bright green at full health through yellow and orange to red at nothing - the user's own
- * description of the in-game ramp. A mount that declares NO health is never anything but whole -
+ * description of the in-game ramp. A hardpoint that declares NO health is never anything but whole -
  * 210 of foc's hardpoints declare none - so it stays green rather than reading as destroyed.
  */
 export function healthColour(fraction: number | null | undefined): string {
@@ -82,24 +82,30 @@ export function healthColour(fraction: number | null | undefined): string {
 
     const at = Math.min(1, Math.max(0, fraction));
 
-    // Nearest stop rather than a blend: the game's marks are flat colours, and interpolating would
-    // put the mark in shades that never appear in it.
-    let best = RAMP[0];
-    for (const stop of RAMP) {
-        if (Math.abs(stop[0] - at) < Math.abs(best[0] - at)) {
-            best = stop;
-        }
-    }
+    // Four colours, four EQUAL bands: green above three quarters, then yellow, orange and red,
+    // switching at 75, 50 and 25 percent.
+    //
+    // It used to take the nearest of four stops written at 1, 0.66, 0.33 and 0, which put the
+    // switches at 83, 50 and 17 percent - thresholds nobody can predict from looking at a bar, and
+    // nothing in the game asks for them. Flat bands rather than a blend, though: the game's marks
+    // are flat colours and interpolating would put one in a shade that never appears in it.
+    const band = RAMP.find(([floor]) => at > floor);
 
-    return best[1];
+    return (band ?? RAMP[RAMP.length - 1])[1];
 }
 
-/** Health fraction to colour, healthiest first. */
+/**
+ * Health fraction to colour, healthiest first, each entry giving the FLOOR of its band.
+ *
+ * The colours are the user's - the game's own ramp. The thresholds are quarters, so the last entry
+ * has to sit below zero: a hardpoint on exactly nothing must still be red, and a floor of 0 with a
+ * strict `>` would fall off the end of the list.
+ */
 const RAMP: readonly (readonly [number, string])[] = [
-    [1, '#3cd63c'],
-    [0.66, '#d6d63c'],
-    [0.33, '#e08a20'],
-    [0, '#e02020'],
+    [0.75, '#3cd63c'],
+    [0.5, '#d6d63c'],
+    [0.25, '#e08a20'],
+    [-1, '#e02020'],
 ];
 
 /**
@@ -107,7 +113,7 @@ const RAMP: readonly (readonly [number, string])[] = [
  *
  * Anchored on the ATTACHMENT BONE, which is the hull's - that is where the game draws it. Centring
  * on the attached model's bounds instead was wrong AND slow: it asked three.js for a part's
- * bounding box per mark per tick, walking every vertex, and ten mounts made the viewport crawl.
+ * bounding box per mark per tick, walking every vertex, and ten hardpoints made the viewport crawl.
  *
  * Absent art is a skip, never a broken image: the icons are empty whenever no game directory is
  * configured, and a scene reads perfectly well without reticles.
@@ -127,7 +133,7 @@ export function reticleMarks(
 
     for (const hardpoint of hardpoints) {
         // A wreck is not a target. Its model is hidden too, so a mark left behind would float in
-        // the gap where the mount used to be.
+        // the gap where the hardpoint used to be.
         if (!hardpoint.isTargetable || destroyed.has(hardpoint.id)) {
             continue;
         }
@@ -149,8 +155,8 @@ export function reticleMarks(
             ? reticles.icons[trackedIcon]
             : reticles.icons[icon];
 
-        // The mark hangs off the ATTACHMENT BONE, which belongs to whatever the mount is attached
-        // TO - the hull, in every shipped case - not to the mounted model.
+        // The mark is attached to the ATTACHMENT BONE, which belongs to whatever the hardpoint is attached
+        // TO - the hull, in every shipped case - not to the attached model.
         const left = health[hardpoint.id];
         const full = hardpoint.health ?? null;
 
@@ -213,4 +219,29 @@ export function reticleScreenSize(
     return state.startsWith('friendly')
         ? reticles?.friendlyScreenSize
         : reticles?.enemyScreenSize;
+}
+
+/**
+ * The reticle art a hardpoint TYPE resolves to, ready to put in an img.
+ *
+ * Two levels, because the catalog has two: a type names an icon and an icon names the pixels -
+ * thirteen shipped hardpoint types share five artwork families, so inlining the PNG per type would
+ * send the same image up to four times.
+ *
+ * The enemy state, which is the one a reader is looking at when they think of a targeting mark.
+ * Absent art is a quiet null: a workspace with no game directory configured gets the map and no
+ * images, and a scene is perfectly usable without them.
+ */
+export function reticleFor(
+    reticles: { byType?: Record<string, PreviewReticleStates>; icons?: Record<string, string> }
+        | null | undefined,
+    type: string | null | undefined,
+): string | null {
+    if (reticles === null || reticles === undefined || type === null || type === undefined) {
+        return null;
+    }
+
+    const icon = reticles.byType?.[type]?.enemy ?? null;
+
+    return icon === null ? null : reticles.icons?.[icon] ?? null;
 }

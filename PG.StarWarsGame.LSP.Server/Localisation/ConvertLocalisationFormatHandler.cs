@@ -227,7 +227,7 @@ public sealed class ConvertLocalisationFormatHandler
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "aet/convertLocalisationFormat: failed to read '{Path}'.", path);
-            return $"Cannot convert '{path}': it could not be read - {ex.Message}";
+            return $"Cannot convert '{path}': It could not be read - {ex.Message}";
         }
     }
 

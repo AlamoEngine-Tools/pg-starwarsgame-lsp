@@ -100,7 +100,7 @@ describe('following the emitter', () => {
     /**
      * A system anchored on a bone inside a model, which is the shape every attached effect has.
      *
-     * The root hangs off the SPACE, not off the bone: the bone is motion data the emitters read,
+     * The root is attached to the SPACE, not to the bone: the bone is motion data the emitters read,
      * never a parent whose visibility could take the effect with it. See `attachTo`.
      */
     function rig(over: Partial<AlamoEmitterProperties>, piece?: THREE.Object3D): {
@@ -142,7 +142,7 @@ describe('following the emitter', () => {
     /**
      * The Nebulon-B's blast, and the reason the anchor is not the parent.
      *
-     * `p_explosion_big00#12` is a proxy bone hanging under `Busted_00#11` - the very chunk whose
+     * `p_explosion_big00#12` is a proxy bone attached to `Busted_00#11` - the very chunk whose
      * breaking up it exists to cover - and the death clip hides that chunk on the frame the blast
      * fires. three prunes a hidden subtree, so the explosion vanished with the piece: one frame of
      * 91 particles, then nothing. In the engine those particles are world-space and outlive the
@@ -581,7 +581,7 @@ describe('emission gating', () => {
      * The defect a wholesale `setEmitting(true)` caused, in its own right.
      *
      * More than one thing can want an effect held, and they do not know about each other. The clip
-     * holds a proxy whose moment has not come; hiding the part a system hangs off holds it too. But
+     * holds a proxy whose moment has not come; hiding the part a system is attached to holds it too. But
      * `applyEmitterGating` runs EVERY frame and, with no clip playing, resolved "the clip says
      * nothing" to `setEmitting(true)` - so it re-armed the emitters of a part that had been hidden,
      * one frame after they were held. `stopAnimation` did the same for the whole scene.

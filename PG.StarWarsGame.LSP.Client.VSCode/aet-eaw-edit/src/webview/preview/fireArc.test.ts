@@ -42,7 +42,7 @@ describe('fireConePoints', () => {
         assert.ok(Math.abs(Math.abs(widest[1]) - 100 * Math.sin(Math.PI / 4)) < 1e-3);
     });
 
-    it('is elliptical: width opens across Y and height across Z', () => {
+    it('opens width across Y and height across Z', () => {
         // A turret with a wide traverse and little elevation reads as the flat fan it actually is -
         // which is a different thing from the whole cone being flattened.
         const { rim } = fireConePoints(120, 20, 100, 32);
@@ -50,6 +50,66 @@ describe('fireConePoints', () => {
         const spreadZ = Math.max(...rim.map(p => Math.abs(p[2])));
 
         assert.ok(spreadY > spreadZ * 3);
+    });
+
+    // ── the shape is exactly the pair of angles the engine compares ──
+    //
+    // The target is transformed into the fire bone's frame and reduced to two angles:
+    //
+    //   yaw       = atan2(y, x)
+    //   elevation = -atan2(z, hypot(x, y))
+    //
+    // then each is checked against its own half-angle. Note the elevation denominator: it is the
+    // HORIZONTAL distance, not x - so the vertical limit is a parallel of latitude, not a plane.
+    // That makes the arc a spherical rectangle, and it is why these helpers exist rather than a
+    // bare `atan2(z, x)`.
+
+    const yawOf = (p: readonly number[]) => Math.abs(Math.atan2(p[1], p[0])) * (180 / Math.PI);
+    const elevationOf = (p: readonly number[]) =>
+        Math.abs(Math.atan2(p[2], Math.hypot(p[0], p[1]))) * (180 / Math.PI);
+
+    it('never exceeds either half-angle, on either axis', () => {
+        // Both checks reject independently, so no direction inside the arc may break either.
+        const { rim } = fireConePoints(175, 160, 1100, 64);
+
+        for (const point of rim) {
+            assert.ok(yawOf(point) <= 175 / 2 + 0.01, `yaw ${yawOf(point)}`);
+            assert.ok(elevationOf(point) <= 160 / 2 + 0.01, `elevation ${elevationOf(point)}`);
+        }
+    });
+
+    it('reaches BOTH limits at once in the corners', () => {
+        // The whole difference from a rounded shape: two independent checks admit the corner where
+        // yaw and elevation are both at maximum. On a 90x90 arc that corner is 60 degrees off axis
+        // - acos(cos45 * cos45) - where a shape trading one angle against the other stops at 45.
+        const { rim } = fireConePoints(90, 90, 100, 64);
+
+        const corner = rim.find(p => Math.abs(yawOf(p) - 45) < 0.5
+            && Math.abs(elevationOf(p) - 45) < 0.5);
+
+        assert.ok(corner !== undefined, 'no corner point reaching both half-angles');
+
+        const offAxis = Math.acos(corner![0] / 100) * (180 / Math.PI);
+        assert.ok(Math.abs(offAxis - 60) < 0.5, `corner sits ${offAxis.toFixed(1)} off axis`);
+    });
+
+    it('still reaches exactly the half-angle on each axis alone', () => {
+        // The corners are wider, but the axes are not: a 120-degree traverse is 60 degrees off the
+        // bone and no more, which is the number the weapon row reports.
+        const { rim } = fireConePoints(120, 40, 100, 4);
+
+        assert.ok(Math.abs(Math.max(...rim.map(yawOf)) - 60) < 0.01);
+        assert.ok(Math.abs(Math.max(...rim.map(elevationOf)) - 20) < 0.01);
+    });
+
+    it('lets a full-turn traverse reach behind the muzzle', () => {
+        // 11 shipped hardpoints declare 360 width. On a sphere that is a full ring and needs no clamp;
+        // the old tan-based build had to cap it at 89.5 degrees a side, drawing a free-traversing
+        // turret as though it could only fire forwards.
+        const { rim } = fireConePoints(360, 20, 100, 32);
+
+        assert.ok(rim.some(p => p[0] < -50), 'nothing points backwards');
+        assert.ok(Math.max(...rim.map(elevationOf)) <= 10 + 0.01, 'elevation leaked');
     });
 
     it('points down the bone s local +X', () => {
@@ -98,7 +158,7 @@ describe('drawnConeRange', () => {
 
     it('draws a WIDE arc shorter than a narrow one', () => {
         // The length that suits a cone depends on how much sky it covers. A Star Destroyer's six
-        // banks are 160 by 130 degrees - very nearly domes - and at twice the hull they enclosed
+        // weapons are 160 by 130 degrees - very nearly domes - and at twice the hull they enclosed
         // the camera completely: the viewport was one orange field with the ship lost inside it.
         // A narrow arc is a spike, and a spike can be as long as it likes.
         assert.ok(drawnConeRange(2000, 600, 160, 130) < drawnConeRange(2000, 600, 20, 20));
@@ -126,20 +186,25 @@ describe('fireConeSurface', () => {
     const offAxis = (p: number[]) =>
         Math.atan2(Math.hypot(p[1], p[2]), p[0]) * (180 / Math.PI);
 
-    it('never opens WIDER than the larger half-angle', () => {
-        // The saddle, and what made them Pringles. The old build added the yaw and pitch offsets, so
-        // a point 45 degrees round the rim of a 175-by-160 arc sat further off axis than either
-        // half-angle allows - it bulged backwards, twice per turn.
+    it('respects BOTH per-axis limits at every point of the surface', () => {
+        // The real invariant, and not the same as "within the larger half-angle" - the corner of a
+        // spherical rectangle is legitimately wider than either side. What must never happen is a
+        // point breaking its OWN axis, which is what the engine checks one at a time.
         const tris = fireConeSurface(175, 160, 100, 32, 4);
 
         for (const p of points(tris)) {
-            assert.ok(offAxis(p) <= 87.5 + 0.01,
-                `a rim point sits ${offAxis(p).toFixed(1)} degrees off axis, past the 87.5 limit`);
+            const yaw = Math.abs(Math.atan2(p[1], p[0])) * (180 / Math.PI);
+            const elevation =
+                Math.abs(Math.atan2(p[2], Math.hypot(p[0], p[1]))) * (180 / Math.PI);
+
+            assert.ok(yaw <= 87.5 + 0.01, `yaw ${yaw.toFixed(1)} past 87.5`);
+            assert.ok(elevation <= 80 + 0.01, `elevation ${elevation.toFixed(1)} past 80`);
         }
     });
 
     it('opens to exactly the declared half-angle on each axis', () => {
-        // 90 wide by 30 tall: 45 degrees across Y, 15 across Z. The ellipse is in the ANGLES.
+        // 90 wide by 30 tall: 45 degrees across Y, 15 across Z. On the AXES the shape agrees with
+        // every rounder reading of it - the corners are where they part company.
         const tris = fireConeSurface(90, 30, 100, 64, 2);
         const across = points(tris).filter(p => Math.abs(p[2]) < 0.5);
         const up = points(tris).filter(p => Math.abs(p[1]) < 0.5);
@@ -148,11 +213,20 @@ describe('fireConeSurface', () => {
         assert.ok(Math.abs(Math.max(...up.map(offAxis)) - 15) < 1);
     });
 
-    it('is between the two half-angles on the diagonal, never beyond', () => {
-        const tris = fireConeSurface(90, 30, 100, 8, 1);
+    it('is WIDEST at the corner, exactly where both limits meet', () => {
+        // A 90-by-30 arc reaches acos(cos45 * cos15) = 46.9 degrees at its corner - past the 45 of
+        // its own traverse, which is the property that separates this shape from any rounded one.
+        //
+        // Sampled finely on purpose. At 8 segments the corner sits between two spokes (its azimuth
+        // is atan2(15, 45), about 18 degrees) and the old assertion of "never past 45" passed on
+        // that alone - a test that only held because it never looked in the right place.
+        const tris = fireConeSurface(90, 30, 100, 128, 1);
         const worst = Math.max(...points(tris).map(offAxis));
+        const corner = Math.acos(Math.cos(Math.PI / 4) * Math.cos(Math.PI / 12)) * (180 / Math.PI);
 
-        assert.ok(worst <= 45.01, `diagonal reached ${worst.toFixed(1)}`);
+        assert.ok(Math.abs(worst - corner) < 0.5,
+            `widest point ${worst.toFixed(1)}, corner should be ${corner.toFixed(1)}`);
+        assert.ok(worst > 45, 'the corner must exceed the traverse half-angle');
     });
 
     it('has a ROUNDED bottom - the cap sits on the sphere', () => {

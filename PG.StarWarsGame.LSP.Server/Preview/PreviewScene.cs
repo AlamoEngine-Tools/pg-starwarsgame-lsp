@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Newtonsoft.Json;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Server.Assets;
 
@@ -47,7 +48,7 @@ public sealed record PreviewRgba(int R, int G, int B, int A);
 ///     The model name as the XML writes it. Left unresolved on purpose - the client asks for the GLB
 ///     by this name, and the resolver decides which layer supplies it.
 /// </param>
-/// <param name="AttachToPartId">The part this hangs off, or null for the root.</param>
+/// <param name="AttachToPartId">The part this is attached to, or null for the root.</param>
 /// <param name="AttachBone">The bone on that part, or null to sit at its origin.</param>
 /// <param name="Resolved">
 ///     Whether the model file was found. A part is emitted either way: a hardpoint whose model is
@@ -65,7 +66,7 @@ public sealed record PreviewPart(
 /// <summary>Where a weapon is declared.</summary>
 public enum PreviewWeaponSource
 {
-    /// <summary>A mounted <c>HardPoint</c> object, with its own model, arcs and cadence.</summary>
+    /// <summary>An attached <c>HardPoint</c> object, with its own model, arcs and cadence.</summary>
     Hardpoint,
 
     /// <summary>
@@ -77,7 +78,7 @@ public enum PreviewWeaponSource
 /// <summary>How the engine chooses which fire point a shot leaves from.</summary>
 public enum PreviewFirePointMode
 {
-    /// <summary>Each bone in turn, one per volley. What every shipped mount does.</summary>
+    /// <summary>Each bone in turn, one per volley. What every shipped hardpoint does.</summary>
     CycleBones,
 
     /// <summary>
@@ -89,7 +90,7 @@ public enum PreviewFirePointMode
 }
 
 /// <summary>
-///     One weapon bank: everything needed to draw its arc and describe its cadence.
+///     One weapon: everything needed to draw its arc and describe its cadence.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -103,15 +104,15 @@ public enum PreviewFirePointMode
 ///         would swamp the hull they are drawn on.
 ///     </para>
 /// </remarks>
-/// <param name="Id"><c>hardpoint:&lt;id&gt;</c>, or <c>bank:A</c> for a unit weapon.</param>
-/// <param name="Label">The hardpoint's <c>Type</c>, or the bank's name.</param>
+/// <param name="Id"><c>hardpoint:&lt;id&gt;</c>, or <c>weapon:A</c> for a unit weapon.</param>
+/// <param name="Label">The hardpoint's <c>Type</c>, or the weapon's name.</param>
 /// <param name="FireBones">
 ///     Where the shot leaves from. NOTE that a fire bone aims along its local X, not its Y - see
 ///     <c>AlamoFireBone.AimDirection</c>, which anything drawing this must go through.
 /// </param>
 /// <param name="FireModes">
 ///     The <c>Fire_When_*</c> gates that are set. Carried rather than collapsed to a boolean so the
-///     client does not draw an arc for a mount that cannot fire in the state being shown.
+///     client does not draw an arc for a hardpoint that cannot fire in the state being shown.
 /// </param>
 public sealed record PreviewWeapon(
     string Id,
@@ -162,7 +163,7 @@ public sealed record PreviewTurret(
     string? BarrelBone);
 
 /// <summary>
-///     One mounted hardpoint, with everything needed to destroy and repair it in the preview.
+///     One attached hardpoint, with everything needed to destroy and repair it in the preview.
 /// </summary>
 /// <remarks>
 ///     The damage wiring is the part worth understanding. Destroying a hardpoint hides its
@@ -185,7 +186,7 @@ public sealed record PreviewHardpoint(
     string? AttachBone,
     bool IsDestroyable,
     /// <summary>
-    ///     Whether the game lets a player target this mount, from <c>Is_Targetable</c>.
+    ///     Whether the game lets a player target this hardpoint, from <c>Is_Targetable</c>.
     /// </summary>
     /// <remarks>
     ///     Decides whether a reticle is drawn over it. Every shipped hardpoint states it - 258 Yes
@@ -201,6 +202,24 @@ public sealed record PreviewHardpoint(
     string? DeathExplosionParticles,
     string? DeathBreakoffProp,
     bool EngineDeathHidesEngineParticles,
+    /// <summary>
+    ///     The <c>Tooltip_Text</c> tag verbatim, which is a localisation KEY. 422 objects write one.
+    /// </summary>
+    /// <remarks>
+    ///     Kept beside the resolved <paramref name="TooltipText" /> rather than replaced by it: the
+    ///     key is what the author wrote and what they would search their own files for, and the text
+    ///     is what a player reads. The ability rows make the same split between <c>GuiName</c> and
+    ///     <c>Name</c>.
+    /// </remarks>
+    string? TooltipKey,
+    /// <summary>
+    ///     What <paramref name="TooltipKey" /> resolves to, or null when it resolves to nothing.
+    /// </summary>
+    /// <remarks>
+    ///     Null rather than an echo of the key. A key with no row is a real authoring mistake, but
+    ///     it is the localisation editor's to report - showing the key as though it were text would
+    ///     hide it behind something that looks like an answer.
+    /// </remarks>
     string? TooltipText,
     PreviewTurret? Turret);
 
@@ -306,11 +325,11 @@ public sealed record PreviewVector3(float X, float Y, float Z);
 /// <remarks>
 ///     <para>
 ///         A <c>Death_Breakoff_Prop</c> names an ordinary <c>SpaceProp</c> with its own model and a
-///         <c>DEBRIS</c> behaviour, so the mount does not simply vanish - it breaks off and tumbles
+///         <c>DEBRIS</c> behaviour, so the hardpoint does not simply vanish - it breaks off and tumbles
 ///         away burning. 167 of foc's 355 hardpoints name one, 147 of them distinct.
 ///     </para>
 ///     <para>
-///         Carried once per scene rather than inline on the hardpoint: mirrored mounts share a prop,
+///         Carried once per scene rather than inline on the hardpoint: mirrored hardpoints share a prop,
 ///         and a copy each would have the client instantiate the same wreck twice.
 ///     </para>
 /// </remarks>
@@ -461,6 +480,45 @@ public sealed record PreviewAbilityModifier(string Stat, float Factor);
 ///     cannot know what the client will call the instance it loads. It is a descriptor of a model,
 ///     and the client rewrites both it and the ids when it puts one in the scene.
 /// </param>
+/// <summary>
+///     The automated death clone: a unit that declares none keeps flying and comes apart.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The user's account of the mechanic: with <c>Spin_Away_On_Death</c> set and NO
+///         <c>Death_Clone</c> declared, the unit carries on along its current vector at its current
+///         speed, corkscrewing, and explodes at the end.
+///     </para>
+///     <para>
+///         Measured over both shipped trees: <b>34 objects declare it, all Yes, and not one of them
+///         also declares a Death_Clone.</b> The rule holds in the data. The engine's own parameter
+///         table names five tags in the family, so the time, the chance and the explosion are read
+///         rather than invented; only the corkscrew itself has no number in any file.
+///     </para>
+/// </remarks>
+/// <param name="TimeSeconds">
+///     <c>Spin_Away_On_Death_Time</c>. 31 of the 34 write <c>2.0f</c> and 3 write <c>1.0f</c> - note
+///     the <c>f</c> suffix, which is in the files and has to be parsed off.
+/// </param>
+/// <param name="Chance">
+///     <c>Spin_Away_On_Death_Chance</c>, 0 to 1. Shipped values are 0.2 (21) and 0.4 (13), so most
+///     deaths do NOT spin. The preview always spins and READS THIS OUT instead - a tool pressed to
+///     see a thing has to show the thing, and a one-in-five roll looks broken four times out of five.
+/// </param>
+/// <param name="Explosion">
+///     <c>Spin_Away_On_Death_Explosion</c> - its OWN explosion, fired at the end of the spin, and a
+///     different tag from the object's <c>Death_Explosions</c>.
+/// </param>
+/// <param name="MaxSpeed">
+///     <c>Max_Speed</c>, which all 34 declare. **Per FRAME, not per second** - the engine runs at
+///     30Hz, so 4.5 here is 135 units a second. The client does that multiplication.
+/// </param>
+public sealed record PreviewSpinAway(
+    float TimeSeconds,
+    float Chance,
+    string? Explosion,
+    float MaxSpeed);
+
 public sealed record PreviewDeathClone(
     string? DamageType,
     string ObjectId,
@@ -526,9 +584,9 @@ public sealed record PreviewTargetDefence(
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         A unit with hardpoints cannot be targeted itself - only its mounts can - and it dies
-    ///         when the last of them does. Untargetable mounts count: the game warns about that
-    ///         combination and at least two mods use it deliberately, so an untargetable mount still
+    ///         A unit with hardpoints cannot be targeted itself - only its hardpoints can - and it dies
+    ///         when the last of them does. Untargetable hardpoints count: the game warns about that
+    ///         combination and at least two mods use it deliberately, so an untargetable hardpoint still
     ///         has to die before the unit does. Indestructible ones cannot contribute to a death and
     ///         are left out.
     ///     </para>
@@ -554,8 +612,33 @@ public sealed record PreviewFaction(
     string Name, PreviewRgba? Color, PreviewRgba? NoColorizationColor, PreviewRgba? DisplayFontColor);
 
 /// <summary>Something the author should see about this scene.</summary>
+/// <param name="DiagnosticId">
+///     Which kind of finding this is. Required rather than optional, and first rather than last, so
+///     a new preview finding cannot be added without one - which is exactly how every one of these
+///     came to have no id at all.
+/// </param>
 /// <param name="Severity"><c>error</c>, <c>warning</c> or <c>info</c>.</param>
-public sealed record PreviewProblem(string Severity, string Message, string? HardpointId = null);
+/// <summary>
+///     One row of the damage table: the health band's upper bound, and the stage shown inside it.
+/// </summary>
+/// <remarks>
+///     <para>
+///         The thresholds are the upper and lower BOUND of each stage, not a list of trip points.
+///         <c>1, 0.66, 0.33, 0</c> against <c>0, 1, 2, 3</c> reads: 100% &gt; h &gt; 66% is ALT0,
+///         66% &gt; h &gt; 33% is ALT1, 33% &gt; h &gt; 0% is ALT2, and 0 is ALT3. So a row's own
+///         threshold is its ceiling and the NEXT row's is its floor; the last row runs to zero.
+///     </para>
+///     <para>
+///         Sent as ordered PAIRS because <see cref="PreviewScene.DamageStages" /> deliberately sorts
+///         and de-duplicates - the right shape for "which stages exist" and useless for "which stage
+///         at what health". Measured over foc with XML comments stripped: 219 objects declare the
+///         table, every one has thresholds, and the two columns never disagree in length.
+///     </para>
+/// </remarks>
+public sealed record PreviewDamageBand(float Threshold, int Stage);
+
+public sealed record PreviewProblem(
+    DiagnosticId DiagnosticId, string Severity, string Message, string? HardpointId = null);
 
 /// <summary>
 ///     Everything needed to draw a preview, with no binary payload.
@@ -644,12 +727,16 @@ public sealed record PreviewScene(
     /// </summary>
     IReadOnlyList<PreviewDeathClone>? DeathClones = null,
     /// <summary>
+    ///     How the subject comes apart when it declares no death clone, or null where it does not.
+    /// </summary>
+    PreviewSpinAway? SpinAway = null,
+    /// <summary>
     ///     The explosion the SUBJECT sets off when it dies, from its own <c>Death_Explosions</c>.
     /// </summary>
     /// <remarks>
     ///     Distinct from a hardpoint's and from a breakoff prop's, both of which already travel on
     ///     their own records. This is the one that goes off where the ship was, and without it on
-    ///     the wire the client had nothing to play when the last mount died.
+    ///     the wire the client had nothing to play when the last hardpoint died.
     /// </remarks>
     string? DeathExplosions = null,
     /// <summary>
@@ -689,8 +776,47 @@ public sealed record PreviewScene(
     ///     The FIRST of several: 29 of the 775 tags name more than one - <c>Neutral, Rebel,
     ///     Empire</c> on the capturable structures - and a unit cannot wear two fallback colours.
     /// </remarks>
-    string? Affiliation = null)
+    string? Affiliation = null,
+    /// <summary>
+    ///     The damage stages the object DECLARES, ascending, or empty where it declares none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         From <c>Land_Damage_Alternates</c>, the middle column of a positional table it shares
+    ///         with <c>Land_Damage_Thresholds</c> and <c>Land_Damage_SFX</c>: at this fraction of
+    ///         health, show this <c>_ALT</c>, and play this sound. 222 shipped objects declare it.
+    ///     </para>
+    ///     <para>
+    ///         Sent because the client CANNOT work this out. It derives its ALT levels by walking
+    ///         the loaded geometry for <c>alamoAlt</c> tags, which only ever finds stages the model
+    ///         draws something for - and a stage need not draw anything, being possibly no more
+    ///         than an explosion and a sound. The shipped data proves the gap rather than merely
+    ///         allowing for it: <b>35</b> objects declare the lone alternate <c>3</c>, and
+    ///         <b>7</b> declare <c>1, 2, 3</c> with no stage zero at all.
+    ///     </para>
+    ///     <para>
+    ///         Sorted and de-duplicated here, because as a SET of which stages exist the written
+    ///         order is meaningless - it belongs to the thresholds standing beside it.
+    ///     </para>
+    /// </remarks>
+    IReadOnlyList<int>? DamageStages = null,
+    /// <summary>
+    ///     The damage table in WRITTEN order, or empty when the object declares none usable.
+    /// </summary>
+    /// <remarks>
+    ///     What drives the stage in Gameplay: the hull's remaining fraction picks a band. Empty
+    ///     rather than guessed when the two columns disagree in length or the thresholds are
+    ///     missing - the pairing is positional, so half a table is not a table, and inventing an
+    ///     alignment would put the wrong mesh on screen at the wrong health.
+    /// </remarks>
+    IReadOnlyList<PreviewDamageBand>? DamageTable = null)
 {
+    /// <summary>Never null, so the client has one shape to walk.</summary>
+    public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];
+
+    /// <summary>Never null, so the client has one shape to walk.</summary>
+    public IReadOnlyList<PreviewDamageBand> DamageTable { get; init; } = DamageTable ?? [];
+
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<PreviewAbility> Abilities { get; init; } = Abilities ?? [];
 
@@ -714,7 +840,7 @@ public sealed record PreviewScene(
     /// </summary>
     /// <remarks>
     ///     Never null, so the client has one shape to walk. See <see cref="PreviewParticleResolver" />
-    ///     for how a hardpoint's <c>Damage_Particles</c> bone claims the smoke hanging under it.
+    ///     for how a hardpoint's <c>Damage_Particles</c> bone claims the smoke attached to it.
     /// </remarks>
     public IReadOnlyList<PreviewParticle> Particles { get; init; } = Particles ?? [];
 
@@ -725,6 +851,6 @@ public sealed record PreviewScene(
     public static PreviewScene NotFound(string subject, string message, GameAssetTiers tiers)
     {
         return new PreviewScene(PreviewSceneKind.Object, subject, [], [], [],
-            [new PreviewProblem("error", message)], tiers);
+            [new PreviewProblem(DiagnosticIds.PreviewSubjectNotFound, "error", message)], tiers);
     }
 }

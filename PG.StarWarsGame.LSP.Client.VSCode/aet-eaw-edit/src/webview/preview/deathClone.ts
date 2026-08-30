@@ -10,11 +10,27 @@
 
 import type { PreviewDeathClone, PreviewTurret } from '../../protocol/modelPreview';
 
-/** One row in the Gameplay dock's Death clone section. */
+/**
+ * One card in the Gameplay dock's Death clone section.
+ *
+ * A MAPPING - this damage type leaves that object behind - and deliberately nothing more. The rows
+ * used to carry a joined sentence naming the model file and whether the clone plays its idle, under
+ * a paragraph explaining the section; the user's answer was that all a reader needs is which damage
+ * type causes which clone. The model file and the idle flag are properties OF the named object and
+ * are reached through the card's jump, not restated here.
+ */
 export interface DeathCloneRow {
     objectId: string;
+    /** The damage type this clone answers, or the catch-all label where it names none. */
     label: string;
-    detail: string;
+    /**
+     * Whether the clone names a model.
+     *
+     * False covers two cases the file cannot tell apart - the object is not defined anywhere, a
+     * typo the game says nothing about, or it is defined and declares no tactical model. Either way
+     * there is no wreck, which is worth a mark on the card.
+     */
+    resolved: boolean;
     /** Whether the weapon currently configured would produce THIS clone. */
     selected: boolean;
 }
@@ -64,28 +80,10 @@ export function deathCloneRows(
         objectId: clone.objectId,
         // A row naming no damage type is the catch-all, and saying so beats a blank cell.
         label: (clone.damageType ?? '') === '' ? 'Any other damage' : clone.damageType!,
-        detail: detailOf(clone),
+        resolved: (clone.modelFile ?? '') !== '',
         selected: chosen !== null && chosen.objectId === clone.objectId
             && (chosen.damageType ?? null) === (clone.damageType ?? null),
     }));
-}
-
-function detailOf(clone: PreviewDeathClone): string {
-    const parts = [clone.objectId];
-
-    if ((clone.modelFile ?? '') === '') {
-        // Either the clone is not defined anywhere - a typo that costs the wreck entirely and which
-        // the game says nothing about - or it defines no tactical model of its own.
-        parts.push('not defined, or declares no model');
-    } else {
-        parts.push(clone.modelFile!);
-    }
-
-    if (clone.playsIdle) {
-        parts.push('plays its idle');
-    }
-
-    return parts.join(' - ');
 }
 
 /** How far a turret is turned at one point in a sweep. Degrees, relative to the model. */
@@ -128,13 +126,20 @@ export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
 
 /** A turret the viewport can swing, and where its bones live. */
 export interface TurretSweep {
+    /**
+     * The hardpoint or weapon that declared it.
+     *
+     * Carried because the sweep is a per-hardpoint control: one button swinging every turret at
+     * once cannot say what it will do on a hull whose hardpoints declare different extents.
+     */
+    id: string;
     partId: string;
     turretBone: string;
     barrelBone: string | null;
     turret: PreviewTurret;
 }
 
-/** Anything that can declare a turret: a mount, or a weapon bank. */
+/** Anything that can declare a turret: a hardpoint, or a weapon on the unit itself. */
 export interface TurretSource {
     id: string;
     partId: string;
@@ -146,10 +151,10 @@ export interface TurretSource {
  *
  * BOTH sources, and that is the whole point of this function. The AT-AA's turret is declared on its
  * unit WEAPON - `B_Turret_Base` / `B_Missile_Launcher` at 360 by 45 - and it has no hardpoints at
- * all, so reading mounts alone found nothing to sweep on the very unit the feature exists for.
+ * all, so reading hardpoints alone found nothing to sweep on the very unit the feature exists for.
  * Measured on a live server.
  *
- * Deduplicated by part and bone, because a hardpoint weapon carries its mount's turret too: the
+ * Deduplicated by part and bone, because a hardpoint weapon carries its hardpoint's turret too: the
  * naive union sweeps one bone twice and the second pass fights the first.
  */
 export function turretSweeps(
@@ -180,6 +185,7 @@ export function turretSweeps(
         seen.add(key);
 
         sweeps.push({
+            id: source.id,
             partId: source.partId,
             turretBone: bone,
             barrelBone: turret.barrelBone ?? null,

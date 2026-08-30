@@ -9,7 +9,7 @@ import type { PreviewHardpoint, PreviewWeapon } from '../../protocol/modelPrevie
 import type { TreeItem } from './previewTree';
 
 import {
-    allBankIds, bankTitle, boneRowIndex, fireBoneTitle, visibleArcs, weaponRows,
+    allWeaponIds, weaponTitle, boneRowIndex, fireBoneTitle, visibleArcs, weaponRows,
 } from './weaponRows';
 
 function weapon(over: Partial<PreviewWeapon> = {}): PreviewWeapon {
@@ -41,8 +41,8 @@ function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
 }
 
 describe('weaponRows', () => {
-    it('puts a hardpoint weapon on the part it is mounted on, not on the hull', () => {
-        // The cone hangs off the fire bone of the ATTACHED model. Anchoring it on the hull would
+    it('puts a hardpoint weapon on the part it is attached on, not on the hull', () => {
+        // The cone is attached to the fire bone of the ATTACHED model. Anchoring it on the hull would
         // draw a Star Destroyer's arcs from its centre, all 148 of them, in a fan.
         const rows = weaponRows(
             { weapons: [weapon()], hardpoints: [hardpoint()] }, new Set());
@@ -54,10 +54,10 @@ describe('weaponRows', () => {
     it('anchors a unit weapon on the hull, because that is where MuzzleA lives', () => {
         const rows = weaponRows({
             weapons: [weapon({
-                id: 'bank:A',
+                id: 'weapon:A',
                 source: 'Unit',
                 hardpointId: null,
-                label: 'Bank A',
+                label: 'Weapon A',
                 fireBones: ['MuzzleA_00', 'MuzzleA_01'],
             })],
             hardpoints: [],
@@ -127,7 +127,7 @@ describe('weaponRows', () => {
         assert.deepEqual(rows[0].arcs, []);
     });
 
-    it('marks a row whose mount has been shot away', () => {
+    it('marks a row whose hardpoint has been shot away', () => {
         const rows = weaponRows(
             { weapons: [weapon()], hardpoints: [hardpoint()] }, new Set(['HP_Turbolaser']));
 
@@ -136,7 +136,7 @@ describe('weaponRows', () => {
 
     it('never marks a unit weapon destroyed - the hull is the subject', () => {
         const rows = weaponRows({
-            weapons: [weapon({ id: 'bank:A', source: 'Unit', hardpointId: null })],
+            weapons: [weapon({ id: 'weapon:A', source: 'Unit', hardpointId: null })],
             hardpoints: [hardpoint()],
         }, new Set(['HP_Turbolaser']));
 
@@ -215,7 +215,7 @@ describe('visibleArcs', () => {
         hardpoints: [hardpoint(), hardpoint({ id: 'HP_Missile', partId: 'HP_Missile' })],
     }, new Set());
 
-    it('draws every bank when the master is on and nothing is switched off', () => {
+    it('draws every weapon when the master is on and nothing is switched off', () => {
         assert.deepEqual(
             visibleArcs(rows, true, new Set()).map(arc => arc.weaponId),
             ['hardpoint:HP_Turbolaser', 'hardpoint:HP_Missile']);
@@ -223,18 +223,18 @@ describe('visibleArcs', () => {
 
     it('draws none at all when the master is off, whatever the rows say', () => {
         // The pill on the stage is the master, exactly as the effects pill is: one place to kill
-        // the lot without losing which banks you had picked.
+        // the lot without losing which weapons you had picked.
         assert.deepEqual(visibleArcs(rows, false, new Set()), []);
     });
 
-    it('drops the banks that were switched off', () => {
+    it('drops the weapons that were switched off', () => {
         assert.deepEqual(
             visibleArcs(rows, true, new Set(['hardpoint:HP_Missile'])).map(arc => arc.weaponId),
             ['hardpoint:HP_Turbolaser']);
     });
 
-    it('drops a bank whose mount has been shot away', () => {
-        // A destroyed mount's model is hidden; leaving its cone hanging in the gap would say the
+    it('drops a weapon whose hardpoint has been shot away', () => {
+        // A destroyed hardpoint's model is hidden; leaving its cone hanging in the gap would say the
         // wreck still shoots.
         const damaged = weaponRows({
             weapons: [weapon({ range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30 })],
@@ -289,19 +289,19 @@ describe('the tooltips on a weapon row', () => {
     }
 
     it('offers the cone when there is one to draw', () => {
-        assert.match(bankTitle(row({ range: 2000 })), /^Draw this bank/);
+        assert.match(weaponTitle(row({ range: 2000 })), /^Draw this weapon/);
     });
 
     it('explains a tick that would do nothing rather than just greying it out', () => {
-        assert.match(bankTitle(row({})), /no range/);
+        assert.match(weaponTitle(row({})), /no range/);
     });
 
-    it('says the mount is gone before it says anything about cones', () => {
+    it('says the hardpoint is gone before it says anything about cones', () => {
         const dead = weaponRows(
             { weapons: [weapon({ range: 2000 })], hardpoints: [hardpoint()] },
             new Set(['HP_Turbolaser']))[0];
 
-        assert.match(bankTitle(dead), /shot away/);
+        assert.match(weaponTitle(dead), /shot away/);
     });
 
     it('tells a reader why a fire bone cannot be pointed at', () => {
@@ -311,8 +311,8 @@ describe('the tooltips on a weapon row', () => {
 });
 
 describe('naming a weapon row', () => {
-    it('names a mounted weapon after its MOUNT, not after its type', () => {
-        // Seen on the real Star Destroyer: `label` is the hardpoint's Type, and six laser mounts
+    it('names an attached weapon after its HARDPOINT, not after its type', () => {
+        // Seen on the real Star Destroyer: `label` is the hardpoint's Type, and six laser hardpoints
         // gave six rows all reading HARD_POINT_WEAPON_LASER. The id is what tells them apart, and
         // it is what the Hardpoints list beside this one already shows.
         const rows = weaponRows({
@@ -332,19 +332,19 @@ describe('naming a weapon row', () => {
             'HARD_POINT_WEAPON_LASER');
     });
 
-    it('names a unit bank after the bank, which is all it has', () => {
+    it('names a unit weapon after the weapon, which is all it has', () => {
         const row = weaponRows({
-            weapons: [weapon({ id: 'bank:A', source: 'Unit', hardpointId: null, label: 'Bank A' })],
+            weapons: [weapon({ id: 'weapon:A', source: 'Unit', hardpointId: null, label: 'Weapon A' })],
             hardpoints: [],
         }, new Set())[0];
 
-        assert.equal(row.name, 'Bank A');
+        assert.equal(row.name, 'Weapon A');
     });
 });
 
 describe('the turret on a weapon row', () => {
     it('comes through, because a unit weapon is where a turret is usually declared', () => {
-        // MEASURED on the live AT-AA: its turret is on `bank:A`, not on any hardpoint - it has
+        // MEASURED on the live AT-AA: its turret is on `weapon:A`, not on any hardpoint - it has
         // none. The sweep reads it from here.
         const row = weaponRows({
             weapons: [weapon({
@@ -364,24 +364,24 @@ describe('the turret on a weapon row', () => {
     });
 });
 
-describe('which banks a subject opens with', () => {
+describe('which weapons a subject opens with', () => {
     function drawable(id: string) {
         return weapon({ id, hardpointId: id, range: 1000, coneWidthDegrees: 175,
             coneHeightDegrees: 160 });
     }
 
-    it('opens with EVERY bank off', () => {
+    it('opens with EVERY weapon off', () => {
         // The user's rule: the stage pill is all-or-nothing and everything starts off. Measured
-        // reason it matters - the Nebulon B's four mounts each declare 175 by 160 degrees, very
+        // reason it matters - the Nebulon B's four hardpoints each declare 175 by 160 degrees, very
         // nearly omnidirectional, so drawing them together fills the viewport however correct the
         // geometry is.
         const rows = weaponRows(
             { weapons: [drawable('a'), drawable('b'), drawable('c')], hardpoints: [] }, new Set());
 
-        assert.deepEqual([...allBankIds(rows)].sort(), ['a', 'b', 'c']);
+        assert.deepEqual([...allWeaponIds(rows)].sort(), ['a', 'b', 'c']);
     });
 
-    it('counts only the banks that can actually be DRAWN', () => {
+    it('counts only the weapons that can actually be DRAWN', () => {
         // A weapon with no reach has no cone, so there is nothing to switch either way and an id in
         // the hidden set for it would make the pill's "n of m" count lie.
         const rows = weaponRows({
@@ -389,11 +389,51 @@ describe('which banks a subject opens with', () => {
             hardpoints: [],
         }, new Set());
 
-        assert.deepEqual([...allBankIds(rows)], ['b']);
+        assert.deepEqual([...allWeaponIds(rows)], ['b']);
     });
 
     it('is empty when nothing can be drawn at all', () => {
-        assert.equal(allBankIds(weaponRows(
+        assert.equal(allWeaponIds(weaponRows(
             { weapons: [weapon()], hardpoints: [] }, new Set())).size, 0);
+    });
+});
+
+describe('the words these strings use', () => {
+    // Two words were ours; the game has its own, and they are the ones a modder can search their
+    // own files for. `HardPoint` is an XML tag and `HardPoints` a list on 91 objects.
+    //
+    // `bank` was worse than merely invented: `Bank_Turn_Angle` is a real tag about how a ship ROLLS
+    // in a turn, so the word already meant something else in the very files these rows describe.
+    it('uses the game`s words, not ours', () => {
+        const built = (destroyed: Set<string>, over: Partial<PreviewWeapon>) => weaponRows(
+            { weapons: [weapon(over)], hardpoints: [hardpoint()] }, destroyed)[0];
+
+        const strings = [
+            // Every branch of both, so a word cannot hide in the one nobody renders.
+            weaponTitle(built(new Set(['HP_Turbolaser']), { range: 2000 })),
+            weaponTitle(built(new Set(), {})),
+            weaponTitle(built(new Set(), { range: 2000 })),
+            fireBoneTitle('FP_00', false),
+            fireBoneTitle('MuzzleA_00', true),
+        ];
+
+        // No regex. The first two attempts at this guard both went quietly vacuous: a rename
+        // sweep rewrote the pattern's own words, and then a word-boundary escape inside a template
+        // literal turned out to be the BACKSPACE character, so it matched nothing at all. Split the
+        // text into words and compare - there is nothing left to get subtly wrong.
+        const banned = ['mount', 'mounts', 'bank', 'banks'];
+
+        for (const text of strings) {
+            const words = new Set(text.toLowerCase().split(/[^a-z]+/));
+
+            for (const ours of banned) {
+                assert.ok(!words.has(ours), `"${text}" uses our word "${ours}"`);
+            }
+        }
+
+        // The guard guards itself. Twice now it has been able to pass without checking anything,
+        // and a check that cannot fail is worse than none - it reads as coverage.
+        const control = new Set('this mount has been shot away'.split(' '));
+        assert.ok(control.has('mount'));
     });
 });

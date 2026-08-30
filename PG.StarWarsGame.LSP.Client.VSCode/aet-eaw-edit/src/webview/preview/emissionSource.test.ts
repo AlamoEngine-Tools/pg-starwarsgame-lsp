@@ -25,7 +25,7 @@ function triangle(name: string, shader = 'alDefault.fx'): THREE.Mesh {
 }
 
 /**
- * The Nebulon-B's shape: the emitter hangs off a bone of its own, and the geometry it is meant to
+ * The Nebulon-B's shape: the emitter is attached to a bone of its own, and the geometry it is meant to
  * come off lives one bone further up.
  */
 function nebulonShaped(): { engines: THREE.Object3D; proxy: THREE.Object3D; mesh: THREE.Mesh } {
@@ -50,7 +50,7 @@ function nebulonShaped(): { engines: THREE.Object3D; proxy: THREE.Object3D; mesh
 }
 
 describe('emissionMeshFor', () => {
-    it('takes the geometry hanging off the bone itself', () => {
+    it('takes the geometry attached to the bone itself', () => {
         const { engines } = nebulonShaped();
 
         const source = emissionMeshFor(engines);
@@ -72,7 +72,7 @@ describe('emissionMeshFor', () => {
     });
 
     /**
-     * Particles are simulated in the space of the node they hang off, so a source read from a bone
+     * Particles are simulated in the space of the node they are attached to, so a source read from a bone
      * further up has to be brought down into it or the whole cloud is born displaced.
      */
     it('expresses the geometry in the attachment`s own space', () => {

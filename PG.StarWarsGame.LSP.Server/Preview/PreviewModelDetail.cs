@@ -143,7 +143,7 @@ public sealed record PreviewMeshDetail(
     int VertexCount,
     int TriangleCount);
 
-/// <summary>One proxy - a named attachment point that a particle system or another model hangs off.</summary>
+/// <summary>One proxy - a named attachment point that a particle system or another model is attached to.</summary>
 /// <param name="AltDecreaseStayHidden">
 ///     Whether the proxy stays hidden when the damage state is REPAIRED rather than coming back. Set
 ///     on 1225 proxies across 86 shipped models, so the asymmetry is real rather than theoretical.

@@ -6,6 +6,7 @@ using System.Reflection;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -26,6 +27,23 @@ public sealed class PreviewWireShapeTest
     private static JObject SerializeAsResponse(object value)
     {
         return JObject.Parse(PreviewSerialization.Create().SerializeObject(value));
+    }
+
+    /// <summary>
+    ///     A problem's id crosses as the string a reader would type, not as its two numbers.
+    /// </summary>
+    /// <remarks>
+    ///     <c>DiagnosticId</c> is a record struct, so without its converter this goes out as
+    ///     <c>{"group":14,"number":1}</c> and the panel renders "[object Object]" beside the
+    ///     message - or, worse, nothing at all.
+    /// </remarks>
+    [Fact]
+    public void ADiagnosticId_CrossesAsItsWireFormat()
+    {
+        var json = SerializeAsResponse(
+            new PreviewProblem(DiagnosticIds.PreviewHardpointNotDefined, "warning", "anything"));
+
+        Assert.Equal("aetswg-014-0007", json["diagnosticId"]?.Value<string>());
     }
 
     [Fact]
@@ -123,6 +141,37 @@ public sealed class PreviewWireShapeTest
         var viaSerialize = JObject.Parse(writer.ToString())["shape"]?.ToString();
 
         Assert.Equal(viaFromObject, viaSerialize);
+    }
+
+    [Fact]
+    public void ParticleAbilityClaim_CrossesTheWireUnderTheNameTheClientReads()
+    {
+        // The client's whole veto depends on this one field. A name the TS mirror does not read
+        // arrives as undefined, `unboundEffectIds` returns an empty set, and the Tartan's TURBO
+        // engines are burning again - with every unit test still green, because the rule itself is
+        // right and only the wire is wrong.
+        var particle = new PreviewParticle(
+            "hull#0", "Pte_tartanengine_lrg", "hull", "Pte_tartanengine_lrg", 2,
+            PreviewParticleGate.Always, null, true, ClaimsAbility: "TURBO");
+
+        var json = SerializeAsResponse(particle);
+
+        Assert.Equal("TURBO", json["claimsAbility"]?.Value<string>());
+    }
+
+    [Fact]
+    public void ParticleWithNoAbilityClaim_SaysSoRatherThanOmittingIt()
+    {
+        // Null, not absent: the client reads `claimsAbility` optional, and both spellings mean the
+        // same thing there - but 5404 of 5443 proxies take this path, so it is the one worth
+        // pinning against a serializer setting that starts dropping nulls.
+        var particle = new PreviewParticle(
+            "hull#3", "p_engine_glow", "hull", "p_engine_glow", 4,
+            PreviewParticleGate.Always, null, true);
+
+        var json = SerializeAsResponse(particle);
+
+        Assert.Null(json["claimsAbility"]?.Value<string>());
     }
 
     [Fact]

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { modelCameraEntries } from './modelCameras';
+import { cameraPose, cameraViewOptions, modelCameraEntries } from './modelCameras';
 
 const camera = (name: string) => ({ name, position: [0, 0, 10], target: [0, 0, 0] });
 
@@ -46,3 +46,106 @@ describe('modelCameraEntries', () => {
     });
 });
 
+
+describe('cameraViewOptions', () => {
+    const presets = [
+        { view: 'threeQuarter', label: '3/4', title: 'Look from three-quarters on' },
+        { view: 'front', label: 'Front', title: 'Look from the front' },
+    ];
+
+    it('is ONE list, because the camera is in one place at a time', () => {
+        // The stage drew these as two groups of independent toggles, which said the reader could
+        // hold a preset and an author camera at once. They cannot: `cameraView` is a single value.
+        const options = cameraViewOptions(presets, [camera('Camera01')]);
+
+        assert.deepEqual(options.map(o => o.label), ['3/4', 'Front', 'Camera01']);
+    });
+
+    it('keeps the presets first and the model`s own cameras after', () => {
+        // The presets apply to any subject and the author's camera belongs to this one, so the
+        // list runs from what is always there to what this file happens to carry.
+        const options = cameraViewOptions(presets, [camera('Camera01')]);
+
+        assert.equal(options[options.length - 1].id, 'camera:0');
+    });
+
+    it('never disables a preset', () => {
+        const options = cameraViewOptions(presets, []);
+
+        assert.equal(options.filter(o => o.id === 'threeQuarter')[0].disabled, false);
+    });
+
+    it('carries the disabled author entry through when the model declares none', () => {
+        const options = cameraViewOptions(presets, []);
+        const last = options[options.length - 1];
+
+        assert.equal(last.disabled, true);
+        assert.match(last.title, /does not|no camera/i);
+    });
+
+    it('gives every option a distinct id, so exactly one can read as chosen', () => {
+        const options = cameraViewOptions(presets, [camera('Camera01'), camera('Camera01')]);
+        const ids = new Set(options.map(o => o.id));
+
+        assert.equal(ids.size, options.length);
+    });
+});
+
+describe('a camera entry carries its POSE, not just its name', () => {
+    /**
+     * The panel used to re-find the camera in the loaded model by name, looking for a bone called
+     * `Camera01` and one called `Camera01.Target`. The bone in the GLB is `Camera01Target` - the
+     * dot does not survive the export - so the pair never resolved and pressing the entry did
+     * nothing at all, silently, on every model that has one.
+     *
+     * The server already resolves both ends and sends them. Carrying the numbers through is both
+     * simpler and the only version that cannot be broken by a name.
+     */
+    it('carries the position and target the server resolved', () => {
+        const entries = modelCameraEntries([{
+            name: 'Camera01',
+            position: [-375.47, -372.2, 213.04],
+            target: [-86.85, 101.88, -131.61],
+        }]);
+
+        assert.deepEqual(entries[0].position, [-375.47, -372.2, 213.04]);
+        assert.deepEqual(entries[0].target, [-86.85, 101.88, -131.61]);
+    });
+
+    it('leaves the pose absent on the entry that stands in for none', () => {
+        const [none] = modelCameraEntries([]);
+
+        assert.equal(none.disabled, true);
+        assert.equal(none.position, null);
+    });
+});
+
+describe('cameraPose', () => {
+    /**
+     * The pose in the SCENE's axes, which is not the axes the server sends.
+     *
+     * `PreviewCamera` is MODEL space - Alamo, Z up - and the exporter turns the geometry into
+     * glTF's Y up with a rotation on the root node. Applied raw the camera lands a quarter turn
+     * out: measured on RB_CommandCenter, the eye went to (-375, -372, 213) instead of
+     * (-375, 213, 372), which puts it under the floor looking back at the model from the wrong
+     * side - and reads exactly like the eye and the target having been swapped.
+     */
+    it('turns Alamo Z-up into the scene Y-up, for both ends', () => {
+        const pose = cameraPose({
+            position: [-375, -372, 213],
+            target: [-87, 102, -132],
+        });
+
+        assert.deepEqual(pose?.position, { x: -375, y: 213, z: 372 });
+        assert.deepEqual(pose?.target, { x: -87, y: -132, z: -102 });
+    });
+
+    it('is null when either end is missing, so nothing is aimed at the origin', () => {
+        assert.equal(cameraPose({ position: [1, 2, 3] }), null);
+        assert.equal(cameraPose({ target: [1, 2, 3] }), null);
+    });
+
+    it('is null for a pose that is not three numbers', () => {
+        assert.equal(cameraPose({ position: [1, 2], target: [1, 2, 3] }), null);
+    });
+});

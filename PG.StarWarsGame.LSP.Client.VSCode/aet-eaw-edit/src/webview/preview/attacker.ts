@@ -14,6 +14,34 @@
 import type { PreviewProjectile, PreviewTargetDefence } from '../../protocol/modelPreview';
 import type { HullPool } from './unitPool';
 import type { BlastHit } from './blast';
+import { healthColour } from './reticles';
+
+/**
+ * Which optional mechanics the panel is showing.
+ *
+ * Energy is behind a feature toggle and **off by default**, at the user's instruction: the mechanic
+ * is in the engine and works, but the game disables it and ships no UI for it, so a mod maker should
+ * turn it on deliberately and read what it means first. Every energy element goes together - the
+ * pool row, the bar and the projectile switch - or the panel would offer a weapon setting that
+ * drains a pool it does not draw.
+ */
+export interface PoolOptions {
+    energy: boolean;
+
+    /**
+     * Every hardpoint projecting the shield has been shot off, so there is no shield.
+     *
+     * The user's rule: *"if a ship has all hardpoints of type shield generator destroyed the shields
+     * have to drop to zero, no matter the current state - similar to how the engines turn off."* A
+     * SWITCH, not a drain - the bar reads empty whatever the pool holds, and the row says why.
+     *
+     * See `shieldGeneratorsDown`, which decides it.
+     */
+    shieldsDown?: boolean;
+}
+
+/** Off, which is what a caller that has not been told yet must assume. */
+const POOLS_OFF: PoolOptions = { energy: false };
 
 /** The weapon the reader has configured. */
 export interface Attacker {
@@ -23,13 +51,88 @@ export interface Attacker {
     shield: boolean;
     energy: boolean;
     hitpoint: boolean;
+
+    /**
+     * `Projectile_Blast_Area_Damage`. Zero for a bolt that does not go off, which is most of them.
+     *
+     * Blast used to arrive ONLY with a picked projectile, read straight off the file - so a reader
+     * could type a damage number and a damage type and had no way at all to say "and it explodes".
+     * It is part of the weapon you build now, like every other field here.
+     */
+    blastDamage: number;
+
+    /** `Projectile_Blast_Area_Range`, in engine units. Zero reaches nothing but the target. */
+    blastRange: number;
+
+    /** `Projectile_Blast_Area_Dropoff` - whether the blast falls off with distance. */
+    blastDropoff: boolean;
+
+    /**
+     * `Projectile_Blast_Area_Dropoff_Tiers` - how many bands it falls off in.
+     *
+     * Only 10 of foc's 63 blast projectiles declare a dropoff at all, with 3, 4 or 5 tiers, so a
+     * FLAT blast inside a radius is the normal case and this is the exception.
+     */
+    blastDropoffTiers: number;
 }
 
 /** What is left of the target. Reset on open - the opening rules beat persistence. */
 export interface Pools {
+    /**
+     * The subject these numbers were measured on. Empty before any scene has arrived.
+     *
+     * Carried so a reading can never be mistaken for a reading of a DIFFERENT unit. The pools are
+     * refilled by an effect and the scene changes during a render, so there is always a commit where
+     * the two disagree - and an empty hull read against the new unit's declared health is a unit
+     * that is dead on arrival. See {@link poolsFor}.
+     */
+    subject: string;
     shield: number;
     hull: number;
     energy: number;
+}
+
+/**
+ * The pools, but only when they describe the scene being drawn.
+ *
+ * Reported as "loading a unit without hardpoints immediately plays the death explosion on load",
+ * and it was the load ORDER rather than any particular unit: whichever hardpoint-less subject
+ * opened first in a fresh panel blew itself up. The reset effect runs at MOUNT as well, when there
+ * is no scene, so it leaves every pool at 0; the first real scene then renders for one commit
+ * against those zeroes, `unitDestroyed` sees an empty hull with a positive maximum, and the death
+ * watch fires. The commit after that refills the pool and silently undoes it, which is why nothing
+ * looked wrong afterwards and only the explosion gave it away.
+ *
+ * A unit WITH destructible hardpoints was never affected - its hull is summed from them and the
+ * pools are not consulted at all.
+ */
+export function poolsFor(
+    scene: { subject: string } | null | undefined,
+    pools: Pools | null | undefined,
+): Pools | null {
+    if (scene === null || scene === undefined || pools === null || pools === undefined) {
+        return null;
+    }
+
+    return pools.subject === scene.subject ? pools : null;
+}
+
+/**
+ * Every pool at capacity, as a freshly opened - or freshly repaired - subject stands.
+ *
+ * The one place a `Pools` is built from a scene, so the subject is always stamped on it. Both
+ * callers used to write the three fields out by hand, which is how one of them could have carried
+ * the stamp and the other not.
+ */
+export function fullPools(
+    scene: { subject: string; defence?: PreviewTargetDefence | null } | null | undefined,
+): Pools {
+    return {
+        subject: scene?.subject ?? '',
+        shield: scene?.defence?.shieldPoints ?? 0,
+        hull: scene?.defence?.tacticalHealth ?? 0,
+        energy: scene?.defence?.energyCapacity ?? 0,
+    };
 }
 
 /**
@@ -45,7 +148,37 @@ export const DEFAULT_ATTACKER: Attacker = {
     shield: false,
     energy: false,
     hitpoint: true,
+    // No blast: a plain bolt that damages what it hits and nothing else, which is what 110 of foc's
+    // 173 projectiles are.
+    blastDamage: 0,
+    blastRange: 0,
+    blastDropoff: false,
+    blastDropoffTiers: 0,
 };
+
+/**
+ * The weapon the reader built, shaped as a projectile so one code path resolves every shot.
+ *
+ * `fire` used to BRANCH: with a projectile picked it went through `blastVictims`, and without one it
+ * hand-built a single hit with no blast. Two paths, and the reader's own blast fields could only
+ * ever have reached one of them. This is the whole of the difference now - the picker fills the
+ * fields, and the fields are what fires.
+ */
+export function attackerProjectile(attacker: Attacker): PreviewProjectile {
+    return {
+        id: 'attacker',
+        render: 'Model',
+        damage: attacker.damage,
+        damageType: attacker.damageType,
+        doesShieldDamage: attacker.shield,
+        doesEnergyDamage: attacker.energy,
+        doesHitpointDamage: attacker.hitpoint,
+        blastAreaDamage: attacker.blastDamage,
+        blastAreaRange: attacker.blastRange,
+        blastAreaDropoff: attacker.blastDropoff,
+        blastAreaDropoffTiers: attacker.blastDropoffTiers,
+    };
+}
 
 /**
  * The multiplier for one damage type against one armor column.
@@ -97,37 +230,37 @@ export function resolveHit(
 
     const hit = applyHit(attacker, defence, pools.shield, pools.energy, pools.hull);
 
-    return { shield: hit.shield, energy: hit.energy, hull: hit.hullLike };
+    return { ...pools, shield: hit.shield, energy: hit.energy, hull: hit.hullLike };
 }
 
 /**
- * The same hit, aimed at ONE MOUNT rather than at the hull.
+ * The same hit, aimed at ONE HARDPOINT rather than at the hull.
  *
  * A hardpoint declares no armor and no shield of its own - measured: 0 of them do, and 145 declare
  * only `Health` - so it is hull geometry sitting behind the ship's shield. It therefore takes the
  * HULL's armor factor, and the shield stops a bolt aimed at it exactly as it stops one aimed at the
  * hull.
  *
- * A mount with no `Health` at all is indestructible rather than already dead: 210 of foc's
+ * A hardpoint with no `Health` at all is indestructible rather than already dead: 210 of foc's
  * hardpoints declare none, and reading that as zero would blow every one of them off on the first
  * shot.
  */
-export function fireAtMount(
+export function fireAtHardpoint(
     attacker: Attacker,
     defence: PreviewTargetDefence | null | undefined,
     pools: Pools,
-    mountHealth: number | null,
-): { pools: Pools; mountHealth: number | null; destroyed: boolean } {
-    if (defence === null || defence === undefined || mountHealth === null) {
-        return { pools: { ...pools }, mountHealth, destroyed: false };
+    hardpointHealth: number | null,
+): { pools: Pools; hardpointHealth: number | null; destroyed: boolean } {
+    if (defence === null || defence === undefined || hardpointHealth === null) {
+        return { pools: { ...pools }, hardpointHealth, destroyed: false };
     }
 
-    const hit = applyHit(attacker, defence, pools.shield, pools.energy, mountHealth);
+    const hit = applyHit(attacker, defence, pools.shield, pools.energy, hardpointHealth);
 
     return {
-        // The hull pool is untouched: the shot went into the mount.
-        pools: { shield: hit.shield, energy: hit.energy, hull: pools.hull },
-        mountHealth: hit.hullLike,
+        // The hull pool is untouched: the shot went into the hardpoint.
+        pools: { ...pools, shield: hit.shield, energy: hit.energy },
+        hardpointHealth: hit.hullLike,
         // At EXACTLY its health, not a point later. `damage.ts` takes it from here - the model
         // hides, the decal shows, the death explosion plays once and the breakoff prop drops.
         destroyed: hit.hullLike <= 0,
@@ -137,7 +270,7 @@ export function fireAtMount(
 /**
  * The rules, in one place, over an abstract "hull-like" pool.
  *
- * Shared by the hull and the mount paths deliberately: they differ only in WHICH pool absorbs the
+ * Shared by the hull and the hardpoint paths deliberately: they differ only in WHICH pool absorbs the
  * hull half, and copying the shield logic into both is how the two would come to disagree about the
  * bypass.
  */
@@ -198,6 +331,14 @@ export function attackerFromProjectile(
         shield: projectile.doesShieldDamage,
         energy: projectile.doesEnergyDamage,
         hitpoint: projectile.doesHitpointDamage,
+
+        // The blast is the OPPOSITE, and deliberately: a bolt that declares none is a bolt that
+        // does not go off, so the fields are cleared rather than keeping the last weapon's radius.
+        // Leaving it would simulate something nobody described.
+        blastDamage: projectile.blastAreaDamage ?? 0,
+        blastRange: projectile.blastAreaRange ?? 0,
+        blastDropoff: projectile.blastAreaDropoff === true,
+        blastDropoffTiers: projectile.blastAreaDropoffTiers ?? 0,
     };
 }
 
@@ -224,7 +365,7 @@ export const DAMAGE_SWITCHES: readonly {
     {
         id: 'energy', label: 'Energy',
         title: 'Projectile_Does_Energy_Damage - drains the energy pool. Independent of the other '
-            + 'two: it applies whether or not the shield is up.',
+            + 'two: It applies whether or not the shield is up.',
     },
     {
         id: 'hitpoint', label: 'Hull',
@@ -233,12 +374,53 @@ export const DAMAGE_SWITCHES: readonly {
     },
 ];
 
-/** One line of the target readout. */
+/**
+ * The switches on offer, which is all of them unless energy is off.
+ *
+ * Withheld rather than disabled: a disabled control says "this exists and not here", and the point
+ * of the toggle is that energy damage should not be part of the panel at all until it is asked for.
+ * {@link DAMAGE_SWITCHES} stays the full table - the wire still carries
+ * `Projectile_Does_Energy_Damage`, and a projectile that sets it still resolves correctly.
+ */
+export function damageSwitches(options: PoolOptions = POOLS_OFF): readonly {
+    id: 'shield' | 'energy' | 'hitpoint'; label: string; title: string;
+}[] {
+    return options.energy ? DAMAGE_SWITCHES : DAMAGE_SWITCHES.filter(s => s.id !== 'energy');
+}
+
+/**
+ * One line of the target readout, and one bar under the ability command bar.
+ *
+ * The words and the bar are ONE model. They are the same three pools said two ways, and a second
+ * copy would drift the first time either changed.
+ */
 export interface PoolRow {
     id: 'shield' | 'hull' | 'energy';
     label: string;
     detail: string;
     title: string;
+    /** How full, 0 to 1 and clamped. A pool cannot be more than full or less than empty. */
+    fraction: number;
+    /**
+     * The bar's colour.
+     *
+     * The user set these: shields BLUE, the hull on the hardpoints' own ramp - so a bar gone orange
+     * in here and a targeting mark gone orange out there are saying the same thing - and energy
+     * something neither of them is. Violet, because it is the one hue the preview does not already
+     * spend: the hull ramp owns green through red, and blue is the shield.
+     */
+    colour: string;
+}
+
+/** Shields. Blue, and from the theme so it tracks a light editor. */
+const SHIELD_COLOUR = 'var(--vscode-charts-blue, #3794ff)';
+
+/** Energy. Deliberately neither of the other two - see {@link PoolRow.colour}. */
+const ENERGY_COLOUR = 'var(--vscode-charts-purple, #b180d7)';
+
+/** How full, clamped at both ends. A capacity of zero reads as empty rather than dividing by it. */
+function fractionOf(left: number, capacity: number): number {
+    return capacity > 0 ? Math.min(1, Math.max(0, left / capacity)) : 0;
 }
 
 /**
@@ -253,6 +435,7 @@ export function poolRows(
     defence: PreviewTargetDefence | null | undefined,
     pools: Pools | null | undefined,
     hull?: HullPool | null,
+    options: PoolOptions = POOLS_OFF,
 ): PoolRow[] {
     if (defence === null || defence === undefined || pools === null || pools === undefined) {
         return [];
@@ -264,21 +447,31 @@ export function poolRows(
         rows.push({
             id: 'shield',
             label: 'Shield',
-            detail: defence.isShielded
-                ? `${round(pools.shield)} of ${round(defence.shieldPoints ?? 0)}`
-                    + `${defence.shieldArmorType === null || defence.shieldArmorType === undefined
-                        ? '' : ` - ${defence.shieldArmorType}`}`
-                : 'not in play - this object declares Shield_Points but not SHIELDED',
+            detail: options.shieldsDown === true
+                ? 'down - every shield generator has been destroyed'
+                : defence.isShielded
+                    ? `${round(pools.shield)} of ${round(defence.shieldPoints ?? 0)}`
+                        + `${defence.shieldArmorType === null
+                            || defence.shieldArmorType === undefined
+                            ? '' : ` - ${defence.shieldArmorType}`}`
+                    : 'not in play - this object declares Shield_Points but not SHIELDED',
             title: 'Shield_Points, defended by Shield_Armor_Type',
+            // Empty for either reason: a shield the object never raises protects nothing, and one
+            // whose generators are gone has stopped protecting. The bar says what is between a
+            // shot and the hull, and in both cases that is nothing.
+            fraction: defence.isShielded && options.shieldsDown !== true
+                ? fractionOf(pools.shield, defence.shieldPoints ?? 0)
+                : 0,
+            colour: SHIELD_COLOUR,
         });
     }
 
-    // The MOUNTS are the hull on a unit that has them - it cannot be targeted itself, and most
+    // The HARDPOINTS are the hull on a unit that has them - it cannot be targeted itself, and most
     // mods author its health as their sum. Falls back to what the file declares, which is also what
-    // a unit without mounts uses.
+    // a unit without hardpoints uses.
     const hullMax = hull?.fromHardpoints === true ? hull.max : defence.tacticalHealth ?? 0;
 
-    // `hull.current` is only an answer when the hull IS the mounts. For a unit with none,
+    // `hull.current` is only an answer when the hull IS the hardpoints. For a unit with none,
     // `hullPool` can only report the declared `Tactical_Health` - it has nothing to sum - and
     // reading that as the current value pinned the bar to full: the damage landed in `pools.hull`
     // every shot and the row never moved. That is what "units without hardpoints don't take any
@@ -303,15 +496,23 @@ export function poolRows(
                     + `the convention is drawn rather than a derivation. Tactical_Health says ${
                         round(defence.tacticalHealth ?? 0)}.`
                 : 'Tactical_Health, defended by Armor_Type',
+            fraction: fractionOf(hullNow, hullMax),
+            // The hardpoints' own ramp, so a bar gone orange in here and a targeting mark gone
+            // orange out there are saying the same thing.
+            colour: healthColour(fractionOf(hullNow, hullMax)),
         });
     }
 
-    if ((defence.energyCapacity ?? 0) > 0) {
+    // Off unless asked for, and then the row, the bar and the projectile switch all appear
+    // together - see PoolOptions.
+    if (options.energy && (defence.energyCapacity ?? 0) > 0) {
         rows.push({
             id: 'energy',
             label: 'Energy',
             detail: `${round(pools.energy)} of ${round(defence.energyCapacity ?? 0)}`,
             title: 'Energy_Capacity. Never scaled by an armor factor - energy damage is flat.',
+            fraction: fractionOf(pools.energy, defence.energyCapacity ?? 0),
+            colour: ENERGY_COLOUR,
         });
     }
 
@@ -350,25 +551,25 @@ export function projectileChoices(catalog: readonly string[], search: string): s
 /** What one shot did to the whole target. */
 export interface BlastResult {
     pools: Pools;
-    mountHealth: Record<string, number | null>;
-    /** Mounts this shot finished off, for the destruction path to pick up. */
+    hardpointHealth: Record<string, number | null>;
+    /** Hardpoints this shot finished off, for the destruction path to pick up. */
     destroyed: ReadonlySet<string>;
 }
 
 /**
- * One shot, resolved against every mount it caught.
+ * One shot, resolved against every hardpoint it caught.
  *
  * Sequential, nearest first, through the SHARED pools: it is one shot, but each victim is worked
- * out against the shield as it stands after the last, so a blast catching three mounts through a
+ * out against the shield as it stands after the last, so a blast catching three hardpoints through a
  * thin shield gets through on the later ones. That ordering is a reading rather than a measurement,
  * and it is the only sane one available - resolving them all against the shield's opening value
  * would let a single blast be absorbed several times over.
  *
  * The surplus is LOST, per the user's rule: a projectile applies its damage to a target, and if
  * that is more than the target has left the target disappears. Nothing carries over to the next
- * mount - that is the difference between a blast and a chain reaction.
+ * hardpoint - that is the difference between a blast and a chain reaction.
  *
- * A mount with no declared `Health` is untouched. 210 of foc's hardpoints declare none and are
+ * A hardpoint with no declared `Health` is untouched. 210 of foc's hardpoints declare none and are
  * indestructible rather than fragile.
  */
 export function fireBlast(
@@ -376,13 +577,13 @@ export function fireBlast(
     defence: PreviewTargetDefence | null | undefined,
     pools: Pools,
     hits: readonly BlastHit[],
-    mountHealth: Readonly<Record<string, number | null>>,
+    hardpointHealth: Readonly<Record<string, number | null>>,
 ): BlastResult {
-    const health: Record<string, number | null> = { ...mountHealth };
+    const health: Record<string, number | null> = { ...hardpointHealth };
     const destroyed = new Set<string>();
 
     if (defence === null || defence === undefined) {
-        return { pools: { ...pools }, mountHealth: health, destroyed };
+        return { pools: { ...pools }, hardpointHealth: health, destroyed };
     }
 
     let after: Pools = { ...pools };
@@ -393,13 +594,13 @@ export function fireBlast(
             continue;
         }
 
-        // The direct number and the blast are one hit on this mount, not two: they are separate
+        // The direct number and the blast are one hit on this hardpoint, not two: they are separate
         // tags because they reach different victims, not because they land separately.
         const damage = hit.directDamage + hit.blastDamage;
         const resolved = applyHit(
             { ...attacker, damage }, defence, after.shield, after.energy, current);
 
-        after = { shield: resolved.shield, energy: resolved.energy, hull: after.hull };
+        after = { ...after, shield: resolved.shield, energy: resolved.energy };
         health[hit.id] = resolved.hullLike;
 
         if (resolved.hullLike <= 0) {
@@ -407,5 +608,5 @@ export function fireBlast(
         }
     }
 
-    return { pools: after, mountHealth: health, destroyed };
+    return { pools: after, hardpointHealth: health, destroyed };
 }

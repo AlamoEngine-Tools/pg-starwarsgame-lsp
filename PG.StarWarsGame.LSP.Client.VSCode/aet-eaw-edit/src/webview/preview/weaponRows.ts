@@ -1,15 +1,15 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-// One weapon bank, as the Gameplay dock shows it and as the viewport draws it.
+// One weapon, as the Gameplay dock shows it and as the viewport draws it.
 //
 // The scene sends measurements; a row is what a reader can act on. Keeping the two apart is what
 // lets the whole thing be tested without three.js: the dock renders these rows and the viewport
 // takes `visibleArcs`, and neither has to know how a nullable `Pulse_Delay` becomes a sentence.
 //
 // Arcs are controlled at THREE levels, the same shape the particle systems settled into: the pill
-// on the stage is the master, each row is one bank, and a fire bone is the individual thing you can
-// point at in the tree. The master holds no opinion about which banks are on - switch it off and
+// on the stage is the master, each row is one weapon, and a fire bone is the individual thing you can
+// point at in the tree. The master holds no opinion about which weapons are on - switch it off and
 // back on and your picks are still there.
 
 import type {
@@ -19,9 +19,9 @@ import type { TreeItem } from './previewTree';
 
 import { PREVIEW_WEAPON_SOURCE } from '../../protocol/modelPreview';
 
-/** One cone the viewport draws, tagged with the bank it belongs to. */
+/** One cone the viewport draws, tagged with the weapon it belongs to. */
 export interface WeaponArc {
-    /** The `PreviewWeapon.id` this came from, so a bank can be switched without a rebuild. */
+    /** The `PreviewWeapon.id` this came from, so a weapon can be switched without a rebuild. */
     weaponId: string;
     partId: string;
     bone: string;
@@ -34,9 +34,9 @@ export interface WeaponArc {
 export interface WeaponRow {
     id: string;
     /**
-     * What the row is CALLED - the mount's id, or the bank's name.
+     * What the row is CALLED - the hardpoint's id, or the weapon's name.
      *
-     * Not the type. Six laser mounts on one hull all declare `HARD_POINT_WEAPON_LASER`, so naming
+     * Not the type. Six laser hardpoints on one hull all declare `HARD_POINT_WEAPON_LASER`, so naming
      * rows by type gave six identical ones; the id is what separates them, and it is what the
      * Hardpoints list beside this one already shows.
      */
@@ -46,7 +46,7 @@ export interface WeaponRow {
     /** `Hardpoint` or `Unit`, verbatim from the wire. */
     source: string;
     hardpointId: string | null;
-    /** The part its fire bones live on: the mounted model, or the hull. */
+    /** The part its fire bones live on: the attached model, or the hull. */
     partId: string;
     fireBones: string[];
     /** Empty when the weapon declares no reach, so there is nothing to draw. */
@@ -57,9 +57,9 @@ export interface WeaponRow {
     cone: string | null;
     projectileId: string | null;
     fireModes: string[];
-    /** The turret this bank sits on, when it declares one. Read by the sweep. */
+    /** The turret this weapon sits on, when it declares one. Read by the sweep. */
     turret: PreviewTurret | null;
-    /** Its mount has been shot away, so the game would no longer fire it. */
+    /** Its hardpoint has been shot away, so the game would no longer fire it. */
     destroyed: boolean;
 }
 
@@ -70,7 +70,7 @@ export interface WeaponScene {
 }
 
 /**
- * Builds a row per weapon bank.
+ * Builds a row per weapon.
  *
  * `destroyed` is the set of hardpoint ids the reader has blown off, exactly as `damage.ts` holds
  * it - the row reads that state rather than keeping a second copy of it.
@@ -104,7 +104,7 @@ export function weaponRows(
             fireModes: [...weapon.fireModes],
             turret: weapon.turret ?? null,
             // A unit weapon belongs to the hull, which is the subject itself and is never in the
-            // destroyed set - guarding on the source keeps it that way if a mount is ever named
+            // destroyed set - guarding on the source keeps it that way if a hardpoint is ever named
             // after the hull part.
             destroyed: weapon.source === PREVIEW_WEAPON_SOURCE.hardpoint
                 && hardpointId !== null && destroyed.has(hardpointId),
@@ -115,43 +115,43 @@ export function weaponRows(
 /**
  * The arcs the viewport should be showing right now.
  *
- * `master` is the stage pill and `hiddenBanks` the rows switched off; a destroyed mount drops out
+ * `master` is the stage pill and `hiddenWeapons` the rows switched off; a destroyed hardpoint drops out
  * regardless, because its model is hidden and a cone hanging in the gap would claim the wreck still
  * shoots.
  */
 export function visibleArcs(
-    rows: readonly WeaponRow[], master: boolean, hiddenBanks: ReadonlySet<string>,
+    rows: readonly WeaponRow[], master: boolean, hiddenWeapons: ReadonlySet<string>,
 ): WeaponArc[] {
     if (!master) {
         return [];
     }
 
     return rows
-        .filter(row => !row.destroyed && !hiddenBanks.has(row.id))
+        .filter(row => !row.destroyed && !hiddenWeapons.has(row.id))
         .flatMap(row => row.arcs);
 }
 
 /**
- * Why a bank's tick is on offer, or why it is not.
+ * Why a weapon's tick is on offer, or why it is not.
  *
  * A disabled control has to say what would make it available - greying it out and leaving the
  * reader to guess is the failure the disable-don't-hide rule exists to avoid.
  */
-export function bankTitle(row: WeaponRow): string {
+export function weaponTitle(row: WeaponRow): string {
     if (row.destroyed) {
-        return 'This mount has been shot away, so it no longer fires';
+        return 'This hardpoint has been shot away, so it no longer fires';
     }
 
     return row.arcs.length > 0
-        ? "Draw this bank's cone"
+        ? "Draw this weapon's cone"
         : 'This weapon declares no range, so there is no cone to draw';
 }
 
-/** Same, for the fire-bone buttons: a bone off the mounted model is not in the hull's tree. */
+/** Same, for the fire-bone buttons: a bone off the hardpoint's model is not in the hull's tree. */
 export function fireBoneTitle(bone: string, inTree: boolean): string {
     return inTree
         ? `Select ${bone} on the model`
-        : `${bone} is a bone of this mount's own model, not of the hull`;
+        : `${bone} is a bone of this hardpoint's own model, not of the hull`;
 }
 
 /**
@@ -267,16 +267,16 @@ function num(value: number): string {
 }
 
 /**
- * Every bank that has a cone to draw.
+ * Every weapon that has a cone to draw.
  *
  * The subject opens with all of them OFF and the stage pill switches the lot on or off together -
- * the user's call, and the reason is measured: the Nebulon B's four mounts each declare 175 by 160
+ * the user's call, and the reason is measured: the Nebulon B's four hardpoints each declare 175 by 160
  * degrees, very nearly omnidirectional, so drawing them together fills the viewport however correct
  * the geometry is. Starting dark means the reader turns on exactly what they want to look at.
  *
  * Only the DRAWABLE ones. A weapon with no reach has no cone, so there is nothing to switch either
- * way, and listing it would make the pill's "n of m banks" count lie.
+ * way, and listing it would make the pill's "n of m weapons" count lie.
  */
-export function allBankIds(rows: readonly WeaponRow[]): ReadonlySet<string> {
+export function allWeaponIds(rows: readonly WeaponRow[]): ReadonlySet<string> {
     return new Set(rows.filter(row => row.arcs.length > 0).map(row => row.id));
 }

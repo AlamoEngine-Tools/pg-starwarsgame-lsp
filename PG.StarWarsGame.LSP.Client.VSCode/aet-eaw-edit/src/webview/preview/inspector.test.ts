@@ -168,7 +168,7 @@ describe('inspectPanel for a mesh', () => {
         })), 'Mesh');
 
         assert.equal(rows['Damage state'], '2');
-        assert.equal(rows.Detail, '1');
+        assert.equal(rows.LOD, '1');
     });
 
     it('says a mesh is untagged rather than pretending it is level 0', () => {
@@ -176,7 +176,7 @@ describe('inspectPanel for a mesh', () => {
         const rows = rowsOf(inspectPanel(mesh()), 'Mesh');
 
         assert.equal(rows['Damage state'], 'none');
-        assert.equal(rows.Detail, 'none');
+        assert.equal(rows.LOD, 'none');
     });
 
     it('explains a mesh that is not drawn', () => {
@@ -230,7 +230,7 @@ describe('inspectPanel for a bone', () => {
 });
 
 describe('inspectPanel for a particle system', () => {
-    it('names the system, its emitters and the bone it hangs off', () => {
+    it('names the system, its emitters and the bone it is attached to', () => {
         const source: ParticleInspection = {
             kind: 'particle',
             name: 'p_hp_imperial_damage',

@@ -9,6 +9,7 @@ using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
+using PG.StarWarsGame.LSP.Server.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
 
@@ -149,6 +150,22 @@ public sealed class ServerConfiguratorRegistrationTest
         Assert.NotNull(ActivatorUtilities.CreateInstance<GetPreviewSceneHandler>(provider));
         Assert.NotNull(ActivatorUtilities.CreateInstance<GetModelGlbHandler>(provider));
         Assert.NotNull(ActivatorUtilities.CreateInstance<GetModelTextureHandler>(provider));
+    }
+
+    /// <summary>
+    ///     The ungated go-to endpoint, which the panels use.
+    /// </summary>
+    /// <remarks>
+    ///     It is one constructor parameter deep, but that parameter used to be reachable only from
+    ///     inside a story handler. Constructing it the way the host does is what proves
+    ///     <c>IDefinitionLocator</c> is actually registered rather than merely written.
+    /// </remarks>
+    [Fact]
+    public void ResolveReferenceHandler_Resolves()
+    {
+        using var provider = BuildProviderWithHostStubs();
+
+        Assert.NotNull(ActivatorUtilities.CreateInstance<ResolveReferenceHandler>(provider));
     }
 
     /// <summary>

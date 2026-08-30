@@ -100,7 +100,7 @@ public static class LuaSuppressionCommentParser
     }
 
     /// <summary>
-    ///     The statement the directive sits in front of. Trivia hangs off the token that follows
+    ///     The statement the directive sits in front of. Trivia attaches to the token that follows
     ///     it, so the statement is found by walking up from that token rather than by scanning
     ///     forward through the tree.
     /// </summary>

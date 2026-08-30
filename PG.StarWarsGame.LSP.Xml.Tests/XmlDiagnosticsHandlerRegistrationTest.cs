@@ -78,7 +78,11 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 108 → 109: ModelTextureExistenceHandler added - the textures a model names INSIDE itself,
         // which no XML tag mentions and nothing therefore validated. Reported against the tag that
         // pulls the model in, because that is the only place in the document it can be anchored.
-        const int expectedHandlerCount = 109;
+        // 109 -> 110: DamageStageNotOnModelHandler added - Land_Damage_Alternates naming a damage
+        // stage nothing in the object's model is tagged _ALT<n> for, so the unit reaches that state
+        // and does not change. One direction only: a model staging MORE than the XML uses is an
+        // asset carrying more than this object asks of it, and is never reported.
+        const int expectedHandlerCount = 110;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

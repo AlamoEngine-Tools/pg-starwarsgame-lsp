@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Globalization;
+using Newtonsoft.Json;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
@@ -15,6 +16,7 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///         diagnostic. Both would silence something other than what the author wrote down.
 ///     </para>
 /// </summary>
+[JsonConverter(typeof(DiagnosticIdJsonConverter))]
 public readonly record struct DiagnosticId
 {
     private const string Prefix = "aetswg";
@@ -72,5 +74,43 @@ public readonly record struct DiagnosticId
 
         id = new DiagnosticId(group, number);
         return true;
+    }
+}
+
+/// <summary>
+///     Carries a <see cref="DiagnosticId" /> as the id a reader would type, in both directions.
+/// </summary>
+/// <remarks>
+///     <para>
+///         On the TYPE rather than installed per serializer. It is a record struct, so without this
+///         it travels as <c>{"group":14,"number":7}</c> - two numbers a client would have to know
+///         how to spell back into <c>aetswg-014-0007</c>. The wire format already exists and is the
+///         published contract.
+///     </para>
+///     <para>
+///         Symmetric, unlike the preview's write-only enum converter. Anything that reads one of
+///         these DTOs back in C# - an E2E test driving the real server, for one - needs the string
+///         to become an id again, and a converter that only writes makes the DTO's declared type a
+///         lie the moment anyone deserialises it.
+///     </para>
+/// </remarks>
+public sealed class DiagnosticIdJsonConverter : JsonConverter<DiagnosticId>
+{
+    public override void WriteJson(
+        JsonWriter writer, DiagnosticId value, JsonSerializer serializer)
+    {
+        ArgumentNullException.ThrowIfNull(writer);
+        writer.WriteValue(value.ToString());
+    }
+
+    public override DiagnosticId ReadJson(
+        JsonReader reader, Type objectType, DiagnosticId existingValue, bool hasExistingValue,
+        JsonSerializer serializer)
+    {
+        ArgumentNullException.ThrowIfNull(reader);
+
+        // An unparseable or absent id reads as the default rather than throwing: a malformed id is
+        // a reason to lose the id, never a reason to lose the finding that carried it.
+        return DiagnosticId.TryParse(reader.Value as string, out var id) ? id : default;
     }
 }

@@ -8,7 +8,7 @@
 // which makes "which row is this about" a question of geometry: it lines up with the row's own top
 // edge and sits just clear of the dock, so the two read as one thing.
 
-/** The gap between the flyout and the dock edge it hangs off. */
+/** The gap between the flyout and the dock edge it is anchored to. */
 export const GAP = 6;
 
 /** How close to the window edge the flyout is allowed to get. */

@@ -16,7 +16,7 @@
 
 import {
     CSSProperties, DragEvent, PointerEvent as ReactPointerEvent,
-    useCallback, useEffect, useReducer, useRef, useState,
+    useCallback, useEffect, useMemo, useReducer, useRef, useState,
 } from 'react';
 import {
     dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
@@ -24,7 +24,8 @@ import {
 } from './shared/dockChrome';
 import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
 import { RightDock } from './shared/RightDock';
-import { ProblemsPanel } from './shared/ProblemsPanel';
+import { ProblemsPanel, type ProblemFilterControl } from './shared/ProblemsPanel';
+import { filterProblems } from './shared/problemFilter';
 import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
@@ -1551,9 +1552,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             }
         },
         fit(): void {
-            // Windowed: fit the whole MODEL (only a subset is mounted); else fit the mounted nodes.
-            if (windowed) { void fitModel(); }
-            else { void AreaExtensions.zoomAt(area, editor.getNodes()); }
+            // Fit the whole MODEL whenever the mounted set is not the whole graph - which is any
+            // windowed graph, and ALSO any graph at all while zoomed out past K_DETAIL, where
+            // reconcileWindow has unmounted everything to show the overview. Keying on `windowed`
+            // alone left `zoomAt` fitting an empty node list on a small graph, which fits nothing.
+            const mounted = editor.getNodes();
+
+            if (windowed || mounted.length === 0) { void fitModel(); }
+            else { void AreaExtensions.zoomAt(area, mounted); }
         },
         autoArrange(): Promise<void> {
             const run = async (): Promise<void> => {
@@ -1630,15 +1636,24 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     window.setTimeout(() => element.classList.remove('story-flash'), 1600);
                 }
             };
-            if (!windowed) {
-                const node = editor.getNode(nodeId);
-                if (!node) { return; }
-                void AreaExtensions.zoomAt(area, [node]);
+            // Keyed on whether the node is MOUNTED, never on whether the graph is windowed.
+            //
+            // `windowed` is a node-COUNT decision (see shouldWindow), while mounting is a ZOOM one:
+            // reconcileWindow unmounts everything below K_DETAIL for every graph size, small ones
+            // included, because the overview canvas sits behind the nodes. Unmounting calls
+            // editor.removeNode, so on any graph too small to be windowed - a filtered one, most
+            // often - getNode returned undefined while zoomed out and the jump silently did
+            // nothing. The model path below already handles a node that is not mounted, at any size.
+            const mounted = editor.getNode(nodeId);
+
+            if (mounted !== undefined && area.nodeViews.has(nodeId)) {
+                void AreaExtensions.zoomAt(area, [mounted]);
                 flash();
                 return;
             }
-            // Windowed: the target may not be mounted. Centre the viewport on its model position at a
-            // zoom past K_DETAIL so the windowing reconcile mounts it, then flash once it exists.
+
+            // Not mounted. Centre the viewport on its model position at a zoom past K_DETAIL so the
+            // reconcile mounts it, then flash once it exists.
             const m = graphModel.get(nodeId);
             if (!m) { return; }
             const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
@@ -3327,6 +3342,20 @@ function App(): React.JSX.Element {
     const [availableModes, setAvailableModes] = useState<{ edit: boolean; simulate: boolean }>(
         { edit: false, simulate: false });
     const [problems, setProblems] = useState<StoryDiagnosticDto[]>([]);
+
+    /**
+     * The nodes the graph currently holds, for narrowing the problems table to them.
+     *
+     * The graph is filtered on the SERVER - a filtered-out event is not in the response at all -
+     * while diagnostics are computed for the whole campaign, so without this the table reports
+     * findings about nodes that are not on screen. Null until the first graph arrives: filtering
+     * against a set nobody has filled would empty the table for reasons that have nothing to do
+     * with the filter.
+     */
+    const [graphNodeIds, setGraphNodeIds] = useState<Set<string> | null>(null);
+
+    /** The reader has asked to see the findings the view filter holds back. */
+    const [showAllProblems, setShowAllProblems] = useState(false);
     const [showProblems, setShowProblems] = useState(false);
     const [showSimLog, setShowSimLog] = useState(true);
     // Whether the current (possibly staged) state has been validated since it last changed.
@@ -3579,6 +3608,7 @@ function App(): React.JSX.Element {
                             }
                         }
                     }
+                    setGraphNodeIds(new Set(graphNodes.map(n => n.id)));
                     applyGraph(
                         graphNodes,
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
@@ -3715,7 +3745,26 @@ function App(): React.JSX.Element {
     // unvalidated (stale/never run) beats error beats warning beats clean. The precedence and the
     // glyph mapping are shared with the localisation editor's Validate tag so the two controls mean
     // the same thing - two copies of this rule drifted apart once already.
-    const severity = !validated ? 'unvalidated' : worstSeverity(problems);
+    /**
+     * What "in this view" means here: the node is in the graph the server sent back.
+     *
+     * A finding that names no node - a malformed manifest, an unresolved plot entry - is about a
+     * FILE and no graph filter can bring it into view, so it is always kept. Undefined until the
+     * first graph arrives, which is how the panel knows not to filter yet.
+     */
+    const problemInView = useMemo(
+        () => graphNodeIds === null
+            ? undefined
+            : (p: StoryDiagnosticDto) => !p.nodeId || graphNodeIds.has(p.nodeId),
+        [graphNodeIds]);
+
+    const problemView = useMemo(
+        () => filterProblems(problems, problemInView, showAllProblems),
+        [problems, problemInView, showAllProblems]);
+
+    // The badge follows what is ON SCREEN, so it agrees with the table under it. What stops that
+    // reading as all-clear over a hidden error is the panel's own "n of m" and its filter chip.
+    const severity = !validated ? 'unvalidated' : worstSeverity(problemView.shown);
     const severityIcon = severityIconFor(severity);
 
     return (
@@ -3762,7 +3811,14 @@ function App(): React.JSX.Element {
                 <div className="bottom-panels">
                     {showProblems && problems.length ? (
                         <ProblemsBar
-                            problems={problems}
+                            problems={problemView.shown}
+                            label={problemView.label}
+                            filter={{
+                                hidden: problemView.hidden,
+                                showingAll: showAllProblems,
+                                filterable: problemView.filterable,
+                                onToggle: () => setShowAllProblems(open => !open),
+                            }}
                             onJump={id => editorRef.current?.centerNode(id)}
                             onClose={() => setShowProblems(false)}
                         />
@@ -3903,6 +3959,9 @@ const SIM_LOG_DEFAULT_HEIGHT = 140;
  */
 function ProblemsBar(props: {
     problems: StoryDiagnosticDto[];
+    /** The count for the heading, which says "3 of 12" while the view filter is holding some back. */
+    label: string;
+    filter: ProblemFilterControl;
     onJump: (nodeId: string) => void;
     onClose: () => void;
 }): React.JSX.Element {
@@ -3911,7 +3970,8 @@ function ProblemsBar(props: {
             className="problems"
             memoKey="storyGraph.problems"
             defaultHeight={150}
-            title={`Problems (${props.problems.length})`}
+            title={`Problems (${props.label})`}
+            filter={props.filter}
             onClose={props.onClose}
         >
             {props.problems.map((problem, i) => (
