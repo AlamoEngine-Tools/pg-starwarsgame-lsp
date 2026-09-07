@@ -436,6 +436,32 @@ describe('abilities that reveal the shield mesh', () => {
     });
 });
 
+describe('abilities that cloak the unit', () => {
+    it('makes a cloak worth a switch even with no proxy or clip', () => {
+        // `TIE_Phantom` is the report. Its `Unit_Ability` declares a Type, an icon and a
+        // `GUI_Activated_Ability_Name` and nothing else - no proxy, no bone, no particle, no clip -
+        // so the key rendered disabled and the cloak could never be engaged. Exactly the shape
+        // DEFEND was in before the shield got its own clause.
+        const rows = abilityRows([ability({ type: 'STEALTH' })], new Map());
+
+        assert.equal(rows[0].drivesSomething, true);
+        assert.match(rows[0].detail, /stealth mesh/i);
+    });
+
+    it('does the same for the other type that cloaks', () => {
+        // `Luke_Skywalker_Jedi` declares FORCE_CLOAK, which shares no word with STEALTH.
+        const rows = abilityRows([ability({ type: 'FORCE_CLOAK' })], new Map());
+
+        assert.equal(rows[0].drivesSomething, true);
+        assert.match(rows[0].detail, /stealth mesh/i);
+    });
+
+    it('says nothing about the shell for an ability that does not cloak', () => {
+        assert.doesNotMatch(
+            abilityRows([ability({ type: 'TURBO' })], new Map())[0].detail, /stealth/i);
+    });
+});
+
 describe('shieldRevealed', () => {
     it('is on while any revealing ability is active', () => {
         assert.equal(shieldRevealed(new Set(['DEFEND'])), true);

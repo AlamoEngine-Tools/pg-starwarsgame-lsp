@@ -12,12 +12,26 @@
 
 import * as React from 'react';
 
-/** One position on the dial. */
-export interface RotaryMode<Id extends string> {
-    id: Id;
-    /** A codicon name, without the `codicon-` prefix. */
+import { type ChoiceOption } from './choice';
+
+/**
+ * One position on the dial.
+ *
+ * A choice option with a place on the arc. Everything a position shares with a joined-button option
+ * - what it is called, what it is called at length, whether it can be taken - comes from the shared
+ * model; the angle and the count are the parts that only mean something on a dial.
+ *
+ * The icon is the one field that does NOT come from there, and deliberately. It is a codicon name
+ * rather than a meaning from the catalogue because these glyphs are calibrated as a set: the
+ * positions are 24px circles inside a 40px readout, and previewMode.ts records that a dense or
+ * already-round glyph fills its button edge to edge and the dial stops reading as a dial. Moving
+ * them to the catalogue means choosing six new glyphs against that constraint, which is a look
+ * decision rather than a refactor - so it is the last hole left in the icon seam, and it is open on
+ * purpose until someone picks them.
+ */
+export type RotaryMode<Id extends string> = Omit<ChoiceOption<Id>, 'icon'> & {
+    /** A codicon name, without the `codicon-` prefix. See the note above. */
     icon: string;
-    label: string;
     /** Degrees, 0 at 3 o'clock and 90 pointing down - so the arc above the centre is 180 to 360. */
     angle: number;
     /**
@@ -27,7 +41,7 @@ export interface RotaryMode<Id extends string> {
      * animations" is a finding worth surfacing in a preview whose job is to expose authoring gaps.
      */
     count?: number;
-}
+};
 
 /**
  * How far the positions sit from the centre.

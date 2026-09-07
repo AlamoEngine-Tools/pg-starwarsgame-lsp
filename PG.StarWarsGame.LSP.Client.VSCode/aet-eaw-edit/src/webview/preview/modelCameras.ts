@@ -8,9 +8,10 @@
 // the control: a reader who never sees the entry never learns the feature is there.
 
 import { type PreviewCamera } from '../../protocol/modelPreview';
+import { type ChoiceOption } from '../shared/choice';
 
 /** One selectable camera, or the one disabled entry that stands in for none. */
-export interface ModelCameraEntry {
+export type ModelCameraEntry = ChoiceOption<string> & {
     /** Unique within the list, which the name alone is not: nothing stops a file repeating one. */
     id: string;
 
@@ -23,7 +24,6 @@ export interface ModelCameraEntry {
     label: string;
 
     title: string;
-    disabled: boolean;
 
     /**
      * Where the camera stands and what it looks at, as the SERVER resolved them.
@@ -37,7 +37,7 @@ export interface ModelCameraEntry {
      */
     position: readonly number[] | null;
     target: readonly number[] | null;
-}
+};
 
 /** What the list says when the subject declares no camera of its own. */
 const NONE: ModelCameraEntry = {
@@ -46,8 +46,9 @@ const NONE: ModelCameraEntry = {
     // 447 of the 3340 shipped models carry one, as a Camera01 / Camera01.Target bone pair. That is
     // the note at the top of this file, which is where it belongs - a reader who wants to know what
     // the entry IS has the disabled button in front of them saying this model has none.
-    title: 'This model carries no camera of its own',
+    title: "Look from the model's own camera",
     disabled: true,
+    disabledReason: 'Author - this model carries no camera of its own',
     position: null,
     target: null,
 };
@@ -69,20 +70,20 @@ export function modelCameraEntries(cameras: readonly PreviewCamera[]): ModelCame
         // the reason nobody read the tooltip. It is in the docs for `label` above, which is where
         // someone looking for it will be.
         title: `Look from ${camera.name}, the author's own camera`,
-        disabled: false,
         position: camera.position ?? null,
         target: camera.target ?? null,
     }));
 }
 
 
-/** One entry in the camera group on the stage - a preset, or a camera the model carries. */
-export interface CameraViewOption {
-    id: string;
-    label: string;
-    title: string;
-    disabled: boolean;
-}
+/**
+ * One entry in the camera group on the stage - a preset, or a camera the model carries.
+ *
+ * A choice option, so the stage can hand the whole list to ModeSelector unchanged. `title` is
+ * required here where the shared type leaves it optional: every entry in this group has something
+ * longer to say than its label.
+ */
+export type CameraViewOption = ChoiceOption<string> & { title: string };
 
 /**
  * Every camera the reader can be looking from, as ONE list.
@@ -109,7 +110,6 @@ export function cameraViewOptions(
             id: preset.view,
             label: preset.label,
             title: preset.title,
-            disabled: false,
         })),
         ...modelCameraEntries(cameras),
     ];

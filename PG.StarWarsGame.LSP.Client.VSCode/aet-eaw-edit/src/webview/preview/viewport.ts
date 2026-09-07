@@ -51,6 +51,7 @@ import { type Inspection } from './inspector';
 import { emissionMeshFor } from './emissionSource';
 import { billboardLocalRotation, billboardRotation, billboardTypeOf } from './billboards';
 import { hiddenAt, visibilityTracks, type VisibilityTrack } from './boneVisibility';
+import { skinHiddenByClip } from './skinVisibility';
 import { drawnBounds } from './modelBounds';
 import { HeatPass } from './heatPass';
 import { BloomPass } from './bloomPass';
@@ -594,6 +595,18 @@ export class PreviewViewport {
         mesh?: THREE.Mesh;
         particleId?: string;
     }>();
+
+    /**
+     * Every bone a skinned mesh is weighted to, worked out once.
+     *
+     * Weak, so a mesh dropped when the subject changes takes its entry with it - this map is never
+     * cleared by hand and must not be the thing that keeps a discarded model alive.
+     */
+    private readonly skinBoneIds = new WeakMap<THREE.Mesh, readonly BoneId[]>();
+
+    /** The clip map {@link restingClipName} last answered for, and its answer. */
+    private restingClipFor: Map<string, VisibilityTrack> | null = null;
+    private restingClipCached: string | undefined;
 
     /** Each row's parent, so a hidden ancestor can veto without walking the scene graph. */
     private readonly rowParents = new Map<string, string | null>();
@@ -3496,6 +3509,29 @@ export class PreviewViewport {
             if (this.knownDecals.has(decal)) {
                 Object.assign(facts, damageMeshFacts(facts, this.shownDecals.has(decal)));
             }
+
+            // A SKINNED mesh rides no bone, so every track below missed it - see `skinVisibility`.
+            // Only ever a hide, and only ever ONE of the two questions.
+            //
+            // Asking both cost Yoda his blade during every attack. The rule is a hide-or-silence,
+            // so a clip that SHOWS the bones leaves `animated` undefined - and the idle's answer,
+            // computed beside it, then hid the mesh from below. `attack_00` shows the saber bones
+            // and `idle_00` hides them, so the resting pose was overruling the clip on screen.
+            //
+            // A resting pose is what the model does when nothing is playing. If something is
+            // playing, that clip is the only one entitled to speak.
+            const skin = this.skinBonesOf(target.mesh);
+
+            if (skin.length > 0) {
+                const playing = this.active.action !== null;
+                const asked = skinHiddenByClip(skin, playing
+                    ? id => this.animatedVisibilityOf(id)
+                    : id => this.restingVisibilityOf(id));
+
+                if (asked === true) {
+                    if (playing) { facts.animated = false; } else { facts.resting = false; }
+                }
+            }
         }
 
         if (target.boneIndex !== undefined) {
@@ -3510,7 +3546,15 @@ export class PreviewViewport {
             const id = this.hull()?.bonesByIndex.get(target.boneIndex)?.name;
 
             facts.animated = this.animatedVisibilityOf(id);
-            facts.resting = this.restingVisibilityOf(id);
+
+            // Only when nothing is playing, which is what a resting pose MEANS and what the method
+            // above it has always claimed. Computed unconditionally, the idle's opinion reached the
+            // chain from below whenever the playing clip happened to be silent about a bone - so a
+            // clip that shows a part the idle hides lost to the idle. Yoda's hilt is that: his
+            // `attack_00` shows `b_hilt` and his `idle_00` hides it, and the hilt stayed away.
+            facts.resting = this.active.action === null
+                ? this.restingVisibilityOf(id)
+                : undefined;
         }
 
         return facts;
@@ -3573,9 +3617,27 @@ export class PreviewViewport {
      * rule the user set.
      */
     private restingVisibilityOf(id: BoneId | undefined): boolean | undefined {
-        const clip = restingClip([...this.active.visibility.keys()]);
+        const clip = this.restingClipName();
 
         return clip === undefined ? undefined : this.trackedAt(clip, id, 0);
+    }
+
+    /**
+     * Which clip the model rests in, worked out once per set of clips.
+     *
+     * It was copied, sorted and searched on every call - and this is asked once per bone row
+     * per frame, now once per skin bone of every skinned mesh as well. The answer cannot
+     * change while the subject's clips do not, so it is memoised against the map it reads.
+     */
+    private restingClipName(): string | undefined {
+        const clips = this.active.visibility;
+
+        if (this.restingClipFor !== clips) {
+            this.restingClipFor = clips;
+            this.restingClipCached = restingClip([...clips.keys()]);
+        }
+
+        return this.restingClipCached;
     }
 
     private animatedVisibilityOf(id: BoneId | undefined): boolean | undefined {
@@ -3614,6 +3676,30 @@ export class PreviewViewport {
      * which is exactly how this broke before. The track is keyed by CANONICAL ID, and so is the
      * question; `resolveBoneId` is the fallback for a track written against a bare name.
      */
+    /**
+     * The canonical ids of every bone a mesh is weighted to, or empty when it is not skinned.
+     *
+     * Cached per mesh: this is asked on every frame of a playing clip, once per row, and the answer
+     * cannot change - a skeleton's joint list is fixed when the model loads. Rebuilding the array
+     * each time is the same mistake `resolveRows` records above about `skeleton()`.
+     */
+    private skinBonesOf(mesh: THREE.Mesh): readonly BoneId[] {
+        const cached = this.skinBoneIds.get(mesh);
+
+        if (cached !== undefined) {
+            return cached;
+        }
+
+        const skinned = mesh as THREE.SkinnedMesh;
+        const ids = skinned.isSkinnedMesh === true
+            ? (skinned.skeleton?.bones ?? []).map(bone => bone.name)
+            : [];
+
+        this.skinBoneIds.set(mesh, ids);
+
+        return ids;
+    }
+
     private trackedAt(clip: string, id: BoneId | undefined, seconds: number): boolean | undefined {
         const track = this.active.visibility.get(clip);
 

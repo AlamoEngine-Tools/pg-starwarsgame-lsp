@@ -88,7 +88,7 @@ public sealed class DialogDefinitionHandler : DefinitionHandlerBase
                 var originSelectionRange = new LspRange(
                     new Position(fact.Command.Line, arg.Column),
                     new Position(fact.Command.Line, arg.Column + arg.Text.Length));
-                _logger.LogDebug("Dialog go-to-def: '{Id}' → {Uri}:{Line}", arg.Text, origin.Uri, origin.Line);
+                _logger.LogDebug("Dialog go-to-def: '{Id}' -> {Uri}:{Line}", arg.Text, origin.Uri, origin.Line);
                 return Task.FromResult<LocationOrLocationLinks?>(
                     new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocationLink(originSelectionRange))));
             }

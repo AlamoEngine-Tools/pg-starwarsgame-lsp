@@ -345,6 +345,44 @@ describe('restingClip', () => {
         assert.equal(restingClip(['ev_at-at_attack_00', 'ev_at-at_die_00']), undefined);
     });
 
+    /**
+     * An ATTACK idle is not a resting pose, and Yoda is the model that proves it.
+     *
+     * He carries a cane at rest and draws the lightsaber to fight, and his clips say so: `idle_00`
+     * hides the `saber` bone and shows `stick`, while `attackidle_00` does the opposite. Matching
+     * any clip that merely CONTAINS "idle" picked `attackidle_00` - it sorts first - so the model
+     * opened with the blade out at his hip and the cane gone, on every frame, for every reader.
+     *
+     * The same trap `deathClip` beside this already avoids, and for the same reason: `diehard` is
+     * not a death and `attackidle` is not an idle. The word has to stand on its own.
+     */
+    it('does not mistake an attack idle for a resting pose', () => {
+        const yoda = [
+            'Ri_yoda_attack_00', 'Ri_yoda_attackidle_00', 'Ri_yoda_idle_00',
+            'Ri_yoda_walk_00',
+        ];
+
+        assert.equal(restingClip(yoda), 'Ri_yoda_idle_00');
+    });
+
+    it('still takes an idle that leads or trails the name', () => {
+        assert.equal(restingClip(['idle_00']), 'idle_00');
+        assert.equal(restingClip(['ev_at-at_idle']), 'ev_at-at_idle');
+    });
+
+    /**
+     * A qualified idle is still a rest when it is all the model has.
+     *
+     * Measured over the 2408 shipped clips: every qualified idle is a prefix - attackidle 108,
+     * crouchidle 23, flyidle 4, flylandidle 4 - and a flier whose only rest is `flyidle` has to
+     * rest on something. They lose to a plain idle; they do not stop counting.
+     */
+    it('falls back to a qualified idle when the model ships no plain one', () => {
+        assert.equal(restingClip(['ev_fighter_attack_00', 'ev_fighter_flyidle_00']),
+            'ev_fighter_flyidle_00');
+        assert.equal(restingClip(['ev_trooper_attackidle_00']), 'ev_trooper_attackidle_00');
+    });
+
     it('takes the same one every time when several match', () => {
         // Deterministic, or the model would open differently on different days.
         const clips = ['b_idle_01', 'a_idle_00'];

@@ -88,11 +88,11 @@ public sealed class StorySimulator
     {
         var node = _eventNodes.FirstOrDefault(n => n.Id == nodeId);
         if (node is null)
-            return snapshot with { Log = snapshot.Log.Add($"⚠ Unknown event node '{nodeId}'.") };
+            return snapshot with { Log = snapshot.Log.Add($"Unknown event node '{nodeId}'.") };
         if (_evaluator.GetLifecycle(nodeId, snapshot.Runtime) != StoryEventLifecycle.Armed)
             return snapshot with
             {
-                Log = snapshot.Log.Add($"⚠ '{node.Event!.Name}' is not armed - trigger ignored.")
+                Log = snapshot.Log.Add($"'{node.Event!.Name}' is not armed - trigger ignored.")
             };
 
         return Cascade(Fire(snapshot, node, "manual trigger"));
@@ -136,7 +136,7 @@ public sealed class StorySimulator
         }
 
         if (!fired)
-            next = next with { Log = next.Log.Add($"⚠ No armed event listens for '{notificationId}'.") };
+            next = next with { Log = next.Log.Add($"No armed event listens for '{notificationId}'.") };
         return Cascade(next);
     }
 
@@ -249,12 +249,12 @@ public sealed class StorySimulator
             if (edge.Label?.Contains("DISABLE", StringComparison.OrdinalIgnoreCase) == true)
             {
                 runtime = runtime.WithDisabled(edge.ToId);
-                log = log.Add($"  → disabled '{EventNameOf(edge.ToId)}'.");
+                log = log.Add($"  -> disabled '{EventNameOf(edge.ToId)}'.");
             }
             else
             {
                 triggered = triggered.Add(edge.ToId);
-                log = log.Add($"  → triggered '{EventNameOf(edge.ToId)}'.");
+                log = log.Add($"  -> triggered '{EventNameOf(edge.ToId)}'.");
             }
 
         // Flag-writing rewards (schema StoryFlag params on the reward side). SET_FLAG writes
@@ -277,7 +277,7 @@ public sealed class StorySimulator
                             ? amount
                             : 1;
                     runtime = runtime.WithFlag(flag, value);
-                    log = log.Add($"  → flag {flag} = {value}.");
+                    log = log.Add($"  -> flag {flag} = {value}.");
                 }
             }
 
@@ -293,7 +293,7 @@ public sealed class StorySimulator
                     if (match is not null)
                     {
                         runtime = runtime with { SuspendedThreads = runtime.SuspendedThreads.Remove(match) };
-                        log = log.Add($"  → activated thread '{element}'.");
+                        log = log.Add($"  -> activated thread '{element}'.");
                     }
                 }
             }

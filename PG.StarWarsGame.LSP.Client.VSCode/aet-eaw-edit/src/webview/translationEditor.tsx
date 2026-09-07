@@ -39,6 +39,8 @@ import {
 } from './translationNewRow';
 import { applyStaged, coalesce, TranslationCommand } from './translationStaging';
 import { countDuplicateKeys, nextSort, sortRows, SortState } from './translationView';
+import { Button } from './shared/Button';
+import { Field } from './shared/Field';
 
 function App(): React.JSX.Element {
     const [filter, setFilter] = useState('');
@@ -591,8 +593,7 @@ function AddTranslationDialog(props: {
                     Add is disabled - both have to stay readable while the language list scrolls,
                     or a small dialog hides the thing you are being asked to fix. */}
                 <div className="modal-pinned">
-                <label className="field">
-                    <span>Key</span>
+                <Field label="Key" as="label">
                     <input
                         type="text"
                         value={draft.key}
@@ -605,7 +606,7 @@ function AddTranslationDialog(props: {
                         }}
                         onBlur={() => setTouched(true)}
                     />
-                </label>
+                </Field>
                 {touched && error !== null && (
                     <p className="field-error">
                         <span className="codicon codicon-error" aria-hidden="true" />
@@ -636,14 +637,13 @@ function AddTranslationDialog(props: {
                 <div className="modal-body">
                 <div className="languages">
                     {props.languages.map(language => (
-                        <label className="field" key={language}>
-                            <span>{language}</span>
+                        <Field label={language} as="label" key={language}>
                             <input
                                 type="text"
                                 value={draft.values.find(v => v.language === language)?.value ?? ''}
                                 onChange={e => setValue(language, e.target.value)}
                             />
-                        </label>
+                        </Field>
                     ))}
                 </div>
 
@@ -657,8 +657,15 @@ function AddTranslationDialog(props: {
                         <span className="codicon codicon-info" aria-hidden="true" />
                         Languages left empty stay empty.
                     </p>
-                    <button type="button" onClick={props.onCancel}>Cancel</button>
-                    <button type="submit" className="primary" disabled={error !== null}>Add</button>
+                    <Button onClick={props.onCancel}>Cancel</Button>
+                    <Button
+                        submit
+                        className="primary"
+                        disabled={error !== null}
+                        disabledReason={error ?? 'Fill in the fields above'}
+                    >
+                        Add
+                    </Button>
                 </div>
                 <ResizeHandles handleProps={resizeHandleProps} />
             </form>

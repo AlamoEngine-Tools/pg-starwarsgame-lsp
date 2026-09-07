@@ -51,7 +51,7 @@ var eawPathOption = new Option<DirectoryInfo>("--path", "-p")
 
 var eawCommand = new Command("eaw",
     "Build an Empire at War baseline. " +
-    "Note: full EaW engine support is not yet implemented; game-object and SFX projection uses FoC-mode against the EaW path.")
+    "Full EaW engine support is not implemented - game-object and SFX projection runs in FoC mode against the EaW path.")
 {
     eawPathOption, outputOption, schemaOption
 };

@@ -134,7 +134,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
             var normalized = resolved.Replace('\\', '/');
             var slashIdx = normalized.LastIndexOf('/');
             var filename = slashIdx >= 0 ? normalized[(slashIdx + 1)..] : normalized;
-            markdown = $"**require** `{requireArg}`\n→ `{filename}`";
+            markdown = $"**require** `{requireArg}`\n-> `{filename}`";
         }
         else
         {
@@ -278,7 +278,7 @@ public sealed class LuaHoverHandler : ILuaHoverProvider
         if (ann.IsDeprecated)
         {
             sb.AppendLine();
-            sb.Append("*⚠ Deprecated*");
+            sb.Append("*Deprecated*");
         }
 
         if (ann.Description is not null)

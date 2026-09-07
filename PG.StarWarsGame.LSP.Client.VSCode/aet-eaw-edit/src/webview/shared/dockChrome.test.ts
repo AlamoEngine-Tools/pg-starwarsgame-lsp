@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 import { dockChromeCss, rotarySwitchCss } from './dockChrome';
+import { scaleCss } from './tokens';
 
 /** Every class this stylesheet defines a rule for. */
 function selectorsIn(css: string): Set<string> {
@@ -73,7 +74,9 @@ describe('dockChromeCss', () => {
 
         // `assert.notMatch` does not survive the test bundle's interop shim, though `match` does.
         assert.equal(/opacity/.test(title), false, title);
-        assert.match(title, /color:\s*var\(--vscode-descriptionForeground/);
+        // The colour comes from a role now. It used to be descriptionForeground here and the link
+        // colour in .panel-section - two chromes for one thing - and the role is what settles it.
+        assert.match(title, /color:\s*var\(--colour-heading\)/);
     });
 
     /**
@@ -116,7 +119,9 @@ describe('dockChromeCss', () => {
      */
     it('gives a field note a warning colour without changing anything else about it', () => {
         assert.match(dockChromeCss, /\.field-warn\s*\{[^}]*editorWarning-foreground/);
-        assert.match(dockChromeCss, /\.field-warn\s*\{[^}]*font-size:\s*0\.9em/);
+        // The size comes off the type scale now. Still asserted, because the point of the rule is
+        // that a warning note is a note that changed COLOUR and nothing else.
+        assert.match(dockChromeCss, /\.field-warn\s*\{[^}]*font-size:\s*var\(--font-size-smaller\)/);
     });
 
     /** An action in a settings pane needs a surface. A borderless glyph reads as an ornament. */
@@ -151,11 +156,19 @@ describe('rotarySwitchCss', () => {
 
     /** A glyph that fills its circle stops the circle reading as a switch position. */
     it('leaves a ring of ground around every glyph', () => {
-        const glyph = /\.rotary-pos \.codicon\s*\{[^}]*font-size:\s*(\d+)px/.exec(rotarySwitchCss);
+        // The glyph size is a token now and the face is still a fitted dimension, so the ratio is
+        // measured across the two: resolve the token out of the scale rather than weakening the
+        // assertion to "it names a token", which would stop checking the thing that matters.
+        const named = /\.rotary-pos \.codicon\s*\{[^}]*font-size:\s*var\((--[a-z0-9-]+)\)/
+            .exec(rotarySwitchCss);
+        assert.ok(named !== null, 'the glyph size is not taken from a token');
+
+        const step = new RegExp(`${named[1]}\\s*:\\s*(\\d+)px`).exec(scaleCss);
         const face = /\.rotary-pos\s*\{[^}]*width:\s*(\d+)px/.exec(rotarySwitchCss);
 
-        assert.ok(glyph !== null && face !== null);
-        assert.ok(Number(glyph[1]) / Number(face[1]) < 0.5,
+        assert.ok(step !== null, `${named[1]} is not defined in the scale`);
+        assert.ok(face !== null);
+        assert.ok(Number(step[1]) / Number(face[1]) < 0.5,
             'the glyph covers half its button or more');
     });
 });

@@ -681,7 +681,7 @@
             "order": 2155,
             "type": "boolean",
             "default": false,
-            "markdownDescription": "Shows the energy pool in the model preview: its bar under the ability bar, its row in the target readout, and the `Projectile_Does_Energy_Damage` switch on the attacker.\n\n**Off by default on purpose.** The energy mechanic is implemented in the engine and works, but the shipped game disables it and offers no interface for it, so nothing you author against it will be visible to a player unless you have enabled it yourself. Turn this on only if you know that is what you want.\n\nThis setting affects the preview only. `Energy_Capacity` and `Projectile_Does_Energy_Damage` are read from your files either way."
+            "markdownDescription": "Shows the energy pool in the model preview: its bar under the ability bar, its row in the target readout, and the `Projectile_Does_Energy_Damage` switch on the attacker.\n\n**Off by default on purpose.** The engine implements the energy mechanic, but the shipped game disables it and offers no interface for it, so nothing authored against it reaches a player unless the mod enables it.\n\nThis setting affects the preview only. `Energy_Capacity` and `Projectile_Does_Energy_Damage` are read from your files either way."
           },
           "aet-eaw-edit.shaders.directory": {
             "order": 2160,
@@ -731,9 +731,9 @@
     "check-types": "tsc -p ./ --noEmit && tsc -p ./src/webview --noEmit && tsc -p ./src/webview/tsconfig.test.json --noEmit",
     "watch": "node esbuild.js --watch",
     "watch:tsc": "tsc -p ./ --noEmit --watch",
-    "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\"",
+    "test:unit": "node esbuild.test.js && node --test \"out/test-unit/**/*.test.js\" && node --test \"scripts/**/*.test.js\"",
     "pretest": "npm run compile && npm run lint",
-    "lint": "node scripts/lint-styled-css.js && eslint src",
+    "lint": "node scripts/lint-styled-css.js && node scripts/lint-ascii-strings.js && eslint src",
     "test": "vscode-test",
     "package": "vsce package --no-dependencies"
   },

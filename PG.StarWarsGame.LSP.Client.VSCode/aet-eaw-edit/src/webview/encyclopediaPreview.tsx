@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The panel around the card: a centred stage with the tool dock on the right, matching the layout
@@ -23,15 +23,17 @@ import styled from 'styled-components';
 import { GetEncyclopediaEntryResult } from '../protocol/encyclopedia';
 import { EncyclopediaCard } from './encyclopediaCard';
 import { encyclopediaNotices, noticeSeverity } from './encyclopediaNotices';
-import { severityIconFor } from './loc/validateState';
 import {
     dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
 } from './shared/dockChrome';
+import { DockSection } from './shared/DockSection';
+import { Field } from './shared/Field';
 import { ProblemsPanel } from './shared/ProblemsPanel';
 import { problemLook } from './shared/problemLook';
 import { RightDock } from './shared/RightDock';
 
 import { initPanelLayout } from './shared/panelLayoutBridge';
+import { SeverityTag } from './shared/SeverityTag';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -70,7 +72,7 @@ const Shell = styled.div`
     flex-direction: row;
     min-height: 0;
     font-family: var(--vscode-font-family);
-    font-size: 12px;
+    font-size: var(--font-size-12);
 
     /* The stage column: the card, with the notes bar under it. The bar sits INSIDE this column so
        it borders the dock rather than running underneath it - the dock stays full height. Same
@@ -94,11 +96,11 @@ const Shell = styled.div`
         display: flex;
         align-items: safe center;
         justify-content: safe center;
-        padding: 16px;
+        padding: var(--space-16);
     }
     .preview-stage > * { flex: 0 0 auto; }
 
-    .empty { padding: 12px; opacity: 0.7; }
+    .empty { padding: var(--space-12); opacity: 0.7; }
 
     /* ── Header: the severity tag ───────────────────────────────────────── */
     .dock-header { min-height: 34px; }
@@ -109,7 +111,7 @@ const Shell = styled.div`
         text-overflow: ellipsis;
         white-space: nowrap;
         /* Clear of the tag floating over the right edge. */
-        padding: 0 34px;
+        padding: 0 var(--space-24);
     }
 
     /* ── Foot of the editor: what the tag has to say ────────────────────── */
@@ -119,15 +121,15 @@ const Shell = styled.div`
         display: flex;
         flex-direction: column;
         min-height: 0;
-        border-top: 1px solid var(--vscode-panel-border, #444);
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
         background: var(--vscode-sideBar-background, #252526);
-        font-size: 12px;
+        font-size: var(--font-size-12);
     }
     /* This editor's notices are PROSE, not the short entry labels the other two report, so they
        wrap instead of being clamped to the row - the shared rule's one-line ellipsis would hide
        most of every message. Full width is available here, which is the whole reason these moved
        out of the dock. */
-    .encyclopedia-problems .problem-row { align-items: flex-start; padding: 3px 6px; }
+    .encyclopedia-problems .problem-row { align-items: flex-start; padding: var(--space-2) var(--space-6); }
     .encyclopedia-problems .problem-msg {
         white-space: normal;
         overflow: visible;
@@ -135,7 +137,7 @@ const Shell = styled.div`
         /* A Windows path has no break opportunity in it, so without this it runs off the edge. */
         overflow-wrap: anywhere;
     }
-    .encyclopedia-problems .problem-row .codicon { margin-top: 2px; }
+    .encyclopedia-problems .problem-row .codicon { margin-top: var(--space-2); }
 
     /* ── Content: the ship name pool ────────────────────────────────────── */
     /* A real list, one name per row, scrolling in place - the Star Destroyer pool alone is nineteen
@@ -145,26 +147,30 @@ const Shell = styled.div`
     /* The library fills the level it owns rather than stopping at a guessed height: a nineteen-name
        pool should use a tall dock, and a short one should not leave a box of dead space. */
     .dock-content { display: flex; flex-direction: column; }
+    /* Through the body as well as the section. DockSection wraps its children in .dock-section-body,
+       so without this the fill stops at the section and the list keeps its minimum height with dead
+       space under it. */
     .dock-content > .dock-section { flex: 1; min-height: 0; }
+    .dock-content > .dock-section > .dock-section-body { flex: 1; min-height: 0; }
 
     .name-list {
         display: flex;
         flex-direction: column;
         margin: 0;
-        padding: 2px;
+        padding: var(--space-2);
         list-style: none;
         flex: 1;
         min-height: 60px;
         overflow-y: auto;
-        border: 1px solid var(--vscode-panel-border, #444);
-        border-radius: 3px;
+        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-radius: var(--radius-3);
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.06));
     }
     .name-list li {
         display: flex;
         align-items: baseline;
-        gap: 6px;
-        padding: 3px 6px;
+        gap: var(--space-6);
+        padding: var(--space-2) var(--space-6);
         border-left: 2px solid transparent;
         cursor: default;
     }
@@ -177,13 +183,13 @@ const Shell = styled.div`
     }
     .name-list li .drawn-tag {
         margin-left: auto;
-        font-size: 10px;
+        font-size: var(--font-size-10);
         font-weight: normal;
         opacity: 0.7;
         white-space: nowrap;
     }
     /* ── Foot: the view controls ────────────────────────────────────────── */
-    .dock-overview .field + .field { margin-top: 2px; }
+    .dock-overview .field + .field { margin-top: var(--space-2); }
 `;
 
 function App(): React.JSX.Element {
@@ -332,30 +338,19 @@ function App(): React.JSX.Element {
                 maxWidth={420}
                 header={<>
                     <span className="header-title" title={entry?.objectId}>{title}</span>
-                    <button
-                        className={`icon-btn validate-btn header-right sev-${severity}`}
+                    <SeverityTag
+                        severity={severity}
+                        count={notices.length}
+                        expanded={noticesOpen}
                         disabled={notices.length === 0}
-                        aria-expanded={noticesOpen}
+                        disabledReason="Nothing to report about this card"
+                        title={`${notices.length} ${noticeWord} about this card. `
+                            + `Press to ${noticesOpen ? 'hide' : 'read'} them.`}
                         onClick={() => setNoticesOpen(open => !open)}
-                        title={notices.length === 0
-                            ? 'Nothing to report about this card.'
-                            : `${notices.length} ${noticeWord} about this card. `
-                              + `Press to ${noticesOpen ? 'hide' : 'read'} them.`}
-                    >
-                        <span className={`codicon codicon-${severityIconFor(severity)}`} />
-                        {notices.length > 0 ? ` ${notices.length}` : ''}
-                    </button>
+                    />
                 </>}
                 content={<>
-                    <div className="dock-section">
-                        <div className="dock-section-title">
-                            Ship names
-                            {entry?.shipNames && (
-                                <span className="section-count">
-                                    {entry.shipNames.names.length}
-                                </span>
-                            )}
-                        </div>
+                    <DockSection title="Ship names" count={entry?.shipNames?.names.length}>
                         {/* Three cases, and the middle one is why this is not a ternary: a pool
                             that read empty must not draw an empty bordered box, and must not be
                             described as "not registered" either - it IS wired up, and the notes
@@ -387,11 +382,10 @@ function App(): React.JSX.Element {
                                 GameConstants under ShipNameTextFiles draw an individual name here.
                             </div>
                         )}
-                    </div>
+                    </DockSection>
                 </>}
                 overview={<>
-                    <label className="field">
-                        <span className="field-label">Zoom {zoom.toFixed(2)}x</span>
+                    <Field label={`Zoom ${zoom.toFixed(2)}x`} as="label">
                         <input
                             type="range"
                             min={ZOOM_MIN}
@@ -401,11 +395,10 @@ function App(): React.JSX.Element {
                             onChange={e => setZoom(clampZoom(Number(e.target.value)))}
                             title="Drag, or scroll over the preview"
                         />
-                    </label>
+                    </Field>
 
                     {factionFrames.length > 1 && (
-                        <label className="field">
-                            <span className="field-label">Faction frame</span>
+                        <Field label="Faction frame" as="label">
                             <select
                                 value={factionSlot}
                                 onChange={e => setFactionSlot(Number(e.target.value))}
@@ -422,7 +415,7 @@ function App(): React.JSX.Element {
                                     </option>
                                 ))}
                             </select>
-                        </label>
+                        </Field>
                     )}
 
                     <label

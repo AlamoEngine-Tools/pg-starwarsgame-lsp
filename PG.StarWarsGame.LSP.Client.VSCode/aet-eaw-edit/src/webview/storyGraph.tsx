@@ -27,6 +27,7 @@ import { RightDock } from './shared/RightDock';
 import { ProblemsPanel, type ProblemFilterControl } from './shared/ProblemsPanel';
 import { filterProblems } from './shared/problemFilter';
 import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
+import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
 import { labelLayout, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
@@ -37,7 +38,7 @@ import { paramRowSpecs } from './storyGraph/paramRows';
 import { StagedRenames } from './storyGraph/stagedRenames';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
 import { useEdgeResize } from './useEdgeResize';
-import { severityIconFor, worstSeverity } from './loc/validateState';
+import { worstSeverity } from './loc/validateState';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
 import { AreaExtensions, AreaPlugin } from 'rete-area-plugin';
@@ -53,6 +54,15 @@ import {
 
 import { readPanelSize, writePanelSize } from './shared/panelLayout';
 import { initPanelLayout } from './shared/panelLayoutBridge';
+import { Button, IconButton } from './shared/Button';
+import { DockSection } from './shared/DockSection';
+import { colourResolver } from './shared/resolveColour';
+import { SeverityTag } from './shared/SeverityTag';
+import { tokensRootCss } from './shared/tokens';
+import {
+    JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
+    branchToken, laneToken,
+} from './storyGraph/palette';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -176,20 +186,9 @@ const renameDrafts = new Map<string, string>();
  * light/dark), so branch colours belong to the theme rather than being hard-coded hues. Branches
  * beyond the palette length reuse a colour; that's fine for the handful of branches a thread has.
  */
-const BRANCH_CHART_VARS = [
-    '--vscode-charts-blue',
-    '--vscode-charts-green',
-    '--vscode-charts-orange',
-    '--vscode-charts-purple',
-    '--vscode-charts-red',
-    '--vscode-charts-yellow',
-];
-
 /** Stable themed chart colour per branch name - shared by the node glow and the edge glow. */
 function branchColor(branch: string): string {
-    let hash = 0;
-    for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }
-    return `var(${BRANCH_CHART_VARS[Math.abs(hash) % BRANCH_CHART_VARS.length]})`;
+    return `var(${branchToken(branch)})`;
 }
 
 /**
@@ -567,32 +566,23 @@ const LABEL_MEASURE_PX = 100;
 /** Inset between a node's rect and its label text, in screen pixels. */
 const LABEL_PAD = 4;
 
-// Overview colour for a node (canvas needs a concrete colour, not a CSS var): events by lifecycle
-// (matching the node border + legend), junctions purple.
-function lodColor(dto: StoryGraphNodeDto): string {
-    if (dto.kind !== 'Event') { return '#b180d7'; }
-    switch (dto.lifecycle) {
-        case 'Waiting': return '#3794ff';
-        case 'Armed': return '#89d185';
-        case 'Fired': return '#b180d7';
-        case 'Disabled': return '#f14c4c';
-        default: return '#888888';
-    }
+// Overview colour for a node: events by lifecycle (matching the node border + legend), junctions
+// the colour a fired event takes.
+function lodToken(dto: StoryGraphNodeDto): string {
+    if (dto.kind !== 'Event') { return JUNCTION_TOKEN; }
+    return LIFECYCLE_TOKENS[dto.lifecycle as keyof typeof LIFECYCLE_TOKENS] ?? UNKNOWN_LIFECYCLE_TOKEN;
 }
 
-// Hex forms of the branch chart palette, SAME order/hash as branchColor + BRANCH_CHART_VARS, so an
-// overview node's colour matches the branch glow the real node gets (canvas can't use CSS vars).
-const BRANCH_CHART_HEX = ['#3794ff', '#89d185', '#d18616', '#b180d7', '#f14c4c', '#cca700'];
-function branchColorHex(branch: string): string {
-    let hash = 0;
-    for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }
-    return BRANCH_CHART_HEX[Math.abs(hash) % BRANCH_CHART_HEX.length];
-}
-
-/** Overview colour for a node: its branch colour (matching the real node's glow) if it has a branch,
- * otherwise the lifecycle colour. */
-function overviewColor(dto: StoryGraphNodeDto, branch: string | null): string {
-    return branch ? branchColorHex(branch) : lodColor(dto);
+/**
+ * Overview colour for a node: its branch colour (matching the real node's glow) if it has a branch,
+ * otherwise the lifecycle colour.
+ *
+ * A TOKEN, not a colour. It is stored on the model and resolved in the draw pass, so a theme switch
+ * repaints the overview without the model being rebuilt - which is also why the hex mirror of the
+ * branch palette this used to index is gone.
+ */
+function overviewToken(dto: StoryGraphNodeDto, branch: string | null): string {
+    return branch ? branchToken(branch) : lodToken(dto);
 }
 
 async function createEditor(container: HTMLElement): Promise<EditorHandle> {
@@ -840,7 +830,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // has mounted. Minimap, swimlanes and save-layout read this (not area.nodeViews) so they stay
     // whole once node mounting is windowed. Synced by rebuildModel() after each full build/patch and
     // upserted per node on drag (the 'nodetranslated' pipe below).
-    interface ModelNode { dto: StoryGraphNodeDto; x: number; y: number; w: number; h: number; color: string; }
+    interface ModelNode { dto: StoryGraphNodeDto; x: number; y: number; w: number; h: number; colorToken: string; }
     const graphModel = new Map<string, ModelNode>();
 
     const rebuildModel = (): void => {
@@ -850,7 +840,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             graphModel.set(node.id, {
                 dto: node.dto, w: node.width, h: node.height,
                 x: view?.position.x ?? 0, y: view?.position.y ?? 0,
-                color: overviewColor(node.dto, node.branchGlow),
+                colorToken: overviewToken(node.dto, node.branchGlow),
             });
         }
     };
@@ -934,7 +924,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 graphModel.set(id, {
                     dto: node.dto, w: node.width, h: node.height,
                     x: view.position.x, y: view.position.y,
-                    color: overviewColor(node.dto, node.branchGlow),
+                    colorToken: overviewToken(node.dto, node.branchGlow),
                 });
             }
             scheduleGeometryChanged();
@@ -1045,14 +1035,14 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         }
         graphModel.clear();
         const branchByEvent = branchIndex(nodes);
-        const colorFor = (dto: StoryGraphNodeDto): string => overviewColor(dto, branchOfNodeId(dto.id, branchByEvent));
+        const colorFor = (dto: StoryGraphNodeDto): string => overviewToken(dto, branchOfNodeId(dto.id, branchByEvent));
         for (const dto of events) {
             // An event with no stored entry - newly added since the layout was written - is left
             // for the placement pass below rather than discarding everyone else's positions.
             const e = stored.get(layoutKey(dto));
             if (e === undefined) { continue; }
             const { w, h } = modelSizeFor(dto);
-            graphModel.set(dto.id, { dto, x: e.x, y: e.y, w, h, color: colorFor(dto) });
+            graphModel.set(dto.id, { dto, x: e.x, y: e.y, w, h, colorToken: colorFor(dto) });
         }
         // Everything still unplaced - junctions, and events added since the layout was saved - sits
         // at the midpoint of its neighbours. Some connect only to OTHER unplaced nodes, so iterate
@@ -1065,7 +1055,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const dto of junctions) {
                 if (graphModel.has(dto.id)) { continue; }
                 const pos = modelPlaceNode(dto, edges);
-                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), color: colorFor(dto) }); changed = true; }
+                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto) }); changed = true; }
             }
             if (!changed) { break; }
         }
@@ -1074,7 +1064,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const m of graphModel.values()) { cx += m.x + m.w / 2; cy += m.y + m.h / 2; n += 1; }
             cx = n ? cx / n : 0; cy = n ? cy / n : 0;
             for (const dto of junctions) {
-                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), color: colorFor(dto) }); }
+                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), colorToken: colorFor(dto) }); }
             }
         }
         return true;
@@ -1288,7 +1278,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         for (const [id, m] of graphModel) { oldPos.set(id, { x: m.x, y: m.y }); }
         graphModel.clear();
         const branchByEvent = branchIndex(nodes);
-        const colorFor = (dto: StoryGraphNodeDto): string => overviewColor(dto, branchOfNodeId(dto.id, branchByEvent));
+        const colorFor = (dto: StoryGraphNodeDto): string => overviewToken(dto, branchOfNodeId(dto.id, branchByEvent));
         const rest: StoryGraphNodeDto[] = [];
         let placedFromDrop = false;
         for (const dto of nodes) {
@@ -1304,7 +1294,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const jpos = je?.kind === dto.kind ? { x: je.x, y: je.y } : undefined;
             const pos = old ?? drop ?? jpos ?? (s ? { x: s.x, y: s.y } : null);
             if (pos) {
-                graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), color: colorFor(dto) });
+                graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto) });
                 if (drop && key) { pendingDropPositions.delete(key); placedFromDrop = true; }
                 if (jpos && owner) { pendingJunctionPositions.delete(owner); }
             } else { rest.push(dto); } // new node with no known spot - placed below from its neighbours
@@ -1314,7 +1304,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const dto of rest) {
                 if (graphModel.has(dto.id)) { continue; }
                 const pos = modelPlaceNode(dto, edges);
-                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), color: colorFor(dto) }); changed = true; }
+                if (pos) { graphModel.set(dto.id, { dto, x: pos.x, y: pos.y, ...modelSizeFor(dto), colorToken: colorFor(dto) }); changed = true; }
             }
             if (!changed) { break; }
         }
@@ -1323,7 +1313,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const m of graphModel.values()) { cx += m.x + m.w / 2; cy += m.y + m.h / 2; n += 1; }
             cx = n ? cx / n : 0; cy = n ? cy / n : 0;
             for (const dto of rest) {
-                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), color: colorFor(dto) }); }
+                if (!graphModel.has(dto.id)) { graphModel.set(dto.id, { dto, x: cx, y: cy, ...modelSizeFor(dto), colorToken: colorFor(dto) }); }
             }
         }
         if (placedFromDrop) { saveAllPositions(); } // persist the drop, like patch() does
@@ -1702,6 +1692,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         drawLodTo(canvas: HTMLCanvasElement): void {
             const ctx = canvas.getContext('2d');
             if (!ctx) { return; }
+            // Once per frame, never per node: it reads the computed style, and the whole point of
+            // this overview is that a large campaign stays cheap to draw. Per frame rather than
+            // cached across frames is what lets a theme switch land without anything listening.
+            const colour = colourResolver(container);
             const w = container.clientWidth, h = container.clientHeight;
             const dpr = window.devicePixelRatio || 1;
             if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
@@ -1723,7 +1717,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // mounts no rete connections), so connections are consistent regardless of what's on screen.
             const bezier = k >= K_LABEL;
             ctx.globalAlpha = 0.4;
-            ctx.strokeStyle = '#999999';
+            ctx.strokeStyle = colour('--colour-muted');
             ctx.lineWidth = 1;
             ctx.beginPath();
             for (const e of lastEdges) {
@@ -1748,10 +1742,10 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             let fontPx = 11;
             let maxLines = 1;
             let advancePerPx = 0;
-            let labelColor = '#cccccc';
+            // Resolved with the rest of the frame's colours rather than re-read here: it was the
+            // one canvas colour that already followed the theme, and now they all do.
+            const labelColor = colour('--colour-editor-ink');
             if (showLabels) {
-                labelColor = getComputedStyle(container).getPropertyValue('--vscode-editor-foreground').trim() || '#cccccc';
-
                 // Measure the font once per frame instead of assuming 0.55em per character. The
                 // guess is what made the truncation land in the wrong place, so most names were
                 // sliced down to their first few characters.
@@ -1786,7 +1780,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
                 const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
                 if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
-                const color = m.color;
+                const color = colour(m.colorToken);
                 ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
                 ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(sx, sy, sw, sh);
                 if (showLabels && m.dto.kind === 'Event' && sw > 30) {
@@ -1811,6 +1805,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         drawSwimlanesTo(canvas: HTMLCanvasElement, showThread: boolean, showChapter: boolean): void {
             const ctx = canvas.getContext('2d');
             if (!ctx) { return; }
+            // One read for the frame, as in drawLodTo. There are far fewer lanes than nodes, but
+            // the resolver also memoises, so a lane repeating a hue costs nothing after the first.
+            const colour = colourResolver(container);
             const w = container.clientWidth, h = container.clientHeight;
             const dpr = window.devicePixelRatio || 1;
             if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
@@ -1826,7 +1823,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 for (const g of computeGroupBounds(by)) {
                     const sx = g.x * k + x, sy = g.y * k + y, sw = g.w * k, sh = g.h * k;
                     if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
-                    const color = laneColorFor(by + ':' + g.key);
+                    const color = colour(laneToken(by + ':' + g.key));
                     ctx.globalAlpha = 0.07; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
                     ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
                     ctx.setLineDash(dashed ? [8, 4] : []);
@@ -1882,7 +1879,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             const m = graphModel.get(nodeId);
             if (m && m.dto.kind === 'Event') {
                 m.dto = newDto ?? update(m.dto);
-                m.color = overviewColor(m.dto, m.dto.branch ?? null);
+                m.colorToken = overviewToken(m.dto, m.dto.branch ?? null);
             }
         },
         repaintNodes(nodeIds: Iterable<string>): void {
@@ -1918,12 +1915,12 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     color: var(--vscode-editor-foreground);
     border: 2px solid var(--vscode-disabledForeground, #888);
-    border-radius: 6px;
+    border-radius: var(--radius-6);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    padding: 2px 10px;
+    padding: var(--space-2) var(--space-8);
     cursor: pointer;
     /* The OR node's box is transparent - the rotated inner square is its shape - so outlining the
        box draws a rectangle around a diamond. Outline the diamond instead: an outline on a rotated
@@ -1940,7 +1937,7 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     ` : ''}
 
     .title {
-        font-size: 12px;
+        font-size: var(--font-size-12);
         font-family: var(--vscode-font-family);
         text-align: center;
         overflow: hidden;
@@ -1970,13 +1967,13 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         inset: 15%;
         transform: rotate(45deg);
         border: 2px solid var(--vscode-disabledForeground, #888);
-        border-radius: 4px;
+        border-radius: var(--radius-3);
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     }
     &.k-OrJunction .title, &.k-StagingOr .title { position: relative; z-index: 1; }
     &.k-Portal, &.k-TacticalPlot {
         border-style: dashed;
-        border-radius: 12px;
+        border-radius: var(--radius-6);
     }
     /* Dashed = "not yet attached", same visual language as Portal/TacticalPlot's "not fully
        resolved" - nothing about a staging junction is saved until its output reaches an event. */
@@ -1992,10 +1989,10 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-align: center;
         border-radius: 50%;
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-        border: 1px solid var(--vscode-disabledForeground, #888);
+        border: var(--space-1) solid var(--vscode-disabledForeground, #888);
         color: var(--vscode-descriptionForeground);
         cursor: pointer;
-        font-size: 10px;
+        font-size: var(--font-size-10);
         padding: 0;
     }
     .discard:hover { color: var(--vscode-errorForeground, #f44); }
@@ -2009,10 +2006,10 @@ const NodeBox = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         text-align: center;
         border-radius: 50%;
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-        border: 1px solid var(--vscode-disabledForeground, #888);
+        border: var(--space-1) solid var(--vscode-disabledForeground, #888);
         color: var(--vscode-descriptionForeground);
         cursor: pointer;
-        font-size: 10px;
+        font-size: var(--font-size-10);
         padding: 0;
     }
     .jump:hover { color: var(--vscode-focusBorder); }
@@ -2107,31 +2104,33 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
     color: var(--vscode-editor-foreground);
     border: 2px solid var(--vscode-disabledForeground, #888);
-    border-radius: 6px;
+    border-radius: var(--radius-6);
     box-sizing: border-box;
     display: flex;
     flex-direction: column;
-    padding: 4px 8px 6px;
-    font-size: 11px;
+    padding: var(--space-4) var(--space-8) var(--space-6);
+    font-size: var(--font-size-11);
     font-family: var(--vscode-font-family);
     cursor: default;
     ${p => p.selected ? 'outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;' : ''}
 
-    &.lc-Waiting  { border-color: var(--vscode-charts-blue,   #3794ff); }
-    &.lc-Armed    { border-color: var(--vscode-charts-green,  #89d185); }
-    &.lc-Fired    { border-color: var(--vscode-charts-purple, #b180d7); }
-    &.lc-Disabled { border-color: var(--vscode-charts-red,    #f14c4c); }
+    /* Generated from LIFECYCLE_TOKENS, which the legend swatches and the overview rects also read.
+       These four rules, those swatches and a hex mirror for the canvas used to be three separate
+       copies of one mapping, kept in step by hand. */
+    ${Object.entries(LIFECYCLE_TOKENS)
+        .map(([lifecycle, token]) => `&.lc-${lifecycle} { border-color: var(${token}); }`)
+        .join('\n    ')}
     &.unreachable { opacity: 0.5; }
     &.untested    { border-style: dashed; }
 
     .header {
         display: flex;
         align-items: center;
-        gap: 3px;
+        gap: var(--space-2);
         height: ${EVENT_HEADER_H}px;
         flex-shrink: 0;
-        border-bottom: 1px solid var(--vscode-panel-border);
-        margin-bottom: 2px;
+        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        margin-bottom: var(--space-2);
     }
     /* Same Drag.NoDrag wrapper-span problem as .row > span: the wrappers are plain inline spans,
        so a long title never shrinks and pushes the icon buttons out of the node. The first span
@@ -2155,10 +2154,10 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     .header input.title-edit {
         background: var(--vscode-input-background);
         color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-focusBorder);
-        font-size: 11px;
+        border: var(--space-1) solid var(--vscode-focusBorder);
+        font-size: var(--font-size-11);
         font-family: inherit;
-        padding: 0 2px;
+        padding: 0 var(--space-2);
     }
     .header button {
         flex-shrink: 0;
@@ -2166,8 +2165,8 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border: none;
         color: var(--vscode-descriptionForeground);
         cursor: pointer;
-        padding: 0 2px;
-        font-size: 11px;
+        padding: 0 var(--space-2);
+        font-size: var(--font-size-11);
         line-height: 1.6;
     }
     .header button:hover { color: var(--vscode-editor-foreground); }
@@ -2176,7 +2175,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     .row {
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
         height: ${EVENT_ROW_H}px;
         flex-shrink: 0;
     }
@@ -2189,8 +2188,8 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         white-space: nowrap;
     }
     .row.section-head {
-        border-top: 1px solid var(--vscode-panel-border);
-        margin-top: 2px;
+        border-top: var(--space-1) solid var(--vscode-panel-border);
+        margin-top: var(--space-2);
     }
     .section-toggle {
         flex: 1;
@@ -2198,7 +2197,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         align-self: center;
         cursor: pointer;
         font-weight: bold;
-        font-size: 10px;
+        font-size: var(--font-size-10);
         letter-spacing: 0.5px;
         text-transform: uppercase;
         color: var(--vscode-descriptionForeground);
@@ -2217,22 +2216,22 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     .row select, .row input[type=text] {
         flex: 1;
         min-width: 0;
-        font-size: 11px;
+        font-size: var(--font-size-11);
         font-family: inherit;
         background: var(--vscode-input-background);
         color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-input-border, transparent);
-        padding: 0 3px;
+        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        padding: 0 var(--space-2);
     }
     .row input[type=checkbox] { margin: 0; }
     .row input.missing, .row select.missing { border-color: var(--vscode-errorForeground, #f44); }
     .row input.diag-error, .row select.diag-error {
         border-color: var(--vscode-errorForeground, #f44);
-        outline: 1px solid var(--vscode-errorForeground, #f44);
+        outline: var(--space-1) solid var(--vscode-errorForeground, #f44);
     }
     .row input.diag-warning, .row select.diag-warning {
         border-color: var(--vscode-charts-yellow, #cca700);
-        outline: 1px solid var(--vscode-charts-yellow, #cca700);
+        outline: var(--space-1) solid var(--vscode-charts-yellow, #cca700);
     }
     .row input:disabled, .row select:disabled { opacity: 0.7; }
     /* NoDrag wrappers around a row's buttons must not flex like the input wrappers. */
@@ -2256,8 +2255,8 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
         border: none;
         color: var(--vscode-descriptionForeground);
         cursor: pointer;
-        padding: 0 2px;
-        font-size: 11px;
+        padding: 0 var(--space-2);
+        font-size: var(--font-size-11);
     }
     .row button.goto:hover { color: var(--vscode-focusBorder); }
 
@@ -2916,6 +2915,10 @@ function StorySocketView(): React.JSX.Element {
 // ── App chrome ───────────────────────────────────────────────────────────────────────────────────
 
 const GlobalStyle = createGlobalStyle`
+    /* The rules below style html, body and #root - the Shell's ANCESTORS - so they cannot inherit
+       the layer the Shell carries. Declared at the root, it reaches both them and the Shell. */
+    ${tokensRootCss}
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body, #root {
         height: 100%;
@@ -2956,7 +2959,7 @@ const GlobalStyle = createGlobalStyle`
     }
     .story-flash {
         animation: story-flash 0.8s ease-in-out 2;
-        border-radius: 6px;
+        border-radius: var(--radius-6);
         z-index: 5;
     }
     /* Same reason as the selection outline: on an OR node the ring belongs to the diamond, not to
@@ -2984,11 +2987,11 @@ const GlobalStyle = createGlobalStyle`
         overflow-y: auto;
         z-index: 30;
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-        border: 1px solid var(--vscode-focusBorder);
-        font-size: 11px;
+        border: var(--space-1) solid var(--vscode-focusBorder);
+        font-size: var(--font-size-11);
     }
     .suggest-item {
-        padding: 2px 6px;
+        padding: var(--space-2) var(--space-6);
         cursor: pointer;
         white-space: nowrap;
         overflow: hidden;
@@ -2998,9 +3001,9 @@ const GlobalStyle = createGlobalStyle`
 
     /* Diagnostic severity accents - node header badges and the problems list. */
     .diag-badge {
-        font-size: 10px;
+        font-size: var(--font-size-10);
         font-weight: bold;
-        padding: 0 2px;
+        padding: 0 var(--space-2);
     }
     .diag-badge.diag-error { color: var(--vscode-errorForeground, #f44); }
     .diag-badge.diag-warning { color: var(--vscode-charts-yellow, #cca700); }
@@ -3011,22 +3014,22 @@ const GlobalStyle = createGlobalStyle`
     .type-chip {
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
         min-width: 0;
-        padding: 1px 6px;
-        border: 1px solid var(--vscode-panel-border);
-        border-radius: 3px;
+        padding: var(--space-1) var(--space-6);
+        border: var(--space-1) solid var(--vscode-panel-border);
+        border-radius: var(--radius-3);
         background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
         /* Pair the text with the badge background - without this the chip inherited the dark
            editor foreground and read as near-black on the theme's (often blue) badge colour. */
         color: var(--vscode-badge-foreground, var(--vscode-editor-foreground));
     }
-    .type-chip .codicon { font-size: 12px; flex-shrink: 0; }
+    .type-chip .codicon { font-size: var(--icon-size-12); flex-shrink: 0; }
     .type-chip-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .type-empty {
-        padding: 1px 6px;
-        border: 1px dashed var(--vscode-panel-border);
-        border-radius: 3px;
+        padding: var(--space-1) var(--space-6);
+        border: var(--space-1) dashed var(--vscode-panel-border);
+        border-radius: var(--radius-3);
         color: var(--vscode-descriptionForeground);
         font-style: italic;
         overflow: hidden;
@@ -3044,19 +3047,19 @@ const Shell = styled.div`
     flex-direction: column;
 
     .toolbar {
-        padding: 4px 8px;
+        padding: var(--space-4) var(--space-8);
         display: flex;
-        gap: 6px;
+        gap: var(--space-6);
         align-items: center;
         background: var(--vscode-sideBar-background);
-        border-bottom: 1px solid var(--vscode-panel-border);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border);
         flex-shrink: 0;
     }
     select, input[type=text] {
         background: var(--vscode-input-background);
         color: var(--vscode-input-foreground);
-        border: 1px solid var(--vscode-input-border, transparent);
-        padding: 2px 6px;
+        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        padding: var(--space-2) var(--space-6);
         font-size: var(--vscode-font-size);
         font-family: var(--vscode-font-family);
         outline: none;
@@ -3068,7 +3071,7 @@ const Shell = styled.div`
         background: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
         color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));
         border: none;
-        padding: 3px 8px;
+        padding: var(--space-2) var(--space-8);
         cursor: pointer;
         font-size: var(--vscode-font-size);
         font-family: var(--vscode-font-family);
@@ -3085,15 +3088,15 @@ const Shell = styled.div`
     .mode-switch {
         display: flex;
         flex-shrink: 0;
-        border: 1px solid var(--vscode-panel-border);
-        border-radius: 3px;
+        border: var(--space-1) solid var(--vscode-panel-border);
+        border-radius: var(--radius-3);
         overflow: hidden;
     }
     .mode-switch button {
         border-radius: 0;
     }
     .mode-switch button + button {
-        border-left: 1px solid var(--vscode-panel-border);
+        border-left: var(--space-1) solid var(--vscode-panel-border);
     }
 
     .body { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -3125,7 +3128,7 @@ const Shell = styled.div`
         display: flex;
         align-items: center;
         justify-content: center;
-        padding: 16px;
+        padding: var(--space-16);
         color: var(--vscode-disabledForeground);
         background: var(--vscode-editor-background);
     }
@@ -3139,17 +3142,17 @@ const Shell = styled.div`
     ${dockOverviewCss}
     /* Tools column sprawls from the vertical centre, minimap to its right with breathing room. */
     /* Tools on the left set the left gap; mirror it on the right, minimap flexes to fill between. */
-    .overview-mid { display: flex; align-items: center; gap: 10px; padding-right: 10px; }
-    .overview-tools { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
-    .filters-below { display: flex; flex-direction: column; gap: 4px; }
+    .overview-mid { display: flex; align-items: center; gap: var(--space-8); padding-right: var(--space-8); }
+    .overview-tools { display: flex; flex-direction: column; gap: var(--space-4); flex-shrink: 0; }
+    .filters-below { display: flex; flex-direction: column; gap: var(--space-4); }
     .filters-below select { width: 100%; }
 
     /* Codicons inherit their button's colour (never coloured individually) and scale per context. */
-    .codicon { font-size: 15px; vertical-align: middle; }
-    .overview-tools .codicon { font-size: 16px; }
-    .rotary-center .codicon { font-size: 22px; }
-    .rotary-pos .codicon { font-size: 13px; }
-    .sim-head .codicon { font-size: 13px; vertical-align: -1px; }
+    .codicon { font-size: var(--icon-size-16); vertical-align: middle; }
+    .overview-tools .codicon { font-size: var(--icon-size-16); }
+    .rotary-center .codicon { font-size: var(--icon-size-22); }
+    .rotary-pos .codicon { font-size: var(--icon-size-14); }
+    .sim-head .codicon { font-size: var(--icon-size-14); vertical-align: -1px; }
 
     .resize-handle-w {
         position: absolute;
@@ -3166,40 +3169,41 @@ const Shell = styled.div`
 
     /* ── Palette (dock content, Edit mode) ─────────────────────────────── */
     .palette-scroll { min-width: 0; }
-    .palette-scroll .dock-search { margin-bottom: 10px; }
+    .palette-scroll .dock-search { margin-bottom: var(--space-8); }
     .palette-new {
-        padding-bottom: 12px;
-        border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+        padding-bottom: var(--space-12);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
     }
-    .dock-section-title.toggle { cursor: pointer; user-select: none; }
-    .dock-section-title.toggle:hover { color: var(--vscode-editor-foreground); }
+    /* The .toggle variant lived here: a third hand-rolled folding heading, on a div with an
+       onClick, so it could not be reached by keyboard at all. DockSection carries the cursor, the
+       hover and a real button. */
     /* Colour family: just a gap between groups - no box (the tile tint is the grouping). */
-    .tile-family { margin-bottom: 7px; }
+    .tile-family { margin-bottom: var(--space-6); }
     /* Geometry comes from the shared dock chrome, so a palette tile is the same object as a tile in
        the localisation docks. Only the colour is this editor's own: tiles are tinted by type family,
        which is what makes the palette scannable. */
     .palette-tile {
         border-style: solid;
-        border-width: 1px;
+        border-width: var(--space-1);
         cursor: grab;
     }
-    .palette-tile:hover { outline: 1px solid var(--vscode-focusBorder); }
+    .palette-tile:hover { outline: var(--space-1) solid var(--vscode-focusBorder); }
 
-    .palette-empty { font-size: 11px; color: var(--vscode-descriptionForeground); }
+    .palette-empty { font-size: var(--font-size-11); color: var(--vscode-descriptionForeground); }
 
     /* ── Minimap (dock overview) ───────────────────────────────────────── */
     .minimap-wrap { flex: 1; min-width: 0; display: flex; }
     .minimap {
         display: block;
-        border: 1px solid var(--vscode-panel-border);
-        border-radius: 3px;
+        border: var(--space-1) solid var(--vscode-panel-border);
+        border-radius: var(--radius-3);
         background: var(--vscode-editor-background);
         cursor: crosshair;
     }
     .minimap.minimap-empty {
         flex: 1; height: 118px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 11px; color: var(--vscode-descriptionForeground);
+        font-size: var(--font-size-11); color: var(--vscode-descriptionForeground);
     }
     .minimap .mm-node { fill: var(--vscode-descriptionForeground); opacity: 0.55; }
     .minimap .mm-view {
@@ -3210,9 +3214,9 @@ const Shell = styled.div`
     }
 
     /* ── Simulation controls (dock content, Simulation mode) ───────────── */
-    .sim-controls { display: flex; flex-direction: column; gap: 10px; font-size: 12px; }
+    .sim-controls { display: flex; flex-direction: column; gap: var(--space-8); font-size: var(--font-size-12); }
     .sim-section { min-width: 0; }
-    .sim-head { font-weight: bold; margin-bottom: 3px; }
+    .sim-head { font-weight: bold; margin-bottom: var(--space-2); }
 
     /* ── Bottom panels (full width) ────────────────────────────────────── */
     ${problemsPanelCss}
@@ -3225,26 +3229,26 @@ const Shell = styled.div`
         position: sticky;
         top: 0;
         background: var(--vscode-sideBar-background);
-        padding: 1px 4px 2px;
+        padding: var(--space-1) var(--space-4) var(--space-2);
     }
-    .problem-row { padding: 1px 4px; }
+    .problem-row { padding: var(--space-1) var(--space-4); }
     .sim-log-panel {
         position: relative;
         overflow-y: auto;
-        padding: 4px 8px;
+        padding: var(--space-4) var(--space-8);
         background: var(--vscode-sideBar-background);
-        border-top: 1px solid var(--vscode-panel-border);
-        font-size: 11px;
+        border-top: var(--space-1) solid var(--vscode-panel-border);
+        font-size: var(--font-size-11);
         color: var(--vscode-descriptionForeground);
     }
-    .sim-row { display: flex; gap: 4px; align-items: center; margin: 2px 0; }
+    .sim-row { display: flex; gap: var(--space-4); align-items: center; margin: var(--space-2) 0; }
     .sim-row input[type=text] { width: 90px; flex: none; }
     .sim-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
     .sim-kind {
-        font-size: 10px;
-        padding: 0 4px;
-        border-radius: 3px;
-        border: 1px solid var(--vscode-panel-border);
+        font-size: var(--font-size-10);
+        padding: 0 var(--space-4);
+        border-radius: var(--radius-3);
+        border: var(--space-1) solid var(--vscode-panel-border);
         color: var(--vscode-descriptionForeground);
     }
     .sim-kind.k-lua      { border-color: var(--vscode-charts-blue, #3794ff); }
@@ -3253,11 +3257,11 @@ const Shell = styled.div`
     .problems {
         position: relative;
         overflow-y: auto;
-        border-top: 1px solid var(--vscode-panel-border);
+        border-top: var(--space-1) solid var(--vscode-panel-border);
         background: var(--vscode-sideBar-background);
         flex-shrink: 0;
-        font-size: 12px;
-        padding: 2px 4px;
+        font-size: var(--font-size-12);
+        padding: var(--space-2) var(--space-4);
     }
     .problem-node {
         flex-shrink: 0;
@@ -3272,29 +3276,29 @@ const Shell = styled.div`
         border: none;
         color: var(--vscode-descriptionForeground);
         cursor: pointer;
-        padding: 0 3px;
+        padding: 0 var(--space-2);
         flex-shrink: 0;
     }
     .problem-row button:hover { background: transparent; color: var(--vscode-editor-foreground); }
 
     .legend {
-        padding: 2px 8px;
+        padding: var(--space-2) var(--space-8);
         display: flex;
-        gap: 12px;
-        font-size: 11px;
+        gap: var(--space-12);
+        font-size: var(--font-size-11);
         color: var(--vscode-descriptionForeground);
         background: var(--vscode-sideBar-background);
-        border-top: 1px solid var(--vscode-panel-border);
+        border-top: var(--space-1) solid var(--vscode-panel-border);
         flex-shrink: 0;
         flex-wrap: wrap;
     }
     .legend .swatch {
         display: inline-block;
         width: 10px; height: 10px;
-        border-radius: 2px;
+        border-radius: var(--radius-3);
         border: 2px solid;
         vertical-align: -1px;
-        margin-right: 3px;
+        margin-right: var(--space-2);
     }
 
     /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
@@ -3739,7 +3743,6 @@ function App(): React.JSX.Element {
         setShowChapterLanes(nextChapter);
         vscode.postMessage({ type: 'setLanePref', showThreadLanes: nextThread, showChapterLanes: nextChapter });
     };
-    const anyFilter = !!(filters.nameFilter || filters.branch || filters.lifecycle || filters.reachableFrom);
 
     // Validate button reads out validation health (codicon name; coloured via sev-* class):
     // unvalidated (stale/never run) beats error beats warning beats clean. The precedence and the
@@ -3765,7 +3768,6 @@ function App(): React.JSX.Element {
     // The badge follows what is ON SCREEN, so it agrees with the table under it. What stops that
     // reading as all-clear over a hidden error is the panel's own "n of m" and its filter chip.
     const severity = !validated ? 'unvalidated' : worstSeverity(problemView.shown);
-    const severityIcon = severityIconFor(severity);
 
     return (
         <Shell>
@@ -3827,11 +3829,18 @@ function App(): React.JSX.Element {
                         <SimLog state={simState} onClose={() => setShowSimLog(false)} />
                     ) : null}
                     <div className="legend">
-                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-disabledForeground, #888)' }} />Inactive</span>
-                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-blue, #3794ff)' }} />Waiting</span>
-                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-green, #89d185)' }} />Armed</span>
-                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-purple, #b180d7)' }} />Fired</span>
-                        <span><span className="swatch" style={{ borderColor: 'var(--vscode-charts-red, #f14c4c)' }} />Disabled</span>
+                        <span>
+                            <span className="swatch" style={{ borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})` }} />
+                            Inactive
+                        </span>
+                        {/* The same mapping the node borders are generated from, so a swatch cannot
+                            come to disagree with the node it is describing. */}
+                        {Object.entries(LIFECYCLE_TOKENS).map(([lifecycle, token]) => (
+                            <span key={lifecycle}>
+                                <span className="swatch" style={{ borderColor: `var(${token})` }} />
+                                {lifecycle}
+                            </span>
+                        ))}
                         <span><span className="shape-diamond" /> OR</span>
                         <span><span className="shape-circle" /> AND</span>
                         <span>dashed = portal / tactical / untested</span>
@@ -3846,12 +3855,17 @@ function App(): React.JSX.Element {
                     maxWidth={520}
                     header={<>
                         {mode === 'edit' ? (
-                            <button
-                                className={'icon-btn header-left' + (pendingCount > 0 ? ' active' : '')}
-                                disabled={pendingCount === 0 || saving}
-                                onClick={saveEdits}
+                            <IconButton
+                                icon="save"
+                                className={'header-left' + (pendingCount > 0 ? ' active' : '')}
                                 title="Save - write all staged changes to the XML files"
-                            ><span className="codicon codicon-save" />{pendingCount > 0 ? ` ${pendingCount}` : ''}</button>
+                                badge={pendingCount > 0 ? ` ${pendingCount}` : ''}
+                                disabled={pendingCount === 0 || saving}
+                                disabledReason={saving
+                                    ? 'Save - writing the staged changes now'
+                                    : 'Save - nothing is staged'}
+                                onClick={saveEdits}
+                            />
                         ) : null}
                         <RotaryModeSwitch
                             mode={mode}
@@ -3860,11 +3874,12 @@ function App(): React.JSX.Element {
                                     : m.id === 'simulate' ? availableModes.simulate : true))}
                             onSelect={switchMode}
                         />
-                        <button
-                            className={'icon-btn validate-btn header-right sev-' + severity}
-                            onClick={() => { validateEdits(); }}
+                        <SeverityTag
+                            severity={severity}
+                            count={problems.length}
                             title="Validate - check the story for problems (opens the panel below)"
-                        ><span className={'codicon codicon-' + severityIcon} />{problems.length ? ` ${problems.length}` : ''}</button>
+                            onClick={() => { validateEdits(); }}
+                        />
                     </>}
                     content={<>
                         {mode === 'edit'
@@ -3888,13 +3903,9 @@ function App(): React.JSX.Element {
                         </div>
                         <div className="overview-mid">
                             <div className="overview-tools">
-                                {anyFilter ? (
-                                    <button className="icon-btn" onClick={clearFilters} title="Clear all filters">
-                                        <span className="codicon codicon-clear-all" />
-                                    </button>
-                                ) : null}
-                                <button
-                                    className="icon-btn"
+                                <ClearFiltersButton filters={filters} onClear={clearFilters} />
+                                <IconButton
+                                    icon="arrange"
                                     onClick={() => {
                                         const handle = editorRef.current;
                                         if (!handle) { return; }
@@ -3906,20 +3917,26 @@ function App(): React.JSX.Element {
                                         }));
                                     }}
                                     title="Arrange - recompute the automatic layout"
-                                ><span className="codicon codicon-type-hierarchy" /></button>
-                                <button className="icon-btn" onClick={() => editorRef.current?.fit()} title="Fit graph to view">
-                                    <span className="codicon codicon-screen-full" />
-                                </button>
-                                <button
-                                    className={'icon-btn' + (showThreadLanes ? ' active' : '')}
-                                    onClick={() => toggleLane('thread')}
+                                />
+                                <IconButton
+                                    icon="frame"
+                                    title="Fit graph to view"
+                                    onClick={() => editorRef.current?.fit()}
+                                />
+                                <IconButton
+                                    icon="threadLanes"
+                                    className={showThreadLanes ? 'active' : undefined}
+                                    pressed={showThreadLanes}
                                     title="Toggle thread lanes"
-                                ><span className="codicon codicon-list-tree" /></button>
-                                <button
-                                    className={'icon-btn' + (showChapterLanes ? ' active' : '')}
-                                    onClick={() => toggleLane('chapter')}
+                                    onClick={() => toggleLane('thread')}
+                                />
+                                <IconButton
+                                    icon="chapterLanes"
+                                    className={showChapterLanes ? 'active' : undefined}
+                                    pressed={showChapterLanes}
                                     title="Toggle chapter lanes"
-                                ><span className="codicon codicon-book" /></button>
+                                    onClick={() => toggleLane('chapter')}
+                                />
                             </div>
                             <Minimap getHandle={() => editorRef.current} />
                         </div>
@@ -4197,13 +4214,6 @@ function Minimap(props: { getHandle: () => EditorHandle | null }): React.JSX.Ele
     return <div className="minimap-wrap" ref={wrapRef}>{inner}</div>;
 }
 
-const LANE_COLORS = ['#3794ff', '#89d185', '#d18616', '#b180d7', '#cca700', '#4ec9b0', '#e2649a'];
-/** Stable colour per group key, so a thread/chapter keeps its hue as nodes move. */
-function laneColorFor(key: string): string {
-    let hash = 0;
-    for (let i = 0; i < key.length; i++) { hash = (hash * 31 + key.charCodeAt(i)) >>> 0; }
-    return LANE_COLORS[hash % LANE_COLORS.length];
-}
 
 /**
  * The zoomed-out overview: one cheap SVG (no per-node React roots) drawing every node as a coloured
@@ -4300,8 +4310,15 @@ function TacticalCreateBar(props: {
                 {props.threads.length === 0 ? <option value="">(no thread files)</option> : null}
                 {props.threads.map(t => <option key={t} value={t}>{baseName(t)}</option>)}
             </select>
-            <button className="primary" onClick={create} disabled={!thread || !file.trim()}>Create</button>
-            <button onClick={props.onClose}>Cancel</button>
+            <Button
+                className="primary"
+                disabled={!thread || !file.trim()}
+                disabledReason="Pick a thread file and give the story a name"
+                onClick={create}
+            >
+                Create
+            </Button>
+            <Button onClick={props.onClose}>Cancel</Button>
         </div>
     );
 }
@@ -4390,23 +4407,21 @@ function NodePalette(props: { eventTypes: string[]; rewardTypes: string[] }): Re
             if (list) { list.push(t); } else { families.set(c, [t]); }
         }
         return (
-            <div className="dock-section">
-                <div
-                    className="dock-section-title toggle"
-                    onClick={() => setCollapsed(c => ({ ...c, [label]: !c[label] }))}
-                    title={isCollapsed ? `Expand ${label}` : `Collapse ${label}`}
-                >
-                    <span className={`codicon codicon-chevron-${isCollapsed ? 'right' : 'down'}`} /> {label}
-                    <span className="section-count">{items.length}</span>
-                </div>
-                {isCollapsed ? null : [...families.entries()].map(([color, names]) => (
+            <DockSection
+                id={label}
+                title={label}
+                count={items.length}
+                collapsed={isCollapsed}
+                onToggle={() => setCollapsed(c => ({ ...c, [label]: !c[label] }))}
+            >
+                {[...families.entries()].map(([color, names]) => (
                     <div key={color} className="tile-family">
                         <div className="tile-grid">
                             {names.map(t => tile(t, null, t, { category, type: t }, hint))}
                         </div>
                     </div>
                 ))}
-            </div>
+            </DockSection>
         );
     };
 

@@ -173,14 +173,14 @@ internal static class HoverUtility
             var fullPath = matches[0];
             sb.AppendLine();
             sb.Append(assetFiles.IsPackedAsset(fullPath)
-                ? $"📦 `{fullPath}`"
+                ? $"Packed - `{fullPath}`"
                 : $"`{fullPath}`");
         }
         else
         {
             sb.AppendLine();
             foreach (var path in matches)
-                sb.AppendLine(assetFiles.IsPackedAsset(path) ? $"- 📦 `{path}`" : $"- `{path}`");
+                sb.AppendLine(assetFiles.IsPackedAsset(path) ? $"- Packed - `{path}`" : $"- `{path}`");
         }
 
         return new Hover
@@ -220,7 +220,7 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine();
         sb.AppendLine("---");
-        sb.Append($"📦 Packed in the base game - `{shipped.Uri.Replace('\\', '/')}`");
+        sb.Append($"Packed in the base game - `{shipped.Uri.Replace('\\', '/')}`");
     }
 
     // A navigable workspace definition that lives in a DEPENDENCY project's layer (rank below the
@@ -232,8 +232,8 @@ internal static class HoverUtility
         sb.AppendLine();
         sb.AppendLine("---");
         sb.Append(layerName.Length > 0
-            ? $"📚 Defined in dependency **{layerName}**"
-            : "📚 Defined in a dependency project");
+            ? $"Defined in dependency **{layerName}**"
+            : "Defined in a dependency project");
     }
 
     private static void AppendNotes(StringBuilder sb, IReadOnlyDictionary<string, string> notes, string locale)

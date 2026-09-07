@@ -60,7 +60,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
                 locations.Add(fo.ToLspLocation());
             }
 
-            _logger.LogDebug("Find-refs (group): {Id} → {Count} member(s)", id, locations.Count);
+            _logger.LogDebug("Find-refs (group): {Id} -> {Count} member(s)", id, locations.Count);
             return Task.FromResult<LocationContainer?>(new LocationContainer(locations));
         }
 
@@ -81,7 +81,7 @@ public sealed class XmlReferencesHandler : ReferencesHandlerBase
                 locations.Add(fo.ToLspLocation());
             }
 
-        _logger.LogDebug("Find-refs: {Id} → {Count} location(s)", id, locations.Count);
+        _logger.LogDebug("Find-refs: {Id} -> {Count} location(s)", id, locations.Count);
         return Task.FromResult<LocationContainer?>(new LocationContainer(locations));
     }
 

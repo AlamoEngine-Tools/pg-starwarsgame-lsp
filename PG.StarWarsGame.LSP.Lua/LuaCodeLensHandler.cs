@@ -91,7 +91,7 @@ public sealed class LuaCodeLensHandler : CodeLensHandlerBase
             }
 
             lenses.Add(new CodeLens { Range = range, Command = command });
-            _logger.LogDebug("CodeLens (Lua): {Id} → {Count} reference(s) at line {Line}", symbol.Id, count, fo.Line);
+            _logger.LogDebug("CodeLens (Lua): {Id} -> {Count} reference(s) at line {Line}", symbol.Id, count, fo.Line);
         }
 
         return Task.FromResult<CodeLensContainer?>(new CodeLensContainer(lenses));

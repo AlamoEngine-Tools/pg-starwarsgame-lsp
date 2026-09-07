@@ -24,6 +24,8 @@ import {
     IconCamera, IconCheck, IconCircleX,
     IconChevronDown, IconChevronLeft, IconChevronRight, IconCircleOff, IconClipboardCopy,
     IconCloudDownload, IconCube, IconDeviceFloppy, IconExternalLink, IconFileCode,
+    IconAsterisk, IconBook, IconFilterOff, IconHierarchy, IconLetterCase, IconListTree,
+    IconRegex,
     IconEye, IconEyeClosed, IconEyeDotted, IconFlame, IconGridDots, IconHeartBroken,
     IconInfoCircle,
     IconLayoutGrid, IconMesh,
@@ -159,6 +161,28 @@ const ICONS = {
     collapsed: IconChevronRight,
 
     bounds: IconBox,
+
+    // ── the story graph's own tools ───────────────────────────────────────────
+    // Taking every filter OFF at once. Not `reset`, which undoes what you did to the SUBJECT, and
+    // not `search`, which is the control that put a filter on in the first place.
+    clearFilter: IconFilterOff,
+
+    // Recomputing the automatic layout. The glyph is the shape the layout produces - a graph laid
+    // out in ranks - because "arrange" on its own could mean sorting a list.
+    arrange: IconHierarchy,
+
+    // The two swimlane groupings. A thread is a sequence you follow down the graph and a chapter is
+    // a division of the story, so one is drawn as an outline and the other as a book. They are a
+    // PAIR and must not converge: the two are toggled independently and the reader has to see which
+    // of them is on.
+    threadLanes: IconListTree,
+    chapterLanes: IconBook,
+
+    // The find widget's three modes. Listed here so the whole set can be read in one place, but
+    // `iconSource` routes all three to the editor's own marks - see the note there.
+    searchLiteral: IconLetterCase,
+    searchWildcard: IconAsterisk,
+    searchRegex: IconRegex,
 } satisfies Record<string, ComponentType<IconProps>>;
 
 export type IconName = keyof typeof ICONS;

@@ -10,26 +10,15 @@
 //
 // Not for long lists. A `<select>` is still right for a model's forty animation clips; this is for
 // the handful where seeing the alternatives IS the point.
+//
+// A radiogroup, and that is not decoration: three independent toggles each reporting their own
+// pressed state say nothing about being alternatives to one another, which is the one fact about
+// this control worth telling a screen reader.
 
 import * as React from 'react';
 
-/** One choice. An icon alone needs a label for the tooltip and for anyone using a screen reader. */
-export interface ModeOption<Id extends string> {
-    id: Id;
-    label: string;
-    /** A codicon name without the `codicon-` prefix. Shown INSTEAD of the label when present. */
-    icon?: string;
-    /** Longer than the label, for the tooltip. */
-    title?: string;
-    /**
-     * Offered but not choosable yet.
-     *
-     * Disabled rather than dropped from the list, because a choice that vanishes when it is
-     * unavailable takes its own explanation with it - the reader is left not knowing the option
-     * exists, and every button beside it shifts. Say WHY in {@link title}.
-     */
-    disabled?: boolean;
-}
+import { type ChoiceOption } from './choice';
+import { Icon } from './Icon';
 
 export function ModeSelector<Id extends string>(props: {
     /**
@@ -40,7 +29,7 @@ export function ModeSelector<Id extends string>(props: {
      * you are no longer looking from.
      */
     value: Id | null;
-    options: readonly ModeOption<Id>[];
+    options: readonly ChoiceOption<Id>[];
     onSelect: (id: Id) => void;
     /** Announced to assistive tech, since the group itself carries the meaning. */
     label: string;
@@ -55,12 +44,16 @@ export function ModeSelector<Id extends string>(props: {
                     aria-checked={option.id === props.value}
                     className={option.id === props.value ? 'active' : ''}
                     disabled={option.disabled ?? false}
-                    title={option.title ?? option.label}
+                    // The reason outranks both: it is the only thing worth saying about an option
+                    // that cannot be taken.
+                    title={option.disabled
+                        ? option.disabledReason
+                        : option.title ?? option.label}
                     onClick={() => props.onSelect(option.id)}
                 >
                     {option.icon === undefined
                         ? option.label
-                        : <span className={`codicon codicon-${option.icon}`} />}
+                        : <Icon name={option.icon} />}
                 </button>
             ))}
         </span>

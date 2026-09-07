@@ -22,7 +22,37 @@
 const fs = require('fs');
 const path = require('path');
 
+const { tokenOffences } = require('./styleTokenRules');
+
 const ROOT = path.join(__dirname, '..', 'src');
+
+/** Where the token layer is declared, and the only file allowed to write the values themselves. */
+const TOKENS = path.join(ROOT, 'webview', 'shared', 'tokens.ts');
+
+/**
+ * Files whose raw values are not design decisions.
+ *
+ * The credits crawl reproduces the game's own titles - themed, it would stop being the crawl - and
+ * the encyclopedia card draws text over artwork loaded from the game. A colour in either is game
+ * truth. Neither carries the token layer either, so a var() in them would resolve to nothing.
+ */
+const GAME_TRUTH = new Set([
+    path.join(ROOT, 'webview', 'creditsCrawl.tsx'),
+    path.join(ROOT, 'webview', 'encyclopediaCard.tsx'),
+]);
+
+/** Every custom property the layer declares, for checking that a var() resolves to something. */
+function definedTokens() {
+    const text = fs.readFileSync(TOKENS, 'utf8');
+    const names = new Set();
+
+    // Declarations in the CSS blocks, plus the colour roles, which are generated from a list of
+    // objects rather than written out as CSS.
+    for (const m of text.matchAll(/^\s*(--[a-z0-9-]+)\s*:/gm)) { names.add(m[1]); }
+    for (const m of text.matchAll(/name:\s*'(--[a-z0-9-]+)'/g)) { names.add(m[1]); }
+
+    return names;
+}
 
 /** Every .ts/.tsx under src, so a styled template added anywhere is covered. */
 function sources(dir) {
@@ -107,21 +137,79 @@ function offences(text) {
     return found;
 }
 
+/** Every style template in a file, as [body, offsetOfBody]. */
+function templates(text) {
+    const opener = /(?:styled\.[A-Za-z][A-Za-z0-9]*|createGlobalStyle|[A-Za-z][A-Za-z0-9]*(?:Css|Styles)\s*=)\s*`/g;
+    const found = [];
+
+    for (let match = opener.exec(text); match !== null; match = opener.exec(text)) {
+        const start = match.index + match[0].length;
+        const end = endOfTemplate(text, start);
+
+        if (end === -1) {
+            continue;
+        }
+
+        found.push([text.slice(start, end), start]);
+        opener.lastIndex = end;
+    }
+
+    return found;
+}
+
 let failed = 0;
+let cutShort = 0;
+const defined = definedTokens();
 
 for (const file of sources(ROOT)) {
-    for (const offence of offences(fs.readFileSync(file, 'utf8'))) {
-        console.error(
-            `${path.relative(process.cwd(), file)}:${offence.line}`
+    const text = fs.readFileSync(file, 'utf8');
+    const where = path.relative(process.cwd(), file);
+
+    for (const offence of offences(text)) {
+        console.error(`${where}:${offence.line}`
             + '  a backtick in this CSS comment ends the styled template.');
         console.error(`    ${offence.text}`);
+        cutShort++;
         failed++;
+    }
+
+    // The token layer's own file writes the values; everything else references them.
+    if (file === TOKENS) {
+        continue;
+    }
+
+    const exempt = GAME_TRUTH.has(file);
+
+    // A component may set a custom property of its own from JS - the credits crawl drives its
+    // animation from `style={{ '--crawl-from': ... }}` - so the declaration is in the same file but
+    // outside the stylesheet that reads it.
+    // The key may be computed and cast - `['--crawl-from' as string]:` - so anything but a newline
+    // is allowed between the closing quote and the colon.
+    const alsoDeclared = new Set(
+        [...text.matchAll(/['"](--[a-z0-9-]+)['"][^:\n]*:/g)].map(m => m[1]));
+
+    for (const [body, offset] of templates(text)) {
+        for (const offence of tokenOffences(body, {
+            defined, alsoDeclared, allowRawLengths: exempt, allowRawColours: exempt,
+        })) {
+            const line = text.slice(0, offset + offence.index).split('\n').length;
+
+            console.error(`${where}:${line}  ${offence.text}`);
+            console.error(`    use ${offence.hint}`);
+            failed++;
+        }
     }
 }
 
-if (failed > 0) {
+if (cutShort > 0) {
     console.error(
-        `\n${failed} styled template${failed === 1 ? '' : 's'} cut short by a comment.`);
+        `\n${cutShort} styled template${cutShort === 1 ? '' : 's'} cut short by a comment.`);
     console.error('Rewrite it without backticks - name the class or property in plain words.');
+}
+
+if (failed > 0) {
+    console.error(`\n${failed} style problem${failed === 1 ? '' : 's'}.`);
+    console.error('Spacing, radius and type come from src/webview/shared/tokens.ts. A fitted');
+    console.error('measurement that is not on any scale belongs in that file too, named.');
     process.exit(1);
 }

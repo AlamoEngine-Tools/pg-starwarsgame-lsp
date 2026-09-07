@@ -311,6 +311,7 @@ export function abilityRows(
         const drivesSomething = proxyCount > 0
             || deployClip !== null
             || revealsShield(ability.type)
+            || revealsStealth(ability.type)
             || (ability.ownerAttachmentBone ?? '') !== ''
             || (ability.particleEffect ?? '') !== '';
 
@@ -364,6 +365,14 @@ function detailOf(
 
     if (revealsShield(ability.type)) {
         parts.push('shows the shield mesh');
+    }
+
+    // ONLY, because that is the whole of what a cloak draws - the hull, the effects and the
+    // shadow volumes all go with it. Said on the row because the ability declares nothing else:
+    // `TIE_Phantom`'s STEALTH is a type and an icon, so without this the row read
+    // "no effects, bones or clips declared" beside a key that cloaks the ship.
+    if (revealsStealth(ability.type)) {
+        parts.push('shows the stealth mesh only');
     }
 
     if (deployClip !== null) {

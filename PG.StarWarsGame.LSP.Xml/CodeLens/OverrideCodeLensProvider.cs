@@ -54,7 +54,7 @@ internal sealed class OverrideCodeLensProvider : IXmlCodeLensProvider
             Range = range,
             Command = new Command
             {
-                Title = $"▽ overrides '{ctx.Symbol.Id}' from {from}",
+                Title = $"v Overrides '{ctx.Symbol.Id}' from {from}",
                 Name = "aet-eaw-edit.lsp.showReferences",
                 Arguments = JArray.FromObject(new object[]
                 {

@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The 3D preview panel: a canvas with the tool dock on the right, matching the layout the story
@@ -37,14 +37,16 @@ import {
     ModelDetail, PREVIEW_SCENE_KIND, PreviewParticle,
     PreviewProblem, PreviewRgba, PreviewScene,
 } from '../protocol/modelPreview';
-import { severityIconFor, worstSeverity } from './loc/validateState';
+import { worstSeverity } from './loc/validateState';
 import { collectTextureNames } from './preview/materials';
 import { type InspectorSubject } from './preview/inspectorSubject';
 import { AssetLedger, loadState, type LoadTally } from './preview/loadProgress';
 import { anchorFlyout } from './preview/flyoutAnchor';
 import { groundRange, snapToZero } from './preview/groundRange';
 import { InfoBadge } from './shared/InfoBadge';
-import { PanelSection } from './shared/PanelSection';
+import { Button, IconButton } from './shared/Button';
+import { DockSection } from './shared/DockSection';
+import { Field } from './shared/Field';
 import { Icon, type IconName } from './shared/Icon';
 import { addressingFor } from './preview/textures';
 import {
@@ -155,7 +157,8 @@ import {
 } from './preview/animationNames';
 import { pickTake } from './preview/takeRoulette';
 import { AnimationTile } from './preview/AnimationTile';
-import { ModeSelector, type ModeOption } from './shared/ModeSelector';
+import { type ChoiceOption } from './shared/choice';
+import { ModeSelector } from './shared/ModeSelector';
 import { RotaryModeSwitch } from './shared/RotaryModeSwitch';
 import { subjectStateFrom, type SubjectState } from './preview/subjectState';
 import {
@@ -168,6 +171,7 @@ import { shadowTintReach, type ShadowTintReach } from './preview/shadowVolumePas
 import { RightDock } from './shared/RightDock';
 
 import { initPanelLayout } from './shared/panelLayoutBridge';
+import { SeverityTag } from './shared/SeverityTag';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
 const vscode = acquireVsCodeApi();
@@ -301,8 +305,8 @@ const Shell = styled.div`
        in a row - the graph's own layout, one anchored button either side. */
     /* The dial and the two hand-off buttons are one centred column, so the buttons sit under the
        thing they belong to rather than in a corner of the header. */
-    .header-modes { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
-    .header-handoff { display: inline-flex; gap: 6px; }
+    .header-modes { display: inline-flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+    .header-handoff { display: inline-flex; gap: var(--space-6); }
 
     /* The model's identity, floating under the button that opens it. Anchored to the header, which
        is position: relative and clips nothing - inside the content it would be trapped by that
@@ -314,10 +318,10 @@ const Shell = styled.div`
         z-index: 20;
         min-width: 210px;
         max-width: min(280px, calc(100vw - 24px));
-        padding: 8px 10px;
+        padding: var(--space-8) var(--space-8);
         text-align: left;
-        border: 1px solid var(--vscode-panel-border, #444);
-        border-radius: 4px;
+        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-radius: var(--radius-3);
         background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
@@ -334,7 +338,7 @@ const Shell = styled.div`
     }
     .model-info::before {
         top: -5px;
-        border: 1px solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--vscode-panel-border, #444);
         background: var(--vscode-panel-border, #444);
     }
     .model-info::after {
@@ -345,7 +349,7 @@ const Shell = styled.div`
     .model-info-name {
         font-weight: 600;
         word-break: break-all;
-        margin-bottom: 6px;
+        margin-bottom: var(--space-6);
     }
 
     /* With the tree, not in the foot: the text box and the kind chips narrow the same list, and
@@ -354,7 +358,7 @@ const Shell = styled.div`
        win back vertical space for the tree - which stopped being the trade the moment the tree got
        the top of the panel to itself. Squeezed rows are harder to hit and harder to scan, and the
        saving was a dozen pixels. */
-    .dock-section { gap: 8px; }
+    .dock-section { gap: var(--space-8); }
     /* The tree's search: a magnifier and, next to it, either the kind filters or the box.
 
        One element rather than two blocks with a gap. border-box on the input because the loose one
@@ -363,23 +367,23 @@ const Shell = styled.div`
     /* A hardpoint card. A bordered block rather than a list row, because it carries four kinds of
        thing - a name, the game's own words, its measurements and its switches - and a flat row put
        them all on one line where none of them read. */
-    .hardpoint-cards { display: flex; flex-direction: column; gap: 6px; margin: 0 0 10px; }
+    .hardpoint-cards { display: flex; flex-direction: column; gap: var(--space-6); margin: 0 0 var(--space-8); }
 
     /* A type heading over the cards it gathers. Quieter than the section's own title - this is a
        division INSIDE the list, not another list. */
     .card-group-title {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-6);
         width: 100%;
-        padding: 3px 2px;
+        padding: var(--space-2) var(--space-2);
         border: none;
-        border-radius: 3px;
+        border-radius: var(--radius-3);
         background: none;
         cursor: pointer;
         text-align: left;
-        margin: 4px 0 5px;
-        font-size: 11px;
+        margin: var(--space-4) 0 var(--space-4);
+        font-size: var(--font-size-11);
         letter-spacing: 0.03em;
         text-transform: uppercase;
         opacity: 0.6;
@@ -390,7 +394,7 @@ const Shell = styled.div`
 
     /* The hardpoint list's search sits in the flow above the cards rather than floating on them:
        there is no list box here for it to float over, and the section already scrolls as one. */
-    .hardpoint-search { position: static; margin: 2px 0 6px; padding: 0; background: none;
+    .hardpoint-search { position: static; margin: var(--space-2) 0 var(--space-6); padding: 0; background: none;
         border: none; }
 
     /* What the attacker is aimed at, said rather than chosen. */
@@ -407,14 +411,14 @@ const Shell = styled.div`
        line under your eye rather than the one you have to scroll to. */
     .damage-log {
         list-style: none;
-        margin: 0 0 8px;
+        margin: 0 0 var(--space-8);
         padding: 0;
         max-height: 220px;
         overflow-y: auto;
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
     }
-    .damage-log li { padding: 3px 2px; border-bottom: 1px solid var(--vscode-panel-border, #333); }
+    .damage-log li { padding: var(--space-2) var(--space-2); border-bottom: var(--space-1) solid var(--vscode-panel-border, #333); }
     .damage-log li:last-child { border-bottom: none; }
     /* The shot that finished something, and the shot that did nothing: the two lines a reader is
        scanning for. Everything between them is ordinary and stays quiet. */
@@ -435,10 +439,10 @@ const Shell = styled.div`
         /* Lines within a group sit close; the GROUPS are pushed apart below. Not blank rows - just
            enough air that the title block, the bar, the muzzles and the buttons read as four
            things rather than one column of text. */
-        gap: 4px;
-        padding: 9px 10px;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
-        border-radius: 5px;
+        gap: var(--space-4);
+        padding: var(--space-8) var(--space-8);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+        border-radius: var(--radius-6);
         cursor: pointer;
     }
     .hardpoint-card:hover { background: var(--vscode-list-hoverBackground); }
@@ -468,7 +472,7 @@ const Shell = styled.div`
     .card-unresolved { color: var(--vscode-editorWarning-foreground, #cca700); }
 
     /* Title line: the name, and the jump pushed to the far corner. */
-    .card-head { display: flex; align-items: center; gap: 6px; }
+    .card-head { display: flex; align-items: center; gap: var(--space-6); }
     .card-head .part-name { font-weight: 600; }
     .card-head .goto-definition, .card-head .icon-btn { margin-left: auto; flex-shrink: 0; }
 
@@ -491,7 +495,7 @@ const Shell = styled.div`
         position: relative;
         display: block;
         height: 14px;
-        border-radius: 3px;
+        border-radius: var(--radius-3);
         overflow: hidden;
         background: var(--vscode-input-background, rgba(128, 128, 128, 0.18));
     }
@@ -502,8 +506,8 @@ const Shell = styled.div`
         display: flex;
         align-items: center;
         justify-content: flex-end;
-        padding-right: 5px;
-        font-size: 0.82em;
+        padding-right: var(--space-4);
+        font-size: var(--font-size-smallest);
         font-variant-numeric: tabular-nums;
         /* Over both the filled and the empty half, so it has to carry its own contrast rather than
            relying on whichever colour happens to be under it. */
@@ -514,18 +518,18 @@ const Shell = styled.div`
     /* One row per fire bone, full width: the slot on the left and the bone it names beside it. They
        were inline pills showing the bone alone, which says where a shot leaves from but not which
        of Fire_Bone_A and _B declared it. */
-    .bone-picks { display: flex; flex-direction: column; gap: 4px; }
+    .bone-picks { display: flex; flex-direction: column; gap: var(--space-4); }
     .muzzle-row {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-6);
         width: 100%;
-        padding: 3px 6px;
-        border: 1px solid transparent;
-        border-radius: 4px;
+        padding: var(--space-2) var(--space-6);
+        border: var(--space-1) solid transparent;
+        border-radius: var(--radius-3);
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.14));
         color: var(--vscode-foreground);
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         cursor: pointer;
         text-align: left;
     }
@@ -547,10 +551,10 @@ const Shell = styled.div`
     .card-info {
         display: grid;
         grid-template-columns: auto 1fr;
-        gap: 2px 10px;
+        gap: var(--space-2) var(--space-8);
         margin: 0;
-        padding: 8px 10px;
-        font-size: 0.9em;
+        padding: var(--space-8) var(--space-8);
+        font-size: var(--font-size-smaller);
     }
     .card-info dt { opacity: 0.65; }
     .card-info dd { margin: 0; font-variant-numeric: tabular-nums; }
@@ -561,9 +565,9 @@ const Shell = styled.div`
     .card-actions .card-info-btn { margin-left: auto; }
 
     /* The gaps that group the card. Each of these starts a new group, so the space goes above it. */
-    .hardpoint-card .card-health { margin-top: 10px; }
-    .hardpoint-card .bone-picks { margin-top: 10px; }
-    .card-actions { margin-top: 10px; }
+    .hardpoint-card .card-health { margin-top: var(--space-8); }
+    .hardpoint-card .bone-picks { margin-top: var(--space-8); }
+    .card-actions { margin-top: var(--space-8); }
 
     .tree-pane { position: relative; }
 
@@ -588,14 +592,14 @@ const Shell = styled.div`
            the field got 34px sharing the row - not enough to read a bone name in - and the same
            layout at twice the width gives it 135px, which is. */
         flex-wrap: wrap;
-        gap: 4px;
-        padding: 3px;
-        border-radius: 6px;
+        gap: var(--space-4);
+        padding: var(--space-2);
+        border-radius: var(--radius-6);
         /* Its own plate. Rows run underneath it, and a transparent strip over a list of names is
            unreadable in both directions. */
         background: color-mix(in srgb,
             var(--vscode-sideBar-background, #181818) 88%, transparent);
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.3));
     }
     .tree-search.open { left: 6px; }
     /* The basis is what decides where it wraps: below this it is not worth having on the row, and
@@ -615,18 +619,18 @@ const Shell = styled.div`
            had just pressed it. Padding goes with it: an input centres its own text once it has a
            height, so the vertical padding was only ever there to make one. */
         height: 22px;
-        padding: 0 8px;
+        padding: 0 var(--space-8);
         color: var(--vscode-input-foreground);
         background: var(--vscode-input-background);
-        border: 1px solid var(--vscode-input-border, transparent);
-        border-radius: 4px;
+        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        border-radius: var(--radius-3);
         font-family: inherit;
         font-size: inherit;
     }
     /* Inset, so the ring is drawn ON the field rather than growing it - an outline that adds a
        pixel each side would nudge the icons every time the box took focus. */
     .tree-search .tree-filter:focus {
-        outline: 1px solid var(--vscode-focusBorder);
+        outline: var(--space-1) solid var(--vscode-focusBorder);
         outline-offset: -1px;
     }
     .tree-search .tree-filter::placeholder {
@@ -635,7 +639,7 @@ const Shell = styled.div`
     /* The one button that never moves. Everything else in this row is what it opens onto, so it
        keeps its width whichever of the two is showing. */
     .tree-search .tree-search-toggle { flex: 0 0 auto; }
-    .tree-search-icons { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+    .tree-search-icons { display: flex; align-items: center; gap: var(--space-4); flex: 0 0 auto; }
     /* The empty message keeps the list's own shape rather than the row's - no hover, no pointer,
        and it must not look like something you can click. */
     .bone-tree .tree-empty { list-style: none; cursor: default; }
@@ -655,12 +659,12 @@ const Shell = styled.div`
         z-index: 2;
         display: flex;
         align-items: center;
-        gap: 4px;
-        padding: 3px;
-        border-radius: 6px;
+        gap: var(--space-4);
+        padding: var(--space-2);
+        border-radius: var(--radius-6);
         background: color-mix(in srgb,
             var(--vscode-editorWidget-background, #202020) 82%, transparent);
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         /* Never wider than the stage; a long faction roster wraps rather than running off it. */
         max-width: calc(100% - 16px);
         flex-wrap: wrap;
@@ -682,7 +686,7 @@ const Shell = styled.div`
         right: 8px;
         z-index: 2;
         display: flex;
-        gap: 8px;
+        gap: var(--space-8);
         pointer-events: none;
     }
     .stage-row > * { pointer-events: auto; }
@@ -707,7 +711,7 @@ const Shell = styled.div`
         .stage-row {
             flex-direction: column;
             align-items: center;
-            gap: 6px;
+            gap: var(--space-6);
         }
         /* Stacked, a slot is one centred line rather than a third of a row. */
         .stage-slot,
@@ -743,8 +747,8 @@ const Shell = styled.div`
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        font-size: 0.9em;
+        gap: var(--space-4);
+        font-size: var(--font-size-smaller);
         opacity: 0.7;
         color: var(--vscode-descriptionForeground, #999);
     }
@@ -760,7 +764,7 @@ const Shell = styled.div`
         min-width: 0;
         display: flex;
         align-items: flex-start;
-        gap: 8px;
+        gap: var(--space-8);
         flex-wrap: wrap;
     }
     .stage-slot-end { justify-content: flex-end; }
@@ -803,8 +807,8 @@ const Shell = styled.div`
     .stage-field {
         display: flex;
         align-items: center;
-        gap: 4px;
-        font-size: 0.9em;
+        gap: var(--space-4);
+        font-size: var(--font-size-smaller);
         white-space: nowrap;
     }
     .stage-field > span { opacity: 0.7; }
@@ -833,9 +837,9 @@ const Shell = styled.div`
         font-size: 1em;
         color: var(--vscode-dropdown-foreground);
         background: var(--vscode-dropdown-background);
-        border: 1px solid var(--vscode-dropdown-border, transparent);
-        border-radius: 4px;
-        padding: 0 4px;
+        border: var(--space-1) solid var(--vscode-dropdown-border, transparent);
+        border-radius: var(--radius-3);
+        padding: 0 var(--space-4);
         max-width: 150px;
     }
 
@@ -845,7 +849,7 @@ const Shell = styled.div`
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
         max-width: 100%;
     }
 
@@ -875,7 +879,7 @@ const Shell = styled.div`
     .status-bars {
         display: flex;
         flex-direction: column;
-        gap: 3px;
+        gap: var(--space-2);
         width: 100%;
         min-width: 148px;
         box-sizing: border-box;
@@ -885,7 +889,7 @@ const Shell = styled.div`
         display: block;
         width: 100%;
         height: 5px;
-        border-radius: 3px;
+        border-radius: var(--radius-3);
         overflow: hidden;
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.25));
     }
@@ -902,8 +906,8 @@ const Shell = styled.div`
         display: flex;
         align-items: center;
         justify-content: center;
-        border-radius: 4px;
-        border: 1px solid transparent;
+        border-radius: var(--radius-3);
+        border: var(--space-1) solid transparent;
         background: var(--vscode-button-secondaryBackground, rgba(255, 255, 255, 0.08));
         color: var(--vscode-button-secondaryForeground, inherit);
         cursor: pointer;
@@ -926,9 +930,9 @@ const Shell = styled.div`
     /* The stand-in where no icon resolved: the first characters of the name, which at 30px is
        enough to tell two keys apart when the tooltip carries the rest. */
     .ability-key-text {
-        font-size: 0.75em;
+        font-size: var(--font-size-smallest);
         line-height: 1;
-        padding: 0 2px;
+        padding: 0 var(--space-2);
         text-align: center;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -941,7 +945,7 @@ const Shell = styled.div`
     .stage-chrome.icon-only .icon-btn {
         width: 22px;
         padding: 0;
-        border-radius: 4px;
+        border-radius: var(--radius-3);
     }
 
     /* ONE height for everything on the stage, set here rather than left to each control's
@@ -950,8 +954,8 @@ const Shell = styled.div`
        The box is the same and what sits in it is centred. */
     .stage-chrome .icon-btn, .stage-chrome .swatch, .stage-chrome .mode-selector button {
         height: 22px;
-        font-size: 0.9em;
-        padding: 0 8px;
+        font-size: var(--font-size-smaller);
+        padding: 0 var(--space-8);
         /* A two-word label breaking in half makes the button taller than the plate it sits in,
            which then reports a height nothing else expects. */
         white-space: nowrap;
@@ -967,10 +971,10 @@ const Shell = styled.div`
 
        The end radii come from the shared rule, which is interpolated above this one; all this has
        to do is stop overriding them. */
-    .stage-chrome .icon-btn, .stage-chrome .swatch { border-radius: 10px; }
+    .stage-chrome .icon-btn, .stage-chrome .swatch { border-radius: var(--radius-6); }
     .stage-chrome .mode-selector button { border-radius: 0; }
-    .stage-chrome .mode-selector button:first-child { border-radius: 4px 0 0 4px; }
-    .stage-chrome .mode-selector button:last-child { border-radius: 0 4px 4px 0; }
+    .stage-chrome .mode-selector button:first-child { border-radius: var(--radius-3) 0 0 var(--radius-3); }
+    .stage-chrome .mode-selector button:last-child { border-radius: 0 var(--radius-3) var(--radius-3) 0; }
     /* Sized to the box above rather than to the glyph, which is what made the globe the odd one
        out - a 16px icon in a row of 0.9em words. */
     /* An icon is an SVG here, sized by the component. The stage's own buttons carry nothing else,
@@ -984,8 +988,8 @@ const Shell = styled.div`
         width: 22px;
         height: 22px;
         padding: 0;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
-        border-radius: 4px;
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
+        border-radius: var(--radius-3);
         cursor: pointer;
         background-clip: padding-box;
     }
@@ -1004,9 +1008,9 @@ const Shell = styled.div`
     }
     /* Always last, whatever the roster does - see the markup. A divider says it is not a faction. */
     .faction-palette .swatch-custom {
-        margin-left: 4px;
-        border-left: 1px solid var(--vscode-panel-border, #444);
-        padding-left: 6px;
+        margin-left: var(--space-4);
+        border-left: var(--space-1) solid var(--vscode-panel-border, #444);
+        padding-left: var(--space-6);
         width: 28px;
         box-sizing: content-box;
     }
@@ -1026,8 +1030,8 @@ const Shell = styled.div`
         max-height: calc(100% - 56px);
         display: flex;
         flex-direction: column;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        border-radius: 6px;
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: var(--radius-6);
         background: var(--vscode-editorWidget-background, #202020);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
@@ -1052,10 +1056,10 @@ const Shell = styled.div`
     .stage-flyout-head {
         display: flex;
         align-items: center;
-        gap: 4px;
-        padding: 6px 6px 6px 12px;
-        border-bottom: 1px solid var(--vscode-panel-border);
-        font-size: 11px;
+        gap: var(--space-4);
+        padding: var(--space-6) var(--space-6) var(--space-6) var(--space-12);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        font-size: var(--font-size-11);
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -1067,15 +1071,15 @@ const Shell = styled.div`
        two of those split the gap and left the count stranded in the middle. */
     .stage-flyout-head .section-count { margin-left: auto; }
     .stage-flyout-head .icon-btn:first-of-type { margin-left: auto; }
-    .stage-flyout-head .section-count ~ .icon-btn { margin-left: 4px; }
+    .stage-flyout-head .section-count ~ .icon-btn { margin-left: var(--space-4); }
     /* The gap here is BETWEEN sections and is deliberately larger than the one inside them
-       (10px, see .panel-section-body): that difference is what makes a heading read as the start
-       of a group rather than as one more row in a list. */
+       (see .dock-section-body): that difference is what makes a heading read as the start of a
+       group rather than as one more row in a list. */
     .stage-flyout-body {
         display: flex;
         flex-direction: column;
-        gap: 16px;
-        padding: 14px 14px 16px;
+        gap: var(--space-16);
+        padding: var(--space-12) var(--space-12) var(--space-16);
         overflow-y: auto;
     }
 
@@ -1090,11 +1094,11 @@ const Shell = styled.div`
 
     /* A section is a GROUP. At 8px its fields butted into each other and the heading read as one
        more row. */
-    .stage-flyout .dock-section { gap: 12px; }
-    .stage-flyout .field { gap: 6px; }
+    .stage-flyout .dock-section { gap: var(--space-12); }
+    .stage-flyout .field { gap: var(--space-6); }
     /* A row of switches needs more between them than a flex gap of 4, which put "Shield" and "Hull"
        close enough to read as one control with two boxes. */
-    .stage-flyout .view-row { gap: 10px; }
+    .stage-flyout .view-row { gap: var(--space-8); }
     /* A note is prose and is the one thing here that wraps, so it gets the leading to match. */
     .stage-flyout .field-note { line-height: 1.45; }
 
@@ -1104,14 +1108,14 @@ const Shell = styled.div`
     .stage-flyout input[type=text],
     .stage-flyout input[type=number],
     .stage-flyout select {
-        padding: 5px 8px;
+        padding: var(--space-4) var(--space-8);
     }
 
     /* A list box, where the padding has to go on the ROWS - padding on the select itself indents
        the frame and leaves the rows as tight as they were. This is the control the report was
        most obviously about. */
-    .stage-flyout select[size] { padding: 3px; }
-    .stage-flyout select[size] option { padding: 4px 7px; border-radius: 3px; }
+    .stage-flyout select[size] { padding: var(--space-2); }
+    .stage-flyout select[size] option { padding: var(--space-4) var(--space-6); border-radius: var(--radius-3); }
 
     .body { flex: 1; display: flex; min-height: 0; }
 
@@ -1144,10 +1148,10 @@ const Shell = styled.div`
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 10px;
+        gap: var(--space-8);
         background: var(--vscode-editor-background, #1f1f1f);
         color: var(--vscode-descriptionForeground, #999);
-        font-size: 12px;
+        font-size: var(--font-size-12);
     }
 
     .load-spinner {
@@ -1184,8 +1188,9 @@ const Shell = styled.div`
         height: 100%;
         display: block;
         /* The scene paints its own ground. Without this the canvas borrows the panel background and
-           an unlit hull on a dark theme is invisible. */
-        background: #1b1d21;
+           an unlit hull on a dark theme is invisible. Deliberately NOT a themed colour - see the
+           token's own note in tokens.ts. */
+        background: var(--colour-scene-ground);
     }
 
     /* Labels are DOM, not sprites: they stay crisp at any zoom, theme themselves, and can be read by
@@ -1195,13 +1200,13 @@ const Shell = styled.div`
         position: absolute;
         top: 0;
         left: 0;
-        margin: -9px 0 0 8px;
-        padding: 0 3px;
-        font-size: 10px;
+        margin: -9px 0 0 var(--space-8);
+        padding: 0 var(--space-2);
+        font-size: var(--font-size-10);
         white-space: nowrap;
         color: var(--vscode-editor-foreground);
         background: color-mix(in srgb, var(--vscode-editor-background) 70%, transparent);
-        border-radius: 2px;
+        border-radius: var(--radius-3);
     }
     .bone-label.selected {
         color: var(--vscode-editor-background);
@@ -1237,11 +1242,11 @@ const Shell = styled.div`
 
        .kind-filter and .selection-actions were the two blocks this pass folded away - the kinds
        into the search element, Reset into the section title - so only the overlay strip is left. */
-    .view-toggles { display: flex; gap: 4px; flex-wrap: wrap; }
+    .view-toggles { display: flex; gap: var(--space-4); flex-wrap: wrap; }
     .tree-search .icon-btn, .view-toggles .icon-btn {
-        font-size: 0.9em;
-        padding: 3px 10px;
-        border-radius: 10px;
+        font-size: var(--font-size-smaller);
+        padding: var(--space-2) var(--space-8);
+        border-radius: var(--radius-6);
     }
 
     /* A small picture, so a row's kind reads at a glance without widening every line in a deep
@@ -1276,11 +1281,11 @@ const Shell = styled.div`
        name gives up its tail instead; the whole of it is on the row's tooltip and in its details. */
     .bone-tree {
         list-style: none;
-        margin: 0 0 2px;
+        margin: 0 0 var(--space-2);
         /* The foot pad is the floating search strip's height. Without it the last row can never be
            scrolled out from under the strip, and on a model whose last row is the one you want -
            the tree is ordered, so that happens - it is simply unreachable. */
-        padding: 2px 0 34px;
+        padding: var(--space-2) 0 var(--space-24);
         overflow-y: auto;
         overflow-x: hidden;
         max-height: 48vh;
@@ -1288,8 +1293,8 @@ const Shell = styled.div`
     .bone-row {
         display: flex;
         align-items: center;
-        gap: 5px;
-        padding: 3px 6px;
+        gap: var(--space-4);
+        padding: var(--space-2) var(--space-6);
         cursor: pointer;
         white-space: nowrap;
         /* Load-bearing: without it a flex item refuses to shrink below its content, so the row
@@ -1331,7 +1336,7 @@ const Shell = styled.div`
     }
     .bone-row .twisty:hover { opacity: 1; }
     .bone-row .twisty.leaf { visibility: hidden; }
-    .bone-row .bone-attach { color: var(--vscode-descriptionForeground); font-size: 0.9em; }
+    .bone-row .bone-attach { color: var(--vscode-descriptionForeground); font-size: var(--font-size-smaller); }
 
     /* The eye, and the pair of buttons it heads. Pushed to the far edge so they line up in a
        column whatever the names do - the eye first, then the row's details, which is the order the
@@ -1345,7 +1350,7 @@ const Shell = styled.div`
         flex-shrink: 0;
         min-width: 18px;
         height: 18px;
-        padding: 0 3px;
+        padding: 0 var(--space-2);
         opacity: 0.85;
     }
     .bone-row .row-eye:hover { opacity: 1; }
@@ -1374,7 +1379,7 @@ const Shell = styled.div`
            merely unlabelled. */
         min-width: 18px;
         height: 18px;
-        padding: 0 3px;
+        padding: 0 var(--space-2);
     }
     .bone-row:hover .row-details,
     .bone-row .row-details:focus-visible,
@@ -1389,18 +1394,18 @@ const Shell = styled.div`
         max-height: 62vh;
         display: flex;
         flex-direction: column;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        border-radius: 6px;
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: var(--radius-6);
         background: var(--vscode-editorWidget-background, #202020);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
     .details-head {
         display: flex;
         align-items: baseline;
-        gap: 6px;
-        padding: 4px 4px 4px 10px;
-        border-bottom: 1px solid var(--vscode-panel-border);
-        font-size: 11px;
+        gap: var(--space-6);
+        padding: var(--space-4) var(--space-4) var(--space-4) var(--space-8);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        font-size: var(--font-size-11);
     }
     .details-title {
         font-weight: 600;
@@ -1424,8 +1429,8 @@ const Shell = styled.div`
     .details-body {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        padding: 8px 10px 10px;
+        gap: var(--space-8);
+        padding: var(--space-8) var(--space-8) var(--space-8);
         overflow-y: auto;
     }
 
@@ -1439,15 +1444,15 @@ const Shell = styled.div`
         display: flex;
         flex-direction: column;
         min-height: 0;
-        border-top: 1px solid var(--vscode-panel-border, #444);
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
         background: var(--vscode-sideBar-background, #252526);
-        font-size: 12px;
+        font-size: var(--font-size-12);
     }
 
     /* This editor's findings are PROSE, not the short entry labels the loc grids report, so they
        wrap instead of being clamped to one line - the shared rule's ellipsis would hide most of
        every message. The same override the encyclopedia already makes, for the same reason. */
-    .preview-problems .problem-row { align-items: flex-start; padding: 3px 6px; }
+    .preview-problems .problem-row { align-items: flex-start; padding: var(--space-2) var(--space-6); }
     .preview-problems .problem-msg {
         white-space: normal;
         overflow: visible;
@@ -1455,7 +1460,7 @@ const Shell = styled.div`
         /* A bone or file name has no break opportunity in it, so without this it runs off. */
         overflow-wrap: anywhere;
     }
-    .preview-problems .problem-row .codicon { margin-top: 2px; }
+    .preview-problems .problem-row .codicon { margin-top: var(--space-2); }
 
     /* At the end of the row and out of the way: an id is what you look up AFTER reading the
        finding, so it must not compete with the sentence for the reader's eye. Monospaced because
@@ -1463,9 +1468,9 @@ const Shell = styled.div`
     .preview-problems .problem-id {
         flex: 0 0 auto;
         margin-left: auto;
-        padding-left: 8px;
+        padding-left: var(--space-8);
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
         opacity: 0.55;
         white-space: nowrap;
@@ -1482,10 +1487,10 @@ const Shell = styled.div`
     /* Which hardpoint, when the sentence does not already say so - see problemWhere. */
     .problem-where {
         flex-shrink: 0;
-        padding: 0 4px;
-        border-radius: 3px;
+        padding: 0 var(--space-4);
+        border-radius: var(--radius-3);
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         background: var(--vscode-badge-background, rgba(128, 128, 128, 0.2));
         color: var(--vscode-badge-foreground, inherit);
     }
@@ -1497,13 +1502,13 @@ const Shell = styled.div`
     .part-list li {
         display: flex;
         flex-direction: column;
-        gap: 1px;
-        padding: 3px 6px;
+        gap: var(--space-1);
+        padding: var(--space-2) var(--space-6);
         min-width: 0;
         cursor: default;
     }
     .part-list li .field-label { min-width: 0; align-items: flex-start; }
-    .part-list li .field-label input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+    .part-list li .field-label input[type=checkbox] { margin-top: var(--space-2); flex-shrink: 0; }
     /* The name WRAPS; only the detail under it is clipped. Alamo hardpoint ids share a long prefix
        and differ in their last two characters, so one clipped line gave ten rows all reading
        "HP_Star_Destroyer_Weapon_..." - which is worse than a taller row, because it is the same
@@ -1522,8 +1527,8 @@ const Shell = styled.div`
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        padding-left: 21px;
-        font-size: 0.9em;
+        padding-left: var(--space-24);
+        font-size: var(--font-size-smaller);
         color: var(--vscode-descriptionForeground);
     }
     /* A weapon's is four separate facts - reach, cone, cadence, damage - and clipping them at the
@@ -1535,7 +1540,7 @@ const Shell = styled.div`
     }
     /* The command bar's own icon, at the size the atlas holds it. Blowing a 26x26 slot up makes
        hand-drawn art look broken; the game draws it at native size and so does this. */
-    .ability-row-head { display: flex; align-items: flex-start; gap: 6px; min-width: 0; }
+    .ability-row-head { display: flex; align-items: flex-start; gap: var(--space-6); min-width: 0; }
     .ability-row-head .field-label, .ability-row-head .part-name { flex: 1; }
     .ability-icon {
         width: 26px;
@@ -1557,11 +1562,11 @@ const Shell = styled.div`
        NOTE: no backticks in this block - it lives inside a styled.div template literal, and one
        terminates it. That mistake reports itself as "Shell cannot be used as a JSX component". */
     .ability-list li {
-        gap: 4px;
-        padding: 8px 6px;
+        gap: var(--space-4);
+        padding: var(--space-8) var(--space-6);
     }
     .ability-list li + li {
-        border-top: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+        border-top: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
     }
     /* How a jump LOOKS. Where it goes is the card head's business, and this used to decide that
        too: align-self flex-start and a 21px left margin put it under the text, indented past the
@@ -1576,7 +1581,7 @@ const Shell = styled.div`
         border: none;
         background: none;
         font: inherit;
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         color: var(--vscode-textLink-foreground);
         cursor: pointer;
     }
@@ -1587,7 +1592,7 @@ const Shell = styled.div`
     }
     /* Full width now, one row per fire bone - the 21px indent it carried lined it up with a jump
        that no longer sits under the name. */
-    .part-list li .bone-picks { margin-top: 3px; }
+    .part-list li .bone-picks { margin-top: var(--space-2); }
     /* A count that can be pressed. Same type as the count beside it so the header does not jump
        when a selection appears, but with an affordance so it reads as the way out. */
     /* Pushed to the far end of the title, past the count. The class is the dock's own name for
@@ -1595,21 +1600,21 @@ const Shell = styled.div`
        NOTE: no backticks in this comment; one would end the template literal the whole stylesheet
        lives in, and the error surfaces far away as a TS1005. */
     .dock-section-title .header-right {
-        margin-left: 6px;
+        margin-left: var(--space-6);
         flex: 0 0 auto;
         min-width: 20px;
         height: 18px;
-        padding: 0 3px;
+        padding: 0 var(--space-2);
     }
     .dock-section-title .header-right:disabled { opacity: 0.35; }
 
     .section-count.as-button {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.4));
-        border-radius: 9px;
-        padding: 0 5px;
+        gap: var(--space-2);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.4));
+        border-radius: var(--radius-6);
+        padding: 0 var(--space-4);
         background: none;
         color: inherit;
         font: inherit;
@@ -1627,26 +1632,26 @@ const Shell = styled.div`
     .stat-row {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
-        padding: 1px 6px;
+        gap: var(--space-12);
+        padding: var(--space-1) var(--space-6);
         font-variant-numeric: tabular-nums;
     }
     .stat-row .value { color: var(--vscode-descriptionForeground); }
 
-    .view-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+    .view-row { display: flex; align-items: center; gap: var(--space-4); flex-wrap: wrap; }
 
     /* The clip library. Wide rows that look pressable, because they ARE the play control - there is
        no separate play button and no dropdown to open first. */
-    .player { display: flex; flex-direction: column; gap: 6px; }
-    .player-row { display: flex; align-items: center; gap: 1px; flex-wrap: wrap; }
+    .player { display: flex; flex-direction: column; gap: var(--space-6); }
+    .player-row { display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
     /* Six controls and a clock have to share one dock-wide row. The toolbar default leaves them
        ~30px too wide at the dock's opening size, which wrapped the clock onto a line of its own. */
-    .player-row .icon-btn { min-width: 20px; padding: 4px 4px; }
+    .player-row .icon-btn { min-width: 20px; padding: var(--space-4) var(--space-4); }
     .player-row .player-time {
         margin-left: auto;
-        padding-right: 4px;
+        padding-right: var(--space-4);
         font-variant-numeric: tabular-nums;
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         color: var(--vscode-descriptionForeground);
     }
     /* The travel direction is explicit on every slider in this panel. A range input takes it from
@@ -1656,15 +1661,15 @@ const Shell = styled.div`
        (No backticks in here: this is a styled-components template literal.) */
     .player-scrub, .player input[type=range], .field input[type=range] { direction: ltr; }
     .player-scrub { width: 100%; }
-    .player-section { margin-bottom: 10px; }
+    .player-section { margin-bottom: var(--space-8); }
 
     /* No padding of its own now that it lives in the foot - the foot lays its children out with a
        gap. The old top padding was there to hold it off the tree it used to sit under. */
 
-    .anim-list { display: flex; flex-direction: column; gap: 2px; }
+    .anim-list { display: flex; flex-direction: column; gap: var(--space-2); }
     /* A family, folded or open. The heading is the whole hit area, not just the chevron - a 13px
        target beside a word that obviously names the thing being folded is a target people miss. */
-    .anim-family { gap: 4px; margin-bottom: 8px; }
+    .anim-family { gap: var(--space-4); margin-bottom: var(--space-8); }
     .anim-family:last-child { margin-bottom: 0; }
     .dock-section-title.as-fold { cursor: pointer; user-select: none; }
     .dock-section-title.as-fold:hover { color: var(--vscode-foreground, #ccc); }
@@ -1679,15 +1684,15 @@ const Shell = styled.div`
 
        The shape is the user's: play state left and vertically centred, name on the top row left
        aligned, takes on the bottom row left aligned and filling right. */
-    .anim-list { display: flex; flex-direction: column; gap: 4px; }
+    .anim-list { display: flex; flex-direction: column; gap: var(--space-4); }
 
     .anim-card {
         display: flex;
         align-items: center;
-        gap: 10px;
-        padding: 9px 10px;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
-        border-radius: 5px;
+        gap: var(--space-8);
+        padding: var(--space-8) var(--space-8);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.25));
+        border-radius: var(--radius-6);
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
     }
     .anim-card:hover { background: var(--vscode-list-hoverBackground); }
@@ -1706,7 +1711,7 @@ const Shell = styled.div`
         height: 28px;
         padding: 0;
         border: none;
-        border-radius: 4px;
+        border-radius: var(--radius-3);
         background: none;
         color: inherit;
         cursor: pointer;
@@ -1719,7 +1724,7 @@ const Shell = styled.div`
         display: flex;
         flex: 1 1 auto;
         flex-direction: column;
-        gap: 3px;
+        gap: var(--space-2);
         min-width: 0;
     }
     .anim-name { text-align: left; overflow-wrap: anywhere; }
@@ -1730,19 +1735,19 @@ const Shell = styled.div`
         display: flex;
         flex-wrap: wrap;
         justify-content: flex-start;
-        gap: 3px;
+        gap: var(--space-2);
         width: 100%;
     }
     .anim-take {
         flex: 0 0 auto;
         min-width: 20px;
-        padding: 1px 4px;
-        border: 1px solid transparent;
-        border-radius: 3px;
+        padding: var(--space-1) var(--space-4);
+        border: var(--space-1) solid transparent;
+        border-radius: var(--radius-3);
         background: none;
         color: var(--vscode-descriptionForeground, #999);
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.8em;
+        font-size: var(--font-size-smallest);
         cursor: pointer;
     }
     .anim-take:hover { background: var(--vscode-list-hoverBackground); }
@@ -1753,11 +1758,11 @@ const Shell = styled.div`
     .anim-row {
         display: flex;
         align-items: center;
-        gap: 7px;
+        gap: var(--space-6);
         width: 100%;
-        padding: 5px 8px;
-        border: 1px solid transparent;
-        border-radius: 4px;
+        padding: var(--space-4) var(--space-8);
+        border: var(--space-1) solid transparent;
+        border-radius: var(--radius-3);
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
         color: var(--vscode-foreground, #ccc);
         font-family: var(--vscode-font-family, sans-serif);
@@ -4793,20 +4798,20 @@ function ModelPreview(): React.JSX.Element {
         const drawable = row.arcs.length > 0;
 
         return (
-            <button
-                type="button"
-                className={'icon-btn'
-                    + (drawable && !row.destroyed && !hiddenWeapons.has(row.id) ? ' active' : '')}
-                aria-pressed={drawable && !hiddenWeapons.has(row.id)}
-                disabled={!drawable || row.destroyed}
+            <IconButton
+                icon="arcs"
+                className={drawable && !row.destroyed && !hiddenWeapons.has(row.id)
+                    ? 'active' : undefined}
+                pressed={drawable && !hiddenWeapons.has(row.id)}
                 title={weaponTitle(row)}
+                disabled={!drawable || row.destroyed}
+                // weaponTitle already phrases the state, including the two that disable this.
+                disabledReason={weaponTitle(row)}
                 onClick={event => {
                     event.stopPropagation();
                     setWeaponArcs(row.id, hiddenWeapons.has(row.id));
                 }}
-            >
-                <Icon name="arcs" />
-            </button>
+            />
         );
     };
 
@@ -5341,9 +5346,9 @@ function ModelPreview(): React.JSX.Element {
         const fromShaders = translatedOn && !anyShaderSource
             ? [{
                 severity: 'info',
-                message: 'No shader sources are reachable, so nothing can be translated. A game '
-                    + 'install ships compiled .fxo files; the .fx sources are a separate download '
-                    + 'published by Petroglyph.',
+                message: 'No shader sources are reachable, so nothing can be translated. A '
+                    + 'game install ships compiled .fxo; the .fx sources are a separate '
+                    + 'Petroglyph download.',
                 hardpointId: null,
             }]
             : [];
@@ -5357,9 +5362,8 @@ function ModelPreview(): React.JSX.Element {
             : [{
                 severity: 'warning',
                 message: `${shieldOffShader.join(', ')} ${shieldOffShader.length === 1
-                    ? 'is named as a shield mesh but is not' : 'are named as shield meshes but are '
-                        + 'not'} drawn with a shield shader, so ${shieldOffShader.length === 1
-                    ? 'it' : 'they'} will look like solid geometry rather than a field.`,
+                    ? 'is' : 'are'} named as a shield mesh but not drawn with a shield shader `
+                    + '- draws as solid geometry, not a field.',
                 hardpointId: null,
             }];
 
@@ -5772,14 +5776,13 @@ function ModelPreview(): React.JSX.Element {
                             them switch something - putting all of it on one bar said they were one
                             group of related switches, which the flyout button is not. */}
                         <div className="stage-chrome">
-                            <button
-                                className={'icon-btn world-globe' + (worldOpen ? ' active' : '')}
-                                aria-expanded={worldOpen}
+                            <IconButton
+                                icon="scene"
+                                className={'world-globe' + (worldOpen ? ' active' : '')}
+                                expanded={worldOpen}
                                 title="Scene settings"
                                 onClick={() => setWorldOpen(open => !open)}
-                            >
-                                <Icon name="scene" />
-                            </button>
+                            />
                         </div>
 
                         {/* The grid, the ground and the effects master describe the ROOM the model
@@ -5793,18 +5796,19 @@ function ModelPreview(): React.JSX.Element {
                             camera. The name leads the tooltip. */}
                         <div className="stage-chrome icon-only">
                             {overlays.map(overlay => (
-                                <button
+                                <IconButton
                                     key={overlay.id}
-                                    type="button"
-                                    className={'icon-btn' + (overlay.on ? ' active' : '')}
-                                    aria-pressed={overlay.on}
-                                    aria-label={overlay.label}
-                                    disabled={overlay.disabled ?? false}
+                                    icon={overlay.icon}
+                                    className={overlay.on ? 'active' : undefined}
+                                    pressed={overlay.on}
+                                    label={overlay.label}
                                     title={overlay.title}
+                                    disabled={overlay.disabled ?? false}
+                                    // The overlay's own title already says why when it is off:
+                                    // each one phrases its state, so there is nothing to add here.
+                                    disabledReason={overlay.title}
                                     onClick={() => overlay.set(!overlay.on)}
-                                >
-                                    <Icon name={overlay.icon} />
-                                </button>
+                                />
                             ))}
                         </div>
                         </span>
@@ -5933,14 +5937,13 @@ function ModelPreview(): React.JSX.Element {
                             on the right as the scene is first on the left, so the stage reads
                             outwards from the model in both directions. */}
                         <div className="stage-chrome">
-                            <button
-                                className={'icon-btn' + (cameraOpen ? ' active' : '')}
-                                aria-expanded={cameraOpen}
+                            <IconButton
+                                icon="camera"
+                                className={cameraOpen ? 'active' : undefined}
+                                expanded={cameraOpen}
                                 title="Camera settings"
                                 onClick={() => setCameraOpen(open => !open)}
-                            >
-                                <Icon name="camera" />
-                            </button>
+                            />
                         </div>
                         </span>
                         </div>
@@ -5953,39 +5956,34 @@ function ModelPreview(): React.JSX.Element {
                             >
                                 <div className="stage-flyout-head">
                                     Scene
-                                    <button
-                                        className="icon-btn"
+                                    <IconButton
+                                        icon="reset"
                                         title={'Put the backdrop, lights, wind and draw distance '
                                             + 'back to their defaults. The model`s own state is '
                                             + 'left as it is.'}
                                         onClick={resetRoom}
-                                    >
-                                        <Icon name="reset" />
-                                    </button>
-                                    <button
-                                        className="icon-btn"
+                                    />
+                                    <IconButton
+                                        icon="close"
                                         title="Close"
                                         onClick={() => setWorldOpen(false)}
-                                    >
-                                        <Icon name="close" />
-                                    </button>
+                                    />
                                 </div>
                                 <div className="stage-flyout-body">
 
-        <PanelSection
+        <DockSection
             id="scene.room"
             title="Room"
             collapsed={folded.has('scene.room')}
             onToggle={toggleSection}
         >
-        <div className="field">
-            <span className="field-label">
-                Backdrop
-                <InfoBadge>
-                    Never lit and never in the depth buffer, so a backdrop cannot be
-                    mistaken for part of the model.
-                </InfoBadge>
-            </span>
+        <Field
+            label="Backdrop"
+            info={<>
+                Never lit and never in the depth buffer, so a backdrop cannot be
+                mistaken for part of the model.
+            </>}
+        >
             <ModeSelector
                 label="Backdrop"
                 value={background}
@@ -5993,22 +5991,21 @@ function ModelPreview(): React.JSX.Element {
                     { id: 'flat', label: 'Flat', title: 'A plain, neutral field' },
                     { id: 'starfield', label: 'Stars', title: 'A starfield' },
                     { id: 'sky', label: 'Sky', title: 'A sky with a horizon' },
-                ] satisfies ModeOption<BackgroundKind>[]}
+                ] satisfies ChoiceOption<BackgroundKind>[]}
                 onSelect={setBackground}
             />
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Ground height
-                <InfoBadge>
-                    Zero is the middle of the track - the plane the model itself stands on. The ends are
-                    one model radius either way, so the control means the same thing on a trooper and
-                    on a Star Destroyer. The grid moves with it: it is the ruler for the ground, not for
-                    the origin.
-                </InfoBadge>
-                <span className="section-count">{floorLevel}</span>
-            </span>
+        <Field
+            label="Ground height"
+            value={floorLevel}
+            info={<>
+                Zero is the middle of the track - the plane the model itself stands on. The ends are
+                one model radius either way, so the control means the same thing on a trooper and
+                on a Star Destroyer. The grid moves with it: it is the ruler for the ground, not for
+                the origin.
+            </>}
+        >
             {/* The tick marks where the model stands. Zero is always the exact middle, because
                 the track is symmetrical by construction - see `groundRange`. */}
             <span className="detent-track">
@@ -6034,23 +6031,22 @@ function ModelPreview(): React.JSX.Element {
                         groundDragging.current ? 1 : 0))}
                 />
             </span>
-        </div>
-        </PanelSection>
+        </Field>
+        </DockSection>
 
-        <PanelSection
+        <DockSection
             id="scene.light"
             title="Light"
             collapsed={folded.has('scene.light')}
             onToggle={toggleSection}
         >
-        <div className="field">
-            <span className="field-label">
-                Light
-                <InfoBadge>
-                    The engine's own rig: a sun that casts the shadow and two fills that
-                    do not. All three reach the translated shaders.
-                </InfoBadge>
-            </span>
+        <Field
+            label="Light"
+            info={<>
+                The engine's own rig: a sun that casts the shadow and two fills that
+                do not. All three reach the translated shaders.
+            </>}
+        >
             <ModeSelector
                 label="Light being edited"
                 value={editing}
@@ -6061,19 +6057,16 @@ function ModelPreview(): React.JSX.Element {
                 }))}
                 onSelect={setEditing}
             />
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Light around
-                <InfoBadge>
-                    Turns round the model the way the stage does, from the same zero: at 0 the light
-                    stands where you stand in the Front view, and it moves clockwise seen from above.
-                </InfoBadge>
-                <span className="section-count">
-                    {lights[editing].azimuth} deg, from {bearing.from}
-                </span>
-            </span>
+        <Field
+            label="Light around"
+            value={<>{lights[editing].azimuth} deg, from {bearing.from}</>}
+            info={<>
+                Turns round the model the way the stage does, from the same zero: at 0 the light
+                stands where you stand in the Front view, and it moves clockwise seen from above.
+            </>}
+        >
             <input
                 type="range"
                 min={0}
@@ -6082,25 +6075,23 @@ function ModelPreview(): React.JSX.Element {
                 value={lights[editing].azimuth}
                 onChange={e => setLight(editing, { azimuth: Number(e.target.value) })}
             />
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Light height
-                <InfoBadge severity={bearing.belowGround ? 'warning' : 'info'}>
-                    {bearing.belowGround
-                        ? (editing === 'sun'
-                            ? 'Under the ground plane. The floor is between the sun and the model, so '
-                              + 'it lights the hull from beneath and casts nothing onto the ground.'
-                            : 'Under the ground plane, which is where the engine puts both of its own '
-                              + 'fills. They cast no shadow, so nothing is hidden by it.')
-                        : 'The sun drives the shadow. Straight overhead flattens the hull and hides '
-                          + 'the shadow under it; raking is what makes panel lines read.'}
-                </InfoBadge>
-                <span className="section-count">
-                    {lights[editing].elevation} deg, {bearing.height}
-                </span>
-            </span>
+        <Field
+            label="Light height"
+            infoSeverity={bearing.belowGround ? 'warning' : 'info'}
+            info={<>
+                {bearing.belowGround
+                    ? (editing === 'sun'
+                        ? 'Under the ground plane. The floor is between the sun and the model, so '
+                          + 'it lights the hull from beneath and casts nothing onto the ground.'
+                        : 'Under the ground plane, which is where the engine puts both of its own '
+                          + 'fills. They cast no shadow, so nothing is hidden by it.')
+                    : 'The sun drives the shadow. Straight overhead flattens the hull and hides '
+                      + 'the shadow under it; raking is what makes panel lines read.'}
+            </>}
+            value={<>{lights[editing].elevation} deg, {bearing.height}</>}
+        >
             <input
                 type="range"
                 min={-90}
@@ -6110,15 +6101,9 @@ function ModelPreview(): React.JSX.Element {
                 onChange={e =>
                     setLight(editing, { elevation: Number(e.target.value) })}
             />
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Light colour
-                <span className="section-count">
-                    {lights[editing].intensity.toFixed(2)}x
-                </span>
-            </span>
+        <Field label="Light colour" value={<>{lights[editing].intensity.toFixed(2)}x</>}>
             <span className="view-row">
                 <input
                     type="color"
@@ -6136,19 +6121,16 @@ function ModelPreview(): React.JSX.Element {
                         setLight(editing, { intensity: Number(e.target.value) })}
                 />
             </span>
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Ambient
-                <InfoBadge>
-                    What reaches the parts no light does. Too much and the model reads
-                    flat; none at all and its shadowed side is black.
-                </InfoBadge>
-                <span className="section-count">
-                    {lights.ambient.intensity.toFixed(2)}x
-                </span>
-            </span>
+        <Field
+            label="Ambient"
+            value={<>{lights.ambient.intensity.toFixed(2)}x</>}
+            info={<>
+                What reaches the parts no light does. Too much and the model reads
+                flat; none at all and its shadowed side is black.
+            </>}
+        >
             <span className="view-row">
                 <input
                     type="color"
@@ -6176,7 +6158,7 @@ function ModelPreview(): React.JSX.Element {
                     }))}
                 />
             </span>
-        </div>
+        </Field>
 
         {/* The swatch rides IN the label, not under it.
 
@@ -6190,63 +6172,55 @@ function ModelPreview(): React.JSX.Element {
             composites its whole subtree as a group, so a swatch in there renders a colour that is
             not the one stored - measured, a stored #ffffff drew as #bdbdbd. A sibling keeps its
             own colour and still reaches the far edge, because the well carries the auto margin. */}
-        <div className="field">
-            <span className="view-row">
-                <span className="field-label">
-                    Shadow colour
-                    <InfoBadge>
-                        Alamo`s one shadow colour, and it MULTIPLIES: 0.5 grey means half as bright.
-                        In Game mode it tints the stencil volume, so it reaches the hull`s own
-                        self-shadowing as well as the ground. In Default mode only the ground can
-                        catch it.
-                    </InfoBadge>
-                </span>
-                <input
-                    type="color"
-                    value={hexFromColour(lights.shadow)}
-                    /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
-                       disabled a working control: in Game mode the stencil darken tints the hull's
-                       own self-shadowing with no ground under it at all. */
-                    disabled={shadowReach === 'none'}
-                    title={SHADOW_TINT_TITLE[shadowReach]}
-                    onChange={e => setLights(current => ({
-                        ...current, shadow: colourFromHex(e.target.value),
-                    }))}
-                />
-            </span>
-        </div>
+        <Field
+            label="Shadow colour"
+            inline
+            info={<>
+                Alamo`s one shadow colour, and it MULTIPLIES: 0.5 grey means half as bright.
+                In Game mode it tints the stencil volume, so it reaches the hull`s own
+                self-shadowing as well as the ground. In Default mode only the ground can
+                catch it.
+            </>}
+        >
+            <input
+                type="color"
+                value={hexFromColour(lights.shadow)}
+                /* Dead ONLY when nothing can show it. It was gated on the floor alone, which
+                   disabled a working control: in Game mode the stencil darken tints the hull's
+                   own self-shadowing with no ground under it at all. */
+                disabled={shadowReach === 'none'}
+                title={SHADOW_TINT_TITLE[shadowReach]}
+                onChange={e => setLights(current => ({
+                    ...current, shadow: colourFromHex(e.target.value),
+                }))}
+            />
+        </Field>
 
-        <div className="field">
-            <span className="view-row">
-                <span className="field-label">
-                    Highlight colour
-                    <InfoBadge>
-                        One global specular for all three lights, as the engine keeps it.
-                        Only the translated effect shaders read it.
-                    </InfoBadge>
-                </span>
-                <input
-                    type="color"
-                    value={hexFromColour(lights.specular)}
-                    onChange={e => setLights(current => ({
-                        ...current, specular: colourFromHex(e.target.value),
-                    }))}
-                />
-            </span>
-        </div>
-        </PanelSection>
+        <Field
+            label="Highlight colour"
+            inline
+            info={<>
+                One global specular for all three lights, as the engine keeps it.
+                Only the translated effect shaders read it.
+            </>}
+        >
+            <input
+                type="color"
+                value={hexFromColour(lights.specular)}
+                onChange={e => setLights(current => ({
+                    ...current, specular: colourFromHex(e.target.value),
+                }))}
+            />
+        </Field>
+        </DockSection>
 
-        <PanelSection
+        <DockSection
             id="scene.weather"
             title="Weather"
             collapsed={folded.has('scene.weather')}
             onToggle={toggleSection}
         >
-        <div className="field">
-            <span className="field-label">
-                Wind from
-                <span className="section-count">{wind.heading} deg</span>
-            </span>
+        <Field label="Wind from" value={<>{wind.heading} deg</>}>
             <input
                 type="range"
                 min={0}
@@ -6256,17 +6230,16 @@ function ModelPreview(): React.JSX.Element {
                 onChange={e =>
                     setWind(current => ({ ...current, heading: Number(e.target.value) }))}
             />
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Wind speed
-                <InfoBadge>
-                    Bends the trees, leans the grass, and carries the 484 emitters that
-                    declare themselves affected by it.
-                </InfoBadge>
-                <span className="section-count">{wind.speed.toFixed(1)}</span>
-            </span>
+        <Field
+            label="Wind speed"
+            value={wind.speed.toFixed(1)}
+            info={<>
+                Bends the trees, leans the grass, and carries the 484 emitters that
+                declare themselves affected by it.
+            </>}
+        >
             <input
                 type="range"
                 min={0}
@@ -6276,10 +6249,10 @@ function ModelPreview(): React.JSX.Element {
                 onChange={e =>
                     setWind(current => ({ ...current, speed: Number(e.target.value) }))}
             />
-        </div>
-        </PanelSection>
+        </Field>
+        </DockSection>
 
-        <PanelSection
+        <DockSection
             id="scene.effects"
             title="Effects"
             collapsed={folded.has('scene.effects')}
@@ -6292,17 +6265,16 @@ function ModelPreview(): React.JSX.Element {
             it are passes over the finished frame. All three are Tier 1: they describe the picture,
             not the model, so they follow the reader from one file to the next. */}
         {scene !== null && scene.kind !== 'Particle' && (
-            <div className="field">
-                <span className="field-label">
-                    Renderer
-                    <InfoBadge>
-                        Default reads each sub-mesh`s shader NAME and draws the archetype it names -
-                        never wrong about geometry, only about how a surface is lit. Game draws the
-                        model the way the engine does: its own effect shaders, translated, and
-                        stencil shadow volumes cast by its authored shadow mesh. Only the shaders
-                        need the .fx sources; the shadows work without them.
-                    </InfoBadge>
-                </span>
+            <Field
+                label="Renderer"
+                info={<>
+                    Default reads each sub-mesh`s shader NAME and draws the archetype it names -
+                    never wrong about geometry, only about how a surface is lit. Game draws the
+                    model the way the engine does: its own effect shaders, translated, and
+                    stencil shadow volumes cast by its authored shadow mesh. Only the shaders
+                    need the .fx sources; the shadows work without them.
+                </>}
+            >
                 <ModeSelector
                     label="Which renderer draws the model"
                     /* What is actually RUNNING, not what could be fully delivered. The stencil
@@ -6355,29 +6327,26 @@ function ModelPreview(): React.JSX.Element {
                         Shader sources ready
                     </span>
                 ) : (
-                    <button
-                        type="button"
-                        className="icon-btn"
+                    <Button
                         title="Fetch the .fx shader sources"
                         onClick={() => vscode.postMessage({ type: 'obtainShaders' })}
                     >
                         <Icon name="download" />
                         Set up shader sources
-                    </button>
+                    </Button>
                 )}
-            </div>
+            </Field>
         )}
 
-        <div className="field">
-            <span className="field-label">
-                Heat distortion
-                <InfoBadge>
-                    Debug draws the heat BUFFER instead of the bent picture - the only way to see which
-                    pixels a distortion covers, since its whole effect is a displacement. Red and green
-                    carry the direction, blue the strength, and ALL BLACK means nothing on this model is
-                    distorting anything. It keeps the buffers alive while it is on.
-                </InfoBadge>
-            </span>
+        <Field
+            label="Heat distortion"
+            info={<>
+                Debug draws the heat BUFFER instead of the bent picture - the only way to see which
+                pixels a distortion covers, since its whole effect is a displacement. Red and green
+                carry the direction, blue the strength, and ALL BLACK means nothing on this model is
+                distorting anything. It keeps the buffers alive while it is on.
+            </>}
+        >
             <span className="view-row">
                 <label className="field-label">
                     <input
@@ -6397,10 +6366,12 @@ function ModelPreview(): React.JSX.Element {
                     Debug
                 </label>
             </span>
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
+        <Field
+            // The checkbox and its word are one <label>, so pressing the word toggles it -
+            // and the mark stays OUTSIDE that label, or pressing the mark would toggle it too.
+            label={
                 <label className="field-label">
                     <input
                         type="checkbox"
@@ -6409,13 +6380,13 @@ function ModelPreview(): React.JSX.Element {
                     />
                     Bloom
                 </label>
-                <InfoBadge>
-                    Off by default, as it is in the game. It runs after the heat pass, so the two
-                    compose in that order rather than fighting over the frame.
-                </InfoBadge>
-            </span>
-        </div>
-        </PanelSection>
+            }
+            info={<>
+                Off by default, as it is in the game. It runs after the heat pass, so the two
+                compose in that order rather than fighting over the frame.
+            </>}
+        />
+        </DockSection>
 
                                 </div>
                             </div>
@@ -6432,38 +6403,33 @@ function ModelPreview(): React.JSX.Element {
                             >
                                 <div className="stage-flyout-head">
                                     Camera
-                                    <button
-                                        className="icon-btn"
+                                    <IconButton
+                                        icon="close"
                                         title="Close"
                                         onClick={() => setCameraOpen(false)}
-                                    >
-                                        <Icon name="close" />
-                                    </button>
+                                    />
                                 </div>
                                 <div className="stage-flyout-body">
 
-        <PanelSection
+        <DockSection
             id="camera.shots"
             title="Saved shots" count={cameraPresets.length}
             collapsed={folded.has('camera.shots')}
             onToggle={toggleSection}
         >
-        <div className="field">
-            <span className="field-label">
-                Camera presets
-                <InfoBadge>
-                    Saved shots are kept in RADII rather than in game units, so one preset frames a
-                    trooper and a Star Destroyer the same way. Copy as Lua works the distance back out
-                    for whatever is on screen.
-                </InfoBadge>
-                <span className="section-count">{cameraPresets.length}</span>
-            </span>
+        <Field
+            label="Camera presets"
+            value={cameraPresets.length}
+            info={<>
+                Saved shots are kept in RADII rather than in game units, so one preset frames a
+                trooper and a Star Destroyer the same way. Copy as Lua works the distance back out
+                for whatever is on screen.
+            </>}
+        >
 
             {cameraPresets.map(saved => (
                 <span className="view-row" key={saved.id}>
-                    <button
-                        type="button"
-                        className="btn"
+                    <Button
                         title={`Frame this model the way ${saved.name} does: `
                             + `${saved.distance.toFixed(1)} radii out, pitch `
                             + `${Math.round(saved.pitch)}, yaw ${Math.round(saved.yaw)}`}
@@ -6479,10 +6445,8 @@ function ModelPreview(): React.JSX.Element {
                         }}
                     >
                         {saved.name}
-                    </button>
-                    <button
-                        type="button"
-                        className="btn"
+                    </Button>
+                    <Button
                         title={'Copy this shot as a Set_Cinematic_Camera_Key line, with the '
                             + 'distance worked out for the model on screen'}
                         onClick={() => {
@@ -6499,22 +6463,17 @@ function ModelPreview(): React.JSX.Element {
                         }}
                     >
                         Copy as Lua
-                    </button>
-                    <button
-                        type="button"
-                        className="icon-btn"
+                    </Button>
+                    <IconButton
+                        icon="remove"
                         title={`Delete ${saved.name}`}
                         onClick={() => setCameraPresets(
                             current => current.filter(p => p.id !== saved.id))}
-                    >
-                        <Icon name="remove" />
-                    </button>
+                    />
                 </span>
             ))}
 
-            <button
-                type="button"
-                className="btn"
+            <Button
                 onClick={() => {
                     const viewport = viewportRef.current;
                     if (viewport === null) {
@@ -6532,40 +6491,37 @@ function ModelPreview(): React.JSX.Element {
             >
                 <Icon name="add" />
                 Save this shot
-            </button>
+            </Button>
 
-        </div>
+        </Field>
 
-        <div className="field">
-            <span className="field-label">
-                Opens with
-                <InfoBadge severity={bindTargets.length === 0 ? 'warning' : 'info'}>
-                    {bindTargets.length === 0
-                        ? 'A model opened on its own has no object, type or category to bind to. Open '
-                          + 'it through a game object to bind a shot to a whole roster.'
-                        : 'A bound shot is applied when the model opens, most specific rule first: '
-                          + 'this object beats its type, and its type beats a category. Moving the '
-                          + 'camera afterwards is always allowed.'}
-                </InfoBadge>
-                <span className="section-count">
-                    {boundRule === null
-                        ? 'nothing'
-                        : cameraPresets.find(p => p.id === boundRule.presetId)?.name ?? 'a lost shot'}
-                </span>
-            </span>
+        <Field
+            label="Opens with"
+            infoSeverity={bindTargets.length === 0 ? 'warning' : 'info'}
+            info={<>
+                {bindTargets.length === 0
+                    ? 'A model opened on its own has no object, type or category to bind to. Open '
+                      + 'it through a game object to bind a shot to a whole roster.'
+                    : 'A bound shot is applied when the model opens, most specific rule first: '
+                      + 'this object beats its type, and its type beats a category. Moving the '
+                      + 'camera afterwards is always allowed.'}
+            </>}
+            value={boundRule === null
+                ? 'nothing'
+                : cameraPresets.find(p => p.id === boundRule.presetId)?.name ?? 'a lost shot'}
+        >
 
             {/* Bind the LAST saved shot: with no preset there is nothing to bind, and picking
                 which one belongs in a list rather than in three buttons. */}
             {bindTargets.map(target => (
-                <button
+                <Button
                     key={target.kind}
-                    type="button"
-                    className="btn"
+                    title={`Open every ${target.what} with ${
+                        cameraPresets.length === 0
+                            ? 'a saved shot'
+                            : cameraPresets[cameraPresets.length - 1].name}`}
                     disabled={cameraPresets.length === 0}
-                    title={cameraPresets.length === 0
-                        ? 'Save a shot first - there is nothing to bind yet'
-                        : `Open every ${target.what} with ${
-                            cameraPresets[cameraPresets.length - 1].name}`}
+                    disabledReason="Save a shot first - there is nothing to bind yet"
                     onClick={() => {
                         const preset = cameraPresets[cameraPresets.length - 1];
                         setCameraBindings(current => [
@@ -6584,13 +6540,11 @@ function ModelPreview(): React.JSX.Element {
                     }}
                 >
                     {target.label}
-                </button>
+                </Button>
             ))}
 
             {boundRule !== null && (
-                <button
-                    type="button"
-                    className="btn"
+                <Button
                     title={`Stop opening ${boundRule.kind === 'object' ? 'this object' : `every ${
                         boundRule.value}`} with a saved shot`}
                     onClick={() => setCameraBindings(
@@ -6598,26 +6552,25 @@ function ModelPreview(): React.JSX.Element {
                 >
                     <Icon name="remove" />
                     Unbind
-                </button>
+                </Button>
             )}
 
-        </div>
-        </PanelSection>
+        </Field>
+        </DockSection>
 
-        <PanelSection
+        <DockSection
             id="camera.view"
             title="View"
             collapsed={folded.has('camera.view')}
             onToggle={toggleSection}
         >
-        <div className="field">
-            <span className="field-label">
-                Draw distance
-                <InfoBadge>
-                    The fit already reaches the end of the effects, not just the hull.
-                    Reach further for a long trail; a huge model may z-fight if you do.
-                </InfoBadge>
-            </span>
+        <Field
+            label="Draw distance"
+            info={<>
+                The fit already reaches the end of the effects, not just the hull.
+                Reach further for a long trail; a huge model may z-fight if you do.
+            </>}
+        >
             <ModeSelector
                 label="Draw distance"
                 value={String(drawDistance)}
@@ -6629,25 +6582,24 @@ function ModelPreview(): React.JSX.Element {
                 ]}
                 onSelect={value => setDrawDistance(Number(value))}
             />
-        </div>
-        </PanelSection>
+        </Field>
+        </DockSection>
 
-        <PanelSection
+        <DockSection
             id="camera.capture"
             title="Capture"
             collapsed={folded.has('camera.capture')}
             onToggle={toggleSection}
         >
-        <div className="field">
-            <span className="field-label">
-                Capture
-                <InfoBadge>
-                    Renders the shot on screen at the chosen size and asks where to put it. Off by
-                    default the grid, the floor, the effects and every annotation stay out of it, which
-                    is what an icon wants - tick the box to capture the room exactly as you see it.
-                </InfoBadge>
-                <span className="section-count">{captureSizePx}px</span>
-            </span>
+        <Field
+            label="Capture"
+            value={<>{captureSizePx}px</>}
+            info={<>
+                Renders the shot on screen at the chosen size and asks where to put it. Off by
+                default the grid, the floor, the effects and every annotation stay out of it, which
+                is what an icon wants - tick the box to capture the room exactly as you see it.
+            </>}
+        >
 
             <ModeSelector
                 label="Capture size"
@@ -6678,9 +6630,7 @@ function ModelPreview(): React.JSX.Element {
                 Keep the grid, floor, effects and markers
             </label>
 
-            <button
-                type="button"
-                className="btn"
+            <Button
                 onClick={() => {
                     const viewport = viewportRef.current;
                     if (viewport === null) {
@@ -6713,10 +6663,10 @@ function ModelPreview(): React.JSX.Element {
             >
                 <Icon name="capture" />
                 Save a picture
-            </button>
+            </Button>
 
-        </div>
-        </PanelSection>
+        </Field>
+        </DockSection>
 
                                 </div>
                             </div>
@@ -6865,15 +6815,13 @@ function ModelPreview(): React.JSX.Element {
                                     cannot hold a tooltip's worth of text per ability, and the jump
                                     to a definition needs a control of its own - so both live one
                                     press away instead of being dropped. */}
-                                <button
-                                    type="button"
-                                    className={'icon-btn' + (abilitiesOpen ? ' active' : '')}
-                                    aria-expanded={abilitiesOpen}
+                                <IconButton
+                                    icon="details"
+                                    className={abilitiesOpen ? 'active' : undefined}
+                                    expanded={abilitiesOpen}
                                     title="Show abilities"
                                     onClick={() => setAbilitiesOpen(open => !open)}
-                                >
-                                    <Icon name="details" />
-                                </button>
+                                />
                             </div>
                         )}
 
@@ -6938,27 +6886,21 @@ function ModelPreview(): React.JSX.Element {
                                     the reason, rather than firing into nothing. The title also
                                     names the target, which the flyout's own readout used to be
                                     the only place to see. */}
-                                <button
-                                    type="button"
-                                    className={'icon-btn as-action'
-                                        + (justFired ? ' fired' : '')}
+                                <IconButton
+                                    icon="fire"
+                                    className={'as-action' + (justFired ? ' fired' : '')}
+                                    title={`Fire at ${fireTarget === 'hull'
+                                        ? 'the whole unit' : fireTarget}`}
                                     disabled={fireTarget === 'hull' && !shipTargetable}
-                                    title={fireTarget === 'hull' && !shipTargetable
-                                        ? 'Pick a hardpoint to fire at'
-                                        : `Fire at ${fireTarget === 'hull'
-                                            ? 'the whole unit' : fireTarget}`}
+                                    disabledReason="Fire - pick a hardpoint to fire at"
                                     onClick={fire}
-                                >
-                                    <Icon name="fire" />
-                                </button>
-                                <button
-                                    type="button"
-                                    className="icon-btn as-action"
+                                />
+                                <IconButton
+                                    icon="repair"
+                                    className="as-action"
                                     title="Repair the target"
                                     onClick={() => { repairTarget(); destroyAll(false); }}
-                                >
-                                    <Icon name="repair" />
-                                </button>
+                                />
                             </div>
                         )}
 
@@ -6969,35 +6911,30 @@ function ModelPreview(): React.JSX.Element {
                         {mode === 'gameplay' && scene?.defence !== null
                             && scene?.defence !== undefined && (
                             <div className="stage-chrome">
-                                <button
-                                    type="button"
-                                    className={'icon-btn' + (attackOpen ? ' active' : '')}
-                                    aria-expanded={attackOpen}
+                                <IconButton
+                                    icon="settings"
+                                    className={attackOpen ? 'active' : undefined}
+                                    expanded={attackOpen}
                                     title="Weapon settings"
                                     onClick={() => setAttackOpen(open => !open)}
-                                >
-                                    <Icon name="settings" />
-                                </button>
+                                />
 
                                 {/* Beside the settings, because it is the same kind of control -
                                     it OPENS something. What each shot actually did, so a reader
                                     can see WHY a number came out the way it did rather than
                                     watching a bar move and guessing. */}
-                                <button
-                                    type="button"
-                                    className={'icon-btn' + (logOpen ? ' active' : '')}
-                                    aria-expanded={logOpen}
+                                <IconButton
+                                    icon="log"
+                                    className={logOpen ? 'active' : undefined}
+                                    expanded={logOpen}
+                                    title="Damage log"
                                     disabled={damageLog.length === 0}
                                     // Names the control even when it is disabled: a tooltip that
                                     // gives only the reason leaves a reader who has never opened it
                                     // no idea what it is.
-                                    title={damageLog.length === 0
-                                        ? 'Damage log - nothing fired yet'
-                                        : 'Damage log'}
+                                    disabledReason="Damage log - nothing fired yet"
                                     onClick={() => setLogOpen(open => !open)}
-                                >
-                                    <Icon name="log" />
-                                </button>
+                                />
                             </div>
                         )}
                         </span>
@@ -7021,13 +6958,11 @@ function ModelPreview(): React.JSX.Element {
                                     <span className="section-count header-right">
                                         {abilities.length}
                                     </span>
-                                    <button
-                                        className="icon-btn"
+                                    <IconButton
+                                        icon="close"
                                         title="Close"
                                         onClick={() => setAbilitiesOpen(false)}
-                                    >
-                                        <Icon name="close" />
-                                    </button>
+                                    />
                                 </div>
                                 <div className="stage-flyout-body">
                                     <ul className="part-list ability-list">
@@ -7090,23 +7025,20 @@ function ModelPreview(): React.JSX.Element {
                                                 )}
 
                                                 <span className="view-row card-actions">
-                                                    <button
-                                                        type="button"
-                                                        className={'icon-btn card-info-btn'
+                                                    <IconButton
+                                                        icon="details"
+                                                        className={'card-info-btn'
                                                             + (infoAbility === ability.type
                                                                 ? ' active' : '')}
-                                                        aria-expanded={infoAbility === ability.type}
+                                                        expanded={infoAbility === ability.type}
+                                                        title="Info"
                                                         disabled={abilityFacts(ability).length === 0}
-                                                        title={abilityFacts(ability).length === 0
-                                                            ? 'This ability declares nothing else'
-                                                            : 'Info'}
+                                                        disabledReason="This ability declares nothing else"
                                                         onClick={() => setInfoAbility(open =>
                                                             open === ability.type
                                                                 ? null
                                                                 : ability.type)}
-                                                    >
-                                                        <Icon name="details" />
-                                                    </button>
+                                                    />
                                                 </span>
                                             </li>
                                         ))}
@@ -7137,13 +7069,11 @@ function ModelPreview(): React.JSX.Element {
                                     <span className="section-count header-right">
                                         {damageLog.length}
                                     </span>
-                                    <button
-                                        className="icon-btn"
+                                    <IconButton
+                                        icon="close"
                                         title="Close"
                                         onClick={() => setLogOpen(false)}
-                                    >
-                                        <Icon name="close" />
-                                    </button>
+                                    />
                                 </div>
                                 <div className="stage-flyout-body">
                                     <ol className="damage-log">
@@ -7160,14 +7090,14 @@ function ModelPreview(): React.JSX.Element {
                                     </ol>
 
                                     <span className="view-row">
-                                        <button
-                                            className="btn compact"
+                                        <Button
+                                            compact
                                             title="Empty the log"
                                             onClick={() => setDamageLog([])}
                                         >
                                             <Icon name="remove" />
                                             Clear
-                                        </button>
+                                        </Button>
                                     </span>
                                 </div>
                             </div>
@@ -7181,32 +7111,26 @@ function ModelPreview(): React.JSX.Element {
                             >
                                 <div className="stage-flyout-head">
                                     Weapon
-                                    <button
-                                        className="icon-btn"
+                                    <IconButton
+                                        icon="close"
                                         title="Close"
                                         onClick={() => setAttackOpen(false)}
-                                    >
-                                        <Icon name="close" />
-                                    </button>
+                                    />
                                 </div>
                                 <div className="stage-flyout-body">
                         {mode === 'gameplay' && scene?.defence !== null
                             && scene?.defence !== undefined && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Attacker
-                                    <span className="section-count">
-                                        {scene.defence.isShielded ? 'shielded' : 'unshielded'}
-                                    </span>
-                                </div>
+                            <DockSection
+                                title="Attacker"
+                                count={scene.defence.isShielded ? 'shielded' : 'unshielded'}
+                            >
 
                                 <div className="field-note">
                                     The model on stage is the TARGET. Build a weapon here and fire
                                     it at the unit or at one hardpoint.
                                 </div>
 
-                                <div className="field">
-                                    <span className="field-label">Damage</span>
+                                <Field label="Damage">
                                     <input
                                         type="number"
                                         min={0}
@@ -7216,30 +7140,27 @@ function ModelPreview(): React.JSX.Element {
                                             damage: Number(e.target.value),
                                         }))}
                                     />
-                                </div>
+                                </Field>
 
-                                <div className="field">
-                                    <span className="field-label">
-                                        Damage type
-                                        <span
-                                            className="section-count"
-                                            title="What the damage table says against this target`s
-                                                armor. A pair the table does not name is 1.0, which
-                                                is over half of them."
-                                        >
-                                            {/* Off the LIVE defence: a ship whose generators are
-                                                gone is unshielded, so the factor a shot would
-                                                actually take is the hull's. Reading the scene's
-                                                own copy showed the shield column beside a bar
-                                                that had just gone flat. */}
-                                            x{armorFactor(
-                                                attacker.shield
-                                                    && liveDefence?.isShielded === true
-                                                    ? scene.defence.shieldFactors
-                                                    : scene.defence.hullFactors,
-                                                attacker.damageType)}
-                                        </span>
-                                    </span>
+                                <Field
+                                    label="Damage type"
+                                    valueTitle={'What the damage table says against this '
+                                        + 'target`s armor. A pair the table does not name is '
+                                        + '1.0, which is over half of them.'}
+                                    value={<>
+                                        {/* Off the LIVE defence: a ship whose generators are
+                                            gone is unshielded, so the factor a shot would
+                                            actually take is the hull's. Reading the scene's
+                                            own copy showed the shield column beside a bar
+                                            that had just gone flat. */}
+                                        x{armorFactor(
+                                            attacker.shield
+                                                && liveDefence?.isShielded === true
+                                                ? scene.defence.shieldFactors
+                                                : scene.defence.hullFactors,
+                                            attacker.damageType)}
+                                    </>}
+                                >
                                     <select
                                         value={attacker.damageType}
                                         onChange={e => setAttacker(current => ({
@@ -7260,7 +7181,7 @@ function ModelPreview(): React.JSX.Element {
                                             <option key={type} value={type}>{type}</option>
                                         ))}
                                     </select>
-                                </div>
+                                </Field>
 
                                 {/* The three switches a projectile carries. They decide entirely
                                     what a hit touches - see `attacker.ts` for the four rules. */}
@@ -7290,42 +7211,39 @@ function ModelPreview(): React.JSX.Element {
                                     range reaches nobody and the fields below it are moot - they
                                     disable rather than vanish, since a reader who has typed a
                                     damage and seen nothing happen needs to see the reason. */}
-                                <div className="field">
-                                    <span className="field-label">Blast damage</span>
+                                <Field label="Blast damage">
                                     <input
                                         type="number"
                                         min={0}
                                         value={attacker.blastDamage}
                                         title="Projectile_Blast_Area_Damage - applied to the target
-                                            AND to everything inside the range below."
+                                            AND to everything inside the range below"
                                         onChange={e => setAttacker(current => ({
                                             ...current,
                                             blastDamage: Number(e.target.value),
                                         }))}
                                     />
-                                </div>
+                                </Field>
 
-                                <div className="field">
-                                    <span className="field-label">Blast range</span>
+                                <Field label="Blast range">
                                     <input
                                         type="number"
                                         min={0}
                                         value={attacker.blastRange}
-                                        title="Projectile_Blast_Area_Range, in engine units. How far
-                                            the blast reaches; the target itself is always hit."
+                                        title="Projectile_Blast_Area_Range, in engine units.
+                                            The target itself is always hit."
                                         onChange={e => setAttacker(current => ({
                                             ...current,
                                             blastRange: Number(e.target.value),
                                         }))}
                                     />
-                                </div>
+                                </Field>
 
                                 <div className="view-row">
                                     <label
                                         className="field-label"
                                         title="Projectile_Blast_Area_Dropoff - the blast weakens
-                                            with distance instead of being flat. Only 10 of foc's 63
-                                            blast projectiles declare it."
+                                            with distance instead of being flat"
                                     >
                                         <input
                                             type="checkbox"
@@ -7342,7 +7260,7 @@ function ModelPreview(): React.JSX.Element {
                                     <label
                                         className="field-label"
                                         title="Projectile_Blast_Area_Dropoff_Tiers - how many bands
-                                            it falls off in. The shipped ones use 3, 4 or 5."
+                                            it falls off in. Shipped values are 3, 4 or 5."
                                     >
                                         Tiers
                                         <input
@@ -7367,13 +7285,10 @@ function ModelPreview(): React.JSX.Element {
                                     fires - you are building a weapon to shoot AT it, so its own
                                     armament is the wrong list. 105 of them, so the search is the
                                     way through rather than an optional extra. */}
-                                <div className="field">
-                                    <span className="field-label">
-                                        Fill from a projectile
-                                        <span className="section-count">
-                                            {scene.projectileCatalog?.length ?? 0}
-                                        </span>
-                                    </span>
+                                <Field
+                                    label="Fill from a projectile"
+                                    value={<>{scene.projectileCatalog?.length ?? 0}</>}
+                                >
                                     <input
                                         type="text"
                                         placeholder="Search projectiles"
@@ -7418,18 +7333,12 @@ function ModelPreview(): React.JSX.Element {
                                     {projectileNote !== null && (
                                         <span className="field-note">{projectileNote}</span>
                                     )}
-                                </div>
+                                </Field>
 
                                 {/* Presets are TIER 1: they describe the reader's testing habits,
                                     not this model, so they live in globalState beside the camera
                                     presets and survive opening a different ship. */}
-                                <div className="field">
-                                    <span className="field-label">
-                                        Saved weapons
-                                        <span className="section-count">
-                                            {attackerPresets.length}
-                                        </span>
-                                    </span>
+                                <Field label="Saved weapons" value={<>{attackerPresets.length}</>}>
                                     <select
                                         value=""
                                         disabled={attackerPresets.length === 0}
@@ -7453,7 +7362,7 @@ function ModelPreview(): React.JSX.Element {
                                             </option>
                                         ))}
                                     </select>
-                                </div>
+                                </Field>
 
                                 <span className="view-row">
                                     <input
@@ -7462,12 +7371,11 @@ function ModelPreview(): React.JSX.Element {
                                         value={presetName}
                                         onChange={e => setPresetName(e.target.value)}
                                     />
-                                    <button
-                                        className="btn compact"
+                                    <Button
+                                        compact
+                                        title="Saves these values under that name, for any model"
                                         disabled={presetName.trim() === ''}
-                                        title={presetName.trim() === ''
-                                            ? 'Give the weapon a name to save it.'
-                                            : 'Saves these values under that name, for any model'}
+                                        disabledReason="Give the weapon a name to save it"
                                         onClick={() => {
                                             const name = presetName.trim();
 
@@ -7483,19 +7391,20 @@ function ModelPreview(): React.JSX.Element {
                                     >
                                         <Icon name="save" />
                                         Save
-                                    </button>
-                                    <button
-                                        className="btn compact"
-                                        disabled={attackerPresets.length === 0}
+                                    </Button>
+                                    <Button
+                                        compact
                                         title="Remove every saved weapon"
+                                        disabled={attackerPresets.length === 0}
+                                        disabledReason="No saved weapons to remove"
                                         onClick={() => setAttackerPresets([])}
                                     >
                                         <Icon name="remove" />
                                         Clear
-                                    </button>
+                                    </Button>
                                 </span>
 
-                            </div>
+                            </DockSection>
                         )}
                                 </div>
                             </div>
@@ -7569,12 +7478,13 @@ function ModelPreview(): React.JSX.Element {
                             the dial alone in the centred slot, one anchored right. The preview has
                             nothing to save, so the left slot carries what the model IS - its name
                             and its counts - which frees the centre entirely for the dial. */}
-                        <button
-                            className={'icon-btn header-left' + (infoOpen ? ' active' : '')}
-                            aria-expanded={infoOpen}
-                            onClick={() => setInfoOpen(open => !open)}
+                        <IconButton
+                            icon="details"
+                            className={'header-left' + (infoOpen ? ' active' : '')}
+                            expanded={infoOpen}
                             title={scene?.subject ?? 'No model'}
-                        ><Icon name="details" /></button>
+                            onClick={() => setInfoOpen(open => !open)}
+                        />
 
                         {/* A flyout, anchored under the button that opens it and pointing back at
                             it: the model's name and its counts are something you check, not
@@ -7620,7 +7530,7 @@ function ModelPreview(): React.JSX.Element {
                                             <div
                                                 className="stat-row"
                                                 title="The engine lights everything with the three scene
-                                                    directionals instead."
+                                                    directionals instead"
                                             >
                                                 <span>Lights (ignored)</span>
                                                 <span className="value">
@@ -7654,108 +7564,91 @@ function ModelPreview(): React.JSX.Element {
                                     in a corner, because they are about the subject it names. */}
                                 {scene.kind === 'Model' && (
                                     <span className="header-handoff">
-                                        <button
-                                            className="icon-btn"
+                                        <IconButton
+                                            icon="open"
                                             title="Open this model in AloViewer"
                                             onClick={() => vscode.postMessage(
                                                 { type: 'openExternal', tool: 'model' })}
-                                        >
-                                            <Icon name="open" />
-                                        </button>
-                                        <button
-                                            className="icon-btn"
+                                        />
+                                        <IconButton
+                                            icon="bloom"
                                             title="Open this file in the Particle Editor"
                                             onClick={() => vscode.postMessage(
                                                 { type: 'openExternal', tool: 'particles' })}
-                                        >
-                                            <Icon name="bloom" />
-                                        </button>
+                                        />
                                     </span>
                                 )}
                             </span>
                         )}
 
-                        <button
-                            className={`icon-btn validate-btn header-right sev-${severity}`}
+                        <SeverityTag
+                            severity={severity}
+                            count={notices.length}
+                            expanded={problemsOpen}
                             disabled={notices.length === 0}
-                            aria-expanded={problemsOpen}
+                            disabledReason="Nothing to report about this model"
+                            title={`${problemsOpen ? 'Hide' : 'Read'} `
+                                + `${notices.length} ${problemWord}`}
                             onClick={() => setProblemsOpen(open => !open)}
-                            title={notices.length === 0
-                                ? 'Nothing to report about this model'
-                                : `${problemsOpen ? 'Hide' : 'Read'} `
-                                  + `${notices.length} ${problemWord}`}
-                        >
-                            <span className={`codicon codicon-${severityIconFor(severity)}`} />
-                            {notices.length > 0 ? ` ${notices.length}` : ''}
-                        </button>
+                        />
 
 
                     </>}
                     content={<>
                         {mode === 'model' && treeItems.length > 0 && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Model tree
-
-                                    {/* One group at the far end, in a FIXED order: what comes and
-                                        goes on the left, what is always there on the right.
-
-                                        The count and Reset are on this header whatever the reader
-                                        does; the selection chip is not. With the count and the chip
-                                        each taking their own auto margin the free space was split
-                                        between them, so picking a row shoved the count 88 pixels
-                                        left and the thing being read moved out from under the eye.
-                                        The group grows leftwards now and nothing already in it
-                                        shifts. */}
-                                    <span className="title-end">
-                                        {/* The way OUT of a selection. Escape has always cleared
-                                            it and clicking the row again does now, but neither is
-                                            visible - the reader's complaint was that there was no
-                                            obvious way back, and a count that does nothing was the
-                                            only thing on screen saying a selection existed. */}
-                                        {selected.size > 0 && (
-                                            <button
-                                                className="section-count as-button"
-                                                title="Clear the selection"
-                                                onClick={clearSelection}
-                                            >
-                                                {selected.size} selected
-                                                <Icon name="close" size={11} />
-                                            </button>
-                                        )}
-
-                                        {/* BOTH, when both apply. The selection readout used to
-                                            replace the count outright, which put an active filter
-                                            back out of sight the moment a row was picked - and
-                                            hiding a filter is the one thing this header exists to
-                                            stop. They are separate facts about the tree. */}
-                                        <span
-                                            className="section-count"
-                                            title={filterSummary === null
-                                                ? undefined
-                                                : 'Some rows are filtered out'}
-                                        >
-                                            {filterSummary ?? treeRows.length}
-                                        </span>
-
-                                        {/* Reset stands with the count because they are the same
-                                            corner of the same header: one says what state the tree
-                                            is in, the other is the way out of it. Below the list it
-                                            was a row of its own, a hundred rows from what it
-                                            undoes. */}
+                            // The count is inside `end` rather than given as `count`, because this
+                            // one carries a title of its own when rows are filtered out - which a
+                            // plain count cannot. The order within the group is still fixed, and
+                            // the group still takes the section's one auto margin.
+                            <DockSection
+                                title="Model tree"
+                                end={<>
+                                    {/* The way OUT of a selection. Escape has always cleared
+                                        it and clicking the row again does now, but neither is
+                                        visible - the reader's complaint was that there was no
+                                        obvious way back, and a count that does nothing was the
+                                        only thing on screen saying a selection existed. */}
+                                    {selected.size > 0 && (
                                         <button
-                                            type="button"
-                                            className="icon-btn header-right"
-                                            disabled={!touched}
-                                            title={touched
-                                                ? 'Put the model back the way it opened'
-                                                : 'The model is as it opened'}
-                                            onClick={resetModel}
+                                            className="section-count as-button"
+                                            title="Clear the selection"
+                                            onClick={clearSelection}
                                         >
-                                            <Icon name="reset" size={13} />
+                                            {selected.size} selected
+                                            <Icon name="close" size={11} />
                                         </button>
+                                    )}
+
+                                    {/* BOTH, when both apply. The selection readout used to
+                                        replace the count outright, which put an active filter
+                                        back out of sight the moment a row was picked - and
+                                        hiding a filter is the one thing this header exists to
+                                        stop. They are separate facts about the tree. */}
+                                    <span
+                                        className="section-count"
+                                        title={filterSummary === null
+                                            ? undefined
+                                            : 'Some rows are filtered out'}
+                                    >
+                                        {filterSummary ?? treeRows.length}
                                     </span>
-                                </div>
+
+                                    {/* Reset stands with the count because they are the same
+                                        corner of the same header: one says what state the tree
+                                        is in, the other is the way out of it. Below the list it
+                                        was a row of its own, a hundred rows from what it
+                                        undoes. */}
+                                    <IconButton
+                                        icon="reset"
+                                        className="header-right"
+                                        size={13}
+                                        title="Put the model back the way it opened"
+                                        disabled={!touched}
+                                        disabledReason="The model is as it opened"
+                                        onClick={resetModel}
+                                    />
+                                </>}
+                            >
 
                                 {/* The list and the search element share a box, because the second
                                     one is drawn ON the first. Positioned against this rather than
@@ -7847,19 +7740,22 @@ ${becauseText(node.because)}`}
                                                 });
 
                                                 return (
-                                                    <button
-                                                        type="button"
-                                                        className={`icon-btn row-eye eye-${eye.state}`}
-                                                        aria-pressed={eye.state === 'shown'}
-                                                        disabled={!eye.canAct}
+                                                    <IconButton
+                                                        icon={EYE_ICONS[eye.state]}
+                                                        className={`row-eye eye-${eye.state}`}
+                                                        size={13}
+                                                        pressed={eye.state === 'shown'}
                                                         title={eye.title}
+                                                        disabled={!eye.canAct}
+                                                        // Already the reason when it cannot act:
+                                                        // rowEye phrases the title from the state,
+                                                        // and a row that cannot be hidden says so.
+                                                        disabledReason={eye.title}
                                                         onClick={event => {
                                                             event.stopPropagation();
                                                             setRowsVisible(node.id, !node.visible);
                                                         }}
-                                                    >
-                                                        <Icon name={EYE_ICONS[eye.state]} size={13} />
-                                                    </button>
+                                                    />
                                                 );
                                             })()}
 
@@ -7868,20 +7764,21 @@ ${becauseText(node.because)}`}
                                                 than a column of buttons - but always THERE, since
                                                 a control that only exists on hover is one nobody
                                                 finds. */}
-                                            <button
-                                                type="button"
-                                                className={'icon-btn row-details'
+                                            <IconButton
+                                                icon="details"
+                                                className={'row-details'
                                                     + (detailsRow === node.id ? ' active' : '')}
-                                                // Not aria-expanded: it opens an editor tab beside
-                                                // this one, which is not this control disclosing
-                                                // something underneath it.
-                                                aria-pressed={detailsRow === node.id}
+                                                size={13}
+                                                // pressed, not expanded: it opens an editor tab
+                                                // beside this one, which is not this control
+                                                // disclosing something underneath it.
+                                                pressed={detailsRow === node.id}
                                                 title={`Inspect ${node.name}`}
                                                 onClick={event => {
                                                     event.stopPropagation();
                                                     openInspector(node.id);
                                                 }}
-                                            ><Icon name="details" size={13} /></button>
+                                            />
                                         </li>
                                     ))}
                                     {/* Inside the list, not after it. Below the box it was one
@@ -7947,11 +7844,11 @@ ${becauseText(node.because)}`}
                                         field's line and the three kinds dropped below it, which is
                                         neither of the two layouts this is meant to have. */}
                                     <div className="tree-search-icons">
-                                    <button
-                                        type="button"
-                                        className={'icon-btn tree-search-toggle'
+                                    <IconButton
+                                        icon="search"
+                                        className={'tree-search-toggle'
                                             + (searchOpen ? ' active' : '')}
-                                        aria-expanded={searchOpen}
+                                        expanded={searchOpen}
                                         title={searchOpen
                                             ? 'Close the filter'
                                             : 'Filter the tree by name'}
@@ -7964,22 +7861,19 @@ ${becauseText(node.because)}`}
                                             }
                                             setSearchPressed(open => !open);
                                         }}
-                                    >
-                                        <Icon name="search" />
-                                    </button>
+                                    />
 
                                     {/* Always here, open or closed. A pattern and a kind are two
                                         halves of the same question, and hiding one of them the
                                         moment you start typing makes narrowing by kind a round
                                         trip out of the box you are typing in. */}
                                     {TREE_KINDS.map(kind => (
-                                        <button
+                                        <IconButton
                                             key={kind}
-                                            type="button"
-                                            className={`icon-btn${kinds.has(kind)
-                                                ? ' active' : ''}`}
+                                            icon={KIND_ICONS[kind]}
+                                            className={kinds.has(kind) ? 'active' : undefined}
+                                            pressed={kinds.has(kind)}
                                             title={`Show ${KIND_LABELS[kind].toLowerCase()}`}
-                                            aria-pressed={kinds.has(kind)}
                                             onClick={() => setKinds(current => {
                                                 const next = new Set(current);
                                                 if (!next.delete(kind)) {
@@ -7987,14 +7881,12 @@ ${becauseText(node.because)}`}
                                                 }
                                                 return next;
                                             })}
-                                        >
-                                            <Icon name={KIND_ICONS[kind]} />
-                                        </button>
+                                        />
                                     ))}
                                     </div>
                                 </div>
                                 </div>
-                            </div>
+                            </DockSection>
                         )}
 
                         {/* Bulk switches over the same systems the tree lists one by one - not a
@@ -8009,11 +7901,7 @@ ${becauseText(node.because)}`}
                             so ticking either moved the other and nothing said why. See
                             `FAMILIES` in `particleScene.ts` for how a meaning is recognised. */}
                         {mode === 'model' && groups.length > 0 && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Effect groups
-                                    <span className="section-count">{groups.length}</span>
-                                </div>
+                            <DockSection title="Effect groups" count={groups.length}>
                                 <ul className="part-list">
                                     {groups.map(group => {
                                         const state = groupState(group, shownSystems);
@@ -8044,15 +7932,11 @@ ${becauseText(node.because)}`}
                                         );
                                     })}
                                 </ul>
-                            </div>
+                            </DockSection>
                         )}
 
                         {emitters.length > 0 && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Emitters
-                                    <span className="section-count">{emitters.length}</span>
-                                </div>
+                            <DockSection title="Emitters" count={emitters.length}>
                                 <ul className="part-list">
                                     {emitters.map((name, index) => (
                                         <li key={index}>
@@ -8068,16 +7952,12 @@ ${becauseText(node.because)}`}
                                         </li>
                                     ))}
                                 </ul>
-                            </div>
+                            </DockSection>
                         )}
 
 
                         {mode === 'animation' && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Animations
-                                    <span className="section-count">{animations.length}</span>
-                                </div>
+                            <DockSection title="Animations" count={animations.length}>
 
                                 {animations.length === 0 ? (
                                     <div className="field-note">
@@ -8166,7 +8046,7 @@ ${becauseText(node.because)}`}
                                         })}
                                     </div>
                                 )}
-                            </div>
+                            </DockSection>
                         )}
 
                         {/* Nothing to say only when the subject is unarmed, unattached AND unable.
@@ -8174,25 +8054,20 @@ ${becauseText(node.because)}`}
                             at all, and telling it there is nothing here would be wrong twice. */}
                         {mode === 'gameplay' && (scene?.hardpoints.length ?? 0) === 0
                             && weapons.length === 0 && abilities.length === 0 && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">Gameplay</div>
+                            <DockSection title="Gameplay">
                                 <div className="field-note">
                                     This unit declares no weapons, no hardpoints and no
                                     abilities, so there is nothing to destroy and no damage effects
                                     to drive.
                                 </div>
-                            </div>
+                            </DockSection>
                         )}
 
                         {/* What is LEFT after the cards: the weapons without
                             hardpoint. A fighter carries its guns on the unit itself and declares no
                             hardpoints at all, so this is not an edge case - it is every fighter. */}
                         {mode === 'gameplay' && looseWeapons.length > 0 && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Unit weapons
-                                    <span className="section-count">{looseWeapons.length}</span>
-                                </div>
+                            <DockSection title="Unit weapons" count={looseWeapons.length}>
 
                                 {/* The hardpoints' own card, which is what the user asked for -
                                     same shape, same list, same info button. What a unit weapon has
@@ -8234,69 +8109,64 @@ ${becauseText(node.because)}`}
                                                     hardpoint card - so the AT-AA, whose turret is
                                                     on its weapon and which has no hardpoints at
                                                     all, had nothing to press. */}
-                                                <button
-                                                    type="button"
-                                                    className={'icon-btn'
-                                                        + (sweeping.has(row.id) ? ' active' : '')}
-                                                    aria-pressed={sweeping.has(row.id)}
+                                                <IconButton
+                                                    icon="loop"
+                                                    className={sweeping.has(row.id) ? 'active' : undefined}
+                                                    pressed={sweeping.has(row.id)}
+                                                    title="Move turret"
                                                     disabled={!sweepable.some(s => s.id === row.id)}
-                                                    title={sweepable.some(s => s.id === row.id)
-                                                        ? 'Move turret'
-                                                        : 'No traverse declared'}
+                                                    disabledReason="No traverse declared"
                                                     onClick={event => {
                                                         event.stopPropagation();
                                                         setSweeping(current =>
                                                             toggleSelected(current, row.id));
                                                     }}
-                                                >
-                                                    <Icon name="loop" />
-                                                </button>
+                                                />
 
-                                                <button
-                                                    type="button"
-                                                    className={'icon-btn card-info-btn'
+                                                <IconButton
+                                                    icon="details"
+                                                    className={'card-info-btn'
                                                         + (infoCard === row.id ? ' active' : '')}
-                                                    aria-expanded={infoCard === row.id}
+                                                    expanded={infoCard === row.id}
                                                     title="Info"
                                                     onClick={event => {
                                                         event.stopPropagation();
                                                         setInfoCard(open =>
                                                             open === row.id ? null : row.id);
                                                     }}
-                                                >
-                                                    <Icon name="details" />
-                                                </button>
+                                                />
                                             </span>
                                         </li>
                                     ))}
                                 </ul>
-                            </div>
+                            </DockSection>
                         )}
 
                         {mode === 'gameplay' && cards.length > 0 && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Hardpoints
-                                    <span className="section-count">{cards.length}</span>
-                                    <button
-                                        type="button"
-                                        className="icon-btn header-right"
-                                        disabled={!cards.some(c => c.isDestroyable)}
-                                        title="Destroy all hardpoints"
-                                        onClick={() => destroyAll(true)}
-                                    >
-                                        <Icon name="effects" size={13} />
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="icon-btn header-right"
-                                        disabled={destroyed.size === 0}
-                                        title="Repair all hardpoints"
-                                        onClick={() => destroyAll(false)}
-                                    >
-                                        <Icon name="reset" size={13} />
-                                    </button>
-                                </div>
+                            <DockSection
+                                title="Hardpoints"
+                                count={cards.length}
+                                end={<>
+                                <IconButton
+                                    icon="effects"
+                                    className="header-right"
+                                    size={13}
+                                    title="Destroy all hardpoints"
+                                    disabled={!cards.some(c => c.isDestroyable)}
+                                    disabledReason="No hardpoint on this model can be destroyed"
+                                    onClick={() => destroyAll(true)}
+                                />
+                                <IconButton
+                                    icon="reset"
+                                    className="header-right"
+                                    size={13}
+                                    title="Repair all hardpoints"
+                                    disabled={destroyed.size === 0}
+                                    disabledReason="Nothing is destroyed"
+                                    onClick={() => destroyAll(false)}
+                                />
+                                </>}
+                            >
 
                                 <div className="field-note">
                                     Hover a targeting mark to see its tracked art; click one to aim
@@ -8331,11 +8201,11 @@ ${becauseText(node.because)}`}
                                         />
                                     )}
                                     <div className="tree-search-icons">
-                                        <button
-                                            type="button"
-                                            className={'icon-btn tree-search-toggle'
+                                        <IconButton
+                                            icon="search"
+                                            className={'tree-search-toggle'
                                                 + (hardpointSearchOpen ? ' active' : '')}
-                                            aria-expanded={hardpointSearchOpen}
+                                            expanded={hardpointSearchOpen}
                                             title={hardpointSearchOpen
                                                 ? 'Close the filter'
                                                 : 'Filter by type or name'}
@@ -8345,9 +8215,7 @@ ${becauseText(node.because)}`}
                                                 }
                                                 setHardpointSearchPressed(open => !open);
                                             }}
-                                        >
-                                            <Icon name="search" />
-                                        </button>
+                                        />
                                     </div>
                                 </div>
 
@@ -8497,34 +8365,27 @@ ${becauseText(node.because)}`}
                                                 && fireBoneButtons(card.weapon)}
 
                                             <span className="view-row card-actions">
-                                                <button
-                                                    type="button"
-                                                    className={'icon-btn'
-                                                        + (card.destroyed ? ' active' : '')}
-                                                    aria-pressed={card.destroyed}
+                                                {/* The glyph follows the tooltip: a wrench once it
+                                                    is destroyed, because that is what pressing it
+                                                    does now. Alive, it is the same reticle the
+                                                    stage's Fire wears - shooting a hardpoint off
+                                                    and pressing this are one outcome, and two
+                                                    glyphs for it said they were different things. */}
+                                                <IconButton
+                                                    icon={card.destroyed ? 'repair' : 'fire'}
+                                                    className={card.destroyed ? 'active' : undefined}
+                                                    pressed={card.destroyed}
+                                                    title={card.destroyed
+                                                        ? 'Repair hardpoint'
+                                                        : 'Destroy hardpoint'}
                                                     disabled={!card.isDestroyable}
-                                                    title={card.isDestroyable
-                                                        ? card.destroyed
-                                                            ? 'Repair hardpoint'
-                                                            : 'Destroy hardpoint'
-                                                        : 'Is_Destroyable is off'}
+                                                    disabledReason="Is_Destroyable is off"
                                                     onClick={event => {
                                                         event.stopPropagation();
                                                         setHardpointDestroyed(
                                                             card.id, !card.destroyed);
                                                     }}
-                                                >
-                                                    {/* The glyph follows the tooltip: a wrench
-                                                        once it is destroyed, because that is what
-                                                        pressing it does now. Alive, it is the same
-                                                        reticle the stage's Fire wears - shooting a
-                                                        hardpoint off and pressing this are one
-                                                        outcome, and two glyphs for it said they
-                                                        were different things. */}
-                                                    <Icon
-                                                        name={card.destroyed ? 'repair' : 'fire'}
-                                                    />
-                                                </button>
+                                                />
 
                                                 {card.weapon !== null
                                                     && weaponToggles(card.weapon)}
@@ -8533,42 +8394,36 @@ ${becauseText(node.because)}`}
                                                     declares the traverse. One button swinging
                                                     everything at once could not say what it would
                                                     do on a hull whose hardpoints differ. */}
-                                                <button
-                                                    type="button"
-                                                    className={'icon-btn'
-                                                        + (sweeping.has(card.id) ? ' active' : '')}
-                                                    aria-pressed={sweeping.has(card.id)}
+                                                <IconButton
+                                                    icon="loop"
+                                                    className={sweeping.has(card.id) ? 'active' : undefined}
+                                                    pressed={sweeping.has(card.id)}
+                                                    title="Move turret"
                                                     disabled={!card.sweepable}
-                                                    title={card.sweepable
-                                                        ? 'Move turret'
-                                                        : 'No traverse declared'}
+                                                    disabledReason="No traverse declared"
                                                     onClick={event => {
                                                         event.stopPropagation();
                                                         setSweeping(current =>
                                                             toggleSelected(current, card.id));
                                                     }}
-                                                >
-                                                    <Icon name="loop" />
-                                                </button>
+                                                />
 
                                                     {/* Pushed to the far end: the three on the
                                                         left DO something to the model, and this
                                                         one only says what the file holds. */}
-                                                    <button
-                                                        type="button"
-                                                        className={'icon-btn card-info-btn'
+                                                    <IconButton
+                                                        icon="details"
+                                                        className={'card-info-btn'
                                                             + (infoCard === card.id
                                                                 ? ' active' : '')}
-                                                        aria-expanded={infoCard === card.id}
+                                                        expanded={infoCard === card.id}
                                                         title="Info"
                                                         onClick={event => {
                                                             event.stopPropagation();
                                                             setInfoCard(open =>
                                                                 open === card.id ? null : card.id);
                                                         }}
-                                                    >
-                                                        <Icon name="details" />
-                                                </button>
+                                                    />
                                             </span>
 
 
@@ -8578,20 +8433,14 @@ ${becauseText(node.because)}`}
                                 )}
                                 </Fragment>
                                 ))}
-                            </div>
+                            </DockSection>
                         )}
                         {mode === 'gameplay'
                             && ((scene?.deathClones?.length ?? 0) > 0
                                 || (scene?.spinAway ?? null) !== null) && (
-                            <div className="dock-section">
-                                <div className="dock-section-title">
-                                    Death clone
-                                    <span className="section-count">
-                                        {(scene?.deathClones?.length ?? 0)
+                            <DockSection title="Death clone" count={(scene?.deathClones?.length ?? 0)
                                             + (scene?.spinAway === null
-                                                || scene?.spinAway === undefined ? 0 : 1)}
-                                    </span>
-                                </div>
+                                                || scene?.spinAway === undefined ? 0 : 1)}>
 
                                 {/* The automated one. Its own card, and marked the way a real clone
                                     is when it is what would happen - which is whenever the object
@@ -8681,7 +8530,7 @@ ${becauseText(node.because)}`}
                                         </li>
                                     ))}
                                 </ul>
-                            </div>
+                            </DockSection>
                         )}
 
                     </>}
@@ -8695,14 +8544,14 @@ ${becauseText(node.because)}`}
                             particleSystems: scene?.particles.length ?? 0,
                             abilities: activeAbilities.size,
                         }).map(chip => (
-                            <button
+                            <Button
                                 key={chip.mode}
-                                className="icon-btn"
+                                compact
                                 title={`Switch to ${chip.mode} mode`}
                                 onClick={() => setMode(chip.mode)}
                             >
                                 {chip.text}
-                            </button>
+                            </Button>
                         ))}
 
                         {/* HOW YOU LOOK at the model, which is what the foot is for - the dock's
@@ -8778,65 +8627,63 @@ ${becauseText(node.because)}`}
                                     triangle - the same glyph as Play, saying the opposite of what
                                     it did. */}
                                 <div className="player-row">
-                                    <button
-                                        className="icon-btn"
-                                        disabled={orderedClips.length < 2}
+                                    {/* Every one of these says why it cannot be pressed. Four of
+                                        them used to go quiet instead - "Previous clip" on a control
+                                        that could not step - and only Play had ever been given the
+                                        sentence. Its wording is reused rather than reinvented: it
+                                        is already this panel's way of saying the same state. */}
+                                    <IconButton
+                                        icon="previousClip"
                                         title="Previous clip"
-                                        onClick={() => step(-1)}
-                                    >
-                                        <Icon name="previousClip" />
-                                    </button>
-                                    <button
-                                        className="icon-btn"
-                                        disabled={animation === null}
-                                        title="First frame"
-                                        onClick={() => seek(0)}
-                                    >
-                                        <Icon name="firstFrame" />
-                                    </button>
-                                    <button
-                                        className="icon-btn"
-                                        disabled={animation === null}
-                                        title={animation === null
-                                            ? 'Pick a clip below to play it'
-                                            : playing
-                                                ? 'Pause'
-                                                : atEnd && !animationLoop
-                                                    ? 'Play again from the first frame'
-                                                    : 'Play'}
-                                        onClick={togglePlay}
-                                    >
-                                        <Icon name={playing ? 'pause' : 'play'} />
-                                    </button>
-                                    <button
-                                        className="icon-btn"
-                                        disabled={animation === null}
-                                        title="Last frame"
-                                        onClick={() => seek(playhead.duration)}
-                                    >
-                                        <Icon name="lastFrame" />
-                                    </button>
-                                    <button
-                                        className="icon-btn"
                                         disabled={orderedClips.length < 2}
-                                        title="Next clip"
-                                        onClick={() => step(1)}
-                                    >
-                                        <Icon name="nextClip" />
-                                    </button>
-                                    <button
-                                        className={'icon-btn' + (animationLoop ? ' active' : '')}
-                                        aria-pressed={animationLoop}
+                                        disabledReason="Only one clip"
+                                        onClick={() => step(-1)}
+                                    />
+                                    <IconButton
+                                        icon="firstFrame"
+                                        title="First frame"
                                         disabled={animation === null}
+                                        disabledReason="Pick a clip below to play it"
+                                        onClick={() => seek(0)}
+                                    />
+                                    <IconButton
+                                        icon={playing ? 'pause' : 'play'}
+                                        title={playing
+                                            ? 'Pause'
+                                            : atEnd && !animationLoop
+                                                ? 'Play again from the first frame'
+                                                : 'Play'}
+                                        disabled={animation === null}
+                                        disabledReason="Pick a clip below to play it"
+                                        onClick={togglePlay}
+                                    />
+                                    <IconButton
+                                        icon="lastFrame"
+                                        title="Last frame"
+                                        disabled={animation === null}
+                                        disabledReason="Pick a clip below to play it"
+                                        onClick={() => seek(playhead.duration)}
+                                    />
+                                    <IconButton
+                                        icon="nextClip"
+                                        title="Next clip"
+                                        disabled={orderedClips.length < 2}
+                                        disabledReason="Only one clip"
+                                        onClick={() => step(1)}
+                                    />
+                                    <IconButton
+                                        icon="loop"
+                                        className={animationLoop ? 'active' : undefined}
+                                        pressed={animationLoop}
                                         title={animationLoop
                                             ? 'Looping. Press to play the clip once and hold '
                                                 + 'its last frame.'
                                             : 'Playing once and holding the last frame. Press '
                                                 + 'to loop.'}
+                                        disabled={animation === null}
+                                        disabledReason="Pick a clip below to play it"
                                         onClick={() => setAnimationLoop(current => !current)}
-                                    >
-                                        <Icon name="loop" />
-                                    </button>
+                                    />
 
                                     <span className="player-time">
                                         {playhead.time.toFixed(2)}
@@ -8863,13 +8710,7 @@ ${becauseText(node.because)}`}
                                     }}
                                 />
 
-                                <div className="field">
-                                    <span className="field-label">
-                                        Speed
-                                        <span className="section-count">
-                                            {animationSpeed.toFixed(2)}x
-                                        </span>
-                                    </span>
+                                <Field label="Speed" value={<>{animationSpeed.toFixed(2)}x</>}>
                                     <input
                                         type="range"
                                         disabled={animation === null}
@@ -8881,7 +8722,7 @@ ${becauseText(node.because)}`}
                                         onChange={e =>
                                             setAnimationSpeed(Number(e.target.value))}
                                     />
-                                </div>
+                                </Field>
                             </div>
                         </div>
                         )}
@@ -8910,14 +8751,11 @@ ${becauseText(node.because)}`}
                             <span className="details-title">
                                 {abilities.find(a => a.type === infoAbility)?.label ?? infoAbility}
                             </span>
-                            <button
-                                type="button"
-                                className="icon-btn"
+                            <IconButton
+                                icon="close"
                                 title="Close"
                                 onClick={() => setInfoAbility(null)}
-                            >
-                                <Icon name="close" />
-                            </button>
+                            />
                         </div>
                         <div className="details-body">
                             <dl className="card-info">
@@ -8949,14 +8787,11 @@ ${becauseText(node.because)}`}
                     >
                         <div className="details-head">
                             <span className="details-title">{infoCard}</span>
-                            <button
-                                type="button"
-                                className="icon-btn"
+                            <IconButton
+                                icon="close"
                                 title="Close"
                                 onClick={() => setInfoCard(null)}
-                            >
-                                <Icon name="close" />
-                            </button>
+                            />
                         </div>
                         <div className="details-body">
                             {(() => {

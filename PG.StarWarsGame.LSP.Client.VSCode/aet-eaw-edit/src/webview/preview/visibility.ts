@@ -192,7 +192,22 @@ function decide(
  * unit stands in". Sorted before picking, so a model with several idles opens the same way twice.
  */
 export function restingClip(clips: readonly string[]): string | undefined {
-    return [...clips].sort().find(clip => clip.toLowerCase().includes('idle'));
+    // A PLAIN idle first, and only then a qualified one.
+    //
+    // Matching anything that merely contains the word took `attackidle_00` for Yoda's resting pose,
+    // because it sorts before `idle_00` - and an attack idle is the opposite of a rest. His
+    // `idle_00` hides the `saber` bone and shows `stick`; `attackidle_00` does exactly the reverse.
+    // So he opened with the blade out at his hip and no cane, on every frame.
+    //
+    // Not simply a word-boundary test, which is what `deathClip` needs. Measured over the 2408
+    // shipped clips: 694 name an idle, and every qualified one is a PREFIX - attackidle 108,
+    // crouchidle 23, flyidle 4, flylandidle 4, with nothing ever following the word. A flier whose
+    // only rest is `flyidle` still has to rest on something, so the qualified ones stay eligible -
+    // they just lose to a plain idle whenever the model ships one.
+    const sorted = [...clips].sort();
+
+    return sorted.find(clip => /(^|[^a-z])idle/i.test(clip))
+        ?? sorted.find(clip => clip.toLowerCase().includes('idle'));
 }
 
 /**

@@ -9,7 +9,9 @@
 // both or the same situation looks like two different ones.
 
 import { LocProblem, ValidationState } from './useLocPanel';
-import { severityIconFor, validateTitle } from './validateState';
+import { validateTitle } from './validateState';
+import { IconButton } from '../shared/Button';
+import { SeverityTag } from '../shared/SeverityTag';
 
 export function LocDockHeader(props: {
     /** The staged queue; its length is the badge on Save and disables the button when empty. */
@@ -21,23 +23,21 @@ export function LocDockHeader(props: {
 }): React.JSX.Element {
     return (
         <>
-            <button
-                className={`icon-btn header-left${props.queue.length > 0 ? ' active' : ''}`}
-                disabled={props.queue.length === 0}
-                onClick={props.onSave}
+            <IconButton
+                icon="save"
+                className={`header-left${props.queue.length > 0 ? ' active' : ''}`}
                 title="Save - write all staged changes to the file"
-            >
-                <span className="codicon codicon-save" />
-                {props.queue.length > 0 ? ` ${props.queue.length}` : ''}
-            </button>
-            <button
-                className={`icon-btn validate-btn header-right sev-${props.validation}`}
-                onClick={props.onValidate}
+                badge={props.queue.length > 0 ? ` ${props.queue.length}` : ''}
+                disabled={props.queue.length === 0}
+                disabledReason="Save - nothing is staged"
+                onClick={props.onSave}
+            />
+            <SeverityTag
+                severity={props.validation}
+                count={props.problems.length}
                 title={validateTitle(props.validation, props.problems.length, props.queue.length)}
-            >
-                <span className={`codicon codicon-${severityIconFor(props.validation)}`} />
-                {props.problems.length ? ` ${props.problems.length}` : ''}
-            </button>
+                onClick={props.onValidate}
+            />
         </>
     );
 }

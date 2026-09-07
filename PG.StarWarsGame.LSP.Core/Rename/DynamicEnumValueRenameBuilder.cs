@@ -85,7 +85,7 @@ public static class DynamicEnumValueRenameBuilder
         if (changes.Count == 0)
             return null;
 
-        logger.LogDebug("Rename enum value {Enum}/{Value} → {NewName}: {Count} file(s)",
+        logger.LogDebug("Rename enum value {Enum}/{Value} -> {NewName}: {Count} file(s)",
             enumName, valueName, newName, changes.Count);
         return new WorkspaceEdit
         {

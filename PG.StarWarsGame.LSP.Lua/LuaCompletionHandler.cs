@@ -107,7 +107,7 @@ public sealed class LuaCompletionHandler : CompletionHandlerBase
 
                 if (refEntry is null) return new CompletionList();
 
-                _logger.LogDebug("Lua completion: {Function} param {Index} → type {Type}",
+                _logger.LogDebug("Lua completion: {Function} param {Index} -> type {Type}",
                     fn, param, refEntry.Value.ExpectedTypeName ?? "*");
 
                 return new CompletionList(BuildXmlRefCompletions(index, refEntry.Value.ExpectedTypeName));

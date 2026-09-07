@@ -12,35 +12,61 @@
 //
 // Colours stay out of here on purpose. Each editor tints its own tiles (the graph colours them by
 // type family), and only the geometry has to agree for the two to look like the same product.
+//
+// The token layer is interpolated at the top of this block rather than imported by each panel
+// separately: all five consumers already interpolate this stylesheet, so carrying the scale here
+// gets it to every one of them without touching a single call site. The tile properties that used
+// to be declared here in full now live in tokens.ts with the reasoning that fitted them.
+
+import { tokensCss } from './tokens';
 
 export const dockChromeCss = `
-    /* One tile size for every dock in the extension.
-       The width has to leave room for the dock's own padding AND its vertical scrollbar, which is
-       always there once the content is taller than the panel - 136px fitted the padding but not the
-       scrollbar, so two tiles overflowed by a few pixels and the dock grew a horizontal one. */
-    --dock-tile-w: 128px;
-    /* Tall enough for the worst case a tile actually holds: a glyph, a label and the raw token
-       badge under it. At 64px that combination overflowed and was clipped mid-word. */
-    --dock-tile-h: 78px;
-    --dock-tile-gap: 6px;
+${tokensCss}
 
     /* ── Sections ──────────────────────────────────────────────────────── */
-    .dock-section { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .dock-section { display: flex; flex-direction: column; gap: var(--space-6); margin-bottom: var(--space-12); }
     .dock-section:last-child { margin-bottom: 0; }
-    /* No opacity. It multiplies with everything inside, and descriptionForeground already carries
-       alpha of its own in the shipped themes - a count at 0.75 inside a heading at 0.65 measured
+    /* No opacity. It multiplies with everything inside, and the heading colour already carries
+       alpha of its own in some shipped themes - a count at 0.75 inside a heading at 0.65 measured
        2.53:1 against the dock, which is what the reader saw as "nigh invisible with a default
        visual studio dark skin". Uppercase, 11px and 600 is what makes this read as a heading; the
-       muted colour finishes it. The opacity only made it unreadable. */
+       colour finishes it. The opacity only made it unreadable.
+
+       One heading for every dock section, foldable or not. There were two of these - this one
+       muted, and .panel-section's in the link colour - for the same thing. */
     .dock-section-title {
-        font-size: 11px;
+        font-size: var(--font-size-11);
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
-        color: var(--vscode-descriptionForeground, #999);
+        color: var(--colour-heading);
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
+    }
+
+    /* A foldable section's heading IS the button - the whole width of it, not just the chevron: a
+       13px target beside a word that plainly names the thing is a target people miss. Transparent
+       and borderless, because it is a heading that happens to be pressable rather than a button
+       with a title in it. */
+    button.dock-section-title {
+        width: 100%;
+        padding: 0;
+        border: none;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+    }
+    button.dock-section-title:hover { color: var(--colour-heading-hover); }
+    .dock-section-name { flex: 1; min-width: 0; }
+
+    .dock-section-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-12);
+        /* Indented under its heading, so a fold reads as a group closing rather than as controls
+           disappearing from a flat list. */
+        padding-left: var(--space-2);
     }
 
     /* A VALUE, not a label - it is the one thing in the heading someone reads a number off, so it
@@ -62,7 +88,7 @@ export const dockChromeCss = `
         margin-left: auto;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
     }
     .dock-section-title .title-end .section-count { margin-left: 0; }
 
@@ -90,14 +116,14 @@ export const dockChromeCss = `
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 4px;
-        padding: 8px 6px;
-        border-radius: 6px;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        gap: var(--space-4);
+        padding: var(--space-8) var(--space-6);
+        border-radius: var(--radius-6);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorWidget-background, rgba(128, 128, 128, 0.08));
         color: var(--vscode-foreground, #ccc);
         font-family: var(--vscode-font-family, sans-serif);
-        font-size: var(--vscode-font-size, 13px);
+        font-size: var(--font-size-body);
         cursor: pointer;
         text-align: center;
         min-width: 0;
@@ -107,10 +133,10 @@ export const dockChromeCss = `
         background: var(--vscode-toolbar-hoverBackground, rgba(128, 128, 128, 0.2));
         border-color: var(--vscode-focusBorder, #007fd4);
     }
-    .dock-tile:focus-visible { outline: 1px solid var(--vscode-focusBorder, #007fd4); }
+    .dock-tile:focus-visible { outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4); }
     .dock-tile[draggable="true"] { cursor: grab; }
     .dock-tile[draggable="true"]:active { cursor: grabbing; }
-    .dock-tile .codicon, .dock-tile .tile-glyph { font-size: 18px; line-height: 1; opacity: 0.85; }
+    .dock-tile .codicon, .dock-tile .tile-glyph { font-size: var(--icon-size-18); line-height: 1; opacity: 0.85; }
     /* A tile carrying a badge has three stacked things in it, so its label gets one line; without
        one it can have two. Either way the tile is the same height and nothing is cut off. */
     .dock-tile.with-badge .tile-label { -webkit-line-clamp: 1; }
@@ -130,10 +156,10 @@ export const dockChromeCss = `
     /* The raw token a tile stands for, in the monospace the file itself would show it in. */
     .dock-tile .tile-badge {
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.8em;
-        padding: 0 4px;
-        border: 1px solid var(--vscode-panel-border, #444);
-        border-radius: 3px;
+        font-size: var(--font-size-smallest);
+        padding: 0 var(--space-4);
+        border: var(--space-1) solid var(--vscode-panel-border, #444);
+        border-radius: var(--radius-3);
         opacity: 0.7;
         max-width: 100%;
         overflow: hidden;
@@ -143,29 +169,37 @@ export const dockChromeCss = `
     /* ── Search ────────────────────────────────────────────────────────── */
     /* The mode toggles sit inside the box, the way an editor's find widget puts them - that buys
        back a whole row, which is what made this corner feel cramped. */
-    .dock-search { display: flex; flex-direction: column; gap: 6px; }
+    .dock-search { display: flex; flex-direction: column; gap: var(--space-6); }
     .search-field { position: relative; display: flex; align-items: center; }
-    .search-field input[type=text] { width: 100%; padding: 4px 8px; }
+    .search-field input[type=text] { width: 100%; padding: var(--space-4) var(--space-8); }
     /* Room for the three toggles, which overlay the trailing edge. Only where they exist - the
        graph editor's filters have no modes and must not carry a gap for buttons it never draws. */
-    .search-field.with-modes input[type=text] { padding-right: 78px; }
-    .search-field .mode-group { position: absolute; right: 3px; display: flex; gap: 1px; }
-    .search-field .mode-group .icon-btn { min-width: 22px; padding: 2px 4px; border-radius: 4px; }
-    .search-field .mode-group .codicon { font-size: 14px; }
+    .search-field.with-modes input[type=text] { padding-right: var(--search-modes-inset); }
+    .search-field .mode-group { position: absolute; right: 3px; display: flex; gap: var(--space-1); }
+    /* The three modes are a one-of-N choice and say so - but inside the box they are a compact
+       cluster over the trailing edge, not the full-width joined row a settings pane gets. So the
+       group keeps its own width and its segments keep the size they had as separate toggles. */
+    .search-field .mode-group .mode-selector { width: auto; }
+    .search-field .mode-group .mode-selector button {
+        flex: 0 0 auto;
+        min-width: 22px;
+        padding: var(--space-2) var(--space-4);
+    }
+    .search-field .mode-group .codicon { font-size: var(--icon-size-14); }
 
     /* A control and its label are a pair and sit close; the gap BETWEEN fields is what the
        section body sets, and it is larger. Three pixels here had the label almost touching the
        control above it, so a run of settings read as one block of text with sliders in it. */
-    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field { display: flex; flex-direction: column; gap: var(--space-4); }
     .field select, .field input[type=text] { width: 100%; }
     /* Room to actually grab. A range input defaults to a track a few pixels tall inside a box the
        browser sizes to the thumb, which in a settings panel reads as a hairline. */
     .field input[type=range] { width: 100%; height: 18px; margin: 0; }
-    .field .btn { width: 100%; padding: 5px 14px; }
+    .field .btn { width: 100%; padding: var(--space-4) var(--space-12); }
     /* A row, so a label can carry a checkbox on its left and a readout on its right. Laid out the
        way a section title is: the count goes to the far edge. Without that they simply butted up
        against the label - "Wind speed1.0", "Light around45 deg" - which read as a missing space. */
-    .field-label { display: flex; align-items: center; gap: 5px; font-size: 0.9em; opacity: 0.7; }
+    .field-label { display: flex; align-items: center; gap: var(--space-4); font-size: var(--font-size-smaller); opacity: 0.7; }
 
     /* The mark on a label that has more to say. Sized and coloured like the text around it until
        it has a warning to carry, so a panel with nothing wrong on it stays quiet. */
@@ -178,7 +212,7 @@ export const dockChromeCss = `
         padding: 0;
         flex-shrink: 0;
         border: none;
-        border-radius: 50%;
+        border-radius: var(--radius-round);
         background: transparent;
         color: inherit;
         opacity: 0.6;
@@ -210,58 +244,20 @@ export const dockChromeCss = `
         width: 2px;
         height: 9px;
         transform: translate(-50%, -50%);
-        border-radius: 1px;
+        border-radius: var(--radius-pill);
         background: var(--vscode-descriptionForeground, #999);
         opacity: 0.55;
         pointer-events: none;
     }
 
-    /* A foldable group of controls, after BSI CX's step library: a small coloured heading, a count
-       where the number says something, and room between groups so the eye lands on a heading. */
-    .panel-section { display: flex; flex-direction: column; gap: 10px; }
-
-    /* The whole heading folds the group, not just the chevron - a 12px target beside a word that
-       plainly names the thing is a target people miss. Transparent and borderless: it is a heading
-       that happens to be pressable, not a button with a title in it. */
-    .panel-section-head {
-        display: flex;
-        align-items: center;
-        gap: 5px;
-        width: 100%;
-        padding: 0;
-        border: none;
-        background: transparent;
-        color: var(--vscode-textLink-foreground, #4daafc);
-        font-size: 11px;
-        font-weight: 600;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
-        text-align: left;
-        cursor: pointer;
-    }
-    .panel-section-head:hover { color: var(--vscode-textLink-activeForeground, #6fb3ff); }
-    .panel-section-head .codicon { font-size: 13px; opacity: 0.8; }
-    .panel-section-title { flex: 1; min-width: 0; }
-    /* To the far edge, quieter than the name: it reports, the name identifies. */
-    .panel-section-count {
-        font-weight: 400;
-        letter-spacing: 0;
-        text-transform: none;
-        color: var(--vscode-descriptionForeground, #999);
-    }
-    .panel-section-body {
-        display: flex;
-        flex-direction: column;
-        gap: 14px;
-        /* Indented under its heading, so a fold reads as a group closing rather than as controls
-           disappearing from a flat list. */
-        padding-left: 2px;
-    }
+    /* The .panel-section family lived here: a second chrome for a dock section, differing from
+       .dock-section on gap, on body spacing and on which colour role the heading took. Both meant
+       the same thing, so they are one now - see .dock-section above and DockSection.tsx. */
     .field-label .section-count { margin-left: auto; opacity: 0.85; }
     /* The sentence under a control that says what it does. It is support, not content, so it is
        quieter and tighter than the setting it explains. */
     .field-note {
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         line-height: 1.35;
         color: var(--vscode-descriptionForeground, #999);
     }
@@ -269,7 +265,7 @@ export const dockChromeCss = `
        the control. Warning colour and no other change: it has to read as the same kind of text in
        the same place, or it becomes an alert the eye has to deal with on every glance. */
     .field-warn {
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         line-height: 1.35;
         color: var(--vscode-editorWarning-foreground, #cca700);
     }
@@ -287,8 +283,8 @@ export const dockChromeCss = `
         height: 20px;
         padding: 0;
         flex-shrink: 0;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        border-radius: 3px;
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: var(--radius-3);
         background: none;
         cursor: pointer;
     }
@@ -296,11 +292,11 @@ export const dockChromeCss = `
     .check-field {
         display: flex;
         align-items: flex-start;
-        gap: 6px;
+        gap: var(--space-6);
         cursor: pointer;
         line-height: 1.35;
     }
-    .check-field input[type=checkbox] { margin-top: 2px; flex-shrink: 0; }
+    .check-field input[type=checkbox] { margin-top: var(--space-2); flex-shrink: 0; }
     .check-detail { opacity: 0.7; }
 
     /* A one-of-N choice as joined buttons: the alternatives stay visible, and switching is one
@@ -310,12 +306,12 @@ export const dockChromeCss = `
     .mode-selector button {
         flex: 1;
         min-width: 0;
-        padding: 3px 6px;
-        border: 1px solid var(--vscode-panel-border, #444);
+        padding: var(--space-2) var(--space-6);
+        border: var(--space-1) solid var(--vscode-panel-border, #444);
         border-right-width: 0;
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.18));
         color: var(--vscode-foreground);
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         line-height: 1.5;
         cursor: pointer;
         overflow: hidden;
@@ -333,8 +329,8 @@ export const dockChromeCss = `
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.18));
     }
 
-    .mode-selector button:first-child { border-radius: 4px 0 0 4px; }
-    .mode-selector button:last-child { border-right-width: 1px; border-radius: 0 4px 4px 0; }
+    .mode-selector button:first-child { border-radius: var(--radius-3) 0 0 var(--radius-3); }
+    .mode-selector button:last-child { border-right-width: var(--space-1); border-radius: 0 var(--radius-3) var(--radius-3) 0; }
     .mode-selector button:hover {
         background: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.3));
     }
@@ -352,15 +348,15 @@ export const dockChromeCss = `
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 5px;
-        padding: 4px 14px;
-        border-radius: 4px;
-        border: 1px solid var(--vscode-button-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.4)));
+        gap: var(--space-4);
+        padding: var(--space-4) var(--space-12);
+        border-radius: var(--radius-3);
+        border: var(--space-1) solid var(--vscode-button-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.4)));
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
         box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
         color: var(--vscode-button-secondaryForeground, #ccc);
         font-family: var(--vscode-font-family, sans-serif);
-        font-size: var(--vscode-font-size, 13px);
+        font-size: var(--font-size-body);
         cursor: pointer;
     }
     .btn.primary {
@@ -372,7 +368,7 @@ export const dockChromeCss = `
     /* For a button whose glyph IS the label - a transport control, say. The .icon-btn language is
        for toolbars, where a row of borderless glyphs reads as a toolbar; standing alone in a
        settings pane the same button reads as an ornament, because nothing says it can be pressed. */
-    .btn.compact { padding: 4px 9px; }
+    .btn.compact { padding: var(--space-4) var(--space-8); }
 
     /* ── Dialogs ───────────────────────────────────────────────────────── */
     .modal-backdrop {
@@ -400,10 +396,13 @@ export const dockChromeCss = `
         overflow: hidden;
         display: flex;
         flex-direction: column;
-        gap: 10px;
-        padding: 14px 16px;
-        border-radius: 8px;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        gap: var(--space-8);
+        /* Coupled to .modal-title below, which pulls out over exactly this padding to meet the
+           dialog's edges. The two are one measurement: change this and the title's negative margin
+           has to follow, or the bar stops reaching the edge. */
+        padding: var(--space-12) var(--space-16);
+        border-radius: var(--radius-6);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorWidget-background, #252526);
         box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
     }
@@ -411,10 +410,16 @@ export const dockChromeCss = `
        host's own title-bar colours, which is where a user already expects to grab a window. Pulled
        out over the dialog's padding to meet its edges. */
     .modal-title, .modal > h2.drag-handle {
-        margin: -14px -16px 0;
-        padding: 7px 14px;
-        border-radius: 7px 7px 0 0;
-        border-bottom: 1px solid var(--vscode-titleBar-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
+        /* Derived from the dialog's padding rather than restated, so the bar cannot come adrift
+           from the edge it is supposed to meet. */
+        margin: calc(var(--space-12) * -1) calc(var(--space-16) * -1) 0;
+        /* Horizontally the same inset as the dialog body, so the title sits over the content it
+           names. It used to be 14px against the body's 16px, leaving the title 2px to the left of
+           everything beneath it. */
+        padding: var(--space-6) var(--space-16);
+        /* The dialog's radius less its border, or the bar's corners sit proud of the dialog's. */
+        border-radius: calc(var(--radius-6) - var(--space-1)) calc(var(--radius-6) - var(--space-1)) 0 0;
+        border-bottom: var(--space-1) solid var(--vscode-titleBar-border, var(--vscode-widget-border, rgba(128, 128, 128, 0.35)));
         background: var(--vscode-titleBar-activeBackground, var(--vscode-editorWidget-background, #3c3c3c));
         color: var(--vscode-titleBar-activeForeground, var(--vscode-foreground, #ccc));
         font-weight: 600;
@@ -462,12 +467,12 @@ export const dockChromeCss = `
     .modal-body {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--space-8);
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
     }
-    .modal-note { margin: 0; opacity: 0.8; font-size: 0.92em; line-height: 1.35; }
+    .modal-note { margin: 0; opacity: 0.8; font-size: var(--font-size-smaller); line-height: 1.35; }
     .modal-title, .modal > h2.drag-handle, .modal-buttons, .dialog-actions,
     .modal-pinned { flex: 0 0 auto; }
 
@@ -480,11 +485,11 @@ export const dockChromeCss = `
     .modal-pinned {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--vscode-panel-border, #444);
+        gap: var(--space-8);
+        padding-bottom: var(--space-8);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
     }
-    .modal-buttons { display: flex; align-items: center; gap: 8px; }
+    .modal-buttons { display: flex; align-items: center; gap: var(--space-8); }
 
     /* A one-line hint that shares the button row, so it stays readable however the body is scrolled
        or the dialog resized - a hint about what confirming will do is worth nothing once it has
@@ -494,32 +499,32 @@ export const dockChromeCss = `
     .modal-footnote {
         display: flex;
         align-items: center;
-        gap: 6px;
+        gap: var(--space-6);
         margin: 0 auto 0 0;
         opacity: 0.75;
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         line-height: 1.35;
     }
-    .modal-footnote .codicon { font-size: 14px; opacity: 0.9; flex: 0 0 auto; }
+    .modal-footnote .codicon { font-size: var(--icon-size-14); opacity: 0.9; flex: 0 0 auto; }
 
     /* Aligned to the first line rather than centred: the message can wrap, and a centred icon then
        drifts into the middle of the text block. */
     .field-error {
         display: flex;
         align-items: flex-start;
-        gap: 6px;
+        gap: var(--space-6);
     }
-    .field-error .codicon { font-size: 14px; flex: 0 0 auto; margin-top: 2px; }
+    .field-error .codicon { font-size: var(--icon-size-14); flex: 0 0 auto; margin-top: var(--space-2); }
 
-    .choice-list { display: flex; flex-direction: column; gap: 4px; }
+    .choice-list { display: flex; flex-direction: column; gap: var(--space-4); }
     .choice {
         display: grid;
         grid-template-columns: auto auto 1fr;
         align-items: center;
-        gap: 8px;
-        padding: 6px 8px;
-        border-radius: 4px;
-        border: 1px solid transparent;
+        gap: var(--space-8);
+        padding: var(--space-6) var(--space-8);
+        border-radius: var(--radius-3);
+        border: var(--space-1) solid transparent;
         cursor: pointer;
     }
     .choice:hover { background: var(--vscode-list-hoverBackground, rgba(128, 128, 128, 0.15)); }
@@ -528,7 +533,7 @@ export const dockChromeCss = `
         background: var(--vscode-list-activeSelectionBackground, rgba(0, 127, 212, 0.15));
     }
     .choice-label { font-weight: 600; }
-    .choice-detail { opacity: 0.75; font-size: 0.9em; }
+    .choice-detail { opacity: 0.75; font-size: var(--font-size-smaller); }
 `;
 
 /**
@@ -559,14 +564,14 @@ export const rightDockCss = `
         display: flex;
         flex-direction: column;
         min-height: 0;
-        border-left: 1px solid var(--vscode-panel-border);
+        border-left: var(--space-1) solid var(--vscode-panel-border);
         background: var(--vscode-sideBar-background);
     }
     /* The gutter is set in dockBodyCss, which is interpolated after this one and would win anyway.
        One owner: this rule declaring it too was how it came to be set twice with different values,
        and the losing declaration was the one carrying the fix. */
-    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; }
-    .dock-hint { font-size: 12px; color: var(--vscode-descriptionForeground); padding: 8px 4px; }
+    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8); }
+    .dock-hint { font-size: var(--font-size-12); color: var(--vscode-descriptionForeground); padding: var(--space-8) var(--space-4); }
     /* Sits just outside the dock's left edge, so the grab area is not stolen from its content. */
     .resize-handle-w {
         position: absolute;
@@ -602,9 +607,9 @@ export const dockHeaderCss = `
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        padding: 6px 8px;
-        border-bottom: 1px solid var(--vscode-panel-border, #444);
+        gap: var(--space-6);
+        padding: var(--space-6) var(--space-8);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
     }
     .dock-header .header-left { position: absolute; left: 8px; }
     .dock-header .header-right { position: absolute; right: 8px; }
@@ -613,16 +618,16 @@ export const dockHeaderCss = `
     .icon-btn {
         display: inline-flex;
         align-items: center;
-        gap: 3px;
+        gap: var(--space-2);
         min-width: 26px;
         justify-content: center;
-        padding: 5px 7px;
+        padding: var(--space-4) var(--space-6);
         background: transparent;
         border: none;
-        border-radius: 8px;
+        border-radius: var(--radius-6);
         color: var(--vscode-foreground, #ccc);
         opacity: 0.72;
-        font-size: 14px;
+        font-size: var(--icon-size-14);
         line-height: 1;
         cursor: pointer;
     }
@@ -638,7 +643,7 @@ export const dockHeaderCss = `
        A resting border is what says press me. */
     .icon-btn.as-action {
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.14));
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         opacity: 1;
     }
     .icon-btn.as-action:hover:not(:disabled) {
@@ -657,12 +662,12 @@ export const dockHeaderCss = `
     .icon-btn.sev-warning { color: var(--vscode-charts-yellow, #cca700); opacity: 1; }
     .icon-btn.sev-error { color: var(--vscode-errorForeground, #f14c4c); opacity: 1; }
     /* Header controls read out at roughly VS Code activity-bar icon scale. */
-    .dock-header .icon-btn { font-size: 18px; padding: 6px 9px; }
-    .dock-header .icon-btn .codicon { font-size: 18px; }
+    .dock-header .icon-btn { font-size: var(--icon-size-18); padding: var(--space-6) var(--space-8); }
+    .dock-header .icon-btn .codicon { font-size: var(--icon-size-18); }
 
     /* The severity tag is an always-present soft pill, tinted with a hue of its own state colour.
        Must stay after .icon-btn: same specificity, so order is what lets it win. */
-    .validate-btn { border-radius: 14px; font-weight: 600; }
+    .validate-btn { border-radius: var(--radius-pill); font-weight: 600; }
     .validate-btn.sev-unvalidated {
         background: color-mix(in srgb, var(--vscode-foreground, #ccc) 15%, transparent);
     }
@@ -716,15 +721,15 @@ export const problemsPanelCss = `
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 2px 4px;
+        padding: var(--space-2) var(--space-4);
     }
-    .panel-title { font-weight: bold; font-size: 11px; color: var(--vscode-descriptionForeground, #999); }
+    .panel-title { font-weight: bold; font-size: var(--font-size-11); color: var(--vscode-descriptionForeground, #999); }
     .panel-close {
         background: transparent;
         border: none;
         color: var(--vscode-descriptionForeground, #999);
         cursor: pointer;
-        padding: 0 4px;
+        padding: 0 var(--space-4);
         flex-shrink: 0;
     }
     .panel-close:hover { background: transparent; color: var(--vscode-editor-foreground, #ccc); }
@@ -739,13 +744,13 @@ export const problemsPanelCss = `
         border: none;
         color: var(--vscode-descriptionForeground, #999);
         cursor: pointer;
-        padding: 0 6px;
-        margin-left: 8px;
-        font-size: 11px;
+        padding: 0 var(--space-6);
+        margin-left: var(--space-8);
+        font-size: var(--font-size-11);
         flex-shrink: 0;
         display: inline-flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
     }
     .panel-filter:hover:not(:disabled) {
         background: transparent;
@@ -760,9 +765,9 @@ export const problemsPanelCss = `
     .panel-bar .panel-close { margin-left: auto; }
 
     /* The scrolling part: the title bar keeps its height and the rows take what is left. */
-    .problem-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: 2px; }
+    .problem-list { flex: 1; min-height: 0; overflow-y: auto; padding-bottom: var(--space-2); }
 
-    .problem-row { display: flex; gap: 6px; align-items: center; padding: 1px 6px; }
+    .problem-row { display: flex; gap: var(--space-6); align-items: center; padding: var(--space-1) var(--space-6); }
     /* Only where the row actually goes somewhere - a row that names nothing navigable must not
        advertise a click, which is the same rule the ship-name list follows. */
     .problem-row.clickable { cursor: pointer; }
@@ -786,11 +791,11 @@ export const problemsPanelCss = `
 export const dockOverviewCss = `
     .dock-overview {
         flex-shrink: 0;
-        border-top: 1px solid var(--vscode-panel-border, #444);
-        padding: 10px 8px;
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
+        padding: var(--space-8) var(--space-8);
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: var(--space-8);
 
         /* Capped and scrollable, or a foot that outgrows the panel simply runs off the bottom -
            taking with it whatever control would have closed it again. That is not a squeeze on the
@@ -813,8 +818,8 @@ export const rotarySwitchCss = `
     /* Glyphs sized WELL inside their circles. At 22px across, a 13px icon covers three fifths of
        the face and the button stops reading as a round switch position - it reads as a smudge.
        These ratios (18/40 in the readout, 11/24 on a position) leave a visible ring of ground. */
-    .rotary-center .codicon { font-size: 18px; }
-    .rotary-pos .codicon { font-size: 11px; }
+    .rotary-center .codicon { font-size: var(--icon-size-18); }
+    .rotary-pos .codicon { font-size: var(--icon-size-11); }
 
     /* Rotary mode switch - large clickable readout (cycles modes) with the three modes on an arc above. */
     .rotary { position: relative; width: 108px; height: 80px; flex-shrink: 0; }
@@ -825,10 +830,10 @@ export const rotarySwitchCss = `
         width: 40px; height: 40px;
         padding: 0;
         display: flex; align-items: center; justify-content: center;
-        border-radius: 50%;
+        border-radius: var(--radius-round);
         background: var(--vscode-button-background);
         color: var(--vscode-button-foreground);
-        border: 2px solid var(--vscode-focusBorder);
+        border: var(--space-2) solid var(--vscode-focusBorder);
         cursor: pointer;
         z-index: 1;
     }
@@ -840,7 +845,7 @@ export const rotarySwitchCss = `
         padding: 0;
         display: flex; align-items: center; justify-content: center;
         border: none;
-        border-radius: 50%;
+        border-radius: var(--radius-round);
         line-height: 1;
         background: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
         color: var(--vscode-button-secondaryForeground, #ccc);
@@ -880,20 +885,20 @@ export const inspectorCss = `
        lengths - a shader name runs past the column a triangle count needs - and a table would set
        one column width for both. The label column is fixed and the value takes the rest, so the
        labels line up while a long value wraps under itself instead of widening the panel. */
-    .inspect-group + .inspect-group { margin-top: 10px; }
+    .inspect-group + .inspect-group { margin-top: var(--space-8); }
 
     .inspect-title {
-        font-size: 0.85em;
+        font-size: var(--font-size-smaller);
         text-transform: uppercase;
         letter-spacing: 0.04em;
         opacity: 0.75;
-        margin-bottom: 4px;
+        margin-bottom: var(--space-4);
     }
 
     .inspect-rows {
         display: grid;
         grid-template-columns: minmax(0, 8.5em) minmax(0, 1fr);
-        gap: 3px 8px;
+        gap: var(--space-2) var(--space-8);
         margin: 0;
     }
 
@@ -926,7 +931,7 @@ export const inspectorCss = `
         white-space: pre;
         overflow-x: auto;
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.92em;
+        font-size: var(--font-size-smaller);
         line-height: 1.35;
     }
 
@@ -938,18 +943,18 @@ export const inspectorCss = `
     .geometry-tabs {
         display: flex;
         flex-wrap: wrap;
-        gap: 2px;
-        margin: 4px 0 0;
+        gap: var(--space-2);
+        margin: var(--space-4) 0 0;
     }
 
     .geometry-tab {
         display: inline-flex;
         align-items: center;
-        gap: 5px;
-        padding: 4px 12px;
-        border: 1px solid transparent;
+        gap: var(--space-4);
+        padding: var(--space-4) var(--space-12);
+        border: var(--space-1) solid transparent;
         border-bottom: none;
-        border-radius: 3px 3px 0 0;
+        border-radius: var(--radius-3) var(--radius-3) 0 0;
         background: none;
         color: var(--vscode-descriptionForeground, #999);
         font: inherit;
@@ -963,8 +968,8 @@ export const inspectorCss = `
         border-color: var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorWidget-background, #202020);
         color: var(--vscode-foreground, #ccc);
-        margin-bottom: -1px;
-        padding-bottom: 5px;
+        margin-bottom: -var(--space-1);
+        padding-bottom: var(--space-4);
     }
 
     .geometry-tab .section-count {
@@ -974,8 +979,8 @@ export const inspectorCss = `
     }
 
     .geometry-panel {
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
-        border-radius: 0 3px 3px 3px;
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: 0 var(--radius-3) var(--radius-3) var(--radius-3);
         overflow: hidden;
     }
 
@@ -990,12 +995,12 @@ export const inspectorCss = `
     .geometry-table {
         border-collapse: collapse;
         font-family: var(--vscode-editor-font-family, monospace);
-        font-size: 0.88em;
+        font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
         white-space: nowrap;
     }
 
-    .geometry-table th, .geometry-table td { padding: 2px 8px; text-align: right; }
+    .geometry-table th, .geometry-table td { padding: var(--space-2) var(--space-8); text-align: right; }
 
     /* Names read left; every other column is a number. */
     .geometry-table td:last-child, .geometry-table th:last-child { text-align: left; }
@@ -1017,10 +1022,10 @@ export const inspectorCss = `
        request at 500 - and a reader several thousand rows down wants to know whether the end they
        are looking at is the table's end or merely today's. */
     .geometry-foot {
-        padding: 3px 8px;
-        border-top: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        padding: var(--space-2) var(--space-8);
+        border-top: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         color: var(--vscode-descriptionForeground, #999);
-        font-size: 0.88em;
+        font-size: var(--font-size-smaller);
         font-variant-numeric: tabular-nums;
     }
 
@@ -1028,11 +1033,11 @@ export const inspectorCss = `
         display: inline-block;
         width: 0.8em;
         height: 0.8em;
-        margin-right: 5px;
+        margin-right: var(--space-4);
         vertical-align: -1px;
-        border-radius: 2px;
+        border-radius: var(--radius-3);
         /* Over a border rather than inside it: a border would eat into the colour being judged. */
-        outline: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
+        outline: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.5));
         outline-offset: -1px;
     }
 `;

@@ -121,7 +121,7 @@ public sealed class HoverUtilityTest
         var md = hover.Contents.MarkupContent!.Value;
         Assert.Contains("FoC_Art.meg", md);
         Assert.Contains("DATA/ART/TEXTURES/FOO.TGA", md);
-        Assert.Contains("📦", md);
+        Assert.Contains("Packed in", md);
     }
 
     [Fact]
@@ -152,7 +152,7 @@ public sealed class HoverUtilityTest
         var hover = HoverUtility.BuildReferenceHover(
             MakeType("SpaceUnit"), "Fighter_Mk2", MakeRef("Fighter_Mk2", 2, 14, 11), "en", origin);
         var md = hover.Contents.MarkupContent!.Value;
-        Assert.Contains("📦", md);
+        Assert.Contains("Packed in", md);
         Assert.Contains("base game", md);
     }
 
@@ -209,7 +209,7 @@ public sealed class HoverUtilityTest
             Packed("data/art/textures/foo.tga"), 5, 10, 7);
         var md = hover!.Contents.MarkupContent!.Value;
         Assert.Contains("data/art/textures/foo.tga", md);
-        Assert.Contains("📦", md);
+        Assert.Contains("Packed - ", md);
     }
 
     [Fact]

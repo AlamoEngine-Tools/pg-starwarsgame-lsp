@@ -19,6 +19,25 @@ describe('codiconFor', () => {
         assert.equal(codiconFor('definition'), 'go-to-file');
     });
 
+    /**
+     * The same rule again, and the clearest case of it. Aa, the star and .* are not descriptions of
+     * anything - they are marks a reader has already learned from the editor's own find box. Drawn
+     * from another set they would make a control someone knows look like a new one, so all three
+     * route past their Tabler entries.
+     */
+    it('uses the editor`s own marks for the three search modes', () => {
+        assert.equal(codiconFor('searchLiteral'), 'case-sensitive');
+        assert.equal(codiconFor('searchWildcard'), 'star-full');
+        assert.equal(codiconFor('searchRegex'), 'regex');
+    });
+
+    /** The story graph's tools are domain, so they keep Tabler like the rest of the vocabulary. */
+    it('leaves the graph tools to Tabler', () => {
+        for (const name of ['clearFilter', 'arrange', 'threadLanes', 'chapterLanes'] as const) {
+            assert.equal(codiconFor(name), null, name);
+        }
+    });
+
     it('leaves the domain icons to Tabler', () => {
         // These are the reason this panel does not simply use codicons throughout.
         for (const name of ['skeleton', 'mesh', 'detail', 'axes', 'ground'] as const) {

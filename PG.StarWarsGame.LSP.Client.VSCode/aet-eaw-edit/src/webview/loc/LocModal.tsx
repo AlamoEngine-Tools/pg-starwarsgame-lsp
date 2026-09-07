@@ -5,6 +5,7 @@ import { ReactNode, useEffect } from 'react';
 
 import { ResizeHandles } from '../shared/ResizeHandles';
 import { useMovableDialog } from '../shared/useMovableDialog';
+import { Button } from '../shared/Button';
 
 export interface LocModalProps {
     /** Identifies the dialog across sessions, so it reopens where it was last put. */
@@ -70,14 +71,15 @@ export function LocModal(props: LocModalProps): React.JSX.Element {
                             {props.footnote}
                         </p>
                     )}
-                    <button className="btn" onClick={onCancel}>Cancel</button>
-                    <button
-                        className="btn primary"
+                    <Button onClick={onCancel}>Cancel</Button>
+                    <Button
+                        className="primary"
                         disabled={props.canConfirm === false}
+                        disabledReason="Fill the fields above first"
                         onClick={props.onConfirm}
                     >
                         {props.confirmLabel}
-                    </button>
+                    </Button>
                 </div>
                 <ResizeHandles handleProps={resizeHandleProps} />
             </div>

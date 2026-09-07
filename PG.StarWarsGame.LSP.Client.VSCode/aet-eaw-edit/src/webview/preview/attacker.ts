@@ -1,4 +1,4 @@
-// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
+﻿// Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 // The weapon you build, and what it does to the thing on stage.
@@ -359,18 +359,18 @@ export const DAMAGE_SWITCHES: readonly {
 }[] = [
     {
         id: 'shield', label: 'Shield',
-        title: 'Projectile_Does_Shield_Damage - depletes the shield. On its own it never reaches '
-            + 'the hull, however much is left over.',
+        title: 'Projectile_Does_Shield_Damage - depletes the shield. On its own it never '
+            + 'reaches the hull.',
     },
     {
         id: 'energy', label: 'Energy',
-        title: 'Projectile_Does_Energy_Damage - drains the energy pool. Independent of the other '
-            + 'two: It applies whether or not the shield is up.',
+        title: 'Projectile_Does_Energy_Damage - drains the energy pool. Applies whether or '
+            + 'not the shield is up.',
     },
     {
         id: 'hitpoint', label: 'Hull',
-        title: 'Projectile_Does_Hitpoint_Damage - hits the hull. On its own it BYPASSES the shield '
-            + 'entirely rather than being stopped by it.',
+        title: 'Projectile_Does_Hitpoint_Damage - hits the hull. On its own it BYPASSES the '
+            + 'shield.',
     },
 ];
 
@@ -510,7 +510,7 @@ export function poolRows(
             id: 'energy',
             label: 'Energy',
             detail: `${round(pools.energy)} of ${round(defence.energyCapacity ?? 0)}`,
-            title: 'Energy_Capacity. Never scaled by an armor factor - energy damage is flat.',
+            title: 'Energy_Capacity - never scaled by an armor factor',
             fraction: fractionOf(pools.energy, defence.energyCapacity ?? 0),
             colour: ENERGY_COLOUR,
         });

@@ -35,6 +35,7 @@ import { LocRow } from './loc/locRow';
 import { rowSeverityClass, severityByRow } from './loc/rowSeverity';
 import { FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { LocPanelMessage, LocProblem, post, useLocPanel } from './loc/useLocPanel';
+import { DockSection } from './shared/DockSection';
 import { buildRowFilter, FilterMode } from './locFilter';
 
 /**
@@ -480,8 +481,7 @@ function App(): React.JSX.Element {
                 Dropping says where far more directly than choosing "insert above" does. On the same
                 tile grid as the actions above: two tile species in one dock read as two unrelated
                 control sets. */}
-            <div className="dock-section">
-                <div className="dock-section-title">Content elements</div>
+            <DockSection title="Content elements">
                 <LocTileGrid>
                     {CREDITS_STEPS.map(step => (
                         <LocTile
@@ -504,7 +504,7 @@ function App(): React.JSX.Element {
                     ))}
                 </LocTileGrid>
                 <p className="step-help">Drag onto the table to place, or click to add at the end.</p>
-            </div>
+            </DockSection>
         </>
     );
 

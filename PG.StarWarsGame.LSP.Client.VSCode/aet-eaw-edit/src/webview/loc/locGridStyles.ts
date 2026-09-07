@@ -37,7 +37,7 @@ export const Shell = styled.div`
        put a horizontal scrollbar under a table whose columns fitted perfectly well. */
     input, select, textarea, button { box-sizing: border-box; }
 
-    .message { padding: 12px; }
+    .message { padding: var(--space-12); }
 
     .body { flex: 1; display: flex; min-height: 0; }
 
@@ -68,7 +68,7 @@ export const Shell = styled.div`
 
     .step-help {
         margin: 0;
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         opacity: 0.6;
         line-height: 1.35;
     }
@@ -81,9 +81,9 @@ export const Shell = styled.div`
         display: flex;
         flex-direction: column;
         min-height: 0;
-        border-top: 1px solid var(--vscode-panel-border, #444);
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
         background: var(--vscode-sideBar-background, #252526);
-        font-size: 12px;
+        font-size: var(--font-size-12);
     }
 
     ${problemsPanelCss}
@@ -97,10 +97,10 @@ export const Shell = styled.div`
     }
     .grid-footer {
         flex-shrink: 0;
-        padding: 3px 8px;
-        border-top: 1px solid var(--vscode-panel-border, #444);
+        padding: var(--space-2) var(--space-8);
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
         background: var(--vscode-editorWidget-background, #252526);
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         opacity: 0.8;
         white-space: nowrap;
         overflow: hidden;
@@ -120,11 +120,11 @@ export const Shell = styled.div`
         top: 0;
         z-index: 2;
         background: var(--vscode-editorWidget-background, #252526);
-        border-bottom: 1px solid var(--vscode-panel-border, #444);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
         font-weight: 600;
     }
 
-    .head-row .cell { padding: 4px 8px; white-space: nowrap; }
+    .head-row .cell { padding: var(--space-4) var(--space-8); white-space: nowrap; }
 
     /* The column picker sits at the right-hand end of the header, above the rows' unused trailing
        track. Positioned so the flyout can hang from it. */
@@ -144,10 +144,10 @@ export const Shell = styled.div`
         min-width: 160px;
         display: flex;
         flex-direction: column;
-        gap: 4px;
-        padding: 8px 10px;
-        border-radius: 6px;
-        border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        gap: var(--space-4);
+        padding: var(--space-8) var(--space-8);
+        border-radius: var(--radius-6);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorWidget-background, #252526);
         box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
         font-weight: normal;
@@ -170,8 +170,8 @@ export const Shell = styled.div`
     .column-flyout-title {
         display: flex;
         align-items: center;
-        gap: 8px;
-        font-size: 11px;
+        gap: var(--space-8);
+        font-size: var(--font-size-11);
         font-weight: 600;
         letter-spacing: 0.04em;
         text-transform: uppercase;
@@ -183,7 +183,7 @@ export const Shell = styled.div`
     .head-row .sortable {
         display: flex;
         align-items: center;
-        gap: 4px;
+        gap: var(--space-4);
         cursor: pointer;
         user-select: none;
     }
@@ -191,7 +191,7 @@ export const Shell = styled.div`
     .head-row .sortable:hover { background: var(--vscode-list-hoverBackground, #2a2d2e); }
 
     .head-row .sortable:focus-visible {
-        outline: 1px solid var(--vscode-focusBorder, #007fd4);
+        outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4);
         outline-offset: -1px;
     }
 
@@ -200,7 +200,7 @@ export const Shell = styled.div`
        selected row has - on a plain header in a light theme that is white on near-white. */
     .head-row .sorted { font-weight: 700; }
 
-    .head-row .codicon { font-size: 12px; opacity: 0.6; }
+    .head-row .codicon { font-size: var(--icon-size-12); opacity: 0.6; }
     .head-row .sorted .codicon { opacity: 1; }
 
     .head-row .head-label { overflow: hidden; text-overflow: ellipsis; }
@@ -237,16 +237,16 @@ export const Shell = styled.div`
     }
     .data-row.selected { background: var(--vscode-list-inactiveSelectionBackground, #37373d); }
 
-    .cell { min-width: 0; padding: 0 4px; }
+    .cell { min-width: 0; padding: 0 var(--space-4); }
 
     /* Sits flush in the cell like the text inputs, so a credits row does not look like a form. */
     select.directive {
         width: 100%;
-        border: 1px solid transparent;
+        border: var(--space-1) solid transparent;
         background: transparent;
         color: inherit;
         font: inherit;
-        padding: 2px 4px;
+        padding: var(--space-2) var(--space-4);
     }
     select.directive:hover { border-color: var(--vscode-panel-border, #444); }
     select.directive:focus {
@@ -257,11 +257,11 @@ export const Shell = styled.div`
 
     .grid input {
         width: 100%;
-        border: 1px solid transparent;
+        border: var(--space-1) solid transparent;
         background: transparent;
         color: inherit;
         font: inherit;
-        padding: 2px 4px;
+        padding: var(--space-2) var(--space-4);
     }
     .grid input:hover { border-color: var(--vscode-panel-border, #444); }
     .grid input:focus {
@@ -274,7 +274,7 @@ export const Shell = styled.div`
     /* A header of plain buttons; no dial to make room for. */
     .dock-header { min-height: 34px; }
 
-    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .dock-content { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-8); display: flex; flex-direction: column; gap: var(--space-8); }
 
     /* Filters sit at the foot of the dock, as they do in the story graph editor - the header is for
        acting on the file, the foot for narrowing what you are looking at. */
@@ -285,7 +285,7 @@ export const Shell = styled.div`
         background: var(--vscode-button-secondaryBackground, var(--vscode-button-background, #3a3d41));
         color: var(--vscode-button-secondaryForeground, var(--vscode-button-foreground, #ccc));
         border: none;
-        padding: 3px 8px;
+        padding: var(--space-2) var(--space-8);
         cursor: pointer;
         font-size: var(--vscode-font-size, 13px);
         font-family: var(--vscode-font-family, sans-serif);
@@ -318,8 +318,8 @@ export const Shell = styled.div`
     select, input[type=text] {
         background: var(--vscode-input-background, #3c3c3c);
         color: var(--vscode-input-foreground, #ccc);
-        border: 1px solid var(--vscode-input-border, transparent);
-        padding: 2px 6px;
+        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        padding: var(--space-2) var(--space-6);
         font-size: var(--vscode-font-size, 13px);
         font-family: var(--vscode-font-family, sans-serif);
         outline: none;
@@ -330,7 +330,7 @@ export const Shell = styled.div`
     }
 
     /* The search-mode toggles: icon buttons, the same ones the graph editor's overview tools use. */
-    .mode-group { display: flex; gap: 4px; }
+    .mode-group { display: flex; gap: var(--space-4); }
 
     .row-menu {
         position: fixed;
@@ -338,10 +338,10 @@ export const Shell = styled.div`
         min-width: 200px;
         display: flex;
         flex-direction: column;
-        padding: 4px 0;
+        padding: var(--space-4) 0;
         background: var(--vscode-menu-background, var(--vscode-editorWidget-background, #252526));
         color: var(--vscode-menu-foreground, #ccc);
-        border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border, #454545));
+        border: var(--space-1) solid var(--vscode-menu-border, var(--vscode-panel-border, #454545));
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
     }
 
@@ -349,7 +349,7 @@ export const Shell = styled.div`
         background: transparent;
         color: inherit;
         text-align: left;
-        padding: 4px 12px;
+        padding: var(--space-4) var(--space-12);
         border: none;
     }
     .row-menu button:hover:not(:disabled) {
@@ -361,7 +361,7 @@ export const Shell = styled.div`
     }
     .row-menu .sep {
         height: 1px;
-        margin: 4px 0;
+        margin: var(--space-4) 0;
         background: var(--vscode-menu-separatorBackground, #454545);
     }
 
@@ -371,14 +371,14 @@ export const Shell = styled.div`
         grid-column: 1 / -1;
         display: flex;
         align-items: center;
-        gap: 8px;
+        gap: var(--space-8);
         opacity: 0.5;
         cursor: default;
         user-select: none;
     }
-    .spacer-cell:focus { outline: 1px solid var(--vscode-focusBorder, #007fd4); }
+    .spacer-cell:focus { outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4); }
     .spacer-rule { flex: 1; height: 1px; background: currentColor; opacity: 0.5; }
-    .spacer-label { font-size: 0.85em; font-style: italic; white-space: nowrap; }
+    .spacer-label { font-size: var(--font-size-smaller); font-style: italic; white-space: nowrap; }
 
     /* A row that only repeats the layer below is shown dimmed and italic, so when they are on
        screen it stays obvious which lines this file actually changes. */
@@ -387,25 +387,25 @@ export const Shell = styled.div`
         font-style: italic;
     }
 
-    .inherited-toggle { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+    .inherited-toggle { display: flex; align-items: center; gap: var(--space-6); cursor: pointer; }
     .inherited-toggle input { cursor: pointer; }
     .inherited-toggle .badge {
         opacity: 0.7;
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
         background: var(--vscode-badge-background, #4d4d4d);
         color: var(--vscode-badge-foreground, #fff);
-        border-radius: 8px;
-        padding: 0 6px;
+        border-radius: var(--radius-6);
+        padding: 0 var(--space-6);
     }
 
-    .counts { opacity: 0.75; display: flex; flex-direction: column; gap: 2px; }
+    .counts { opacity: 0.75; display: flex; flex-direction: column; gap: var(--space-2); }
     /* A duplicate key in a keyed file is an error the batch validator reports, so it is not just
        another statistic. */
     .counts .warn { color: var(--vscode-charts-yellow, #cca700); opacity: 1; }
-    .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .actions { display: flex; gap: var(--space-6); flex-wrap: wrap; }
 
-    .problems { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-    .problems li { border-left: 2px solid transparent; padding-left: 6px; }
+    .problems { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-4); }
+    .problems li { border-left: 2px solid transparent; padding-left: var(--space-6); }
     .problems li.sev-error { border-left-color: var(--vscode-errorForeground, #f48771); }
     .problems li.sev-warning { border-left-color: var(--vscode-charts-yellow, #cca700); }
     .problems li.sev-info { border-left-color: var(--vscode-charts-blue, #3794ff); }
@@ -414,20 +414,20 @@ export const Shell = styled.div`
        Only what this dialog's own content needs. Its box, backdrop, title bar and resize handles
        are the shared .modal base in dockChrome - it used to carry a second copy of all of that,
        which is how the two dialogs ended up with different padding, radius and shadow. */
-    .field { display: flex; flex-direction: column; gap: 3px; }
+    .field { display: flex; flex-direction: column; gap: var(--space-2); }
 
-    .field > span { opacity: 0.85; font-size: 0.9em; }
+    .field > span { opacity: 0.85; font-size: var(--font-size-smaller); }
 
     .field input {
         background: var(--vscode-input-background, #3c3c3c);
         color: var(--vscode-input-foreground, #ccc);
-        border: 1px solid var(--vscode-input-border, transparent);
-        padding: 4px 6px;
+        border: var(--space-1) solid var(--vscode-input-border, transparent);
+        padding: var(--space-4) var(--space-6);
         font: inherit;
     }
 
     .field input:focus {
-        outline: 1px solid var(--vscode-focusBorder, #007fd4);
+        outline: var(--space-1) solid var(--vscode-focusBorder, #007fd4);
         outline-offset: -1px;
     }
 
@@ -438,7 +438,7 @@ export const Shell = styled.div`
     .field-error {
         margin: -4px 0 0;
         color: var(--vscode-inputValidation-errorForeground, var(--vscode-errorForeground, #f48771));
-        font-size: 0.9em;
+        font-size: var(--font-size-smaller);
     }
 
     /* Flows; it does not scroll on its own. The dialog body is the scroller, and a list that kept
@@ -447,11 +447,11 @@ export const Shell = styled.div`
     .languages {
         display: flex;
         flex-direction: column;
-        gap: 8px;
-        padding-top: 4px;
+        gap: var(--space-8);
+        padding-top: var(--space-4);
     }
 
-    .hint { margin: 0; opacity: 0.6; font-size: 0.9em; }
+    .hint { margin: 0; opacity: 0.6; font-size: var(--font-size-smaller); }
 
     /* The one list that does keep a cap: it appears under the key field while typing, and a broad
        prefix would otherwise shove the rest of the form down the moment a letter is deleted. Capped
@@ -463,15 +463,15 @@ export const Shell = styled.div`
         padding: 0;
         max-height: 180px;
         overflow-y: auto;
-        border: 1px solid var(--vscode-panel-border, #444);
+        border: var(--space-1) solid var(--vscode-panel-border, #444);
     }
 
     .suggestions button {
         display: flex;
         justify-content: space-between;
-        gap: 12px;
+        gap: var(--space-12);
         width: 100%;
-        padding: 3px 6px;
+        padding: var(--space-2) var(--space-6);
         background: none;
         border: none;
         color: inherit;
@@ -494,13 +494,13 @@ export const Shell = styled.div`
         white-space: nowrap;
     }
 
-    .dialog-actions { display: flex; justify-content: flex-end; gap: 6px; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: var(--space-6); }
 
     .dialog-actions button {
         background: var(--vscode-button-secondaryBackground, #3a3d41);
         color: var(--vscode-button-secondaryForeground, #ccc);
         border: none;
-        padding: 4px 14px;
+        padding: var(--space-4) var(--space-12);
         font: inherit;
         cursor: pointer;
     }

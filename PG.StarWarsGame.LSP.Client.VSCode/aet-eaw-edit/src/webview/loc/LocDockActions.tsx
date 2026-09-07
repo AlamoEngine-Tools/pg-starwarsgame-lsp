@@ -16,7 +16,9 @@ import {
     canCopyBetweenLanguages, copyFromOptions, FillSource, nextCopyFrom, resolveFillSource,
 } from './fillLanguage';
 import { LocModal } from './LocModal';
+import { DockSection } from '../shared/DockSection';
 import { LocTile, LocTileGrid } from './LocTile';
+import { Field } from '../shared/Field';
 
 /** The text formats a file can be rewritten as. DAT is not one - it is what Export produces. */
 export const CONVERTIBLE_FORMATS = ['CSV', 'XML', 'NLS'] as const;
@@ -146,8 +148,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
 
     return (
         <>
-            <div className="dock-section">
-                <div className="dock-section-title">File</div>
+            <DockSection title="File">
                 <LocTileGrid>
                     {(props.canAddLanguage || props.addLanguageCreatesFile) && (
                         <LocTile
@@ -196,7 +197,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         onClick={() => setDialog('export')}
                     />
                 </LocTileGrid>
-            </div>
+            </DockSection>
 
             {dialog === 'language' && (
                 <LocModal
@@ -284,12 +285,11 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                         close();
                     }}
                 >
-                    <label className="field">
-                        <span className="field-label">Fill in</span>
+                    <Field label="Fill in" as="label">
                         <select value={copyTo} onChange={e => changeCopyTo(e.target.value)}>
                             {props.languages.map(l => <option key={l} value={l}>{l}</option>)}
                         </select>
-                    </label>
+                    </Field>
 
                     <div className="choice-list">
                         {canCopy && (
@@ -332,8 +332,7 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                     </div>
 
                     {fromFile && (
-                        <label className="field">
-                            <span className="field-label">Copy from</span>
+                        <Field label="Copy from" as="label">
                             <select value={seedFrom} onChange={e => setSeedFrom(e.target.value)}>
                                 {seedSources.map(s => (
                                     <option key={s.filePath} value={s.filePath}>
@@ -341,18 +340,17 @@ export function LocDockActions(props: LocDockActionsProps): React.JSX.Element {
                                     </option>
                                 ))}
                             </select>
-                        </label>
+                        </Field>
                     )}
 
                     {fromLanguage && (
-                        <label className="field">
-                            <span className="field-label">Copy from</span>
+                        <Field label="Copy from" as="label">
                             {/* The language being filled in is left out: copying it into itself
                                 fills nothing, so offering it can only produce a disabled Fill. */}
                             <select value={copyFrom} onChange={e => setCopyFrom(e.target.value)}>
                                 {copyFromLanguages.map(l => <option key={l} value={l}>{l}</option>)}
                             </select>
-                        </label>
+                        </Field>
                     )}
 
                     <p className="modal-note">

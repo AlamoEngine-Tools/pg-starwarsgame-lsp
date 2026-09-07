@@ -65,7 +65,7 @@ public sealed class ApplyStoryCommandBatchHandler(
             return Task.FromResult(new ApplyStoryCommandBatchResult(true));
 
         var label = $"Apply {request.Commands.Count} story change(s)";
-        logger.LogDebug("Story batch of {Count} → applyEdit touching {Files} file(s)",
+        logger.LogDebug("Story batch of {Count} -> applyEdit touching {Files} file(s)",
             request.Commands.Count, changed.Count);
         _ = SendAsync(BuildBatchEdit(changed), label);
         return Task.FromResult(new ApplyStoryCommandBatchResult(true));

@@ -68,7 +68,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
         foreach (var cycle in evaluator.FindPrereqCycles())
         {
             members.UnionWith(cycle);
-            var names = string.Join(" → ", cycle.Select(id => nodesById[id].Label));
+            var names = string.Join(" -> ", cycle.Select(id => nodesById[id].Label));
             foreach (var id in cycle)
             {
                 var node = nodesById[id];

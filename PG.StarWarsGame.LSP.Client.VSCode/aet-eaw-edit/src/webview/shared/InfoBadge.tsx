@@ -27,6 +27,7 @@ import { createGlobalStyle } from 'styled-components';
 import { badgeIcon, type BadgeSeverity } from './badges';
 import { Icon } from './Icon';
 import { placeTooltip, type TooltipPlacement } from './tooltipPlace';
+import { tokensRootCss } from './tokens';
 
 /**
  * The bubble's styles, GLOBAL rather than part of the dock's shared block.
@@ -37,6 +38,11 @@ import { placeTooltip, type TooltipPlacement } from './tooltipPlace';
  * exactly what an unstyled div looks like and nothing like a missing stylesheet.
  */
 const TooltipStyles = createGlobalStyle`
+    /* The tooltip is portalled to the body, so it is NOT inside any panel's Shell and inherits none
+       of the custom properties interpolated there. Without this the four token references below
+       resolve to nothing - and a padding that resolves to nothing is zero, not a fallback. */
+    ${tokensRootCss}
+
     /* Our own tooltip rather than the browser's, which cannot be styled, is slow to appear and
        vanishes while you read it.
 
@@ -46,14 +52,14 @@ const TooltipStyles = createGlobalStyle`
         position: fixed;
         z-index: 40;
         max-width: 290px;
-        padding: 7px 10px;
-        border-radius: 5px;
-        border: 1px solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
+        padding: var(--space-6) var(--space-8);
+        border-radius: var(--radius-6);
+        border: var(--space-1) solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
         background: var(--vscode-editorHoverWidget-background, #252526);
         color: var(--vscode-editorHoverWidget-foreground, #ccc);
         box-shadow: 0 3px 10px rgba(0, 0, 0, 0.45);
         font-family: var(--vscode-font-family);
-        font-size: 12px;
+        font-size: var(--font-size-12);
         line-height: 1.4;
         /* A tooltip is never a target: it must not swallow the click that was heading for whatever
            it happens to be covering. */
@@ -69,7 +75,7 @@ const TooltipStyles = createGlobalStyle`
         margin-left: -4px;
         transform: rotate(45deg);
         background: var(--vscode-editorHoverWidget-background, #252526);
-        border: 1px solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
+        border: var(--space-1) solid var(--vscode-editorHoverWidget-border, rgba(128, 128, 128, 0.35));
     }
     /* Only the two edges facing the mark are drawn; the rest would cut a line across the bubble. */
     .tip-above .info-tip-arrow { bottom: -5px; border-top: none; border-left: none; }

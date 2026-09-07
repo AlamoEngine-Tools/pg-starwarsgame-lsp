@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import { useEffect, useRef, useState } from 'react';
+import { IconButton } from '../shared/Button';
 
 export interface LocColumnMenuProps {
     languages: string[];
@@ -63,16 +64,14 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
 
     return (
         <div className="cell column-menu" ref={ref}>
-            <button
+            <IconButton
                 ref={buttonRef}
-                className="icon-btn"
+                icon="settings"
                 title="Choose which language columns to show"
-                aria-label="Columns"
-                aria-expanded={open}
+                label="Columns"
+                expanded={open}
                 onClick={toggle}
-            >
-                <span className="codicon codicon-gear" />
-            </button>
+            />
 
             {at !== null && (
                 <div

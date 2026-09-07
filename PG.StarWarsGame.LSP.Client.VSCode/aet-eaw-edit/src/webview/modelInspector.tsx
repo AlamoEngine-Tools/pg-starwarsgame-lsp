@@ -34,9 +34,9 @@ const Shell = styled.div`
 
     height: 100%;
     overflow-y: auto;
-    padding: 14px 18px 20px;
+    padding: var(--space-12) var(--space-16) var(--space-16);
     box-sizing: border-box;
-    font-size: 12px;
+    font-size: var(--font-size-12);
     color: var(--vscode-foreground);
 
     /* Tall, because a tab has the room a 320px flyout never did - but still BOUNDED. The table
@@ -48,16 +48,16 @@ const Shell = styled.div`
     .inspect-page-head {
         display: flex;
         align-items: baseline;
-        gap: 10px;
+        gap: var(--space-8);
         flex-wrap: wrap;
-        margin: 0 0 14px;
-        padding-bottom: 8px;
-        border-bottom: 1px solid var(--vscode-panel-border, #444);
+        margin: 0 0 var(--space-12);
+        padding-bottom: var(--space-8);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, #444);
     }
 
     .inspect-page-title {
         margin: 0;
-        font-size: 16px;
+        font-size: var(--font-size-16);
         font-weight: 600;
         overflow-wrap: anywhere;
     }
@@ -73,7 +73,7 @@ const Shell = styled.div`
     .inspect-columns {
         display: grid;
         grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-        gap: 16px 24px;
+        gap: var(--space-16) var(--space-24);
         align-items: start;
     }
 
@@ -82,9 +82,9 @@ const Shell = styled.div`
     .inspect-columns .inspect-group + .inspect-group { margin-top: 0; }
 
     .inspect-geometry {
-        margin-top: 20px;
-        padding-top: 12px;
-        border-top: 1px solid var(--vscode-panel-border, #444);
+        margin-top: var(--space-16);
+        padding-top: var(--space-12);
+        border-top: var(--space-1) solid var(--vscode-panel-border, #444);
     }
 
     /* The panel is as wide as its widest table needs and no wider - a three-column bone mapping

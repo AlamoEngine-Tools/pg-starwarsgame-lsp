@@ -30,7 +30,10 @@ describe('modelCameraEntries', () => {
 
         assert.equal(entries.length, 1);
         assert.equal(only.disabled, true);
-        assert.match(only.title, /does not|no camera/i);
+        // The REASON says there is none; the title still names what the entry would do. They were
+        // one string before, which left the tooltip explaining an absence rather than a control.
+        assert.match(only.disabledReason ?? '', /no camera/i);
+        assert.match(only.title, /camera/i);
     });
 
     it('says what a camera is for in its tooltip', () => {
@@ -69,18 +72,25 @@ describe('cameraViewOptions', () => {
         assert.equal(options[options.length - 1].id, 'camera:0');
     });
 
+    // A preset applies to any subject, so it mentions no disabled state at all - which is what the
+    // shared enablement rule means by "not disableable" rather than "disabled: false".
     it('never disables a preset', () => {
         const options = cameraViewOptions(presets, []);
+        const preset = options.filter(o => o.id === 'threeQuarter')[0];
 
-        assert.equal(options.filter(o => o.id === 'threeQuarter')[0].disabled, false);
+        assert.notEqual(preset.disabled, true);
     });
 
+    /**
+     * And it says WHY, in its own field rather than by leaving the title to do two jobs. The title
+     * names what the entry would do; the reason names why it cannot right now.
+     */
     it('carries the disabled author entry through when the model declares none', () => {
         const options = cameraViewOptions(presets, []);
         const last = options[options.length - 1];
 
         assert.equal(last.disabled, true);
-        assert.match(last.title, /does not|no camera/i);
+        assert.match(last.disabledReason ?? '', /no camera/i);
     });
 
     it('gives every option a distinct id, so exactly one can read as chosen', () => {
