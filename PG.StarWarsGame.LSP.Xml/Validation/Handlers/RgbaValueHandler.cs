@@ -22,7 +22,7 @@ public sealed partial class RgbaValueHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{trimmed}' is not a valid RGBA color for <{fact.Tag.Tag}>. Expected 3 or 4 integers in 0–255, separated by spaces or commas.")
+                    $"'{trimmed}' is not a valid RGBA color for <{fact.Tag.Tag}>. Expected 3 or 4 integers in 0-255, separated by spaces or commas.")
             ];
 
         // Consistent int-slot policy: float components are accepted (the game truncates) but warned.

@@ -108,6 +108,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
         var workspaceRoot = TryGetString(elem, "workspaceRoot");
         var baseGamePath = TryGetString(elem, "baseGamePath");
         var expansionGamePath = TryGetString(elem, "expansionGamePath");
+        var shaderPath = TryGetString(elem, "shaderPath");
         var locale = TryGetString(elem, "locale");
         var localisationLanguage = TryGetString(elem, "localisationLanguage");
         var schemaUrl = TryGetString(elem, "schemaUrl");
@@ -125,6 +126,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             WorkspaceRoot = workspaceRoot,
             GamePath = baseGamePath,
             ExpansionPath = expansionGamePath,
+            ShaderPath = shaderPath,
             Locale = locale ?? "en",
             Localisation = new LocalisationConfig
             {
@@ -175,6 +177,7 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
             WorkspaceRoot = overlay.WorkspaceRoot ?? file.WorkspaceRoot,
             GamePath = overlay.GamePath ?? file.GamePath,
             ExpansionPath = overlay.ExpansionPath ?? file.ExpansionPath,
+            ShaderPath = overlay.ShaderPath ?? file.ShaderPath,
             Locale = overlay.Locale != "en" ? overlay.Locale : file.Locale,
             Localisation = MergeLocalisation(file.Localisation, overlay.Localisation),
             SchemaSource = overlay.SchemaSource.Type == SchemaSourceType.Local

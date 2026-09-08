@@ -415,7 +415,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         const writtenPath = result.writtenPath;
         const choice = await vscode.window.showInformationMessage(
-            `EaWEdit: created ${writtenPath} with every key from this file, ready to translate.`,
+            `EaWEdit: Created ${writtenPath} with every key from this file, ready to translate.`,
             'Open');
 
         if (choice === 'Open') {
@@ -471,7 +471,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         // queue neither written nor released, which looks exactly like the button doing nothing.
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
-                'EaWEdit LSP: server is not running; your edits are still staged.');
+                'EaWEdit LSP: Server is not running; the edits are still staged.');
             this.post({ type: 'saveResult', success: false });
             return;
         }
@@ -546,7 +546,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
             .join('; ');
 
         const choice = await vscode.window.showErrorMessage(
-            `EaWEdit: could not save - ${named}. Your edits are still staged.`, 'Reload');
+            `EaWEdit: Could not save - ${named}. The edits are still staged.`, 'Reload');
 
         if (choice === 'Reload') { await this._sendRows(); }
     }
@@ -559,7 +559,7 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
         const failed = result.failedIndex;
         const where = failed !== null && failed !== undefined ? ` (change ${failed + 1})` : '';
         const choice = await vscode.window.showErrorMessage(
-            `EaWEdit: could not save - ${result.error ?? 'unknown error'}${where}`, 'Reload');
+            `EaWEdit: Could not save - ${result.error ?? 'unknown error'}${where}`, 'Reload');
 
         if (choice === 'Reload') { await this._sendRows(); }
     }
@@ -569,7 +569,8 @@ export class LocalisationEditorPanel extends WebviewPanelHost {
 
         const count = this._state.pendingCount;
         const choice = await vscode.window.showWarningMessage(
-            `EaWEdit: ${count} unsaved localisation change(s) in '${this._filePath}'.`,
+            `EaWEdit: ${count} unsaved localisation ${count === 1 ? 'change' : 'changes'} `
+            + `in '${this._filePath}'.`,
             { modal: true }, 'Save');
 
         if (choice === 'Save') { await this._save(this._state.pending); }

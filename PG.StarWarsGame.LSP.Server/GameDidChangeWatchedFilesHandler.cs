@@ -263,7 +263,7 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
         return new DidChangeWatchedFilesRegistrationOptions
         {
             Watchers = new Container<LspFileSystemWatcher>(
-                WatchedGlobs.Select(g => new LspFileSystemWatcher { GlobPattern = g }))
+                WatchedGlobs.Select(g => new LspFileSystemWatcher { GlobPattern = ((GlobPattern?)g)! }))
         };
     }
 }

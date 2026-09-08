@@ -13,12 +13,19 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     nothing for the sources to be out of sync with. Optional so that every existing construction
 ///     site, and every test, keeps working unchanged.
 /// </param>
+/// <param name="IconNames">
+///     The GUI art the project's mega textures hold. Consulted only when a texture reference has
+///     already failed to resolve as a file, so a workspace that ships no mega texture pays nothing.
+///     Optional: without one, the file lookup decides on its own exactly as before.
+/// </param>
 public record DiagnosticsContext(
     ISchemaProvider Schema,
     GameIndex Index,
     string DocumentUri,
     string Locale,
-    IReadOnlySet<string>? IconsAwaitingRepack = null);
+    IReadOnlySet<string>? IconsAwaitingRepack = null,
+    Assets.IModelTextureIndex? ModelTextures = null,
+    Assets.IIconNameIndex? IconNames = null);
 
 /// <summary>
 ///     Supplies the icons a workspace has drawn but not yet repacked.

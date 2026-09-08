@@ -8,6 +8,16 @@ public record LspConfiguration
     public string? WorkspaceRoot { get; init; }
     public string? GamePath { get; init; }
     public string? ExpansionPath { get; init; }
+
+    /// <summary>
+    ///     Where the user's copy of the base game's shader SOURCES lives.
+    /// </summary>
+    /// <remarks>
+    ///     Not part of a game install: the install ships <c>.fxo</c>, compiled DX9 bytecode, which is
+    ///     no use to a translator. The sources are published separately by Petroglyph and are never
+    ///     redistributed with this extension, so this points at wherever the user put their own copy.
+    /// </remarks>
+    public string? ShaderPath { get; init; }
     public string Locale { get; init; } = "en";
     public SchemaSourceConfig SchemaSource { get; init; } = new();
     public BaselineSourceConfig BaselineSource { get; init; } = new();

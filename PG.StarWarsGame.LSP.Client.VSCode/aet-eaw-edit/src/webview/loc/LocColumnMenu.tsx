@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 import { useEffect, useRef, useState } from 'react';
+import { IconButton } from '../shared/Button';
 
 export interface LocColumnMenuProps {
     languages: string[];
@@ -17,7 +18,7 @@ export interface LocColumnMenuProps {
  */
 export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
     // Viewport coordinates, taken when the menu opens. The flyout is pinned to the viewport rather
-    // than hung off the gear: the header scrolls inside `.grid-area`, which clips anything reaching
+    // than anchored to the gear: the header scrolls inside `.grid-area`, which clips anything reaching
     // past its edge - and the gear is at the far right, so an absolutely positioned flyout had its
     // labels cut off and showed a column of checkboxes with nothing beside them. Same reason the
     // row menu and the drop indicator are fixed.
@@ -63,16 +64,14 @@ export function LocColumnMenu(props: LocColumnMenuProps): React.JSX.Element {
 
     return (
         <div className="cell column-menu" ref={ref}>
-            <button
+            <IconButton
                 ref={buttonRef}
-                className="icon-btn"
+                icon="settings"
                 title="Choose which language columns to show"
-                aria-label="Columns"
-                aria-expanded={open}
+                label="Columns"
+                expanded={open}
                 onClick={toggle}
-            >
-                <span className="codicon codicon-gear" />
-            </button>
+            />
 
             {at !== null && (
                 <div

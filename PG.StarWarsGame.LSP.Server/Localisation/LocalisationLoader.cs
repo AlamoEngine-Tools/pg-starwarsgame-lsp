@@ -222,8 +222,9 @@ public sealed class LocalisationLoader : ILocalisationLoader
             if (!resolvedFromFileName)
                 _logger.LogWarning(
                     "{Path} does not say which language it holds; assuming {Language}. Rename it to " +
-                    "'..._{Language}{Extension}' to make it explicit.",
-                    path, language.LanguageIdentifier, ResourceTypeToExtension(resourceType));
+                    "'..._{LanguageSuffix}{Extension}' to make it explicit.",
+                    path, language.LanguageIdentifier, language.LanguageIdentifier,
+                    ResourceTypeToExtension(resourceType));
 
             if (!fileLanguage.Equals(language))
             {

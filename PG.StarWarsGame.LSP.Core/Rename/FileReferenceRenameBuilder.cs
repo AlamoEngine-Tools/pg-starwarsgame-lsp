@@ -71,7 +71,7 @@ public static class FileReferenceRenameBuilder
                 Edits = new TextEditContainer(list)
             }));
 
-        logger.LogDebug("File rename {Id} → {NewStem}: file + {Files} referencing file(s)",
+        logger.LogDebug("File rename {Id} -> {NewStem}: file + {Files} referencing file(s)",
             id, newStem, edits.Count);
         return new WorkspaceEdit { DocumentChanges = new Container<WorkspaceEditDocumentChange>(changes) };
     }

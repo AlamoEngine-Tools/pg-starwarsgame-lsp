@@ -43,20 +43,20 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
             }
         });
 
-        await Task.Delay(200);
-
         var (line, col) = FindFirstGrandchildElementPosition(lines);
-        var result = await _fixture.Client.RequestCompletion(
-            new CompletionParams
-            {
-                TextDocument = new TextDocumentIdentifier { Uri = uri },
-                Position = new Position(line, col),
-                Context = new CompletionContext
+        var result = await PollUntilAsync<CompletionList>(
+            async ct => await _fixture.Client.RequestCompletion(
+                new CompletionParams
                 {
-                    TriggerKind = CompletionTriggerKind.TriggerCharacter,
-                    TriggerCharacter = "<"
-                }
-            }, CancellationToken.None);
+                    TextDocument = new TextDocumentIdentifier { Uri = uri },
+                    Position = new Position(line, col),
+                    Context = new CompletionContext
+                    {
+                        TriggerKind = CompletionTriggerKind.TriggerCharacter,
+                        TriggerCharacter = "<"
+                    }
+                }, ct),
+            r => r is not null && r.Items.Any());
 
         Assert.NotNull(result);
         Assert.NotEmpty(result.Items);
@@ -82,16 +82,16 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
             }
         });
 
-        await Task.Delay(200);
-
         var (line, col) = FindFirstGrandchildElementPosition(lines);
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var result = await _fixture.Client.RequestHover(
-            new HoverParams
-            {
-                TextDocument = new TextDocumentIdentifier { Uri = uri },
-                Position = new Position(line, col)
-            }, cts.Token);
+        var result = await PollUntilAsync<Hover>(
+            async ct => await _fixture.Client.RequestHover(
+                new HoverParams
+                {
+                    TextDocument = new TextDocumentIdentifier { Uri = uri },
+                    Position = new Position(line, col)
+                }, ct),
+            r => (r?.Contents.MarkupContent?.Value ?? string.Empty)
+                .Contains("Cinematic_Object_Only", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(result);
         var content = result.Contents.MarkupContent?.Value ?? string.Empty;
@@ -151,6 +151,26 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Polls an LSP request until it answers with an indexed result, or the timeout expires. The
+    /// server indexes an opened document asynchronously, so the first answer after didOpen is
+    /// legitimately empty - a fixed delay only guesses at how long that takes. On timeout the last
+    /// response is returned, so the caller's own assertion reports the real shortfall.
+    /// </summary>
+    private static async Task<T?> PollUntilAsync<T>(Func<CancellationToken, Task<T?>> request,
+        Func<T?, bool> isReady, TimeSpan? timeout = null)
+        where T : class
+    {
+        var deadline = DateTime.UtcNow + (timeout ?? TimeSpan.FromSeconds(30));
+        while (true)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            var result = await request(cts.Token);
+            if (isReady(result) || DateTime.UtcNow >= deadline) return result;
+            await Task.Delay(100);
+        }
+    }
 
     private static void RequireWorkspace()
     {

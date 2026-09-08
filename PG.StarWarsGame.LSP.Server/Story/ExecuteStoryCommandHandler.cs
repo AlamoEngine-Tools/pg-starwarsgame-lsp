@@ -48,7 +48,7 @@ public sealed class ExecuteStoryCommandHandler(
         if (error is not null)
             return Task.FromResult(Error(error));
 
-        logger.LogDebug("Story command {Kind} → applyEdit", request.Kind);
+        logger.LogDebug("Story command {Kind} -> applyEdit", request.Kind);
         return Task.FromResult(ApplyDetached(
             StoryCommandExecutor.BuildWorkspaceEdit(produced!), produced!.Label));
     }

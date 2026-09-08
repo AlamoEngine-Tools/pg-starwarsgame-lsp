@@ -133,6 +133,10 @@ public static class XmlLanguageServiceExtensions
 
         // Asset-file existence handlers (shared asset-file catalog)
         services.AddSingleton<IXmlDiagnosticsHandler, TextureFileExistenceHandler>();
+
+        // The textures a model names INSIDE itself. Needs an IModelTextureIndex from the host to do
+        // anything at all - see the handler.
+        services.AddSingleton<IXmlDiagnosticsHandler, ModelTextureExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IconAwaitingRepackHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ModelFileExistenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioFileExistenceHandler>();
@@ -156,6 +160,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageStageNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();
 
         // Shared parse source: one HAP parse per (document, content) reused by indexing,
@@ -225,6 +230,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCodeLensProvider, VariantCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, OverrideCodeLensProvider>();
         services.AddSingleton<IXmlCodeLensProvider, EncyclopediaCodeLensProvider>();
+        services.AddSingleton<IXmlCodeLensProvider, PreviewUnitCodeLensProvider>();
 
         // Inlay hint providers - add IXmlInlayHintProvider implementations here to register new providers
         services.AddSingleton<IXmlInlayHintRegistry, XmlInlayHintRegistry>();
@@ -239,6 +245,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IVariantTagSource, WorkspaceVariantTagSource>();
         services.AddSingleton<IXmlVariantFactProducer, XmlVariantFactProducer>();
         services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
+        services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();

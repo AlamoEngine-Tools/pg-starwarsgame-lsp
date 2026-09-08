@@ -4,11 +4,12 @@
 import * as vscode from 'vscode';
 
 import { LspGateway } from './lsp/lspGateway';
+import { revealDefinition } from './revealDefinition';
 import { PanelRegistry, WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
 import {
     ApplyStoryCommandBatchResult, ExecuteStoryCommandResult, GetStoryDiagnosticsResult,
     GetStoryGraphResult, GetStoryLayoutResult, GetStoryNodeDetailResult,
-    GetStoryParamOptionsResult, GetStorySchemaResult, GraphFilters, ResolveStoryReferenceResult,
+    GetStoryParamOptionsResult, GetStorySchemaResult, GraphFilters,
     StoryLayoutEntryDto, StoryParamOptionDto, StorySimStateResult, WorkspaceSettingsDto,
 } from './protocol';
 
@@ -209,29 +210,10 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     /** Go-to-definition for a reference-typed param value - opens the XML beside the graph. */
     private async _resolveRef(value: string, referenceType: string | undefined): Promise<void> {
-        if (!value) { return; }
-
-        const result = await this._lsp.requestOrReport<ResolveStoryReferenceResult>(
-            'aet/resolveStoryReference', { value, referenceType },
-            `cannot open the definition of '${value}'`);
-        if (result === undefined) { return; }
-
-        if (result.error || !result.uri) {
-            void vscode.window.showWarningMessage(
-                `EaWEdit: ${result.error ?? `Cannot resolve '${value}'.`}`);
-            return;
-        }
-
-        try {
-            const doc = await vscode.workspace.openTextDocument(vscode.Uri.parse(result.uri));
-            const position = new vscode.Position(Math.max(0, result.line), Math.max(0, result.column));
-            await vscode.window.showTextDocument(doc, {
-                viewColumn: vscode.ViewColumn.Beside,
-                selection: new vscode.Range(position, position),
-            });
-        } catch (e) {
-            void vscode.window.showErrorMessage(`EaWEdit: cannot open ${result.uri}: ${e}`);
-        }
+        // Its own endpoint rather than the shared one: this lookup is the story editor's, and the
+        // server keeps it behind that feature's flag. The caller-side handling is identical, so
+        // only the method name differs.
+        await revealDefinition(this._lsp, value, referenceType, 'aet/resolveStoryReference');
     }
 
     /**
@@ -355,7 +337,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         if (!this._lsp.isRunning) {
             void vscode.window.showWarningMessage(
-                'EaWEdit LSP: server is not running; changes were not saved.');
+                'EaWEdit LSP: Server is not running; changes were not saved.');
             return;
         }
 
@@ -367,7 +349,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         const where = typeof result.failedIndex === 'number' ? ` (change ${result.failedIndex + 1})` : '';
         void vscode.window.showErrorMessage(
-            `EaWEdit: could not save the closed story graph${where}: ${result.error ?? ''}`);
+            `EaWEdit: Could not save the closed story graph${where} - ${result.error ?? ''}`);
     }
 
     /**
@@ -508,7 +490,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
                 selection: new vscode.Range(position, position),
             });
         } catch (e) {
-            void vscode.window.showErrorMessage(`EaWEdit: cannot open ${threadUri}: ${e}`);
+            void vscode.window.showErrorMessage(`EaWEdit: Cannot open ${threadUri} - ${e}`);
         }
     }
 

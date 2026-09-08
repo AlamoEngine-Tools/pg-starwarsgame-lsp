@@ -9,6 +9,6 @@ public static class MegArchiveOriginHoverText
     {
         var archiveName = Path.GetFileName(origin.ArchivePath);
         return
-            $"📦 Packed in `{archiveName}` → `{origin.InternalPath}` - read-only, cannot be renamed or navigated to.";
+            $"Packed in `{archiveName}` -> `{origin.InternalPath}` - read-only, cannot be renamed or navigated to.";
     }
 }

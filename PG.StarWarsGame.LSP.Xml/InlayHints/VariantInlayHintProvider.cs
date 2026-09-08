@@ -72,7 +72,7 @@ internal sealed class VariantInlayHintProvider : IXmlInlayHintProvider
         if (inherited > 0) parts.Add($"inherits {inherited}");
         if (overridden > 0) parts.Add($"overrides {overridden}");
         if (added > 0) parts.Add($"adds {added}");
-        return parts.Count == 0 ? null : string.Join(" · ", parts);
+        return parts.Count == 0 ? null : string.Join(" - ", parts);
     }
 
     private static string? ParentObjectId(HtmlNode variantTagNode)

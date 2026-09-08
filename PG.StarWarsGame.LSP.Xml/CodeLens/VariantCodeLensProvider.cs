@@ -41,7 +41,7 @@ internal sealed class VariantCodeLensProvider : IXmlCodeLensProvider
                 Range = range,
                 Command = new Command
                 {
-                    Title = $"▲ variant of {ctx.Symbol.VariantBaseId} - show effective object",
+                    Title = $"^ Variant of {ctx.Symbol.VariantBaseId} - show effective object",
                     Name = ShowEffectiveCommand,
                     Arguments = JArray.FromObject(new object[] { ctx.Symbol.Id })
                 }

@@ -31,9 +31,6 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 {
     // Asset extensions covered by the shared asset-file catalog. Mirrors the set enumerated by
     // the BaselineBuilder's AssetFileEnumerator.
-    private static readonly HashSet<string> AssetExtensions =
-        new(StringComparer.OrdinalIgnoreCase) { ".tga", ".dds", ".alo", ".wav", ".mp3", ".ted" };
-
     private static readonly ImmutableArray<string> StoryPlotManifestTypes = ["StoryPlotManifest"];
     private static readonly ImmutableArray<string> StoryParserTypes = ["StoryParser"];
 
@@ -159,7 +156,11 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             foreach (var file in _fileHelper.FileSystem.Directory
                          .EnumerateFiles(root, "*", SearchOption.AllDirectories))
             {
-                if (!AssetExtensions.Contains(_fileHelper.FileSystem.Path.GetExtension(file)))
+                // The catalogue's own predicate rather than a third copy of its list: the
+                // workspace's loose `.ala` files are exactly what a model preview needs enumerated,
+                // and a list that drifts from the catalogue's leaves them out silently.
+                if (!MegAssetCatalogBuilder.IsAssetExtension(
+                        _fileHelper.FileSystem.Path.GetExtension(file)))
                     continue;
                 var relative = _fileHelper.FileSystem.Path.GetRelativePath(root, file);
                 workspace.Add(_fileHelper.NormalizeGamePath(relative));
@@ -645,7 +646,7 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
     public static bool IsAssetFile(string path)
     {
-        return AssetExtensions.Contains(Path.GetExtension(path));
+        return MegAssetCatalogBuilder.IsAssetExtension(Path.GetExtension(path));
     }
 
     private IEnumerable<string> EnumerateFiles(IEnumerable<string> roots)

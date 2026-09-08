@@ -34,7 +34,7 @@ public sealed class XmlInlayHintRegistryTest
     [Fact]
     public void SingleProvider_ReturnsItsHints()
     {
-        var hint = new InlayHint { Position = new Position(0, 0), Label = "= \"test\"" };
+        var hint = new InlayHint { Position = new Position(0, 0), Label = ((StringOrInlayHintLabelParts?)"= \"test\"")! };
         var provider = new StubProvider([hint]);
         var registry = new XmlInlayHintRegistry([provider]);
 
@@ -47,8 +47,8 @@ public sealed class XmlInlayHintRegistryTest
     [Fact]
     public void MultipleProviders_ConcatenatesAllHints()
     {
-        var h1 = new InlayHint { Position = new Position(0, 0), Label = "= \"a\"" };
-        var h2 = new InlayHint { Position = new Position(0, 0), Label = "= \"b\"" };
+        var h1 = new InlayHint { Position = new Position(0, 0), Label = ((StringOrInlayHintLabelParts?)"= \"a\"")! };
+        var h2 = new InlayHint { Position = new Position(0, 0), Label = ((StringOrInlayHintLabelParts?)"= \"b\"")! };
         var registry = new XmlInlayHintRegistry([new StubProvider([h1]), new StubProvider([h2])]);
 
         var hints = registry.Dispatch(MakeCtx()).ToList();
@@ -59,7 +59,7 @@ public sealed class XmlInlayHintRegistryTest
     [Fact]
     public void ProviderReturningEmpty_DoesNotContributeHints()
     {
-        var h1 = new InlayHint { Position = new Position(0, 0), Label = "= \"a\"" };
+        var h1 = new InlayHint { Position = new Position(0, 0), Label = ((StringOrInlayHintLabelParts?)"= \"a\"")! };
         var registry = new XmlInlayHintRegistry([new StubProvider([]), new StubProvider([h1])]);
 
         var hints = registry.Dispatch(MakeCtx()).ToList();

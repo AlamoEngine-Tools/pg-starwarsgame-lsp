@@ -19,7 +19,6 @@ import { Shell } from './locGridStyles';
 const ROW_HEIGHT = 26;
 
 // Module-level so a remount (the webview reloads when the tab is restored) keeps the dock width.
-let dockWidthMemo = 300;
 
 export interface LocGridShellProps {
     /** The rows to draw, already filtered and ordered by the editor. */
@@ -172,10 +171,10 @@ export function LocGridShell(props: LocGridShellProps): React.JSX.Element {
                 </div>
 
                 <RightDock
-                    initialWidth={dockWidthMemo}
+                    memoKey="localisation.dock"
+                    initialWidth={300}
                     minWidth={210}
                     maxWidth={520}
-                    onWidthChange={v => { dockWidthMemo = v; }}
                     header={props.dockHeader}
                     content={props.dockContent}
                     overview={props.dockOverview}

@@ -148,7 +148,7 @@ public sealed class LuaDiagnosticsPublisherTest
         var diag = Assert.Single(Assert.Single(published).Diagnostics!);
         Assert.Equal(DiagnosticSeverity.Error, diag.Severity);
         Assert.Contains("UNIT_MISSING", diag.Message);
-        Assert.Contains("no object with this name exists", diag.Message);
+        Assert.Contains("No object with this name exists", diag.Message);
     }
 
     // ── suppression, end to end ───────────────────────────────────────────────

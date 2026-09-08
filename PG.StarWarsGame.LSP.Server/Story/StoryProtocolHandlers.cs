@@ -6,6 +6,7 @@ using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
+using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
@@ -331,7 +332,8 @@ public sealed class GetStoryParamOptionsHandler(
             StoryReferenceTypes.EventName => events.Select(e => e.Name),
             StoryReferenceTypes.Branch => events
                 .Select(e => e.Branch)
-                .Where(b => !string.IsNullOrEmpty(b))!,
+                .Where(b => !string.IsNullOrEmpty(b))
+                .Select(b => b!),
             _ => model.Threads.Select(t => FileNameOf(t.DocumentUri))
         };
 
@@ -393,9 +395,16 @@ public sealed class GetStoryDiagnosticsHandler(
     }
 }
 
+/// <summary>
+///     The story editor's go-to for a reference-typed param value.
+/// </summary>
+/// <remarks>
+///     Nothing but the feature gate is left here. The lookup itself moved to
+///     <see cref="IDefinitionLocator" /> once the preview's ability rows needed the same answer, and
+///     it was never story-specific to begin with.
+/// </remarks>
 public sealed class ResolveStoryReferenceHandler(
-    IGameIndexService indexService,
-    ISchemaProvider schema,
+    IDefinitionLocator locator,
     ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<ResolveStoryReferenceParams, ResolveStoryReferenceResult>
 {
@@ -403,47 +412,9 @@ public sealed class ResolveStoryReferenceHandler(
     {
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new ResolveStoryReferenceResult(Error: rejection));
-        if (string.IsNullOrWhiteSpace(request.Value))
-            return Task.FromResult(new ResolveStoryReferenceResult(Error: "Nothing to resolve."));
 
-        var index = indexService.Current;
-        var symbol = Resolve(index, request.Value.Trim(), request.ReferenceType);
-        if (symbol is null)
-            return Task.FromResult(new ResolveStoryReferenceResult(
-                Error: $"'{request.Value}' does not resolve to any known definition."));
-
-        if (symbol.Origin is not FileOrigin origin)
-            return Task.FromResult(new ResolveStoryReferenceResult(
-                Error: $"'{request.Value}' is defined in the base game or an archive - " +
-                       "there is no workspace file to open."));
-
+        var located = locator.Locate(request.Value, request.ReferenceType);
         return Task.FromResult(new ResolveStoryReferenceResult(
-            origin.Uri, origin.Line, origin.Column ?? 0));
-    }
-
-    private GameSymbol? Resolve(GameIndex index, string value, string? referenceType)
-    {
-        // Prefer a type-matched definition when the referenceType names a concrete symbol type;
-        // umbrella names (GameObjectType) and unknown types fall back to the untyped winner.
-        var preferred = referenceType switch
-        {
-            null => null,
-            StoryReferenceTypes.EventName => StoryReferenceTypes.EventSymbol,
-            StoryReferenceTypes.Notification => StoryReferenceTypes.NotificationSymbol,
-            StoryReferenceTypes.Flag => StoryReferenceTypes.FlagSymbol,
-            _ when string.Equals(referenceType, "GameObjectType", StringComparison.OrdinalIgnoreCase) => null,
-            _ when schema.GetObjectType(referenceType) is not null => referenceType,
-            _ => null
-        };
-
-        var symbol = preferred is not null ? index.Resolve(value, preferred) : index.Resolve(value);
-        if (symbol is not null) return symbol;
-
-        // Scoped ability IDs are indexed as "OWNER$name" while params carry the bare name.
-        return index.WorkspaceDefinitions.Keys
-            .Where(k => k.IndexOf('$') is var i and >= 0 &&
-                        string.Equals(k[(i + 1)..], value, StringComparison.OrdinalIgnoreCase))
-            .Select(k => index.Resolve(k))
-            .FirstOrDefault(s => s is not null);
+            located.Uri, located.Line, located.Column, located.Error));
     }
 }

@@ -9,6 +9,7 @@ using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.ShipNames;
@@ -37,9 +38,16 @@ public sealed class GetEncyclopediaEntryHandler
     : IJsonRpcRequestHandler<GetEncyclopediaEntryParams, GetEncyclopediaEntryResult>
 {
     private readonly ILspConfigurationProvider _config;
-    private readonly IIconCatalogProvider? _icons;
     private readonly IGameIndexService _indexService;
-    private readonly ModProjectReloadService? _projects;
+    // Resolving the workspace root and asking for its catalog is shared with the XML diagnostics
+    // and the model preview - see WorkspaceIconCatalog, which is also where the bug lived that had
+    // this asking DI for a concrete type nothing registers.
+    private readonly IWorkspaceIconCatalog? _catalog;
+
+    // Still needed for the ship-name catalog, which resolves its own root. The INTERFACE, not the
+    // concrete service: only `IModProjectReloadService` is registered, so asking for the class
+    // handed this a permanent null and every project-configured path silently fell back.
+    private readonly IModProjectReloadService? _projects;
     private readonly ISchemaProvider _schema;
     private readonly IVariantTagSource _tagSource;
 
@@ -47,16 +55,17 @@ public sealed class GetEncyclopediaEntryHandler
 
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,
-        IIconCatalogProvider? icons = null, ModProjectReloadService? projects = null,
-        IShipNameCatalogProvider? shipNames = null)
+        IWorkspaceIconCatalog? catalog = null,
+        IShipNameCatalogProvider? shipNames = null,
+        IModProjectReloadService? projects = null)
     {
         _indexService = indexService;
         _schema = schema;
         _tagSource = tagSource;
         _config = config;
-        _icons = icons;
-        _projects = projects;
+        _catalog = catalog;
         _shipNames = shipNames;
+        _projects = projects;
     }
 
     public async Task<GetEncyclopediaEntryResult> Handle(GetEncyclopediaEntryParams request,
@@ -157,27 +166,9 @@ public sealed class GetEncyclopediaEntryHandler
     ///     reason. Fetched once per request and shared by the portrait, the ability slots and the
     ///     Against panels.
     /// </summary>
-    private async Task<IconCatalog?> GetCatalogAsync(CancellationToken ct)
+    private Task<IconCatalog?> GetCatalogAsync(CancellationToken ct)
     {
-        if (_icons is null)
-            return null;
-
-        var root = _projects?.LastWorkspaceRoots?.FirstOrDefault() ?? _config.Current.WorkspaceRoot;
-        if (string.IsNullOrEmpty(root))
-            return null;
-
-        try
-        {
-            return await _icons.GetAsync(root, _projects?.LastWorkspaceConfig?.Icons, ct);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch
-        {
-            return null;
-        }
+        return _catalog?.GetAsync(ct) ?? Task.FromResult<IconCatalog?>(null);
     }
 
     private static EncyclopediaIcon? ResolveIcon(IconCatalog? catalog, EffectiveObject effective)
@@ -346,89 +337,48 @@ public sealed class GetEncyclopediaEntryHandler
     private static EncyclopediaImage? ResolveAbilityIcon(
         IconCatalog? catalog, string type, string? alternateIconName)
     {
-        if (catalog is null)
-            return null;
-
-        // An Alternate_* tag REPLACES the default it shadows - the same holds for the ability's name
-        // and description - so when one names an icon, that icon IS the ability's icon and the
-        // type-name guess never applies. It is per-instance, not per-type: two units can give the
-        // same ability type different icons this way.
-        if (!string.IsNullOrWhiteSpace(alternateIconName))
+        // The rules themselves live in AbilityIconResolver, shared with the model preview's
+        // Gameplay lens: two copies of this precedence would be two places for it to drift.
+        var resolved = AbilityIconResolver.Resolve(catalog, type, alternateIconName);
+        return resolved.Outcome switch
         {
-            var overridden = catalog.Resolve(alternateIconName.Trim());
+            AbilityIconOutcome.Resolved => Image(resolved.Icon!),
 
             // A declared override that does not resolve gets the missing-icon placeholder, scaled
             // into the slot - that is what the engine itself draws, so showing it is fidelity
-            // rather than an error report. Substituting the default would be strictly worse: it
-            // would hide a broken reference behind a plausible icon the game would never show.
-            return overridden is null ? Image(FallbackIcon.Png) : Image(overridden);
-        }
+            // rather than an error report.
+            AbilityIconOutcome.DeclaredButMissing => Image(FallbackIcon.Png),
 
-        // A confirmed exception wins over the type-name convention. These were checked against the
-        // running game, not inferred - several could not be guessed at all (INVULNERABILITY draws
-        // EVASIVE_MANEUVERS) and one leans on a misspelling Petroglyph shipped.
-        var known = AbilityIconNames.For(type);
-        if (known is not null)
-        {
-            var mapped = catalog.Resolve(known);
-            if (mapped is not null)
-                return Image(mapped);
-        }
-
-        // A miss HERE is AMBIGUOUS, which is why it draws neither the icon nor the placeholder.
-        // The engine resolves its hardcoded name out of the same mega texture, so a missing entry
-        // does make it draw MISSING - but I_SA_<TYPE> is only a guess at that name, and a miss can
-        // equally mean the real name is something else entirely (BARRAGE's icon is I_SA_BARRAGE_AREA)
-        // while the game shows perfectly good art. We cannot tell those apart without knowing the
-        // hardcoded name, so the slot asserts neither and falls back to the ability type as text.
-        var resolved = catalog.Resolve("I_SA_" + type.Trim().ToUpperInvariant());
-        return resolved is null ? null : Image(resolved);
+            // Ambiguous: the type-name guess missed, which is not evidence of missing art. The slot
+            // asserts neither and falls back to the ability type as text.
+            _ => null
+        };
     }
 
     private static IReadOnlyList<EncyclopediaAbility> ResolveAbilities(
         EffectiveObject effective, IconCatalog? catalog)
     {
+        // Through the shared reader. This walked the block with its own HAP pass until the preview
+        // needed the same list, and two walkers is two places for "which child names the type" to
+        // drift apart.
         var fragment = effective.Tags.FirstOrDefault(t =>
                 string.Equals(t.TagName, EncyclopediaTags.UnitAbilitiesData,
                     StringComparison.OrdinalIgnoreCase))
             ?.Fragment;
-        if (string.IsNullOrWhiteSpace(fragment))
-            return [];
 
-        var doc = XmlUtility.CreateHtmlDocument(fragment);
-        if (!XmlUtility.TryGetRootNode(doc, out var root) || root is null)
-            return [];
+        return
+        [
+            .. UnitAbilityReader.Read(fragment).Select(ability =>
+            {
+                var alternateIconName = ability.Tag("Alternate_Icon_Name");
 
-        var abilities = new List<EncyclopediaAbility>();
-        foreach (var node in root.Descendants()
-                     .Where(n => n.NodeType == HtmlNodeType.Element
-                                 && string.Equals(n.Name, "unit_ability",
-                                     StringComparison.OrdinalIgnoreCase)))
-        {
-            // Type is what a slot draws while icons are out of reach, so an entry without one has
-            // nothing to show - and letting it take a slot would displace the ability after it.
-            var type = ChildText(node, "type");
-            if (string.IsNullOrWhiteSpace(type))
-                continue;
-
-            var alternateIconName = ChildText(node, "alternate_icon_name");
-            abilities.Add(new EncyclopediaAbility(
-                type,
-                ChildText(node, "gui_activated_ability_name"),
-                alternateIconName,
-                ResolveAbilityIcon(catalog, type, alternateIconName)));
-        }
-
-        return abilities;
-    }
-
-    private static string? ChildText(HtmlNode parent, string lowercaseName)
-    {
-        var child = parent.ChildNodes.FirstOrDefault(n =>
-            n.NodeType == HtmlNodeType.Element
-            && string.Equals(n.Name, lowercaseName, StringComparison.OrdinalIgnoreCase));
-        var text = child?.InnerText.Trim();
-        return string.IsNullOrEmpty(text) ? null : text;
+                return new EncyclopediaAbility(
+                    ability.Type,
+                    ability.Tag("GUI_Activated_Ability_Name"),
+                    alternateIconName,
+                    ResolveAbilityIcon(catalog, ability.Type, alternateIconName));
+            })
+        ];
     }
 
     private static string? Translate(ILocalisationIndex loca, string? key)

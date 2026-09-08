@@ -51,7 +51,7 @@ internal static class StoryDocumentSymbolCollector
         HtmlNode eventNode, List<GameSymbol> symbols)
     {
         var nameAttribute = eventNode.Attributes["Name"];
-        var name = nameAttribute?.Value.Trim();
+        var name = nameAttribute?.Value?.Trim();
         if (string.IsNullOrEmpty(name)) return;
 
         var (line, column) = parsed.LineIndex.GetPosition(nameAttribute!.ValueStartIndex);

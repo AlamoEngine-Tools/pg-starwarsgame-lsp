@@ -56,7 +56,7 @@ public static class IconCatalogLoader
 
         foreach (var name in unsupported)
             logger.LogWarning(
-                "Icon source '{Name}' could not be decoded; DDS sources are not supported and " +
+                "Icon source '{Name}' could not be decoded; BMP sources are not supported and " +
                 "corrupt images are skipped.", name);
 
         return new IconCatalog(workspace, loose, baseline.Icons);

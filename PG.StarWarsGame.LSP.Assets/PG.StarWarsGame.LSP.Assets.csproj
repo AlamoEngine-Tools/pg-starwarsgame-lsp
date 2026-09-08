@@ -11,6 +11,7 @@
         <PackageReference Include="Microsoft.Extensions.Http"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
         <PackageReference Include="Pfim"/>
+        <PackageReference Include="SharpGLTF.Toolkit"/>
         <PackageReference Include="System.IO.Abstractions"/>
     </ItemGroup>
 

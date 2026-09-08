@@ -80,7 +80,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
             return Task.FromResult<LocationOrLocationLinks?>(null);
         }
 
-        _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
+        _logger.LogDebug("Go-to-def: {Id} -> {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
         return Task.FromResult<LocationOrLocationLinks?>(
             new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range))));
     }
@@ -99,7 +99,7 @@ public sealed class XmlDefinitionHandler : DefinitionHandlerBase
         if (!valueMap.TryGetValue(valueName, out var origin) || !origin.IsNavigable)
             return null;
 
-        _logger.LogDebug("Go-to-def (enum): {Id} → {Uri}:{Line}", id, origin.Uri, origin.Line);
+        _logger.LogDebug("Go-to-def (enum): {Id} -> {Uri}:{Line}", id, origin.Uri, origin.Line);
         return new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocationLink(originSelectionRange)));
     }
 

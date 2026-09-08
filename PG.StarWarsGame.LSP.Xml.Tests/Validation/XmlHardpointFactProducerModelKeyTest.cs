@@ -122,7 +122,6 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         // (Model_To_Attach), not the mounting hull - e.g. every Star Destroyer / Nebulon weapon. It must
         // validate against hull UNION Model_To_Attach, so a mesh present on the attached model is valid
         // even though the hull lacks it.
-        const string objUri = "file:///object.xml";
         const string hpText =
             """<X><HardPoint Name="HP_A"><Model_To_Attach>weapon.alo</Model_To_Attach>""" +
             """<Attachment_Bone>HP_Bone</Attachment_Bone><Collision_Mesh>HP_Coll</Collision_Mesh></HardPoint></X>""";
@@ -149,7 +148,6 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     public void CollisionMesh_OnNeitherHullNorModelToAttach_StillFlagged()
     {
         // The union must not blanket-suppress: a genuine typo absent from both models is still flagged.
-        const string objUri = "file:///object.xml";
         const string hpText =
             """<X><HardPoint Name="HP_A"><Model_To_Attach>weapon.alo</Model_To_Attach>""" +
             """<Collision_Mesh>HP_Typo_Coll</Collision_Mesh></HardPoint></X>""";

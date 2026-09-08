@@ -50,7 +50,7 @@ public sealed class NewModProjectCommandHandlerTest
 
         var loader = new ModProjectLoader(new FileHelper(fs), new ListLogger<ModProjectLoader>());
         var model = loader.Load(pgprojPath);
-        Assert.Equal("My Mod", model.Modinfo.Name);
+        Assert.Equal("My Mod", model.Modinfo!.Name);
         Assert.Equal(new[] { "data/xml" }, model.Directories.Xml);
         Assert.Equal("CSV", model.Localisation!.Type);
         Assert.Equal("data/text", model.Localisation.Directory);
@@ -119,7 +119,7 @@ public sealed class NewModProjectCommandHandlerTest
 
         var loader = new ModProjectLoader(new FileHelper(fs), new ListLogger<ModProjectLoader>());
         var model = loader.Load(pgprojPath);
-        Assert.Equal("My Awesome Mod!", model.Modinfo.Name);
+        Assert.Equal("My Awesome Mod!", model.Modinfo!.Name);
     }
 
     private static NewModProjectCommandHandler Build(MockFileSystem fs)

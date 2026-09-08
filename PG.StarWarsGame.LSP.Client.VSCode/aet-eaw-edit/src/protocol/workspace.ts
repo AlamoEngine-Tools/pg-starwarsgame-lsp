@@ -39,3 +39,29 @@ export interface GetEffectiveObjectResult {
     xml: string;
     typeName?: string;
 }
+
+// ── aet/resolveReference - go-to for a value a panel holds by name ───────────
+
+/**
+ * Where a reference value is defined.
+ *
+ * `textDocument/definition` is still the right request wherever a position exists. This one is for
+ * the panels: a webview row holds a NAME and nothing else - no document, no offset - because the
+ * server assembled that row out of several files.
+ *
+ * `error` is not decoration. "defined in the base game" and "does not resolve to any known
+ * definition" mean very different things to someone editing a mod, and a panel that shows neither
+ * leaves the reader hunting for a file that was never theirs.
+ */
+export interface ResolveReferenceParams {
+    value: string;
+    /** The schema's `referenceType`, e.g. `SpecialAbility`. A hint; unknown names resolve untyped. */
+    referenceType?: string;
+}
+
+export interface ResolveReferenceResult {
+    uri?: string | null;
+    line: number;
+    column: number;
+    error?: string | null;
+}

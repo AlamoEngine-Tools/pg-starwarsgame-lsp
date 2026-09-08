@@ -67,7 +67,7 @@ public static class XmlObjectRenameBuilder
         if (changes.Count == 0)
             return null;
 
-        logger.LogDebug("Rename XmlObject {Id} → {NewName}: {Count} file(s)", id, newName, changes.Count);
+        logger.LogDebug("Rename XmlObject {Id} -> {NewName}: {Count} file(s)", id, newName, changes.Count);
         return new WorkspaceEdit
         {
             Changes = changes.ToDictionary(kvp => kvp.Key, kvp => (IEnumerable<TextEdit>)kvp.Value)

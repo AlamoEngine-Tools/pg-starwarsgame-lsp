@@ -9,8 +9,14 @@ namespace PG.StarWarsGame.LSP.Server.Tests;
 ///     A schema that knows nothing. For handlers that take <see cref="ISchemaProvider" /> only to
 ///     pass it on to a collaborator whose schema-dependent behaviour is covered by that
 ///     collaborator's own tests.
+///
+///     Not sealed, and <see cref="GetTag" /> and <see cref="GetObjectType" /> are virtual: a test
+///     that needs the resolver to see ONE tag's real schema mode - <c>Death_Clone</c> is merge plus
+///     multipleAllowed, and reporting no schema makes the resolver collapse it - or that needs a
+///     handful of type names to be recognised as real object types, overrides that alone rather than
+///     restating the whole interface.
 /// </summary>
-internal sealed class NullSchemaProvider : ISchemaProvider
+internal class NullSchemaProvider : ISchemaProvider
 {
     public IReadOnlyList<XmlTagDefinition> AllTags => [];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
@@ -18,7 +24,7 @@ internal sealed class NullSchemaProvider : ISchemaProvider
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
     public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
 
-    public XmlTagDefinition? GetTag(string tagName)
+    public virtual XmlTagDefinition? GetTag(string tagName)
     {
         return null;
     }
@@ -28,7 +34,7 @@ internal sealed class NullSchemaProvider : ISchemaProvider
         return [];
     }
 
-    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    public virtual GameObjectTypeDefinition? GetObjectType(string typeName)
     {
         return null;
     }

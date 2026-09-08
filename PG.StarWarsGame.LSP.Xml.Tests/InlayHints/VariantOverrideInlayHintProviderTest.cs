@@ -109,7 +109,7 @@ public sealed class VariantOverrideInlayHintProviderTest
         var label = SingleLabel(Hints(text, "Tech_Level", source, schema,
             IndexWith(Sym("V", "B"), Sym("B", null, BaseUri))));
 
-        Assert.EndsWith("…", label);
+        Assert.EndsWith("...", label);
         Assert.True(label.Length < 50, $"marker too long for an inline hint: '{label}'");
     }
 

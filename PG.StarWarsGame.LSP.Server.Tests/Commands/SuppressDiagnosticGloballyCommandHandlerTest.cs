@@ -31,7 +31,7 @@ public sealed class SuppressDiagnosticGloballyCommandHandlerTest
         return new ExecuteCommandParams
         {
             Command = SuppressDiagnosticGloballyCommandHandler.CommandName,
-            Arguments = new JArray(args)
+            Arguments = new JArray(args!)
         };
     }
 

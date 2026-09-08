@@ -20,10 +20,6 @@ namespace PG.StarWarsGame.LSP.Assets.Projection;
 /// </remarks>
 public static class AssetFileEnumerator
 {
-    private static readonly ImmutableHashSet<string> AssetExtensions =
-        ImmutableHashSet.Create(StringComparer.OrdinalIgnoreCase,
-            ".tga", ".dds", ".alo", ".wav", ".mp3", ".ted");
-
     public static ImmutableHashSet<string> Enumerate(IFileSystem fileSystem, string rootPath)
     {
         if (string.IsNullOrEmpty(rootPath) || !fileSystem.Directory.Exists(rootPath))
@@ -35,7 +31,10 @@ public static class AssetFileEnumerator
         foreach (var file in fileSystem.Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
         {
             var ext = fileSystem.Path.GetExtension(file);
-            if (!AssetExtensions.Contains(ext))
+            // The catalogue's own predicate, not a copy of its list. Three copies existed and
+            // adding `.ala` to one of them left loose animations uncatalogued - so a model preview
+            // still offered no clips, which is exactly the bug the extension was added to fix.
+            if (!MegAssetCatalogBuilder.IsAssetExtension(ext))
                 continue;
 
             var relative = fileSystem.Path.GetRelativePath(root, file);

@@ -11,6 +11,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -55,9 +56,22 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     private readonly ISchemaProvider _schema;
     private readonly IXmlHardpointFactProducer? _hardpointProducer;
 
+    // Null in the test convenience constructors, like the hardpoint producer beside it. The
+    // damage-stage diagnostic then simply never fires.
+    private readonly IXmlDamageStageFactProducer? _damageStageProducer;
+
     // Null in the test convenience constructors and whenever no workspace icon catalog exists;
     // the icon-repack diagnostic then simply never fires.
     private readonly IIconRepackStatusProvider? _iconRepack;
+
+    // Null wherever nothing can parse an .alo - the test constructors, and any host without the
+    // asset layer. The model-texture diagnostic then simply never fires, which is the right answer:
+    // the Xml project cannot open a binary asset on its own.
+    private readonly IModelTextureIndex? _modelTextures;
+
+    // Null wherever nothing can open a mega texture - the test constructors, and any host without
+    // the asset layer. Texture references then resolve against files alone, exactly as before.
+    private readonly IIconNameIndex? _iconNames;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IStoryChainProblemStore? _storyChainProblems;
     private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
@@ -86,14 +100,18 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryChainProblemStore storyChainProblems,
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         IXmlHardpointFactProducer hardpointProducer,
+        IXmlDamageStageFactProducer damageStageProducer,
         ServerOptions? options = null,
-        IIconRepackStatusProvider? iconRepack = null)
+        IIconRepackStatusProvider? iconRepack = null,
+        IModelTextureIndex? modelTextures = null,
+        IIconNameIndex? iconNames = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
-            storyGraphDiagnostics, hardpointProducer, iconRepack: iconRepack)
+            storyGraphDiagnostics, hardpointProducer, damageStageProducer, iconRepack: iconRepack,
+            modelTextures: modelTextures, iconNames: iconNames)
     {
     }
 
@@ -118,12 +136,18 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryChainProblemStore? storyChainProblems = null,
         IStoryGraphDiagnosticsSource? storyGraphDiagnostics = null,
         IXmlHardpointFactProducer? hardpointProducer = null,
+        IXmlDamageStageFactProducer? damageStageProducer = null,
         IGlobalSuppressionStore? globalSuppressions = null,
-        IIconRepackStatusProvider? iconRepack = null)
+        IIconRepackStatusProvider? iconRepack = null,
+        IModelTextureIndex? modelTextures = null,
+        IIconNameIndex? iconNames = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
         _iconRepack = iconRepack;
+        _modelTextures = modelTextures;
+        _iconNames = iconNames;
         _hardpointProducer = hardpointProducer;
+        _damageStageProducer = damageStageProducer;
         _configProvider = configProvider;
         _indexService = indexService;
         _workspaceHost = workspaceHost;
@@ -158,7 +182,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en",
-            _iconRepack?.IconsAwaitingRepack);
+            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames);
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
         // parse and every request handler touching the same content.
@@ -173,6 +197,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             facts.AddRange(_shadowProducer.Produce(canonicalUri, parsed, index));
         if (_hardpointProducer is not null)
             facts.AddRange(_hardpointProducer.Produce(canonicalUri, parsed, index));
+        if (_damageStageProducer is not null)
+            facts.AddRange(_damageStageProducer.Produce(canonicalUri, parsed, index));
         if (IsStoryParserDocument(uri))
             facts.AddRange(_storyProducer.Produce(parsed, uri));
 
@@ -206,7 +232,7 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     /// <summary>
     ///     Whether an element is an "object" for <c>aetswg:suppress-object</c> - the same test the
-    ///     fact producer uses to decide what a tag hangs off: its name resolves to a schema object
+    ///     fact producer uses to decide what a tag belongs to: its name resolves to a schema object
     ///     type, in either the source or PascalCase spelling.
     /// </summary>
     private bool IsObjectNode(HtmlNode node)

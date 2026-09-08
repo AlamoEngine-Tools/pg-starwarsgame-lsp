@@ -273,7 +273,7 @@ public sealed class DiagnosticsPublisherBaseTest
         {
             Range = new LspRange(new Position(line, 0), new Position(line, 5)),
             Message = "problem",
-            Code = code is null ? null : code
+            Code = code is null ? (DiagnosticCode?)null : new DiagnosticCode(code)
         };
     }
 
@@ -458,8 +458,17 @@ public sealed class DiagnosticsPublisherBaseTest
     {
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-        public event Action<GameIndex>? DynamicEnumChanged;
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<GameIndex>? DynamicEnumChanged
+        {
+            add { }
+            remove { }
+        }
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

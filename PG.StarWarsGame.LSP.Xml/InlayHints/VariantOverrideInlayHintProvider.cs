@@ -115,7 +115,7 @@ internal sealed class VariantOverrideInlayHintProvider : IXmlInlayHintProvider
     {
         var collapsed = string.Join(' ', value.Split((char[])[' ', '\t', '\r', '\n'],
             StringSplitOptions.RemoveEmptyEntries));
-        return collapsed.Length <= MaxValueLength ? collapsed : collapsed[..MaxValueLength] + "…";
+        return collapsed.Length <= MaxValueLength ? collapsed : collapsed[..MaxValueLength] + "...";
     }
 
     private EffectiveObject? ResolveCached(InlayHintContext ctx, string objectId)

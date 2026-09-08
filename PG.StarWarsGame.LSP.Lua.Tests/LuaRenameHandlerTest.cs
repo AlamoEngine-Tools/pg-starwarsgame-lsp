@@ -598,9 +598,23 @@ public sealed class LuaRenameHandlerTest
     private sealed class FakeGameIndexService : IGameIndexService
     {
         public GameIndex Current { get; } = GameIndex.Empty;
-        public event Action<GameIndex>? IndexChanged;
-        public event Action<ILocalisationIndex>? LocalisationChanged;
-        public event Action<GameIndex>? DynamicEnumChanged;
+        public event Action<GameIndex>? IndexChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<ILocalisationIndex>? LocalisationChanged
+        {
+            add { }
+            remove { }
+        }
+
+        public event Action<GameIndex>? DynamicEnumChanged
+        {
+            add { }
+            remove { }
+        }
 
         public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
         {

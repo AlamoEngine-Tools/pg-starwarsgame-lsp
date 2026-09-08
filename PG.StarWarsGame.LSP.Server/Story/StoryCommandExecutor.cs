@@ -564,7 +564,7 @@ internal sealed class StoryCommandExecutor(
             .Select(kvp => new StoryFileEdit(kvp.Key, SortedNonOverlapping(kvp.Value).ToList()))
             .ToList();
         foreach (var file in files)
-            logger.LogDebug("Rename '{Old}'→'{New}' in {Uri}: {Edits}", oldName, newName, file.Uri,
+            logger.LogDebug("Rename '{Old}'->'{New}' in {Uri}: {Edits}", oldName, newName, file.Uri,
                 string.Join(", ", file.Edits.Select(e =>
                     $"[{e.Range.StartLine},{e.Range.StartColumn}-{e.Range.EndLine},{e.Range.EndColumn}]")));
         return (new StoryCommandEdit(files, $"Rename story event '{oldName}'", true), null);

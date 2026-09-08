@@ -27,7 +27,7 @@ public static class DynamicEnumValueRenameBuilder
         if (!index.WorkspaceEnumValueDefinitions.TryGetValue(enumName, out var valueMap) ||
             !valueMap.TryGetValue(valueName, out var origin) || !origin.IsNavigable)
         {
-            logger.LogDebug("Rename blocked: enum value {Enum}/{Value} has no navigable workspace definition",
+            logger.LogDebug("Rename blocked: Enum value {Enum}/{Value} has no navigable workspace definition",
                 enumName, valueName);
             return null;
         }
@@ -35,7 +35,7 @@ public static class DynamicEnumValueRenameBuilder
         if (index.LayerRankOfUri(origin.Uri) != index.LeafLayerRank)
         {
             logger.LogDebug(
-                "Rename blocked: enum value {Enum}/{Value} is defined in a dependency layer, not the leaf project",
+                "Rename blocked: Enum value {Enum}/{Value} is defined in a dependency layer, not the leaf project",
                 enumName, valueName);
             return null;
         }
@@ -62,7 +62,7 @@ public static class DynamicEnumValueRenameBuilder
             var edits = FindElementNameEdits(origin.Uri, origin.Line, valueName, newName, textSource);
             if (edits.Count == 0)
             {
-                logger.LogDebug("Rename blocked: could not locate element name '{Value}' at {Uri}:{Line}",
+                logger.LogDebug("Rename blocked: Could not locate element name '{Value}' at {Uri}:{Line}",
                     valueName, origin.Uri, origin.Line);
                 return null;
             }
@@ -85,7 +85,7 @@ public static class DynamicEnumValueRenameBuilder
         if (changes.Count == 0)
             return null;
 
-        logger.LogDebug("Rename enum value {Enum}/{Value} → {NewName}: {Count} file(s)",
+        logger.LogDebug("Rename enum value {Enum}/{Value} -> {NewName}: {Count} file(s)",
             enumName, valueName, newName, changes.Count);
         return new WorkspaceEdit
         {

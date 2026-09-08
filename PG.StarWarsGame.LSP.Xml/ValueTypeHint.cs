@@ -24,13 +24,13 @@ internal static class ValueTypeHint
                 "**Format:** integer; `-1` = unlimited",
 
             XmlValueType.SfxPercentage =>
-                "**Format:** integer `0`–`100`",
+                "**Format:** integer `0`-`100`",
 
             XmlValueType.HardwareUInt =>
                 "**Format:** unsigned integer",
 
             XmlValueType.UvSlotIndex =>
-                "**Format:** integer `0`–`3`",
+                "**Format:** integer `0`-`3`",
 
             XmlValueType.ShaderVersionHex =>
                 "**Format:** hex string, e.g. `0x0200` (= Shader Model 2.0)",
@@ -48,7 +48,7 @@ internal static class ValueTypeHint
                 "**Format:** `X, Y, Z, W` - four comma-separated floats",
 
             XmlValueType.RGBA =>
-                "**Format:** `R, G, B, A` - four integers `0`–`255`",
+                "**Format:** `R, G, B, A` - four integers `0`-`255`",
 
             XmlValueType.IntList =>
                 "**Format:** comma or space-separated integers",

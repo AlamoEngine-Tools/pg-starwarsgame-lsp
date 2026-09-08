@@ -514,3 +514,5 @@ docs/
 *.MD
 /dist
 .vscode-test/
+shader-sources/
+tools/

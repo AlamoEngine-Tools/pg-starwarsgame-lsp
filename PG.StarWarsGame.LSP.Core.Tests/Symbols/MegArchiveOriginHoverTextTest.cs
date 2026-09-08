@@ -25,11 +25,16 @@ public sealed class MegArchiveOriginHoverTextTest
     }
 
     [Fact]
-    public void Describe_ContainsPackedEmoji()
+    public void Describe_BadgesThePackedAssetInAscii()
     {
         var origin = new MegArchiveOrigin(@"C:\game\FoC_Art.meg", "DATA/ART/TEXTURES/FOO.TGA", null, null);
         var text = MegArchiveOriginHoverText.Describe(origin);
-        Assert.Contains("📦", text);
+
+        // The badge used to be an emoji, which is what the name of this test used to say. Every
+        // string a reader sees is ASCII now, so the word carries it - the check that keeps it that
+        // way is scripts/lint-ascii-strings.js in the client package.
+        Assert.Contains("Packed in", text);
+        Assert.All(text, c => Assert.True(c <= (char)126, $"non-ASCII '{c}' in hover text"));
     }
 
     [Fact]

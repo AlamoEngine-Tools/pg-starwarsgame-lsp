@@ -65,7 +65,7 @@ public sealed class StartupProgress : IStartupProgress
             new WorkDoneProgressBegin
             {
                 Title = "Star Wars LSP - starting",
-                Message = "Initialising…",
+                Message = "Initialising...",
                 Cancellable = false,
                 Percentage = 0
             },

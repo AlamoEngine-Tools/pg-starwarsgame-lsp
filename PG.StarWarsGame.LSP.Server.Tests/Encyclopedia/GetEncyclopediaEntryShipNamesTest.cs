@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Assets.ShipNames;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
+using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.ShipNames;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
@@ -68,7 +69,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 
         var handler = new GetEncyclopediaEntryHandler(
             new FakeGameIndexService(GameIndex.Empty with { WorkspaceDefinitions = defs }),
-            new NullSchemaProvider(), source, config, null, null, shipNames);
+            new NullSchemaProvider(), source, config, null, shipNames);
 
         return await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
     }
@@ -157,7 +158,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
             {
                 WorkspaceDefinitions = defs, Baseline = baseline
             }),
-            new NullSchemaProvider(), source, config, null, null, stub);
+            new NullSchemaProvider(), source, config, null, stub);
 
         var result = await handler.Handle(new GetEncyclopediaEntryParams { ObjectId = ObjectId }, default);
 

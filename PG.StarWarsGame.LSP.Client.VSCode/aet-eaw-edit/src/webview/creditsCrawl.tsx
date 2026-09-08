@@ -13,6 +13,9 @@
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
 
+import { IconButton } from './shared/Button';
+import { dockHeaderCss } from './shared/dockChrome';
+import { tokensCss } from './shared/tokens';
 import { buildCrawl } from './creditsCrawlModel';
 import { generateStars } from './starfield';
 import { LocRow } from './loc/locRow';
@@ -73,8 +76,16 @@ export function CreditsCrawl(props: {
             ref={el => el?.focus()}
         >
             <div className="controls">
-                <button onClick={() => setRunning(r => !r)}>{running ? 'Pause' : 'Play'}</button>
-                <button onClick={() => { setRunId(id => id + 1); setRunning(true); }}>Restart</button>
+                <IconButton
+                    icon={running ? 'pause' : 'play'}
+                    title={running ? 'Pause' : 'Play'}
+                    onClick={() => setRunning(r => !r)}
+                />
+                <IconButton
+                    icon="restart"
+                    title="Restart"
+                    onClick={() => { setRunId(id => id + 1); setRunning(true); }}
+                />
 
                 <select value={speed} onChange={e => setSpeed(Number(e.target.value))} title="Speed">
                     {SPEEDS.map(s => <option key={s} value={s}>{s}x</option>)}
@@ -85,7 +96,11 @@ export function CreditsCrawl(props: {
                 </select>
 
                 <span className="count">{blocks.length} lines</span>
-                <button onClick={props.onClose} title="Close the preview (Esc)">Close</button>
+                <IconButton
+                    icon="close"
+                    title="Close the preview (Esc)"
+                    onClick={props.onClose}
+                />
             </div>
 
             <div className="stage" ref={stageRef}>
@@ -141,6 +156,13 @@ export function CreditsCrawl(props: {
 }
 
 const Overlay = styled.div`
+    /* The token layer and the shared icon-button chrome. This panel draws its own everything else -
+       the crawl is a reproduction of the game's titles and its colours are game truth, not design -
+       but the control bar above it is ordinary editor chrome and had no business inventing its own
+       buttons. dockHeaderCss is the block that owns .icon-btn; nothing else in it matches here. */
+    ${tokensCss}
+    ${dockHeaderCss}
+
     position: absolute;
     inset: 0;
     z-index: 10;
@@ -153,19 +175,22 @@ const Overlay = styled.div`
     .controls {
         display: flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 8px;
-        background: var(--vscode-editorWidget-background, #252526);
-        color: var(--vscode-foreground, #ccc);
-        border-bottom: 1px solid var(--vscode-panel-border, #444);
+        gap: var(--space-6);
+        padding: var(--space-6) var(--space-8);
+        background: var(--colour-panel);
+        color: var(--colour-ink);
+        border-bottom: var(--space-1) solid var(--colour-line);
         flex-shrink: 0;
     }
 
-    .controls button, .controls select {
-        background: var(--vscode-button-secondaryBackground, #3a3d41);
-        color: var(--vscode-button-secondaryForeground, #ccc);
+    /* The selects only. This rule used to name button as well as select - and an element selector
+       inside a class beats .icon-btn on specificity, so leaving the buttons in it would have
+       quietly overridden the shared chrome the moment they started using it. */
+    .controls select {
+        background: var(--colour-action-2);
+        color: var(--colour-action-2-ink);
         border: none;
-        padding: 3px 10px;
+        padding: var(--space-2) var(--space-8);
         font: inherit;
         cursor: pointer;
     }

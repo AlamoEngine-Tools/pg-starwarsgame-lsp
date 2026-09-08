@@ -42,7 +42,7 @@ export interface LspRequestSender {
     sendRequest<T>(method: string, params: unknown): Promise<T>;
 }
 
-export const SERVER_NOT_RUNNING = 'EaWEdit LSP: server is not running.';
+export const SERVER_NOT_RUNNING = 'EaWEdit LSP: Server is not running.';
 
 /**
  * The LSP method behind `ExecuteCommandRequest.type`.
@@ -67,6 +67,59 @@ export class LspGateway {
 
     get isRunning(): boolean {
         return this._resolve() !== undefined;
+    }
+
+    /**
+     * Whether the server has finished STARTING, which is not the same as having a client object.
+     *
+     * `isRunning` answers "has a client been constructed", and the client is constructed several
+     * lines before `start()` is called on it - so it reads true during a window in which every
+     * request throws. Only the extension knows when start() resolved, so it says so.
+     */
+    private _ready = false;
+    private readonly _waiting = new Set<(ready: boolean) => void>();
+
+    /** The server has started and can take requests. */
+    markReady(): void {
+        this._ready = true;
+        const waiting = [...this._waiting];
+        this._waiting.clear();
+        for (const release of waiting) {
+            release(true);
+        }
+    }
+
+    /** The server has stopped, so the next caller must wait again rather than sail past it. */
+    markStopped(): void {
+        this._ready = false;
+    }
+
+    /**
+     * Resolves once the server can take requests, or false if it has not within `timeoutMs`.
+     *
+     * For the callers that run BEFORE the user does anything - a custom editor tab restored when
+     * the window opens resolves long before the server is up. Without this its one request failed,
+     * nothing asked again, and the tab stayed blank until the file was closed and reopened by hand.
+     *
+     * It gives up rather than waiting for ever, because a server that never comes is a real
+     * configuration - the LSP can be switched off - and the caller already knows how to report
+     * being offline.
+     */
+    whenReady(timeoutMs = 30000): Promise<boolean> {
+        if (this._ready) {
+            return Promise.resolve(true);
+        }
+
+        return new Promise<boolean>(resolve => {
+            const release = (ready: boolean): void => {
+                clearTimeout(timer);
+                this._waiting.delete(release);
+                resolve(ready);
+            };
+
+            const timer = setTimeout(() => { release(false); }, timeoutMs);
+            this._waiting.add(release);
+        });
     }
 
     /**

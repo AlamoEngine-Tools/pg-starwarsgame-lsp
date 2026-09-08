@@ -11,6 +11,10 @@
 import { ReactNode } from 'react';
 
 import { FilterMode } from '../locFilter';
+import { IconButton } from '../shared/Button';
+import { type ChoiceOption } from '../shared/choice';
+import { ModeSelector } from '../shared/ModeSelector';
+import { Field } from '../shared/Field';
 
 export interface LocSearchProps {
     filter: string;
@@ -40,13 +44,16 @@ export interface LocSearchProps {
 
 // The icons and wording the sidebar shipped with - unchanged, because users have them in their
 // fingers and this is a layout change, not a behaviour one.
-const MODES: { mode: FilterMode; icon: string; title: string }[] = [
-    { mode: 'text', icon: 'case-sensitive', title: 'Plain text search' },
+const MODES: ChoiceOption<FilterMode>[] = [
+    { id: 'text', label: 'text', icon: 'searchLiteral', title: 'Plain text search' },
     {
-        mode: 'wildcard', icon: 'star-full',
+        id: 'wildcard', label: 'wildcard', icon: 'searchWildcard',
         title: 'Wildcard: * matches any text, ? matches one character',
     },
-    { mode: 'regex', icon: 'regex', title: 'Regular expression (case-insensitive)' },
+    {
+        id: 'regex', label: 'regex', icon: 'searchRegex',
+        title: 'Regular expression (case-insensitive)',
+    },
 ];
 
 export function LocSearch(props: LocSearchProps): React.JSX.Element {
@@ -64,18 +71,15 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
                     aria-invalid={props.error !== undefined}
                 />
                 <div className="mode-group">
-                    {MODES.map(m => (
-                        <button
-                            key={m.mode}
-                            className={`icon-btn${props.mode === m.mode ? ' active' : ''}`}
-                            title={m.title}
-                            aria-label={m.mode}
-                            aria-pressed={props.mode === m.mode}
-                            onClick={() => props.onMode(m.mode)}
-                        >
-                            <span className={`codicon codicon-${m.icon}`} />
-                        </button>
-                    ))}
+                    {/* One of three, so a radiogroup rather than three toggles each
+                        reporting its own pressed state - which says nothing about them
+                        being alternatives to one another. */}
+                    <ModeSelector
+                        label="How the pattern is read"
+                        value={props.mode}
+                        options={MODES}
+                        onSelect={props.onMode}
+                    />
                 </div>
             </div>
 
@@ -83,8 +87,7 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
                 pattern is not valid" - the two are identical on screen. */}
             {props.error && <div className="filter-error">{props.error}</div>}
 
-            <label className="field">
-                <span className="field-label">Search in</span>
+            <Field label="Search in" as="label">
                 <select value={props.scope} onChange={e => props.onScope(e.target.value)}>
                     <option value="all">All fields</option>
                     <option value="key">{props.keyScopeLabel}</option>
@@ -92,7 +95,7 @@ export function LocSearch(props: LocSearchProps): React.JSX.Element {
                         <option key={language} value={language}>{language}</option>
                     ))}
                 </select>
-            </label>
+            </Field>
 
             {props.children}
         </div>

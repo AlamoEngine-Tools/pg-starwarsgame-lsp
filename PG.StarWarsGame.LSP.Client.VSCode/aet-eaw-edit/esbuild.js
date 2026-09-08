@@ -64,11 +64,16 @@ async function main() {
       'src/webview/creditsEditor.tsx',
       'src/webview/creditsPreview.tsx',
       'src/webview/encyclopediaPreview.tsx',
+      'src/webview/modelPreview.tsx',
+      'src/webview/modelInspector.tsx',
     ],
     bundle: true,
     format: 'iife',
     platform: 'browser',
     outdir: 'out/webview',
+    // The missing-texture marker is imported as a data URI: the webview's localResourceRoots only
+    // cover out/, so a file under resources/ is not addressable from it at all.
+    loader: { '.png': 'dataurl' },
     // The auto-arrange plugin imports the node-flavoured elkjs entry (worker files); the
     // bundled build is the self-contained browser variant with the same ELK constructor.
     alias: { elkjs: 'elkjs/lib/elk.bundled.js' },

@@ -68,7 +68,20 @@ public enum DiagnosticGroup
     ///         thing that would leave them with no way to find out why suppression is not working.
     ///     </para>
     /// </summary>
-    Suppression = 13
+    Suppression = 13,
+
+    /// <summary>
+    ///     What the model preview found while assembling a subject: a hull that is not there, a
+    ///     hardpoint mounted on a bone the model does not have, a death clone named but never
+    ///     defined.
+    ///     <para>
+    ///         Its own group because the findings are its own: they come from walking a unit's
+    ///         whole assembly - the variant chain, its hardpoints, their models, their weapons -
+    ///         which nothing else in the server does. A reader silencing "the preview complains
+    ///         about my unfinished turret" must not also silence every unresolved reference.
+    ///     </para>
+    /// </summary>
+    Preview = 14
 }
 
 /// <summary>Display names for <see cref="DiagnosticGroup" />, shown in suppression UI and hovers.</summary>
@@ -91,6 +104,7 @@ public static class DiagnosticGroups
             DiagnosticGroup.Engine => "Engine constraints",
             DiagnosticGroup.Syntax => "Syntax",
             DiagnosticGroup.Suppression => "Suppression comments",
+            DiagnosticGroup.Preview => "Model preview",
             _ => group.ToString()
         };
     }

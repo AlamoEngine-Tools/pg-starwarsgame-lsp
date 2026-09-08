@@ -117,6 +117,13 @@ public record ToolsFeatureFlags
     public bool Encyclopedia { get; init; } = true;
 
     /// <summary>
+    ///     Gates <c>aet/getPreviewScene</c>, <c>aet/getModelGlb</c>, <c>aet/getModelTexture</c> and the
+    ///     3D model preview built on them. Independent of everything else: the preview reads model and
+    ///     texture files and writes nothing.
+    /// </summary>
+    public bool ModelPreview { get; init; } = true;
+
+    /// <summary>
     ///     Gates the story editor protocol: every <c>aet/getStory*</c> endpoint and the
     ///     <c>aet/storyGraphChanged</c> notification (builds on <c>features.story.discovery</c>).
     ///     This is the read surface - the panel and its View mode.

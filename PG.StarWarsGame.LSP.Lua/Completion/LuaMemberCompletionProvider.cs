@@ -50,7 +50,7 @@ internal static class LuaMemberCompletionProvider
                 Kind = member.IsMethod ? CompletionItemKind.Method : CompletionItemKind.Field,
                 Detail = member.Description,
                 Documentation = member.ReturnTypeName is not null
-                    ? new StringOrMarkupContent($"→ {member.ReturnTypeName}")
+                    ? new StringOrMarkupContent($"-> {member.ReturnTypeName}")
                     : null
             };
         }

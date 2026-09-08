@@ -59,7 +59,7 @@ public static class GroupValueRenameBuilder
             Edits = new TextEditContainer(kv.Value)
         })).ToList();
 
-        logger.LogDebug("Group rename {Key} → {New}: {Files} file(s), {Edits} occurrence(s)",
+        logger.LogDebug("Group rename {Key} -> {New}: {Files} file(s), {Edits} occurrence(s)",
             groupKey, trimmed, edits.Count, edits.Values.Sum(l => l.Count));
         return new WorkspaceEdit { DocumentChanges = new Container<WorkspaceEditDocumentChange>(changes) };
     }

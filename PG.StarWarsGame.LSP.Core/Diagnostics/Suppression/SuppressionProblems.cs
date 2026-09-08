@@ -37,7 +37,7 @@ public sealed record SuppressionDirectiveProblem(SuppressionProblemKind Kind, st
     /// </summary>
     public string Message => Kind == SuppressionProblemKind.NoRules
         ? "Suppression directive names no diagnostic and so suppresses nothing. "
-          + "Add an id, for example: aetswg:suppress aetswg-004-0001"
+          + "Add an id, for example `aetswg:suppress aetswg-004-0001`."
         : $"'{Text}' is not a diagnostic id, so this entry suppresses nothing. "
           + "Expected aetswg-<group>-<number> or aetswg-<group>-*, for example aetswg-004-0001.";
 

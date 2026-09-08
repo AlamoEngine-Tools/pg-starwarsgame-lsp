@@ -28,6 +28,16 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
     /// </summary>
     protected virtual IReadOnlyList<string> InterchangeableExtensions => [];
 
+    /// <summary>
+    ///     Whether art packed into a mega texture satisfies this reference.
+    /// </summary>
+    /// <remarks>
+    ///     Off by default, and deliberately narrow. A mega texture holds GUI art and nothing else,
+    ///     so excusing a model, a sound or a map because a <c>.mtd</c> happens to name something
+    ///     similar would turn a real missing-asset warning into silence.
+    /// </remarks>
+    protected virtual bool ResolvesFromMegaTexture => false;
+
     protected sealed override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ReferenceKind != TargetKind)
@@ -40,13 +50,17 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         var results = new List<XmlDiagnosticResult>();
         foreach (var se in Normalize(value))
         {
-            if (Exists(ctx.Index.AssetFiles, se))
+            if (AssetFileLookup.Resolves(
+                    ctx.Index.AssetFiles, se, AllowedExtensions, InterchangeableExtensions))
                 continue;
 
-            var alternates = AlternateNames(se).ToList();
-            if (alternates.Any(a => Exists(ctx.Index.AssetFiles, a)))
+            // Only now, with the file lookup already failed, is it worth asking the mega textures.
+            // Unresolved references are the rare case, so the cost of opening a .mtd is paid on the
+            // path that was about to warn rather than on every reference in the document.
+            if (ResolvesFromMegaTexture && ctx.IconNames?.Contains(se) == true)
                 continue;
 
+            var alternates = AssetFileLookup.AlternateNames(se, InterchangeableExtensions).ToList();
             var alsoChecked = alternates.Count > 0
                 ? $" Also checked {string.Join(", ", alternates.Select(a => $"'{a}'"))} (the game treats these formats interchangeably)."
                 : string.Empty;
@@ -55,38 +69,6 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
         }
 
         return results;
-    }
-
-    // The same name with each other interchangeable extension, when the value's own extension is
-    // part of the interchangeable set.
-    private IEnumerable<string> AlternateNames(string normalised)
-    {
-        var ext = Path.GetExtension(normalised);
-        if (string.IsNullOrEmpty(ext) ||
-            !InterchangeableExtensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
-            yield break;
-
-        foreach (var other in InterchangeableExtensions)
-            if (!other.Equals(ext, StringComparison.OrdinalIgnoreCase))
-                yield return normalised[..^ext.Length] + other;
-    }
-
-    private bool Exists(IAssetFileIndex index, string normalised)
-    {
-        // Exact relative-path match (e.g. "data/art/textures/foo.tga").
-        if (index.Contains(normalised))
-            return true;
-
-        // Bare filename or partial path (e.g. "foo.tga"): match any catalog entry of the right
-        // asset type whose path ends with "/<value>".
-        var suffix = "/" + normalised;
-        foreach (var ext in AllowedExtensions)
-        foreach (var path in index.GetByExtension(ext))
-            if (path.EndsWith(suffix, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(path, normalised, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-        return false;
     }
 
     private static IEnumerable<string> Normalize(string raw)

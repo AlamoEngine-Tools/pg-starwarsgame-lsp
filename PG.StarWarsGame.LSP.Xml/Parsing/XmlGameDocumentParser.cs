@@ -289,6 +289,17 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // (damage type, clone) pairs - `Death_Clone`. Both slots carry a reference and
+                // neither was recorded: the tag has no referenceKind because DeathCloneSpecHandler
+                // validates the shape, so go-to-definition on the clone name found nothing at all.
+                // Slot 0 is a DamageType enum value, slot 1 an ordinary GameObjectType.
+                if (tagDef.ValueType == XmlValueType.DeathCloneSpec)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectDeathCloneReferences(child, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 // Campaign per-faction / force-deployment tuples with fixed-meaning comma slots
                 // (Home_Location "Faction, Planet"; Starting_Credits/Tech_Level/Max_Tech_Level
                 // "Faction, Number"; Starting_Forces/Special_Case_Production "Faction, Planet,
@@ -616,6 +627,45 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             column,
             length));
     }
+
+    /// <summary>
+    ///     Both slots of a <c>Death_Clone</c> pair: the damage type, then the clone it produces.
+    /// </summary>
+    /// <remarks>
+    ///     The clone is recorded with no expected type name, so it resolves BY NAME. A death clone
+    ///     is an ordinary GameObjectType and the tag does not narrow it - naming a type here would
+    ///     manufacture mismatches on the perfectly legal variety the data uses.
+    ///     <para>
+    ///         A row with one slot records nothing. Half a pair is the handler's diagnostic to
+    ///         make; inventing a reference for it would report the missing clone twice.
+    ///     </para>
+    /// </remarks>
+    private static void CollectDeathCloneReferences(HtmlNode child,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var comma = innerText.IndexOf(',');
+        if (comma < 0) return;
+
+        AddSlot(innerText[..comma], 0, $"enum:{DamageTypeEnum}/", null, null);
+        AddSlot(innerText[(comma + 1)..], comma + 1, string.Empty, GameSymbolKind.XmlObject, null);
+
+        void AddSlot(string slot, int slotOffset, string prefix, GameSymbolKind? kind, string? type)
+        {
+            var token = slot.Trim();
+            if (token.Length == 0) return;
+
+            var tokenOffset = slotOffset + slot.IndexOf(token, StringComparison.Ordinal);
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, tokenOffset, token.Length, lineIndex);
+
+            references.Add(new GameReference(
+                prefix + token, kind, type, documentUri, line, column, length));
+        }
+    }
+
+    /// <summary>The schema enum a <c>Death_Clone</c>'s first slot names.</summary>
+    private const string DamageTypeEnum = "DamageType";
 
     private static void CollectEnumReferences(HtmlNode child, string enumName,
         LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)

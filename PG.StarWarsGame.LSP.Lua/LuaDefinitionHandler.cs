@@ -67,7 +67,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
                     return Task.FromResult<LocationOrLocationLinks?>(null);
                 }
 
-                _logger.LogDebug("Go-to-def: {Id} → {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
+                _logger.LogDebug("Go-to-def: {Id} -> {Uri}:{Line}", hit.Value.Id, fo.Uri, fo.Line);
                 return Task.FromResult<LocationOrLocationLinks?>(
                     new LocationOrLocationLinks(new LocationOrLocationLink(fo.ToLspLocationLink(hit.Value.Range))));
             }
@@ -91,7 +91,7 @@ public sealed class LuaDefinitionHandler : DefinitionHandlerBase
             TargetSelectionRange = zeroRange,
             OriginSelectionRange = resolved.Value.Origin
         };
-        _logger.LogDebug("Go-to-def (require): → {Uri}", resolved.Value.Target);
+        _logger.LogDebug("Go-to-def (require): -> {Uri}", resolved.Value.Target);
         return Task.FromResult<LocationOrLocationLinks?>(
             new LocationOrLocationLinks(new LocationOrLocationLink(targetLink)));
     }

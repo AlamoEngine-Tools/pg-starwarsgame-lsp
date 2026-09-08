@@ -75,7 +75,7 @@ public sealed class VariantCodeLensProviderTest
 
         Assert.NotNull(lens);
         Assert.Equal(VariantCodeLensProvider.ShowEffectiveCommand, lens!.Command!.Name);
-        Assert.Contains("variant of B", lens.Command.Title);
+        Assert.Contains("Variant of B", lens.Command.Title);
         Assert.Equal("V", (string)lens.Command.Arguments![0]!);
     }
 
