@@ -63,32 +63,6 @@ public sealed class EawSchemaStoryElapsedParamTest
 
     private static RawEnumValueDefinition EventValue(string name)
     {
-        var path = FindEnumFile("StoryEventType.yaml")
-                   ?? throw new InvalidOperationException(
-                       "schema/eaw/enums/StoryEventType.yaml not found - is the schema checked out?");
-        var def = YamlSchemaParser.ParseEnumFile(File.ReadAllText(path));
-        var value = def.Values.FirstOrDefault(v =>
-            string.Equals(v.Name, name, StringComparison.OrdinalIgnoreCase));
-
-        Assert.NotNull(value);
-        return value!;
-    }
-
-    private static string? FindEnumFile(string enumFile)
-    {
-        var dir = new DirectoryInfo(
-            Path.GetDirectoryName(typeof(EawSchemaStoryElapsedParamTest).Assembly.Location)!);
-        while (dir is not null)
-        {
-            if (dir.EnumerateFiles("*.slnx").Any())
-            {
-                var candidate = Path.Combine(dir.FullName, "schema", "eaw", "enums", enumFile);
-                return File.Exists(candidate) ? candidate : null;
-            }
-
-            dir = dir.Parent;
-        }
-
-        return null;
+        return StoryEventSchema.Value(name);
     }
 }
