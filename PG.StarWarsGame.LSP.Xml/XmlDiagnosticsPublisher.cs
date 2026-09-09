@@ -72,6 +72,24 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     // Null wherever nothing can open a mega texture - the test constructors, and any host without
     // the asset layer. Texture references then resolve against files alone, exactly as before.
     private readonly IIconNameIndex? _iconNames;
+
+    /// <summary>
+    ///     The workspace half of variant resolution. Held rather than a finished resolver because a
+    ///     resolver is bound to one <see cref="GameIndex" />, and the index changes between runs.
+    /// </summary>
+    private readonly IVariantTagSource? _variantTagSource;
+
+    /// <summary>
+    ///     Whether cross-object rules can run at all.
+    /// </summary>
+    /// <remarks>
+    ///     The tag source arrives through an OPTIONAL constructor parameter, so a container that
+    ///     declines to fill it produces a publisher that works in every respect except that every
+    ///     cross-object diagnostic silently reports nothing - and no unit test would notice, because
+    ///     they supply the dependency by hand. Exposed so a registration test can assert the live
+    ///     graph actually wired it.
+    /// </remarks>
+    internal bool HasObjectSource => _variantTagSource is not null;
     private readonly IXmlLayerShadowFactProducer? _shadowProducer;
     private readonly IStoryChainProblemStore? _storyChainProblems;
     private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
@@ -104,14 +122,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         ServerOptions? options = null,
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
-        IIconNameIndex? iconNames = null)
+        IIconNameIndex? iconNames = null,
+        IVariantTagSource? variantTagSource = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,
             (int)(options ?? ServerOptions.Default).DiagnosticsDebounce.TotalMilliseconds,
             variantProducer, shadowProducer, textSource, parseCache, configProvider, storyChainProblems,
             storyGraphDiagnostics, hardpointProducer, damageStageProducer, iconRepack: iconRepack,
-            modelTextures: modelTextures, iconNames: iconNames)
+            modelTextures: modelTextures, iconNames: iconNames, variantTagSource: variantTagSource)
     {
     }
 
@@ -140,12 +159,14 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IGlobalSuppressionStore? globalSuppressions = null,
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
-        IIconNameIndex? iconNames = null)
+        IIconNameIndex? iconNames = null,
+        IVariantTagSource? variantTagSource = null)
         : base(publish, indexService, workspaceHost, debounceMs, logger, globalSuppressions)
     {
         _iconRepack = iconRepack;
         _modelTextures = modelTextures;
         _iconNames = iconNames;
+        _variantTagSource = variantTagSource;
         _hardpointProducer = hardpointProducer;
         _damageStageProducer = damageStageProducer;
         _configProvider = configProvider;
@@ -181,8 +202,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     public IReadOnlyList<Diagnostic> Collect(string uri, string text, GameIndex index)
     {
         var canonicalUri = _fileHelper.NormalizeUri(uri);
+        // Built per run and bound to THIS index, so a cross-object rule sees the same workspace
+        // state as every other check in the pass. Absent only when no tag source was supplied,
+        // which is the case in narrow unit fixtures rather than in the server.
+        var objects = _variantTagSource is null
+            ? null
+            : new EffectiveObjectResolver(index, _schema, _variantTagSource);
+
         var ctx = new DiagnosticsContext(_schema, index, canonicalUri, "en",
-            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames);
+            _iconRepack?.IconsAwaitingRepack, _modelTextures, _iconNames, objects);
 
         // One parse shared by every producer - and via the parse cache, shared with the indexing
         // parse and every request handler touching the same content.

@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 ///     Source-agnostic: workspace tags come from the injected <see cref="IVariantTagSource" /> and shadow
 ///     baseline tags from <see cref="BaselineIndex.ObjectTags" />. Detects cycles in the base chain.
 /// </summary>
-public sealed class EffectiveObjectResolver
+public sealed class EffectiveObjectResolver : IEffectiveObjectSource
 {
     private static readonly char[] ListSeparators = [',', ' ', '\t', '\n', '\r'];
 
