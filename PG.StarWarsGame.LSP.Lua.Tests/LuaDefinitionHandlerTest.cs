@@ -284,7 +284,11 @@ public sealed class LuaDefinitionHandlerTest
             CancellationToken.None);
 
         var loc = Assert.Single(result!.Select(l => l.LocationLink!));
-        Assert.Equal(targetUri, loc.TargetUri.ToString());
+        // Compared with the fold, not ordinally: the protocol's own DocumentUri lowercases a
+        // Windows drive letter on the way out, so "file:///D:/..." comes back as "file:///d:/...".
+        // That is exactly why sameness is a comparer's job - we do not control every producer.
+        Assert.True(DocumentUris.Same(targetUri, loc.TargetUri.ToString()),
+            $"expected {targetUri}, got {loc.TargetUri}");
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

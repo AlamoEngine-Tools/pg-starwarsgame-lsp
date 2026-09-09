@@ -24,4 +24,5 @@ public sealed class RecordingUserNotifier : IUserNotifier
     {
         Infos.Add(message);
     }
+
 }

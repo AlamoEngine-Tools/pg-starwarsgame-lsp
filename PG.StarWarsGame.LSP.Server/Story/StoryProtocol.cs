@@ -247,7 +247,7 @@ public sealed record SetStoryLayoutParams(string Campaign, string Faction, IRead
 
 public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
 
-public sealed record StoryLayoutEntryDto(string File, string EventName, double X, double Y);
+public sealed record StoryLayoutEntryDto(string ThreadUri, string EventName, double X, double Y);
 
 // ── aet/storyGraphChanged - server push after model invalidation ─────────────
 

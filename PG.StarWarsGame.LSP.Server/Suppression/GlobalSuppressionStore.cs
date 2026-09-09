@@ -1,18 +1,18 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Persistence;
 using PG.StarWarsGame.LSP.Server.Project;
 using PG.StarWarsGame.LSP.Server.Startup;
 
 namespace PG.StarWarsGame.LSP.Server.Suppression;
 
-/// <summary>One persisted project-wide suppression.</summary>
+/// <summary>One suppression as it is written down: the id, and why.</summary>
 public sealed class SuppressionEntry
 {
     /// <summary>Wire form of a <see cref="SuppressionMatcher" />: an id or <c>aetswg-000-*</c>.</summary>
@@ -24,9 +24,10 @@ public sealed class SuppressionEntry
 }
 
 /// <summary>
-///     JSON sidecar at <c>.aetswg/suppressions.json</c>, following the same conventions as
-///     <see cref="Story.StoryLayoutStore" />: cached in memory, written through on every change, and
-///     degrading to in-memory when there is no <c>.pgproj</c> to anchor it.
+///     JSON sidecar at <c>.aetswg/suppressions.json</c>, held by a
+///     <see cref="SidecarStore{T}" />: cached in memory, written through on every change, degrading
+///     to in-memory when there is no <c>.pgproj</c>, and versioned by
+///     <see cref="SuppressionsDocument" />.
 ///     <para>
 ///         Unlike the layout sidecar this one is intended for version control - suppressing a
 ///         diagnostic is a decision about the mod, not editor state - which is why
@@ -35,18 +36,17 @@ public sealed class SuppressionEntry
 /// </summary>
 public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
 {
-    private static readonly JsonSerializerOptions s_json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
-    };
-
-    private readonly IFileHelper _fileHelper;
     private readonly object _gate = new();
+    private readonly AetswgSidecarLocator _locator;
     private readonly ILogger<GlobalSuppressionStore> _logger;
     private readonly IUserNotifier? _notifier;
-    private readonly IModProjectReloadService _reloadService;
-    private List<SuppressionEntry>? _cache;
+    private readonly SidecarStore<SuppressionsDocument.Payload> _store;
+
+    /// <summary>
+    ///     Whether the file's own problems have been reported. GetAll runs on every publish, and
+    ///     ballooning the user once per keystroke is worse than the typo it is reporting.
+    /// </summary>
+    private bool _reported;
 
     public GlobalSuppressionStore(
         IModProjectReloadService reloadService,
@@ -54,10 +54,13 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
         ILogger<GlobalSuppressionStore> logger,
         IUserNotifier? notifier = null)
     {
-        _reloadService = reloadService;
-        _fileHelper = fileHelper;
-        _logger = logger;
         _notifier = notifier;
+        _logger = logger;
+        _locator = new AetswgSidecarLocator(reloadService);
+        _store = new SidecarStore<SuppressionsDocument.Payload>(
+            "suppressions.json", SuppressionsDocument.TypeName, SuppressionsDocument.Version,
+            SuppressionsDocument.Migrations, _locator, fileHelper, logger,
+            () => new SuppressionsDocument.Payload());
     }
 
     public IReadOnlyList<SuppressionMatcher> GetAll()
@@ -65,10 +68,9 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
         lock (_gate)
         {
             var result = new List<SuppressionMatcher>();
-            foreach (var entry in LoadLocked())
+            foreach (var entry in LoadLocked().Entries)
                 // A malformed entry is skipped, not fatal: it must leave the diagnostic visible
-                // rather than take the whole suppression file down with it. It is reported when the
-                // file is read, not here - this runs on every publish.
+                // rather than take the whole suppression file down with it.
                 if (SuppressionMatcher.TryParse(entry.Id, out var matcher))
                     result.Add(matcher);
 
@@ -80,12 +82,12 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
     {
         lock (_gate)
         {
-            var entries = LoadLocked();
+            var document = LoadLocked();
             var wire = matcher.ToString();
-            if (entries.Any(e => string.Equals(e.Id, wire, StringComparison.OrdinalIgnoreCase))) return;
+            if (document.Entries.Any(e => string.Equals(e.Id, wire, StringComparison.OrdinalIgnoreCase))) return;
 
-            entries.Add(new SuppressionEntry { Id = wire, Reason = reason });
-            SaveLocked(entries);
+            document.Entries.Add(new SuppressionEntry { Id = wire, Reason = reason });
+            SaveLocked(document);
         }
     }
 
@@ -93,95 +95,65 @@ public sealed class GlobalSuppressionStore : IGlobalSuppressionStore
     {
         lock (_gate)
         {
-            var entries = LoadLocked();
+            var document = LoadLocked();
             var wire = matcher.ToString();
-            if (entries.RemoveAll(e => string.Equals(e.Id, wire, StringComparison.OrdinalIgnoreCase)) == 0)
+            if (document.Entries.RemoveAll(e => string.Equals(e.Id, wire, StringComparison.OrdinalIgnoreCase)) == 0)
                 return;
 
-            SaveLocked(entries);
+            SaveLocked(document);
         }
     }
 
-    private List<SuppressionEntry> LoadLocked()
+    private SuppressionsDocument.Payload LoadLocked()
     {
-        if (_cache is not null) return _cache;
+        var load = _store.Load();
+        if (_reported) return load.Value;
 
-        _cache = [];
-        var path = SidecarPath();
-        if (path is null) return _cache;
+        _reported = true;
+        // Failing open - reporting everything - is the safe direction: a file we cannot read must
+        // not silence diagnostics wholesale, which looks exactly like "the mod is clean".
+        if (load.Message is { } message) Report(message + WhereToLook());
+        ReportUnreadableEntries(load.Value);
 
-        try
-        {
-            var fs = _fileHelper.FileSystem;
-            if (fs.File.Exists(path))
-                _cache = JsonSerializer.Deserialize<List<SuppressionEntry>>(
-                    fs.File.ReadAllText(path), s_json) ?? [];
-        }
-        catch (Exception ex)
-        {
-            // A corrupt file must not disable diagnostics wholesale; starting empty means
-            // everything is reported, which is the safe direction to fail in.
-            _logger.LogWarning(ex, "suppressions.json unreadable - no global suppressions applied");
-            Report("suppressions.json could not be read, so no project-wide suppressions are "
-                   + $"applied. Fix or delete '{path}'. ({ex.Message})");
-            return _cache;
-        }
+        return load.Value;
+    }
 
-        ReportUnreadableEntries(path);
-        return _cache;
+    private void SaveLocked(SuppressionsDocument.Payload document)
+    {
+        // A refused save is the newer-file case: the store says so, and the change stays in memory
+        // rather than overwriting a document this build cannot read.
+        if (!_store.TrySave(document, out var error) && error is not null) Report(error);
     }
 
     /// <summary>
-    ///     Tells the user about entries that will silence nothing. Done once, when the file is
-    ///     read, because the alternative is a balloon on every publish - and left to the log alone,
-    ///     a typo here is invisible: the diagnostic simply stays on screen with no explanation.
+    ///     Tells the user about entries that will silence nothing. Left to the log alone, a typo
+    ///     here is invisible: the diagnostic simply stays on screen with no explanation.
     /// </summary>
-    private void ReportUnreadableEntries(string path)
+    private void ReportUnreadableEntries(SuppressionsDocument.Payload document)
     {
-        var bad = _cache!
+        var bad = document.Entries
             .Where(e => !SuppressionMatcher.TryParse(e.Id, out _))
             .Select(e => $"'{e.Id}'")
             .ToList();
 
         if (bad.Count == 0) return;
 
-        foreach (var id in bad)
-            _logger.LogWarning("Ignoring unreadable suppression id {Id}", id);
+        foreach (var id in bad) _logger.LogWarning("Ignoring unreadable suppression id {Id}", id);
 
         Report($"suppressions.json has {(bad.Count == 1 ? "an entry that is not" : "entries that are not")} "
                + $"a diagnostic id: {string.Join(", ", bad)}. "
                + $"{(bad.Count == 1 ? "It suppresses" : "They suppress")} nothing. "
-               + $"Expected aetswg-<group>-<number> or aetswg-<group>-*, in '{path}'.");
+               + $"Expected aetswg-<group>-<number> or aetswg-<group>-*{WhereToLook()}");
+    }
+
+    private string WhereToLook()
+    {
+        var path = _locator.TryLocate("suppressions.json");
+        return path is null ? "." : $" See '{path}'.";
     }
 
     private void Report(string message)
     {
         _notifier?.ShowError(message);
-    }
-
-    private void SaveLocked(List<SuppressionEntry> entries)
-    {
-        var path = SidecarPath();
-        if (path is null) return;
-
-        try
-        {
-            var fs = _fileHelper.FileSystem;
-            fs.Directory.CreateDirectory(path[..path.LastIndexOf('/')]);
-            fs.File.WriteAllText(path, JsonSerializer.Serialize(entries, s_json));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Could not persist suppressions.json - change stays in-memory");
-        }
-    }
-
-    private string? SidecarPath()
-    {
-        var rootLayer = _reloadService.LastWorkspaceConfig?.Layers
-            .OrderByDescending(l => l.Rank)
-            .FirstOrDefault();
-        if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-        return ProjectIndexLocator.GetAetswgDirectory(pgprojPath) + "/suppressions.json";
     }
 }

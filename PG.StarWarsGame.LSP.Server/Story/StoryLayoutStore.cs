@@ -1,73 +1,92 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Caching;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Persistence;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
 
-/// <summary>One saved node position, keyed by thread file name + event name.</summary>
-public sealed record StoryLayoutEntry(string File, string EventName, double X, double Y);
+/// <summary>
+///     One saved node position. The node is named by its thread and event here, in memory - the
+///     file on disk holds the two hashed together and nothing else.
+/// </summary>
+public sealed record StoryLayoutEntry(string ThreadUri, string EventName, double X, double Y);
+
+/// <summary>A node the caller is holding, and can therefore name a stored key with.</summary>
+public sealed record StoryLayoutNode(string ThreadUri, string EventName);
 
 /// <summary>Per campaign-faction story graph layout persistence.</summary>
 public interface IStoryLayoutStore
 {
-    IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key);
+    /// <summary>
+    ///     The saved positions for a graph, for the nodes it actually has.
+    ///     <para>
+    ///         The nodes are passed in because the file names them by key: turning a key back into
+    ///         a thread and an event is only possible against the candidates the caller is holding,
+    ///         and that is deliberate - it is what stops the file from carrying either.
+    ///     </para>
+    /// </summary>
+    IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key, IReadOnlyList<StoryLayoutNode> nodes);
 
-    /// <summary>Upserts by (file, eventName); entries not mentioned keep their stored position.</summary>
+    /// <summary>Upserts by node; entries not mentioned keep their stored position.</summary>
     void Set(StoryModelKey key, IReadOnlyList<StoryLayoutEntry> entries);
 }
 
 /// <summary>
-///     JSON sidecar under the project's <c>.aetswg/</c> directory
-///     (<c>story-layout.json</c>, <see cref="ProjectIndexLocator" /> conventions). Layout is
-///     editor state, not game data - it deliberately lives next to the index caches, not in the
-///     mod's xml tree. Without a .pgproj the store degrades to in-memory (positions survive the
-///     session only). Orphaned entries (deleted events) are harmless and left in place.
+///     JSON sidecar under the project's <c>.aetswg/</c> directory (<c>story-layout.json</c>), held
+///     by a <see cref="SidecarStore{T}" />. Layout is editor state, not game data - it deliberately
+///     lives next to the index caches, not in the mod's xml tree. Without a .pgproj the store
+///     degrades to in-memory. Orphaned entries (deleted events) are harmless and left in place.
 /// </summary>
-public sealed class StoryLayoutStore(
-    IModProjectReloadService reloadService,
-    IFileHelper fileHelper,
-    ILogger<StoryLayoutStore> logger) : IStoryLayoutStore
+public sealed class StoryLayoutStore : IStoryLayoutStore
 {
-    private static readonly JsonSerializerOptions s_json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
-    };
-
     private readonly object _gate = new();
-    private Dictionary<string, List<StoryLayoutEntry>>? _cache;
+    private readonly ProjectDocumentKeys _keys;
+    private readonly SidecarStore<StoryLayoutDocument.Payload> _store;
 
-    /// <summary>
-    ///     The sidecar's key for one graph.
-    ///     <para>
-    ///         A graph is a campaign FACTION, so the layout is too - keyed by the campaign alone,
-    ///         arranging one faction's chain moved the other's. Written readably rather than hashed,
-    ///         because this ends up as a key in a JSON file a person may open.
-    ///     </para>
-    /// </summary>
-    private static string KeyOf(StoryModelKey key)
+    public StoryLayoutStore(
+        IModProjectReloadService reloadService,
+        IFileHelper fileHelper,
+        ILogger<StoryLayoutStore> logger)
     {
-        return $"{key.Campaign}/{key.Faction}";
+        _keys = new ProjectDocumentKeys(reloadService, fileHelper);
+        _store = new SidecarStore<StoryLayoutDocument.Payload>(
+            "story-layout.json", StoryLayoutDocument.TypeName, StoryLayoutDocument.Version,
+            StoryLayoutDocument.MigrationsUsing(_keys.NodeKeyForBaseName, BucketKey),
+            new AetswgSidecarLocator(reloadService), fileHelper, logger,
+            () => new StoryLayoutDocument.Payload());
     }
 
-    public IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key)
+    public IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key, IReadOnlyList<StoryLayoutNode> nodes)
     {
         lock (_gate)
         {
-            var data = LoadLocked();
-            if (data.TryGetValue(KeyOf(key), out var entries))
-                return entries.ToList();
+            var graphs = _store.Load().Value.Graphs;
 
-            // A sidecar written before layouts were faction-scoped keys by the campaign alone.
-            // Both factions read it once, which is right: an entry is (file, eventName), so each
-            // graph picks up only the positions of nodes it actually has. The next Set writes the
-            // scoped key and the old entry stops being consulted.
-            return data.TryGetValue(key.Campaign, out var legacy) ? legacy.ToList() : [];
+            // Only the nodes this graph holds can be named, which is also the filter: an entry
+            // whose event is not in the campaign any more simply does not come back.
+            var byKey = new Dictionary<Guid, StoryLayoutNode>();
+            foreach (var node in nodes)
+                if (_keys.NodeKey(node.ThreadUri, node.EventName) is { } nodeKey)
+                    byKey[nodeKey] = node;
+
+            var stored = graphs.TryGetValue(GraphKeyOf(key), out var scoped)
+                ? scoped
+                // A sidecar written before layouts were faction-scoped keyed by the campaign alone.
+                // Both factions read it once, which is right: an entry names a node, so each graph
+                // picks up only the positions of nodes it actually has. The next Set writes the
+                // scoped key and the old entry stops being consulted.
+                : graphs.GetValueOrDefault(
+                    ProjectDocumentKeys.LegacyGraphKey(key.Campaign).ToString()) ?? [];
+
+            return stored
+                .Where(e => byKey.ContainsKey(e.Key))
+                .Select(e => new StoryLayoutEntry(
+                    byKey[e.Key].ThreadUri, byKey[e.Key].EventName, e.X, e.Y))
+                .ToList();
         }
     }
 
@@ -75,75 +94,41 @@ public sealed class StoryLayoutStore(
     {
         lock (_gate)
         {
-            var data = LoadLocked();
-            if (!data.TryGetValue(KeyOf(key), out var existing))
-                data[KeyOf(key)] = existing = [];
+            var document = _store.Load().Value;
+            if (!document.Graphs.TryGetValue(GraphKeyOf(key), out var existing))
+                document.Graphs[GraphKeyOf(key)] = existing = [];
 
             foreach (var entry in entries)
             {
-                var index = existing.FindIndex(e =>
-                    string.Equals(e.File, entry.File, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(e.EventName, entry.EventName, StringComparison.OrdinalIgnoreCase));
-                if (index >= 0) existing[index] = entry;
-                else existing.Add(entry);
+                // A thread outside the project has no key that survives a clone, so there is
+                // nothing worth writing down for it.
+                if (_keys.NodeKey(entry.ThreadUri, entry.EventName) is not { } nodeKey) continue;
+
+                var index = existing.FindIndex(e => e.Key == nodeKey);
+                var updated = new StoryLayoutDocument.Entry { Key = nodeKey, X = entry.X, Y = entry.Y };
+
+                if (index >= 0) existing[index] = updated;
+                else existing.Add(updated);
             }
 
-            SaveLocked(data);
+            _store.TrySave(document, out _);
         }
     }
 
-    private Dictionary<string, List<StoryLayoutEntry>> LoadLocked()
+    /// <summary>
+    ///     A version-zero bucket name to its key. Those buckets were <c>campaign/faction</c>, or the
+    ///     campaign alone before layouts were faction-scoped; both are hashed as what they were.
+    /// </summary>
+    private static Guid BucketKey(string bucket)
     {
-        if (_cache is not null) return _cache;
-
-        _cache = new Dictionary<string, List<StoryLayoutEntry>>(StringComparer.OrdinalIgnoreCase);
-        var path = SidecarPath();
-        if (path is null) return _cache;
-
-        try
-        {
-            var fs = fileHelper.FileSystem;
-            if (fs.File.Exists(path))
-            {
-                var loaded = JsonSerializer.Deserialize<Dictionary<string, List<StoryLayoutEntry>>>(
-                    fs.File.ReadAllText(path), s_json);
-                if (loaded is not null)
-                    _cache = new Dictionary<string, List<StoryLayoutEntry>>(loaded, StringComparer.OrdinalIgnoreCase);
-            }
-        }
-        catch (Exception ex)
-        {
-            // A corrupt sidecar must never break the editor - start over.
-            logger.LogWarning(ex, "story-layout.json unreadable - starting with an empty layout");
-        }
-
-        return _cache;
+        var slash = bucket.IndexOf('/');
+        return slash < 0
+            ? ProjectDocumentKeys.LegacyGraphKey(bucket)
+            : ProjectDocumentKeys.GraphKey(bucket[..slash], bucket[(slash + 1)..]);
     }
 
-    private void SaveLocked(Dictionary<string, List<StoryLayoutEntry>> data)
+    private static string GraphKeyOf(StoryModelKey key)
     {
-        var path = SidecarPath();
-        if (path is null) return;
-
-        try
-        {
-            var fs = fileHelper.FileSystem;
-            var dir = path[..path.LastIndexOf('/')];
-            fs.Directory.CreateDirectory(dir);
-            fs.File.WriteAllText(path, JsonSerializer.Serialize(data, s_json));
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not persist story-layout.json - positions stay in-memory");
-        }
-    }
-
-    private string? SidecarPath()
-    {
-        var rootLayer = reloadService.LastWorkspaceConfig?.Layers
-            .OrderByDescending(l => l.Rank)
-            .FirstOrDefault();
-        if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-        return ProjectIndexLocator.GetAetswgDirectory(pgprojPath) + "/story-layout.json";
+        return ProjectDocumentKeys.GraphKey(key.Campaign, key.Faction).ToString();
     }
 }

@@ -63,8 +63,8 @@ public sealed class ValidateStoryCommandBatchHandler(
         // Validate every thread the campaign knows about (reading its staged text where present),
         // plus any new thread the batch created that already has events.
         var modelThreadUris = new HashSet<string>(
-            model.Threads.Select(t => fileHelper.NormalizeUri(t.DocumentUri)), StringComparer.Ordinal);
-        var candidates = new HashSet<string>(modelThreadUris, StringComparer.Ordinal);
+            model.Threads.Select(t => fileHelper.NormalizeUri(t.DocumentUri)), DocumentUris.Comparer);
+        var candidates = new HashSet<string>(modelThreadUris, DocumentUris.Comparer);
         foreach (var (uri, _, _) in texts.Changed())
             candidates.Add(fileHelper.NormalizeUri(uri));
 

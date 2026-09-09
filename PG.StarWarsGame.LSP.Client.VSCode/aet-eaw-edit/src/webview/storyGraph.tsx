@@ -892,7 +892,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         for (const m of graphModel.values()) {
             if (m.dto.kind !== 'Event') { continue; }
             entries.push({
-                file: baseName(m.dto.threadUri),
+                threadUri: m.dto.threadUri ?? '',
                 eventName: m.dto.label,
                 x: m.x,
                 y: m.y,
@@ -941,8 +941,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // Original (static analysis) lifecycles, so ending a simulation restores the pre-sim view.
     const staticLifecycles = new Map<string, string | null | undefined>();
 
+    // Keyed on the thread's URI, not its base name: two threads can share a file name, and the
+    // server has to be able to re-derive this from the model - which it cannot do from a name the
+    // webview shortened.
     const layoutKey = (dto: StoryGraphNodeDto): string =>
-        `${baseName(dto.threadUri)} ${dto.label}`.toLowerCase();
+        `${dto.threadUri ?? ''} ${dto.label}`.toLowerCase();
 
     const connectionKey = (fromId: string, toId: string, kind: string): string =>
         `${fromId}>${toId}|${kind}`;
@@ -1034,7 +1037,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const buildModelFromLayout = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): boolean => {
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
         const events = nodes.filter(n => n.kind === 'Event');
         if (events.length === 0 || !canReuseStoredLayout(events.map(layoutKey), new Set(stored.keys()))) {
             return false;
@@ -1279,7 +1282,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const rebuildModelFromGraph = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): void => {
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
         const oldPos = new Map<string, { x: number; y: number }>();
         for (const [id, m] of graphModel) { oldPos.set(id, { x: m.x, y: m.y }); }
         graphModel.clear();
@@ -1443,7 +1446,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
         // 3. Existing nodes update in place; nodes whose socket shape changed are rebuilt at
         //    their current position; genuinely new nodes appear beside a neighbour.
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
         let placedPending = false;
         for (const dto of nodes) {
             const needsIn = hasIn.has(dto.id) || dto.kind === 'Event';

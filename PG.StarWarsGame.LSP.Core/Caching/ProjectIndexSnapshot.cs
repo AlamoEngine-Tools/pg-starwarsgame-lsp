@@ -18,8 +18,11 @@ public sealed class ProjectIndexSnapshot
     // and owner-scoped ability ids (parser changes of 2026-07-02/04 shipped without a bump);
     // 3 = owner-id resolution gained the Name-attribute fallback (2026-07-05) - ability
     // symbol/reference ids changed from bare to owner-scoped for real game files;
-    // 4 = Presence_Induced_Animations object references added (2026-07-05).
-    public const int CurrentSchemaVersion = 4;
+    // 4 = Presence_Induced_Animations object references added (2026-07-05);
+    // 5 = RelativePath keeps the file's real case (2026-09-09). Every snapshot written before this
+    // holds lowercased keys, which are not names a case-sensitive host can open - so they are
+    // discarded and rebuilt rather than read back and handed to the filesystem.
+    public const int CurrentSchemaVersion = 5;
 
     [Key(0)] public int SchemaVersion { get; set; }
 

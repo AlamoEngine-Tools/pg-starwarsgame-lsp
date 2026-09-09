@@ -5,6 +5,8 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 
+using PG.StarWarsGame.LSP.Core.Util;
+
 namespace PG.StarWarsGame.LSP.Story.Model;
 
 /// <summary>
@@ -106,7 +108,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
         }
 
         var threads = new List<StoryThread>();
-        var suspendedUris = new HashSet<string>(StringComparer.Ordinal);
+        var suspendedUris = new HashSet<string>(DocumentUris.Comparer);
         var uriByThreadFile = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var threadFile in threadFiles)
         {

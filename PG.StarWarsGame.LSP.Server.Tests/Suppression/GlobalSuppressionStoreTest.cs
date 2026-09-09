@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.IO.Abstractions.TestingHelpers;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
@@ -188,6 +189,81 @@ public sealed class GlobalSuppressionStoreTest
 
         Assert.Single(store.GetAll());
         Assert.False(fs.File.Exists(SidecarPath));
+    }
+
+    // ── the envelope ─────────────────────────────────────────────────────────
+
+    // Every test above feeds the bare array this file has always been, so they are the migration's
+    // regression suite. This one states the other half: once read, it is written back versioned,
+    // and the next release finds a document that says what it is.
+    [Fact]
+    public void LegacyArrayFile_IsRewrittenWithItsEnvelope()
+    {
+        var (store, fs) = Build(existingJson: """[{"id":"aetswg-010-0001","reason":"known"}]""");
+
+        store.GetAll();
+
+        var written = JsonNode.Parse(fs.File.ReadAllText(SidecarPath))!.AsObject();
+        Assert.Equal("aetswg.Suppressions", (string?)written["_type"]);
+        Assert.Equal(SuppressionsDocument.Version.ToString(), (string?)written["_typeVersion"]);
+        Assert.Equal("aetswg-010-0001", (string?)written["entries"]![0]!["id"]);
+        Assert.Equal("known", (string?)written["entries"]![0]!["reason"]);
+    }
+
+    [Fact]
+    public void VersionedFile_IsReadWithoutBeingMigrated()
+    {
+        var (store, _) = Build(existingJson:
+            """
+            {
+              "_type": "aetswg.Suppressions",
+              "_typeVersion": "aetswg-1.0.0",
+              "entries": [ { "id": "aetswg-010-0001" } ]
+            }
+            """);
+
+        Assert.Equal([SuppressionMatcher.ForId(DiagnosticIds.DuplicateSymbol)], store.GetAll());
+    }
+
+    // Enforced upgrading, and the half of it that protects the file: an older build suppresses
+    // nothing rather than guessing, and must not write its empty view over the newer document.
+    [Fact]
+    public void NewerFile_SuppressesNothingAndIsLeftIntact()
+    {
+        const string newer =
+            """{ "_type": "aetswg.Suppressions", "_typeVersion": "aetswg-99.0.0", "entries": [] }""";
+        var (store, fs) = Build(existingJson: newer);
+
+        Assert.Empty(store.GetAll());
+        store.Add(SuppressionMatcher.ForId(DiagnosticIds.StoryChain));
+
+        Assert.Equal(newer, fs.File.ReadAllText(SidecarPath));
+    }
+
+    [Fact]
+    public void NewerFile_IsReportedToTheUser()
+    {
+        var notifier = new RecordingUserNotifier();
+        var (store, _) = BuildWith(notifier, existingJson:
+            """{ "_type": "aetswg.Suppressions", "_typeVersion": "aetswg-99.0.0", "entries": [] }""");
+
+        store.GetAll();
+
+        Assert.Contains("99.0.0", Assert.Single(notifier.Errors), StringComparison.Ordinal);
+    }
+
+    // ── the shape guard ──────────────────────────────────────────────────────
+
+    // Fails when the document's shape changes and its version does not. Update BOTH the pin and
+    // the version when this goes red - that is the point of it going red.
+    [Fact]
+    public void Document_StillHasThePinnedShape()
+    {
+        Assert.True(
+            SuppressionsDocument.Shape.Matches(typeof(SuppressionsDocument.Payload),
+                SuppressionsDocument.Version),
+            $"'{SuppressionsDocument.TypeName}' changed shape. Bump its version, add a migration "
+            + "from the old one, and re-pin the signature.");
     }
 
     private sealed class StubReloadService(WorkspaceConfiguration config) : IModProjectReloadService

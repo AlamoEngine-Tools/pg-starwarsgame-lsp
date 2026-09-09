@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Localisation;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -16,8 +17,24 @@ public sealed record GameIndex(
 {
     // WorkspaceDefinitions and WorkspaceReferences are keyed by game object Name, which
     // the engine resolves case-insensitively. Use OrdinalIgnoreCase so "X-wing" and
-    // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI
-    // (already lowercased by IFileHelper.NormalizeUri) and stays ordinal.
+    // "X-Wing" always refer to the same slot. Documents is keyed by canonical URI and takes
+    // DocumentUris.Comparer for the same reason: the URI keeps the file's real case now, so an
+    // ordinal dictionary would hold one file under two keys - a lookup that misses rather than
+    // fails, which is the whole hazard of folding in the value instead of the comparison.
+    /// <summary>
+    ///     The documents, always keyed by <see cref="DocumentUris.Comparer" /> whatever the caller
+    ///     passed in.
+    /// </summary>
+    /// <remarks>
+    ///     Enforced rather than assumed. Every construction site would otherwise have to remember,
+    ///     and forgetting produces a dictionary that holds one file under two spellings and answers
+    ///     "not indexed" for the other - a miss, not a failure, which is exactly the class of bug
+    ///     that keeping the fold in the value used to hide. <c>WithComparers</c> is a no-op when the
+    ///     comparer already matches.
+    /// </remarks>
+    public ImmutableDictionary<string, DocumentIndex> Documents { get; init; } =
+        Documents.WithComparers(DocumentUris.Comparer);
+
     /// <summary>
     ///     Separates the owning object's id from the symbol's own name in an owner-scoped symbol id
     ///     (<c>MY_UNIT$Medic_Healing</c>), as written by the ability symbol pass.
@@ -26,7 +43,7 @@ public sealed record GameIndex(
 
     public static readonly GameIndex Empty = new(
         BaselineIndex.Empty,
-        ImmutableDictionary<string, DocumentIndex>.Empty,
+        ImmutableDictionary.Create<string, DocumentIndex>(DocumentUris.Comparer),
         ImmutableDictionary.Create<string, ImmutableArray<GameSymbol>>(StringComparer.OrdinalIgnoreCase),
         ImmutableDictionary.Create<string, ImmutableArray<GameReference>>(StringComparer.OrdinalIgnoreCase));
 

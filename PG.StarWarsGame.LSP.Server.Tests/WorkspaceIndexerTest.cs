@@ -855,6 +855,119 @@ public sealed class WorkspaceIndexerTest
         Assert.Single(svc.InjectedDocuments); // injected from cache
     }
 
+    // The index's own key used to be lowercased on the way in, which made every lookup work by
+    // accident: both sides had been flattened, so nothing could disagree. That is the same mistake
+    // the URI fold used to make - it destroys the real name, and a project-relative path is what we
+    // hand back to the filesystem. These two pin the rule the URIs now follow: the VALUE keeps the
+    // name the file actually has, and the COMPARISON supplies the case-insensitivity.
+    [Fact]
+    public async Task IndexDocumentsAsync_CacheHit_WhenTheSnapshotRecordsTheFilesRealCase()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "Data", "XML");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/');
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "Data", "XML", "Units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "Units.xml"), fh.FileSystem);
+        var entry = new ProjectFileEntry
+        {
+            // Spelled the way the file really is on disk - which is what the scan now records.
+            RelativePath = "Data/XML/Units.xml", ContentHash = hash,
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files = [entry],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Empty(svc.Calls); // no re-parse
+        Assert.Single(svc.InjectedDocuments); // injected from cache
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_CacheHit_EvenWhenTheSnapshotSpellsThePathInAnotherCase()
+    {
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "Data", "XML");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/');
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "Data", "XML", "Units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+
+        var fh = new FileHelper(fs);
+        var hash = ProjectFileHasher.ComputeFileHash(
+            fh.FileSystem.Path.Combine(xmlDir, "Units.xml"), fh.FileSystem);
+        var entry = new ProjectFileEntry
+        {
+            // A spelling neither side would produce today - an older snapshot, or a file renamed
+            // to differ only in case. The engine calls it the same asset, so the lookup must too.
+            RelativePath = "DATA/xml/UNITS.XML", ContentHash = hash,
+            Document = new SerializedDocument { Symbols = [], References = [], RequireArgs = [] }
+        };
+        var snapshot = new ProjectIndexSnapshot
+        {
+            SchemaVersion = ProjectIndexSnapshot.CurrentSchemaVersion,
+            OverallHash = "anything",
+            DependencyHashes = [],
+            Files = [entry],
+            SchemaFingerprint = SchemaFingerprint.Compute(new FakeSchemaProvider())
+        };
+        var cache = new FakeProjectIndexCache { [pgproj] = snapshot };
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        Assert.Empty(svc.Calls);
+        Assert.Single(svc.InjectedDocuments);
+    }
+
+    [Fact]
+    public async Task IndexDocumentsAsync_SnapshotRecordsTheRelativePathWithItsCaseIntact()
+    {
+        // The saved key is what a case-sensitive host has to open next time, so the flattening has
+        // to be gone from the WRITE side too, not just tolerated on the read side.
+        var root = Root("ws");
+        var xmlDir = Path.Combine(root, "Data", "XML");
+        var pgproj = Path.Combine(root, "mod.pgproj").Replace('\\', '/');
+        var fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(root, "Data", "XML", "Units.xml")] = new("<Root/>")
+        });
+        var svc = new FakeIndexService();
+        var cache = new FakeProjectIndexCache();
+        var config = ConfigWithLayer(xmlDir, pgproj);
+        var (indexer, _) = Build(fs, svc, new FileTypeRegistry(), new FakeSchemaProvider(), cache, null,
+            new FakeParser());
+        indexer.PreScanMetafiles(config, [root]);
+
+        await indexer.IndexDocumentsAsync(config, CancellationToken.None);
+
+        var saved = Assert.Single(cache.Saved).Value;
+        Assert.Equal("Data/XML/Units.xml", Assert.Single(saved.Files).RelativePath);
+    }
+
     [Fact]
     public async Task IndexDocumentsAsync_SchemaFingerprintChanged_DiscardsLayerSnapshot()
     {

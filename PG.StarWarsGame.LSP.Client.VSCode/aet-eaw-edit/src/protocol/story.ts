@@ -205,7 +205,8 @@ export interface GetStoryDiagnosticsResult {
 // ── aet/getStoryLayout / aet/setStoryLayout ──────────────────────────────────
 
 export interface StoryLayoutEntryDto {
-    file: string;
+    /** The thread's document URI. The server keys the sidecar by a hash of it - see DocumentKey. */
+    threadUri: string;
     eventName: string;
     x: number;
     y: number;

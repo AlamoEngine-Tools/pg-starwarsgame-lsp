@@ -2,8 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
 using AET.Modinfo.Spec;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using CoreModinfoData = PG.StarWarsGame.LSP.Core.Project.ModinfoData;
@@ -39,11 +42,24 @@ public sealed class ModProjectLoader
 
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ModProjectLoader> _logger;
+    private readonly IReadOnlyList<IDocumentMigration> _migrations;
+    private readonly IPgprojMigrationSink _migrationSink;
 
-    public ModProjectLoader(IFileHelper fileHelper, ILogger<ModProjectLoader> logger)
+    public ModProjectLoader(
+        IFileHelper fileHelper,
+        ILogger<ModProjectLoader> logger,
+        IPgprojMigrationSink migrationSink,
+        IReadOnlyList<IDocumentMigration> migrations)
     {
         _fileHelper = fileHelper;
         _logger = logger;
+        _migrationSink = migrationSink;
+        _migrations = migrations;
+    }
+
+    public ModProjectLoader(IFileHelper fileHelper, ILogger<ModProjectLoader> logger)
+        : this(fileHelper, logger, new NullPgprojMigrationSink(), PgprojMigrations.All)
+    {
     }
 
     public ModProjectFile Load(string path)
@@ -51,10 +67,34 @@ public sealed class ModProjectLoader
         var text = _fileHelper.FileSystem.File.ReadAllText(path);
         var fileName = _fileHelper.FileSystem.Path.GetFileName(path);
 
+        JsonNode? root;
+        try
+        {
+            root = JsonNode.Parse(text, documentOptions: DocumentOptions);
+        }
+        catch (JsonException ex)
+        {
+            throw new ModProjectLoadException(BuildLoadErrorMessage(fileName, ex), ex);
+        }
+
+        if (root is not JsonObject document)
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': The file is empty or is not a JSON object.");
+
+        // Before anything is read out of it: a project from a newer extension is refused rather
+        // than read as best we can, because this build would go on to write its own shape back
+        // over it. Absent means version one - every .pgproj written so far predates the fields.
+        var declaredType = (string?)document["_type"];
+        var declaredVersion = (string?)document["_typeVersion"];
+        if (PgprojFormat.Check(declaredVersion, declaredType) is { CanLoad: false } refusal)
+            throw new ModProjectLoadException($"Could not load mod project '{fileName}': {refusal.Message}");
+
+        document = BringForward(document, declaredVersion, path, fileName);
+
         ModProjectFileDto? dto;
         try
         {
-            dto = JsonSerializer.Deserialize<ModProjectFileDto>(text, Options);
+            dto = document.Deserialize<ModProjectFileDto>(Options);
         }
         catch (JsonException ex)
         {
@@ -250,9 +290,55 @@ public sealed class ModProjectLoader
         return paths?.Select(NormalizePath).ToList() ?? (IReadOnlyList<string>)[];
     }
 
+    // Separators only. These are author-written paths out of the pgproj - source roots, the mod
+    // directory, the mega-texture - and every one of them is used to OPEN something, so flattening
+    // the case here is the difference between a working project and an unopenable one on a
+    // case-sensitive host. Compare them through DocumentUris, never with Ordinal.
     private static string NormalizePath(string path)
     {
-        return path.Replace('\\', '/').ToLowerInvariant();
+        return path.Replace('\\', '/');
+    }
+
+    /// <summary>
+    ///     Runs the project through its migration chain, in memory, every time it is read.
+    /// </summary>
+    /// <remarks>
+    ///     Always in memory, never as a side effect of reading: the file belongs to the user, sits in
+    ///     their repository and is shared with teammates, so writing it is a separate and consented
+    ///     act. What this does is make sure the rest of the server never sees the old shape - and
+    ///     tell whoever can ask the user that there is something to persist.
+    /// </remarks>
+    private JsonObject BringForward(
+        JsonObject document, string? declaredVersion, string path, string fileName)
+    {
+        // No version and no initial migration means we cannot say which shape it holds, so there is
+        // nothing to bring forward - it is read as it is, which for a project file is version one.
+        if (declaredVersion is null
+            && !DocumentMigrator.HasInitialMigration(
+                PgprojFormat.TypeName, PgprojFormat.Current, _migrations))
+            return document;
+
+        var from = declaredVersion is null
+            ? TypeVersion.Zero(PgprojFormat.Current.Namespace)
+            : TypeVersion.TryParse(declaredVersion, out var parsed)
+                ? parsed
+                : PgprojFormat.Current;
+
+        if (from.CompareTo(PgprojFormat.Current) >= 0) return document;
+
+        var migration = DocumentMigrator.Run(
+            document, PgprojFormat.TypeName, from, PgprojFormat.Current, _migrations);
+
+        // A gap in the chain is a bug in our registration, and this is the file everything else is
+        // read from - reading it at a version whose shape it does not have would paper over it.
+        if (migration.Document is not JsonObject migrated)
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': {migration.Failure}.");
+
+        migrated["_type"] = PgprojFormat.TypeName;
+        migrated["_typeVersion"] = PgprojFormat.Current.ToString();
+        _migrationSink.Migrated(path, migrated, migration.Notices);
+        return migrated;
     }
 
     // Translates System.Text.Json's cryptic deserialization failures into a clear, user-facing
@@ -275,6 +361,13 @@ public sealed class ModProjectLoader
 
     private sealed class ModProjectFileDto
     {
+        /// <summary>The document's identity - see <see cref="PgprojFormat" />. Not the mod's version.</summary>
+        [JsonPropertyName("_type")]
+        public string? Type { get; init; }
+
+        [JsonPropertyName("_typeVersion")]
+        public string? TypeVersion { get; init; }
+
         public string? Name { get; init; }
         public JsonElement? Modinfo { get; init; }
         public DirectoryMapDto? Directories { get; init; }

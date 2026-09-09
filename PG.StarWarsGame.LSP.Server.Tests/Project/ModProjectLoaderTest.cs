@@ -3,7 +3,9 @@
 
 using System.Collections.Concurrent;
 using System.IO.Abstractions.TestingHelpers;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -13,6 +15,210 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Project;
 public sealed class ModProjectLoaderTest
 {
     private const string ProjectPath = "/workspace/mymod.pgproj";
+
+    // ── the format contract ──────────────────────────────────────────────────
+
+    // Every .pgproj written so far predates the field, so its absence is the ordinary case.
+    [Fact]
+    public void Load_NoIdentityFields_IsTheCurrentFormat()
+    {
+        var loader = Build("""{ "name": "Mod" }""", out _);
+
+        Assert.Equal("Mod", loader.Load(ProjectPath).Name);
+    }
+
+    [Fact]
+    public void Load_CurrentIdentity_Loads()
+    {
+        var loader = Build(
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""",
+            out _);
+
+        Assert.Equal("Mod", loader.Load(ProjectPath).Name);
+    }
+
+    // Enforced upgrading, hard: a project from a newer extension is refused rather than read as
+    // best we can, because the next thing this build would do is write its own shape back over it.
+    [Fact]
+    public void Load_NewerTypeVersion_RefusesWithAMessageNamingTheVersion()
+    {
+        var loader = Build("""{ "name": "Mod", "_typeVersion": "aetswg-99.0.0" }""", out _);
+
+        var error = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+
+        Assert.Contains("99.0.0", error.Message, StringComparison.Ordinal);
+        Assert.Contains("mymod.pgproj", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Load_UnreadableTypeVersion_Refuses()
+    {
+        var loader = Build("""{ "name": "Mod", "_typeVersion": "banana" }""", out _);
+
+        Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+    }
+
+    // ── migrating on read ────────────────────────────────────────────────────
+
+    // The project is brought forward in memory every time it is read, whether or not anybody ever
+    // agrees to write it back. Reading it as its old shape would mean the rest of the server sees
+    // a project that no longer exists.
+    [Fact]
+    public void Load_OlderVersion_IsMigratedInMemory()
+    {
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""", out _,
+            migrations: new RenameToName());
+
+        Assert.Equal("From The Past", loader.Load(ProjectPath).Name);
+    }
+
+    // ...and the file itself is not touched by reading it. Writing is a separate, consented act.
+    [Fact]
+    public void Load_OlderVersion_LeavesTheFileAlone()
+    {
+        const string original = """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""";
+        var loader = BuildWith(original, out var fs, migrations: new RenameToName());
+
+        loader.Load(ProjectPath);
+
+        Assert.Equal(original, fs.File.ReadAllText(ProjectPath));
+    }
+
+    [Fact]
+    public void Load_OlderVersion_TellsTheSinkWithTheMigratedDocumentAndItsNotices()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-0.9.0", "renamedName": "From The Past" }""", out _, sink,
+            new RenameToName());
+
+        loader.Load(ProjectPath);
+
+        var (path, migrated, notices) = Assert.Single(sink.Calls);
+        Assert.Equal(ProjectPath, path);
+        Assert.Equal("From The Past", (string?)migrated["name"]);
+        Assert.Equal(PgprojFormat.Current.ToString(), (string?)migrated["_typeVersion"]);
+        Assert.Equal("The 'renamedName' field is called 'name' now.", Assert.Single(notices));
+    }
+
+    [Fact]
+    public void Load_CurrentVersion_TellsTheSinkNothing()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            $$"""{ "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""", out _, sink,
+            new RenameToName());
+
+        loader.Load(ProjectPath);
+
+        Assert.Empty(sink.Calls);
+    }
+
+    // A gap in the chain is a bug in our registration. Loading the project at a version whose shape
+    // it does not have would paper over it - and this file is the one everything else is read from.
+    [Fact]
+    public void Load_OlderVersionWithNoMigrationForIt_Refuses()
+    {
+        var loader = BuildWith(
+            """{ "_typeVersion": "aetswg-0.1.0", "name": "Mod" }""", out _, migrations: new RenameToName());
+
+        Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+    }
+
+    // ── the initial typing of the project file ───────────────────────────────
+
+    // Every .pgproj in existence predates the identity fields, so the first thing this framework
+    // owes them is the migration that gives them one. Without it the fields only ever appear on
+    // projects we happen to create or rewrite, and the format contract describes nothing.
+    [Fact]
+    public void Load_ExistingUnstampedProject_IsOfferedItsIdentity()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith("""{ "name": "Mod" }""", out _, sink, PgprojMigrations.All.ToArray());
+
+        loader.Load(ProjectPath);
+
+        var (_, migrated, _) = Assert.Single(sink.Calls);
+        Assert.Equal(PgprojFormat.TypeName, (string?)migrated["_type"]);
+        Assert.Equal(PgprojFormat.Current.ToString(), (string?)migrated["_typeVersion"]);
+    }
+
+    // The initial migration adds an identity and changes NOTHING else - it exists because the
+    // document became persistent storage, not because its shape moved.
+    [Fact]
+    public void Load_ExistingUnstampedProject_IsOtherwiseUntouched()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            """{ "name": "Mod", "directories": { "xml": ["data/xml"] }, "unknownToUs": 42 }""",
+            out _, sink, PgprojMigrations.All.ToArray());
+
+        loader.Load(ProjectPath);
+
+        var (_, migrated, _) = Assert.Single(sink.Calls);
+        Assert.Equal("Mod", (string?)migrated["name"]);
+        Assert.Equal("data/xml", (string?)migrated["directories"]!["xml"]![0]);
+        // A key this build does not model survives, because the migration runs over the raw tree.
+        Assert.Equal(42, (int?)migrated["unknownToUs"]);
+    }
+
+    // Reading it does not write it: the identity is proposed, and the user decides.
+    [Fact]
+    public void Load_ExistingUnstampedProject_LeavesTheFileAlone()
+    {
+        const string original = """{ "name": "Mod" }""";
+        var loader = BuildWith(original, out var fs, null, PgprojMigrations.All.ToArray());
+
+        loader.Load(ProjectPath);
+
+        Assert.Equal(original, fs.File.ReadAllText(ProjectPath));
+    }
+
+    // A project already carrying its identity has nothing to be offered.
+    [Fact]
+    public void Load_StampedProject_IsNotOfferedAnything()
+    {
+        var sink = new RecordingSink();
+        var loader = BuildWith(
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "_typeVersion": "{{PgprojFormat.Current}}", "name": "Mod" }""",
+            out _, sink, PgprojMigrations.All.ToArray());
+
+        loader.Load(ProjectPath);
+
+        Assert.Empty(sink.Calls);
+    }
+
+    /// <summary>A fixture step: version 0.9.0 called the project's name something else.</summary>
+    private sealed class RenameToName : IDocumentMigration
+    {
+        public string TypeName => PgprojFormat.TypeName;
+        public TypeVersion From => TypeVersion.Of("aetswg", 0, 9);
+        public TypeVersion To => PgprojFormat.Current;
+        public string? UserNotice => "The 'renamedName' field is called 'name' now.";
+
+        public JsonNode Migrate(JsonNode document)
+        {
+            var root = document.AsObject();
+            if (root["renamedName"] is { } renamed)
+            {
+                root.Remove("renamedName");
+                root["name"] = renamed.DeepClone();
+            }
+
+            return root;
+        }
+    }
+
+    private sealed class RecordingSink : IPgprojMigrationSink
+    {
+        public List<(string Path, JsonObject Migrated, IReadOnlyList<string> Notices)> Calls { get; } = [];
+
+        public void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices)
+        {
+            Calls.Add((pgprojPath, migrated.AsObject(), notices));
+        }
+    }
 
     [Fact]
     public void Load_Name_ComesFromTopLevelField_IndependentOfModinfo()
@@ -125,7 +331,7 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal(["data/scripts/story"], model.Directories.StoryDialog);
+        Assert.Equal(["Data/Scripts/Story"], model.Directories.StoryDialog);
     }
 
     [Fact]
@@ -370,7 +576,7 @@ public sealed class ModProjectLoaderTest
     }
 
     [Fact]
-    public void Load_LocalisationNode_DirectoryNormalizedToLowercaseForwardSlashes()
+    public void Load_LocalisationNode_DirectoryNormalizedToForwardSlashes_KeepingItsCase()
     {
         const string json = """
                             {
@@ -382,7 +588,7 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal("data/text", model.Localisation!.Directory);
+        Assert.Equal("Data/Text", model.Localisation!.Directory);
     }
 
     [Fact]
@@ -425,8 +631,12 @@ public sealed class ModProjectLoaderTest
         Assert.Equal(["data/art/textures/icons"], model.Icons.SourceRoots);
     }
 
+    // Separators are unified; case is not. These paths are opened, not just compared - the loader
+    // used to lowercase them, which on a case-sensitive host turns an author's working project
+    // into one whose icon roots cannot be found. Callers that need to MATCH two of these compare
+    // them through DocumentUris instead.
     [Fact]
-    public void Load_IconsNode_PathsNormalizedToLowercaseForwardSlashes()
+    public void Load_IconsNode_PathsNormalizedToForwardSlashes_KeepingTheirCase()
     {
         const string json = """
                             {
@@ -441,8 +651,9 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal("data/art/textures/mt_mymod", model.Icons!.MegaTexture);
-        Assert.Equal(["data/art/icons"], model.Icons.SourceRoots);
+        Assert.Equal("Data/Art/Textures/MT_MyMod", model.Icons!.MegaTexture);
+        Assert.Equal("Data/Art/Textures/MT_MyMod.mtd", model.Icons.MtdPath);
+        Assert.Equal(["Data/Art/Icons"], model.Icons.SourceRoots);
     }
 
     // Absence is not "no icons" - the engine always looks in the same place, so the default applies.
@@ -765,7 +976,7 @@ public sealed class ModProjectLoaderTest
     }
 
     [Fact]
-    public void Load_MixedCasePaths_NormalizedToLowercaseForwardSlashes()
+    public void Load_MixedCasePaths_NormalizedToForwardSlashes_KeepingTheirCase()
     {
         const string json = """
                             {
@@ -782,8 +993,8 @@ public sealed class ModProjectLoaderTest
 
         var model = loader.Load(ProjectPath);
 
-        Assert.Equal(new[] { "data/xml" }, model.Directories.Xml);
-        Assert.Equal("../basemod/basemod.pgproj", model.ProjectReferences[0].Path);
+        Assert.Equal(new[] { "Data/XML" }, model.Directories.Xml);
+        Assert.Equal("../BaseMod/BaseMod.pgproj", model.ProjectReferences[0].Path);
     }
 
     private static ModProjectLoader Build(string json, out ListLogger logger)
@@ -793,7 +1004,21 @@ public sealed class ModProjectLoaderTest
             [ProjectPath] = new(json)
         });
         logger = new ListLogger();
-        return new ModProjectLoader(new FileHelper(fs), logger);
+        return new ModProjectLoader(
+            new FileHelper(fs), logger, new NullPgprojMigrationSink(), PgprojMigrations.All);
+    }
+
+    /// <summary>A loader with a chain and a sink, for the migrate-on-read tests.</summary>
+    private static ModProjectLoader BuildWith(
+        string json, out MockFileSystem fs, IPgprojMigrationSink? sink = null,
+        params IDocumentMigration[] migrations)
+    {
+        fs = new MockFileSystem(new Dictionary<string, MockFileData>
+        {
+            [ProjectPath] = new(json)
+        });
+        return new ModProjectLoader(
+            new FileHelper(fs), new ListLogger(), sink ?? new NullPgprojMigrationSink(), migrations);
     }
 
     private sealed record LogEntry(LogLevel Level, string Message);

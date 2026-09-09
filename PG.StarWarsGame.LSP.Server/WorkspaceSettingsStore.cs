@@ -1,10 +1,11 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
-using PG.StarWarsGame.LSP.Core.Caching;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Server.Persistence;
 using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server;
@@ -22,6 +23,49 @@ public sealed record WorkspaceSettings
     public bool ShowChapterLanes { get; init; }
 }
 
+/// <summary>
+///     What <c>.aetswg/settings/workspace.settings.json</c> is, as a versioned document.
+/// </summary>
+/// <remarks>
+///     Adding a field here is a shape change: bump <see cref="Version" />, add a migration from the
+///     version before it, and re-pin <see cref="Shape" />. A new preference that simply defaults to
+///     false still needs the bump - the file it lands in must be able to say which shape it holds.
+/// </remarks>
+public static class WorkspaceSettingsDocument
+{
+    public const string TypeName = "aetswg.WorkspaceSettings";
+
+    public static readonly TypeVersion Version = TypeVersion.Of("aetswg", 1);
+
+    public static readonly DocumentShapePin Shape = new(
+        TypeName, Version, "d6f035c085149ab369b8a80f00f4a9345f87ef5729e12c53a67030374c4f269b");
+
+    public static readonly IReadOnlyList<IDocumentMigration> Migrations = [new AdoptUnversionedFile()];
+
+    /// <summary>
+    ///     Version zero is the same three properties without an envelope, so this adopts the file
+    ///     rather than rewriting it.
+    ///     <para>
+    ///         The plan had this file simply discarded - one free break, on the assumption that
+    ///         versioning it meant restructuring it. It does not: the envelope sits beside the
+    ///         properties it already had, so adopting costs nothing and the user keeps the toggles
+    ///         they set.
+    ///     </para>
+    /// </summary>
+    private sealed class AdoptUnversionedFile : IDocumentMigration
+    {
+        public string TypeName => WorkspaceSettingsDocument.TypeName;
+        public TypeVersion From => TypeVersion.Zero("aetswg");
+        public TypeVersion To => Version;
+        public string? UserNotice => null;
+
+        public JsonNode Migrate(JsonNode document)
+        {
+            return document;
+        }
+    }
+}
+
 /// <summary>Reads/writes the workspace's editor preferences.</summary>
 public interface IWorkspaceSettingsStore
 {
@@ -30,91 +74,36 @@ public interface IWorkspaceSettingsStore
 }
 
 /// <summary>
-///     JSON sidecar under the project's <c>.aetswg/settings/workspace.settings.json</c>
-///     (<see cref="ProjectIndexLocator" /> conventions) - editor preferences that belong with the
-///     workspace, not the mod's xml tree. Without a .pgproj the store degrades to in-memory (the
-///     preference survives the session only). A corrupt file is treated as defaults, never fatal.
+///     JSON sidecar under the project's <c>.aetswg/settings/workspace.settings.json</c>, held by a
+///     <see cref="SidecarStore{T}" /> - editor preferences that belong with the workspace, not the
+///     mod's xml tree. Without a .pgproj the store degrades to in-memory (the preference survives
+///     the session only). A corrupt file is treated as defaults, never fatal.
 /// </summary>
-public sealed class WorkspaceSettingsStore(
-    IModProjectReloadService reloadService,
-    IFileHelper fileHelper,
-    ILogger<WorkspaceSettingsStore> logger) : IWorkspaceSettingsStore
+public sealed class WorkspaceSettingsStore : IWorkspaceSettingsStore
 {
-    private static readonly JsonSerializerOptions s_json = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        WriteIndented = true
-    };
+    private readonly SidecarStore<WorkspaceSettings> _store;
 
-    private readonly object _gate = new();
-    private WorkspaceSettings? _cache;
+    public WorkspaceSettingsStore(
+        IModProjectReloadService reloadService,
+        IFileHelper fileHelper,
+        ILogger<WorkspaceSettingsStore> logger)
+    {
+        _store = new SidecarStore<WorkspaceSettings>(
+            "settings/workspace.settings.json", WorkspaceSettingsDocument.TypeName,
+            WorkspaceSettingsDocument.Version, WorkspaceSettingsDocument.Migrations,
+            new AetswgSidecarLocator(reloadService), fileHelper, logger,
+            () => new WorkspaceSettings());
+    }
 
     public WorkspaceSettings Get()
     {
-        lock (_gate)
-        {
-            return LoadLocked();
-        }
+        return _store.Load().Value;
     }
 
     public void Set(WorkspaceSettings settings)
     {
-        lock (_gate)
-        {
-            _cache = settings;
-            SaveLocked(settings);
-        }
-    }
-
-    private WorkspaceSettings LoadLocked()
-    {
-        if (_cache is not null) return _cache;
-
-        _cache = new WorkspaceSettings();
-        var path = SidecarPath();
-        if (path is null) return _cache;
-
-        try
-        {
-            var fs = fileHelper.FileSystem;
-            if (fs.File.Exists(path))
-            {
-                var loaded = JsonSerializer.Deserialize<WorkspaceSettings>(fs.File.ReadAllText(path), s_json);
-                if (loaded is not null) _cache = loaded;
-            }
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "workspace.settings.json unreadable - using defaults");
-        }
-
-        return _cache;
-    }
-
-    private void SaveLocked(WorkspaceSettings settings)
-    {
-        var path = SidecarPath();
-        if (path is null) return;
-
-        try
-        {
-            var fs = fileHelper.FileSystem;
-            var dir = path[..path.LastIndexOf('/')];
-            fs.Directory.CreateDirectory(dir);
-            fs.File.WriteAllText(path, JsonSerializer.Serialize(settings, s_json));
-        }
-        catch (Exception ex)
-        {
-            logger.LogWarning(ex, "Could not persist workspace.settings.json - the preference stays in-memory");
-        }
-    }
-
-    private string? SidecarPath()
-    {
-        var rootLayer = reloadService.LastWorkspaceConfig?.Layers
-            .OrderByDescending(l => l.Rank)
-            .FirstOrDefault();
-        if (rootLayer?.ProjectPath is not { } pgprojPath) return null;
-        return ProjectIndexLocator.GetAetswgDirectory(pgprojPath) + "/settings/workspace.settings.json";
+        // A refused write is the newer-file case: the preference stays in memory rather than
+        // overwriting settings this build cannot read.
+        _store.TrySave(settings, out _);
     }
 }

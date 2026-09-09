@@ -209,7 +209,8 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
     }
 }
 
-public sealed class GetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigurationProvider config)
+public sealed class GetStoryLayoutHandler(
+    IStoryLayoutStore store, IStoryModelService models, ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetStoryLayoutParams, GetStoryLayoutResult>
 {
     public Task<GetStoryLayoutResult> Handle(GetStoryLayoutParams request, CancellationToken ct)
@@ -217,8 +218,16 @@ public sealed class GetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigura
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryLayoutResult([], rejection));
 
-        var entries = store.Get(new StoryModelKey(request.Campaign, request.Faction))
-            .Select(e => new StoryLayoutEntryDto(e.File, e.EventName, e.X, e.Y))
+        // The sidecar names a node by its thread and event hashed together, so the graph's own
+        // events are what turn those keys back into nodes. An event the campaign no longer has
+        // simply gets no entry back.
+        var nodes = models.GetCampaignModel(request.Campaign, request.Faction)?.Graph.Nodes
+            .Where(n => n.Kind == StoryNodeKind.Event && n.ThreadUri is not null)
+            .Select(n => new StoryLayoutNode(n.ThreadUri!, n.Label))
+            .ToList() ?? [];
+
+        var entries = store.Get(new StoryModelKey(request.Campaign, request.Faction), nodes)
+            .Select(e => new StoryLayoutEntryDto(e.ThreadUri, e.EventName, e.X, e.Y))
             .ToList();
         return Task.FromResult(new GetStoryLayoutResult(entries));
     }
@@ -233,7 +242,7 @@ public sealed class SetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigura
             return Task.FromResult(new SetStoryLayoutResult(false, rejection));
 
         store.Set(new StoryModelKey(request.Campaign, request.Faction), request.Entries
-            .Select(e => new StoryLayoutEntry(e.File, e.EventName, e.X, e.Y))
+            .Select(e => new StoryLayoutEntry(e.ThreadUri, e.EventName, e.X, e.Y))
             .ToList());
         return Task.FromResult(new SetStoryLayoutResult(true));
     }

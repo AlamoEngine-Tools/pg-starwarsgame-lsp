@@ -253,7 +253,8 @@ public sealed class ExecuteStoryCommandHandlerTest
 
         Assert.True(result.Success);
         var docEdit = SingleDocEdit(applier);
-        Assert.Equal(ThreadUri, docEdit.TextDocument.Uri.ToString());
+        // Folded: the protocol's DocumentUri lowercases a Windows drive letter on the way out.
+        Assert.True(DocumentUris.Same(ThreadUri, docEdit.TextDocument.Uri.ToString()));
         Assert.Equal("STORY_FLAGS", Assert.Single(docEdit.Edits).NewText);
     }
 
@@ -428,7 +429,7 @@ public sealed class ExecuteStoryCommandHandlerTest
 
         Assert.True(result.Success);
         var docEdit = SingleDocEdit(applier);
-        Assert.Equal(ManifestUri, docEdit.TextDocument.Uri.ToString());
+        Assert.True(DocumentUris.Same(ManifestUri, docEdit.TextDocument.Uri.ToString()));
         Assert.Contains("<Suspended_Plot>story_main.xml</Suspended_Plot>",
             Assert.Single(docEdit.Edits).NewText);
     }

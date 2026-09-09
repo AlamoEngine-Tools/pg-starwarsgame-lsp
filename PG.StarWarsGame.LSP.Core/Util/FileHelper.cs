@@ -14,9 +14,17 @@ public sealed class FileHelper : IFileHelper
 
     public IFileSystem FileSystem { get; }
 
+    /// <summary>The canonical URI for a path: separators unified, case LEFT ALONE.</summary>
+    /// <remarks>
+    ///     This used to lowercase the whole path, which made every URI in the system unusable for
+    ///     opening a file on a case-sensitive filesystem: the real name could not be recovered from
+    ///     it, and two files the host considers different collapsed into one key. Case-insensitivity
+    ///     is what the ENGINE means by "the same file", so it belongs to the comparison rather than
+    ///     to the value - see <see cref="DocumentUris" />.
+    /// </remarks>
     public string PathToFileUri(string path)
     {
-        var forward = path.Replace('\\', '/').ToLowerInvariant();
+        var forward = path.Replace('\\', '/');
         return forward.StartsWith('/') ? "file://" + forward : "file:///" + forward;
     }
 
@@ -31,7 +39,7 @@ public sealed class FileHelper : IFileHelper
 
     public bool UrisEqual(string a, string b)
     {
-        return string.Equals(NormalizeUri(a), NormalizeUri(b), StringComparison.Ordinal);
+        return DocumentUris.Same(NormalizeUri(a), NormalizeUri(b));
     }
 
     public string? FindInWorkspace(IList<string> roots, string normalizedRelPath)

@@ -3,10 +3,12 @@
 
 using System.Collections.Concurrent;
 using System.IO.Abstractions.TestingHelpers;
+using System.Text.Json.Nodes;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Commands;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -54,6 +56,22 @@ public sealed class NewModProjectCommandHandlerTest
         Assert.Equal(new[] { "data/xml" }, model.Directories.Xml);
         Assert.Equal("CSV", model.Localisation!.Type);
         Assert.Equal("data/text", model.Localisation.Directory);
+    }
+
+    // A project we create says what it is and which format it is in, like every other document the
+    // extension writes. Absent still means version one, so this is not required for the file to
+    // load - it is what makes the NEXT format change able to tell the two apart.
+    [Fact]
+    public async Task NewProject_IsStampedWithItsTypeAndVersion()
+    {
+        var fs = new MockFileSystem();
+        var handler = Build(fs);
+
+        await handler.Handle(Params("My Mod", "/mods/mymod"), CancellationToken.None);
+
+        var written = JsonNode.Parse(fs.File.ReadAllText("/mods/mymod/My_Mod.pgproj"))!.AsObject();
+        Assert.Equal(PgprojFormat.TypeName, (string?)written["_type"]);
+        Assert.Equal(PgprojFormat.Current.ToString(), (string?)written["_typeVersion"]);
     }
 
     [Fact]

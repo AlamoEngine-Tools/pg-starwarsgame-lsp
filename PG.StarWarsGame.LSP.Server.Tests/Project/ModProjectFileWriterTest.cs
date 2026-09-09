@@ -3,6 +3,8 @@
 
 using System.IO.Abstractions.TestingHelpers;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Project;
 
@@ -137,5 +139,22 @@ public sealed class ModProjectFileWriterTest
         var fs = new MockFileSystem(new Dictionary<string, MockFileData> { [Path] = new(json) });
         var writer = new ModProjectFileWriter(new FileHelper(fs));
         return (writer, fs);
+    }
+
+    // A file we rewrite gains its identity if it did not have one. Stamping on write is what makes
+    // the fields spread without ever touching a project the user has not asked us to change.
+    [Fact]
+    public async Task SetLocalisation_StampsTypeAndVersionOnAnUnstampedProject()
+    {
+        var fs = new MockFileSystem();
+        fs.AddFile(Path, new MockFileData("""{ "name": "Mod" }"""));
+
+        await new ModProjectFileWriter(new FileHelper(fs))
+            .SetLocalisationAsync(Path, "CSV", "data/text", CancellationToken.None);
+
+        var written = JsonNode.Parse(fs.File.ReadAllText(Path))!.AsObject();
+        Assert.Equal(PgprojFormat.TypeName, (string?)written["_type"]);
+        Assert.Equal(PgprojFormat.Current.ToString(), (string?)written["_typeVersion"]);
+        Assert.Equal("Mod", (string?)written["name"]);
     }
 }
