@@ -90,10 +90,14 @@ public sealed record StoryPlotThreadDto(string File, bool Suspended, string? Uri
 [Method("aet/getStoryGraph", Direction.ClientToServer)]
 public sealed record GetStoryGraphParams(
     string Campaign,
+    string Faction,
     string? NameFilter = null,
     string? Branch = null,
     string? Lifecycle = null,
-    string? ReachableFrom = null) : IRequest<GetStoryGraphResult>;
+    string? ReachableFrom = null,
+    // Whether the faction manifest registers a plot as Active_Plot or Suspended_Plot.
+    // Null or empty keeps both, which is the whole chain.
+    string? PlotState = null) : IRequest<GetStoryGraphResult>;
 
 public sealed record GetStoryGraphResult(
     IReadOnlyList<StoryGraphNodeDto> Nodes,
@@ -122,7 +126,7 @@ public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, 
 // ── aet/getStoryNodeDetail - full event payload for the property view ────────
 
 [Method("aet/getStoryNodeDetail", Direction.ClientToServer)]
-public sealed record GetStoryNodeDetailParams(string Campaign, string NodeId)
+public sealed record GetStoryNodeDetailParams(string Campaign, string Faction, string NodeId)
     : IRequest<GetStoryNodeDetailResult>;
 
 public sealed record GetStoryNodeDetailResult(StoryNodeDetailDto? Node, string? Error = null);
@@ -183,6 +187,7 @@ public sealed record StoryParamSchemaDto(
 [Method("aet/getStoryParamOptions", Direction.ClientToServer)]
 public sealed record GetStoryParamOptionsParams(
     string Campaign,
+    string Faction,
     string Side,
     string TypeName,
     int Position,
@@ -210,7 +215,7 @@ public sealed record ResolveStoryReferenceResult(
 // ── aet/getStoryDiagnostics - validation results correlated to graph nodes ───
 
 [Method("aet/getStoryDiagnostics", Direction.ClientToServer)]
-public sealed record GetStoryDiagnosticsParams(string Campaign) : IRequest<GetStoryDiagnosticsResult>;
+public sealed record GetStoryDiagnosticsParams(string Campaign, string Faction) : IRequest<GetStoryDiagnosticsResult>;
 
 public sealed record GetStoryDiagnosticsResult(
     IReadOnlyList<StoryDiagnosticDto> Diagnostics,
@@ -232,12 +237,12 @@ public sealed record StoryDiagnosticDto(
 // ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 
 [Method("aet/getStoryLayout", Direction.ClientToServer)]
-public sealed record GetStoryLayoutParams(string Campaign) : IRequest<GetStoryLayoutResult>;
+public sealed record GetStoryLayoutParams(string Campaign, string Faction) : IRequest<GetStoryLayoutResult>;
 
 public sealed record GetStoryLayoutResult(IReadOnlyList<StoryLayoutEntryDto> Entries, string? Error = null);
 
 [Method("aet/setStoryLayout", Direction.ClientToServer)]
-public sealed record SetStoryLayoutParams(string Campaign, IReadOnlyList<StoryLayoutEntryDto> Entries)
+public sealed record SetStoryLayoutParams(string Campaign, string Faction, IReadOnlyList<StoryLayoutEntryDto> Entries)
     : IRequest<SetStoryLayoutResult>;
 
 public sealed record SetStoryLayoutResult(bool Success, string? Error = null);

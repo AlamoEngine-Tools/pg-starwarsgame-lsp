@@ -32,7 +32,7 @@ public sealed class ApplyStoryCommandBatchHandlerTest
 
     private static ApplyStoryCommandBatchParams Batch(params StoryCommandDto[] commands)
     {
-        return new ApplyStoryCommandBatchParams("GC", commands);
+        return new ApplyStoryCommandBatchParams("GC", "Rebel", commands);
     }
 
     /// <summary>Final text per URI - each changed file is a whole-document replacement (one edit).</summary>

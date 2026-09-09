@@ -30,8 +30,8 @@ import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
 import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
-import { labelLayout, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
-import { shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
+import { createLabelSizer, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
+import { needsFullMountForLayout, shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
 import { Extent, fitZoom } from './storyGraph/viewportFit';
 import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
 import { paramRowSpecs } from './storyGraph/paramRows';
@@ -82,7 +82,11 @@ initPanelLayout(vscode);
  * what gets sent, and "no branch filter" travels as an absent field. Here every filter always has
  * a value, because every filter always has a control showing it.
  */
-interface FilterState { nameFilter: string; branch: string; lifecycle: string; reachableFrom: string; }
+interface FilterState {
+    nameFilter: string; branch: string; lifecycle: string; reachableFrom: string;
+    /** Active_Plot or Suspended_Plot, as the faction manifest registers the thread. */
+    plotState: string;
+}
 
 function sendSim(method: string, args?: Record<string, unknown>): void {
     vscode.postMessage({ type: 'sim', method, args });
@@ -109,7 +113,9 @@ function fetchParamOptions(
     });
 }
 
-const EMPTY_FILTERS: FilterState = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
+const EMPTY_FILTERS: FilterState = {
+    nameFilter: '', branch: '', lifecycle: '', reachableFrom: '', plotState: '',
+};
 
 /** Event/reward type names flagged `untested` in the schema - set once, read during render. */
 const untestedTypes = new Set<string>();
@@ -1557,12 +1563,29 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 // plugin's translations must pass, same as during setGraph.
                 applyingServerGraph = true;
                 const wasWindowed = windowed;
+                // Keyed on the MOUNTED set, never on `windowed` - see needsFullMountForLayout.
+                // Zooming out past K_DETAIL unmounts every graph, small ones included, so this was
+                // also true of an unwindowed graph showing the overview: elk arranged an empty
+                // editor, rebuildModel read that same empty editor, and the model - which is what
+                // the overview, the minimap and the lanes all draw - was cleared. The graph
+                // vanished until the next full rebuild put it back.
+                const needsMount = needsFullMountForLayout(mountedIds.size, graphModel.size);
                 try {
                     if (wasWindowed) {
-                        // elk lays out MOUNTED nodes + their connections, so mount the whole graph
-                        // first (windowed=false makes mountNodes add real connections).
+                        // A windowed mount deliberately carries NO rete connections - the LOD canvas
+                        // draws the edges instead - and elk lays out a graph, not a bag of boxes.
+                        // Dropping the window first is what makes the re-mount add them: mountNodes
+                        // skips ids it already holds, so a window that happened to cover the whole
+                        // graph would otherwise re-enter with nothing fresh, and elk would flow
+                        // sixty unconnected nodes into a grid and persist that as the layout.
+                        await unmountNodes([...mountedIds]);
+                        mountedConnKeys.clear();
                         windowed = false;
-                        await mountNodes(graphModel.keys());
+                        await mountAllFromModel();
+                    } else if (needsMount) {
+                        // elk lays out MOUNTED nodes + their connections, so mount the whole graph
+                        // first (windowed is already false here, so mountNodes adds them).
+                        await mountAllFromModel();
                     }
                     await arrange.layout({ options: ARRANGE_OPTIONS });
                     rebuildModel();      // capture the recomputed layout into the model
@@ -1578,7 +1601,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     await fitModel();
                     await reconcileWindow();
                 } else {
-                    void AreaExtensions.zoomAt(area, editor.getNodes());
+                    await AreaExtensions.zoomAt(area, editor.getNodes());
+                    // A graph mounted only for the layout is still carrying whatever the zoom says
+                    // it should not: settle it here rather than waiting on the 'zoomed' pipe, so
+                    // the overview and the mounted nodes are never both up when this returns.
+                    if (needsMount) { await reconcileWindow(); }
                 }
             };
             // Same serialization as setGraph - arranging mid-patch would interleave mutations.
@@ -1739,9 +1766,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // Nodes: coloured rects; from K_LABEL up the event title is drawn inside too (mid stage).
             // Off-screen nodes skipped. Font/colour set once, labels truncated (no per-node clip).
             const showLabels = k >= K_LABEL;
-            let fontPx = 11;
-            let maxLines = 1;
             let advancePerPx = 0;
+            let sizeFor: ((width: number, height: number) => { fontPx: number; maxLines: number }) | null = null;
+            let lastFontPx = 0;
             // Resolved with the rest of the frame's colours rather than re-read here: it was the
             // one canvas colour that already followed the theme, and now they all do.
             const labelColor = colour('--colour-editor-ink');
@@ -1753,23 +1780,18 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 advancePerPx = ctx.measureText(LABEL_SAMPLE).width
                     / LABEL_SAMPLE.length / LABEL_MEASURE_PX;
 
-                // Sized so the graph's longest label fits a node - from the whole model, not just
-                // what is on screen, so the text does not resize while panning.
+                // Sized so the graph's longest label fits - from the whole model, not just what is
+                // on screen, so the text does not resize while panning. The BOX, though, is each
+                // node's own: they differ by several hundred pixels (an event's height follows its
+                // param count), and one size for all of them either overflowed the short ones or
+                // truncated them. See createLabelSizer.
                 let longest = '';
-                let nodeWidth = 0;
-                let nodeHeight = 0;
                 for (const m of graphModel.values()) {
                     if (m.dto.kind !== 'Event') { continue; }
                     if (m.dto.label.length > longest.length) { longest = m.dto.label; }
-                    if (m.w > nodeWidth) { nodeWidth = m.w; }
-                    if (m.h > nodeHeight) { nodeHeight = m.h; }
                 }
-                const fit = labelLayout(longest, Math.max(0, nodeWidth * k - LABEL_PAD * 2),
-                    Math.max(0, nodeHeight * k - LABEL_PAD * 2), advancePerPx,
+                sizeFor = createLabelSizer(longest, advancePerPx,
                     Math.min(13, Math.max(8, Math.round(k * 55))));
-                fontPx = fit.fontPx;
-                maxLines = fit.maxLines;
-                ctx.font = `${fontPx}px sans-serif`;
                 ctx.textBaseline = 'middle';
             }
             for (const m of graphModel.values()) {
@@ -1783,9 +1805,17 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 const color = colour(m.colorToken);
                 ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
                 ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(sx, sy, sw, sh);
-                if (showLabels && m.dto.kind === 'Event' && sw > 30) {
+                if (showLabels && sizeFor !== null && m.dto.kind === 'Event' && sw > 30) {
                     ctx.globalAlpha = 1;
                     ctx.fillStyle = labelColor;
+                    const { fontPx, maxLines } = sizeFor(
+                        Math.max(0, sw - LABEL_PAD * 2), Math.max(0, sh - LABEL_PAD * 2));
+                    // Only when it actually changes: parsing the font shorthand per node is the
+                    // cost that made one size per frame attractive, and nodes of a size cluster.
+                    if (fontPx !== lastFontPx) {
+                        ctx.font = `${fontPx}px sans-serif`;
+                        lastFontPx = fontPx;
+                    }
                     // Arithmetic from the measured advance rather than measureText per node -
                     // hundreds of these are drawn per frame.
                     const lines = wrapLabel(m.dto.label, sw - LABEL_PAD * 2, maxLines,
@@ -3317,6 +3347,14 @@ const Shell = styled.div`
 
 const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
 
+/**
+ * How the faction's plot manifest registers a thread.
+ *
+ * Two stops and an 'any', so it is a dropdown rather than a slider - the two are not points on
+ * an axis, they are the two lists a manifest keeps.
+ */
+const PLOT_STATES = ['Active', 'Suspended'];
+
 function App(): React.JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
     const editorRef = useRef<EditorHandle | null>(null);
@@ -3948,6 +3986,14 @@ function App(): React.JSX.Element {
                             <select value={filters.lifecycle} onChange={e => setFilter({ lifecycle: e.target.value })} title="Lifecycle">
                                 <option value="">Any lifecycle</option>
                                 {LIFECYCLES.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                            <select
+                                value={filters.plotState}
+                                onChange={e => setFilter({ plotState: e.target.value })}
+                                title="Plot state - how this faction's manifest registers the thread an event lives in"
+                            >
+                                <option value="">Any plot state</option>
+                                {PLOT_STATES.map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
                         </div>
                     </>}

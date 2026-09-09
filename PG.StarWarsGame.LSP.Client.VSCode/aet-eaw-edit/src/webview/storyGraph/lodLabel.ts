@@ -36,6 +36,47 @@ export const MIN_LABEL_PX = 7;
 export const LINE_RATIO = 1.15;
 
 /**
+ * How many lines of `fontPx` text fit in `height`.
+ *
+ * Never fewer than one: a node too short for a line still says its name, and a label that vanished
+ * would be worse than one that reaches its edges.
+ */
+export function linesThatFit(height: number, fontPx: number): number {
+    return Math.max(1, Math.floor(height / (fontPx * LINE_RATIO)));
+}
+
+/**
+ * Per-box label sizing for one frame.
+ *
+ * The size used to be chosen once per frame, from the graph's longest label against its LARGEST
+ * node. Every shorter node inherited a line budget its box could not hold, and since the block is
+ * centred it spilled out of both ends into the rows above and below. Capping each node's budget
+ * fixes the collision but truncates those labels; sizing per box keeps the whole name, because a
+ * smaller font buys more characters per line AND more lines at once.
+ *
+ * Still measured against `longest` rather than each node's own label, so two boxes of the same size
+ * always render at the same size - the variation the reader sees tracks the node's shape, not its
+ * name. Memoised because a campaign draws hundreds of nodes from a handful of box sizes, and
+ * `labelLayout` walks down from the maximum size to find its answer.
+ *
+ * One sizer per frame: the boxes are in SCREEN pixels, so every size changes with the zoom.
+ */
+export function createLabelSizer(
+    longest: string, advancePerPx: number, maxPx: number,
+): (width: number, height: number) => { fontPx: number; maxLines: number } {
+    const cache = new Map<string, { fontPx: number; maxLines: number }>();
+    return (width, height) => {
+        const key = `${Math.round(width)}x${Math.round(height)}`;
+        let fit = cache.get(key);
+        if (fit === undefined) {
+            fit = labelLayout(longest, width, height, advancePerPx, maxPx);
+            cache.set(key, fit);
+        }
+        return fit;
+    };
+}
+
+/**
  * The font size and line budget at which `longest` fits a `width` x `height` node.
  *
  * Size and line count cannot be chosen separately - a smaller font fits more characters per line
@@ -52,8 +93,7 @@ export const LINE_RATIO = 1.15;
 export function labelLayout(
     longest: string, width: number, height: number, advancePerPx: number, maxPx: number,
 ): { fontPx: number; maxLines: number } {
-    const linesAt = (px: number): number =>
-        Math.max(1, Math.floor(height / (px * LINE_RATIO)));
+    const linesAt = (px: number): number => linesThatFit(height, px);
 
     if (longest.length === 0 || advancePerPx <= 0 || !Number.isFinite(width)
         || !Number.isFinite(height)) {

@@ -13,7 +13,7 @@ public sealed class StorySimStartHandler(IStorySimulationService sim, ILspConfig
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.Start(request.Campaign);
+        var (state, error) = sim.Start(new StoryModelKey(request.Campaign, request.Faction));
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -25,7 +25,7 @@ public sealed class StorySimStopHandler(IStorySimulationService sim, ILspConfigu
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.Stop(request.Campaign);
+        var (state, error) = sim.Stop(new StoryModelKey(request.Campaign, request.Faction));
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -37,7 +37,7 @@ public sealed class StorySimGetStateHandler(IStorySimulationService sim, ILspCon
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.GetState(request.Campaign);
+        var (state, error) = sim.GetState(new StoryModelKey(request.Campaign, request.Faction));
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -49,7 +49,7 @@ public sealed class StorySimSatisfyTriggerHandler(IStorySimulationService sim, I
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.SatisfyTrigger(request.Campaign, request.NodeId);
+        var (state, error) = sim.SatisfyTrigger(new StoryModelKey(request.Campaign, request.Faction), request.NodeId);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -61,7 +61,7 @@ public sealed class StorySimSetFlagHandler(IStorySimulationService sim, ILspConf
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.SetFlag(request.Campaign, request.Flag, request.Value);
+        var (state, error) = sim.SetFlag(new StoryModelKey(request.Campaign, request.Faction), request.Flag, request.Value);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -73,7 +73,7 @@ public sealed class StorySimAdvanceClockHandler(IStorySimulationService sim, ILs
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.AdvanceClock(request.Campaign, request.Seconds);
+        var (state, error) = sim.AdvanceClock(new StoryModelKey(request.Campaign, request.Faction), request.Seconds);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }
@@ -85,7 +85,7 @@ public sealed class StorySimLuaNotifyHandler(IStorySimulationService sim, ILspCo
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.LuaNotify(request.Campaign, request.Id);
+        var (state, error) = sim.LuaNotify(new StoryModelKey(request.Campaign, request.Faction), request.Id);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }

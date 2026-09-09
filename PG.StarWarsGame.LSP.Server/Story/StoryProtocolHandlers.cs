@@ -52,21 +52,24 @@ public sealed class GetStoryPlotsHandler(
         var campaigns = new List<StoryCampaignDto>();
         foreach (var campaign in chain.Campaigns)
         {
-            var model = modelService.GetCampaignModel(campaign.Name);
-
-            // Manifest entries use engine casing; canonical thread URIs are lowercase. Indexed by
-            // file name once per campaign, for the same reason as the Lua map above - a manifest
-            // with fifty threads used to walk the campaign's whole thread list fifty times.
-            var threadUrisByFileName = BuildThreadUriIndex(model);
-
-            string? ResolveUri(string thread)
-            {
-                return threadUrisByFileName.GetValueOrDefault(thread.ToLowerInvariant());
-            }
-
             var factions = new List<StoryFactionDto>();
             foreach (var faction in campaign.FactionManifests)
             {
+                // Per FACTION, because that is what a model is. Asking for the campaign gave one
+                // merged model, and a thread's suspension then read from a chain the player of this
+                // faction never runs.
+                var model = modelService.GetCampaignModel(campaign.Name, faction.Faction);
+
+                // Manifest entries use engine casing; canonical thread URIs are lowercase. Indexed
+                // by file name once, for the same reason as the Lua map above - a manifest with
+                // fifty threads used to walk the whole thread list fifty times.
+                var threadUrisByFileName = BuildThreadUriIndex(model);
+
+                string? ResolveUri(string thread)
+                {
+                    return threadUrisByFileName.GetValueOrDefault(thread.ToLowerInvariant());
+                }
+
                 manifestsByFile.TryGetValue(faction.ManifestFile, out var contents);
                 var threads = new List<StoryPlotThreadDto>();
                 foreach (var thread in contents?.ActiveThreads ?? [])
@@ -159,13 +162,14 @@ public sealed class GetStoryGraphHandler(IStoryModelService modelService, ILspCo
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryGraphResult([], [], rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
                 $"Campaign '{request.Campaign}' was not found."));
 
         return Task.FromResult(StoryGraphProjection.Project(
-            model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom));
+            model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
+            request.PlotState));
     }
 }
 
@@ -177,7 +181,7 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryNodeDetailResult(null, rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         var node = model?.Graph.Nodes.FirstOrDefault(n =>
             n.Kind == StoryNodeKind.Event && n.Id == request.NodeId);
         if (node?.Event is not { } storyEvent)
@@ -213,7 +217,7 @@ public sealed class GetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigura
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryLayoutResult([], rejection));
 
-        var entries = store.Get(request.Campaign)
+        var entries = store.Get(new StoryModelKey(request.Campaign, request.Faction))
             .Select(e => new StoryLayoutEntryDto(e.File, e.EventName, e.X, e.Y))
             .ToList();
         return Task.FromResult(new GetStoryLayoutResult(entries));
@@ -228,7 +232,7 @@ public sealed class SetStoryLayoutHandler(IStoryLayoutStore store, ILspConfigura
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new SetStoryLayoutResult(false, rejection));
 
-        store.Set(request.Campaign, request.Entries
+        store.Set(new StoryModelKey(request.Campaign, request.Faction), request.Entries
             .Select(e => new StoryLayoutEntry(e.File, e.EventName, e.X, e.Y))
             .ToList());
         return Task.FromResult(new SetStoryLayoutResult(true));
@@ -299,7 +303,7 @@ public sealed class GetStoryParamOptionsHandler(
 
         // Story-scoped names resolve campaign-wide - the campaign model gives a far tighter
         // candidate set than the index (which mixes every campaign's names together).
-        var campaignScoped = CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, prefix);
+        var campaignScoped = CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, request.Faction, prefix);
         if (campaignScoped is not null)
             return Task.FromResult(new GetStoryParamOptionsResult(campaignScoped.Take(limit).ToList()));
 
@@ -317,13 +321,13 @@ public sealed class GetStoryParamOptionsHandler(
     ///     e.g. Lua-side Story_Event ids, and the generic provider handles them).
     /// </summary>
     private IEnumerable<StoryParamOptionDto>? CampaignScopedOptions(
-        string? referenceType, string campaign, string prefix)
+        string? referenceType, string campaign, string faction, string prefix)
     {
         if (referenceType is not (StoryReferenceTypes.EventName or StoryReferenceTypes.Branch
             or StoryReferenceTypes.PlotFile))
             return null;
 
-        var model = modelService.GetCampaignModel(campaign);
+        var model = modelService.GetCampaignModel(campaign, faction);
         if (model is null) return [];
 
         var events = model.Threads.SelectMany(t => t.Events);
@@ -364,7 +368,7 @@ public sealed class GetStoryDiagnosticsHandler(
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryDiagnosticsResult([], rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
                 $"Campaign '{request.Campaign}' was not found."));

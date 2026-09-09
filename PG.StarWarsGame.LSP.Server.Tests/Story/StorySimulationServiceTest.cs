@@ -31,9 +31,12 @@ public sealed class StorySimulationServiceTest
         "\t</Event>\n" +
         "</Story>\n";
 
-    private static (StorySimulationService Service, List<string> Notified) BuildService()
+    /// <summary>The campaign faction every fixture here runs as; a session is keyed by both.</summary>
+    private static readonly StoryModelKey Key = new("GC", "Rebel");
+
+    private static (StorySimulationService Service, List<StoryModelKey> Notified) BuildService()
     {
-        var notified = new List<string>();
+        var notified = new List<StoryModelKey>();
         var service = new StorySimulationService(
             new StubModelService(), new StubIndexService(IndexWithLuaSymbol()),
             new SimEnumSchema(), notified.Add);
@@ -57,13 +60,13 @@ public sealed class StorySimulationServiceTest
     {
         var (service, notified) = BuildService();
 
-        var (state, error) = service.Start("GC");
+        var (state, error) = service.Start(Key);
 
         Assert.Null(error);
         Assert.True(state!.Running);
         Assert.Contains(state.Nodes, n => n.Lifecycle == "Fired"); // Begin (elapsed 0)
         Assert.Contains(state.Nodes, n => n.Lifecycle == "Armed"); // Manual
-        Assert.Equal(["GC"], notified);
+        Assert.Equal([Key], notified);
     }
 
     [Fact]
@@ -71,7 +74,7 @@ public sealed class StorySimulationServiceTest
     {
         var (service, _) = BuildService();
 
-        var (state, error) = service.Start("Nope");
+        var (state, error) = service.Start(new StoryModelKey("Nope", "Rebel"));
 
         Assert.Null(state);
         Assert.Contains("Nope", error);
@@ -82,7 +85,7 @@ public sealed class StorySimulationServiceTest
     {
         var (service, _) = BuildService();
 
-        var (state, error) = service.GetState("GC");
+        var (state, error) = service.GetState(Key);
 
         Assert.Null(error);
         Assert.False(state!.Running);
@@ -92,10 +95,10 @@ public sealed class StorySimulationServiceTest
     public void SatisfyTrigger_AdvancesTheSession_AndNotifies()
     {
         var (service, notified) = BuildService();
-        service.Start("GC");
-        var armed = service.GetState("GC").State!.Interventions.Single();
+        service.Start(Key);
+        var armed = service.GetState(Key).State!.Interventions.Single();
 
-        var (state, error) = service.SatisfyTrigger("GC", armed.NodeId);
+        var (state, error) = service.SatisfyTrigger(Key, armed.NodeId);
 
         Assert.Null(error);
         Assert.Empty(state!.Interventions);
@@ -107,7 +110,7 @@ public sealed class StorySimulationServiceTest
     {
         var (service, _) = BuildService();
 
-        var (_, error) = service.SetFlag("GC", "FLAG_X", 1);
+        var (_, error) = service.SetFlag(Key, "FLAG_X", 1);
 
         Assert.Contains("No simulation is running", error);
     }
@@ -116,11 +119,11 @@ public sealed class StorySimulationServiceTest
     public void Stop_EndsTheSession()
     {
         var (service, _) = BuildService();
-        service.Start("GC");
+        service.Start(Key);
 
-        service.Stop("GC");
+        service.Stop(Key);
 
-        Assert.False(service.GetState("GC").State!.Running);
+        Assert.False(service.GetState(Key).State!.Running);
     }
 
     [Fact]
@@ -128,7 +131,7 @@ public sealed class StorySimulationServiceTest
     {
         var (service, _) = BuildService();
 
-        var (state, _) = service.Start("GC");
+        var (state, _) = service.Start(Key);
 
         Assert.Equal(["Alert_From_Lua"], state!.LuaNotifications);
     }
@@ -145,7 +148,7 @@ public sealed class StorySimulationServiceTest
         });
 
         var result = await new StorySimStartHandler(service, config)
-            .Handle(new StorySimStartParams("GC"), CancellationToken.None);
+            .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Equal(StorySimFeature.DisabledMessage, result.Error);
     }
@@ -157,9 +160,9 @@ public sealed class StorySimulationServiceTest
         var config = FakeLspConfigurationProvider.WithFeatures(new FeatureFlags());
 
         var started = await new StorySimStartHandler(service, config)
-            .Handle(new StorySimStartParams("GC"), CancellationToken.None);
+            .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
         var advanced = await new StorySimAdvanceClockHandler(service, config)
-            .Handle(new StorySimAdvanceClockParams("GC", 5), CancellationToken.None);
+            .Handle(new StorySimAdvanceClockParams("GC", "Rebel", 5), CancellationToken.None);
 
         Assert.Null(started.Error);
         Assert.Equal(5, advanced.State!.Clock);
@@ -176,7 +179,13 @@ public sealed class StorySimulationServiceTest
             return ["GC"];
         }
 
-        public StoryCampaignModel? GetCampaignModel(string campaignName)
+        public IReadOnlyList<StoryModelKey> GetModelKeys()
+        {
+            return GetCampaignNames()
+                .Select(c => new StoryModelKey(c, "Rebel")).ToList();
+        }
+
+        public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
         {
             return campaignName == "GC" ? Model : null;
         }
@@ -199,7 +208,7 @@ public sealed class StorySimulationServiceTest
         private static StoryCampaignModel BuildModel()
         {
             var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
-            return new StoryCampaignModel("GC", [thread],
+            return new StoryCampaignModel("GC", "Rebel", [thread],
                 new HashSet<string>(StringComparer.Ordinal),
                 new StoryGraphBuilder(new SimEnumSchema()).Build([thread]))
             {

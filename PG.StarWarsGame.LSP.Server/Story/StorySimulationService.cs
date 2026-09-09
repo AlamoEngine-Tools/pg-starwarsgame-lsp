@@ -9,103 +9,103 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 
 public interface IStorySimulationService
 {
-    (StorySimStateDto? State, string? Error) Start(string campaign);
-    (StorySimStateDto? State, string? Error) Stop(string campaign);
-    (StorySimStateDto? State, string? Error) GetState(string campaign);
-    (StorySimStateDto? State, string? Error) SatisfyTrigger(string campaign, string nodeId);
-    (StorySimStateDto? State, string? Error) SetFlag(string campaign, string flag, int value);
-    (StorySimStateDto? State, string? Error) AdvanceClock(string campaign, double seconds);
-    (StorySimStateDto? State, string? Error) LuaNotify(string campaign, string id);
+    (StorySimStateDto? State, string? Error) Start(StoryModelKey key);
+    (StorySimStateDto? State, string? Error) Stop(StoryModelKey key);
+    (StorySimStateDto? State, string? Error) GetState(StoryModelKey key);
+    (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId);
+    (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value);
+    (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds);
+    (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id);
 }
 
 /// <summary>
-///     One simulation session per campaign, pinned to the campaign model that existed at
+///     One simulation session per campaign FACTION, pinned to the model that existed at
 ///     <see cref="Start" /> - edits during a run don't mutate a running story; restart to pick
 ///     them up. Every state change invokes the notify delegate (aet/storySimChanged) so all
 ///     panels re-fetch. The Lua notification catalogue is collected from the workspace index's
-///     StoryNotification symbols, filtered to the campaign's attached scripts.
+///     StoryNotification symbols, filtered to that faction's attached scripts.
 /// </summary>
 public sealed class StorySimulationService(
     IStoryModelService modelService,
     IGameIndexService indexService,
     ISchemaProvider schema,
-    Action<string> notifyChanged) : IStorySimulationService
+    Action<StoryModelKey> notifyChanged) : IStorySimulationService
 {
     private readonly object _gate = new();
-    private readonly Dictionary<string, Session> _sessions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<StoryModelKey, Session> _sessions = new();
 
-    public (StorySimStateDto? State, string? Error) Start(string campaign)
+    public (StorySimStateDto? State, string? Error) Start(StoryModelKey key)
     {
-        var model = modelService.GetCampaignModel(campaign);
+        var model = modelService.GetCampaignModel(key.Campaign, key.Faction);
         if (model is null)
-            return (null, $"Campaign '{campaign}' was not found.");
+            return (null, $"{key} was not found.");
 
         var simulator = new StorySimulator(model, schema);
         var session = new Session(simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts));
         lock (_gate)
         {
-            _sessions[campaign] = session;
+            _sessions[key] = session;
         }
 
-        notifyChanged(campaign);
+        notifyChanged(key);
         return (ToDto(session, true), null);
     }
 
-    public (StorySimStateDto? State, string? Error) Stop(string campaign)
+    public (StorySimStateDto? State, string? Error) Stop(StoryModelKey key)
     {
         lock (_gate)
         {
-            _sessions.Remove(campaign);
+            _sessions.Remove(key);
         }
 
-        notifyChanged(campaign);
+        notifyChanged(key);
         return (new StorySimStateDto(false, 0, [], [], [], [], []), null);
     }
 
-    public (StorySimStateDto? State, string? Error) GetState(string campaign)
+    public (StorySimStateDto? State, string? Error) GetState(StoryModelKey key)
     {
         lock (_gate)
         {
-            if (_sessions.TryGetValue(campaign, out var session))
+            if (_sessions.TryGetValue(key, out var session))
                 return (ToDto(session, true), null);
         }
 
         return (new StorySimStateDto(false, 0, [], [], [], [], []), null);
     }
 
-    public (StorySimStateDto? State, string? Error) SatisfyTrigger(string campaign, string nodeId)
+    public (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId)
     {
-        return Mutate(campaign, (sim, snapshot) => sim.SatisfyTrigger(snapshot, nodeId));
+        return Mutate(key, (sim, snapshot) => sim.SatisfyTrigger(snapshot, nodeId));
     }
 
-    public (StorySimStateDto? State, string? Error) SetFlag(string campaign, string flag, int value)
+    public (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value)
     {
-        return Mutate(campaign, (sim, snapshot) => sim.SetFlag(snapshot, flag, value));
+        return Mutate(key, (sim, snapshot) => sim.SetFlag(snapshot, flag, value));
     }
 
-    public (StorySimStateDto? State, string? Error) AdvanceClock(string campaign, double seconds)
+    public (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds)
     {
-        return Mutate(campaign, (sim, snapshot) => sim.AdvanceClock(snapshot, seconds));
+        return Mutate(key, (sim, snapshot) => sim.AdvanceClock(snapshot, seconds));
     }
 
-    public (StorySimStateDto? State, string? Error) LuaNotify(string campaign, string id)
+    public (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id)
     {
-        return Mutate(campaign, (sim, snapshot) => sim.LuaNotify(snapshot, id));
+        return Mutate(key, (sim, snapshot) => sim.LuaNotify(snapshot, id));
     }
 
     private (StorySimStateDto? State, string? Error) Mutate(
-        string campaign, Func<StorySimulator, StorySimSnapshot, StorySimSnapshot> step)
+        StoryModelKey key, Func<StorySimulator, StorySimSnapshot, StorySimSnapshot> step)
     {
         Session next;
         lock (_gate)
         {
-            if (!_sessions.TryGetValue(campaign, out var session))
-                return (null, $"No simulation is running for campaign '{campaign}'.");
+            if (!_sessions.TryGetValue(key, out var session))
+                return (null, $"No simulation is running for {key}.");
             next = session with { Snapshot = step(session.Simulator, session.Snapshot) };
-            _sessions[campaign] = next;
+            _sessions[key] = next;
         }
 
-        notifyChanged(campaign);
+        notifyChanged(key);
         return (ToDto(next, true), null);
     }
 

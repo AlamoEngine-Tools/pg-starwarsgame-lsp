@@ -92,6 +92,14 @@ export interface GraphFilters {
     branch?: string;
     lifecycle?: string;
     reachableFrom?: string;
+    /**
+     * `Active` or `Suspended` - how the faction's plot manifest registers the thread an event
+     * lives in. Absent or empty keeps both, which is the whole chain.
+     *
+     * Not the same question as `lifecycle`: a suspended plot's events are Inactive, and so is an
+     * event in a running plot whose prereq has not fired.
+     */
+    plotState?: string;
 }
 
 // ── aet/getStoryNodeDetail ───────────────────────────────────────────────────
@@ -268,4 +276,5 @@ export interface StoryGraphChangedParams {
 
 export interface StorySimChangedParams {
     campaign: string;
+    faction: string;
 }

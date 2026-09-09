@@ -36,7 +36,7 @@ public sealed class PreviewStoryGraphHandler(
         if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryGraphResult([], [], rejection));
 
-        var baseModel = modelService.GetCampaignModel(request.Campaign);
+        var baseModel = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (baseModel is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
                 $"Campaign '{request.Campaign}' was not found."));
@@ -44,14 +44,15 @@ public sealed class PreviewStoryGraphHandler(
         // No staged commands → identical to the committed graph.
         if (request.Commands.Count == 0)
             return Task.FromResult(StoryGraphProjection.Project(
-                baseModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom));
+                baseModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
+                request.PlotState));
 
         var executor = new StoryCommandExecutor(
             modelService, indexService, textSource, schema, fileHelper, reloadService, NullLogger.Instance);
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(
-            baseModel, request.Commands.Select(c => c.ToParams(request.Campaign)).ToList(), texts);
+            baseModel, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (error is not null)
             return Task.FromResult(new GetStoryGraphResult([], [],
                 $"Change {(failedIndex ?? 0) + 1} of {request.Commands.Count} can't be staged: {error}"));
@@ -60,13 +61,14 @@ public sealed class PreviewStoryGraphHandler(
         // thread) comes from committed state; graph gestures only touch thread files, which the
         // reader serves from the working set (staged) or buffer (unchanged).
         var previewModel = new StoryCampaignAssembler(schema)
-            .Assemble(request.Campaign, modelService.GetChainResult(), ReadThread);
+            .Assemble(request.Campaign, request.Faction, modelService.GetChainResult(), ReadThread);
         if (previewModel is null)
             return Task.FromResult(new GetStoryGraphResult([], [],
                 $"Campaign '{request.Campaign}' could not be assembled from the staged changes."));
 
         return Task.FromResult(StoryGraphProjection.Project(
-            previewModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom));
+            previewModel, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
+            request.PlotState));
 
         (string Uri, string Text)? ReadThread(string xmlRelativePath)
         {

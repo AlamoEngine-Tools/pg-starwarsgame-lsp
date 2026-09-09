@@ -10,7 +10,7 @@ import { ClearFiltersButton } from './ClearFiltersButton';
 
 const render = (element: React.JSX.Element): string => renderToStaticMarkup(element);
 
-const none = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
+const none = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '', plotState: '' };
 
 describe('ClearFiltersButton', () => {
     /**
@@ -38,12 +38,15 @@ describe('ClearFiltersButton', () => {
         assert.match(html, /title="[^"]*no filters are set"/i);
     });
 
-    it('is live as soon as any one of the four is set', () => {
+    it('is live as soon as any one of them is set', () => {
         for (const filters of [
             { ...none, nameFilter: 'destroy' },
             { ...none, branch: 'Empire' },
             { ...none, lifecycle: 'Armed' },
             { ...none, reachableFrom: 'Event_01' },
+            // A plot's registration state - Active_Plot or Suspended_Plot in the faction's
+            // manifest - which is a different question from an event's lifecycle.
+            { ...none, plotState: 'Suspended' },
         ]) {
             const html = render(<ClearFiltersButton filters={filters} onClear={() => undefined} />);
 

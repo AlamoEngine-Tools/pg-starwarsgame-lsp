@@ -7,9 +7,18 @@ using PG.StarWarsGame.LSP.Story.Graph;
 
 namespace PG.StarWarsGame.LSP.Story.Model;
 
-/// <summary>One campaign's executable story model: parsed threads, suspension state, graph.</summary>
+/// <summary>
+///     One campaign FACTION's executable story model: parsed threads, suspension state, graph.
+///     <para>
+///         Scoped to a faction, not to a campaign. A campaign declares a plot manifest per faction,
+///         and those are separate chains - the playable faction's plots are what the player runs,
+///         and an unplayable faction's are triggered by the AI. The engine never runs two of them
+///         as one story, so a model that merged them reported findings the engine cannot produce.
+///     </para>
+/// </summary>
 public sealed record StoryCampaignModel(
     string CampaignName,
+    string Faction,
     IReadOnlyList<StoryThread> Threads,
     IReadOnlySet<string> SuspendedThreadUris,
     StoryGraph Graph)
@@ -26,20 +35,35 @@ public sealed record StoryCampaignModel(
 }
 
 /// <summary>
-///     Assembles one campaign's model from the chain scan associations: faction manifests →
-///     threads, recursing through tactical plot references. A thread is suspended when no
-///     included manifest lists it as <c>Active_Plot</c>. Thread content comes through the given
-///     reader (open-buffer-first in production), so unsaved edits flow into the model.
+///     Assembles one campaign faction's model from the chain scan associations: that faction's
+///     plot manifest → threads, recursing through tactical plot references. A thread is suspended
+///     when no manifest in THAT faction's closure lists it as <c>Active_Plot</c>. Thread content
+///     comes through the given reader (open-buffer-first in production), so unsaved edits flow into
+///     the model.
 /// </summary>
 public sealed class StoryCampaignAssembler(ISchemaProvider schema)
 {
-    public StoryCampaignModel? Assemble(string campaignName, StoryChainScanResult chain,
-        Func<string, (string Uri, string Text)?> readThread)
+    /// <param name="faction">
+    ///     The faction whose manifest seeds the walk. Null is returned when the campaign declares
+    ///     no manifest for it - a caller asking for a faction that is not there is asking about
+    ///     nothing, and answering with another faction's chain is how this went wrong before.
+    /// </param>
+    public StoryCampaignModel? Assemble(string campaignName, string faction,
+        StoryChainScanResult chain, Func<string, (string Uri, string Text)?> readThread)
     {
         var campaigns = chain.Campaigns
             .Where(c => c.Name.Equals(campaignName, StringComparison.OrdinalIgnoreCase))
             .ToList();
         if (campaigns.Count == 0) return null;
+
+        // The campaign may be declared more than once across layers; every declaration's manifest
+        // for THIS faction seeds the walk, which is what the merged version did per campaign.
+        var factionManifests = campaigns
+            .SelectMany(c => c.FactionManifests)
+            .Where(f => f.Faction.Equals(faction, StringComparison.OrdinalIgnoreCase))
+            .Select(f => f.ManifestFile)
+            .ToList();
+        if (factionManifests.Count == 0) return null;
 
         var manifestsByFile = new Dictionary<string, StoryManifestContents>(StringComparer.OrdinalIgnoreCase);
         foreach (var manifest in chain.Manifests)
@@ -49,8 +73,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
         var tacticalManifestFiles = new HashSet<string>(
             chain.TacticalReferences.Select(t => t.ManifestFile), StringComparer.OrdinalIgnoreCase);
 
-        var manifestQueue = new Queue<string>(
-            campaigns.SelectMany(c => c.FactionManifests.Select(f => f.ManifestFile)));
+        var manifestQueue = new Queue<string>(factionManifests);
         var manifestSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var threadFiles = new List<string>();
         var threadSeen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -104,7 +127,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
                 StringComparer.Ordinal),
             StringComparer.OrdinalIgnoreCase);
 
-        return new StoryCampaignModel(campaignName, threads, suspendedUris,
+        return new StoryCampaignModel(campaignName, faction, threads, suspendedUris,
             new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads))
         {
             LuaScripts = luaScripts,

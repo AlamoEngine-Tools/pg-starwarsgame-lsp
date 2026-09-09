@@ -38,7 +38,7 @@ public sealed class ExecuteStoryCommandHandler(
         if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(Error(rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(Error($"Campaign '{request.Campaign}' was not found."));
 

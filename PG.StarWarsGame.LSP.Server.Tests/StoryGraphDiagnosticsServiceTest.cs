@@ -51,18 +51,27 @@ public sealed class StoryGraphDiagnosticsServiceTest
             return ["GC_One", "GC_Two"];
         }
 
-        public StoryCampaignModel? GetCampaignModel(string campaignName)
+        public IReadOnlyList<StoryModelKey> GetModelKeys()
+        {
+            return GetCampaignNames()
+                .Select(c => new StoryModelKey(c, "Rebel")).ToList();
+        }
+
+        public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
         {
             var thread = StoryThreadParser.Parse(
                 "<Story><Event Name=\"B\"><Prereq>Ghost</Prereq></Event></Story>", ThreadUri);
-            return new StoryCampaignModel(campaignName, [thread],
+            return new StoryCampaignModel(campaignName, faction, [thread],
                 new HashSet<string>(StringComparer.Ordinal),
                 new StoryGraphBuilder(new EmptySchema()).Build([thread]));
         }
 
         public IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri)
         {
-            return GetCampaignNames().Select(GetCampaignModel).Where(m => m is not null).ToList()!;
+            return GetModelKeys()
+                .Select(k => GetCampaignModel(k.Campaign, k.Faction))
+                .Where(m => m is not null)
+                .ToList()!;
         }
 
         public StoryChainScanResult GetChainResult()

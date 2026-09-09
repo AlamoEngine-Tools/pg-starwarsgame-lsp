@@ -12,12 +12,50 @@ using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Server;
 
+/// <summary>
+///     One campaign faction, which is the unit a story model is built and cached under.
+///     <para>
+///         Compared without regard to case, because the campaign name comes from an XML attribute
+///         and the faction from a tag name, and neither is written consistently across the corpus.
+///     </para>
+/// </summary>
+public sealed record StoryModelKey(string Campaign, string Faction)
+{
+    public bool Equals(StoryModelKey? other)
+    {
+        return other is not null
+               && string.Equals(Campaign, other.Campaign, StringComparison.OrdinalIgnoreCase)
+               && string.Equals(Faction, other.Faction, StringComparison.OrdinalIgnoreCase);
+    }
+
+    public override int GetHashCode()
+    {
+        return HashCode.Combine(
+            StringComparer.OrdinalIgnoreCase.GetHashCode(Campaign),
+            StringComparer.OrdinalIgnoreCase.GetHashCode(Faction));
+    }
+
+    public override string ToString()
+    {
+        return $"{Campaign} - {Faction}";
+    }
+}
+
 public interface IStoryModelService
 {
     IReadOnlyList<string> GetCampaignNames();
-    StoryCampaignModel? GetCampaignModel(string campaignName);
 
-    /// <summary>Every campaign model whose thread closure contains the given document.</summary>
+    /// <summary>Every campaign faction pair the chain declares, in document order.</summary>
+    IReadOnlyList<StoryModelKey> GetModelKeys();
+
+    /// <summary>
+    ///     One campaign FACTION's model, or null when the campaign declares no manifest for it.
+    ///     A campaign's factions are separate story chains and are never merged - see
+    ///     <see cref="StoryCampaignModel" />.
+    /// </summary>
+    StoryCampaignModel? GetCampaignModel(string campaignName, string faction);
+
+    /// <summary>Every model whose thread closure contains the given document.</summary>
     IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri);
 
     /// <summary>The current chain scan (campaign → faction → manifest → thread associations).</summary>
@@ -46,7 +84,7 @@ public sealed class StoryModelService : IStoryModelService
     private readonly object _gate = new();
     private readonly IGameIndexService _indexService;
     private readonly ILogger<StoryModelService> _logger;
-    private readonly Dictionary<string, ModelCache> _models = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<StoryModelKey, ModelCache> _models = new();
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
     private readonly IDocumentTextSource _textSource;
@@ -81,13 +119,28 @@ public sealed class StoryModelService : IStoryModelService
             .ToList();
     }
 
-    public StoryCampaignModel? GetCampaignModel(string campaignName)
+    public IReadOnlyList<StoryModelKey> GetModelKeys()
+    {
+        var keys = new List<StoryModelKey>();
+        var seen = new HashSet<StoryModelKey>();
+        foreach (var campaign in GetChain().Result.Campaigns)
+        foreach (var manifest in campaign.FactionManifests)
+        {
+            var key = new StoryModelKey(campaign.Name, manifest.Faction);
+            if (seen.Add(key)) keys.Add(key);
+        }
+
+        return keys;
+    }
+
+    public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
     {
         var chain = GetChain();
+        var key = new StoryModelKey(campaignName, faction);
 
         lock (_gate)
         {
-            if (_models.TryGetValue(campaignName, out var cached)
+            if (_models.TryGetValue(key, out var cached)
                 && ReferenceEquals(cached.Chain, chain)
                 && VersionsMatch(cached.DocumentVersions))
                 return cached.Model;
@@ -95,15 +148,15 @@ public sealed class StoryModelService : IStoryModelService
 
         var reader = new RecordingReader(this);
         var model = new StoryCampaignAssembler(_schema)
-            .Assemble(campaignName, chain.Result, reader.ReadThread);
+            .Assemble(campaignName, faction, chain.Result, reader.ReadThread);
         if (model is null) return null;
 
-        _logger.LogDebug("Story model for campaign '{Campaign}' built: {Threads} thread(s)",
-            campaignName, model.Threads.Count);
+        _logger.LogDebug("Story model for {Key} built: {Threads} thread(s)",
+            key, model.Threads.Count);
 
         lock (_gate)
         {
-            _models[campaignName] = new ModelCache(model, chain, reader.Versions);
+            _models[key] = new ModelCache(model, chain, reader.Versions);
         }
 
         return model;
@@ -112,8 +165,8 @@ public sealed class StoryModelService : IStoryModelService
     public IReadOnlyList<StoryCampaignModel> GetModelsContaining(string canonicalUri)
     {
         var result = new List<StoryCampaignModel>();
-        foreach (var name in GetCampaignNames())
-            if (GetCampaignModel(name) is { } model
+        foreach (var key in GetModelKeys())
+            if (GetCampaignModel(key.Campaign, key.Faction) is { } model
                 && model.Threads.Any(t => string.Equals(t.DocumentUri, canonicalUri, StringComparison.Ordinal)))
                 result.Add(model);
         return result;

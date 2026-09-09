@@ -12,13 +12,13 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 /// <summary>One saved node position, keyed by thread file name + event name.</summary>
 public sealed record StoryLayoutEntry(string File, string EventName, double X, double Y);
 
-/// <summary>Per-campaign story graph layout persistence.</summary>
+/// <summary>Per campaign-faction story graph layout persistence.</summary>
 public interface IStoryLayoutStore
 {
-    IReadOnlyList<StoryLayoutEntry> Get(string campaign);
+    IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key);
 
     /// <summary>Upserts by (file, eventName); entries not mentioned keep their stored position.</summary>
-    void Set(string campaign, IReadOnlyList<StoryLayoutEntry> entries);
+    void Set(StoryModelKey key, IReadOnlyList<StoryLayoutEntry> entries);
 }
 
 /// <summary>
@@ -42,22 +42,42 @@ public sealed class StoryLayoutStore(
     private readonly object _gate = new();
     private Dictionary<string, List<StoryLayoutEntry>>? _cache;
 
-    public IReadOnlyList<StoryLayoutEntry> Get(string campaign)
+    /// <summary>
+    ///     The sidecar's key for one graph.
+    ///     <para>
+    ///         A graph is a campaign FACTION, so the layout is too - keyed by the campaign alone,
+    ///         arranging one faction's chain moved the other's. Written readably rather than hashed,
+    ///         because this ends up as a key in a JSON file a person may open.
+    ///     </para>
+    /// </summary>
+    private static string KeyOf(StoryModelKey key)
+    {
+        return $"{key.Campaign}/{key.Faction}";
+    }
+
+    public IReadOnlyList<StoryLayoutEntry> Get(StoryModelKey key)
     {
         lock (_gate)
         {
             var data = LoadLocked();
-            return data.TryGetValue(campaign, out var entries) ? entries.ToList() : [];
+            if (data.TryGetValue(KeyOf(key), out var entries))
+                return entries.ToList();
+
+            // A sidecar written before layouts were faction-scoped keys by the campaign alone.
+            // Both factions read it once, which is right: an entry is (file, eventName), so each
+            // graph picks up only the positions of nodes it actually has. The next Set writes the
+            // scoped key and the old entry stops being consulted.
+            return data.TryGetValue(key.Campaign, out var legacy) ? legacy.ToList() : [];
         }
     }
 
-    public void Set(string campaign, IReadOnlyList<StoryLayoutEntry> entries)
+    public void Set(StoryModelKey key, IReadOnlyList<StoryLayoutEntry> entries)
     {
         lock (_gate)
         {
             var data = LoadLocked();
-            if (!data.TryGetValue(campaign, out var existing))
-                data[campaign] = existing = [];
+            if (!data.TryGetValue(KeyOf(key), out var existing))
+                data[KeyOf(key)] = existing = [];
 
             foreach (var entry in entries)
             {

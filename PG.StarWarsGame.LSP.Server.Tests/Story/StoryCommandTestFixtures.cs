@@ -125,7 +125,7 @@ internal static class StoryCommandTestFixtures
     {
         return new StoryCommandDto(kind, threadUri ?? ThreadUri, eventName, newName,
             eventType, Value: value, Flag: flag, GroupIndex: groupIndex, Token: token,
-            Tokens: tokens, File: file, Faction: faction);
+            Tokens: tokens, File: file, TargetFaction: faction);
     }
 
     // ── test doubles ─────────────────────────────────────────────────────────
@@ -176,7 +176,13 @@ internal static class StoryCommandTestFixtures
             return ["GC"];
         }
 
-        public StoryCampaignModel? GetCampaignModel(string campaignName)
+        public IReadOnlyList<StoryModelKey> GetModelKeys()
+        {
+            return GetCampaignNames()
+                .Select(c => new StoryModelKey(c, "Rebel")).ToList();
+        }
+
+        public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
         {
             return campaignName == "GC" ? _model : null;
         }
@@ -211,7 +217,7 @@ internal static class StoryCommandTestFixtures
         {
             var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
             IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
-            return new StoryCampaignModel("GC", threads,
+            return new StoryCampaignModel("GC", "Rebel", threads,
                 new HashSet<string>(StringComparer.Ordinal),
                 new StoryGraphBuilder(new StoryTestSchema()).Build([thread]));
         }

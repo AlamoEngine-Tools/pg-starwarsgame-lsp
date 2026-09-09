@@ -35,6 +35,7 @@ import {
     StorySimChangedParams,
 } from './protocol';
 import { StoryGraphPanel } from './storyGraphPanel';
+import { graphTargets, type StoryGraphTarget } from './storyGraphTarget';
 import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
@@ -566,7 +567,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 	});
 
 	lspClient.onNotification('aet/storySimChanged', (params: StorySimChangedParams) => {
-		StoryGraphPanel.simChanged(params.campaign);
+		StoryGraphPanel.simChanged({ campaign: params.campaign, faction: params.faction });
 	});
 
 	lspClient.onNotification('aet/previewSceneChanged', () => {
@@ -802,25 +803,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			() => storyNavigatorProvider?.refresh()),
 		// Opens the read-only story graph panel. Invoked with the campaign tree item (inline icon
 		// in the navigator) or without arguments from the command palette (quick-picks a campaign).
-		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryGraph', async (arg?: StoryTreeItem | string) => {
+		// A graph is one campaign FACTION, so the tree offers this on its faction node and hands
+		// both halves over. The palette has no node to hand over, so it asks - once, over a flat
+		// list of every pair, rather than a campaign prompt followed by a faction prompt.
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryGraph', async (arg?: StoryTreeItem) => {
 			if (!lsp.requireRunning()) { return; }
-			let campaign = typeof arg === 'string' ? arg : arg?.campaignName;
-			if (!campaign) {
+
+			let target: StoryGraphTarget | undefined =
+				arg?.campaignName && arg?.factionName
+					? { campaign: arg.campaignName, faction: arg.factionName }
+					: undefined;
+
+			if (!target) {
 				const result = await lsp.requestOrReport<GetStoryPlotsResult>(
 					'aet/getStoryPlots', {}, 'cannot load story campaigns');
 				if (!result) { return; }
 				if (result.error) { vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); return; }
 
-				const campaigns = result.campaigns ?? [];
-				if (!campaigns.length) {
+				const items = graphTargets(result.campaigns ?? []);
+				if (!items.length) {
 					vscode.window.showInformationMessage('EaWEdit: No story campaigns found in this workspace.');
 					return;
 				}
-				campaign = await vscode.window.showQuickPick(campaigns.map(c => c.name), {
-					title: 'Open Story Graph', placeHolder: 'Select a campaign',
+				const picked = await vscode.window.showQuickPick(items, {
+					title: 'Open Story Graph', placeHolder: 'Select a campaign faction',
 				});
+				target = picked?.target;
 			}
-			if (campaign) { StoryGraphPanel.show(campaign, context.extensionUri, lsp); }
+			if (target) { StoryGraphPanel.show(target, context.extensionUri, lsp); }
 		}),
 		// Prefer the server-resolved URI: manifest entries and on-disk names differ in casing
 		// throughout vanilla data (the engine is case-insensitive, findFiles is not), and the

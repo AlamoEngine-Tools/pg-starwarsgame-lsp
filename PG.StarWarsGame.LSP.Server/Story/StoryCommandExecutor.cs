@@ -388,10 +388,10 @@ internal sealed class StoryCommandExecutor(
         string label;
         if (request.Kind == "addPlotManifest")
         {
-            if (string.IsNullOrEmpty(request.Faction))
+            if (string.IsNullOrEmpty(request.TargetFaction))
                 return (null, "addPlotManifest needs the faction.");
             edits = StoryManifestWriter.AddCampaignStoryName(
-                text, request.Campaign, request.Faction!, request.File!);
+                text, request.Campaign, request.TargetFaction!, request.File!);
             if (edits.Count == 0)
                 return (null, $"Campaign '{request.Campaign}' was not found in '{campaignChain.SourceFile}'.");
 

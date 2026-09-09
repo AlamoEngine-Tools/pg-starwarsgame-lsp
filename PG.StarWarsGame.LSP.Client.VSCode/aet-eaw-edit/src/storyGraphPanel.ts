@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 
 import { LspGateway } from './lsp/lspGateway';
 import { revealDefinition } from './revealDefinition';
+import { panelKey, panelTitle, type StoryGraphTarget } from './storyGraphTarget';
 import { PanelRegistry, WebviewMessage, WebviewPanelHost } from './webviewPanelHost';
 import {
     ApplyStoryCommandBatchResult, ExecuteStoryCommandResult, GetStoryDiagnosticsResult,
@@ -14,7 +15,8 @@ import {
 } from './protocol';
 
 /**
- * Read-only story graph webview, one panel per campaign. The webview (a rete.js app bundled to
+ * Read-only story graph webview, one panel per campaign FACTION - a campaign's factions are
+ * separate story chains and never share a graph. The webview (a rete.js app bundled to
  * out/webview/storyGraph.js) is a pure renderer: it holds the current filter state and asks the
  * extension to re-fetch (`fetch` message) whenever filters change or the server pushes
  * `aet/storyGraphChanged` for this campaign (`invalidate` → the webview replays its filters so
@@ -23,19 +25,30 @@ import {
 export class StoryGraphPanel extends WebviewPanelHost {
     private static readonly _panels = new PanelRegistry<StoryGraphPanel>();
 
-    static show(campaign: string, extensionUri: vscode.Uri, lsp: LspGateway): void {
-        const existing = StoryGraphPanel._panels.get(campaign);
+    static show(target: StoryGraphTarget, extensionUri: vscode.Uri, lsp: LspGateway): void {
+        const key = panelKey(target);
+        const existing = StoryGraphPanel._panels.get(key);
         if (existing) {
             existing.reveal();
             return;
         }
-        StoryGraphPanel._panels.track(campaign, new StoryGraphPanel(campaign, extensionUri, lsp));
+        StoryGraphPanel._panels.track(key, new StoryGraphPanel(target, extensionUri, lsp));
     }
 
-    /** Called on `aet/storyGraphChanged` - refreshes only panels whose campaign was invalidated. */
+    /**
+     * Called on `aet/storyGraphChanged` - refreshes the panels the change reached.
+     *
+     * The notification names CAMPAIGNS while a panel is one campaign faction, so every faction of
+     * an invalidated campaign refreshes. That is wider than it needs to be and deliberately so: a
+     * thread can be listed by more than one faction's manifest, so narrowing by faction here would
+     * have to repeat the server's closure walk to stay correct.
+     */
     static refreshInvalidated(campaigns: string[]): void {
-        for (const campaign of campaigns) {
-            StoryGraphPanel._panels.get(campaign)?.post({ type: 'invalidate' });
+        const invalidated = new Set(campaigns.map(c => c.toLowerCase()));
+        for (const panel of StoryGraphPanel._panels.all) {
+            if (invalidated.has(panel._target.campaign.toLowerCase())) {
+                panel.post({ type: 'invalidate' });
+            }
         }
     }
 
@@ -50,7 +63,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private _skipDeleteConfirm: boolean | undefined;
 
     private constructor(
-        private readonly _campaign: string,
+        private readonly _target: StoryGraphTarget,
         extensionUri: vscode.Uri,
         private readonly _lsp: LspGateway
     ) {
@@ -58,7 +71,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // which is where the rest of its canvas styling lives.
         super(extensionUri, {
             viewType: 'aetStoryGraph',
-            title: `Story: ${_campaign}`,
+            title: panelTitle(_target),
             column: vscode.ViewColumn.Active,
             script: 'storyGraph.js',
         });
@@ -130,8 +143,8 @@ export class StoryGraphPanel extends WebviewPanelHost {
     }
 
     /** Called on `aet/storySimChanged` - the panel's webview re-fetches the sim state. */
-    static simChanged(campaign: string): void {
-        StoryGraphPanel._panels.get(campaign)?.post({ type: 'simChanged' });
+    static simChanged(target: StoryGraphTarget): void {
+        StoryGraphPanel._panels.get(panelKey(target))?.post({ type: 'simChanged' });
     }
 
     /**
@@ -141,7 +154,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _runSim(method: string, args: Record<string, unknown> | undefined): Promise<void> {
         const requestName = 'aet/storySim' + method.charAt(0).toUpperCase() + method.slice(1);
         const result = await this._lsp.requestOrReport<StorySimStateResult>(
-            requestName, { campaign: this._campaign, ...(args ?? {}) }, 'simulation request failed');
+            requestName, { campaign: this._target.campaign, faction: this._target.faction, ...(args ?? {}) }, 'simulation request failed');
         if (result === undefined) { return; }
 
         if (result.error) {
@@ -167,7 +180,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         const result = await this._lsp.requestOrReport<ExecuteStoryCommandResult>(
-            'aet/executeStoryCommand', { campaign: this._campaign, ...payload },
+            'aet/executeStoryCommand', { campaign: this._target.campaign, faction: this._target.faction, ...payload },
             'story command failed');
 
         // Either a failed request or a refused command: a gesture may have changed the view
@@ -197,7 +210,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         const result = await this._lsp.requestOr<GetStoryParamOptionsResult>(
             'aet/getStoryParamOptions',
             {
-                campaign: this._campaign, side, typeName, position,
+                campaign: this._target.campaign, faction: this._target.faction, side, typeName, position,
                 prefix: prefix || undefined, limit: 50,
             },
             { options: [] });
@@ -223,7 +236,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _saveBatch(commands: Record<string, unknown>[]): Promise<void> {
         const result = await this._lsp.requestOrReport<ApplyStoryCommandBatchResult>(
-            'aet/applyStoryCommandBatch', { campaign: this._campaign, commands }, 'save failed');
+            'aet/applyStoryCommandBatch', { campaign: this._target.campaign, faction: this._target.faction, commands }, 'save failed');
 
         // The webview needs an answer either way: without one the Save button stays spinning and
         // the queue is neither cleared nor released for another attempt.
@@ -330,7 +343,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _promptSaveOnClose(): Promise<void> {
         if (this._pendingCommands.length === 0) { return; }
         const choice = await vscode.window.showWarningMessage(
-            `The story graph for '${this._campaign}' was closed with ${this._pendingCommands.length} ` +
+            `The story graph for '${this._target.campaign}' was closed with ${this._pendingCommands.length} ` +
             'unsaved change(s). Save them?',
             'Save', 'Discard');
         if (choice !== 'Save') { return; }
@@ -343,7 +356,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         const result = await this._lsp.requestOrReport<ApplyStoryCommandBatchResult>(
             'aet/applyStoryCommandBatch',
-            { campaign: this._campaign, commands: this._pendingCommands },
+            { campaign: this._target.campaign, faction: this._target.faction, commands: this._pendingCommands },
             'could not save the closed story graph');
         if (result === undefined || result.success) { return; }
 
@@ -373,7 +386,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
     private async _sendPreview(commands: Record<string, unknown>[], filters: GraphFilters): Promise<void> {
         const result = await this._lsp.requestOrReport<GetStoryGraphResult>(
             'aet/previewStoryGraph',
-            { campaign: this._campaign, commands, ...filterFields(filters) }, 'preview failed');
+            { campaign: this._target.campaign, faction: this._target.faction, commands, ...filterFields(filters) }, 'preview failed');
         if (result === undefined) { return; }
 
         if (result.error) {
@@ -382,7 +395,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         }
 
         this.post({
-            type: 'graph', preview: true, campaign: this._campaign,
+            type: 'graph', preview: true, campaign: this._target.campaign, faction: this._target.faction,
             nodes: result.nodes ?? [], edges: result.edges ?? [], layout: await this._layout(),
         });
     }
@@ -390,7 +403,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
     /** Dry-runs the staged batch on the server and posts the resulting diagnostics for the pending state. */
     private async _validateBatch(commands: Record<string, unknown>[]): Promise<void> {
         const result = await this._lsp.requestOrReport<GetStoryDiagnosticsResult>(
-            'aet/validateStoryCommandBatch', { campaign: this._campaign, commands },
+            'aet/validateStoryCommandBatch', { campaign: this._target.campaign, faction: this._target.faction, commands },
             'validation failed');
         if (result === undefined) { return; }
 
@@ -402,7 +415,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     private async _saveLayout(entries: StoryLayoutEntryDto[]): Promise<void> {
         if (!entries?.length) { return; }
-        await this._lsp.notify('aet/setStoryLayout', { campaign: this._campaign, entries });
+        await this._lsp.notify('aet/setStoryLayout', { campaign: this._target.campaign, faction: this._target.faction, entries });
     }
 
     private async _sendSchema(): Promise<void> {
@@ -432,7 +445,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
      */
     private async _layout(): Promise<StoryLayoutEntryDto[]> {
         const stored = await this._lsp.requestOr<GetStoryLayoutResult>(
-            'aet/getStoryLayout', { campaign: this._campaign }, { entries: [] });
+            'aet/getStoryLayout', { campaign: this._target.campaign, faction: this._target.faction }, { entries: [] });
         return stored.entries ?? [];
     }
 
@@ -440,7 +453,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
         // Reported into the webview rather than as a notification: this is the panel's whole
         // content, so the message belongs where the graph would have been.
         const outcome = await this._lsp.request<GetStoryGraphResult>(
-            'aet/getStoryGraph', { campaign: this._campaign, ...filterFields(filters) });
+            'aet/getStoryGraph', { campaign: this._target.campaign, faction: this._target.faction, ...filterFields(filters) });
 
         if (!outcome.ok) {
             this.post({
@@ -459,7 +472,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         this.post({
             type: 'graph',
-            campaign: this._campaign,
+            campaign: this._target.campaign, faction: this._target.faction,
             nodes: outcome.value.nodes ?? [],
             edges: outcome.value.edges ?? [],
             layout: await this._layout(),
@@ -471,7 +484,7 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
     private async _sendDetail(nodeId: string): Promise<void> {
         const outcome = await this._lsp.request<GetStoryNodeDetailResult>(
-            'aet/getStoryNodeDetail', { campaign: this._campaign, nodeId });
+            'aet/getStoryNodeDetail', { campaign: this._target.campaign, faction: this._target.faction, nodeId });
 
         // The property view shows the failure in place; a notification would be a modal over a
         // panel that is already able to say what is wrong.
@@ -510,6 +523,7 @@ function filterFields(filters: GraphFilters | undefined): Record<string, string 
         branch: filters?.branch || undefined,
         lifecycle: filters?.lifecycle || undefined,
         reachableFrom: filters?.reachableFrom || undefined,
+        plotState: filters?.plotState || undefined,
     };
 }
 

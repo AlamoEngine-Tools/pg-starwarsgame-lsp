@@ -44,7 +44,7 @@ public sealed class ValidateStoryCommandBatchHandler(
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryDiagnosticsResult([], rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
                 $"Campaign '{request.Campaign}' was not found."));
@@ -55,7 +55,7 @@ public sealed class ValidateStoryCommandBatchHandler(
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, composeError) = executor.Compose(
-            model, request.Commands.Select(c => c.ToParams(request.Campaign)).ToList(), texts);
+            model, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (composeError is not null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
                 $"Change {(failedIndex ?? 0) + 1} of {request.Commands.Count} can't be staged: {composeError}"));
