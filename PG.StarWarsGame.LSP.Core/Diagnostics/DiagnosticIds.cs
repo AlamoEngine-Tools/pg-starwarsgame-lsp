@@ -199,6 +199,7 @@ public static class DiagnosticIds
     // 11, not 10: DamageStageNotOnModel already holds 10, further down this file.
     public static readonly DiagnosticId DamageAbsorbsNothing = new(DiagnosticGroup.CrossTag, 11);
     public static readonly DiagnosticId SpecialWeaponBehavior = new(DiagnosticGroup.CrossTag, 12);
+    public static readonly DiagnosticId VehicleThiefCloneAbility = new(DiagnosticGroup.CrossTag, 13);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

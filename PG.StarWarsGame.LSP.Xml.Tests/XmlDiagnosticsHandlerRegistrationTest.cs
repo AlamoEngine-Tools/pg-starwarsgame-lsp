@@ -95,7 +95,11 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // OTHER than the one being edited, via DiagnosticsContext.Objects. Checks the behaviour
         // rather than the name, because vanilla's own special weapons (Ground_Ion_Cannon,
         // Ground_Empire_Hypervelocity_Gun) would fail the name rule the issue originally asked for.
-        const int expectedHandlerCount = 113;
+        // 113 -> 114: VehicleThiefCloneHandler added - a capture clone with no EJECT_VEHICLE_THIEF
+        // ability, so the thief can never get out. Second user of the cross-object seam. Only the
+        // ability half of the tag's stated rule is enforced; the GARRISON_VEHICLE half would warn
+        // on two shipped objects with nothing but a description to justify it.
+        const int expectedHandlerCount = 114;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
