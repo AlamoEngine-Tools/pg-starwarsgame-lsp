@@ -99,10 +99,23 @@ public sealed record GetStoryGraphParams(
     // Null or empty keeps both, which is the whole chain.
     string? PlotState = null) : IRequest<GetStoryGraphResult>;
 
+/// <param name="Branches">
+///     Every branch name in the campaign, INDEPENDENT of the filters that produced
+///     <paramref name="Nodes" />. A facet list has to describe what the user could switch to, so it
+///     cannot be derived from the filtered result: reading it off the returned nodes leaves the
+///     branch dropdown holding only the branch already selected, which is the one option that is
+///     of no use. The server resolves the filter, so the server is what knows the full set.
+/// </param>
+/// <param name="Threads">
+///     Every thread URI in the campaign, likewise unfiltered - it backs the thread picker for
+///     placing a NEW event, which must be able to target a thread the current filter hides.
+/// </param>
 public sealed record GetStoryGraphResult(
     IReadOnlyList<StoryGraphNodeDto> Nodes,
     IReadOnlyList<StoryGraphEdgeDto> Edges,
-    string? Error = null);
+    string? Error = null,
+    IReadOnlyList<string>? Branches = null,
+    IReadOnlyList<string>? Threads = null);
 
 public sealed record StoryGraphNodeDto(
     string Id,

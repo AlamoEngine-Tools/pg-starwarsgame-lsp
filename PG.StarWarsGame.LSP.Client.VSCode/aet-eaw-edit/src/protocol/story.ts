@@ -77,6 +77,13 @@ export interface GetStoryGraphResult {
     nodes: StoryGraphNodeDto[];
     edges: StoryGraphEdgeDto[];
     error?: string | null;
+    /**
+     * Facets of the whole campaign, deliberately NOT of `nodes`. A filter dropdown lists what you
+     * could switch to, so deriving it from the filtered result leaves it offering only the value
+     * already selected. Optional so an older server degrades to the previous behaviour.
+     */
+    branches?: string[] | null;
+    threads?: string[] | null;
 }
 
 /**

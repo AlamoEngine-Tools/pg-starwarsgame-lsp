@@ -179,6 +179,44 @@ public sealed class StoryProtocolHandlersTest
         Assert.Equal(["Next"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
     }
 
+    // A facet list answers "what could I switch to", so it describes the CAMPAIGN, not the result.
+    // Derived from the returned nodes it degenerates exactly where it is needed: filter to a branch
+    // and the only branch left to offer is the one already selected.
+    [Fact]
+    public async Task GetStoryGraph_ReportsEveryBranch_EvenTheOnesTheFilterHid()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
+
+        // Act1 is all that survives as a NODE...
+        Assert.Equal(["Next"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
+        // ...but both branches stay switchable.
+        Assert.Equal(["Act1", "Act2"], result.Branches);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_ReportsEveryBranch_EvenWhenAPlotStateFilterHidesAThread()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
+                CancellationToken.None);
+
+        // Act2's only event lives on the suspended thread this filter drops.
+        Assert.DoesNotContain(result.Nodes, n => n.Label == "Later");
+        Assert.Equal(["Act1", "Act2"], result.Branches);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_ReportsEveryThread_SoANewEventCanTargetAHiddenOne()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
+
+        Assert.NotNull(result.Threads);
+        Assert.Contains(ThreadUri, result.Threads!);
+        Assert.Contains(SuspendedUri, result.Threads!);
+    }
+
     /// <summary>
     ///     A plot is a THREAD, and a faction's manifest lists each one as active or suspended.
     ///     That is a different question from an event's lifecycle: a suspended plot's events are
@@ -634,7 +672,7 @@ public sealed class StoryProtocolHandlersTest
 
     private sealed class StubModelService : IStoryModelService
     {
-        // Active thread: Start → (prereq) Next[Branch=Act1]; suspended thread: Later.
+        // Active thread: Start → (prereq) Next[Branch=Act1]; suspended thread: Later[Branch=Act2].
         private static readonly StoryCampaignModel Model = BuildModel();
         public IReadOnlyList<string> Invalidated { get; init; } = [];
 
@@ -682,8 +720,10 @@ public sealed class StoryProtocolHandlersTest
                 "<Story><Event Name=\"Start\"><Event_Type>STORY_ELAPSED</Event_Type></Event>" +
                 "<Event Name=\"Next\"><Event_Type>STORY_TRIGGER</Event_Type>" +
                 "<Prereq>Start</Prereq><Branch>Act1</Branch></Event></Story>", ThreadUri);
+            // Act2 lives on the OTHER thread, and on the suspended one, so a facet list has to
+            // span threads and survive both a branch filter and a plot-state filter to be right.
             var suspended = StoryThreadParser.Parse(
-                "<Story><Event Name=\"Later\"/></Story>", SuspendedUri);
+                "<Story><Event Name=\"Later\"><Branch>Act2</Branch></Event></Story>", SuspendedUri);
             return new StoryCampaignModel("GC", "Rebel", [active, suspended],
                 new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
                 new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended]));

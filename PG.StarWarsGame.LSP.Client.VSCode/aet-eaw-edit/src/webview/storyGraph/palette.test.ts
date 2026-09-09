@@ -7,6 +7,7 @@ import { describe, it } from 'node:test';
 import { colourTokens } from '../shared/tokens';
 import {
     BRANCH_PALETTE,
+    EDGE_KINDS,
     JUNCTION_TOKEN,
     LANE_PALETTE,
     LIFECYCLE_TOKENS,
@@ -36,6 +37,36 @@ describe('the story graph palettes', () => {
         for (const token of every) {
             assert.ok(known.has(token), `${token} is not a defined colour token`);
         }
+    });
+
+    /**
+     * Yellow and orange were reported as undocumented, and they were: the legend was generated from
+     * LIFECYCLE_TOKENS alone, which is blue/green/purple/red plus a faint swatch. Both hues live on
+     * EDGES, where they mean something fixed - so the edge kinds are a palette entry now, read by
+     * the stroke rules and the legend alike rather than hand-written in each.
+     */
+    it('names only tokens the layer defines for edges too', () => {
+        for (const kind of EDGE_KINDS) {
+            assert.ok(known.has(kind.token), `${kind.token} is not a defined colour token`);
+        }
+    });
+
+    it('documents the two hues that were reported as unexplained', () => {
+        const byToken = new Map(EDGE_KINDS.map(k => [k.token, k]));
+        assert.ok(byToken.has('--colour-data-orange'), 'orange must be in the legend');
+        assert.ok(byToken.has('--colour-data-yellow'), 'yellow must be in the legend');
+    });
+
+    // A swatch that does not carry the dash pattern of the edge it describes is a swatch that
+    // disagrees with the graph - the exact failure the lifecycle map was extracted to prevent.
+    it('gives every edge kind a label and keeps its dash pattern with it', () => {
+        for (const kind of EDGE_KINDS) {
+            assert.ok(kind.label.length > 0, `${kind.kind} has no label`);
+            assert.equal(typeof kind.dash, 'string');
+        }
+        assert.equal(EDGE_KINDS.find(k => k.kind === 'Tactical')?.dash, '8 4');
+        assert.equal(EDGE_KINDS.find(k => k.kind === 'Flag')?.dash, '2 4');
+        assert.equal(EDGE_KINDS.find(k => k.kind === 'Prereq')?.dash, '');
     });
 
     it('maps each lifecycle to the colour its node border already used', () => {

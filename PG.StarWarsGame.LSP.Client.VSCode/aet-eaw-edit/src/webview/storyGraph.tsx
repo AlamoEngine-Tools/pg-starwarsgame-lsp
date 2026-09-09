@@ -31,6 +31,8 @@ import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
 import { createLabelSizer, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
+import { facetList } from './storyGraph/facets';
+import { lodShape } from './storyGraph/lodShape';
 import { needsFullMountForLayout, shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
 import { Extent, fitZoom } from './storyGraph/viewportFit';
 import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
@@ -60,7 +62,7 @@ import { colourResolver } from './shared/resolveColour';
 import { SeverityTag } from './shared/SeverityTag';
 import { tokensRootCss } from './shared/tokens';
 import {
-    JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
+    EDGE_KINDS, JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
     branchToken, laneToken,
 } from './storyGraph/palette';
 
@@ -573,7 +575,8 @@ const LABEL_MEASURE_PX = 100;
 const LABEL_PAD = 4;
 
 // Overview colour for a node: events by lifecycle (matching the node border + legend), junctions
-// the colour a fired event takes.
+// a neutral - they have no lifecycle, and the overview tells them apart by SHAPE instead (see
+// lodShape), which is what the mounted view already does.
 function lodToken(dto: StoryGraphNodeDto): string {
     if (dto.kind !== 'Event') { return JUNCTION_TOKEN; }
     return LIFECYCLE_TOKENS[dto.lifecycle as keyof typeof LIFECYCLE_TOKENS] ?? UNKNOWN_LIFECYCLE_TOKEN;
@@ -1806,8 +1809,33 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
                 if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
                 const color = colour(m.colorToken);
-                ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
-                ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(sx, sy, sw, sh);
+                // A junction keeps the silhouette it has when mounted - a circle for AND, a
+                // rotated square for OR - so structure stays readable zoomed out instead of
+                // becoming another rectangle. Rects keep the cheap path: fillRect/strokeRect are
+                // measurably faster than a path, and they are the overwhelming majority.
+                const shape = lodShape(m.dto.kind);
+                if (shape === 'rect') {
+                    ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
+                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+                    ctx.strokeRect(sx, sy, sw, sh);
+                } else {
+                    const cx = sx + sw / 2, cy = sy + sh / 2;
+                    ctx.beginPath();
+                    if (shape === 'circle') {
+                        ctx.ellipse(cx, cy, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+                    } else {
+                        // The diamond is inset like the mounted node's inner square, so the two
+                        // read as the same figure rather than as two different sizes.
+                        const rx = sw * 0.35, ry = sh * 0.35;
+                        ctx.moveTo(cx, cy - ry);
+                        ctx.lineTo(cx + rx, cy);
+                        ctx.lineTo(cx, cy + ry);
+                        ctx.lineTo(cx - rx, cy);
+                        ctx.closePath();
+                    }
+                    ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fill();
+                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+                }
                 if (showLabels && sizeFor !== null && m.dto.kind === 'Event' && sw > 30) {
                     ctx.globalAlpha = 1;
                     ctx.fillStyle = labelColor;
@@ -2892,10 +2920,13 @@ const ConnSvg = styled.svg`
         stroke: var(--vscode-charts-foreground, #999);
         marker-end: url(#story-arrow);
     }
-    &.k-Control path  { stroke: var(--vscode-charts-orange, #d18616); }
-    &.k-Tactical path,
-    &.k-TacticalEntry path { stroke: var(--vscode-charts-yellow, #cca700); stroke-dasharray: 8 4; }
-    &.k-Flag path     { stroke: var(--vscode-charts-blue, #3794ff);   stroke-dasharray: 2 4; }
+    /* Generated from EDGE_KINDS, which the legend swatches read too - a swatch and the edge it
+       describes cannot drift apart if both come from the one list. TacticalEntry deliberately
+       shares Tactical's presentation: it is the same relation seen from the stub side. */
+    ${EDGE_KINDS.filter(k => k.kind !== 'Prereq').map(k => {
+        const selector = k.kind === 'Tactical' ? '&.k-Tactical path, &.k-TacticalEntry path' : `&.k-${k.kind} path`;
+        return `${selector} { stroke: var(${k.token}); ${k.dash ? `stroke-dasharray: ${k.dash};` : ''} }`;
+    }).join('\n    ')}
     /* Sankey glow underlay: a fat translucent stroke UNDER the crisp edge. A plain wide path is
        far cheaper than an SVG filter (drop-shadow was the main pan/zoom perf sink on big
        campaigns) and still reads as a coloured halo. No arrowhead on the underlay. */
@@ -3333,6 +3364,18 @@ const Shell = styled.div`
         vertical-align: -1px;
         margin-right: var(--space-2);
     }
+    /* A real stroke rather than a bordered box: the dash pattern is part of what an edge kind
+       means, and a square cannot show it. */
+    .legend .edge-swatch {
+        vertical-align: middle;
+        margin-right: var(--space-2);
+    }
+    /* Names the axis the swatches after it belong to, so the two keys do not read as one list. */
+    .legend .legend-label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.75;
+    }
 
     /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
        renders, so they are figures and not text - and the house rule keeps user-facing strings
@@ -3577,14 +3620,14 @@ function App(): React.JSX.Element {
     }, []);
 
     const applyGraph = useCallback((
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[], full: boolean
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[], full: boolean,
+        facets: { branches?: string[]; threads?: string[] } = {}
     ) => {
-        setBranches(() => {
-            const found = [...new Set(nodes.map(n => n.branch).filter((b): b is string => !!b))].sort();
-            const active = filtersRef.current.branch;
-            return active && !found.includes(active) ? [...found, active].sort() : found;
-        });
-        setThreads([...new Set(nodes.map(n => n.threadUri).filter((u): u is string => !!u))].sort());
+        // Both lists describe the campaign, not this filtered result - see facetList. The thread
+        // list is not a filter, it backs the picker for placing a NEW event, which likewise has to
+        // be able to target a thread the current filter is hiding.
+        setBranches(facetList(facets.branches, nodes.map(n => n.branch), filtersRef.current.branch));
+        setThreads(facetList(facets.threads, nodes.map(n => n.threadUri), ''));
         if (!nodes.length) {
             setStatus('No events match the current filters.');
             return;
@@ -3658,7 +3701,11 @@ function App(): React.JSX.Element {
                         graphNodes,
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
                         (msg.layout as StoryLayoutEntryDto[] | undefined) ?? [],
-                        full);
+                        full,
+                        {
+                            branches: msg.branches as string[] | undefined,
+                            threads: msg.threads as string[] | undefined,
+                        });
                     // A running simulation keeps painting its lifecycles over fresh renders.
                     if (simRef.current?.running) { applySimOverlay(simRef.current); }
                     break;
@@ -3870,6 +3917,10 @@ function App(): React.JSX.Element {
                         <SimLog state={simState} onClose={() => setShowSimLog(false)} />
                     ) : null}
                     <div className="legend">
+                        {/* Two axes, told apart. A node's colour is its lifecycle; an edge's is
+                            the relation it carries. Reading one key for both is what made yellow
+                            and orange look undocumented. */}
+                        <span className="legend-label">Node</span>
                         <span>
                             <span className="swatch" style={{ borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})` }} />
                             Inactive
@@ -3884,8 +3935,26 @@ function App(): React.JSX.Element {
                         ))}
                         <span><span className="shape-diamond" /> OR</span>
                         <span><span className="shape-circle" /> AND</span>
-                        <span>dashed = portal / tactical / untested</span>
-                        <span>drag socket to socket = prereq</span>
+
+                        {/* Edge colour is a second axis and used to be undocumented, so orange and
+                            yellow appeared on screen with nothing to explain them. Drawn as real
+                            strokes from EDGE_KINDS - same token, same dash array as the graph. */}
+                        <span className="legend-label">Edge</span>
+                        {EDGE_KINDS.map(kind => (
+                            <span key={kind.kind}>
+                                <svg className="edge-swatch" width="22" height="6" aria-hidden="true">
+                                    <line
+                                        x1="0" y1="3" x2="22" y2="3"
+                                        stroke={`var(${kind.token})`}
+                                        strokeWidth="2"
+                                        strokeDasharray={kind.dash || undefined}
+                                    />
+                                </svg>
+                                {kind.label}
+                            </span>
+                        ))}
+                        <span>Branch colour marks the branch only</span>
+                        <span>Drag socket to socket to add a prereq</span>
                     </div>
                 </div>
                 </div>

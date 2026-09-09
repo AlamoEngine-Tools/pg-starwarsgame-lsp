@@ -396,7 +396,9 @@ export class StoryGraphPanel extends WebviewPanelHost {
 
         this.post({
             type: 'graph', preview: true, campaign: this._target.campaign, faction: this._target.faction,
-            nodes: result.nodes ?? [], edges: result.edges ?? [], layout: await this._layout(),
+            nodes: result.nodes ?? [], edges: result.edges ?? [],
+            branches: result.branches ?? undefined, threads: result.threads ?? undefined,
+            layout: await this._layout(),
         });
     }
 
@@ -475,6 +477,8 @@ export class StoryGraphPanel extends WebviewPanelHost {
             campaign: this._target.campaign, faction: this._target.faction,
             nodes: outcome.value.nodes ?? [],
             edges: outcome.value.edges ?? [],
+            branches: outcome.value.branches ?? undefined,
+            threads: outcome.value.threads ?? undefined,
             layout: await this._layout(),
         });
         // Diagnostics are NO LONGER pushed on every graph refresh - they were the "live"

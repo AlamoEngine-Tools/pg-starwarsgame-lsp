@@ -101,7 +101,22 @@ internal static class StoryGraphProjection
             .Select(e => new StoryGraphEdgeDto(e.FromId, e.ToId, e.Kind.ToString(), e.Label))
             .ToList();
 
-        return new GetStoryGraphResult(keptNodes, edges);
+        // Facets describe the CAMPAIGN, so they are read off the whole model rather than off
+        // keptNodes - a list of what you could switch to is worthless once the filter has already
+        // removed everything you might switch to.
+        return new GetStoryGraphResult(keptNodes, edges, null, Facet(model, n => n.Event?.Branch),
+            Facet(model, n => n.ThreadUri));
+    }
+
+    private static List<string> Facet(StoryCampaignModel model, Func<StoryNode, string?> of)
+    {
+        return model.Graph.Nodes
+            .Select(of)
+            .Where(v => !string.IsNullOrEmpty(v))
+            .Select(v => v!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
     }
 
     // Everything transitively downstream of the given node - "show me what this event leads to".
