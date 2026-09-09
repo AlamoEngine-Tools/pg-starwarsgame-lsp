@@ -354,6 +354,76 @@ public sealed class XmlDocumentFactProducerTest
         var facts = Build().Produce(xml, Uri);
         Assert.Empty(facts.OfType<SquadronOffsetsMismatchFact>());
     }
+
+    // ── unnamed objects (issue #122) ──────────────────────────────────────────
+
+    /// <summary>
+    ///     An object whose name attribute is empty is dead content: the parser skips it with a
+    ///     debug log, so it produces no symbol, cannot be referenced, cannot be overridden, and
+    ///     never appears anywhere the author might notice it is gone.
+    /// </summary>
+    private const string SfxUri = "file:///audio/SFXEventFiles.xml";
+
+    [Fact]
+    public void Empty_name_attribute_emits_UnnamedObjectFact()
+    {
+        const string xml = "<SFXEventFiles><SFXEvent Name=\"\"><Text_ID>A</Text_ID></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+
+        var fact = Assert.Single(facts.OfType<XmlUnnamedObjectFact>());
+        Assert.Equal("SFXEvent", fact.TypeName);
+        Assert.Equal("Name", fact.NameTag);
+    }
+
+    // Trimmed, like the parser does - whitespace is not a name.
+    [Fact]
+    public void Whitespace_only_name_attribute_emits_UnnamedObjectFact()
+    {
+        const string xml = "<SFXEventFiles><SFXEvent Name=\"   \"/></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+
+        Assert.Single(facts.OfType<XmlUnnamedObjectFact>());
+    }
+
+    [Fact]
+    public void Missing_name_attribute_emits_UnnamedObjectFact()
+    {
+        const string xml = "<SFXEventFiles><SFXEvent/></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+
+        Assert.Single(facts.OfType<XmlUnnamedObjectFact>());
+    }
+
+    [Fact]
+    public void Named_object_emits_no_UnnamedObjectFact()
+    {
+        const string xml = "<SFXEventFiles><SFXEvent Name=\"Fine\"/></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+
+        Assert.Empty(facts.OfType<XmlUnnamedObjectFact>());
+    }
+
+    // The whole reason 44 vanilla files LOOK like they have empty names: the blocks are commented
+    // out. HAP reports those as comment nodes, so nothing must come of them.
+    [Fact]
+    public void Commented_out_object_emits_no_UnnamedObjectFact()
+    {
+        const string xml = "<SFXEventFiles><!-- <SFXEvent Name=\"\"/> --></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+
+        Assert.Empty(facts.OfType<XmlUnnamedObjectFact>());
+    }
+
+    // A document the registry does not type has no object shape to judge, so the rule stays quiet
+    // rather than guessing that every root child ought to carry a name.
+    [Fact]
+    public void Untyped_document_emits_no_UnnamedObjectFact()
+    {
+        const string xml = "<Root><Obj/></Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        Assert.Empty(facts.OfType<XmlUnnamedObjectFact>());
+    }
 }
 
 // ── fakes ────────────────────────────────────────────────────────────────────

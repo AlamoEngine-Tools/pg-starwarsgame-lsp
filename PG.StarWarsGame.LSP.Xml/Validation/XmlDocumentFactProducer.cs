@@ -50,6 +50,9 @@ public sealed class XmlDocumentFactProducer(
             WalkNodes(root, facts, lineIndex, isTypeContainerLevel, documentUri, initialContext, document.Text);
         }
 
+        if (isTypeContainerLevel)
+            CollectUnnamedObjects(doc, facts, lineIndex, documentUri);
+
         // Collect notes hints for every element in the document
         foreach (var node in doc.DocumentNode.Descendants()
                      .Where(n => n.NodeType == HtmlNodeType.Element))
@@ -66,6 +69,47 @@ public sealed class XmlDocumentFactProducer(
     {
         var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
         return !fileTypes.IsEmpty && fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
+    }
+
+    /// <summary>
+    ///     Flags object elements that carry no usable name.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately mirrors <c>XmlGameDocumentParser.CollectSymbolsFromRegistry</c>: the first
+    ///     registered type that the schema resolves, the first element of the document as the
+    ///     container, and every ELEMENT child of it as an object. Walking a different shape here
+    ///     would report objects the parser never tried to index, or miss the ones it dropped. Only
+    ///     element children are considered, which is what keeps the 44 vanilla files whose
+    ///     <c>Name=""</c> sits inside a comment block silent.
+    /// </remarks>
+    private void CollectUnnamedObjects(
+        HtmlDocument doc, List<XmlFact> facts, LineOffsetIndex lineIndex, string documentUri)
+    {
+        var typeDef = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri))
+            .Select(t => schema.GetObjectType(t))
+            .FirstOrDefault(t => t?.NameTag is not null);
+        if (typeDef?.NameTag is null) return;
+
+        var rootContainer = doc.DocumentNode.ChildNodes
+            .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+        if (rootContainer is null) return;
+
+        foreach (var node in rootContainer.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            // HAP lowercases attribute names, so match the name tag case-insensitively.
+            var attr = node.Attributes.FirstOrDefault(a =>
+                a.Name.Equals(typeDef.NameTag, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrWhiteSpace(attr?.Value)) continue;
+
+            facts.Add(new XmlUnnamedObjectFact(
+                documentUri,
+                XmlUtility.GetLine(node),
+                XmlUtility.GetTagBracketColumn(node),
+                node.Name.Length + 1,
+                typeDef.TypeName,
+                typeDef.NameTag,
+                node.Name));
+        }
     }
 
     private void WalkNodes(

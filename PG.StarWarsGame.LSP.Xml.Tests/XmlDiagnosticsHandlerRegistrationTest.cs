@@ -82,7 +82,15 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // stage nothing in the object's model is tagged _ALT<n> for, so the unit reaches that state
         // and does not change. One direction only: a model staging MORE than the XML uses is an
         // asset carrying more than this object asks of it, and is never reported.
-        const int expectedHandlerCount = 110;
+        // 110 -> 111: UnnamedObjectHandler added - an object element whose Name attribute is empty
+        // or absent. The parser skips it with a debug log, so it becomes no symbol at all: nothing
+        // can reference or override it and it shows up in no list. Error rather than warning, and
+        // safe at that severity - of the 44 shipped files containing the text Name="", every one is
+        // inside a comment block, so the live count across foc/ and eaw/ is zero.
+        // 111 -> 112: DamageAbsorbsNothingHandler added - both terms of the absorb formula at zero,
+        // so the ability triggers and heals nothing. A cross-tag rule because neither value is
+        // wrong alone: zero percentage with a flat amount, or the reverse, are both normal.
+        const int expectedHandlerCount = 112;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

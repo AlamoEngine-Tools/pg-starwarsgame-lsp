@@ -124,6 +124,7 @@ public static class XmlLanguageServiceExtensions
 
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)
         services.AddSingleton<IXmlDiagnosticsHandler, DuplicateSymbolHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, UnnamedObjectHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeMismatchHandler>();
 
@@ -155,6 +156,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryDialogReferenceHandler>();
 
         // Cross-tag validation handler
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageAbsorbsNothingHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CampaignStoryAttachmentHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
@@ -172,6 +174,7 @@ public static class XmlLanguageServiceExtensions
 
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
+        services.AddSingleton<IXmlCrossTagRule, DamageAbsorbRule>();
         services.AddSingleton<IXmlCrossTagRule, SquadronOffsetsRule>();
         services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
         services.AddSingleton<IXmlCrossTagRule, CampaignStoryAttachmentRule>();

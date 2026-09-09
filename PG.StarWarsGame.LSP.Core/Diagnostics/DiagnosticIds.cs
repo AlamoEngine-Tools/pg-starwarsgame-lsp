@@ -196,6 +196,8 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PlanetModeExclusionList = new(DiagnosticGroup.CrossTag, 7);
     public static readonly DiagnosticId SquadronOffsetsMismatch = new(DiagnosticGroup.CrossTag, 8);
     public static readonly DiagnosticId PlanetModeMissingMode = new(DiagnosticGroup.CrossTag, 9);
+    // 11, not 10: DamageStageNotOnModel already holds 10, further down this file.
+    public static readonly DiagnosticId DamageAbsorbsNothing = new(DiagnosticGroup.CrossTag, 11);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
@@ -226,6 +228,7 @@ public static class DiagnosticIds
     public static readonly DiagnosticId DuplicateSymbol = new(DiagnosticGroup.Symbols, 1);
     public static readonly DiagnosticId CrossLayerShadow = new(DiagnosticGroup.Symbols, 2);
     public static readonly DiagnosticId CrossTypeShadow = new(DiagnosticGroup.Symbols, 3);
+    public static readonly DiagnosticId UnnamedObject = new(DiagnosticGroup.Symbols, 4);
 
     // ── Engine ──
     // Built directly by XmlDiagnosticsPublisher rather than by a handler: these check values the
