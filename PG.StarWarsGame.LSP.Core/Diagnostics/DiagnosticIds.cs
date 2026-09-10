@@ -368,4 +368,27 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId PreviewDamageStageNotInModel =
         new(DiagnosticGroup.Preview, 20);
+
+    /// <summary>
+    ///     A destroyable hardpoint whose <c>Collision_Mesh</c> names nothing the model has, so no
+    ///     shot can ever reach it and the unit can never be finished through its hardpoints.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Damage is routed by the collision mesh a projectile struck, matched with
+    ///         <c>_stricmp</c> - exact but case-insensitive. A value matching nothing behaves exactly
+    ///         like an absent one: every shot meant for that hardpoint lands on the hull instead, the
+    ///         hardpoint never dies, and the all-destroyed branch - which counts by
+    ///         <c>Is_Destroyable</c> and never asks whether a hardpoint was reachable - can never
+    ///         complete.
+    ///     </para>
+    ///     <para>
+    ///         The value may name a MESH or a BONE: vanilla points <c>Collision_Mesh</c> at the
+    ///         hardpoint's own <c>Attachment_Bone</c> 22 times in foc and 6 in eaw, so the check is
+    ///         against the union of both. Not reported where the object does not die with its
+    ///         hardpoints - the palace keeps its generators as scenery on purpose.
+    ///     </para>
+    /// </remarks>
+    public static readonly DiagnosticId PreviewHardpointUnreachable =
+        new(DiagnosticGroup.Preview, 21);
 }

@@ -351,12 +351,29 @@ export interface PreviewTargetDefence {
     /**
      * The summed `Health` of every destructible hardpoint, or absent where there are none.
      *
-     * A unit with hardpoints cannot be targeted itself and dies when its last hardpoint does, so this
-     * is the pool that actually drains. Sent alongside `tacticalHealth` rather than replacing it -
-     * the two disagree in the shipped data (2000 against 4075 on the Star Destroyer) and nobody
-     * knows how the engine reconciles them.
+     * Sent alongside `tacticalHealth`, not instead of it: they are SEPARATE POOLS and the shipped
+     * data disagrees freely (2000 against 4075 on the Star Destroyer, and ratios from 0.06x to
+     * 3.40x across the corpus). Each pool is capped at the other's PERCENTAGE plus
+     * `hullVsHardpointsConstraint`, so the absolute totals never have to agree.
      */
     hardpointHealthTotal?: number | null;
+    /**
+     * `Should_Be_Destroyed_When_All_Hardpoints_Destroyed`, defaulting to true.
+     *
+     * Gates every link from the hardpoints back to the hull: dying when the last destroyable
+     * hardpoint does, the pull of the hull down toward the hardpoints, and the health bar's use of
+     * the hardpoint pool. With it off, hardpoints still absorb and still die - they just stop
+     * reaching the hull.
+     */
+    diesWithHardpoints: boolean;
+    /**
+     * `Hull_Vs_Hard_Points_Health_Constraint` from GameConstants, shipped at 0.2.
+     *
+     * How far either pool may run ahead of the other. Read from the workspace rather than assumed,
+     * because at 1 every cap clamps to 100% and both corrections stop entirely - some mods ship
+     * exactly that, and drawing 0.2 for them would show a leash their game does not have.
+     */
+    hullVsHardpointsConstraint: number;
     /** Damage type to factor, against the target's `Armor_Type`. Absent means 1.0. */
     hullFactors: Record<string, number>;
     /** Damage type to factor, against the target's `Shield_Armor_Type`. Absent means 1.0. */

@@ -15,6 +15,7 @@ import type { PreviewProjectile, PreviewTargetDefence } from '../../protocol/mod
 import type { HullPool } from './unitPool';
 import type { BlastHit } from './blast';
 import { healthColour } from './reticles';
+import { displayPercent } from './healthPools';
 
 /**
  * Which optional mechanics the panel is showing.
@@ -233,6 +234,22 @@ export function resolveHit(
     return { ...pools, shield: hit.shield, energy: hit.energy, hull: hit.hullLike };
 }
 
+/** The same hit, with the arithmetic the log shows under it. */
+export function resolveHitWithWorkings(
+    attacker: Attacker, defence: PreviewTargetDefence | null | undefined, pools: Pools,
+): { pools: Pools; workings: string[] } {
+    if (defence === null || defence === undefined) {
+        return { pools: { ...pools }, workings: [] };
+    }
+
+    const hit = applyHit(attacker, defence, pools.shield, pools.energy, pools.hull);
+
+    return {
+        pools: { ...pools, shield: hit.shield, energy: hit.energy, hull: hit.hullLike },
+        workings: hit.workings,
+    };
+}
+
 /**
  * The same hit, aimed at ONE HARDPOINT rather than at the hull.
  *
@@ -250,12 +267,29 @@ export function fireAtHardpoint(
     defence: PreviewTargetDefence | null | undefined,
     pools: Pools,
     hardpointHealth: number | null,
-): { pools: Pools; hardpointHealth: number | null; destroyed: boolean } {
+): { pools: Pools; hardpointHealth: number | null; destroyed: boolean; workings: string[] } {
     if (defence === null || defence === undefined || hardpointHealth === null) {
-        return { pools: { ...pools }, hardpointHealth, destroyed: false };
+        return { pools: { ...pools }, hardpointHealth, destroyed: false, workings: [] };
     }
 
     const hit = applyHit(attacker, defence, pools.shield, pools.energy, hardpointHealth);
+
+    // A hit that lands on an ALREADY-DESTROYED hardpoint is thrown away: the engine finds the
+    // hardpoint by collision mesh, sees it at zero, and clears the flag that would otherwise let the
+    // hull take the shot instead. Neither pool receives it, which is why a ship whose surfaces are
+    // covered by dead hardpoints stops taking damage from those angles.
+    //
+    // What is NOT settled is where the shield sits relative to that decision - the discard is in the
+    // routing, and shields are handled elsewhere in the same function. So the shield and energy
+    // results stand and only the health pools are spared, which is the half that was measured.
+    if (hardpointHealth <= 0) {
+        return {
+            pools: { ...pools, shield: hit.shield, energy: hit.energy },
+            hardpointHealth,
+            destroyed: true,
+            workings: ['Discarded - hardpoint already destroyed, hull not offered it'],
+        };
+    }
 
     return {
         // The hull pool is untouched: the shot went into the hardpoint.
@@ -264,6 +298,7 @@ export function fireAtHardpoint(
         // At EXACTLY its health, not a point later. `damage.ts` takes it from here - the model
         // hides, the decal shows, the death explosion plays once and the breakoff prop drops.
         destroyed: hit.hullLike <= 0,
+        workings: hit.workings,
     };
 }
 
@@ -280,13 +315,16 @@ function applyHit(
     shield: number,
     energy: number,
     hullLike: number,
-): { shield: number; energy: number; hullLike: number } {
+): { shield: number; energy: number; hullLike: number; workings: string[] } {
     const after = { shield, energy, hullLike };
+    const workings: string[] = [];
 
     // Energy is independent of the shield-or-hull question: it drains whenever the switch is set,
     // in every one of the four rows above.
     if (attacker.energy) {
         after.energy = drop(after.energy, attacker.damage);
+        workings.push(`Energy ${round(energy)} -> ${round(after.energy)}`
+            + ` - ${round(attacker.damage)}, unscaled`);
     }
 
     if (attacker.shield && defence.isShielded) {
@@ -295,28 +333,49 @@ function applyHit(
         const absorbed = Math.min(after.shield, scaled);
         after.shield = drop(after.shield, scaled);
 
+        workings.push(`Shield factor: ${round(attacker.damage)} x ${round(shieldFactor)}`
+            + ` = ${round(scaled)} - ${attacker.damageType} vs `
+            + `${defence.shieldArmorType ?? 'no shield armor'}`);
+        workings.push(`Shield ${round(shield)} -> ${round(after.shield)}`
+            + ` - absorbed ${round(absorbed)}`);
+
         // The surplus carries on, but only when a hull switch is set too - a shield-only weapon
         // stops at the shield however much it had left over. Taken back out of the shield's scale
         // and re-scaled by the HULL's, because the overflow is now hitting a different armor.
         if (attacker.hitpoint) {
             const spare = (scaled - absorbed) / Math.max(shieldFactor, Number.EPSILON);
+            const hullFactor = armorFactor(defence.hullFactors, attacker.damageType);
 
-            after.hullLike = drop(after.hullLike,
-                spare * armorFactor(defence.hullFactors, attacker.damageType));
+            after.hullLike = drop(after.hullLike, spare * hullFactor);
+
+            if (spare > 0) {
+                workings.push(`Spare through the shield: ${round(spare)} x ${round(hullFactor)}`
+                    + ` = ${round(spare * hullFactor)} - vs `
+                    + `${defence.armorType ?? 'no armor'}`);
+                workings.push(`Health ${round(hullLike)} -> ${round(after.hullLike)}`);
+            }
         }
 
-        return after;
+        return { ...after, workings };
     }
 
     // Everything else that touches the hull. A hitpoint-only bolt lands here whether or not the
     // shield is up, which IS the bypass; a shield-only bolt against an unshielded target lands
     // nowhere, because there is no shield to deplete and it does no hull damage by definition.
     if (attacker.hitpoint) {
-        after.hullLike = drop(after.hullLike,
-            attacker.damage * armorFactor(defence.hullFactors, attacker.damageType));
+        const hullFactor = armorFactor(defence.hullFactors, attacker.damageType);
+        const scaled = attacker.damage * hullFactor;
+
+        after.hullLike = drop(after.hullLike, scaled);
+
+        workings.push(`Armor factor: ${round(attacker.damage)} x ${round(hullFactor)}`
+            + ` = ${round(scaled)} - ${attacker.damageType} vs `
+            + `${defence.armorType ?? 'no armor'}`);
+        workings.push(`Health ${round(hullLike)} -> ${round(after.hullLike)}`
+            + (scaled > hullLike ? ` - ${round(scaled - hullLike)} overkill lost` : ''));
     }
 
-    return after;
+    return { ...after, workings };
 }
 
 /** Copies a projectile's values in. A COPY, not a binding - see the panel. */
@@ -395,7 +454,7 @@ export function damageSwitches(options: PoolOptions = POOLS_OFF): readonly {
  * copy would drift the first time either changed.
  */
 export interface PoolRow {
-    id: 'shield' | 'hull' | 'energy';
+    id: 'shield' | 'hardpoints' | 'hull' | 'energy';
     label: string;
     detail: string;
     title: string;
@@ -436,6 +495,7 @@ export function poolRows(
     pools: Pools | null | undefined,
     hull?: HullPool | null,
     options: PoolOptions = POOLS_OFF,
+    hardpoints?: HullPool | null,
 ): PoolRow[] {
     if (defence === null || defence === undefined || pools === null || pools === undefined) {
         return [];
@@ -466,40 +526,37 @@ export function poolRows(
         });
     }
 
-    // The HARDPOINTS are the hull on a unit that has them - it cannot be targeted itself, and most
-    // mods author its health as their sum. Falls back to what the file declares, which is also what
-    // a unit without hardpoints uses.
-    const hullMax = hull?.fromHardpoints === true ? hull.max : defence.tacticalHealth ?? 0;
-
-    // `hull.current` is only an answer when the hull IS the hardpoints. For a unit with none,
-    // `hullPool` can only report the declared `Tactical_Health` - it has nothing to sum - and
-    // reading that as the current value pinned the bar to full: the damage landed in `pools.hull`
-    // every shot and the row never moved. That is what "units without hardpoints don't take any
-    // damage" was; they took it, the panel just never said so.
-    const hullNow = hull?.fromHardpoints === true ? hull.current : pools.hull;
+    // ONE health bar, because the game draws one. `Get_Display_Health_Percent` returns the LOWER of
+    // the hull and the combined hardpoint percentage - and only where the unit has destroyable
+    // hardpoints and dies with them; otherwise it is the hull alone. The two pools said separately
+    // belong in the damage log, where a reader is looking for the arithmetic rather than the state.
+    const hullMax = hull?.max ?? defence.tacticalHealth ?? 0;
+    const hullNow = hull?.current ?? pools.hull;
+    const shown = displayPercent(
+        { current: hullNow, max: hullMax },
+        hardpoints ?? { current: 0, max: 0 },
+        defence.diesWithHardpoints);
 
     if (hullMax > 0) {
         const armor = defence.armorType === null || defence.armorType === undefined
             ? '' : ` - ${defence.armorType}`;
+        const leashed = (hardpoints?.max ?? 0) > 0 && defence.diesWithHardpoints;
 
         rows.push({
             id: 'hull',
-            label: 'Hull',
-            detail: hull?.fromHardpoints === true
-                ? `${round(hullNow)} of ${round(hullMax)} - summed from hardpoints${armor}`
+            label: 'Health',
+            detail: leashed
+                ? `${Math.round(shown * 100)}% - lower of hull and hardpoints${armor}`
                 : `${round(hullNow)} of ${round(hullMax)}${armor}`,
-            title: hull?.fromHardpoints === true
-                ? 'The summed Health of every destructible hardpoint. A unit with hardpoints '
-                    + 'cannot be targeted itself and dies when the last of them dies, and most mods '
-                    + 'author its health as this sum. The engine ties the two together with '
-                    + 'Hull_Vs_Hard_Points_Health_Constraint; what that computes is not known, so '
-                    + `the convention is drawn rather than a derivation. Tactical_Health says ${
-                        round(defence.tacticalHealth ?? 0)}.`
-                : 'Tactical_Health, defended by Armor_Type',
-            fraction: fractionOf(hullNow, hullMax),
+            title: leashed
+                ? 'The lower of Tactical_Health and combined hardpoint health, as the game draws '
+                    + 'it. The damage log holds both. The damage stage follows the hull alone.'
+                : 'Tactical_Health, defended by Armor_Type. The pool that dies, and the one the '
+                    + 'damage stage follows.',
+            fraction: shown,
             // The hardpoints' own ramp, so a bar gone orange in here and a targeting mark gone
             // orange out there are saying the same thing.
-            colour: healthColour(fractionOf(hullNow, hullMax)),
+            colour: healthColour(shown),
         });
     }
 
@@ -554,6 +611,15 @@ export interface BlastResult {
     hardpointHealth: Record<string, number | null>;
     /** Hardpoints this shot finished off, for the destruction path to pick up. */
     destroyed: ReadonlySet<string>;
+    /**
+     * How the blast was divided, before any victim's own arithmetic.
+     *
+     * One shot, many victims: the reader needs to see the division once rather than have it implied
+     * by numbers that do not add up to the tag they wrote.
+     */
+    workings: string[];
+    /** The arithmetic per victim, keyed by hardpoint id. */
+    perVictim: Record<string, readonly string[]>;
 }
 
 /**
@@ -581,9 +647,24 @@ export function fireBlast(
 ): BlastResult {
     const health: Record<string, number | null> = { ...hardpointHealth };
     const destroyed = new Set<string>();
+    const workings: string[] = [];
+    const perVictim: Record<string, readonly string[]> = {};
 
     if (defence === null || defence === undefined) {
-        return { pools: { ...pools }, hardpointHealth: health, destroyed };
+        return { pools: { ...pools }, hardpointHealth: health, destroyed, workings, perVictim };
+    }
+
+    const blastTotal = hits.reduce((sum, hit) => sum + hit.blastDamage, 0);
+    const wasted = hits.filter(hit => hit.wasted);
+
+    if (hits.length > 1 || blastTotal > 0) {
+        workings.push(`Blast ${round(blastTotal)} split across ${hits.length} in range`
+            + ` - ${round(hits.length > 0 ? blastTotal / hits.length : 0)} each`);
+
+        if (wasted.length > 0) {
+            workings.push(`Wreckage in range: ${wasted.length} of ${hits.length}`
+                + ` - ${round(wasted.reduce((sum, hit) => sum + hit.blastDamage, 0))} lost`);
+        }
     }
 
     let after: Pools = { ...pools };
@@ -591,6 +672,15 @@ export function fireBlast(
     for (const hit of hits) {
         const current = health[hit.id] ?? null;
         if (current === null) {
+            continue;
+        }
+
+        // The share still came out of the blast - it was counted in the division - but a hardpoint
+        // that is already destroyed receives nothing and the hull is not offered it either. This is
+        // the discard case, reached through splash rather than through aim.
+        if (hit.wasted || current <= 0) {
+            perVictim[hit.id] = [
+                `Discarded ${round(hit.directDamage + hit.blastDamage)} - already destroyed`];
             continue;
         }
 
@@ -602,11 +692,63 @@ export function fireBlast(
 
         after = { ...after, shield: resolved.shield, energy: resolved.energy };
         health[hit.id] = resolved.hullLike;
+        perVictim[hit.id] = hit.directDamage > 0 && hit.blastDamage > 0
+            ? [`Direct ${round(hit.directDamage)} + blast share ${round(hit.blastDamage)}`,
+                ...resolved.workings]
+            : resolved.workings;
 
         if (resolved.hullLike <= 0) {
             destroyed.add(hit.id);
         }
     }
 
-    return { pools: after, hardpointHealth: health, destroyed };
+    return { pools: after, hardpointHealth: health, destroyed, workings, perVictim };
+}
+
+/** The pools at the log's head: the numbers that move, and the facts behind them. */
+export interface PoolSummary {
+    /** The changing values, one line. */
+    text: string;
+    /** What they are and what governs them - fixed for the subject, so not worth a row each. */
+    title: string;
+}
+
+/**
+ * The two health pools as one line.
+ *
+ * Four rows of mostly-constant text pushed the log itself off the panel. Only the two numbers
+ * actually move while a reader fires; the leash width, the tag and the tag names do not, so they
+ * belong on the tooltip where they cost no height.
+ */
+export function poolSummary(
+    defence: PreviewTargetDefence | null | undefined,
+    hull?: HullPool | null,
+    hardpoints?: HullPool | null,
+): PoolSummary | null {
+    if (defence === null || defence === undefined) {
+        return null;
+    }
+
+    const hullMax = hull?.max ?? defence.tacticalHealth ?? 0;
+
+    if (hullMax <= 0) {
+        return null;
+    }
+
+    const parts = [`Hull ${round(hull?.current ?? hullMax)} of ${round(hullMax)}`];
+    const facts = ['Hull: Tactical_Health, the pool that dies.'];
+
+    if ((hardpoints?.max ?? 0) > 0) {
+        parts.push(`Hardpoints ${round(hardpoints?.current ?? 0)}`
+            + ` of ${round(hardpoints?.max ?? 0)}`);
+        facts.push('Hardpoints: the combined Health of every destroyable hardpoint.');
+        facts.push(`Leash: ${defence.hullVsHardpointsConstraint}, the maximum lead of either pool`
+            + ' (Hull_Vs_Hard_Points_Health_Constraint).');
+        facts.push(defence.diesWithHardpoints
+            ? 'Dies with hardpoints: the last one destroyed sets the hull to 0.'
+            : 'Dies with hardpoints: no'
+                + ' (Should_Be_Destroyed_When_All_Hardpoints_Destroyed).');
+    }
+
+    return { text: parts.join('   '), title: facts.join(' ') };
 }
