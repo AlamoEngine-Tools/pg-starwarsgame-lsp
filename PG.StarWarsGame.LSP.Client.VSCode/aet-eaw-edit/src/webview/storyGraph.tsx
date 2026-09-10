@@ -25,7 +25,7 @@ import {
 import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
 import { RightDock } from './shared/RightDock';
 import { ProblemsPanel, type ProblemFilterControl } from './shared/ProblemsPanel';
-import { filterProblems } from './shared/problemFilter';
+import { filterProblems, resolveProblemJump } from './shared/problemFilter';
 import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
 import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
 import { FrameNotifier } from './storyGraph/frameNotifier';
@@ -3441,6 +3441,14 @@ function App(): React.JSX.Element {
      * with the filter.
      */
     const [graphNodeIds, setGraphNodeIds] = useState<Set<string> | null>(null);
+    /**
+     * A problem jump waiting for the graph that can show it (#129).
+     *
+     * Clicking a problem outside the current filter has to drop the filter and re-fetch before the
+     * node exists to centre on, so the id is parked here and {@link runSetGraph} spends it once the
+     * new graph has settled.
+     */
+    const pendingJumpRef = useRef<string | null>(null);
 
     /** The reader has asked to see the findings the view filter holds back. */
     const [showAllProblems, setShowAllProblems] = useState(false);
@@ -3615,7 +3623,14 @@ function App(): React.JSX.Element {
         if (g.full) { setLayouting(true); }
         // Re-apply staged edits once the (re)built graph settles, so a reconcile never reverts them.
         const done = handle.setGraph(g.nodes, g.edges, g.layout, g.full)
-            .then(() => reapplyStagedCommands());
+            .then(() => reapplyStagedCommands())
+            .then(() => {
+                // A jump parked by a problem click, now that its node is mounted and centreable.
+                const queued = pendingJumpRef.current;
+                if (queued === null) { return; }
+                pendingJumpRef.current = null;
+                handle.centerNode(queued);
+            });
         if (g.full) { void done.finally(() => setLayouting(false)); }
     }, []);
 
@@ -3909,7 +3924,17 @@ function App(): React.JSX.Element {
                                 filterable: problemView.filterable,
                                 onToggle: () => setShowAllProblems(open => !open),
                             }}
-                            onJump={id => editorRef.current?.centerNode(id)}
+                            onJump={id => {
+                                // Centring on a node the server filtered out is a no-op, so a
+                                // problem from outside the view clears the filter and jumps when
+                                // the fuller graph lands.
+                                if (resolveProblemJump(id, graphNodeIds) === 'unfilter') {
+                                    pendingJumpRef.current = id;
+                                    clearFilters();
+                                    return;
+                                }
+                                editorRef.current?.centerNode(id);
+                            }}
                             onClose={() => setShowProblems(false)}
                         />
                     ) : null}
