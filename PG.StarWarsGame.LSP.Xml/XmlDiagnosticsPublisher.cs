@@ -119,11 +119,15 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         IStoryGraphDiagnosticsSource storyGraphDiagnostics,
         IXmlHardpointFactProducer hardpointProducer,
         IXmlDamageStageFactProducer damageStageProducer,
+        // REQUIRED, deliberately. As an optional parameter this was the one dependency the
+        // container was free to skip, and skipping it is silent: every cross-object rule would
+        // return nothing forever and every test would still pass. Required means the graph either
+        // supplies it or fails at startup, where the smoke test sees it.
+        IVariantTagSource variantTagSource,
         ServerOptions? options = null,
         IIconRepackStatusProvider? iconRepack = null,
         IModelTextureIndex? modelTextures = null,
-        IIconNameIndex? iconNames = null,
-        IVariantTagSource? variantTagSource = null)
+        IIconNameIndex? iconNames = null)
         : this(p => server.TextDocument.PublishDiagnostics(p), indexService, workspaceHost,
             schema, handlerRegistry, documentProducer, indexProducer, storyProducer, logger,
             fileTypeRegistry, fileHelper,

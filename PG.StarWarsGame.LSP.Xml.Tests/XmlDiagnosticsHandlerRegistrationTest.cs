@@ -99,7 +99,12 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // ability, so the thief can never get out. Second user of the cross-object seam. Only the
         // ability half of the tag's stated rule is enforced; the GARRISON_VEHICLE half would warn
         // on two shipped objects with nothing but a description to justify it.
-        const int expectedHandlerCount = 114;
+        // 114 -> 115: LandDamageTableMismatchHandler added - Land_Damage_Thresholds and
+        // Land_Damage_Alternates are one positional table and must be the same length. Two of the
+        // three columns the issue named: Land_Damage_SFX disagrees with the alternates on 42 of
+        // foc's 219 objects and 37 of eaw's 161, so enforcing the stated three-column rule would
+        // fire on the base game.
+        const int expectedHandlerCount = 115;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
@@ -108,11 +113,12 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
     ///     The cross-object seam has to survive DI, not just compile.
     /// </summary>
     /// <remarks>
-    ///     <c>IVariantTagSource</c> reaches the publisher through an OPTIONAL constructor parameter,
-    ///     which is the one dependency shape a container is free to skip. If it does, the publisher
-    ///     still builds, still publishes, and every cross-object rule silently returns nothing -
-    ///     invisible to the handler tests, which pass the dependency in by hand. So it is asserted
-    ///     against a container built exactly the way the server builds one.
+    ///     <c>IVariantTagSource</c> is a REQUIRED constructor parameter, and this test is why it
+    ///     became one. As an optional it was the single dependency shape a container is free to
+    ///     skip, and skipping it is silent: the publisher still builds, still publishes, and every
+    ///     cross-object rule returns nothing forever - invisible to the handler tests, which pass
+    ///     the dependency in by hand. So it is asserted against a container built exactly the way
+    ///     the server builds one.
     /// </remarks>
     [Fact]
     public void The_publisher_gets_an_object_source_from_the_real_container()
