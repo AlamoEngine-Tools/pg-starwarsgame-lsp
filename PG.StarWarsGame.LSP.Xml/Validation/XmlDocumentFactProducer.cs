@@ -30,24 +30,34 @@ public sealed class XmlDocumentFactProducer(
         var doc = document.Html;
         var lineIndex = document.LineIndex;
 
-        var isTypeContainerLevel = IsTypeContainerDocument(documentUri);
+        var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
+        var isTypeContainerLevel = !fileTypes.IsEmpty &&
+                                   fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
+
         TagResolutionContext? initialContext = null;
-        if (!isTypeContainerLevel)
+        if (!isTypeContainerLevel && !fileTypes.IsEmpty)
         {
-            var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
-            if (!fileTypes.IsEmpty)
-            {
-                var rootNode = doc.DocumentNode.ChildNodes
-                    .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
-                if (rootNode is not null)
-                    initialContext = new TagResolutionContext(fileTypes[0], 0, rootNode);
-            }
+            var rootNode = doc.DocumentNode.ChildNodes
+                .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element);
+            if (rootNode is not null)
+                initialContext = new TagResolutionContext(fileTypes[0], 0, rootNode);
         }
+
+        var state = new WalkState(
+            documentUri, document.Text, lineIndex, facts,
+            // Asked of the schema rather than hardcoded: the variant tag is declared on exactly one
+            // type, so "does this document's type declare it" IS the engine's rule.
+            fileTypes.Any(t => schema.GetTagsForType(t)
+                .Any(x => x.SemanticType == TagSemanticType.VariantParent)),
+            fileTypes.IsEmpty ? null : fileTypes[0]);
 
         foreach (var root in doc.DocumentNode.ChildNodes)
         {
             if (root.NodeType != HtmlNodeType.Element) continue;
-            WalkNodes(root, facts, lineIndex, isTypeContainerLevel, documentUri, initialContext, document.Text);
+            // In a singleton document the root element IS the object, so its children are tags. In
+            // a type container they are objects, and the recursion below raises the flag instead.
+            WalkNodes(root, state, initialContext, isTypeContainerLevel,
+                !isTypeContainerLevel && initialContext is not null);
         }
 
         if (isTypeContainerLevel)
@@ -63,12 +73,6 @@ public sealed class XmlDocumentFactProducer(
         }
 
         return facts;
-    }
-
-    private bool IsTypeContainerDocument(string documentUri)
-    {
-        var fileTypes = fileTypeRegistry.GetTypesForFile(fileHelper.NormalizeUri(documentUri));
-        return !fileTypes.IsEmpty && fileTypes.Any(t => schema.GetObjectType(t)?.NameTag is not null);
     }
 
     /// <summary>
@@ -112,10 +116,20 @@ public sealed class XmlDocumentFactProducer(
         }
     }
 
+    /// <param name="isObjectLevel">
+    ///     Whether <paramref name="node" /> is an OBJECT element, so its direct element children are
+    ///     tags and can be judged against the tag vocabulary. False everywhere below that: the
+    ///     contents of a tag are described by its value type, not by the tag table.
+    /// </param>
     private void WalkNodes(
-        HtmlNode node, List<XmlFact> facts, LineOffsetIndex lineIndex, bool isTypeContainerLevel,
-        string documentUri, TagResolutionContext? context, string text)
+        HtmlNode node, WalkState state, TagResolutionContext? context, bool isTypeContainerLevel,
+        bool isObjectLevel)
     {
+        var facts = state.Facts;
+        var documentUri = state.DocumentUri;
+        var lineIndex = state.LineIndex;
+        var text = state.Text;
+
         if (isTypeContainerLevel)
         {
             foreach (var child in node.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
@@ -125,7 +139,7 @@ public sealed class XmlDocumentFactProducer(
                 var childContext = typeName is not null
                     ? new TagResolutionContext(typeName, XmlUtility.GetDepth(child), child, context)
                     : context;
-                WalkNodes(child, facts, lineIndex, false, documentUri, childContext, text);
+                WalkNodes(child, state, childContext, false, true);
             }
 
             return;
@@ -167,7 +181,7 @@ public sealed class XmlDocumentFactProducer(
                     var abilityTypeName = XmlUtility.ToPascalCase(abilityNode.Name);
                     var abilityContext = new TagResolutionContext(
                         abilityTypeName, XmlUtility.GetDepth(abilityNode), abilityNode, context);
-                    WalkNodes(abilityNode, facts, lineIndex, false, documentUri, abilityContext, text);
+                    WalkNodes(abilityNode, state, abilityContext, false, true);
                 }
 
                 continue;
@@ -175,8 +189,21 @@ public sealed class XmlDocumentFactProducer(
 
             if (tagDef is null)
             {
-                WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
+                if (isObjectLevel && !IsStructuralContainer(child))
+                    facts.Add(UnknownTag(child, node, documentUri, text));
+                WalkNodes(child, state, context, false, false);
                 continue;
+            }
+
+            // Variant derivation exists for GameObjectType and nothing else. The resolver's flat
+            // fallback means the tag resolves on any element, so the unknown-tag rule never sees
+            // this - it needs asking separately.
+            if (isObjectLevel && tagDef.SemanticType == TagSemanticType.VariantParent &&
+                !state.VariantSupported && state.OwnerTypeName is { } ownerType)
+            {
+                var authored = XmlUtility.GetOriginalTagName(child, text);
+                facts.Add(new VariantTagNotSupportedFact(documentUri, XmlUtility.GetLine(child),
+                    XmlUtility.GetTagBracketColumn(child), authored.Length + 1, authored, ownerType));
             }
 
             var line0 = XmlUtility.GetLine(child);
@@ -215,7 +242,7 @@ public sealed class XmlDocumentFactProducer(
                     }
                 }
 
-                WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
+                WalkNodes(child, state, context, false, false);
                 continue;
             }
 
@@ -226,7 +253,7 @@ public sealed class XmlDocumentFactProducer(
                 facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue));
             }
 
-            WalkNodes(child, facts, lineIndex, false, documentUri, context, text);
+            WalkNodes(child, state, context, false, false);
         }
 
         // Pass 3: cross-tag rules evaluated on the current object's full child set
@@ -241,8 +268,78 @@ public sealed class XmlDocumentFactProducer(
         }
     }
 
+    /// <summary>
+    ///     The values that are fixed for one document, carried through the recursion together.
+    /// </summary>
+    /// <param name="VariantSupported">
+    ///     Whether any type this document is registered for declares the variant-parent tag. Asked
+    ///     of the schema rather than hardcoded to <c>GameObjectType</c>, so the rule follows the
+    ///     schema if the engine mapping is ever extended.
+    /// </param>
+    /// <param name="OwnerTypeName">
+    ///     The document's first registered type, used to name the owner in messages. Null when the
+    ///     registry types the document not at all, which is what keeps those documents silent.
+    /// </param>
+    private sealed record WalkState(
+        string DocumentUri,
+        string Text,
+        LineOffsetIndex LineIndex,
+        List<XmlFact> Facts,
+        bool VariantSupported,
+        string? OwnerTypeName);
+
     private XmlTagDefinition? ResolveTag(string name, TagResolutionContext? context)
     {
         return XmlTagResolver.Resolve(schema, name, context);
+    }
+
+    /// <summary>
+    ///     Whether an unresolved element is a grouping element rather than a mistyped tag.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Some documents wrap their tags in a level the schema does not model, because the
+    ///         engine reads straight through it: <c>&lt;RadarMap&gt;</c> holds
+    ///         <c>&lt;RadarMapEvents&gt;</c> and <c>&lt;RadarMapSettings&gt;</c>, and the tags our
+    ///         <c>RadarMap</c> type declares sit inside those. Reporting the wrapper would be a
+    ///         complaint about the shape of a shipped file that loads correctly.
+    ///     </para>
+    ///     <para>
+    ///         The discriminator is the value: a tag exists to carry one, so a mistyped tag still
+    ///         has its text. An element that holds only other elements is carrying structure.
+    ///     </para>
+    /// </remarks>
+    private static bool IsStructuralContainer(HtmlNode node)
+    {
+        var hasElementChildren = false;
+        foreach (var child in node.ChildNodes)
+        {
+            if (child.NodeType == HtmlNodeType.Element) hasElementChildren = true;
+            else if (child.NodeType == HtmlNodeType.Text && !string.IsNullOrWhiteSpace(child.InnerText))
+                return false;
+        }
+
+        return hasElementChildren;
+    }
+
+    /// <summary>
+    ///     Builds the observation for an element the schema has no tag by that name for.
+    /// </summary>
+    /// <remarks>
+    ///     The name is taken from the document rather than from the node, because HAP lower-cases
+    ///     element names and the diagnostic quotes the tag back at the reader.
+    /// </remarks>
+    private XmlUnknownTagFact UnknownTag(
+        HtmlNode child, HtmlNode owner, string documentUri, string text)
+    {
+        var authored = XmlUtility.GetOriginalTagName(child, text);
+        return new XmlUnknownTagFact(
+            documentUri,
+            XmlUtility.GetLine(child),
+            XmlUtility.GetTagBracketColumn(child),
+            authored.Length + 1,
+            authored,
+            XmlUtility.GetOriginalTagName(owner, text),
+            TagNameSuggester.Suggest(schema, authored));
     }
 }

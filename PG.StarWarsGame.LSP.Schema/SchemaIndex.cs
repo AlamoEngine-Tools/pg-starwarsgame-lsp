@@ -118,6 +118,7 @@ public sealed class SchemaIndex
                 : null,
             SemanticType = raw.SemanticType,
             ValueGroups = raw.ValueGroups,
+            AllowedValues = raw.AllowedValues,
             Deprecated = raw.Deprecated,
             AvailableSince = raw.AvailableSince,
             Description = raw.Description,

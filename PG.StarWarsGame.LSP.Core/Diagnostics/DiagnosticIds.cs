@@ -70,6 +70,23 @@ public static class DiagnosticIds
     /// <summary>A dialog command the schema's command set does not contain.</summary>
     public static readonly DiagnosticId DialogUnknownCommand = new(DiagnosticGroup.Enums, 16);
 
+    /// <summary>
+    ///     A value that the enum allows but this OWNER does not - the engine names the one style it
+    ///     supports and overwrites anything else.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="DynamicEnumValue" />, which reports a value no owner accepts.
+    ///     Suppressing "this ability is fussier than the enum" must not silence "that value does not
+    ///     exist".
+    /// </remarks>
+    public static readonly DiagnosticId EnumValueNotAllowedHere = new(DiagnosticGroup.Enums, 17);
+
+    /// <summary>
+    ///     An unknown projectile category in <c>Projectile_Types_Targeted</c>, which makes a point
+    ///     defence silently ignore that projectile.
+    /// </summary>
+    public static readonly DiagnosticId ProjectileCategoryList = new(DiagnosticGroup.Enums, 18);
+
     // ── Values ──
     public static readonly DiagnosticId AbilityModMultiplier = new(DiagnosticGroup.Values, 1);
     public static readonly DiagnosticId AudioParamInt = new(DiagnosticGroup.Values, 2);
@@ -147,6 +164,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId ValueNotBelowOne = new(DiagnosticGroup.Values, 66);
     public static readonly DiagnosticId CurveNeedsTwoControlPoints = new(DiagnosticGroup.Values, 67);
 
+    /// <summary>
+    ///     A value below -1.0 where the engine floors at -1.0 inclusive. Its own id rather than
+    ///     sharing <see cref="BonusPercentageTooLow" />: that rule excludes -1.0 and this one
+    ///     allows it, so a suppression aimed at one must not silence the other.
+    /// </summary>
+    public static readonly DiagnosticId ValueBelowNegativeOne = new(DiagnosticGroup.Values, 68);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);
@@ -201,6 +225,18 @@ public static class DiagnosticIds
     /// <summary>A dialog command that works but has not been verified against the engine.</summary>
     public static readonly DiagnosticId DialogUntestedCommand = new(DiagnosticGroup.Structure, 11);
 
+    /// <summary>
+    ///     An element written where a tag belongs that the schema has no tag by that name for, so
+    ///     the engine reads and discards it.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id rather than a variant of <see cref="TypeMismatch" />: this one has to be
+    ///     silenceable on its own. A mod may carry tags meant for an external tool, and the shipped
+    ///     data itself is full of them - 458 distinct dead names over 3800 occurrences across foc/
+    ///     and eaw/.
+    /// </remarks>
+    public static readonly DiagnosticId UnknownTag = new(DiagnosticGroup.Structure, 12);
+
     // ── CrossTag ──
     public static readonly DiagnosticId DamageNonzero = new(DiagnosticGroup.CrossTag, 1);
     public static readonly DiagnosticId DisallowedOrOperator = new(DiagnosticGroup.CrossTag, 2);
@@ -230,6 +266,12 @@ public static class DiagnosticIds
     public static readonly DiagnosticId TagComparison = new(DiagnosticGroup.CrossTag, 16);
 
     /// <summary>
+    ///     A flag switched on without the tag the engine requires beside it - "If you set
+    ///     See_Fleet_Contents to true you must also set See_Num_Fleets to true", and five more.
+    /// </summary>
+    public static readonly DiagnosticId BooleanGatedRequirement = new(DiagnosticGroup.CrossTag, 17);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.
@@ -241,6 +283,24 @@ public static class DiagnosticIds
     public static readonly DiagnosticId VariantCycle = new(DiagnosticGroup.Variants, 2);
     public static readonly DiagnosticId VariantIgnoredOverride = new(DiagnosticGroup.Variants, 3);
     public static readonly DiagnosticId VariantRedundantOverride = new(DiagnosticGroup.Variants, 4);
+
+    /// <summary>
+    ///     A <c>Variant_Of_Existing_Type</c> naming a base that does not resolve. The engine ignores
+    ///     the tag without a word, so the object loads as a blank slate.
+    /// </summary>
+    public static readonly DiagnosticId VariantBaseUnresolved = new(DiagnosticGroup.Variants, 5);
+
+    /// <summary>
+    ///     A base chain longer than the ten sweeps the engine gives variant resolution, which
+    ///     therefore resolves or not depending on declaration order.
+    /// </summary>
+    public static readonly DiagnosticId VariantChainTooDeep = new(DiagnosticGroup.Variants, 6);
+
+    /// <summary>
+    ///     <c>Variant_Of_Existing_Type</c> on an object type that has no variant machinery, where the
+    ///     engine parses the tag, fails to recognise it and logs an "Unprocessed entry" warning.
+    /// </summary>
+    public static readonly DiagnosticId VariantTagNotSupported = new(DiagnosticGroup.Variants, 7);
 
     // ── Story ──
     public static readonly DiagnosticId StoryChain = new(DiagnosticGroup.Story, 1);

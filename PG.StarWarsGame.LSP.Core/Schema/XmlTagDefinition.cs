@@ -41,6 +41,26 @@ public record XmlTagDefinition
     /// </summary>
     public IReadOnlyList<string> ValueGroups { get; init; } = [];
 
+    /// <summary>
+    ///     A subset of <see cref="Enum" />'s values that this OWNER accepts. Empty means the whole
+    ///     enum, which is the case for every tag that does not narrow it.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The restriction belongs to the owning type, not to the enum: eleven ability classes
+    ///         accept exactly one <c>Activation_Style</c> and say so in their own
+    ///         <c>Validate_Data</c> ("The only currently supported Activation_Style is
+    ///         Galactic_Automatic."), while the same nine-value enum stays correct everywhere else
+    ///         it appears.
+    ///     </para>
+    ///     <para>
+    ///         Narrower than the enum and checked before it, so a value that is legal in the enum
+    ///         but not for this owner is still reported. Matched case-insensitively, which is what
+    ///         the engine does.
+    ///     </para>
+    /// </remarks>
+    public IReadOnlyList<string> AllowedValues { get; init; } = [];
+
     /// <summary>If true, this tag is deprecated and should not be used in new files.</summary>
     public bool Deprecated { get; init; }
 

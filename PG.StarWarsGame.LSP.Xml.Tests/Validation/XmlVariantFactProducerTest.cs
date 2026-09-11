@@ -215,6 +215,99 @@ public sealed class XmlVariantFactProducerTest
         Assert.Contains(facts, f => f is VariantCycleFact { ObjectId: "A" });
     }
 
+    // ── unresolvable base ────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     A base that does not resolve is the engine's one completely silent variant failure.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Overlay_Object_Type</c> returns false and the caller ignores the return value: no
+    ///     assert, no warning, nothing in the log. The object still loads, carrying only the tags
+    ///     the author wrote, so the only symptom is a unit behaving like a blank slate.
+    /// </remarks>
+    [Fact]
+    public void Produce_UnresolvableBase_EmitsFact()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>Missing</Variant_Of_Existing_Type></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+
+        var facts = Produce(text, new FakeTagSource(), schema, Sym("V", "Missing"));
+
+        var fact = Assert.Single(facts.OfType<VariantBaseUnresolvedFact>());
+        Assert.Equal("V", fact.ObjectId);
+        Assert.Equal("Missing", fact.BaseId);
+    }
+
+    [Fact]
+    public void Produce_ResolvableBase_EmitsNoUnresolvedFact()
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+
+        var facts = Produce(text, new FakeTagSource(), schema,
+            Sym("V", "B"), Sym("B", null, "file:///b.xml"));
+
+        Assert.Empty(facts.OfType<VariantBaseUnresolvedFact>());
+    }
+
+    // A cycle is already reported as its own, louder problem; saying the base is missing as well
+    // would be a second complaint about one mistake.
+    [Fact]
+    public void Produce_CyclicChain_EmitsNoUnresolvedFact()
+    {
+        const string text =
+            """<X><SpaceUnit Name="A"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+
+        var facts = Produce(text, new FakeTagSource(), schema,
+            Sym("A", "B"), Sym("B", "A", "file:///b.xml"));
+
+        Assert.Empty(facts.OfType<VariantBaseUnresolvedFact>());
+    }
+
+    // ── chain depth ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    ///     The engine resolves variants in at most ten sweeps, so a chain of eleven links may or may
+    ///     not come out, depending on the order things are declared in.
+    /// </summary>
+    /// <remarks>
+    ///     Base-first declaration resolves any depth in one pass, because a variant becomes
+    ///     "fully loaded" the moment its own overlay succeeds. Declared in reverse, each pass
+    ///     resolves exactly one link. Ten or fewer therefore always works; deeper is decided by
+    ///     declaration order, and failing is silent.
+    /// </remarks>
+    [Fact]
+    public void Produce_ChainOfElevenBases_EmitsTooDeepFact()
+    {
+        var facts = ProduceChain(11);
+
+        var fact = Assert.Single(facts.OfType<VariantChainTooDeepFact>());
+        Assert.Equal(11, fact.BaseCount);
+    }
+
+    [Fact]
+    public void Produce_ChainOfTenBases_EmitsNoTooDeepFact()
+    {
+        Assert.Empty(ProduceChain(10).OfType<VariantChainTooDeepFact>());
+    }
+
+    /// <summary>Builds V -> B1 -> B2 -> ... -> B{count}, and produces facts for V.</summary>
+    private static IReadOnlyList<XmlFact> ProduceChain(int count)
+    {
+        const string text =
+            """<X><SpaceUnit Name="V"><Variant_Of_Existing_Type>B1</Variant_Of_Existing_Type></SpaceUnit></X>""";
+        var schema = new FakeSchema().Variant("Variant_Of_Existing_Type");
+
+        var symbols = new List<GameSymbol> { Sym("V", "B1") };
+        for (var i = 1; i <= count; i++)
+            symbols.Add(Sym($"B{i}", i < count ? $"B{i + 1}" : null, $"file:///b{i}.xml"));
+
+        return Produce(text, new FakeTagSource(), schema, symbols.ToArray());
+    }
+
     [Fact]
     public void Produce_DoesNotFlagVariantParentTagItself()
     {

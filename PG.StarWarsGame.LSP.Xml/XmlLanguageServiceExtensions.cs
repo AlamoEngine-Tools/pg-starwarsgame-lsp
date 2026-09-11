@@ -136,6 +136,14 @@ public static class XmlLanguageServiceExtensions
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)
         services.AddSingleton<IXmlDiagnosticsHandler, DuplicateSymbolHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnnamedObjectHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, UnknownTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantBaseUnresolvedHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantChainTooDeepHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantTagNotSupportedHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AtLeastNegativeOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, BooleanGatedRequirementHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AllowedValuesHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ProjectileCategoryListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeMismatchHandler>();
 
@@ -196,6 +204,15 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, LeechShieldsRequiredTagsRule>();
         services.AddSingleton<IXmlCrossTagRule, DamageRadiusWithinChaseRadiusRule>();
         services.AddSingleton<IXmlCrossTagRule, RespawnTimeOrderRule>();
+        // The engine's six "if you set A you must also set B" rules - five on System_Spy_Ability,
+        // one on Galactic_Sabotage_Ability. Registered individually so each is suppressible and the
+        // registration test can count them like every other rule.
+        services.AddSingleton<IXmlCrossTagRule, SeeFleetContentsNeedsNumFleetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeeMostPowerfulShipNeedsNumFleetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeeGroundCompanyContentsNeedsNumCompaniesRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeeCreditIncomeBreakdownNeedsIncomeRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeePoliticalControlBreakdownNeedsControlRule>();
+        services.AddSingleton<IXmlCrossTagRule, CreditHaltNeedsDurationRule>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
@@ -268,7 +285,11 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
         services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
+        // Deprecated but still registered - see the handler for why. Warnings are errors in this
+        // project, so the obsolete reference is suppressed here rather than at every call site.
+#pragma warning disable CS0618
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
+#pragma warning restore CS0618
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantAdditiveMergeHandler>();
 

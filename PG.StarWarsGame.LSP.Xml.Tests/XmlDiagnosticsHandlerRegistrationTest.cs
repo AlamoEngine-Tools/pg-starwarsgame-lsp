@@ -126,7 +126,44 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 125 -> 126: TagComparisonHandler added, fed by a TagComparisonRuleBase that relates one
         // numeric tag to another - Damage_Radius against Chase_Radius, Min_Respawn_Time against
         // Max_Respawn_Time. Requiring both tags scopes each rule without naming an element.
-        const int expectedHandlerCount = 126;
+        // 126 -> 127: UnknownTagHandler added - an element written where a tag belongs that the
+        // schema has no tag by that name for, which the engine reads and discards. Scoped to the
+        // direct children of an object element: below that an element is the CONTENT of a tag and
+        // is described by its value type, not by the tag table. Measured at that scope over foc/
+        // and eaw/ it fires 3800 times on 458 distinct names, every one of which was checked
+        // against the engine's parser table and has no row there - loud, but no false positives.
+        // 127 -> 129: VariantBaseUnresolvedHandler and VariantChainTooDeepHandler added, the two
+        // things a variant's base CHAIN can be wrong about as opposed to its tags. Unresolvable is
+        // an error - it is the engine's only variant failure with no assert and no log line, so the
+        // author gets no other signal. Too-deep is a warning worded as MAY fail, because the same
+        // eleven-link chain resolves or does not depending on declaration order.
+        // 129 -> 130: VariantTagNotSupportedHandler added - Variant_Of_Existing_Type on a type with
+        // no variant machinery, which the engine logs as an unprocessed entry and then ignores.
+        // Needs its own rule rather than falling out of UnknownTagHandler, because the tag resolver
+        // falls back to a flat lookup across every type: a real tag on the wrong element resolves,
+        // so the unknown-tag rule never sees it.
+        // 130 -> 131: AtLeastNegativeOneHandler added - a floor of -1.0 INCLUSIVE, one boundary away
+        // from BonusPercentageHandler and deliberately not it. Percentage_Income_Modifier's engine
+        // test is x <= -1.0 && x != -1.0, i.e. x < -1.0, so -1.0 passes; the eight
+        // *_Bonus_Percentage tags reject it. The messages differ by two words, so only the
+        // decompiled comparison separates them.
+        // 131 -> 132: BooleanGatedRequirementHandler added, fed by six rules on a shared base - the
+        // engine's "If you set A to true you must also set B" family. Five pair a System_Spy_Ability
+        // detail flag with the summary flag it reads from; the sixth gates a DURATION rather than a
+        // flag (Can_Halt_Credit_Production needs Duration_Of_Credit_Halt > 0). Element-scoped,
+        // because the rule has to fire when the required tag is absent and so cannot use the pair's
+        // presence to scope itself the way TagComparisonRuleBase does.
+        // 132 -> 133: AllowedValuesHandler added, and the allowedValues check MOVED out of
+        // DynamicEnumValueHandler into it. The restriction lives on the tag, so it has to apply
+        // whatever the tag's value type: Causes_Despawn is a Boolean that GalacticSabotageAbility
+        // demands be Yes, and an enum-only check did nothing there. Booleans compare by MEANING,
+        // since Yes/True/1 are interchangeable to the engine.
+        // 133 -> 134: ProjectileCategoryListHandler added - Projectile_Types_Targeted on
+        // Laser_Defense_Ability was the one tag with value type 81 and nothing validated it. The
+        // tag also had no enum wired, so it is now referenceKind: enum + ProjectileCategory. A
+        // misspelt category does not fail the load, it never matches - the point defence quietly
+        // stops intercepting that projectile.
+        const int expectedHandlerCount = 134;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

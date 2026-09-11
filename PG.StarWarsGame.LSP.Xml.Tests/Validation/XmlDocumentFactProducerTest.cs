@@ -363,6 +363,8 @@ public sealed class XmlDocumentFactProducerTest
     ///     never appears anywhere the author might notice it is gone.
     /// </summary>
     private const string SfxUri = "file:///audio/SFXEventFiles.xml";
+    private const string HardPointUri = "file:///units/HardPoints.xml";
+    private const string GameObjectUri = "file:///units/SpaceUnits.xml";
 
     [Fact]
     public void Empty_name_attribute_emits_UnnamedObjectFact()
@@ -423,6 +425,198 @@ public sealed class XmlDocumentFactProducerTest
         var facts = Build().Produce(xml, Uri);
 
         Assert.Empty(facts.OfType<XmlUnnamedObjectFact>());
+    }
+
+    // ── unknown tag facts ─────────────────────────────────────────────────────
+
+    [Fact]
+    public void Unknown_tag_on_an_object_emits_XmlUnknownTagFact()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Bogus_Tag>1</Bogus_Tag></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        var fact = Assert.Single(facts.OfType<XmlUnknownTagFact>());
+        Assert.Equal("Bogus_Tag", fact.TagName);
+        Assert.Equal("SFXEvent", fact.OwnerElement, StringComparer.OrdinalIgnoreCase);
+        Assert.Null(fact.Suggestion);
+    }
+
+    // The authored casing, not HAP's lowercased node name - the message quotes the tag back at the
+    // reader, and a lowercased quote reads like a second, invented problem.
+    [Fact]
+    public void XmlUnknownTagFact_carries_the_tag_name_as_authored()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><CamelCased_Tag>1</CamelCased_Tag></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Equal("CamelCased_Tag", Assert.Single(facts.OfType<XmlUnknownTagFact>()).TagName);
+    }
+
+    [Fact]
+    public void Known_tag_emits_no_XmlUnknownTagFact()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Text_ID>X</Text_ID></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Empty(facts.OfType<XmlUnknownTagFact>());
+    }
+
+    /// <summary>
+    ///     Only the direct children of an object element are judged.
+    /// </summary>
+    /// <remarks>
+    ///     Deeper elements are the CONTENTS of a tag - the rows of a sub-object list, the entries of
+    ///     a curve - and the schema describes those through the tag's value type rather than by
+    ///     naming them. Judging them against the tag vocabulary would report every one of them.
+    /// </remarks>
+    [Fact]
+    public void Element_nested_below_a_known_tag_emits_no_XmlUnknownTagFact()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Text_ID><Row>1</Row></Text_ID></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Empty(facts.OfType<XmlUnknownTagFact>());
+    }
+
+    // Nothing types the document, so there is no vocabulary to judge it against and no fact.
+    [Fact]
+    public void Untyped_document_emits_no_XmlUnknownTagFact()
+    {
+        const string xml = "<Root><Obj><Bogus_Tag>1</Bogus_Tag></Obj></Root>";
+        var facts = Build().Produce(xml, Uri);
+
+        Assert.Empty(facts.OfType<XmlUnknownTagFact>());
+    }
+
+    // The point of the rule: a typo is a near miss of a real tag, so name the tag it nearly is.
+    [Fact]
+    public void Near_miss_of_a_known_tag_suggests_that_tag()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Text_I>X</Text_I></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Equal("Text_ID", Assert.Single(facts.OfType<XmlUnknownTagFact>()).Suggestion);
+    }
+
+    /// <summary>
+    ///     A grouping element the schema does not model is not a mistyped tag.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Radarmap.xml</c> is the shipped case: <c>&lt;RadarMap&gt;</c> wraps its tags in
+    ///     <c>&lt;RadarMapEvents&gt;</c> and <c>&lt;RadarMapSettings&gt;</c>, which the engine reads
+    ///     straight through and our <c>RadarMap</c> type therefore flattens away. Without this the
+    ///     rule complains about the shape of a file that loads correctly.
+    /// </remarks>
+    [Fact]
+    public void Unknown_element_holding_only_elements_emits_no_XmlUnknownTagFact()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Grouping><Text_ID>X</Text_ID></Grouping></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Empty(facts.OfType<XmlUnknownTagFact>());
+    }
+
+    // The other side of that line: a mistyped tag still carries the value it was written for.
+    [Fact]
+    public void Unknown_element_carrying_a_value_still_emits_XmlUnknownTagFact()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Bogus_Tag>1</Bogus_Tag></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Equal("Bogus_Tag", Assert.Single(facts.OfType<XmlUnknownTagFact>()).TagName);
+    }
+
+    /// <summary>
+    ///     Two edits out of a seven-character name is a different tag, not a typo of this one.
+    /// </summary>
+    /// <remarks>
+    ///     The budget is a sixth of the name's length, so short names get one edit and only long
+    ///     compound ones get three. Pinned because the first calibration was a flat three, which
+    ///     answered <c>Shader_Name</c> with <c>Saber_Name</c> - a wrong suggestion is worse than
+    ///     none, since it sends the reader to rename a tag to something never meant.
+    /// </remarks>
+    [Fact]
+    public void Distant_name_suggests_nothing()
+    {
+        const string xml =
+            "<SFXEventFiles><SFXEvent Name=\"A\"><Tixt_XD>1</Tixt_XD></SFXEvent></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Null(Assert.Single(facts.OfType<XmlUnknownTagFact>()).Suggestion);
+    }
+
+    // ── variant tag on a type that has none ──────────────────────────────────
+
+    /// <summary>
+    ///     <c>Variant_Of_Existing_Type</c> works on <c>GameObjectType</c> and nothing else.
+    /// </summary>
+    /// <remarks>
+    ///     The whole derivation machinery - <c>Overlay_Object_Type</c>, <c>Overlay_Types</c> -
+    ///     exists only for that class, and there is no second derivation path in the engine. Every
+    ///     other class parses its own tags and warns about what it does not recognise:
+    ///     <c>HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
+    ///     'Variant_Of_Existing_Type'</c>. The object loads anyway, with the tag ignored.
+    /// </remarks>
+    [Fact]
+    public void Variant_tag_on_a_type_without_variants_emits_a_fact()
+    {
+        const string xml =
+            "<HardPoints><HardPoint Name=\"HP\"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></HardPoint></HardPoints>";
+        var facts = Build(new VariantAwareSchemaProvider(), new HardPointFileTypeRegistry())
+            .Produce(xml, HardPointUri);
+
+        var fact = Assert.Single(facts.OfType<VariantTagNotSupportedFact>());
+        Assert.Equal("HardPoint", fact.TypeName);
+        Assert.Equal("Variant_Of_Existing_Type", fact.TagName);
+    }
+
+    // The same tag on the one type that DOES support it is ordinary, correct authoring.
+    [Fact]
+    public void Variant_tag_on_a_type_with_variants_emits_no_fact()
+    {
+        const string xml =
+            "<GameObjectFiles><SpaceUnit Name=\"U\"><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></SpaceUnit></GameObjectFiles>";
+        var facts = Build(new VariantAwareSchemaProvider(), new GameObjectFileTypeRegistry())
+            .Produce(xml, GameObjectUri);
+
+        Assert.Empty(facts.OfType<VariantTagNotSupportedFact>());
+    }
+
+    // Untyped document: nothing says which type this is, so nothing can say the tag is wrong here.
+    [Fact]
+    public void Variant_tag_in_an_untyped_document_emits_no_fact()
+    {
+        const string xml =
+            "<Root><Obj><Variant_Of_Existing_Type>B</Variant_Of_Existing_Type></Obj></Root>";
+        var facts = Build(new VariantAwareSchemaProvider()).Produce(xml, Uri);
+
+        Assert.Empty(facts.OfType<VariantTagNotSupportedFact>());
+    }
+
+    [Fact]
+    public void Object_element_itself_emits_no_XmlUnknownTagFact()
+    {
+        // <SFXEvent> is an object, not a tag. Reporting it would fire on every object in the file.
+        const string xml = "<SFXEventFiles><SFXEvent Name=\"A\"/></SFXEventFiles>";
+        var facts = Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry())
+            .Produce(xml, SfxUri);
+
+        Assert.Empty(facts.OfType<XmlUnknownTagFact>());
     }
 }
 
@@ -699,6 +893,111 @@ file sealed class SfxEventSchemaProvider : ISchemaProvider
     {
         add { }
         remove { }
+    }
+}
+
+/// <summary>
+///     Two object types, of which only <c>GameObjectType</c> declares the variant tag - which is
+///     exactly the shape of the real schema, where <c>Variant_Of_Existing_Type</c> appears in
+///     <c>GameObjectType.yaml</c> and nowhere else.
+/// </summary>
+file sealed class VariantAwareSchemaProvider : ISchemaProvider
+{
+    private static readonly XmlTagDefinition VariantTag = new()
+    {
+        Tag = "Variant_Of_Existing_Type", ValueType = XmlValueType.TypeReference,
+        SemanticType = TagSemanticType.VariantParent
+    };
+
+    private static readonly XmlTagDefinition BoneTag = new()
+        { Tag = "Attachment_Bone", ValueType = XmlValueType.NameReference };
+
+    private static readonly GameObjectTypeDefinition HardPointType = new()
+        { TypeName = "HardPoint", NameTag = "Name" };
+
+    private static readonly GameObjectTypeDefinition GameObjectType = new()
+        { TypeName = "GameObjectType", NameTag = "Name" };
+
+    public XmlTagDefinition? GetTag(string tagName)
+    {
+        if (tagName.Equals("Variant_Of_Existing_Type", StringComparison.OrdinalIgnoreCase))
+            return VariantTag;
+        return tagName.Equals("Attachment_Bone", StringComparison.OrdinalIgnoreCase) ? BoneTag : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string typeName)
+    {
+        if (typeName.Equals("HardPoint", StringComparison.OrdinalIgnoreCase)) return HardPointType;
+        return typeName.Equals("GameObjectType", StringComparison.OrdinalIgnoreCase)
+            ? GameObjectType
+            : null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+    {
+        if (typeName.Equals("GameObjectType", StringComparison.OrdinalIgnoreCase))
+            return [VariantTag, BoneTag];
+        return typeName.Equals("HardPoint", StringComparison.OrdinalIgnoreCase) ? [BoneTag] : [];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> AllTags => [VariantTag, BoneTag];
+    public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [HardPointType, GameObjectType];
+    public IReadOnlyList<EnumDefinition> AllEnums => [];
+    public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
+    public IReadOnlyList<MetafileDefinition> AllMetafiles => [];
+
+    public event EventHandler? SchemaRefreshed
+    {
+        add { }
+        remove { }
+    }
+}
+
+file sealed class HardPointFileTypeRegistry : IFileTypeRegistry
+{
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
+        new Dictionary<string, ImmutableArray<string>>();
+
+    public ImmutableArray<string> GetTypesForFile(string _)
+    {
+        return ImmutableArray.Create("HardPoint");
+    }
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string normalizedPath)
+    {
+    }
+}
+
+file sealed class GameObjectFileTypeRegistry : IFileTypeRegistry
+{
+    public IReadOnlyDictionary<string, ImmutableArray<string>> All =>
+        new Dictionary<string, ImmutableArray<string>>();
+
+    public ImmutableArray<string> GetTypesForFile(string _)
+    {
+        return ImmutableArray.Create("GameObjectType");
+    }
+
+    public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
+    {
+    }
+
+    public void UnregisterFile(string normalizedPath)
+    {
     }
 }
 

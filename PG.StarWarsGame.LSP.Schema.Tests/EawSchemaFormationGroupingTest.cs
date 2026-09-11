@@ -26,25 +26,41 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 ///         Standard). That is left alone deliberately: nothing reads this enum's ordinals, so the
 ///         order carries no meaning here and churning it would only cost a diff.
 ///     </para>
+///     <para>
+///         Members are UPPER_SNAKE_CASE since the 2026-09-12 house-style decision, which is why
+///         <c>SAMEORDER</c> now reads like a typo - and why the no-underscore guard below matters
+///         more than it did. The engine's string has no separator; adding one to make the uppercase
+///         form legible would break the very thing this file exists to fix.
+///     </para>
 /// </remarks>
 public sealed class EawSchemaFormationGroupingTest
 {
     [Fact]
     public void TheMiddleMember_IsSpelledAsTheEngineReadsIt()
     {
-        Assert.Contains("SameOrder", Members(), StringComparer.Ordinal);
+        Assert.Contains("SAMEORDER", Members(), StringComparer.Ordinal);
     }
 
-    [Fact]
-    public void TheUnderscoredSpelling_IsGone()
-    {
-        Assert.DoesNotContain("Same_Order", Members(), StringComparer.Ordinal);
-    }
-
-    // The two the shipped corpus actually exercises must survive the rename.
+    /// <summary>
+    ///     No separator, in any casing.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Same_Order</c> was the original bug. <c>SAME_ORDER</c> is the same bug wearing the new
+    ///     house style, and is the likelier mistake now that the correct spelling looks wrong.
+    /// </remarks>
     [Theory]
-    [InlineData("Solo")]
-    [InlineData("Standard")]
+    [InlineData("Same_Order")]
+    [InlineData("SAME_ORDER")]
+    public void TheUnderscoredSpelling_IsGone(string wrong)
+    {
+        Assert.DoesNotContain(wrong, Members(), StringComparer.OrdinalIgnoreCase);
+    }
+
+    // The two the shipped corpus actually exercises must survive the rename. Vanilla writes them
+    // as Solo and Standard; the engine matches case-insensitively, so both still load.
+    [Theory]
+    [InlineData("SOLO")]
+    [InlineData("STANDARD")]
     public void TheMembersVanillaUses_AreStillThere(string member)
     {
         Assert.Contains(member, Members(), StringComparer.Ordinal);
