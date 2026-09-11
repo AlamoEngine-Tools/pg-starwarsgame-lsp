@@ -379,7 +379,7 @@ public sealed class EawSchemaA2TagTest
         Assert.Equal(TagSemanticType.FactionMarkupPairList, tag.SemanticType);
     }
 
-    // ── Campaign victory conditions → GalacticVictoryCondition enum (Type69) ──
+    // ── Campaign victory conditions → GalacticVictoryCondition enum (EnumValueList) ──
 
     [Theory]
     [InlineData("Good_Victory_Conditions")]

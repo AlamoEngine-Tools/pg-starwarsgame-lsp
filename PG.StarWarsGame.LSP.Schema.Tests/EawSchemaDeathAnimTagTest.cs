@@ -66,6 +66,16 @@ public sealed class EawSchemaDeathAnimTagTest
         Assert.DoesNotContain("DEPLOY_DIE", text, StringComparison.Ordinal);
     }
 
+    // The other half of #104. The engine's own XML field table registers Specific_Death_Anim_Index
+    // with type code 0x05, which is UInt - the same code Squadron_Capacity carries, and the 2006
+    // map-editor export agrees at Type="5". We had it as Float, which offers a decimal where the
+    // engine reads an unsigned index.
+    [Fact]
+    public void DeathAnimIndex_IsAnUnsignedIndex_NotAFloat()
+    {
+        Assert.Equal(XmlValueType.UInt, Tag("Specific_Death_Anim_Index").ValueType);
+    }
+
     private static RawTagDefinition Tag(string name)
     {
         var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find("tags", "GameObjectType.yaml")));

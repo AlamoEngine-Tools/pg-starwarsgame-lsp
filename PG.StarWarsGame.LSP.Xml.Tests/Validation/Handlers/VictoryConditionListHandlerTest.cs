@@ -28,7 +28,7 @@ public sealed class VictoryConditionListHandlerTest
 
     private static XmlTagValueFact Fact(string value)
     {
-        var tag = XmlHandlerTestFixtures.MakeTag("Good_Victory_Conditions", XmlValueType.Type69, enumDef: Enum());
+        var tag = XmlHandlerTestFixtures.MakeTag("Good_Victory_Conditions", XmlValueType.EnumValueList, enumDef: Enum());
         return XmlHandlerTestFixtures.MakeFact(tag, value);
     }
 

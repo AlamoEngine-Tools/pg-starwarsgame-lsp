@@ -14,7 +14,7 @@ namespace PG.StarWarsGame.LSP.Xml.Completion.Providers;
 /// </summary>
 public sealed class VictoryConditionProposalProvider : IXmlValueProposalProvider
 {
-    public XmlValueType ValueType => XmlValueType.Type69;
+    public XmlValueType ValueType => XmlValueType.EnumValueList;
 
     public IReadOnlyList<ValueProposal> GetProposals(XmlTagDefinition tag, string partialValue)
     {

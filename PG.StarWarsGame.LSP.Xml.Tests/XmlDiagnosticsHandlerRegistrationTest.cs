@@ -70,7 +70,7 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // 104 → 105: HardpointAbilityNotOnOwnerHandler added - Special_Ability_Name must name an
         // ability the mounting object actually has (#53).
         // 105 → 106: VictoryConditionListHandler added - validates the Campaign victory-condition
-        // lists (Type69) against the GalacticVictoryCondition enum (A5).
+        // lists (EnumValueList) against the GalacticVictoryCondition enum (A5).
         // 106 → 107: CampaignStoryAttachmentHandler added - validates how a <Campaign> attaches plot
         // manifests to factions across both *_Story_Name authoring forms.
         // 107 → 108: IconAwaitingRepackHandler added - an Icon_Name whose art exists as a raw source
