@@ -132,6 +132,20 @@ public static class DiagnosticIds
     public static readonly DiagnosticId DialogCommandArity = new(DiagnosticGroup.Values, 57);
     public static readonly DiagnosticId DialogArgValue = new(DiagnosticGroup.Values, 58);
 
+    // Range rules the engine states about dozens of tags in its own error messages, opted into per
+    // tag by validationId rather than carried by a value type.
+    public static readonly DiagnosticId ValueMustBeNonNegative = new(DiagnosticGroup.Values, 59);
+    public static readonly DiagnosticId ValueMustBePositive = new(DiagnosticGroup.Values, 60);
+    public static readonly DiagnosticId BonusPercentageTooLow = new(DiagnosticGroup.Values, 61);
+
+    // Each range rule gets its own id rather than sharing one: a suppression targets an id, and a
+    // shared one would mean silencing an angle check also silences a fraction check.
+    public static readonly DiagnosticId AngleOutsideHalfTurn = new(DiagnosticGroup.Values, 62);
+    public static readonly DiagnosticId AngleOutsideFullTurn = new(DiagnosticGroup.Values, 63);
+    public static readonly DiagnosticId NegativeFractionOutOfRange = new(DiagnosticGroup.Values, 64);
+    public static readonly DiagnosticId FractionNotBelowOne = new(DiagnosticGroup.Values, 65);
+    public static readonly DiagnosticId ValueNotBelowOne = new(DiagnosticGroup.Values, 66);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);

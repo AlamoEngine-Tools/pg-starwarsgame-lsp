@@ -43,6 +43,14 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, ContextNamePairHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ContextNameListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, NonNegativeValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, PositiveValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, BonusPercentageHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AngleDegreesHalfTurnHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AngleDegreesFullTurnHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, NegativeFractionHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, FractionBelowOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, BelowOneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PresenceInducedAnimationsHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();

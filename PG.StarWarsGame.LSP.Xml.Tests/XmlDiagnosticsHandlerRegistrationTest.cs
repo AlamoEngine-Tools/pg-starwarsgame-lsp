@@ -104,7 +104,19 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // three columns the issue named: Land_Damage_SFX disagrees with the alternates on 42 of
         // foc's 219 objects and 37 of eaw's 161, so enforcing the stated three-column rule would
         // fire on the base game.
-        const int expectedHandlerCount = 115;
+        // 115 -> 117: NonNegativeValueHandler and PositiveValueHandler added - two range rules the
+        // engine states in its own error messages about 62 tags between them ("cannot be less than
+        // zero", "must be greater than zero"), harvested from the 2018 binary. Opt-in by
+        // validationId, so no XmlValueType member was invented and each tag keeps the numeric type
+        // the engine actually parses.
+        // 117 -> 118: BonusPercentageHandler added - nine *_Bonus_Percentage tags are multipliers
+        // the engine adds to 1.0, so it rejects -1.0 or below. The bound is exclusive, which is
+        // what separates this from a plain lower-bound check.
+        // 118 -> 123: the remaining ranges the engine states, on the shared NumericRangeHandlerBase
+        // (min, max, and whether each bound is inclusive). AngleDegreesHalfTurn, AngleDegreesFullTurn,
+        // NegativeFraction, FractionBelowOne and BelowOne. The three existing range handlers moved
+        // onto the same base rather than keeping their own copies of parse-and-compare.
+        const int expectedHandlerCount = 123;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
