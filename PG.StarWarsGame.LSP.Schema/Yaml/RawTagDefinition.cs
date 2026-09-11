@@ -13,6 +13,7 @@ internal sealed record RawTagDefinition
     public ReferenceKind ReferenceKind { get; init; }
     public string? ReferenceType { get; init; }
     public string? EnumName { get; init; }
+    public IReadOnlyList<string> AllowedValues { get; init; } = [];
     public TagSemanticType SemanticType { get; init; }
     public IReadOnlyList<string> ValueGroups { get; init; } = [];
     public bool Deprecated { get; init; }

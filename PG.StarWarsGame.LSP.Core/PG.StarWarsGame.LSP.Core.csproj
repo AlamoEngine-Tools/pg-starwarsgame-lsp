@@ -7,6 +7,7 @@
 
     <ItemGroup>
         <PackageReference Include="MessagePack"/>
+        <PackageReference Include="Semver"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
         <PackageReference Include="OmniSharp.Extensions.LanguageServer"/>

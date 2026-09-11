@@ -23,12 +23,12 @@ public sealed class VictoryConditionProposalProviderTest
     };
 
     private static XmlTagDefinition Tag => new()
-        { Tag = "Good_Victory_Conditions", ValueType = XmlValueType.Type69, Enum = Enum };
+        { Tag = "Good_Victory_Conditions", ValueType = XmlValueType.EnumValueList, Enum = Enum };
 
     [Fact]
-    public void ValueType_is_Type69()
+    public void ValueType_is_EnumValueList()
     {
-        Assert.Equal(XmlValueType.Type69, Sut.ValueType);
+        Assert.Equal(XmlValueType.EnumValueList, Sut.ValueType);
     }
 
     [Fact]
@@ -54,6 +54,6 @@ public sealed class VictoryConditionProposalProviderTest
     [Fact]
     public void NoEnum_ReturnsEmpty()
     {
-        Assert.Empty(Sut.GetProposals(new XmlTagDefinition { Tag = "X", ValueType = XmlValueType.Type69 }, ""));
+        Assert.Empty(Sut.GetProposals(new XmlTagDefinition { Tag = "X", ValueType = XmlValueType.EnumValueList }, ""));
     }
 }

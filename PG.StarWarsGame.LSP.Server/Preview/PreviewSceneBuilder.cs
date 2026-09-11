@@ -246,8 +246,14 @@ public sealed class PreviewSceneBuilder(
             parts.Add(new PreviewPart("hull", hull, null, null, PreviewPartOrigin.Hull, null,
                 assets.Locate(PreviewModelReference.ModelPath(hull)) is not null));
 
+        // Whether the hardpoints are a route to this object's death at all. Read once here rather
+        // than per hardpoint: it is the owner's tag, not theirs.
+        var diesWithHardpoints = EngineBoolean.IsTrueUnlessDenied(
+            Tag(effective, "Should_Be_Destroyed_When_All_Hardpoints_Destroyed"));
+
         foreach (var hardpointId in HardpointIds(effective))
-            AddHardpoint(resolver, hull, hardpointId, parts, hardpoints, weapons, problems);
+            AddHardpoint(resolver, hull, hardpointId, diesWithHardpoints,
+                parts, hardpoints, weapons, problems);
 
         // The unit's own armament, for the 188 objects that carry a WEAPON behaviour instead of - or
         // as well as - hardpoints. Nine objects across the two trees have both.
@@ -570,10 +576,36 @@ public sealed class PreviewSceneBuilder(
             Number(effective, "Tactical_Health"),
             Number(effective, "Energy_Capacity"),
             destructible.Count == 0 ? null : destructible.Sum(h => h.Health ?? 0f),
+            EngineBoolean.IsTrueUnlessDenied(
+                Tag(effective, "Should_Be_Destroyed_When_All_Hardpoints_Destroyed")),
+            HullVsHardpointsConstraint(),
             table.FactorsFor(armor),
             table.FactorsFor(shieldArmor),
             table.DamageTypes);
     }
+
+    /// <summary>
+    ///     <c>Hull_Vs_Hard_Points_Health_Constraint</c>, or the shipped 0.2 when GameConstants does
+    ///     not set it to a number.
+    /// </summary>
+    /// <remarks>
+    ///     The default is 0.2 rather than 0 deliberately: 0 would tie the two pools together
+    ///     exactly, which is the opposite of the constant being absent. A value the engine could not
+    ///     parse is treated the same as no value at all.
+    /// </remarks>
+    private float HullVsHardpointsConstraint()
+    {
+        foreach (var value in RepeatedTagReader.Values(
+                     indexService.Current, tagSource, EncyclopediaTags.GameConstantsId,
+                     "Hull_Vs_Hard_Points_Health_Constraint"))
+            if (Parse(value) is { } parsed)
+                return parsed;
+
+        return DefaultHullVsHardpointsConstraint;
+    }
+
+    /// <summary>What both shipped corpora write, and what the engine falls back to.</summary>
+    private const float DefaultHullVsHardpointsConstraint = 0.2f;
 
     /// <summary>Whether any behaviour list names <c>SHIELDED</c>.</summary>
     /// <remarks>
@@ -1069,6 +1101,7 @@ public sealed class PreviewSceneBuilder(
         EffectiveObjectResolver resolver,
         string? hull,
         string hardpointId,
+        bool diesWithHardpoints,
         List<PreviewPart> parts,
         List<PreviewHardpoint> hardpoints,
         List<PreviewWeapon> weapons,
@@ -1127,6 +1160,40 @@ public sealed class PreviewSceneBuilder(
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointBoneMissing, "warning",
                 $"Hardpoint '{hardpointId}' attaches to bone '{attachBone}', which model '{hull}' " +
                 "does not have.", hardpointId));
+
+        // Can a shot ever REACH this hardpoint? Damage is routed by the collision mesh a projectile
+        // struck, matched with _stricmp against Collision_Mesh - exact but case-insensitive - so a
+        // value naming nothing behaves exactly like an absent one: every shot meant for it lands on
+        // the hull, the hardpoint never dies, and the all-destroyed branch can never complete.
+        //
+        // Against the union of BONES and mesh names, because vanilla points Collision_Mesh at the
+        // hardpoint's own Attachment_Bone 28 times across the two trees. The hardpoint's attached
+        // model counts as well as the hull's: 29 of the Executor's 30 meshes are in both, and one is
+        // in the attached model only.
+        //
+        // Silent where the object does not die with its hardpoints - the palace keeps its
+        // generators as destructible scenery, so one that cannot be shot takes nothing away.
+        if (EngineBoolean.IsTrue(Tag(effective, "Is_Destroyable"))
+            && diesWithHardpoints)
+        {
+            var collisionMesh = Tag(effective, "Collision_Mesh");
+            var reachable = !string.IsNullOrWhiteSpace(collisionMesh)
+                            && (HardpointBoneModelResolver.ModelHasBone(
+                                    indexService.Current, hull, collisionMesh)
+                                || HardpointBoneModelResolver.ModelHasBone(
+                                    indexService.Current, model, collisionMesh));
+
+            if (!reachable)
+                problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointUnreachable, "error",
+                    string.IsNullOrWhiteSpace(collisionMesh)
+                        ? $"Hardpoint '{hardpointId}' is destroyable but names no Collision_Mesh, so "
+                          + "no shot can reach it. The unit can never be finished through its "
+                          + "hardpoints."
+                        : $"Hardpoint '{hardpointId}' names Collision_Mesh '{collisionMesh}', which "
+                          + "is neither a mesh nor a bone of its model. No shot can reach it, and "
+                          + "the unit can never be finished through its hardpoints.",
+                    hardpointId));
+        }
 
         var tooltipKey = Tag(effective, "Tooltip_Text");
 

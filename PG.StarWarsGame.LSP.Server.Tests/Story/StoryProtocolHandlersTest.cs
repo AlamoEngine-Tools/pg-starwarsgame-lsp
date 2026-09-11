@@ -148,7 +148,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryGraph_ReturnsNodesWithLifecycleAndEdges()
     {
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("GC"), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Null(result.Error);
         var start = Assert.Single(result.Nodes, n => n.Label == "Start");
@@ -165,7 +165,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryGraph_NameFilter_KeepsMatchingEventsOnly()
     {
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("GC", "sta"), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("GC", "Rebel", "sta"), CancellationToken.None);
 
         Assert.Equal(["Start"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
     }
@@ -174,9 +174,97 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryGraph_BranchFilter_KeepsBranchMembers()
     {
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("GC", Branch: "Act1"), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
 
         Assert.Equal(["Next"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
+    }
+
+    // A facet list answers "what could I switch to", so it describes the CAMPAIGN, not the result.
+    // Derived from the returned nodes it degenerates exactly where it is needed: filter to a branch
+    // and the only branch left to offer is the one already selected.
+    [Fact]
+    public async Task GetStoryGraph_ReportsEveryBranch_EvenTheOnesTheFilterHid()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
+
+        // Act1 is all that survives as a NODE...
+        Assert.Equal(["Next"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
+        // ...but both branches stay switchable.
+        Assert.Equal(["Act1", "Act2"], result.Branches);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_ReportsEveryBranch_EvenWhenAPlotStateFilterHidesAThread()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
+                CancellationToken.None);
+
+        // Act2's only event lives on the suspended thread this filter drops.
+        Assert.DoesNotContain(result.Nodes, n => n.Label == "Later");
+        Assert.Equal(["Act1", "Act2"], result.Branches);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_ReportsEveryThread_SoANewEventCanTargetAHiddenOne()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", Branch: "Act1"), CancellationToken.None);
+
+        Assert.NotNull(result.Threads);
+        Assert.Contains(ThreadUri, result.Threads!);
+        Assert.Contains(SuspendedUri, result.Threads!);
+    }
+
+    /// <summary>
+    ///     A plot is a THREAD, and a faction's manifest lists each one as active or suspended.
+    ///     That is a different question from an event's lifecycle: a suspended plot's events are
+    ///     Inactive, but so is an armed plot's event whose prereq has not fired.
+    /// </summary>
+    [Fact]
+    public async Task GetStoryGraph_PlotStateActive_DropsTheSuspendedThreadsEvents()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Active"),
+                CancellationToken.None);
+
+        var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
+        Assert.Contains("Start", labels);
+        Assert.DoesNotContain("Later", labels);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_PlotStateSuspended_KeepsOnlyTheSuspendedThreadsEvents()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "Suspended"),
+                CancellationToken.None);
+
+        Assert.Equal(["Later"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_NoPlotState_KeepsBoth()
+    {
+        // The default is every plot the faction's manifest registers, in either state - a suspended
+        // plot is part of the chain, waiting for something to resume it.
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
+
+        var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
+        Assert.Contains("Start", labels);
+        Assert.Contains("Later", labels);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_PlotStateIsReadHoweverItIsCased()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", PlotState: "suspended"),
+                CancellationToken.None);
+
+        Assert.Equal(["Later"], result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label));
     }
 
     [Fact]
@@ -185,7 +273,7 @@ public sealed class StoryProtocolHandlersTest
         var startId = $"{ThreadUri}#start";
 
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("GC", ReachableFrom: startId), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: startId), CancellationToken.None);
 
         var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
         Assert.Contains("Start", labels);
@@ -199,7 +287,7 @@ public sealed class StoryProtocolHandlersTest
         // The graph fetch must be self-sufficient for the node body (no per-node detail round
         // trip needed) - same fields aet/getStoryNodeDetail already projects for "Next".
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("GC"), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("GC", "Rebel"), CancellationToken.None);
 
         var next = Assert.Single(result.Nodes, n => n.Label == "Next");
         Assert.Equal("Act1", next.Branch);
@@ -213,7 +301,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryGraph_UnknownCampaign_ReturnsError()
     {
         var result = await new GetStoryGraphHandler(Models(), Config())
-            .Handle(new GetStoryGraphParams("Nope"), CancellationToken.None);
+            .Handle(new GetStoryGraphParams("Nope", "Rebel"), CancellationToken.None);
 
         Assert.Contains("Nope", result.Error);
     }
@@ -224,7 +312,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryNodeDetail_ReturnsFullEventPayload()
     {
         var result = await new GetStoryNodeDetailHandler(Models(), Config())
-            .Handle(new GetStoryNodeDetailParams("GC", $"{ThreadUri}#next"), CancellationToken.None);
+            .Handle(new GetStoryNodeDetailParams("GC", "Rebel", $"{ThreadUri}#next"), CancellationToken.None);
 
         Assert.Null(result.Error);
         var node = result.Node!;
@@ -239,7 +327,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryNodeDetail_UnknownNode_ReturnsError()
     {
         var result = await new GetStoryNodeDetailHandler(Models(), Config())
-            .Handle(new GetStoryNodeDetailParams("GC", "ghost"), CancellationToken.None);
+            .Handle(new GetStoryNodeDetailParams("GC", "Rebel", "ghost"), CancellationToken.None);
 
         Assert.NotNull(result.Error);
         Assert.Null(result.Node);
@@ -298,7 +386,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryParamOptions_StoryEventNameParam_ReturnsCampaignEventNames()
     {
         var result = await OptionsHandler()
-            .Handle(new GetStoryParamOptionsParams("GC", "reward", "TRIGGER_EVENT", 0),
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0),
                 CancellationToken.None);
 
         Assert.Null(result.Error);
@@ -309,7 +397,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryParamOptions_PrefixFiltersCampaignNames()
     {
         var result = await OptionsHandler()
-            .Handle(new GetStoryParamOptionsParams("GC", "reward", "TRIGGER_EVENT", 0, "ne"),
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0, "ne"),
                 CancellationToken.None);
 
         Assert.Equal(["Next"], result.Options.Select(o => o.Value));
@@ -321,7 +409,7 @@ public sealed class StoryProtocolHandlersTest
         var index = IndexWith(("Coruscant", "Planet"), ("Tatooine", "Planet"), ("X_Wing", "SpaceUnit"));
 
         var result = await OptionsHandler(index)
-            .Handle(new GetStoryParamOptionsParams("GC", "event", "STORY_ENTER", 0, "c"),
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "event", "STORY_ENTER", 0, "c"),
                 CancellationToken.None);
 
         Assert.Equal(["Coruscant"], result.Options.Select(o => o.Value));
@@ -331,7 +419,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryParamOptions_UnknownTypeOrPosition_ReturnsEmptyWithoutError()
     {
         var result = await OptionsHandler()
-            .Handle(new GetStoryParamOptionsParams("GC", "event", "STORY_NOPE", 0), CancellationToken.None);
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "event", "STORY_NOPE", 0), CancellationToken.None);
 
         Assert.Null(result.Error);
         Assert.Empty(result.Options);
@@ -341,7 +429,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryParamOptions_LimitCapsTheResult()
     {
         var result = await OptionsHandler()
-            .Handle(new GetStoryParamOptionsParams("GC", "reward", "TRIGGER_EVENT", 0, Limit: 1),
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0, Limit: 1),
                 CancellationToken.None);
 
         Assert.Single(result.Options);
@@ -351,7 +439,7 @@ public sealed class StoryProtocolHandlersTest
     public async Task GetStoryParamOptions_StoryEditorOff_ReturnsDisabledMessage()
     {
         var result = await OptionsHandler(storyEditor: false)
-            .Handle(new GetStoryParamOptionsParams("GC", "reward", "TRIGGER_EVENT", 0),
+            .Handle(new GetStoryParamOptionsParams("GC", "Rebel", "reward", "TRIGGER_EVENT", 0),
                 CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
@@ -391,7 +479,7 @@ public sealed class StoryProtocolHandlersTest
         // inside Start's event range. Aim at the Event_Type VALUE - event-level, no param slot.
         collector.Seed.Add((ThreadUri, Diag(0, 40, DiagnosticSeverity.Error, "bad value")));
 
-        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC"), CancellationToken.None);
+        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Null(result.Error);
         var diagnostic = Assert.Single(result.Diagnostics);
@@ -407,7 +495,7 @@ public sealed class StoryProtocolHandlersTest
         var (handler, collector) = DiagnosticsHandler();
         collector.Seed.Add((SuspendedUri, Diag(0, 1, DiagnosticSeverity.Warning, "file-level")));
 
-        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC"), CancellationToken.None);
+        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Null(diagnostic.NodeId); // column 1 = the <Story> root, before any event
@@ -421,7 +509,7 @@ public sealed class StoryProtocolHandlersTest
         var handler = new GetStoryDiagnosticsHandler(
             Models(), Index(), collector, new FakeTextSource(), Config(false));
 
-        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC"), CancellationToken.None);
+        var result = await handler.Handle(new GetStoryDiagnosticsParams("GC", "Rebel"), CancellationToken.None);
 
         Assert.Equal(StoryEditorFeature.DisabledMessage, result.Error);
     }
@@ -584,7 +672,7 @@ public sealed class StoryProtocolHandlersTest
 
     private sealed class StubModelService : IStoryModelService
     {
-        // Active thread: Start → (prereq) Next[Branch=Act1]; suspended thread: Later.
+        // Active thread: Start → (prereq) Next[Branch=Act1]; suspended thread: Later[Branch=Act2].
         private static readonly StoryCampaignModel Model = BuildModel();
         public IReadOnlyList<string> Invalidated { get; init; } = [];
 
@@ -593,7 +681,13 @@ public sealed class StoryProtocolHandlersTest
             return ["GC"];
         }
 
-        public StoryCampaignModel? GetCampaignModel(string campaignName)
+        public IReadOnlyList<StoryModelKey> GetModelKeys()
+        {
+            return GetCampaignNames()
+                .Select(c => new StoryModelKey(c, "Rebel")).ToList();
+        }
+
+        public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
         {
             return campaignName == "GC" ? Model : null;
         }
@@ -626,9 +720,11 @@ public sealed class StoryProtocolHandlersTest
                 "<Story><Event Name=\"Start\"><Event_Type>STORY_ELAPSED</Event_Type></Event>" +
                 "<Event Name=\"Next\"><Event_Type>STORY_TRIGGER</Event_Type>" +
                 "<Prereq>Start</Prereq><Branch>Act1</Branch></Event></Story>", ThreadUri);
+            // Act2 lives on the OTHER thread, and on the suspended one, so a facet list has to
+            // span threads and survive both a branch filter and a plot-state filter to be right.
             var suspended = StoryThreadParser.Parse(
-                "<Story><Event Name=\"Later\"/></Story>", SuspendedUri);
-            return new StoryCampaignModel("GC", [active, suspended],
+                "<Story><Event Name=\"Later\"><Branch>Act2</Branch></Event></Story>", SuspendedUri);
+            return new StoryCampaignModel("GC", "Rebel", [active, suspended],
                 new HashSet<string>(StringComparer.Ordinal) { SuspendedUri },
                 new StoryGraphBuilder(new ProtocolSchemaProvider()).Build([active, suspended]));
         }

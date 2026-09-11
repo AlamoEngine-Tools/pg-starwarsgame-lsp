@@ -24,7 +24,7 @@ public sealed class PreviewStoryGraphHandlerTest
 
     private static PreviewStoryGraphParams Preview(params StoryCommandDto[] commands)
     {
-        return new PreviewStoryGraphParams("GC", commands);
+        return new PreviewStoryGraphParams("GC", "Rebel", commands);
     }
 
     [Fact]

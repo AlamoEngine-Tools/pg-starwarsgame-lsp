@@ -14,7 +14,8 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 public sealed class GameIndexService : IGameIndexService
 {
     private readonly IFileHelper _fileHelper;
-    private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts = new();
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts =
+        new(DocumentUris.Comparer);
     private readonly IProjectLayerMap? _layerMap;
     private readonly ILogger<GameIndexService> _logger;
     private readonly object _mergeLock = new();
@@ -28,7 +29,7 @@ public sealed class GameIndexService : IGameIndexService
 
     // Per-URI count of queued operations, so the unchanged-content fast path never skips a URI
     // that has a pending removal in the same bulk (e.g. didClose's remove-then-readd sequence).
-    private readonly ConcurrentDictionary<string, int> _pendingUris = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, int> _pendingUris = new(DocumentUris.Comparer);
 
     private GameIndex _current = GameIndex.Empty;
     private int _hasPendingEvent; // 0 = false, 1 = true; int for Interlocked
@@ -70,7 +71,7 @@ public sealed class GameIndexService : IGameIndexService
     public void InjectDocument(DocumentIndex document)
     {
         var uri = NormalizeUri(document.DocumentUri);
-        if (document.DocumentUri != uri)
+        if (!DocumentUris.Same(document.DocumentUri, uri))
             document = document with { DocumentUri = uri };
 
         // Snapshots persist the LayerRank at write time; if the dependency graph changed between
@@ -418,7 +419,7 @@ public sealed class GameIndexService : IGameIndexService
         // Resolve the final operation per URI in arrival order (null = remove). The version rule
         // matches the non-bulk CAS path: a strictly newer already-committed version wins; after a
         // queued removal any version applies, exactly as it would sequentially.
-        var finalDocs = new Dictionary<string, DocumentIndex?>(StringComparer.Ordinal);
+        var finalDocs = new Dictionary<string, DocumentIndex?>(DocumentUris.Comparer);
         foreach (var op in ops)
         {
             if (op.Document is null)

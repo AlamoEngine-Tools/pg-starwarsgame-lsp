@@ -51,12 +51,23 @@ public sealed class EawSchemaA2TagTest
         Assert.Equal("Faction", tag.ObjectType?.TypeName);
     }
 
-    // ── EnableAbilityAbility:Ability_Name → SpecialAbility ───────────────────
+    // ── EnableAbility:Ability_Name → SpecialAbility ──────────────────────────
 
+    /// <summary>
+    ///     The type name here is load-bearing, and it used to be wrong.
+    /// </summary>
+    /// <remarks>
+    ///     This asked for <c>GetTagsForType("EnableAbilityAbility")</c> and passed, because the tag
+    ///     file was named after a phantom type that no XML element resolves to.
+    ///     <c>&lt;Enable_Ability&gt;</c> PascalCases to <c>EnableAbility</c>, so the tags were only
+    ///     ever found through the global fallback - with whichever type's definition loaded first.
+    ///     A test asserting the reachable-but-unused name is what let the bug survive, so assert
+    ///     the name an element actually resolves to.
+    /// </remarks>
     [Fact]
-    public void EnableAbilityAbility_AbilityName_ReferenceTypeIsSpecialAbility()
+    public void EnableAbility_AbilityName_ReferenceTypeIsSpecialAbility()
     {
-        var tag = Schema.GetTagsForType("EnableAbilityAbility")
+        var tag = Schema.GetTagsForType("EnableAbility")
             .First(t => string.Equals(t.Tag, "Ability_Name", StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal(ReferenceKind.XmlObject, tag.ReferenceKind);
@@ -253,7 +264,9 @@ public sealed class EawSchemaA2TagTest
 
         Assert.Equal("SpaceLayerType", tag.Enum?.Name);
         Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
-        Assert.Contains(tag.Enum!.Values, v => v.Name == "SuperCapital");
+        // SUPERCAPITAL, not SUPER_CAPITAL: the engine's string has no separator, and the house
+        // style only changes case.
+        Assert.Contains(tag.Enum!.Values, v => v.Name == "SUPERCAPITAL");
     }
 
     [Fact]
@@ -264,8 +277,9 @@ public sealed class EawSchemaA2TagTest
 
         Assert.Equal("CollisionClassType", tag.Enum?.Name);
         Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
-        // Engine collision classes contain spaces - must survive schema loading intact.
-        Assert.Contains(tag.Enum!.Values, v => v.Name == "Landing Transport");
+        // Engine collision classes contain SPACES - must survive both schema loading and the
+        // uppercase house style, which changes case and nothing else.
+        Assert.Contains(tag.Enum!.Values, v => v.Name == "LANDING TRANSPORT");
     }
 
     // ── HardPoint:Special_Ability_Name → owner-agnostic ability reference ────
@@ -379,7 +393,7 @@ public sealed class EawSchemaA2TagTest
         Assert.Equal(TagSemanticType.FactionMarkupPairList, tag.SemanticType);
     }
 
-    // ── Campaign victory conditions → GalacticVictoryCondition enum (Type69) ──
+    // ── Campaign victory conditions → GalacticVictoryCondition enum (EnumValueList) ──
 
     [Theory]
     [InlineData("Good_Victory_Conditions")]
@@ -394,7 +408,7 @@ public sealed class EawSchemaA2TagTest
         Assert.Equal(ReferenceKind.Enum, tag.ReferenceKind);
         Assert.Equal("GalacticVictoryCondition", tag.Enum?.Name);
         Assert.Equal(EnumKind.SchemaFixed, tag.Enum?.Kind);
-        Assert.Contains(tag.Enum!.Values, v => v.Name == "Galactic_All_Planets_Controlled");
+        Assert.Contains(tag.Enum!.Values, v => v.Name == "GALACTIC_ALL_PLANETS_CONTROLLED");
     }
 
     // ── schema loader (shared with EawSchemaA1TagTest) ────────────────────────

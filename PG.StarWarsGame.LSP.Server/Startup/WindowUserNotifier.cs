@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Window;
 
 namespace PG.StarWarsGame.LSP.Server.Startup;
@@ -45,4 +46,5 @@ public sealed class WindowUserNotifier : IUserNotifier
             _logger.LogWarning(ex, "Failed to show info notification to the client (non-fatal).");
         }
     }
+
 }

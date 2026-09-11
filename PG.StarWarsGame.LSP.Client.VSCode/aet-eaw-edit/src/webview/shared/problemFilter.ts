@@ -76,3 +76,24 @@ export function filterProblems<T>(
         label: hidden > 0 ? `${showAll ? total : matching.length} of ${total}` : String(total),
     };
 }
+
+/** What a click on a problem row has to do to get the reader to its node. */
+export type ProblemJump = 'centre' | 'unfilter';
+
+/**
+ * Whether jumping to a problem's node needs the view filter dropped first.
+ *
+ * The companion to {@link filterProblems}, and here for the same reason: the filter decides what
+ * the reader can SEE, so it also owns what happens when they click something the filter is holding
+ * out of view. The story graph is filtered server-side, so a node outside the current filter is not
+ * merely hidden - it was never sent, and centring on it is a no-op. Clearing the filter and
+ * re-fetching is the only way to put it on screen.
+ *
+ * @param inView Every node id the current view holds, or null before the first one has arrived -
+ *     where there is nothing to judge against, and discarding the reader's filter on a guess is
+ *     worse than a jump that lands on an already-visible node.
+ */
+export function resolveProblemJump(nodeId: string, inView: ReadonlySet<string> | null): ProblemJump {
+    if (inView === null) { return 'centre'; }
+    return inView.has(nodeId) ? 'centre' : 'unfilter';
+}

@@ -226,8 +226,9 @@ public static class ServerConfigurator
                     sp.GetRequiredService<IStoryModelService>(),
                     sp.GetRequiredService<IGameIndexService>(),
                     sp.GetRequiredService<ISchemaProvider>(),
-                    campaign => sp.GetRequiredService<ILanguageServerFacade>()
-                        .SendNotification("aet/storySimChanged", new StorySimChangedParams(campaign))));
+                    key => sp.GetRequiredService<ILanguageServerFacade>()
+                        .SendNotification("aet/storySimChanged",
+                            new StorySimChangedParams(key.Campaign, key.Faction))));
 
                 // Story-dialog (.txt) language service, scoped by the pgproj storyDialog node.
                 services.AddSingleton<IStoryDialogScope, StoryDialogScopeService>();
@@ -252,7 +253,14 @@ public static class ServerConfigurator
                 services.AddSingleton<WorkspaceIndexer>();
                 services.AddSingleton<IWorkspaceIndexer>(sp => sp.GetRequiredService<WorkspaceIndexer>());
 
-                services.AddSingleton<ModProjectLoader>();
+                // Built explicitly rather than by convention: the chain and the sink are what make
+                // a project migrate on read, and a container that silently picked the shorter
+                // constructor would migrate nothing while every test still passed.
+                services.AddSingleton<ModProjectLoader>(sp => new ModProjectLoader(
+                    sp.GetRequiredService<IFileHelper>(),
+                    sp.GetRequiredService<ILogger<ModProjectLoader>>(),
+                    sp.GetRequiredService<IPgprojMigrationSink>(),
+                    PgprojMigrations.All));
                 services.AddSingleton<ProjectDependencyGraph>();
                 services.AddSingleton<ModProjectResolver>();
                 services.AddSingleton<IModProjectDetector, ModProjectDetector>();
@@ -272,6 +280,14 @@ public static class ServerConfigurator
                 services.AddSingleton<IStartupNotifier, StartupNotifier>();
                 services.AddSingleton<IUserNotifier, WindowUserNotifier>();
                 services.AddSingleton<StartupPipeline>();
+
+                // One instance behind both roles: the loader reports migrated projects into it as
+                // the sink, and the reload service asks it to put the question once the workspace
+                // is up. Two registrations of the same type would queue into one and ask the other.
+                services.AddSingleton<IPgprojMigrationPrompt, WindowPgprojMigrationPrompt>();
+                services.AddSingleton<PgprojMigrationOffer>();
+                services.AddSingleton<IPgprojMigrationSink>(sp => sp.GetRequiredService<PgprojMigrationOffer>());
+
 
                 services.AddSingleton<BaselineLoader>(sp =>
                     new BaselineLoader(

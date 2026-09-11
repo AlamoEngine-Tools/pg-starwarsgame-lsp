@@ -144,16 +144,27 @@ export class StoryNavigatorViewProvider
             campaign.name, vscode.TreeItemCollapsibleState.Collapsed, 'campaign', campaign.name);
         item.iconPath = new vscode.ThemeIcon('map');
         item.contextValue = 'aetStoryCampaign';
-        item.tooltip = `${campaign.name} - click the graph icon to open the story graph`;
+        item.tooltip = `${campaign.name} - expand to open a faction's story graph`;
         return item;
     }
 
+    /**
+     * A faction, and the level the graph opens from.
+     *
+     * A campaign declares a plot manifest per faction and those are separate chains - the playable
+     * faction's plots are what the player runs, an unplayable faction's are triggered by the AI.
+     * The graph used to open on the campaign and merged them, which is why the icon lives here.
+     */
     private _factionItem(campaignName: string, faction: StoryFactionDto): StoryTreeItem {
         const item = new StoryTreeItem(
             faction.faction, vscode.TreeItemCollapsibleState.Collapsed, 'faction',
             campaignName, faction.faction);
         item.iconPath = new vscode.ThemeIcon('organization');
+        item.contextValue = 'aetStoryFaction';
         item.description = faction.manifestFile;
+        item.tooltip = `${campaignName} - ${faction.faction}`
+            + `\nDeclared by ${faction.manifestFile}`
+            + '\nClick the graph icon to open this faction\'s story graph';
         return item;
     }
 

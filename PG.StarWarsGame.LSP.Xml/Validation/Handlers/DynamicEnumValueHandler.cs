@@ -45,6 +45,8 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                 ];
         }
 
+        // The owner's own subset is NOT checked here - AllowedValuesHandler does it for every value
+        // type, because the restriction lives on the tag rather than on this one type.
         var enumDef = fact.Tag.Enum;
         if (enumDef is null)
             return [];

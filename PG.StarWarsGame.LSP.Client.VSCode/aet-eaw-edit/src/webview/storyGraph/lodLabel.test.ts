@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { fitLabel, labelLayout, MIN_LABEL_PX, wrapLabel } from './lodLabel';
+import {
+    createLabelSizer, fitLabel, labelLayout, LINE_RATIO, linesThatFit, MIN_LABEL_PX, wrapLabel,
+} from './lodLabel';
 
 describe('fitLabel', () => {
     // One character is one unit wide here, so the arithmetic is obvious in the assertions.
@@ -73,6 +75,63 @@ describe('labelLayout', () => {
     it('falls back to the cap when it cannot compute a size', () => {
         assert.equal(labelLayout('', 50, 60, ADVANCE, 13).fontPx, 13);
         assert.equal(labelLayout('abc', 50, 60, 0, 13).fontPx, 13);
+    });
+});
+
+describe('createLabelSizer', () => {
+    const ADVANCE = 0.5; // one character is half the font size wide, as in the labelLayout tests
+    const LONGEST = 'Empire_ActI_Mission_Two_Failed_04';
+
+    // The frame used to pick ONE size, from the graph's longest label against its LARGEST node.
+    // Every shorter node inherited a line budget its box could not hold, and since the block is
+    // centred the text spilled out of both ends into the rows above and below - invisible while
+    // auto-arrange spread nodes thousands of pixels apart, obvious once they sit 60px apart.
+    // Capping the budget stopped the collision but truncated those labels instead; sizing per box
+    // keeps the name AND keeps it inside, because a smaller font fits both more characters per
+    // line and more lines.
+    it('shrinks the font until the whole name fits a short box', () => {
+        const sizer = createLabelSizer(LONGEST, ADVANCE, 13);
+
+        const tall = sizer(60, 120);
+        const short = sizer(60, 30);
+        assert.ok(short.fontPx < tall.fontPx,
+            `a 30px box takes a smaller font than a 120px one (${short.fontPx} vs ${tall.fontPx})`);
+
+        const wrapped = wrapLabel(LONGEST, 60, short.maxLines,
+            s => s.length * ADVANCE * short.fontPx);
+        assert.equal(wrapped.join(''), LONGEST, 'the whole name is drawn, not a truncation of it');
+    });
+
+    // The property that keeps text inside the box: the block is (lines - 1) * fontPx * LINE_RATIO
+    // tall plus one line of glyphs, centred on the node.
+    it('never returns a layout taller than the box it was asked about', () => {
+        const sizer = createLabelSizer(LONGEST, ADVANCE, 13);
+        for (let height = 12; height <= 400; height += 7) {
+            const { fontPx, maxLines } = sizer(60, height);
+            const block = (maxLines - 1) * fontPx * LINE_RATIO + fontPx;
+            assert.ok(block <= Math.max(height, fontPx),
+                `${maxLines} lines at ${fontPx}px is ${block.toFixed(1)}px, inside a ${height}px box`);
+        }
+    });
+
+    // Hundreds of nodes are drawn per frame and they share a handful of box sizes, so the walk
+    // down from the maximum runs once per size rather than once per node.
+    it('answers the same box from cache', () => {
+        const sizer = createLabelSizer(LONGEST, ADVANCE, 13);
+        assert.equal(sizer(60, 120), sizer(60, 120));
+        assert.notEqual(sizer(60, 120), sizer(60, 30));
+    });
+
+    it('sizes from the graph-wide longest label, so equal boxes agree', () => {
+        const sizer = createLabelSizer(LONGEST, ADVANCE, 13);
+        assert.deepEqual(sizer(60, 90), labelLayout(LONGEST, 60, 90, ADVANCE, 13));
+    });
+});
+
+describe('linesThatFit', () => {
+    it('is the line count the sizing pass and the draw pass share', () => {
+        assert.equal(linesThatFit(100, 10), Math.floor(100 / (10 * LINE_RATIO)));
+        assert.equal(linesThatFit(5, 10), 1, 'never fewer than one');
     });
 });
 

@@ -26,15 +26,17 @@ public sealed class EaWXmlContext : IEaWXmlContext
 
         // TODO: implement proper AI XML parsing - AI files use a different format that
         //       requires a dedicated parser; exclude them until that parser exists.
-        if (normalized.Contains("/ai/", StringComparison.Ordinal)) return false;
+        // Segment and prefix tests over a URI fold, like every other comparison of one: the value
+        // keeps the file's real case now, so an ordinal test here would miss "/AI/" on disk.
+        if (DocumentUris.Contains(normalized, "/ai/")) return false;
 
-        return _directories.Any(dir => normalized.StartsWith(dir, StringComparison.Ordinal));
+        return _directories.Any(dir => DocumentUris.StartsWith(normalized, dir));
     }
 
     public bool IsLeafFile(string fileUri)
     {
         var normalized = _fileHelper.NormalizeUri(fileUri);
-        return _leafDirectories.Any(dir => normalized.StartsWith(dir, StringComparison.Ordinal));
+        return _leafDirectories.Any(dir => DocumentUris.StartsWith(normalized, dir));
     }
 
     public string? TryGetXmlRelativePath(string fileUri)
@@ -44,7 +46,7 @@ public sealed class EaWXmlContext : IEaWXmlContext
         // Longest matching directory wins, so a file under a nested xml root is made relative to
         // that root rather than an ancestor (directories are stored with a trailing '/').
         var root = _directories
-            .Where(dir => normalized.StartsWith(dir, StringComparison.OrdinalIgnoreCase))
+            .Where(dir => DocumentUris.StartsWith(normalized, dir))
             .OrderByDescending(dir => dir.Length)
             .FirstOrDefault();
         if (root is null) return null;

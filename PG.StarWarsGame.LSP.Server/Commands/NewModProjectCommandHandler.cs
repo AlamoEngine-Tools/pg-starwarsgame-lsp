@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Workspace;
+using PG.StarWarsGame.LSP.Core.Persistence;
 using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Server.Commands;
@@ -95,26 +96,32 @@ public sealed class NewModProjectCommandHandler : ExecuteCommandHandlerBase
 
     private void WritePgproj(string pgprojPath, string name)
     {
-        var content = new
+        var content = new Dictionary<string, object?>
         {
-            modinfo = new
+            // A project we write says what it is and which format it is in, first, like every other
+            // document here. Absent still means version one, so this is not what makes the file
+            // loadable - it is what lets the next format change tell a stamped file from an
+            // unstamped one instead of guessing.
+            ["_type"] = PgprojFormat.TypeName,
+            ["_typeVersion"] = PgprojFormat.Current.ToString(),
+            ["modinfo"] = new
             {
                 name,
                 version = "1.0.0"
             },
-            directories = new
+            ["directories"] = new
             {
                 xml = new[] { "data/xml" },
                 scripts = new[] { "data/scripts" },
                 art = new[] { "data/art" },
                 audio = new[] { "data/audio" }
             },
-            localisation = new
+            ["localisation"] = new
             {
                 type = "CSV",
                 directory = "data/text"
             },
-            projectReferences = Array.Empty<object>()
+            ["projectReferences"] = Array.Empty<object>()
         };
 
         _fileHelper.FileSystem.File.WriteAllText(

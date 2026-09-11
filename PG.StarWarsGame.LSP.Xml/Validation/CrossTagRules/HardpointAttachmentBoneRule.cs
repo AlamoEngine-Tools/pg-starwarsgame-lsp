@@ -9,9 +9,19 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 /// <summary>
-///     Flags a <c>HardPoint</c> that is declared destroyable but has no <c>Attachment_Bone</c>. Without
-///     one the engine cannot attach it to the parent model and it becomes indestructible - so the unit
-///     keeps a weak point that can never be shot off, contradicting its own <c>Is_Destroyable</c> (#53).
+///     Flags a <c>HardPoint</c> that is declared destroyable but has neither an
+///     <c>Attachment_Bone</c> nor a <c>Fire_Bone_A</c>. With no bone the engine cannot give it a
+///     world position, so it can never be targeted and is indestructible in practice - the unit
+///     keeps a weak point that can never be shot off, contradicting its own
+///     <c>Is_Destroyable</c> (#53).
+///     <para>
+///         Either bone will do, which is the engine's own condition:
+///         <c>HardPointClass::Get_Transformed_World_Position</c> (<c>009c92a0</c>) asserts
+///         <c>AttachmentBoneIndex &gt;= 0 || FireBoneAIndex &gt;= 0</c> and falls back to the fire
+///         bone. Destruction reads no bone at all - <c>HardPointClass::Take_Damage</c>
+///         (<c>009c8510</c>) consults only <c>Is_Destroyable()</c> and health - so the failure is
+///         about being targetable, not about destruction.
+///     </para>
 ///     <para>
 ///         The <c>Is_Destroyable</c> condition is not incidental. A hardpoint that is deliberately not
 ///         destroyable has nothing to attach and legitimately omits the bone: across vanilla EaW and FoC
@@ -29,6 +39,10 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
 {
     private const string HardpointElement = "hardpoint";
     private const string AttachmentBoneTag = "Attachment_Bone";
+
+    /// <summary>Only FireBoneA is named in the engine's assert; FireBoneB is not a fallback.</summary>
+    private const string FireBoneTag = "Fire_Bone_A";
+
     private const string IsDestroyableTag = "Is_Destroyable";
 
     public IEnumerable<XmlFact> Evaluate(
@@ -41,8 +55,15 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
         if (!objectNode.Name.Equals(HardpointElement, StringComparison.OrdinalIgnoreCase))
             return [];
 
-        if (childrenByName.TryGetValue(AttachmentBoneTag, out var bones)
-            && bones.Any(b => b.InnerText.Trim().Length > 0))
+        // Either bone gives the hardpoint a world position, and that is what the engine actually
+        // requires: HardPointClass::Get_Transformed_World_Position (009c92a0) asserts
+        // "AttachmentBoneIndex >= 0 || FireBoneAIndex >= 0" and falls back to the fire bone when the
+        // attachment bone is absent. Its error (014d6160) fires only when BOTH are -1.
+        //
+        // Destruction itself reads no bone - HardPointClass::Take_Damage (009c8510) checks
+        // Is_Destroyable() and health and nothing else. A boneless hardpoint is indestructible
+        // because it cannot be positioned and so cannot be targeted, which a fire bone also fixes.
+        if (HasValue(childrenByName, AttachmentBoneTag) || HasValue(childrenByName, FireBoneTag))
             return [];
 
         // Only a hardpoint that claims to be destroyable is contradicting itself. Vanilla always
@@ -64,6 +85,13 @@ public sealed class HardpointAttachmentBoneRule : IXmlCrossTagRule
                 XmlUtility.GetOpeningTagLength(objectNode),
                 id)
         ];
+    }
+
+    private static bool HasValue(
+        IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName, string tag)
+    {
+        return childrenByName.TryGetValue(tag, out var nodes)
+               && nodes.Any(n => n.InnerText.Trim().Length > 0);
     }
 
     private static bool IsExplicitlyDestroyable(

@@ -7,18 +7,26 @@ using PG.StarWarsGame.LSP.Core.Schema;
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
-///     Validates an engine type-69 tag - a comma-separated list of victory-condition enum values
-///     (<c>Campaign</c>'s <c>Good_/Evil_/Human_/AI_Victory_Conditions</c>). Each token must be a
-///     member of the tag's schema-fixed enum (<c>GalacticVictoryCondition</c>); an unknown token is
-///     an error. Items are conventionally written one per line, so a token's surrounding whitespace
+///     Validates an <see cref="XmlValueType.EnumValueList" /> tag - a comma-separated list of enum
+///     values. Each token must be a member of the enum the tag names; an unknown token is an error.
+///     Items are conventionally written one per line, so a token's surrounding whitespace
 ///     (including newlines) is trimmed before the lookup.
 /// </summary>
+/// <remarks>
+///     Despite the name, this is not specific to victory conditions. The engine gives the same type
+///     to <c>Campaign</c>'s <c>Good_/Evil_/Human_/AI_Victory_Conditions</c>
+///     (<c>GalacticVictoryCondition</c>) and to <c>TargetingPrioritySet</c>'s
+///     <c>Hard_Point_Priorities</c> and <c>Hard_Point_Exclusions</c>, which carry a different
+///     vocabulary. The lookup has always come from <c>fact.Tag.Enum</c>, so the behaviour was
+///     already general; a tag with no enum wired is left unchecked rather than measured against the
+///     wrong set.
+/// </remarks>
 public sealed class VictoryConditionListHandler : NamedEnumValueHandlerBase
 {
     /// <inheritdoc />
     public override DiagnosticId? DefaultId => DiagnosticIds.VictoryConditionList;
 
-    protected override XmlValueType TargetType => XmlValueType.Type69;
+    protected override XmlValueType TargetType => XmlValueType.EnumValueList;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
     {

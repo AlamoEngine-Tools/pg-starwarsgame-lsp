@@ -9,6 +9,8 @@ using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
+using PG.StarWarsGame.LSP.Core.Util;
+
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
@@ -174,7 +176,7 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
             .Where(d => d.PublishDiagnostics)
             .Where(d => Path.GetExtension(d.Uri).Equals(FileExtension, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
+        var openUris = new HashSet<string>(openDocs.Select(d => d.Uri), DocumentUris.Comparer);
 
         // Reference-diff against the last run: a document's diagnostics can only change when its
         // own Documents entry changed or when any cross-document input (symbols, references,

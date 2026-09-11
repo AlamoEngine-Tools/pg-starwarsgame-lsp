@@ -23,6 +23,7 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 [Method("aet/executeStoryCommand", Direction.ClientToServer)]
 public sealed record ExecuteStoryCommandParams(
     string Campaign,
+    string Faction,
     string Kind,
     string? ThreadUri = null,
     string? EventName = null,
@@ -39,7 +40,7 @@ public sealed record ExecuteStoryCommandParams(
     IReadOnlyList<StoryParamValueEditDto>? Params = null,
     string? ParamKind = null,
     string? File = null,
-    string? Faction = null,
+    string? TargetFaction = null,
     // createEvent only: initial event/reward param slots written into the new block.
     IReadOnlyList<StoryParamValueEditDto>? EventParams = null,
     IReadOnlyList<StoryParamValueEditDto>? RewardParams = null) : IRequest<ExecuteStoryCommandResult>;
@@ -68,16 +69,16 @@ public sealed record StoryCommandDto(
     IReadOnlyList<StoryParamValueEditDto>? Params = null,
     string? ParamKind = null,
     string? File = null,
-    string? Faction = null,
+    string? TargetFaction = null,
     IReadOnlyList<StoryParamValueEditDto>? EventParams = null,
     IReadOnlyList<StoryParamValueEditDto>? RewardParams = null)
 {
-    /// <summary>Rehydrates the full command envelope for the given campaign.</summary>
-    public ExecuteStoryCommandParams ToParams(string campaign)
+    /// <summary>Rehydrates the full command envelope for the given campaign faction.</summary>
+    public ExecuteStoryCommandParams ToParams(string campaign, string faction)
     {
-        return new ExecuteStoryCommandParams(campaign, Kind, ThreadUri, EventName, NewName,
+        return new ExecuteStoryCommandParams(campaign, faction, Kind, ThreadUri, EventName, NewName,
             EventType, RewardType, Value, Flag, GroupIndex, Token, Tokens, Params, ParamKind,
-            File, Faction, EventParams, RewardParams);
+            File, TargetFaction, EventParams, RewardParams);
     }
 }
 
@@ -93,6 +94,7 @@ public sealed record StoryCommandDto(
 [Method("aet/applyStoryCommandBatch", Direction.ClientToServer)]
 public sealed record ApplyStoryCommandBatchParams(
     string Campaign,
+    string Faction,
     IReadOnlyList<StoryCommandDto> Commands) : IRequest<ApplyStoryCommandBatchResult>;
 
 /// <param name="FailedIndex">0-based index of the command that failed, when <c>Success</c> is false.</param>
@@ -111,6 +113,7 @@ public sealed record ApplyStoryCommandBatchResult(
 [Method("aet/validateStoryCommandBatch", Direction.ClientToServer)]
 public sealed record ValidateStoryCommandBatchParams(
     string Campaign,
+    string Faction,
     IReadOnlyList<StoryCommandDto> Commands) : IRequest<GetStoryDiagnosticsResult>;
 
 // ── aet/previewStoryGraph - the graph as it would look with the staged batch applied ─────────────
@@ -125,11 +128,15 @@ public sealed record ValidateStoryCommandBatchParams(
 [Method("aet/previewStoryGraph", Direction.ClientToServer)]
 public sealed record PreviewStoryGraphParams(
     string Campaign,
+    string Faction,
     IReadOnlyList<StoryCommandDto> Commands,
     string? NameFilter = null,
     string? Branch = null,
     string? Lifecycle = null,
-    string? ReachableFrom = null) : IRequest<GetStoryGraphResult>;
+    string? ReachableFrom = null,
+    // Whether the faction manifest registers a plot as Active_Plot or Suspended_Plot.
+    // Null or empty keeps both, which is the whole chain.
+    string? PlotState = null) : IRequest<GetStoryGraphResult>;
 
 /// <summary>
 ///     Sends <c>workspace/applyEdit</c> to the client. A seam so command handlers are testable

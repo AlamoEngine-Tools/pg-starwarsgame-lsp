@@ -18,6 +18,12 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     already failed to resolve as a file, so a workspace that ships no mega texture pays nothing.
 ///     Optional: without one, the file lookup decides on its own exactly as before.
 /// </param>
+/// <param name="Objects">
+///     Resolves an object OTHER than the one being edited, variant chain merged - the seam a
+///     cross-object rule needs ("does the object this tag names have behaviour X"). Optional, and a
+///     handler that uses it must stay silent when it is absent: a context without one is a caller
+///     that cannot answer the question, not an object that fails the check.
+/// </param>
 public record DiagnosticsContext(
     ISchemaProvider Schema,
     GameIndex Index,
@@ -25,7 +31,8 @@ public record DiagnosticsContext(
     string Locale,
     IReadOnlySet<string>? IconsAwaitingRepack = null,
     Assets.IModelTextureIndex? ModelTextures = null,
-    Assets.IIconNameIndex? IconNames = null);
+    Assets.IIconNameIndex? IconNames = null,
+    Symbols.IEffectiveObjectSource? Objects = null);
 
 /// <summary>
 ///     Supplies the icons a workspace has drawn but not yet repacked.

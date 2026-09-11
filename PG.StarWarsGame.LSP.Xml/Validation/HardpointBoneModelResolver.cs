@@ -6,6 +6,8 @@ using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.Util;
 
+using PG.StarWarsGame.LSP.Core.Util;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 /// <summary>
@@ -204,7 +206,7 @@ public sealed class HardpointBoneModelResolver
             yield break;
 
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var uri in references.Select(r => r.DocumentUri).Distinct(StringComparer.Ordinal))
+        foreach (var uri in references.Select(r => r.DocumentUri).Distinct(DocumentUris.Comparer))
         {
             if (!_index.Documents.TryGetValue(uri, out var doc)) continue;
 

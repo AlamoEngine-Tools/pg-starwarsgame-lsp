@@ -8,6 +8,8 @@ using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Story;
 using static PG.StarWarsGame.LSP.Server.Tests.Story.StoryCommandTestFixtures;
 
+using PG.StarWarsGame.LSP.Core.Util;
+
 namespace PG.StarWarsGame.LSP.Server.Tests.Story;
 
 public sealed class ApplyStoryCommandBatchHandlerTest
@@ -32,17 +34,21 @@ public sealed class ApplyStoryCommandBatchHandlerTest
 
     private static ApplyStoryCommandBatchParams Batch(params StoryCommandDto[] commands)
     {
-        return new ApplyStoryCommandBatchParams("GC", commands);
+        return new ApplyStoryCommandBatchParams("GC", "Rebel", commands);
     }
 
     /// <summary>Final text per URI - each changed file is a whole-document replacement (one edit).</summary>
     private static Dictionary<string, string> FinalTexts(WorkspaceEdit edit)
     {
+        // Keyed with the URI comparer: the edits come back through the protocol's own DocumentUri,
+        // which lowercases a Windows drive letter, so an ordinal dictionary would not find the file
+        // the test asked about.
         return edit.DocumentChanges!
             .Where(c => c.IsTextDocumentEdit)
             .ToDictionary(
                 c => c.TextDocumentEdit!.TextDocument.Uri.ToString(),
-                c => c.TextDocumentEdit!.Edits.Single().NewText);
+                c => c.TextDocumentEdit!.Edits.Single().NewText,
+                DocumentUris.Comparer);
     }
 
     [Fact]

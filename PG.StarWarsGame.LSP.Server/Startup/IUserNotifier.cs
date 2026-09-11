@@ -20,4 +20,5 @@ public interface IUserNotifier
     ///     failure.
     /// </summary>
     void ShowInfo(string message);
+
 }

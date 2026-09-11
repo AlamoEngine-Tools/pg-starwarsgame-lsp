@@ -95,7 +95,7 @@
       "view/item/context": [
         {
           "command": "aet-eaw-edit.lsp.openStoryGraph",
-          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryCampaign",
+          "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryFaction",
           "group": "inline"
         },
         {

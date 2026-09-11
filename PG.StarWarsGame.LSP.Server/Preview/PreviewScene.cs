@@ -592,14 +592,35 @@ public sealed record PreviewTargetDefence(
     ///     </para>
     ///     <para>
     ///         Sent ALONGSIDE <paramref name="TacticalHealth" /> rather than replacing it, because
-    ///         the two disagree in the shipped data - the Star Destroyer declares 2000 against 4075
-    ///         of hardpoint health - and nobody knows how the engine reconciles them.
-    ///         <c>Hull_Vs_Hard_Points_Health_Constraint</c> (0.2) is what ties them, and the
-    ///         community never established what it computes. Most mods simply author the unit's
-    ///         health as the sum, which is the convention the preview draws.
+    ///         the two are SEPARATE POOLS and disagree in the shipped data - the Star Destroyer
+    ///         declares 2000 against 4075 of hardpoint health. How the engine reconciles them was
+    ///         settled by decompiling the 2018 build: each pool is capped at the other's PERCENTAGE
+    ///         plus <see cref="HullVsHardpointsConstraint" />, so the absolute totals never have to
+    ///         agree. See <paramref name="DiesWithHardpoints" /> for the half that is gated.
     ///     </para>
     /// </remarks>
     float? HardpointHealthTotal,
+    /// <summary>
+    ///     <c>Should_Be_Destroyed_When_All_Hardpoints_Destroyed</c>, defaulting to true.
+    /// </summary>
+    /// <remarks>
+    ///     Gates three links from the hardpoints back to the hull: dying when the last destroyable
+    ///     hardpoint does, the per-tick pull of the hull down toward the hardpoints, and the health
+    ///     bar's use of the hardpoint pool. With it off - <c>U_Ground_Palace</c> is the one vanilla
+    ///     object that says so - hardpoints still absorb and still die, they just stop reaching the
+    ///     hull by any route. Absent means true: exactly one shipped object writes the tag.
+    /// </remarks>
+    bool DiesWithHardpoints,
+    /// <summary>
+    ///     <c>Hull_Vs_Hard_Points_Health_Constraint</c> from GameConstants, shipped at 0.2.
+    /// </summary>
+    /// <remarks>
+    ///     How far either pool may run ahead of the other, as a fraction. Read rather than assumed
+    ///     because it is a global a mod can change, and the change is drastic: at 1 every cap clamps
+    ///     to 100% and BOTH corrections stop running, leaving the pools fully independent. Drawing
+    ///     vanilla's 0.2 for such a mod would show a leash their game does not have.
+    /// </remarks>
+    float HullVsHardpointsConstraint,
     // Keyed by game data - a damage type name - which the camel-case naming strategy would otherwise
     // rewrite. See VerbatimKeyDictionaryConverter.
     [property: JsonConverter(typeof(VerbatimKeyDictionaryConverter))]

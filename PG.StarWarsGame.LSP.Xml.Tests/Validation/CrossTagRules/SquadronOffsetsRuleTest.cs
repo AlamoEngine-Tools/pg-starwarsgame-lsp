@@ -70,16 +70,21 @@ public sealed class SquadronOffsetsRuleTest
         Assert.Equal(Uri, fact.DocumentUri);
     }
 
+    /// <summary>
+    ///     Fewer offsets than units, with the tag present, is the case the rule is actually for -
+    ///     the author meant to place every member and stopped short.
+    /// </summary>
     [Fact]
-    public void One_Squadron_Units_with_zero_offsets_emits_mismatch_fact()
+    public void Fewer_offsets_than_units_emits_mismatch_fact()
     {
         const string xml = "<Root><Obj>" +
                            "<Squadron_Units>A, B, C</Squadron_Units>" +
+                           "<Squadron_Offsets>0,0,0</Squadron_Offsets>" +
                            "</Obj></Root>";
         var facts = BuildProducer(new SquadronOffsetsRule()).Produce(xml, Uri);
         var fact = Assert.Single(facts.OfType<SquadronOffsetsMismatchFact>());
         Assert.Equal(3, fact.TotalUnits);
-        Assert.Equal(0, fact.TotalOffsets);
+        Assert.Equal(1, fact.TotalOffsets);
     }
 
     [Fact]
@@ -130,12 +135,40 @@ public sealed class SquadronOffsetsRuleTest
         Assert.Single(fact.OffsetTagLocations);
     }
 
+    /// <summary>
+    ///     A squadron that declares no <c>Squadron_Offsets</c> at all is not a count mismatch.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The tag is optional - the engine registers it as a FloatVector3List at struct offset
+    ///         0x820 with no named accessor, states no rule about it in any of its error messages,
+    ///         and six of the base game's 45 squadrons omit it entirely and ship that way.
+    ///     </para>
+    ///     <para>
+    ///         Reading absent as "zero offsets" turned those six into warnings. The claim itself is
+    ///         sound where the tag IS present: all 39 shipped squadrons that declare offsets declare
+    ///         exactly as many as they have units.
+    ///     </para>
+    /// </remarks>
     [Fact]
-    public void Multiple_mismatched_objects_each_emit_one_fact()
+    public void No_offsets_at_all_is_not_a_mismatch()
     {
         const string xml = "<Root>" +
                            "<Obj1><Squadron_Units>A</Squadron_Units></Obj1>" +
                            "<Obj2><Squadron_Units>B, C</Squadron_Units></Obj2>" +
+                           "</Root>";
+        var facts = BuildProducer(new SquadronOffsetsRule()).Produce(xml, Uri);
+        Assert.Empty(facts.OfType<SquadronOffsetsMismatchFact>());
+    }
+
+    [Fact]
+    public void Multiple_mismatched_objects_each_emit_one_fact()
+    {
+        const string xml = "<Root>" +
+                           "<Obj1><Squadron_Units>A, B</Squadron_Units>" +
+                           "<Squadron_Offsets>0,0,0</Squadron_Offsets></Obj1>" +
+                           "<Obj2><Squadron_Units>B, C, D</Squadron_Units>" +
+                           "<Squadron_Offsets>0,0,0</Squadron_Offsets></Obj2>" +
                            "</Root>";
         var facts = BuildProducer(new SquadronOffsetsRule()).Produce(xml, Uri);
         Assert.Equal(2, facts.OfType<SquadronOffsetsMismatchFact>().Count());

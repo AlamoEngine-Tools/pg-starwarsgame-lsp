@@ -35,7 +35,11 @@ import {
     StorySimChangedParams,
 } from './protocol';
 import { StoryGraphPanel } from './storyGraphPanel';
+import { graphTargets, type StoryGraphTarget } from './storyGraphTarget';
 import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
+import {
+	ACCEPT, DECLINE, declinedMessage, diffTitle, outcomeOf, PgprojMigrationProposal, proposalMessage,
+} from './pgprojMigrationPrompt';
 
 const CLIENT_ID = 'aet.pg.swg.lsp';
 const CLIENT_NAME = 'Alamo Engine Tools - Empire at War Edit';
@@ -102,6 +106,9 @@ class ForceStaticCapabilitiesFeature implements StaticFeature {
 /** URI scheme for the read-only "effective object" virtual documents (variant inheritance). */
 const EFFECTIVE_SCHEME = 'aet-effective';
 
+/** URI scheme for the right-hand side of a project-migration diff: the file as it would be written. */
+const PGPROJ_PROPOSED_SCHEME = 'aet-pgproj-proposed';
+
 /**
  * A leading XML comment banner clarifying that the document is a generated, read-only preview of the
  * fully-merged object - reinforcing what the tab title already says, for when only the body is visible.
@@ -126,6 +133,34 @@ function effectiveObjectBanner(objectId: string): string {
  * The object id is carried in the URI query; content is fetched from the server via
  * `aet/getEffectiveObject`. Read-only is implicit for TextDocumentContentProvider documents.
  */
+/**
+ * Serves the proposed content of a project file so it can be the right-hand side of a diff.
+ *
+ * Held in memory and keyed by the project's path: the proposal is a one-off answer to one question,
+ * and writing it to a temp file would leave something behind whichever way the user answers.
+ */
+class PgprojProposedContentProvider implements vscode.TextDocumentContentProvider {
+	private readonly _texts = new Map<string, string>();
+	private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+	readonly onDidChange = this._onDidChange.event;
+
+	/** Returns the URI to diff against, having stored what it should show. */
+	offer(path: string, proposedText: string): vscode.Uri {
+		const uri = vscode.Uri.parse(`${PGPROJ_PROPOSED_SCHEME}:${path}`);
+		this._texts.set(uri.toString(), proposedText);
+		this._onDidChange.fire(uri);
+		return uri;
+	}
+
+	forget(uri: vscode.Uri): void {
+		this._texts.delete(uri.toString());
+	}
+
+	provideTextDocumentContent(uri: vscode.Uri): string {
+		return this._texts.get(uri.toString()) ?? '';
+	}
+}
+
 class EffectiveObjectContentProvider implements vscode.TextDocumentContentProvider {
 	private readonly _onDidChange = new vscode.EventEmitter<vscode.Uri>();
 	readonly onDidChange = this._onDidChange.event;
@@ -167,6 +202,7 @@ let lspClient: LanguageClient | undefined;
 const lsp = new LspGateway(() => lspClient, vscodeMessageSink);
 
 let effectiveObjectProvider: EffectiveObjectContentProvider | undefined;
+let pgprojProposedProvider: PgprojProposedContentProvider | undefined;
 let localisationNavigatorProvider: LocalisationNavigatorViewProvider | undefined;
 let storyNavigatorProvider: StoryNavigatorViewProvider | undefined;
 let statusItem: vscode.StatusBarItem | undefined;
@@ -539,6 +575,39 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 		});
 	});
 
+	// The server has read a project file in an older format and wants to write the updated form.
+	// It asks rather than tells, and shows rather than describes: the user gets the two files side
+	// by side and decides. Declining stops the server - see declinedMessage.
+	lspClient.onRequest(
+		'aet/pgprojMigrationProposal',
+		async (proposal: PgprojMigrationProposal): Promise<{ accepted: boolean }> => {
+			const proposedUri = pgprojProposedProvider?.offer(proposal.path, proposal.proposedText);
+			if (proposedUri) {
+				await vscode.commands.executeCommand(
+					'vscode.diff',
+					vscode.Uri.file(proposal.path),
+					proposedUri,
+					diffTitle(proposal.fileName),
+					{ preview: false } satisfies vscode.TextDocumentShowOptions);
+			}
+
+			const answer = await vscode.window.showInformationMessage(
+				proposalMessage(proposal), { modal: true }, ACCEPT, DECLINE);
+			const outcome = outcomeOf(answer);
+			if (proposedUri) { pgprojProposedProvider?.forget(proposedUri); }
+
+			if (outcome === 'accept') { return { accepted: true }; }
+
+			// Stopped from HERE rather than by the server exiting: vscode-languageclient treats a
+			// server that exits on its own as a crash and restarts it, straight back into this same
+			// proposal. The client stopping itself is the only version that stays stopped.
+			logLine('Project migration declined - stopping the language server.');
+			void lspClient?.stop().then(() => {
+				void vscode.window.showWarningMessage(declinedMessage(proposal.fileName));
+			});
+			return { accepted: false };
+		});
+
 	lspClient.onNotification('$/workspaceScanComplete', () => {
 		logLine('Workspace scan complete.');
 		if (statusItem) {
@@ -566,7 +635,7 @@ async function startLspClient(context: vscode.ExtensionContext): Promise<void> {
 	});
 
 	lspClient.onNotification('aet/storySimChanged', (params: StorySimChangedParams) => {
-		StoryGraphPanel.simChanged(params.campaign);
+		StoryGraphPanel.simChanged({ campaign: params.campaign, faction: params.faction });
 	});
 
 	lspClient.onNotification('aet/previewSceneChanged', () => {
@@ -791,8 +860,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 	);
 
 	effectiveObjectProvider = new EffectiveObjectContentProvider();
+	pgprojProposedProvider = new PgprojProposedContentProvider();
 	context.subscriptions.push(
-		vscode.workspace.registerTextDocumentContentProvider(EFFECTIVE_SCHEME, effectiveObjectProvider)
+		vscode.workspace.registerTextDocumentContentProvider(EFFECTIVE_SCHEME, effectiveObjectProvider),
+		vscode.workspace.registerTextDocumentContentProvider(
+			PGPROJ_PROPOSED_SCHEME, pgprojProposedProvider)
 	);
 
 	storyNavigatorProvider = new StoryNavigatorViewProvider(lsp);
@@ -802,25 +874,34 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 			() => storyNavigatorProvider?.refresh()),
 		// Opens the read-only story graph panel. Invoked with the campaign tree item (inline icon
 		// in the navigator) or without arguments from the command palette (quick-picks a campaign).
-		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryGraph', async (arg?: StoryTreeItem | string) => {
+		// A graph is one campaign FACTION, so the tree offers this on its faction node and hands
+		// both halves over. The palette has no node to hand over, so it asks - once, over a flat
+		// list of every pair, rather than a campaign prompt followed by a faction prompt.
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.openStoryGraph', async (arg?: StoryTreeItem) => {
 			if (!lsp.requireRunning()) { return; }
-			let campaign = typeof arg === 'string' ? arg : arg?.campaignName;
-			if (!campaign) {
+
+			let target: StoryGraphTarget | undefined =
+				arg?.campaignName && arg?.factionName
+					? { campaign: arg.campaignName, faction: arg.factionName }
+					: undefined;
+
+			if (!target) {
 				const result = await lsp.requestOrReport<GetStoryPlotsResult>(
 					'aet/getStoryPlots', {}, 'cannot load story campaigns');
 				if (!result) { return; }
 				if (result.error) { vscode.window.showWarningMessage(`EaWEdit: ${result.error}`); return; }
 
-				const campaigns = result.campaigns ?? [];
-				if (!campaigns.length) {
+				const items = graphTargets(result.campaigns ?? []);
+				if (!items.length) {
 					vscode.window.showInformationMessage('EaWEdit: No story campaigns found in this workspace.');
 					return;
 				}
-				campaign = await vscode.window.showQuickPick(campaigns.map(c => c.name), {
-					title: 'Open Story Graph', placeHolder: 'Select a campaign',
+				const picked = await vscode.window.showQuickPick(items, {
+					title: 'Open Story Graph', placeHolder: 'Select a campaign faction',
 				});
+				target = picked?.target;
 			}
-			if (campaign) { StoryGraphPanel.show(campaign, context.extensionUri, lsp); }
+			if (target) { StoryGraphPanel.show(target, context.extensionUri, lsp); }
 		}),
 		// Prefer the server-resolved URI: manifest entries and on-disk names differ in casing
 		// throughout vanilla data (the engine is case-insensitive, findFiles is not), and the

@@ -110,9 +110,9 @@ public sealed class ExecuteStoryCommandHandlerTest
         int? groupIndex = null, string? token = null, string campaign = "GC", string? file = null,
         string? faction = null, IReadOnlyList<string>? tokens = null)
     {
-        return new ExecuteStoryCommandParams(campaign, kind, threadUri ?? ThreadUri, eventName, newName,
+        return new ExecuteStoryCommandParams(campaign, "Rebel", kind, threadUri ?? ThreadUri, eventName, newName,
             Value: value, Flag: flag, GroupIndex: groupIndex, Token: token, Tokens: tokens,
-            File: file, Faction: faction);
+            File: file, TargetFaction: faction);
     }
 
     private static TextDocumentEdit SingleDocEdit(CapturingApplier applier)
@@ -253,7 +253,8 @@ public sealed class ExecuteStoryCommandHandlerTest
 
         Assert.True(result.Success);
         var docEdit = SingleDocEdit(applier);
-        Assert.Equal(ThreadUri, docEdit.TextDocument.Uri.ToString());
+        // Folded: the protocol's DocumentUri lowercases a Windows drive letter on the way out.
+        Assert.True(DocumentUris.Same(ThreadUri, docEdit.TextDocument.Uri.ToString()));
         Assert.Equal("STORY_FLAGS", Assert.Single(docEdit.Edits).NewText);
     }
 
@@ -428,7 +429,7 @@ public sealed class ExecuteStoryCommandHandlerTest
 
         Assert.True(result.Success);
         var docEdit = SingleDocEdit(applier);
-        Assert.Equal(ManifestUri, docEdit.TextDocument.Uri.ToString());
+        Assert.True(DocumentUris.Same(ManifestUri, docEdit.TextDocument.Uri.ToString()));
         Assert.Contains("<Suspended_Plot>story_main.xml</Suspended_Plot>",
             Assert.Single(docEdit.Edits).NewText);
     }
@@ -614,7 +615,13 @@ public sealed class ExecuteStoryCommandHandlerTest
             return ["GC"];
         }
 
-        public StoryCampaignModel? GetCampaignModel(string campaignName)
+        public IReadOnlyList<StoryModelKey> GetModelKeys()
+        {
+            return GetCampaignNames()
+                .Select(c => new StoryModelKey(c, "Rebel")).ToList();
+        }
+
+        public StoryCampaignModel? GetCampaignModel(string campaignName, string faction)
         {
             return campaignName == "GC" ? _model : null;
         }
@@ -649,7 +656,7 @@ public sealed class ExecuteStoryCommandHandlerTest
             // referenced by two faction manifests - the rename must still emit each edit once.
             var thread = StoryThreadParser.Parse(ThreadText, ThreadUri);
             IReadOnlyList<StoryThread> threads = duplicateThreads ? [thread, thread] : [thread];
-            return new StoryCampaignModel("GC", threads,
+            return new StoryCampaignModel("GC", "Rebel", threads,
                 new HashSet<string>(StringComparer.Ordinal),
                 new StoryGraphBuilder(new EmptySchema()).Build([thread]));
         }

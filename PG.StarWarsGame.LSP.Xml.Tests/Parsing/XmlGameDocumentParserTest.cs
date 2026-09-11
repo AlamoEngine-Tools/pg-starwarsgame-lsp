@@ -61,12 +61,13 @@ public sealed class XmlGameDocumentParserTest
     }
 
     private static XmlTagDefinition WorkspaceFileTag(string tag, string referenceType,
-        TagSemanticType semanticType = TagSemanticType.Default)
+        TagSemanticType semanticType = TagSemanticType.Default,
+        XmlValueType valueType = XmlValueType.NameReference)
     {
         return new XmlTagDefinition
         {
             Tag = tag,
-            ValueType = XmlValueType.NameReference,
+            ValueType = valueType,
             ReferenceKind = ReferenceKind.WorkspaceFile,
             ReferenceTypeName = referenceType,
             SemanticType = semanticType
@@ -104,6 +105,36 @@ public sealed class XmlGameDocumentParserTest
         Assert.Equal(1, reference.Line);
         Assert.Equal("<Empire_Story_Name>".Length, reference.Column);
         Assert.Equal("Story_Plots_Campaign_Empire.xml".Length, reference.Length);
+    }
+
+    /// <summary>
+    ///     <c>Debug_Hot_Key_Load_Map_Script</c>, the tag that had no <c>referenceKind</c> at all.
+    /// </summary>
+    /// <remarks>
+    ///     Every other workspaceFile tag in the schema is a <c>NameReference</c>; this one is a
+    ///     <c>TypeReferenceList</c>, like the <c>mapFile</c> sibling it sits beside. That made it
+    ///     worth pinning rather than assuming: emission dispatches on the reference KIND, not on
+    ///     the value type, so declaring the kind is genuinely all it takes - and the vanilla value
+    ///     carries surrounding whitespace, which the range has to exclude.
+    /// </remarks>
+    [Fact]
+    public async Task WorkspaceFileTag_OnATypeReferenceList_StillEmitsTheReference()
+    {
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(WorkspaceFileTag("Debug_Hot_Key_Load_Map_Script", "StoryPlotManifest",
+            valueType: XmlValueType.TypeReferenceList));
+
+        var index = await Build(schema).ParseAsync("file:///gc.xml",
+            "<GameConstants>\n" +
+            "<Debug_Hot_Key_Load_Map_Script> Story_Plots_UM00_CIN_Test.xml </Debug_Hot_Key_Load_Map_Script>\n" +
+            "</GameConstants>", 1, default);
+
+        var reference = Assert.Single(index.References, r => r.ExpectedKind == GameSymbolKind.WorkspaceFile);
+        Assert.Equal("storyplotmanifest:story_plots_um00_cin_test.xml", reference.TargetId);
+        Assert.Equal("StoryPlotManifest", reference.ExpectedTypeName);
+        // The range must cover the trimmed name, not the padding around it.
+        Assert.Equal("<Debug_Hot_Key_Load_Map_Script> ".Length, reference.Column);
+        Assert.Equal("Story_Plots_UM00_CIN_Test.xml".Length, reference.Length);
     }
 
     [Fact]

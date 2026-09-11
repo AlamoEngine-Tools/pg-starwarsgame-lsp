@@ -136,7 +136,8 @@ import {
 import {
     DEFAULT_ATTACKER, armorFactor, attackerFromProjectile,
     attackerProjectile as attackerProjectileSpec, damageSwitches, fireBlast, poolRows,
-    fullPools, poolsFor, projectileChoices, resolveHit, type Attacker, type Pools,
+    fullPools, poolsFor, projectileChoices, resolveHitWithWorkings, type Attacker,
+    type Pools,
 } from './preview/attacker';
 import {
     abilityAllows, abilityBarTitle, abilityClaims, abilityFacts, abilityOwnership, abilityProxies,
@@ -149,9 +150,14 @@ import { spinAwayEnd, spinAwaySummary } from './preview/spinAway';
 import { BY_HAND, appendShot, damageLine, type DamageLogEntry } from './preview/damageLog';
 import { breakoffAnchor, breakoffFor, type BreakoffAnchor } from './preview/breakoff';
 import {
-    hullPool, shieldGeneratorsDown, unitDestroyed, unitTargetable,
+    hardpointPool, hullAfterHardpointDeath, hullPool, shieldGeneratorsDown, unitDestroyed,
+    unitTargetable,
 } from './preview/unitPool';
+import { DEFAULT_HULL_CONSTRAINT, leashed } from './preview/healthPools';
 import { blastVictims, candidatesFrom } from './preview/blast';
+import { useEdgeResize } from './useEdgeResize';
+import { readPanelSize, writePanelSize } from './shared/panelLayout';
+import { poolSummary } from './preview/attacker';
 import {
     clipNamingModel, groupAnimations, playheadLabel, type AnimationAction,
 } from './preview/animationNames';
@@ -418,8 +424,44 @@ const Shell = styled.div`
         font-family: var(--vscode-editor-font-family, monospace);
         font-size: var(--font-size-smaller);
     }
-    .damage-log li { padding: var(--space-2) var(--space-2); border-bottom: var(--space-1) solid var(--vscode-panel-border, #333); }
+    .damage-log li {
+        padding: var(--space-2) var(--space-2);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, #333);
+        /* Long names - a projectile, an armour column, a hardpoint id - must wrap rather than push
+           a horizontal scrollbar under the whole flyout. */
+        overflow-wrap: anywhere;
+    }
     .damage-log li:last-child { border-bottom: none; }
+    /* The pools, above the shots that moved them. A definition list because that is what it is:
+       each pool named, then said in full. */
+    /* The pools, in one line above the shots that moved them. */
+    .pool-summary {
+        margin: 0 0 var(--space-4) 0;
+        padding: 0 0 var(--space-4) 0;
+        border-bottom: var(--space-1) solid var(--vscode-panel-border, #333);
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: var(--font-size-smaller);
+        font-variant-numeric: tabular-nums;
+        white-space: pre-wrap;
+        opacity: 0.85;
+    }
+
+    /* Given a height by the grip, the LIST is what should grow - not the empty space under it.
+       Its own max-height was fixed at 220px, so dragging the flyout taller moved the Clear button
+       down and nothing else. */
+    .stage-flyout.sizeable .damage-log { flex: 1 1 auto; max-height: none; min-height: 0; }
+    /* The workings, subordinate to the sentence they explain. Monospace because they are numbers
+       lining up, and dimmed because the sentence is what a reader scans first. */
+    .damage-log .log-workings {
+        list-style: none;
+        margin: var(--space-1) 0 0 0;
+        padding: 0 0 0 var(--space-12);
+        font-family: var(--vscode-editor-font-family, monospace);
+        font-size: 0.9em;
+        opacity: 0.7;
+        font-variant-numeric: tabular-nums;
+    }
+    .damage-log .log-workings li { padding: 0; border-bottom: none; }
     /* The shot that finished something, and the shot that did nothing: the two lines a reader is
        scanning for. Everything between them is ordinary and stays quiet. */
     .damage-log .log-kill { color: var(--vscode-charts-red, #f14c4c); }
@@ -1035,6 +1077,10 @@ const Shell = styled.div`
         background: var(--vscode-editorWidget-background, #202020);
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
     }
+    /* A flyout the reader can size. The max-height above still caps it against the stage, so a
+       remembered height from a taller window cannot push it off the top. */
+    .stage-flyout.sizeable { position: absolute; }
+    .stage-flyout.sizeable .stage-flyout-body { flex: 1 1 auto; min-height: 0; }
     .stage-flyout.on-left { left: 8px; }
     .stage-flyout.on-right { right: 8px; }
     /* Centred on the stage, like the bar it belongs to. */
@@ -2131,6 +2177,24 @@ function ModelPreview(): React.JSX.Element {
      * carried across subjects would read as damage to a unit that never took any.
      */
     const [damageLog, setDamageLog] = useState<DamageLogEntry[]>([]);
+
+    /**
+     * How tall the log flyout stands, remembered across opens.
+     *
+     * It carries the full arithmetic of every shot now - the armour factor, the shield, the blast
+     * division, each pool before and after - so the height that suited a one-line-per-shot list is
+     * no longer the height a reader wants. Same hook and same store as the problems panels, so the
+     * grip behaves identically wherever it appears.
+     */
+    const { size: logHeight, handleProps: logResizeN } = useEdgeResize(
+        readPanelSize('preview.damageLog', 260), 120, 620, 'n',
+        value => { writePanelSize('preview.damageLog', value); });
+
+    // Width as well as height. The lines are long - a factor, both operands and the pool either
+    // side of the shot - and a fixed 304px column wrapped nearly every one of them.
+    const { size: logWidth, handleProps: logResizeW } = useEdgeResize(
+        readPanelSize('preview.damageLog.width', 340), 280, 720, 'w',
+        value => { writePanelSize('preview.damageLog.width', value); });
     const [logOpen, setLogOpen] = useState(false);
 
     /**
@@ -3365,10 +3429,34 @@ function ModelPreview(): React.JSX.Element {
             //
             // ONE hardpoint's worth. The attacker's Repair target refills the SHIP's pools as well,
             // and those are not this hardpoint's to give back.
-            setHardpointHealth(current => ({ ...current, [id]: hardpoint?.health ?? null }));
+            const full = hardpoint?.health ?? null;
+
+            setHardpointHealth(current => {
+                // Repairing is as much a thing that happened to the unit as destroying is, and the
+                // log reads as a record of both or of neither. The value BEFORE is only knowable
+                // here, so the line is queued from inside the update rather than read from a
+                // closure that may be a render behind.
+                const before = current[id] ?? 0;
+
+                if (log) {
+                    queueMicrotask(() => setDamageLog(lines => appendShot(lines, [{
+                        kind: 'repair',
+                        source: BY_HAND,
+                        amount: Math.max((full ?? 0) - before, 0),
+                        target: id,
+                        armor: null,
+                        pool: 'hull',
+                        destroyed: false,
+                        workings: [`Health ${before} -> ${full ?? 0}`],
+                    }])));
+                }
+
+                return { ...current, [id]: full };
+            });
 
             viewportRef.current?.clearBreakoff(id);
             breakoffsRef.current = breakoffsRef.current.filter(entry => entry.id !== id);
+
             return;
         }
 
@@ -3421,11 +3509,18 @@ function ModelPreview(): React.JSX.Element {
         }
     }, [scene, playEffect]);
 
-    /** Destroys or repairs every hardpoint the XML allows to be destroyed. */
-    const destroyAll = useCallback((isDestroyed: boolean): void => {
+    /**
+     * Destroys or repairs every hardpoint the XML allows to be destroyed.
+     *
+     * @param log Whether each hardpoint writes its own line. False from Repair target, which
+     *     refills the pools FIRST and writes one line for the whole unit - leaving this on there
+     *     produced a line per hardpoint reading "Health 325 -> 325", because the health it was
+     *     reporting on had already been put back.
+     */
+    const destroyAll = useCallback((isDestroyed: boolean, log = true): void => {
         for (const hardpoint of scene?.hardpoints ?? []) {
             if (hardpoint.isDestroyable) {
-                setHardpointDestroyed(hardpoint.id, isDestroyed);
+                setHardpointDestroyed(hardpoint.id, isDestroyed, log);
             }
         }
     }, [scene, setHardpointDestroyed]);
@@ -4368,13 +4463,35 @@ function ModelPreview(): React.JSX.Element {
      * Declared ABOVE the death watch because the watch reads it - a unit with no hardpoints dies
      * when this empties, and there is nothing else that could tell it so.
      */
-    const hull = useMemo(
-        // `pools.hull` is the LIVE number for a unit with no hardpoints - the one the attacker
-        // panel depletes. Without it the bar drew Tactical_Health forever and a reader could shoot
-        // such a unit all day against a full bar.
-        () => hullPool(
-            scene?.defence, scene?.hardpoints ?? [], hardpointHealth, destroyed, livePools?.hull),
-        [scene, hardpointHealth, destroyed, livePools?.hull]);
+    /**
+     * The two pools, corrected against each other exactly as a service tick would.
+     *
+     * They are SEPARATE - the hull is the unit's own Tactical_Health, the hardpoints are their own
+     * sum - and neither may run more than Hull_Vs_Hard_Points_Health_Constraint ahead of the other.
+     * The panel used to draw the hardpoint sum as the hull, so the pool that actually kills the unit
+     * was never on screen and the leash was not modelled at all.
+     */
+    const healthNow = useMemo(() => {
+        // `livePools.hull` is the LIVE number the attacker panel depletes. Without it the bar drew
+        // Tactical_Health forever and a reader could shoot a unit all day against a full bar.
+        const rawHardpoints = hardpointPool(scene?.hardpoints ?? [], hardpointHealth, destroyed);
+
+        // The all-destroyed branch has its say FIRST: losing the last destroyable hardpoint sets the
+        // hull to zero by flat assignment, and everything downstream - the bar, the damage stage,
+        // the death watch - reads the hull.
+        const rawHull = hullAfterHardpointDeath(
+            hullPool(scene?.defence, livePools?.hull),
+            scene?.hardpoints ?? [], destroyed,
+            scene?.defence?.diesWithHardpoints ?? true);
+
+        return leashed(
+            rawHull, rawHardpoints,
+            scene?.defence?.hullVsHardpointsConstraint ?? DEFAULT_HULL_CONSTRAINT,
+            scene?.defence?.diesWithHardpoints ?? true);
+    }, [scene, hardpointHealth, destroyed, livePools?.hull]);
+
+    const hull = healthNow.hull;
+    const hardpointHealthPool = healthNow.hardpoints;
 
     /**
      * Whether the HULL is choosing the damage stage rather than the reader.
@@ -4423,7 +4540,9 @@ function ModelPreview(): React.JSX.Element {
         // The hull pool as well as the hardpoints. A unit with no destructible hardpoints dies by
         // its own health, and until that was passed in it could not die at all - which is most
         // units: 188 carry their weapons as WEAPON behaviour and no hardpoints, against 68 with.
-        const dead = unitDestroyed(scene?.hardpoints ?? [], destroyed, hull);
+        const dead = unitDestroyed(
+            scene?.hardpoints ?? [], destroyed, hull,
+            scene?.defence?.diesWithHardpoints ?? true);
 
         if (!dead) {
             // Coming BACK from death, and only on the transition. This is the exact inverse of what
@@ -4558,7 +4677,7 @@ function ModelPreview(): React.JSX.Element {
             .find(p => p.id === attackerProjectile)?.id ?? attacker.damageType;
 
         if (fireTarget === 'hull') {
-            const after = resolveHit(attacker, defence, current);
+            const { pools: after, workings } = resolveHitWithWorkings(attacker, defence, current);
 
             setPools(after);
 
@@ -4580,6 +4699,10 @@ function ModelPreview(): React.JSX.Element {
                         : hit.pool === 'energy' ? null : defence.armorType ?? null,
                     pool: hit.pool,
                     destroyed: hit.pool === 'hull' && after.hull <= 0 && current.hull > 0,
+                    // The whole calculation, on the line it belongs to. Only the pool that took the
+                    // hull half carries it - repeating it under the shield line would say the same
+                    // arithmetic twice for one shot.
+                    workings: hit.pool === 'hull' ? workings : undefined,
                 }))));
 
             return;
@@ -4618,11 +4741,12 @@ function ModelPreview(): React.JSX.Element {
                     armor: defence.shieldArmorType ?? null,
                     pool: 'shield' as const,
                     destroyed: false,
+                    workings: result.workings,
                 }]
                 : []),
             // Then each victim, nearest out - the order the blast reached them, which is the order
             // the damage was applied in.
-            ...hits.map(hit => ({
+            ...hits.map((hit, index) => ({
                 source,
                 amount: (hardpointHealth[hit.id] ?? 0)
                     - (result.hardpointHealth[hit.id] ?? 0),
@@ -4630,6 +4754,11 @@ function ModelPreview(): React.JSX.Element {
                 armor: defence.armorType ?? null,
                 pool: 'hull' as const,
                 destroyed: result.destroyed.has(hit.id),
+                // The split is said once, on whichever line comes first, and each victim then
+                // carries only its own arithmetic.
+                workings: index === 0 && current.shield - result.pools.shield <= 0
+                    ? [...result.workings, ...(result.perVictim[hit.id] ?? [])]
+                    : result.perVictim[hit.id],
             })),
         ]));
 
@@ -4657,7 +4786,28 @@ function ModelPreview(): React.JSX.Element {
         // The wreck and the hidden ship are NOT this function's to put back. The death watch owns
         // that, because `Repair all` never comes through here at all - see `restoreFromDeath`.
 
-        setPools(fullPools(scene));
+        const full = fullPools(scene);
+
+        setPools(current => {
+            // One line for the whole unit rather than one per hardpoint: the reader pressed one
+            // button, and ten lines would bury the shots that came before it.
+            const before = current?.hull ?? 0;
+
+            queueMicrotask(() => setDamageLog(lines => appendShot(lines, [{
+                kind: 'repair',
+                source: BY_HAND,
+                amount: Math.max(full.hull - before, 0),
+                target: scene?.subject ?? 'the unit',
+                armor: null,
+                pool: 'hull',
+                destroyed: false,
+                workings: [`Hull ${before} -> ${full.hull}`,
+                    'Hardpoints restored to their declared Health'],
+            }])));
+
+            return full;
+        });
+
         setHardpointHealth(Object.fromEntries(
             (scene?.hardpoints ?? []).map(h => [h.id, h.health ?? null])));
     }, [scene]);
@@ -6832,13 +6982,13 @@ function ModelPreview(): React.JSX.Element {
 
                             Energy is absent unless its setting is on - see `poolOptions`. */}
                         {mode === 'gameplay'
-                            && poolRows(scene?.defence, livePools, hull, poolOptions).length > 0 && (
+                            && poolRows(scene?.defence, livePools, hull, poolOptions, hardpointHealthPool).length > 0 && (
                             <div
                                 className="stage-chrome status-bars"
                                 role="group"
                                 aria-label="What the unit has left"
                             >
-                                {poolRows(scene?.defence, livePools, hull, poolOptions)
+                                {poolRows(scene?.defence, livePools, hull, poolOptions, hardpointHealthPool)
                                     .map(row => (
                                     <span
                                         key={row.id}
@@ -6899,7 +7049,7 @@ function ModelPreview(): React.JSX.Element {
                                     icon="repair"
                                     className="as-action"
                                     title="Repair the target"
-                                    onClick={() => { repairTarget(); destroyAll(false); }}
+                                    onClick={() => { repairTarget(); destroyAll(false, false); }}
                                 />
                             </div>
                         )}
@@ -7060,10 +7210,21 @@ function ModelPreview(): React.JSX.Element {
                             read after the fact and the settings are set before it. */}
                         {logOpen && (
                             <div
-                                className="stage-flyout from-bottom on-right"
+                                className="stage-flyout from-bottom on-right sizeable"
                                 role="dialog"
                                 ref={logRef}
+                                style={{ height: logHeight, width: logWidth }}
                             >
+                                <div
+                                    className="resize-handle-n"
+                                    title="Drag to resize"
+                                    {...logResizeN}
+                                />
+                                <div
+                                    className="resize-handle-w"
+                                    title="Drag to resize"
+                                    {...logResizeW}
+                                />
                                 <div className="stage-flyout-head">
                                     Damage log
                                     <span className="section-count header-right">
@@ -7076,6 +7237,21 @@ function ModelPreview(): React.JSX.Element {
                                     />
                                 </div>
                                 <div className="stage-flyout-body">
+                                    {/* Only the numbers that move. What they are and what
+                                        governs them is fixed for the subject, so it rides on the
+                                        tooltip rather than costing four rows of height. */}
+                                    {poolSummary(scene?.defence, hull, hardpointHealthPool) && (
+                                        <p
+                                            className="pool-summary"
+                                            title={poolSummary(
+                                                scene?.defence, hull, hardpointHealthPool,
+                                            )!.title}
+                                        >
+                                            {poolSummary(
+                                                scene?.defence, hull, hardpointHealthPool,
+                                            )!.text}
+                                        </p>
+                                    )}
                                     <ol className="damage-log">
                                         {damageLog.map((entry, index) => (
                                             <li
@@ -7085,6 +7261,16 @@ function ModelPreview(): React.JSX.Element {
                                                     : entry.amount > 0 ? undefined : 'log-nothing'}
                                             >
                                                 {damageLine(entry)}
+                                                {/* The arithmetic under the sentence: the factor
+                                                    that scaled it, how a blast was divided, and
+                                                    where each pool stood before and after. */}
+                                                {(entry.workings ?? []).length > 0 && (
+                                                    <ul className="log-workings">
+                                                        {(entry.workings ?? []).map((line, at) => (
+                                                            <li key={at}>{line}</li>
+                                                        ))}
+                                                    </ul>
+                                                )}
                                             </li>
                                         ))}
                                     </ol>

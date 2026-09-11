@@ -248,6 +248,67 @@ public sealed class EffectiveObjectResolverTest
         Assert.Equal("A, B, C", merged.Value);
     }
 
+    /// <summary>
+    ///     An additive tag APPENDS. A value the base already has is contributed again, not dropped.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Measured in <c>DatabaseMapClass::Map_Data_Of_Type</c>: the 17 additive type codes
+    ///         push into a plain vector with no reset and no membership test on either path, so the
+    ///         engine's list really does carry the repeat. Nothing in the engine ever removes one.
+    ///     </para>
+    ///     <para>
+    ///         This used to union, which made the effective object we compute disagree with the
+    ///         game for any chain that re-contributes a value - and for the spawn tables, where
+    ///         repeating an entry is how you ask for two of that unit, the count itself was wrong.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void Resolve_MergeMode_KeepsAValueTheBaseAlreadyHad()
+    {
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tags", "A, B"))
+            .With("V", Tag("Tags", "B, C"));
+        var schema = new FakeSchema().WithMode("Tags", VariantMode.Merge);
+
+        var result = Resolver(index, source, schema).Resolve("V");
+
+        Assert.Equal("A, B, B, C", TagNamed(result, "Tags").Value);
+    }
+
+    // Repeats WITHIN one layer survive too - the engine reads them one after another.
+    [Fact]
+    public void Resolve_MergeMode_KeepsRepeatsInsideOneLayersValue()
+    {
+        var index = WorkspaceIndex(Sym("V", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tags", "A"))
+            .With("V", Tag("Tags", "C, C"));
+        var schema = new FakeSchema().WithMode("Tags", VariantMode.Merge);
+
+        var result = Resolver(index, source, schema).Resolve("V");
+
+        Assert.Equal("A, C, C", TagNamed(result, "Tags").Value);
+    }
+
+    // Appending accumulates down the WHOLE chain, so a value contributed at every level appears
+    // once per level.
+    [Fact]
+    public void Resolve_MergeMode_AccumulatesRepeatsAlongTheChain()
+    {
+        var index = WorkspaceIndex(Sym("V2", "V1"), Sym("V1", "B"), Sym("B"));
+        var source = new FakeTagSource()
+            .With("B", Tag("Tags", "X"))
+            .With("V1", Tag("Tags", "X"))
+            .With("V2", Tag("Tags", "X"));
+        var schema = new FakeSchema().WithMode("Tags", VariantMode.Merge);
+
+        var result = Resolver(index, source, schema).Resolve("V2");
+
+        Assert.Equal("X, X, X", TagNamed(result, "Tags").Value);
+    }
+
     // ── ignored mode ─────────────────────────────────────────────────────────
 
     [Fact]

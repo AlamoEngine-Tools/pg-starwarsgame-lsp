@@ -90,15 +90,32 @@ public sealed record StoryPlotThreadDto(string File, bool Suspended, string? Uri
 [Method("aet/getStoryGraph", Direction.ClientToServer)]
 public sealed record GetStoryGraphParams(
     string Campaign,
+    string Faction,
     string? NameFilter = null,
     string? Branch = null,
     string? Lifecycle = null,
-    string? ReachableFrom = null) : IRequest<GetStoryGraphResult>;
+    string? ReachableFrom = null,
+    // Whether the faction manifest registers a plot as Active_Plot or Suspended_Plot.
+    // Null or empty keeps both, which is the whole chain.
+    string? PlotState = null) : IRequest<GetStoryGraphResult>;
 
+/// <param name="Branches">
+///     Every branch name in the campaign, INDEPENDENT of the filters that produced
+///     <paramref name="Nodes" />. A facet list has to describe what the user could switch to, so it
+///     cannot be derived from the filtered result: reading it off the returned nodes leaves the
+///     branch dropdown holding only the branch already selected, which is the one option that is
+///     of no use. The server resolves the filter, so the server is what knows the full set.
+/// </param>
+/// <param name="Threads">
+///     Every thread URI in the campaign, likewise unfiltered - it backs the thread picker for
+///     placing a NEW event, which must be able to target a thread the current filter hides.
+/// </param>
 public sealed record GetStoryGraphResult(
     IReadOnlyList<StoryGraphNodeDto> Nodes,
     IReadOnlyList<StoryGraphEdgeDto> Edges,
-    string? Error = null);
+    string? Error = null,
+    IReadOnlyList<string>? Branches = null,
+    IReadOnlyList<string>? Threads = null);
 
 public sealed record StoryGraphNodeDto(
     string Id,
@@ -122,7 +139,7 @@ public sealed record StoryGraphEdgeDto(string FromId, string ToId, string Kind, 
 // ── aet/getStoryNodeDetail - full event payload for the property view ────────
 
 [Method("aet/getStoryNodeDetail", Direction.ClientToServer)]
-public sealed record GetStoryNodeDetailParams(string Campaign, string NodeId)
+public sealed record GetStoryNodeDetailParams(string Campaign, string Faction, string NodeId)
     : IRequest<GetStoryNodeDetailResult>;
 
 public sealed record GetStoryNodeDetailResult(StoryNodeDetailDto? Node, string? Error = null);
@@ -183,6 +200,7 @@ public sealed record StoryParamSchemaDto(
 [Method("aet/getStoryParamOptions", Direction.ClientToServer)]
 public sealed record GetStoryParamOptionsParams(
     string Campaign,
+    string Faction,
     string Side,
     string TypeName,
     int Position,
@@ -210,7 +228,7 @@ public sealed record ResolveStoryReferenceResult(
 // ── aet/getStoryDiagnostics - validation results correlated to graph nodes ───
 
 [Method("aet/getStoryDiagnostics", Direction.ClientToServer)]
-public sealed record GetStoryDiagnosticsParams(string Campaign) : IRequest<GetStoryDiagnosticsResult>;
+public sealed record GetStoryDiagnosticsParams(string Campaign, string Faction) : IRequest<GetStoryDiagnosticsResult>;
 
 public sealed record GetStoryDiagnosticsResult(
     IReadOnlyList<StoryDiagnosticDto> Diagnostics,
@@ -232,17 +250,17 @@ public sealed record StoryDiagnosticDto(
 // ── aet/getStoryLayout / aet/setStoryLayout - node position sidecar ──────────
 
 [Method("aet/getStoryLayout", Direction.ClientToServer)]
-public sealed record GetStoryLayoutParams(string Campaign) : IRequest<GetStoryLayoutResult>;
+public sealed record GetStoryLayoutParams(string Campaign, string Faction) : IRequest<GetStoryLayoutResult>;
 
 public sealed record GetStoryLayoutResult(IReadOnlyList<StoryLayoutEntryDto> Entries, string? Error = null);
 
 [Method("aet/setStoryLayout", Direction.ClientToServer)]
-public sealed record SetStoryLayoutParams(string Campaign, IReadOnlyList<StoryLayoutEntryDto> Entries)
+public sealed record SetStoryLayoutParams(string Campaign, string Faction, IReadOnlyList<StoryLayoutEntryDto> Entries)
     : IRequest<SetStoryLayoutResult>;
 
 public sealed record SetStoryLayoutResult(bool Success, string? Error = null);
 
-public sealed record StoryLayoutEntryDto(string File, string EventName, double X, double Y);
+public sealed record StoryLayoutEntryDto(string ThreadUri, string EventName, double X, double Y);
 
 // ── aet/storyGraphChanged - server push after model invalidation ─────────────
 
