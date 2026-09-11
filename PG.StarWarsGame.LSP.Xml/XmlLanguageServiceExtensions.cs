@@ -51,6 +51,9 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, NegativeFractionHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, FractionBelowOneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BelowOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, MissingRequiredTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ControlPointCurveHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, TagComparisonHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PresenceInducedAnimationsHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
@@ -190,6 +193,9 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, LandDamageTableRule>();
         services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
         services.AddSingleton<IXmlCrossTagRule, CampaignStoryAttachmentRule>();
+        services.AddSingleton<IXmlCrossTagRule, LeechShieldsRequiredTagsRule>();
+        services.AddSingleton<IXmlCrossTagRule, DamageRadiusWithinChaseRadiusRule>();
+        services.AddSingleton<IXmlCrossTagRule, RespawnTimeOrderRule>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();

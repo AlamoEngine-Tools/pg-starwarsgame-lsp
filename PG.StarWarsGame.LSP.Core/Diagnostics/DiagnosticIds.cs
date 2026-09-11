@@ -145,6 +145,7 @@ public static class DiagnosticIds
     public static readonly DiagnosticId NegativeFractionOutOfRange = new(DiagnosticGroup.Values, 64);
     public static readonly DiagnosticId FractionNotBelowOne = new(DiagnosticGroup.Values, 65);
     public static readonly DiagnosticId ValueNotBelowOne = new(DiagnosticGroup.Values, 66);
+    public static readonly DiagnosticId CurveNeedsTwoControlPoints = new(DiagnosticGroup.Values, 67);
 
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
@@ -225,6 +226,8 @@ public static class DiagnosticIds
     ///     would be one the base game trips - see <c>LandDamageTableRule</c> for the measurement.
     /// </remarks>
     public static readonly DiagnosticId LandDamageTableMismatch = new(DiagnosticGroup.CrossTag, 14);
+    public static readonly DiagnosticId MissingRequiredTag = new(DiagnosticGroup.CrossTag, 15);
+    public static readonly DiagnosticId TagComparison = new(DiagnosticGroup.CrossTag, 16);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

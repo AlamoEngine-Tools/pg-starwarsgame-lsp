@@ -116,7 +116,17 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // (min, max, and whether each bound is inclusive). AngleDegreesHalfTurn, AngleDegreesFullTurn,
         // NegativeFraction, FractionBelowOne and BelowOne. The three existing range handlers moved
         // onto the same base rather than keeping their own copies of parse-and-compare.
-        const int expectedHandlerCount = 123;
+        // 123 -> 124: MissingRequiredTagHandler added - seven tags a Leech_Shields_Ability cannot
+        // run without, each with its own "has not been set" message in the binary. Scoped to the
+        // element rather than the tag, since Beam_Texture_Name and friends appear on other
+        // abilities where the rule does not apply.
+        // 124 -> 125: ControlPointCurveHandler added, on a ListLengthHandlerBase that counts
+        // ENTRIES rather than values (a curve point is an x,y pair). Three Cost_Mod_By_* tags need
+        // at least two points; shape and per-token typing stay with the value type's own handler.
+        // 125 -> 126: TagComparisonHandler added, fed by a TagComparisonRuleBase that relates one
+        // numeric tag to another - Damage_Radius against Chase_Radius, Min_Respawn_Time against
+        // Max_Respawn_Time. Requiring both tags scopes each rule without naming an element.
+        const int expectedHandlerCount = 126;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
