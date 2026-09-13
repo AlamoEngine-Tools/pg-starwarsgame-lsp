@@ -46,13 +46,26 @@ public sealed class DiagnosticIdCoverageTest
 
         // Each `new Diagnostic { ... }` object initialiser must assign Code before its closing
         // brace. Splitting on the initialiser keyword keeps this readable without a C# parser.
-        var blocks = source.Split("new Diagnostic", StringSplitOptions.None).Skip(1).ToList();
+        //
+        // The split must not catch `new DiagnosticRelatedInformation`, which shares the prefix. That
+        // false block used to be harmless only by accident - nothing after it in the file contained
+        // a `};`, so its body came out empty and was skipped - and it turned into a failure the
+        // moment an unrelated object initialiser was added further down. An initialiser is
+        // identified by the `{` that follows the type name.
+        var blocks = source.Split("new Diagnostic", StringSplitOptions.None)
+            .Skip(1)
+            .Where(b => b.TrimStart().StartsWith('{'))
+            .ToList();
         var uncoded = blocks
             .Select((b, i) => (Index: i + 1, Body: b[..Math.Max(0, b.IndexOf("};", StringComparison.Ordinal))]))
             .Where(b => b.Body.Length > 0 && !b.Body.Contains("Code =", StringComparison.Ordinal))
             .Select(b => $"#{b.Index}")
             .ToList();
 
+        // A source-scanning check that matches nothing passes for the wrong reason. The publisher
+        // has always built several of these by hand; if that ever reaches zero, this test has
+        // stopped looking rather than started being satisfied.
+        Assert.NotEmpty(blocks);
         Assert.Empty(uncoded);
     }
 

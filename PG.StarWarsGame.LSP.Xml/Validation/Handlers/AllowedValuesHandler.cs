@@ -40,11 +40,19 @@ public sealed class AllowedValuesHandler : XmlDiagnosticsHandler<XmlTagValueFact
 
         if (IsAllowed(fact.Tag, value, allowed)) return [];
 
+        // Where exactly one value is legal, that value IS what the engine writes over the author's:
+        // each of the nine Activation_Style validators assigns the style it names, and the three
+        // Causes_Despawn ones assign true. With a choice of legal values there is no single thing
+        // the engine substitutes, so there is nothing to offer.
+        var repair = allowed.Count == 1 ? allowed[0] : null;
+
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                 $"<{fact.Tag.Tag}> here only supports {Listed(allowed)} - the engine overwrites " +
-                "anything else.")
+                "anything else.",
+                SuggestedFix: repair,
+                FixTitle: repair is null ? null : $"Apply the engine's own value: {repair}")
         ];
     }
 

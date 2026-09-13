@@ -36,6 +36,19 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
     /// <summary>Whether the pair is acceptable.</summary>
     protected abstract bool IsAcceptable(double left, double right);
 
+    /// <summary>
+    ///     Whether the engine repairs a violation by EXCHANGING the two values, as measured in its
+    ///     own code rather than assumed from the relation.
+    /// </summary>
+    /// <remarks>
+    ///     False by default. A relation being violated implies nothing about what the engine does
+    ///     next: <c>SpecialAbilityClass::Validate_Data</c> calls
+    ///     <c>std::swap(MinRespawnTime, MaxRespawnTime)</c>, while the chase-radius comparison
+    ///     leaves both values alone. Inheriting a swap would offer the second rule a fix the engine
+    ///     never performs.
+    /// </remarks>
+    protected virtual bool EngineSwapsTheValues => false;
+
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
@@ -65,8 +78,28 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
                 RightTag,
                 left,
                 right,
-                Expectation)
+                Expectation,
+                SwapEdits(leftNode, rightNode, lineIndex))
         ];
+    }
+
+    /// <summary>
+    ///     The two edits that exchange the values, or null where this rule's engine does not swap or
+    ///     either value cannot be replaced in place.
+    /// </summary>
+    /// <remarks>
+    ///     The authored text is moved across rather than the parsed number written back, so
+    ///     <c>30.0f</c> stays <c>30.0f</c> and a deliberate spelling survives the fix.
+    /// </remarks>
+    private IReadOnlyList<XmlDiagnosticEdit>? SwapEdits(
+        HtmlNode leftNode, HtmlNode rightNode, LineOffsetIndex lineIndex)
+    {
+        if (!EngineSwapsTheValues) return null;
+
+        var toLeft = ValueEditFactory.ReplaceValue(leftNode, lineIndex, rightNode.InnerHtml.Trim());
+        var toRight = ValueEditFactory.ReplaceValue(rightNode, lineIndex, leftNode.InnerHtml.Trim());
+
+        return toLeft is null || toRight is null ? null : [toLeft, toRight];
     }
 
     /// <summary>The last occurrence, matching the engine's keep-the-last rule for repeated tags.</summary>

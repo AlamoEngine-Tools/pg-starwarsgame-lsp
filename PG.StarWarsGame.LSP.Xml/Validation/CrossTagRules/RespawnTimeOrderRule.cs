@@ -30,4 +30,11 @@ public sealed class RespawnTimeOrderRule : TagComparisonRuleBase
     {
         return left <= right;
     }
+
+    /// <summary>
+    ///     Measured: after the message, <c>SpecialAbilityClass::Validate_Data</c> calls
+    ///     <c>std::swap&lt;float&gt;(&amp;MinRespawnTime, &amp;MaxRespawnTime)</c> - it does not
+    ///     clamp either end, so the window the author meant survives, reversed.
+    /// </summary>
+    protected override bool EngineSwapsTheValues => true;
 }

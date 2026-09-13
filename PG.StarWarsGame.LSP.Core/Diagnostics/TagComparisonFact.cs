@@ -18,6 +18,11 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     The relation as a sentence fragment, phrased as the engine phrases it, completing
 ///     "&lt;LeftTag&gt; ... &lt;RightTag&gt;".
 /// </param>
+/// <param name="SwapEdits">
+///     The engine's own correction where it exchanges the two values - measured, not inferred from
+///     the relation. Null for a comparison the engine leaves alone, and null where either value
+///     cannot be replaced in place.
+/// </param>
 public sealed record TagComparisonFact(
     string DocumentUri,
     int Line,
@@ -27,4 +32,5 @@ public sealed record TagComparisonFact(
     string RightTag,
     double Left,
     double Right,
-    string Expectation) : XmlFact(DocumentUri, Line, Column, Length);
+    string Expectation,
+    IReadOnlyList<XmlDiagnosticEdit>? SwapEdits = null) : XmlFact(DocumentUri, Line, Column, Length);

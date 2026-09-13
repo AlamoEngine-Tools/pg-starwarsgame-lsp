@@ -20,11 +20,16 @@ public sealed class MissingRequiredTagHandler : XmlDiagnosticsHandler<MissingReq
     protected override IEnumerable<XmlDiagnosticResult> Handle(
         MissingRequiredTagFact fact, DiagnosticsContext ctx)
     {
+        // Where the engine substitutes a value, saying WHICH one is the more useful half of the
+        // message: the author's complaint is not that nothing happened, it is that something did.
+        var consequence = fact.Repair.Length > 0
+            ? $"and the engine {fact.Repair}"
+            : "and the engine reports it as unset on load";
+
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.TagName}> is not set. {fact.OwningType} needs it, and the engine reports "
-                + "it as unset on load")
+                $"<{fact.TagName}> is not set. {fact.OwningType} needs it, {consequence}")
         ];
     }
 }

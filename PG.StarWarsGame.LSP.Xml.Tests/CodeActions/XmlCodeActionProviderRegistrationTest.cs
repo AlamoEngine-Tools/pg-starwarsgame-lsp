@@ -51,7 +51,11 @@ public sealed class XmlCodeActionProviderRegistrationTest
     {
         // 5 → 6: SuppressDiagnosticCodeActionProvider added - offers the four suppression scopes
         // from #66 on any diagnostic carrying an id.
-        const int expectedProviderCount = 6;
+        // 6 -> 7: EngineRepairCodeActionProvider added - applies the correction the ENGINE makes at
+        // load, for the repairs that land on a different tag than the one reported (turning off a
+        // child flag, exchanging two values). The value-anchored repairs still go through
+        // FixSuggestionCodeActionProvider, which already replaces the diagnostic's own range.
+        const int expectedProviderCount = 7;
         Assert.Equal(expectedProviderCount, RegisteredProviderTypes().Count);
     }
 

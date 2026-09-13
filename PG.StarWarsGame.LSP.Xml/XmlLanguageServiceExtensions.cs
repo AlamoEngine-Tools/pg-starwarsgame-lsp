@@ -141,7 +141,10 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantChainTooDeepHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantTagNotSupportedHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastNegativeOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AtLeastOneSecondHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BooleanGatedRequirementHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, EitherOrRequirementHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AutomaticDespawnHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AllowedValuesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ProjectileCategoryListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();
@@ -201,7 +204,20 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, LandDamageTableRule>();
         services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
         services.AddSingleton<IXmlCrossTagRule, CampaignStoryAttachmentRule>();
+        // The engine's "you must specify" asserts, each attributed to its owning class by the xref
+        // to the message string rather than by where our schema declares the tag - Bomb_Type is
+        // declared on three ability types and demanded by one.
         services.AddSingleton<IXmlCrossTagRule, LeechShieldsRequiredTagsRule>();
+        services.AddSingleton<IXmlCrossTagRule, DemolitionBombTypeRule>();
+        services.AddSingleton<IXmlCrossTagRule, ArcSweepAttackAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, GenericAttackAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, EatAttackAnimationRule>();
+        // The engine's three "set either A or B, otherwise this ability won't do anything" pairs.
+        services.AddSingleton<IXmlCrossTagRule, HeroAssassinTargetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, BaseDestructionTargetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, NeutralizeHeroTargetsRule>();
+        // Stated on the ability base class, so it is scoped by its two tags rather than by element.
+        services.AddSingleton<IXmlCrossTagRule, AutomaticAbilityDespawnRule>();
         services.AddSingleton<IXmlCrossTagRule, DamageRadiusWithinChaseRadiusRule>();
         services.AddSingleton<IXmlCrossTagRule, RespawnTimeOrderRule>();
         // The engine's six "if you set A you must also set B" rules - five on System_Spy_Ability,
@@ -250,6 +266,8 @@ public static class XmlLanguageServiceExtensions
         // Code action providers - add IXmlCodeActionProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
         services.AddSingleton<IXmlCodeActionProvider, FixSuggestionCodeActionProvider>();
+        // The engine's own correction, where it edits a tag other than the one reported.
+        services.AddSingleton<IXmlCodeActionProvider, EngineRepairCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();

@@ -74,20 +74,3 @@ public sealed class CreditHaltNeedsDurationRule : BooleanGatedRequirementRuleBas
         return IsPositiveNumber(value);
     }
 }
-
-/// <summary>Convenience grouping so callers and tests register the same six rules.</summary>
-public static class CrossTagRuleSets
-{
-    public static IReadOnlyList<IXmlCrossTagRule> BooleanGatedRequirements()
-    {
-        return
-        [
-            new SeeFleetContentsNeedsNumFleetsRule(),
-            new SeeMostPowerfulShipNeedsNumFleetsRule(),
-            new SeeGroundCompanyContentsNeedsNumCompaniesRule(),
-            new SeeCreditIncomeBreakdownNeedsIncomeRule(),
-            new SeePoliticalControlBreakdownNeedsControlRule(),
-            new CreditHaltNeedsDurationRule()
-        ];
-    }
-}

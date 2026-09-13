@@ -1,10 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
-using PG.StarWarsGame.LSP.Xml.Util;
-
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 /// <summary>
@@ -29,11 +25,12 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///         this rule is silent on vanilla data.
 ///     </para>
 /// </remarks>
-public sealed class LeechShieldsRequiredTagsRule : IXmlCrossTagRule
+public sealed class LeechShieldsRequiredTagsRule : RequiredTagsRuleBase
 {
-    private const string OwningType = "LeechShieldsAbility";
+    protected override string ElementName => "leech_shields_ability";
+    protected override string OwningType => "LeechShieldsAbility";
 
-    private static readonly string[] Required =
+    protected override IReadOnlyList<string> RequiredTags =>
     [
         "Beam_Bone_Name",
         "Beam_Effect_Name",
@@ -43,38 +40,4 @@ public sealed class LeechShieldsRequiredTagsRule : IXmlCrossTagRule
         "Damage_Multiplier",
         "Shield_Damage_Per_Second",
     ];
-
-    public IEnumerable<XmlFact> Evaluate(
-        HtmlNode objectNode,
-        IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
-        string documentUri,
-        LineOffsetIndex lineIndex)
-    {
-        if (!IsLeechShields(objectNode)) return [];
-
-        var facts = new List<XmlFact>();
-        foreach (var tag in Required)
-        {
-            // Present but blank is still unset as far as the engine is concerned.
-            if (childrenByName.TryGetValue(tag, out var nodes)
-                && nodes.Any(n => !string.IsNullOrWhiteSpace(n.InnerText)))
-                continue;
-
-            facts.Add(new MissingRequiredTagFact(
-                documentUri,
-                XmlUtility.GetLine(objectNode),
-                XmlUtility.GetTagBracketColumn(objectNode),
-                XmlUtility.GetOpeningTagLength(objectNode),
-                OwningType,
-                tag));
-        }
-
-        return facts;
-    }
-
-    /// <summary>HAP lower-cases element names, so compare on the underscored form directly.</summary>
-    private static bool IsLeechShields(HtmlNode node)
-    {
-        return string.Equals(node.Name, "leech_shields_ability", StringComparison.OrdinalIgnoreCase);
-    }
 }

@@ -163,7 +163,30 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // tag also had no enum wired, so it is now referenceKind: enum + ProjectileCategory. A
         // misspelt category does not fail the load, it never matches - the point defence quietly
         // stops intercepting that projectile.
-        const int expectedHandlerCount = 134;
+        // 134 -> 135: EitherOrRequirementHandler added, fed by three rules on a shared base - the
+        // engine's "you should set either A or B to Yes, otherwise this ability won't do anything"
+        // family. Its own id rather than BooleanGatedRequirement's: that one reports a value the
+        // engine is about to OVERWRITE, this one an ability the engine leaves inert, and a modder
+        // silencing "this ability deliberately covers neither case" must not lose the other.
+        // Reported once against the object, because neither flag is wrong alone - a No is the
+        // ordinary value for whichever half an ability does not cover.
+        // The third rule was not in the harvested list: the harvest keyed on the "Error: (%s) "
+        // prefix and NeutralizeHeroAbilityClass labels its copy "Warning" while stating the same
+        // consequence, with the sentence split across two constants by an embedded newline.
+        // 135 -> 136: AutomaticDespawnHandler added - an automatic activation style with
+        // Causes_Despawn on, which SpecialAbilityClass::Validate_Data reports and then turns off
+        // itself. Scoped by the two TAGS rather than by an element: the rule is stated on the base
+        // class every ability type calls first, so naming elements would mean listing all of them
+        // and missing whichever one a mod reaches for. Which six styles are automatic is measured
+        // from that function's switch, not inferred from the names - and the switch is also where
+        // Global_Automatic turned up, a style our enum did not carry.
+        // No collision with the three classes that DEMAND Causes_Despawn=Yes: each of those accepts
+        // only Ground_Activated, which is not an automatic style.
+        // 136 -> 137: AtLeastOneSecondHandler added - LeechShieldsAbilityClass tests Duration < 1.0
+        // and then assigns 1.0, so the bound is inclusive and the repair value is the bound itself.
+        // Its own id and handler rather than a shared minimum: Duration_In_Secs appears on three
+        // ability types and only this one's validator mentions it, so the rule opts in per owner.
+        const int expectedHandlerCount = 137;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

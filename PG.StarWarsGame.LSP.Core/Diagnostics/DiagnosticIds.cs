@@ -171,6 +171,13 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId ValueBelowNegativeOne = new(DiagnosticGroup.Values, 68);
 
+    /// <summary>
+    ///     A duration below the one second the engine insists on, which it then substitutes. Its own
+    ///     id rather than a shared minimum: the bound is a unit of time rather than a fraction, and
+    ///     it applies to one owner of a tag name three types share.
+    /// </summary>
+    public static readonly DiagnosticId DurationBelowOneSecond = new(DiagnosticGroup.Values, 69);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);
@@ -270,6 +277,25 @@ public static class DiagnosticIds
     ///     See_Fleet_Contents to true you must also set See_Num_Fleets to true", and five more.
     /// </summary>
     public static readonly DiagnosticId BooleanGatedRequirement = new(DiagnosticGroup.CrossTag, 17);
+
+    /// <summary>
+    ///     Both halves of an either/or flag pair are off, so the ability loads and does nothing -
+    ///     "You should set either Can_Assassinate_Minor_Heroes or Can_Assassinate_Major_Heroes to
+    ///     'Yes'", and two more.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="BooleanGatedRequirement" />: that one is a flag creating a
+    ///     requirement the engine then REPAIRS, this one is an object the engine leaves inert. A
+    ///     modder silencing "my ability deliberately covers neither case" must not thereby silence
+    ///     "the engine is about to overwrite your value".
+    /// </remarks>
+    public static readonly DiagnosticId EitherOrRequirement = new(DiagnosticGroup.CrossTag, 18);
+
+    /// <summary>
+    ///     An ability with an automatic activation style that also causes its owner to despawn. The
+    ///     engine states it once on the base class and then turns the flag off itself.
+    /// </summary>
+    public static readonly DiagnosticId AutomaticAbilityDespawn = new(DiagnosticGroup.CrossTag, 19);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

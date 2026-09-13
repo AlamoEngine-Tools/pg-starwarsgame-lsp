@@ -645,12 +645,26 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     {
         if (result.SuggestedFix is null && result.CreateLocalisationKey is null &&
             result.SquadronSyncJson is null && !result.RemoveRedundantOverride &&
-            !result.OfferRemoveEarlierDuplicates)
+            !result.OfferRemoveEarlierDuplicates && result.EngineRepair is null)
             return null;
 
         var obj = new JObject();
         if (result.SuggestedFix is not null)
             obj["fix"] = result.SuggestedFix;
+        if (result.FixTitle is not null)
+            obj["fixTitle"] = result.FixTitle;
+        if (result.EngineRepair is not null)
+            obj["engineRepair"] = new JObject
+            {
+                ["title"] = result.EngineRepair.Title,
+                ["edits"] = new JArray(result.EngineRepair.Edits.Select(e => new JObject
+                {
+                    ["line"] = e.Line,
+                    ["column"] = e.Column,
+                    ["length"] = e.Length,
+                    ["newText"] = e.NewText,
+                })),
+            };
         if (result.CreateLocalisationKey is not null)
             obj["createLocKey"] = result.CreateLocalisationKey;
         if (result.SquadronSyncJson is not null)

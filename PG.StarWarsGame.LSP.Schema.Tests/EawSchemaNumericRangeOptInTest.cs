@@ -41,6 +41,51 @@ public sealed class EawSchemaNumericRangeOptInTest
     }
 
     /// <summary>
+    ///     <c>Duration_In_Secs</c> has three owners and only one of them states a bound.
+    /// </summary>
+    /// <remarks>
+    ///     <c>LeechShieldsAbilityClass::Validate_Data</c> (<c>01028000</c>) tests
+    ///     <c>Duration &lt; 1.0</c> and repairs to <c>1.0</c>, so the bound is inclusive.
+    ///     <c>Sensor_Jamming_Ability</c> and <c>System_Spy_Ability</c> carry a tag of the same name
+    ///     that no validator mentions, which is exactly why this opts in per owner.
+    /// </remarks>
+    [Fact]
+    public void DurationInSecs_TakesItsBoundOnlyOnLeechShields()
+    {
+        Assert.Equal("at-least-one-second", ValidationId("LeechShieldsAbility.yaml", "Duration_In_Secs"));
+        Assert.Null(ValidationId("SensorJammingAbility.yaml", "Duration_In_Secs"));
+        Assert.Null(ValidationId("SystemSpyAbility.yaml", "Duration_In_Secs"));
+    }
+
+    /// <summary>
+    ///     The Slicer's three interpolated curves, each needing at least two control points.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>SlicerAbilityClass::Validate_Data</c> (<c>00f1e8b0</c>) calls
+    ///         <c>Get_Num_Control_Points</c> on each and complains below two, then CLEARS the curve
+    ///         and installs its own two points - so a one-point curve does not merely warn, it is
+    ///         replaced by something the author never wrote.
+    ///     </para>
+    ///     <para>
+    ///         The engine's messages name these tags <c>Chance_Mod_By_Base_Level</c>,
+    ///         <c>Chance_Mod_By_Planet_Difficulty</c> and
+    ///         <c>Price_Mod_By_Planet_Tech_Availability</c>, which are stale internal names: the
+    ///         parser table registers the longer forms used here, and those are what the XML
+    ///         actually takes. Matching the rules to tags by the message text alone would have
+    ///         invented three tags and missed these three.
+    ///     </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("Chance_Modifier_By_Base_Level")]
+    [InlineData("Chance_Modifier_By_Planet_Difficulty")]
+    [InlineData("Cost_Multiplier_By_Planet_Tech_Availability")]
+    public void SlicerCurves_NeedTwoControlPoints(string tag)
+    {
+        Assert.Equal("control-point-curve", ValidationId("SlicerAbility.yaml", tag));
+    }
+
+    /// <summary>
     ///     The message says "cannot be less than -1.0" and the code agrees: -1.0 itself is legal.
     /// </summary>
     /// <remarks>

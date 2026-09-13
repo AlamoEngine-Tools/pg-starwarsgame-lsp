@@ -47,16 +47,19 @@ public sealed class EawSchemaActivationStyleTest
     }
 
     /// <summary>
-    ///     The two values only the engine's messages attest to.
+    ///     The three values only the engine attests to.
     /// </summary>
     /// <remarks>
-    ///     Neither appears anywhere in the shipped corpus, because neither owning ability class
-    ///     does. They are in the enum on the strength of the engine naming them as the supported
-    ///     style - without them, writing what the engine asks for reads as an unknown enum member.
+    ///     None appears anywhere in the shipped corpus. The first two are in the enum on the
+    ///     strength of the engine naming them as an ability class's supported style; the third,
+    ///     <c>GLOBAL_AUTOMATIC</c>, is the twelfth case in <c>SpecialAbilityClass::Validate_Data</c>
+    ///     (<c>00c1f7a0</c>) and sits in the arm that refuses <c>Causes_Despawn</c>. Without them,
+    ///     writing what the engine handles reads as an unknown enum member.
     /// </remarks>
     [Theory]
     [InlineData("COMBAT_IMMINENT")]
     [InlineData("HERO_DETECTED")]
+    [InlineData("GLOBAL_AUTOMATIC")]
     public void Engine_named_styles_are_in_the_enum(string value)
     {
         var path = Path.Combine(Path.GetDirectoryName(Find("GameObjectType.yaml"))!, "..", "enums",
