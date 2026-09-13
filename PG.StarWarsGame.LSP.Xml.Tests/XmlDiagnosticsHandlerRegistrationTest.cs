@@ -195,7 +195,21 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // share check despite the message saying "greater than zero", and the conflict rule needs
         // the allies split ON - the ignored-flag branch runs first and has already cleared
         // Split_Favors_Owner when it is off, so the engine never reaches the second complaint.
-        const int expectedHandlerCount = 139;
+        // 139 -> 140: RespawnTimeListHandler added - the per-tech-level respawn table, as
+        // Validate_Respawn_Times checks it for both the Slicer and the Black Market: exactly five
+        // entries, none negative, zeros all-or-nothing. One handler and one id for all three,
+        // because the engine gates them together and returns at the first failure, after which the
+        // caller CLEARS both lists - so any of them costs the same thing and suppressing one while
+        // the table stays unusable would help nobody. No quick fix: the engine's repair is that
+        // deletion, which is not something to put one keystroke away.
+        // 140 -> 141: HardpointUnhittableHandler added - a destroyable hardpoint nothing can hit,
+        // either because it names no Collision_Mesh or because another destroyable hardpoint on the
+        // same object already claims that mesh and wins the first-match lookup. Both shapes come
+        // from the damage-routing pass rather than from an engine message: the game says nothing,
+        // and the hardpoint still shows in the UI and still takes its share of the object's health.
+        // Its own id for that reason - someone who disagrees with our routing model should not have
+        // to silence the rules the engine itself states.
+        const int expectedHandlerCount = 141;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

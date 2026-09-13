@@ -17,6 +17,8 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private const string HardpointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
     private const string IsTurretTag = "Is_Turret";
+    private const string DestroyableTag = "Is_Destroyable";
+    private const string CollisionMeshTag = "Collision_Mesh";
     private const string SpecialAbilityNameTag = "Special_Ability_Name";
 
     // Bone-tag classification and cross-file attachment/model resolution are shared with the bone-model
@@ -58,6 +60,16 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     private static void CheckHardpoint(string hardpointId, HtmlNode hardpointNode, Pass pass)
     {
+        // Before the bone checks, and deliberately before their early return: a hardpoint with no
+        // bone tags at all can still be a destroyable one with no collision mesh.
+        if (EngineBoolean.IsTrue(SingleValue(hardpointNode, DestroyableTag))
+            && SingleValue(hardpointNode, CollisionMeshTag) is null)
+            pass.Facts.Add(new HardpointUnhittableFact(pass.DocumentUri,
+                XmlUtility.GetLine(hardpointNode),
+                XmlUtility.GetTagBracketColumn(hardpointNode),
+                XmlUtility.GetOpeningTagLength(hardpointNode),
+                hardpointId, null));
+
         var bones = CollectBoneTags(hardpointNode, pass);
         if (bones.Count == 0) return;
 
@@ -140,16 +152,30 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             n.Name.Equals(HardpointsTag, StringComparison.OrdinalIgnoreCase));
         if (hardpointsNode is null) return;
 
+        // Damage reaches a hardpoint through its collision mesh and the lookup returns the FIRST
+        // match, so two destroyable hardpoints claiming one mesh leave the later one unreachable.
+        // Per object, because that is the scope the lookup runs in - two units may reuse a mesh name
+        // freely.
+        var meshClaimedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         var models = pass.DeclaredModels(ownerId);
-        if (models.Count == 0) return;
 
         foreach (var (hardpointId, offset) in XmlUtility.SplitListWithOffsets(hardpointsNode.InnerText))
         {
             var hardpointTags = pass.TagSource.TryGetTags(hardpointId);
             if (hardpointTags is null) continue; // unresolved hardpoint: the reference pipeline owns that
 
-            var isTurret = IsTurretFromTags(hardpointTags);
             var position = pass.TokenPosition(hardpointsNode, offset, hardpointId);
+
+            // Which mesh each hardpoint claims is a question about the LIST, so it is asked before
+            // the model gate below: an object with no model declared still routes damage by mesh.
+            CheckCollisionMeshClaim(hardpointId, hardpointTags, position, meshClaimedBy, pass);
+
+            // Everything past here compares a bone against a model, so without one there is nothing
+            // to check. Unchanged in effect from the early return this replaced.
+            if (models.Count == 0) continue;
+
+            var isTurret = IsTurretFromTags(hardpointTags);
             var attachedModel = hardpointTags.LastOrDefault(t =>
                 t.TagName.Equals(ModelToAttachTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
 
@@ -253,6 +279,38 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private static bool IsTurret(HtmlNode hardpointNode)
     {
         return HardpointBoneModelResolver.IsTurret(hardpointNode);
+    }
+
+    /// <summary>
+    ///     Records which destroyable hardpoint claimed a collision mesh on this object, and reports
+    ///     the later ones that can therefore never be hit.
+    /// </summary>
+    /// <remarks>
+    ///     Only destroyable hardpoints compete: an indestructible one is never a damage target, so
+    ///     it takes nothing away from the one that matters.
+    /// </remarks>
+    private static void CheckCollisionMeshClaim(string hardpointId, IReadOnlyList<VariantTag> tags,
+        Position position, Dictionary<string, string> meshClaimedBy, Pass pass)
+    {
+        if (!EngineBoolean.IsTrue(LastTagValue(tags, DestroyableTag))) return;
+
+        var mesh = LastTagValue(tags, CollisionMeshTag);
+        if (string.IsNullOrEmpty(mesh)) return;
+
+        if (meshClaimedBy.TryGetValue(mesh, out var first))
+        {
+            pass.Facts.Add(new HardpointUnhittableFact(pass.DocumentUri,
+                position.Line, position.Column, position.Length, hardpointId, first));
+            return;
+        }
+
+        meshClaimedBy[mesh] = hardpointId;
+    }
+
+    private static string? LastTagValue(IReadOnlyList<VariantTag> tags, string tagName)
+    {
+        return tags.LastOrDefault(t =>
+            t.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
     }
 
     private static bool IsTurretFromTags(IReadOnlyList<VariantTag> tags)

@@ -142,6 +142,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantTagNotSupportedHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastNegativeOneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastOneSecondHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, RespawnTimeListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BooleanGatedRequirementHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, EitherOrRequirementHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AutomaticDespawnHandler>();
@@ -187,6 +188,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, CampaignStoryAttachmentHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointUnhittableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageStageNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();

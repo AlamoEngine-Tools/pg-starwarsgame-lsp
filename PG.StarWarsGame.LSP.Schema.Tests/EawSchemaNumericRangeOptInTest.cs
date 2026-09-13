@@ -86,6 +86,25 @@ public sealed class EawSchemaNumericRangeOptInTest
     }
 
     /// <summary>
+    ///     Both users of <c>Validate_Respawn_Times</c>, whose tags are named differently.
+    /// </summary>
+    /// <remarks>
+    ///     The engine labels both pairs <c>Min_Respawn_Time_Per_Tech_Level</c> in its messages -
+    ///     <c>BlackMarketAbilityClass</c> passes that literal while its XML tag is
+    ///     <c>Min_Respawn_Times</c> - so the rule is bound per owner and never by the name in the
+    ///     message.
+    /// </remarks>
+    [Theory]
+    [InlineData("SlicerAbility.yaml", "Min_Respawn_Time_Per_Tech_Level")]
+    [InlineData("SlicerAbility.yaml", "Max_Respawn_Time_Per_Tech_Level")]
+    [InlineData("BlackMarketAbility.yaml", "Min_Respawn_Times")]
+    [InlineData("BlackMarketAbility.yaml", "Max_Respawn_Times")]
+    public void RespawnTables_AreCheckedOnBothOwners(string file, string tag)
+    {
+        Assert.Equal("respawn-time-list", ValidationId(file, tag));
+    }
+
+    /// <summary>
     ///     The message says "cannot be less than -1.0" and the code agrees: -1.0 itself is legal.
     /// </summary>
     /// <remarks>

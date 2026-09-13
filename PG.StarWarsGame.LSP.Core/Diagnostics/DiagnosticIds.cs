@@ -185,6 +185,13 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId OwnerIncomeShareOutOfRange = new(DiagnosticGroup.Values, 70);
 
+    /// <summary>
+    ///     A per-tech-level respawn table the engine refuses - wrong length, a negative entry, or a
+    ///     zero among non-zeros. One id for all three, because the engine discards the same thing
+    ///     whichever check fails.
+    /// </summary>
+    public static readonly DiagnosticId RespawnTimeList = new(DiagnosticGroup.Values, 71);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);
@@ -314,6 +321,17 @@ public static class DiagnosticIds
     ///     it cannot mean anything. Someone silencing one would mean the other.
     /// </remarks>
     public static readonly DiagnosticId IncomeSplitConflict = new(DiagnosticGroup.CrossTag, 20);
+
+    /// <summary>
+    ///     A destroyable hardpoint nothing can hit - no <c>Collision_Mesh</c>, or one another
+    ///     destroyable hardpoint on the same object already claims.
+    /// </summary>
+    /// <remarks>
+    ///     Derived from the damage-routing pass rather than from an engine message, which is why it
+    ///     has its own id: someone who trusts their own routing and wants this quiet should not have
+    ///     to silence the rules the engine itself states.
+    /// </remarks>
+    public static readonly DiagnosticId HardpointCannotBeHit = new(DiagnosticGroup.CrossTag, 21);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

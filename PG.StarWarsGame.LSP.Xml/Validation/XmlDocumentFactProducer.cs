@@ -69,10 +69,41 @@ public sealed class XmlDocumentFactProducer(
         {
             var tag = schema.GetTag(node.Name);
             if (tag is null || tag.Notes.Count == 0) continue;
+            if (NoteIsAmbiguous(node.Name)) continue;
             facts.Add(new XmlNotesFact(documentUri, XmlUtility.GetLine(node), 0, 0, tag));
         }
 
         return facts;
+    }
+
+    /// <summary>
+    ///     Whether several types declare this tag name while disagreeing about what it means.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Notes are collected by flat lookup, which returns whichever type happens to hold the
+    ///         name - the same owner-agnostic answer that let an <c>allowedValues</c> narrowing leak
+    ///         onto types that never asked for it. A note is documentation rather than a rule, so
+    ///         suppressing it wholesale would be too blunt: in a document the registry does not type,
+    ///         the flat entry is the ONLY answer available and it is usually the right one.
+    ///     </para>
+    ///     <para>
+    ///         So the test is agreement, not provenance. One declaring type, or several that say the
+    ///         same thing, is unambiguous. Several that say different things is a guess, and a guess
+    ///         presented as documentation is worse than silence.
+    ///     </para>
+    /// </remarks>
+    private bool NoteIsAmbiguous(string tagName)
+    {
+        var declarations = schema.GetAllTagDefinitions(tagName);
+        if (declarations.Count < 2) return false;
+
+        return declarations
+            .Where(d => d.Notes.Count > 0)
+            .Select(d => string.Join('', d.Notes.OrderBy(n => n.Key, StringComparer.Ordinal)
+                .Select(n => n.Key + '' + n.Value)))
+            .Distinct(StringComparer.Ordinal)
+            .Count() > 1;
     }
 
     /// <summary>
