@@ -105,7 +105,11 @@ public sealed class RequiredTagsRuleTest
     [InlineData("Remote_Bomb_Ability")]
     public void Only_the_demolition_ability_requires_a_bomb_type(string element)
     {
-        Assert.Empty(Missing(Run($"<{element} Name='B'><Damage_Radius>50</Damage_Radius></{element}>")));
+        var missing = Missing(Run($"<{element} Name='B'><Damage_Radius>50</Damage_Radius></{element}>"));
+
+        // Specifically about Bomb_Type, not about silence: Remote_Bomb_Ability has a required tag of
+        // its own (Toss_Anim), and this fixture legitimately lacks it.
+        Assert.DoesNotContain(missing, f => f.TagName == "Bomb_Type");
     }
 
     // Inherited from the shared base: the engine's complaint is that the value was not SET.

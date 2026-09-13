@@ -218,6 +218,10 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, ArcSweepAttackAnimationRule>();
         services.AddSingleton<IXmlCrossTagRule, GenericAttackAnimationRule>();
         services.AddSingleton<IXmlCrossTagRule, EatAttackAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, BountyTargetFactionsRule>();
+        services.AddSingleton<IXmlCrossTagRule, GarrisonUpgradeUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, GrenadeTossAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, RemoteBombTossAnimationRule>();
         // The engine's three "set either A or B, otherwise this ability won't do anything" pairs.
         services.AddSingleton<IXmlCrossTagRule, HeroAssassinTargetsRule>();
         services.AddSingleton<IXmlCrossTagRule, BaseDestructionTargetsRule>();
@@ -225,6 +229,7 @@ public static class XmlLanguageServiceExtensions
         // The same shape over lists - an ability applicable to no unit at all. Four messages across
         // nine owning classes, so each rule carries the owners that reference its message.
         services.AddSingleton<IXmlCrossTagRule, CombatBonusApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, ForceHealingApplicableUnitsRule>();
         services.AddSingleton<IXmlCrossTagRule, AbsorbBlasterApplicableUnitsRule>();
         services.AddSingleton<IXmlCrossTagRule, AttackAbilityApplicableUnitsRule>();
         services.AddSingleton<IXmlCrossTagRule, RedirectBlasterApplicableUnitsRule>();

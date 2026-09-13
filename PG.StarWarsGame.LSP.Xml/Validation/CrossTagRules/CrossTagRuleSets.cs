@@ -36,7 +36,11 @@ public static class CrossTagRuleSets
             new DemolitionBombTypeRule(),
             new ArcSweepAttackAnimationRule(),
             new GenericAttackAnimationRule(),
-            new EatAttackAnimationRule()
+            new EatAttackAnimationRule(),
+            new BountyTargetFactionsRule(),
+            new GarrisonUpgradeUnitsRule(),
+            new GrenadeTossAnimationRule(),
+            new RemoteBombTossAnimationRule()
         ];
     }
 
@@ -60,6 +64,7 @@ public static class CrossTagRuleSets
         return
         [
             new CombatBonusApplicableUnitsRule(),
+            new ForceHealingApplicableUnitsRule(),
             new AbsorbBlasterApplicableUnitsRule(),
             new AttackAbilityApplicableUnitsRule(),
             new RedirectBlasterApplicableUnitsRule()

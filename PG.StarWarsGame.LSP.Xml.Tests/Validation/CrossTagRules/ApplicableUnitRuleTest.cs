@@ -40,11 +40,42 @@ public sealed class ApplicableUnitRuleTest
     {
         { "Combat_Bonus_Ability", "affects no units at all" },
         { "Reduce_Production_Price_Ability", "affects no units at all" },
+        { "Find_Weakness_Ability", "affects no units at all" },
         { "Absorb_Blaster_Ability", "cannot absorb fire from any source" },
         { "Earthquake_Attack_Ability", "cannot activate" },
         { "Concentrate_Fire_Attack_Ability", "cannot activate" },
+        // From the truncated half of the list - a 23-owner message read as 4.
+        { "Personal_Flame_Thrower_Ability", "cannot activate" },
+        { "Ion_Cannon_Shot_Attack_Ability", "cannot activate" },
+        { "Hack_Ability", "cannot activate" },
+        { "Repair_Ability", "cannot activate" },
         { "Redirect_Blaster_Ability", "cannot block or redirect fire" },
     };
+
+    /// <summary>
+    ///     Every class the engine's four messages are referenced from, so a truncated xref cannot
+    ///     quietly shrink this rule again.
+    /// </summary>
+    [Fact]
+    public void All_thirty_owners_are_covered()
+    {
+        var covered = CrossTagRuleSets.ApplicableUnits()
+            .OfType<ApplicableUnitRuleBase>()
+            .SelectMany(Elements)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.Equal(30, covered.Count);
+    }
+
+    private static IEnumerable<string> Elements(ApplicableUnitRuleBase rule)
+    {
+        // The element list is the rule's own; reading it back is the only way to count coverage
+        // without restating all thirty names here and calling that a test.
+        var property = typeof(EitherOrRequirementRuleBase).GetProperty("ElementNames",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+
+        return (IReadOnlyList<string>)property!.GetValue(rule)!;
+    }
 
     [Theory]
     [MemberData(nameof(Owners))]
@@ -94,6 +125,28 @@ public sealed class ApplicableUnitRuleTest
         Assert.Empty(Diagnose(
             "<Combat_Bonus_Ability Name='A'><Applicable_Unit_Categories>No</Applicable_Unit_Categories>"
             + "</Combat_Bonus_Ability>"));
+    }
+
+    /// <summary>
+    ///     Force healing only asks which units it applies to when it has a range to heal within, so
+    ///     an ability with no range is not required to name any.
+    /// </summary>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("0.0")]
+    [InlineData("")]
+    public void Force_healing_without_a_range_is_not_asked(string range)
+    {
+        var body = range.Length == 0 ? "" : $"<Heal_Range>{range}</Heal_Range>";
+
+        Assert.Empty(Diagnose($"<Force_Healing_Ability Name='H'>{body}</Force_Healing_Ability>"));
+    }
+
+    [Fact]
+    public void Force_healing_with_a_range_is_asked()
+    {
+        Assert.Single(Diagnose(
+            "<Force_Healing_Ability Name='H'><Heal_Range>200</Heal_Range></Force_Healing_Ability>"));
     }
 
     /// <summary>Regression: the boolean either/or pairs still read their halves as booleans.</summary>

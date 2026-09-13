@@ -60,6 +60,20 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
         return EngineBoolean.IsTrue(value);
     }
 
+    /// <summary>
+    ///     Whether the engine asks the question of this object at all.
+    /// </summary>
+    /// <remarks>
+    ///     Nearly always yes. <c>ForceHealingAbilityClass</c> is the exception: it only asks which
+    ///     units it applies to when <c>Heal_Range</c> is positive, so an ability that heals at no
+    ///     range is not required to name any. Reporting it would be inventing a rule the engine
+    ///     does not state for that object.
+    /// </remarks>
+    protected virtual bool Applies(IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
+    {
+        return true;
+    }
+
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
@@ -67,6 +81,8 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
         LineOffsetIndex lineIndex)
     {
         if (!ElementNames.Contains(objectNode.Name, StringComparer.OrdinalIgnoreCase)) return [];
+
+        if (!Applies(childrenByName)) return [];
 
         if (IsSet(childrenByName, FirstTag) || IsSet(childrenByName, SecondTag)) return [];
 
