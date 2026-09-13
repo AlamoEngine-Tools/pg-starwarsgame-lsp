@@ -228,7 +228,17 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Suspended_Plot reaches the same outcome it would have anyway and is a Warning.
         // Checked against the authored text rather than the node, because HAP lower-cases names and
         // the casing is gone everywhere else in the walk.
-        const int expectedHandlerCount = 143;
+        // 143 -> 144: SystemSpyDurationHandler added - Duration_In_Secs on a System_Spy_Ability,
+        // whose legal range flips with Activation_Style. SystemSpyAbilityClass::Validate_Data
+        // (0101dcdf) demands the OPPOSITE sign in each arm: Galactic_Automatic complains when
+        // 0.0 <= duration and writes -1.0, Ground_Activated complains when duration <= 0.0 and
+        // writes 30.0. Zero is refused by both.
+        // Its own handler rather than a range on the tag, because no range could say it - the same
+        // value is correct under one style and overwritten under the other.
+        // The branch's third arm, an unsupported style, is NOT reported here: allowedValues on that
+        // owner's Activation_Style reports it where it is written, and picking a bound for a style
+        // the class refuses would invent one.
+        const int expectedHandlerCount = 144;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

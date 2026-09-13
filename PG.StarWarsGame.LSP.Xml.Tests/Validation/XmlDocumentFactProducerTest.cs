@@ -377,6 +377,58 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Equal("Name", fact.NameTag);
     }
 
+    /// <summary>
+    ///     An object name the engine cannot hold.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> (<c>GameObjectType.cpp</c> line 2225) copies the
+    ///     name into a 128-byte buffer to uppercase and hash it, guarded by an assert and followed
+    ///     by a bare <c>strcpy</c> - so the bound exists in the build Petroglyph tested with and not
+    ///     in the one anyone plays. The longest shipped name is 76 characters.
+    /// </remarks>
+    [Fact]
+    public void An_object_name_at_the_limit_is_reported()
+    {
+        var facts = ProduceNamed(new string('A', 128));
+
+        var fact = Assert.Single(facts.OfType<EngineTextLimitFact>());
+        Assert.Equal(128, fact.Limit);
+        Assert.Equal(1, fact.CharactersOver);
+    }
+
+    /// <summary>The check is <c>size() &lt; 128</c>, so 127 still fits - but only just.</summary>
+    [Fact]
+    public void An_object_name_just_inside_the_limit_warns_instead()
+    {
+        var fact = Assert.Single(ProduceNamed(new string('A', 127)).OfType<EngineTextLimitFact>());
+
+        Assert.Equal(0, fact.CharactersOver);
+        Assert.Equal(0, fact.CharactersLeft);
+    }
+
+    [Fact]
+    public void An_ordinary_object_name_is_silent()
+    {
+        Assert.Empty(ProduceNamed("Rebel_Trooper").OfType<EngineTextLimitFact>());
+    }
+
+    /// <summary>The name is quoted back, because the object cannot be identified any other way.</summary>
+    [Fact]
+    public void The_report_names_the_object()
+    {
+        var name = new string('A', 200);
+
+        Assert.Contains(name, Assert.Single(ProduceNamed(name).OfType<EngineTextLimitFact>()).Subject,
+            StringComparison.Ordinal);
+    }
+
+    private static IReadOnlyList<XmlFact> ProduceNamed(string name)
+    {
+        var xml = $"<SFXEventFiles><SFXEvent Name=\"{name}\"><Text_ID>A</Text_ID></SFXEvent></SFXEventFiles>";
+
+        return Build(new SfxEventSchemaProvider(), new SfxEventFileTypeRegistry()).Produce(xml, SfxUri);
+    }
+
     // Trimmed, like the parser does - whitespace is not a name.
     [Fact]
     public void Whitespace_only_name_attribute_emits_UnnamedObjectFact()

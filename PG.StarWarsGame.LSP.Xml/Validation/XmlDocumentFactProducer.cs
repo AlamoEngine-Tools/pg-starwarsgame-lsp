@@ -77,6 +77,40 @@ public sealed class XmlDocumentFactProducer(
     }
 
     /// <summary>
+    ///     Reports an object name longer than the buffer the engine hashes it in.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GameObjectTypeClass::Get_Name_CRC</c> copies the name into a 128-byte buffer,
+    ///         uppercases it and hashes that. The size check beside the copy is an assert and the
+    ///         copy itself is a bare <c>strcpy</c>, so the bound is enforced in the build Petroglyph
+    ///         tested with and nowhere else.
+    ///     </para>
+    ///     <para>
+    ///         Sits here rather than in a rule because this is where the object's name is already in
+    ///         hand - the same walk that reports a MISSING name is the one that can see an
+    ///         impossible one.
+    ///     </para>
+    /// </remarks>
+    private static void CheckObjectNameLength(
+        HtmlNode node, string name, List<XmlFact> facts, string documentUri)
+    {
+        var bytes = EngineTextLimits.ByteCount(name);
+        if (bytes < EngineTextLimits.ObjectName * EngineTextLimits.WarnAtFraction) return;
+
+        facts.Add(new EngineTextLimitFact(
+            documentUri,
+            XmlUtility.GetLine(node),
+            XmlUtility.GetTagBracketColumn(node),
+            node.Name.Length + 1,
+            $"The name '{name}'",
+            EngineTextLimits.CharactersToRemove(name, EngineTextLimits.ObjectName),
+            EngineTextLimits.CharactersLeft(name, EngineTextLimits.ObjectName),
+            bytes,
+            EngineTextLimits.ObjectName));
+    }
+
+    /// <summary>
     ///     Reports a tag written in a casing its own parser will not accept.
     /// </summary>
     /// <remarks>
@@ -163,7 +197,11 @@ public sealed class XmlDocumentFactProducer(
             // HAP lowercases attribute names, so match the name tag case-insensitively.
             var attr = node.Attributes.FirstOrDefault(a =>
                 a.Name.Equals(typeDef.NameTag, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrWhiteSpace(attr?.Value)) continue;
+            if (!string.IsNullOrWhiteSpace(attr?.Value))
+            {
+                CheckObjectNameLength(node, attr.Value.Trim(), facts, documentUri);
+                continue;
+            }
 
             facts.Add(new XmlUnnamedObjectFact(
                 documentUri,

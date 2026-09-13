@@ -32,8 +32,8 @@ public sealed class UnknownTagHandler : XmlDiagnosticsHandler<XmlUnknownTagFact>
         XmlUnknownTagFact fact, DiagnosticsContext ctx)
     {
         var message = fact.Suggestion is null
-            ? $"<{fact.TagName}> is not a known {fact.OwnerElement} tag - the engine ignores it"
-            : $"<{fact.TagName}> is not a known {fact.OwnerElement} tag - did you mean " +
+            ? $"<{fact.TagName}> is not a known {fact.OwnerElement} tag. The engine discards it"
+            : $"<{fact.TagName}> is not a known {fact.OwnerElement} tag. Did you mean " +
               $"<{fact.Suggestion}>?";
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message)];

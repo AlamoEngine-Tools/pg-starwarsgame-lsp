@@ -362,6 +362,17 @@ public static class DiagnosticIds
     public static readonly DiagnosticId HardpointCannotBeHit = new(DiagnosticGroup.CrossTag, 21);
 
     /// <summary>
+    ///     A system spy's <c>Duration_In_Secs</c> on the wrong side of zero for the
+    ///     <c>Activation_Style</c> it declares - the engine overwrites it either way.
+    /// </summary>
+    /// <remarks>
+    ///     One id for both arms of the branch. They are the same concern from the author's side -
+    ///     a duration whose sign does not match the style - and someone silencing one would mean
+    ///     the other.
+    /// </remarks>
+    public static readonly DiagnosticId SystemSpyDurationSign = new(DiagnosticGroup.CrossTag, 22);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

@@ -150,6 +150,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, AutomaticDespawnHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, OwnerIncomeShareHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IncomeSplitConflictHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, SystemSpyDurationHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AllowedValuesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ProjectileCategoryListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();
@@ -239,6 +240,8 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, OwnerIncomeShareRule>();
         services.AddSingleton<IXmlCrossTagRule, SplitFavorsOwnerIgnoredRule>();
         services.AddSingleton<IXmlCrossTagRule, SplitFavorsOwnerVsFullAmountRule>();
+        // Opposite bounds on one tag depending on another - see SystemSpyDurationRule.
+        services.AddSingleton<IXmlCrossTagRule, SystemSpyDurationRule>();
         services.AddSingleton<IXmlCrossTagRule, DamageRadiusWithinChaseRadiusRule>();
         services.AddSingleton<IXmlCrossTagRule, RespawnTimeOrderRule>();
         // The engine's six "if you set A you must also set B" rules - five on System_Spy_Ability,
