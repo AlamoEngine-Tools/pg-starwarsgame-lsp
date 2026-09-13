@@ -151,6 +151,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, OwnerIncomeShareHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, IncomeSplitConflictHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SystemSpyDurationHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, RequiredFirstEntryHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AllowedValuesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ProjectileCategoryListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();

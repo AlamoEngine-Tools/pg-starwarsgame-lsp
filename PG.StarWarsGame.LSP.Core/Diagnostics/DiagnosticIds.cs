@@ -215,6 +215,18 @@ public static class DiagnosticIds
     public static readonly DiagnosticId EngineTextLimitApproaching = new(DiagnosticGroup.Values, 73);
 
     /// <summary>
+    ///     A list whose first entry the engine requires to be a particular name, because index 0 is
+    ///     the fallback it hands out when a lookup misses - <c>Damage_Types</c> and
+    ///     <c>Armor_Types</c>.
+    /// </summary>
+    /// <remarks>
+    ///     One id for the family rather than one per list: it is a single concern from the author's
+    ///     side - the default entry has to stay at the front - and someone silencing it for damage
+    ///     types would mean it for armour types too.
+    /// </remarks>
+    public static readonly DiagnosticId RequiredFirstListEntry = new(DiagnosticGroup.Values, 74);
+
+    /// <summary>
     ///     A tag spelled in a casing its own parser will not accept. Rare by design: nearly every
     ///     tag is case-insensitive, and the exceptions are the ones with a hand-rolled parser.
     /// </summary>

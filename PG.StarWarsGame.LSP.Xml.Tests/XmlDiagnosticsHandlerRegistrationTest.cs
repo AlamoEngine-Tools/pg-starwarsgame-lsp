@@ -238,7 +238,18 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // The branch's third arm, an unsupported style, is NOT reported here: allowedValues on that
         // owner's Activation_Style reports it where it is written, and picking a bound for a style
         // the class refuses would invent one.
-        const int expectedHandlerCount = 144;
+        // 144 -> 145: RequiredFirstEntryHandler added - the first entry of Damage_Types must be
+        // Damage_Default and of Armor_Types must be Armor_Default, because index 0 is the fallback
+        // the engine returns when a lookup misses. Prepending a type silently repoints every
+        // default; appending is safe.
+        // The first rule taken from the ASSERT seam rather than from an engine message - these two
+        // have no message at all (GameConstants.cpp:1170 and :1180), so neither message harvest
+        // could ever have found them, and no shipped build reports them.
+        // Additive, not replace: the tag's own NameReferenceList handling still has to run.
+        // Keyed on (owner, tag) in code beside the handler rather than carried in the schema - the
+        // required name is an engine fact with an address behind it, not something a schema author
+        // could author correctly. Same reasoning as EngineValueRepairs.
+        const int expectedHandlerCount = 145;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
