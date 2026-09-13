@@ -403,7 +403,7 @@ public static class DiagnosticIds
     /// <summary>The object declares no tactical model, so there is nothing to draw.</summary>
     public static readonly DiagnosticId PreviewNoTacticalModel = new(DiagnosticGroup.Preview, 6);
 
-    /// <summary>A hardpoint is mounted but defined nowhere.</summary>
+    /// <summary>A hardpoint is attached but defined nowhere.</summary>
     public static readonly DiagnosticId PreviewHardpointNotDefined = new(DiagnosticGroup.Preview, 7);
 
     /// <summary>A hardpoint's attached model is not there.</summary>
@@ -433,7 +433,7 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PreviewUnboundAbilityEffect =
         new(DiagnosticGroup.Preview, 14);
 
-    /// <summary>GameConstants maps no targeting reticle for a hardpoint type the object mounts.</summary>
+    /// <summary>GameConstants maps no targeting reticle for a hardpoint type the object attaches.</summary>
     public static readonly DiagnosticId PreviewNoReticleForType = new(DiagnosticGroup.Preview, 15);
 
     /// <summary>An animation override whose skeleton differs from the hull's. Informational: the

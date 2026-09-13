@@ -18,24 +18,24 @@ namespace PG.StarWarsGame.LSP.Xml.InlayHints;
 ///     <para>
 ///         Which model a bone targets is context-dependent. Inside a <c>HardPoint</c> it is resolved with
 ///         the shared <see cref="HardpointBoneModelResolver" /> - the same role split and cross-file
-///         cumulative mounting logic the hardpoint validator uses - so an <c>Attachment_Bone</c> shows the
-///         mounting hull(s), a <c>Turret_Bone_Name</c> shows the hardpoint's own attached model, and a
+///         cumulative attachment logic the hardpoint validator uses - so an <c>Attachment_Bone</c> shows the
+///         attaching hull(s), a <c>Turret_Bone_Name</c> shows the hardpoint's own attached model, and a
 ///         fire bone follows <c>Is_Turret</c>. Everywhere else (a bone tag on a GameObject that declares
 ///         its own model) it falls back to the sibling-model <see cref="BoneModelScopeResolver" /> walk,
 ///         matching bone completion. In both cases only the model(s) that actually expose the bone (in
 ///         <see cref="GameIndex.ModelBones" />, the bones-union-mesh-names catalog) are shown; when the
 ///         value resolves nowhere the hint stays silent - a genuine typo is the bone-not-on-model
-///         diagnostic's job. A bone mounted cumulatively on several hulls lists them, capped.
+///         diagnostic's job. A bone whose hardpoint several hulls attach lists them all, capped.
 ///     </para>
 /// </summary>
 internal sealed class BoneModelInlayHintProvider : IXmlInlayHintProvider
 {
-    // A cumulative hardpoint can mount on many hulls; list a couple and summarise the rest so the label
+    // One hardpoint can be attached by many hulls; list a couple and summarise the rest so the label
     // stays readable.
     private const int MaxModelsShown = 2;
 
-    // One resolver per index instance carries the mounting/model memoisation across every bone tag in a
-    // request; keyed on GameIndex so a re-index drops it rather than serving stale mounts.
+    // One resolver per index instance carries the attachment/model memoisation across every bone tag in a
+    // request; keyed on GameIndex so a re-index drops it rather than serving stale attachments.
     private static readonly ConditionalWeakTable<GameIndex, HardpointBoneModelResolver> Resolvers = new();
 
     private readonly IVariantTagSource _tagSource;
@@ -79,7 +79,7 @@ internal sealed class BoneModelInlayHintProvider : IXmlInlayHintProvider
         ];
     }
 
-    // Role-aware for hardpoint bones (mounting hull vs the hardpoint's own model, across files), sibling
+    // Role-aware for hardpoint bones (attaching hull vs the hardpoint's own model, across files), sibling
     // model walk otherwise - the same dispatch bone completion uses, so hint and completion agree.
     private IReadOnlyList<string> CandidateModelKeys(InlayHintContext ctx)
     {

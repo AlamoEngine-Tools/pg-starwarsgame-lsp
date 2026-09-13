@@ -6,7 +6,7 @@ using PG.StarWarsGame.LSP.Core.Diagnostics;
 namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 /// <summary>
-///     Reports a <c>Special_Ability_Name</c> the mounting object does not have. Error: the resolution
+///     Reports a <c>Special_Ability_Name</c> the attaching object does not have. Error: the resolution
 ///     is deterministic - it walks the object's own variant chain and needs no model or asset data - and
 ///     the consequence is an ability that silently never fires.
 /// </summary>

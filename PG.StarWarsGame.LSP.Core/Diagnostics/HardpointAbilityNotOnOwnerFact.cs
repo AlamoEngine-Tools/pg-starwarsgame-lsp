@@ -4,18 +4,18 @@
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
-///     A hardpoint's <c>Special_Ability_Name</c> names an ability that the object mounting the
-///     hardpoint does not have. The engine enables the ability on the mounting object while the
+///     A hardpoint's <c>Special_Ability_Name</c> names an ability that the object attaching the
+///     hardpoint does not have. The engine enables the ability on the attaching object while the
 ///     hardpoint is alive, so an ability that object never defines simply never activates.
 ///     <para>
-///         Checked against the mounting object's whole <c>Variant_Of_Existing_Type</c> chain, because a
+///         Checked against the attaching object's whole <c>Variant_Of_Existing_Type</c> chain, because a
 ///         variant inherits its base's abilities while the ability symbols stay indexed under the base
 ///         that declares them.
 ///     </para>
 /// </summary>
 /// <param name="HardpointId">The hardpoint naming the ability.</param>
 /// <param name="AbilityName">The ability that is missing.</param>
-/// <param name="OwnerId">The object mounting the hardpoint.</param>
+/// <param name="OwnerId">The object attaching the hardpoint.</param>
 /// <param name="DefinedElsewhere">
 ///     True when some other object does define an ability of that name - the difference between a
 ///     typo and an ability attached to the wrong unit, which are fixed differently.
