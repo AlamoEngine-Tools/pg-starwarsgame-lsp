@@ -516,3 +516,4 @@ docs/
 .vscode-test/
 shader-sources/
 tools/
+.claude/

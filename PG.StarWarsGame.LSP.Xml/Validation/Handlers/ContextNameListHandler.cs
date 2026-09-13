@@ -8,9 +8,13 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <summary>
 ///     Named handler (ID: <c>context-name-list</c>) for tags that hold multiple
 ///     (ContextName, ValueName) pairs in a single tag value - e.g.
-///     <c>Land_Terrain_Model_Mapping</c>. Replaces the default TupleList
-///     handler for that tag via <c>validationOverride</c> in YAML.
+///     <c>Land_Terrain_Model_Mapping</c>. Reached through <c>validationOverride</c> in YAML.
 /// </summary>
+/// <remarks>
+///     Its <c>mode: replace</c> supersedes the TupleList shape check, but the mode is wider than
+///     that intent - see <see cref="ContextNamePairHandler" /> for what else it discards and the
+///     test that guards it.
+/// </remarks>
 public sealed class ContextNameListHandler : XmlDiagnosticsHandler<XmlTagValueFact>, IXmlNamedDiagnosticsHandler
 {
     /// <inheritdoc />

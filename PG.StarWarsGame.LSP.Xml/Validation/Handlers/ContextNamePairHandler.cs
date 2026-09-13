@@ -8,9 +8,16 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// <summary>
 ///     Named handler (ID: <c>context-name-pair</c>) for tags that hold a single
 ///     (ContextName, ValueName) pair - e.g. <c>Music_Event_List_Ambient</c> and
-///     <c>Music_Event_List_Battle</c>. Replaces the default TupleList
-///     handler for those tags via <c>validationOverride</c> in YAML.
+///     <c>Music_Event_List_Battle</c>. Reached through <c>validationOverride</c> in YAML.
 /// </summary>
+/// <remarks>
+///     Its <c>mode: replace</c> is here to supersede the TupleList shape check, which those tags'
+///     declared type would otherwise apply to a value it does not describe. Be aware that the mode
+///     is wider than that intent: <c>XmlDiagnosticsHandlerRegistry.Dispatch</c> discards EVERY
+///     default handler for the fact type, so reference resolution and allowed values would stop
+///     running too. Neither tag carries either, which is what makes the wider scope harmless -
+///     and <c>EawSchemaReplaceOverrideScopeTest</c> fails if that stops being true.
+/// </remarks>
 public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFact>, IXmlNamedDiagnosticsHandler
 {
     /// <inheritdoc />
