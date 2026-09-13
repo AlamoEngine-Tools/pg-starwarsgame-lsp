@@ -4,6 +4,7 @@
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
@@ -76,14 +77,19 @@ public sealed class EngineRepairFixTest
         Assert.Null(d.SuggestedFix);
     }
 
-    /// <summary>The engine assigns the bound itself - <c>Duration = 1.0</c>.</summary>
+    /// <summary>
+    ///     The engine assigns the bound itself - <c>Duration = 1.0</c>. The fact has to name its
+    ///     owner: the repair is keyed on (owner, tag), because <c>Duration_In_Secs</c> also appears
+    ///     on two ability types whose validators say nothing about it.
+    /// </summary>
     [Fact]
     public void A_short_duration_is_offered_the_engines_own_one_second()
     {
         var tag = XmlHandlerTestFixtures.MakeTag("Duration_In_Secs", XmlValueType.Float);
+        var fact = new XmlTagValueFact("file:///test.xml", 0, 0, 4, tag, "0.25",
+            "LeechShieldsAbility");
 
-        var d = Assert.Single(new AtLeastOneSecondHandler()
-            .Handle(XmlHandlerTestFixtures.MakeFact(tag, "0.25"), XmlHandlerTestFixtures.EmptyCtx));
+        var d = Assert.Single(new AtLeastOneSecondHandler().Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
 
         Assert.Equal("1.0", d.SuggestedFix);
     }

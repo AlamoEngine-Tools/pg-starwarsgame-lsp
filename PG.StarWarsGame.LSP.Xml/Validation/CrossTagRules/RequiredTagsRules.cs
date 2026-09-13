@@ -26,6 +26,9 @@ public sealed class DemolitionBombTypeRule : RequiredTagsRuleBase
     protected override string OwningType => "DemolitionAbility";
     protected override IReadOnlyList<string> RequiredTags => ["Bomb_Type"];
     protected override string Repair => "defaults it to Demolition_Bomb";
+
+    /// <summary>Measured: the message itself names the substitute, <c>Demolition_Bomb</c>.</summary>
+    protected override string? DefaultValue => "Demolition_Bomb";
 }
 
 /// <summary>

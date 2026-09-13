@@ -26,11 +26,4 @@ public sealed class AtLeastOneSecondHandler : NumericRangeHandlerBase
     protected override float? Maximum => null;
 
     protected override string Expectation => "should have at least one second of time";
-
-    /// <summary>
-    ///     Measured: the line after the message is <c>this-&gt;Duration = 1.0</c>, so the bound and
-    ///     the repair are the same number here. They are not always - see
-    ///     <see cref="NumericRangeHandlerBase.RepairValue" />.
-    /// </summary>
-    protected override string? RepairValue => "1.0";
 }

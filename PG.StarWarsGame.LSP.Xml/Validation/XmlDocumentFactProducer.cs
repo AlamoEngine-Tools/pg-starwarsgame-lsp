@@ -238,7 +238,8 @@ public sealed class XmlDocumentFactProducer(
                     {
                         var (dupLine, dupCol, dupLen) = XmlUtility.GetValuePosition(child, lineIndex);
                         facts.Add(new XmlTagValueFact(
-                            documentUri, dupLine, dupCol, dupLen, tagDef, duplicateValue));
+                            documentUri, dupLine, dupCol, dupLen, tagDef, duplicateValue,
+                            context?.ObjectTypeName));
                     }
                 }
 
@@ -250,7 +251,10 @@ public sealed class XmlDocumentFactProducer(
             if (!string.IsNullOrEmpty(rawValue))
             {
                 var (valLine, valCol, valLen) = XmlUtility.GetValuePosition(child, lineIndex);
-                facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue));
+                // The element's own owning type, not the document's - a tag name alone does not
+                // identify a rule, and the engine's repair for it can differ per owner.
+                facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue,
+                    context?.ObjectTypeName));
             }
 
             WalkNodes(child, state, context, false, false);

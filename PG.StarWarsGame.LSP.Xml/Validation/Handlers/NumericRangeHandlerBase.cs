@@ -45,20 +45,6 @@ public abstract class NumericRangeHandlerBase : XmlDiagnosticsHandler<XmlTagValu
     /// <inheritdoc />
     public abstract string ValidationId { get; }
 
-    /// <summary>
-    ///     What the engine assigns after complaining, where that has been READ OUT OF THE BINARY -
-    ///     the assignment following the message. Offered as a quick fix so the file can be made to
-    ///     say what the game will do with it anyway.
-    /// </summary>
-    /// <remarks>
-    ///     Null by default, and it must stay null until measured. The repair is not implied by the
-    ///     bound: a rule may clamp to the bound, clamp to something inside it (the income split
-    ///     clamps to 0.99, not 1.0), reset to zero, or clear the value entirely. Guessing here would
-    ///     put the author's file one keystroke from a value the engine never picks - and where a
-    ///     handler serves several owners, the repair can differ per owner, which is a reason to
-    ///     leave it null rather than to average it.
-    /// </remarks>
-    protected virtual string? RepairValue => null;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
@@ -73,12 +59,16 @@ public abstract class NumericRangeHandlerBase : XmlDiagnosticsHandler<XmlTagValu
         if (!belowMinimum && !aboveMaximum)
             return [];
 
+        // The repair belongs to the (owner, tag) pair rather than to this rule - see
+        // EngineValueRepairs. An unmeasured pair offers no fix at all.
+        var repair = EngineValueRepairs.For(fact.OwningType, fact.Tag.Tag);
+
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                 $"<{fact.Tag.Tag}> {Expectation}. The engine rejects this value on load",
-                SuggestedFix: RepairValue,
-                FixTitle: RepairValue is null ? null : $"Apply the engine's own value: {RepairValue}")
+                SuggestedFix: repair,
+                FixTitle: repair is null ? null : $"Apply the engine's own value: {repair}")
         ];
     }
 }

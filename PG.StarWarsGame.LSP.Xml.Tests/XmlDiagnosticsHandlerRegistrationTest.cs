@@ -186,7 +186,16 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // and then assigns 1.0, so the bound is inclusive and the repair value is the bound itself.
         // Its own id and handler rather than a shared minimum: Duration_In_Secs appears on three
         // ability types and only this one's validator mentions it, so the rule opts in per owner.
-        const int expectedHandlerCount = 137;
+        // 137 -> 139: the income-stream pair. OwnerIncomeShareHandler reports a split share outside
+        // [0,1) - a CONDITIONAL range, checked by the engine only while Split_Favors_Owner and
+        // Split_Income_With_Allies are both on, which is why it is a rule and not a validationId on
+        // the tag. IncomeSplitConflictHandler covers the two flag combinations the engine clears,
+        // under one id because they are one concern: that flag set where it cannot mean anything.
+        // Two things here are measured against the code rather than the messages. Zero passes the
+        // share check despite the message saying "greater than zero", and the conflict rule needs
+        // the allies split ON - the ignored-flag branch runs first and has already cleared
+        // Split_Favors_Owner when it is off, so the engine never reaches the second complaint.
+        const int expectedHandlerCount = 139;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

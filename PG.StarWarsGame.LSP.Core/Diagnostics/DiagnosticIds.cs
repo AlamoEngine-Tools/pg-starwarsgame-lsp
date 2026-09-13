@@ -178,6 +178,13 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId DurationBelowOneSecond = new(DiagnosticGroup.Values, 69);
 
+    /// <summary>
+    ///     The owner's share of a split income outside <c>[0, 1)</c>. Its own id rather than a range
+    ///     rule's, because the engine only checks it while both split flags are on - a value the
+    ///     engine never reads is not a defect.
+    /// </summary>
+    public static readonly DiagnosticId OwnerIncomeShareOutOfRange = new(DiagnosticGroup.Values, 70);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);
@@ -296,6 +303,17 @@ public static class DiagnosticIds
     ///     engine states it once on the base class and then turns the flag off itself.
     /// </summary>
     public static readonly DiagnosticId AutomaticAbilityDespawn = new(DiagnosticGroup.CrossTag, 19);
+
+    /// <summary>
+    ///     A flag combination on an income stream the engine refuses and clears -
+    ///     <c>Split_Favors_Owner</c> with no allies split, or alongside
+    ///     <c>Full_Amount_To_Everyone</c>.
+    /// </summary>
+    /// <remarks>
+    ///     One id for both, because they are one concern from the author's side: that flag set where
+    ///     it cannot mean anything. Someone silencing one would mean the other.
+    /// </remarks>
+    public static readonly DiagnosticId IncomeSplitConflict = new(DiagnosticGroup.CrossTag, 20);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

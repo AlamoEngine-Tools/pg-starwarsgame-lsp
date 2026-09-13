@@ -23,6 +23,11 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///     <c>defaults it to Demolition_Bomb</c>. Empty where the engine only complains, which is the
 ///     common case: the seven Leech_Shields tags have no substitute and the ability does not run.
 /// </param>
+/// <param name="Insertion">
+///     The engine's default written into the file as an edit, where the engine HAS a default and the
+///     surrounding layout could be derived. Null for the tags it only complains about, and null for
+///     an object with no existing child to copy a layout from.
+/// </param>
 public sealed record MissingRequiredTagFact(
     string DocumentUri,
     int Line,
@@ -30,4 +35,5 @@ public sealed record MissingRequiredTagFact(
     int Length,
     string OwningType,
     string TagName,
-    string Repair = "") : XmlFact(DocumentUri, Line, Column, Length);
+    string Repair = "",
+    XmlEngineRepair? Insertion = null) : XmlFact(DocumentUri, Line, Column, Length);

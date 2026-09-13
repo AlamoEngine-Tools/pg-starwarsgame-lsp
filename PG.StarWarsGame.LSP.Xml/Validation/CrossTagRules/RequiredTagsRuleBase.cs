@@ -42,6 +42,13 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
     /// </summary>
     protected virtual string Repair => string.Empty;
 
+    /// <summary>
+    ///     The value the engine writes in when the tag is absent, where it writes one. Null for the
+    ///     tags it only complains about - most of them - and the reason the quick fix is offered for
+    ///     one rule in this family and not the rest.
+    /// </summary>
+    protected virtual string? DefaultValue => null;
+
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
@@ -66,9 +73,24 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
                 XmlUtility.GetOpeningTagLength(objectNode),
                 OwningType,
                 tag,
-                Repair));
+                Repair,
+                BuildInsertion(objectNode, lineIndex, tag)));
         }
 
         return facts;
+    }
+
+    /// <summary>
+    ///     The engine's default written into the document, where there is one to write.
+    /// </summary>
+    private XmlEngineRepair? BuildInsertion(HtmlNode objectNode, LineOffsetIndex lineIndex, string tag)
+    {
+        if (DefaultValue is not { } value) return null;
+
+        var edit = TagInsertionFactory.InsertLastChild(objectNode, lineIndex, tag, value);
+
+        return edit is null
+            ? null
+            : new XmlEngineRepair($"Apply the engine's own default: <{tag}>{value}</{tag}>", [edit]);
     }
 }
