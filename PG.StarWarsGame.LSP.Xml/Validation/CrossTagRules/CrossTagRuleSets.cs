@@ -50,4 +50,19 @@ public static class CrossTagRuleSets
             new NeutralizeHeroTargetsRule()
         ];
     }
+
+    /// <summary>
+    ///     The same shape over lists: an ability naming neither a unit category nor a unit type.
+    ///     Four messages, nine owning classes.
+    /// </summary>
+    public static IReadOnlyList<IXmlCrossTagRule> ApplicableUnits()
+    {
+        return
+        [
+            new CombatBonusApplicableUnitsRule(),
+            new AbsorbBlasterApplicableUnitsRule(),
+            new AttackAbilityApplicableUnitsRule(),
+            new RedirectBlasterApplicableUnitsRule()
+        ];
+    }
 }

@@ -209,7 +209,26 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // and the hardpoint still shows in the UI and still takes its share of the object's health.
         // Its own id for that reason - someone who disagrees with our routing model should not have
         // to silence the rules the engine itself states.
-        const int expectedHandlerCount = 141;
+        // 141 -> 142: EngineTextLimitHandler added, and it is the only rule here whose consequence
+        // is a game that will not start. DatabaseMapClass::Map_Data_Of_Type strcpy's a tag's value
+        // into strtok_string_buffer[8192] with no length check - the size test beside it is an
+        // assert, so it exists in the build Petroglyph tested with and not in the one anyone plays.
+        // Produced in the fact producer rather than by a value handler because it is a property of
+        // the TEXT, true of every tag whatever the schema says it holds.
+        // Reached through long list values - a station's HardPoints, a campaign's trade routes or
+        // planets - once names get descriptive. Vanilla's longest HardPoints is 869 characters and
+        // its longest value of any kind 2,535, so the headroom is real but spendable.
+        // 142 -> 143: CaseSensitiveTagHandler added - a tag spelled in a casing its own parser will
+        // not accept. Rare by design: DatabaseMapClass uppercases every key it handles, so casing is
+        // free for all but the tags with a hand-rolled parser. StoryModeClass::Load_Plots is one,
+        // comparing with std::operator==, and the result of its Active_Plot test becomes the
+        // is_active argument to Load_Single_Plot - so <active_plot> loads SUSPENDED and the campaign
+        // never starts, with nothing said at runtime.
+        // Severity follows the consequence, not the rule: that case is an Error, while a mis-cased
+        // Suspended_Plot reaches the same outcome it would have anyway and is a Warning.
+        // Checked against the authored text rather than the node, because HAP lower-cases names and
+        // the casing is gone everywhere else in the walk.
+        const int expectedHandlerCount = 143;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

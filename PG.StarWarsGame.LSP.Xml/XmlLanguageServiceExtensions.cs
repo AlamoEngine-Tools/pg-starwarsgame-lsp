@@ -137,12 +137,14 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, DuplicateSymbolHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnnamedObjectHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnknownTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, CaseSensitiveTagHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantBaseUnresolvedHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantChainTooDeepHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantTagNotSupportedHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastNegativeOneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastOneSecondHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, RespawnTimeListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, EngineTextLimitHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BooleanGatedRequirementHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, EitherOrRequirementHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AutomaticDespawnHandler>();
@@ -220,6 +222,12 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, HeroAssassinTargetsRule>();
         services.AddSingleton<IXmlCrossTagRule, BaseDestructionTargetsRule>();
         services.AddSingleton<IXmlCrossTagRule, NeutralizeHeroTargetsRule>();
+        // The same shape over lists - an ability applicable to no unit at all. Four messages across
+        // nine owning classes, so each rule carries the owners that reference its message.
+        services.AddSingleton<IXmlCrossTagRule, CombatBonusApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, AbsorbBlasterApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, AttackAbilityApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, RedirectBlasterApplicableUnitsRule>();
         // Stated on the ability base class, so it is scoped by its two tags rather than by element.
         services.AddSingleton<IXmlCrossTagRule, AutomaticAbilityDespawnRule>();
         // The three conditional rules in IncomeStreamAbilityClass::Validate_Data.

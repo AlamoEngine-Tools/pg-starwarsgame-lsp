@@ -77,6 +77,35 @@ public sealed class XmlDocumentFactProducer(
     }
 
     /// <summary>
+    ///     Reports a tag written in a casing its own parser will not accept.
+    /// </summary>
+    /// <remarks>
+    ///     Reads the name back out of the document text: <see cref="HtmlNode.Name" /> is lower-cased
+    ///     by HAP, so by the time anything else in this walk sees a tag, the very thing being checked
+    ///     is gone.
+    /// </remarks>
+    private static void CheckTagCasing(HtmlNode child, WalkState state)
+    {
+        // Cheap gate first. Reading the authored spelling means going back to the document text, and
+        // two tag names in the whole game can fail this check - so the common answer has to be free.
+        if (!CaseSensitiveTags.IsCandidate(child.Name)) return;
+
+        var authored = XmlUtility.GetOriginalTagName(child, state.Text);
+        var rule = CaseSensitiveTags.For(authored, out var expected);
+        if (rule is null) return;
+
+        state.Facts.Add(new CaseSensitiveTagFact(
+            state.DocumentUri,
+            XmlUtility.GetLine(child),
+            XmlUtility.GetTagBracketColumn(child),
+            authored.Length + 1,
+            authored,
+            expected,
+            rule.Consequence,
+            rule.ChangesBehaviour));
+    }
+
+    /// <summary>
     ///     Whether several types declare this tag name while disagreeing about what it means.
     /// </summary>
     /// <remarks>
@@ -200,6 +229,12 @@ public sealed class XmlDocumentFactProducer(
         {
             if (child.NodeType != HtmlNodeType.Element) continue;
             var name = child.Name;
+
+            // Before anything resolves: a handful of tags are matched byte for byte by a parser of
+            // their own, so the AUTHORED spelling matters. Checked here because every other check in
+            // this file has already lost it - HAP lower-cases element names.
+            CheckTagCasing(child, state);
+
             var tagDef = ResolveTag(name, context);
 
             // AbilityDefinitionSubObjectList: each child element name IS the ability schema type (PascalCase).
@@ -286,6 +321,20 @@ public sealed class XmlDocumentFactProducer(
                 // identify a rule, and the engine's repair for it can differ per owner.
                 facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue,
                     context?.ObjectTypeName));
+
+                // The database mapper strcpy's this into a fixed stack buffer. Checked here rather
+                // than in a handler because it is a property of the TEXT, not of the tag's type -
+                // it applies to every value the engine reads, whatever the schema says it holds.
+                //
+                // Measured in BYTES: the engine tests std::string::size() and then copies bytes, so
+                // a character count is the wrong ruler as soon as the text leaves ASCII.
+                var valueBytes = EngineTextLimits.ByteCount(rawValue);
+                if (valueBytes >= EngineTextLimits.TagValue * EngineTextLimits.WarnAtFraction)
+                    facts.Add(new EngineTextLimitFact(documentUri, valLine, valCol, valLen,
+                        $"<{XmlUtility.GetOriginalTagName(child, text)}>",
+                        EngineTextLimits.CharactersToRemove(rawValue, EngineTextLimits.TagValue),
+                        EngineTextLimits.CharactersLeft(rawValue, EngineTextLimits.TagValue),
+                        valueBytes, EngineTextLimits.TagValue));
             }
 
             WalkNodes(child, state, context, false, false);

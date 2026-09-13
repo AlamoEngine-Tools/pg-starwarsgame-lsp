@@ -16,8 +16,7 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 /// </remarks>
 public sealed class HeroAssassinTargetsRule : EitherOrRequirementRuleBase
 {
-    protected override string ElementName => "hero_assassin_ability";
-    protected override string OwningType => "HeroAssassinAbility";
+    protected override IReadOnlyList<string> ElementNames => ["hero_assassin_ability"];
     protected override string FirstTag => "Can_Assassinate_Minor_Heroes";
     protected override string SecondTag => "Can_Assassinate_Major_Heroes";
 }
@@ -33,8 +32,7 @@ public sealed class HeroAssassinTargetsRule : EitherOrRequirementRuleBase
 /// </remarks>
 public sealed class BaseDestructionTargetsRule : EitherOrRequirementRuleBase
 {
-    protected override string ElementName => "base_destruction_ability";
-    protected override string OwningType => "BaseDestructionAbility";
+    protected override IReadOnlyList<string> ElementNames => ["base_destruction_ability"];
     protected override string FirstTag => "Destroy_Starbase";
     protected override string SecondTag => "Destroy_Land_Base";
 }
@@ -63,8 +61,7 @@ public sealed class BaseDestructionTargetsRule : EitherOrRequirementRuleBase
 /// </remarks>
 public sealed class NeutralizeHeroTargetsRule : EitherOrRequirementRuleBase
 {
-    protected override string ElementName => "neutralize_hero_ability";
-    protected override string OwningType => "NeutralizeHeroAbility";
+    protected override IReadOnlyList<string> ElementNames => ["neutralize_hero_ability"];
     protected override string FirstTag => "Can_Neutralize_Minor_Heroes";
     protected override string SecondTag => "Can_Neutralize_Major_Heroes";
 }

@@ -25,8 +25,8 @@ public sealed class EitherOrRequirementHandler : XmlDiagnosticsHandler<EitherOrR
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"<{fact.FirstTag}> and <{fact.SecondTag}> are both off, so this "
-                + $"{fact.OwningType} does nothing - set one of them to Yes")
+                $"<{fact.FirstTag}> and <{fact.SecondTag}> are both {fact.State}, so this "
+                + $"{fact.OwningType} {fact.Consequence} - {fact.Remedy}")
         ];
     }
 }

@@ -192,6 +192,34 @@ public static class DiagnosticIds
     /// </summary>
     public static readonly DiagnosticId RespawnTimeList = new(DiagnosticGroup.Values, 71);
 
+    /// <summary>
+    ///     Text longer than the fixed buffer the engine copies it into. Not a validity rule but a
+    ///     crash: the copy is an unchecked <c>strcpy</c>, and the game does not start.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id, and one nobody should suppress lightly - unlike every other rule here, the
+    ///     consequence is not a silent behaviour change but a game that will not load.
+    /// </remarks>
+    public static readonly DiagnosticId EngineTextLimit = new(DiagnosticGroup.Values, 72);
+
+    /// <summary>
+    ///     Text approaching that buffer but still inside it. Warned about because these limits are
+    ///     reached by accumulation, so the useful moment to say something is while there is still
+    ///     room to act.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id so it can be silenced on its own. Someone who knows their file is large and
+    ///     deliberate should be able to stop the nagging without also silencing
+    ///     <see cref="EngineTextLimit" />, which reports a game that will not load.
+    /// </remarks>
+    public static readonly DiagnosticId EngineTextLimitApproaching = new(DiagnosticGroup.Values, 73);
+
+    /// <summary>
+    ///     A tag spelled in a casing its own parser will not accept. Rare by design: nearly every
+    ///     tag is case-insensitive, and the exceptions are the ones with a hand-rolled parser.
+    /// </summary>
+    public static readonly DiagnosticId CaseSensitiveTag = new(DiagnosticGroup.Structure, 13);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);
