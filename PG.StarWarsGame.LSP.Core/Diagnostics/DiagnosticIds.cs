@@ -385,6 +385,16 @@ public static class DiagnosticIds
     public static readonly DiagnosticId SystemSpyDurationSign = new(DiagnosticGroup.CrossTag, 22);
 
     /// <summary>
+    ///     A grenade or remote-bomb ability naming a projectile whose <c>Projectile_Category</c> is
+    ///     not <c>GRENADE</c>, which the ability refuses.
+    /// </summary>
+    /// <remarks>
+    ///     One id for both owners: it is one concern - the projectile is the wrong kind - and
+    ///     someone silencing it for grenades would mean it for remote bombs.
+    /// </remarks>
+    public static readonly DiagnosticId GrenadeProjectileCategory = new(DiagnosticGroup.CrossTag, 23);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

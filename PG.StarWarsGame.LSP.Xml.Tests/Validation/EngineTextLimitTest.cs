@@ -146,7 +146,7 @@ public sealed class EngineTextLimitTest
     [Fact]
     public void The_report_names_the_tag()
     {
-        Assert.Contains("Max_Speed", Assert.Single(Fact(new string('9', 9000))).Subject,
+        Assert.Contains("HardPoints", Assert.Single(Fact(new string('9', 9000))).Subject,
             StringComparison.Ordinal);
     }
 
@@ -155,9 +155,37 @@ public sealed class EngineTextLimitTest
         return Assert.Single(new EngineTextLimitHandler().Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
     }
 
+    /// <summary>
+    ///     The limit binds the tag's TYPE, not just its text - so a scalar never reports, however
+    ///     long it is.
+    /// </summary>
+    /// <remarks>
+    ///     <c>Map_Data_Of_Type</c> is one switch on the type code, so the <c>strtok_string_buffer</c>
+    ///     copy belongs to individual cases: 50 of the 83 codes, all composites. A
+    ///     <c>Float</c> is read straight out of the node and never copied, so reporting the limit on
+    ///     it would be wider than the engine. Nothing reachable turns on this - vanilla's longest
+    ///     value is 2,535 and no scalar approaches 8,192 - but the claim has to be true.
+    /// </remarks>
+    [Fact]
+    public void A_scalar_is_never_reported_however_long_it_is()
+    {
+        var facts = Produce($"<Root><Max_Speed>{new string('9', 9000)}</Max_Speed></Root>")
+            .OfType<EngineTextLimitFact>()
+            .ToList();
+
+        Assert.Empty(facts);
+    }
+
+    /// <summary>The composite alongside it, same length, so the contrast is the TYPE and nothing else.</summary>
+    [Fact]
+    public void The_same_text_in_a_composite_tag_is_reported()
+    {
+        Assert.NotEmpty(Fact(new string('9', 9000)));
+    }
+
     private static IReadOnlyList<EngineTextLimitFact> Fact(string value)
     {
-        return Produce($"<Root><Max_Speed>{value}</Max_Speed></Root>")
+        return Produce($"<Root><HardPoints>{value}</HardPoints></Root>")
             .OfType<EngineTextLimitFact>()
             .ToList();
     }
@@ -176,14 +204,21 @@ public sealed class EngineTextLimitTest
 
     private sealed class LimitSchema : ISchemaProvider
     {
-        private static readonly XmlTagDefinition Speed = new()
+        private static readonly XmlTagDefinition HardPoints = new()
+        {
+            Tag = "HardPoints", ValueType = XmlValueType.NameReferenceList,
+        };
+
+        // A scalar, for the narrowing: its case in Map_Data_Of_Type never copies into the buffer.
+        private static readonly XmlTagDefinition MaxSpeed = new()
         {
             Tag = "Max_Speed", ValueType = XmlValueType.Float,
         };
 
         public XmlTagDefinition? GetTag(string tagName)
         {
-            return tagName.Equals("Max_Speed", StringComparison.OrdinalIgnoreCase) ? Speed : null;
+            if (tagName.Equals("HardPoints", StringComparison.OrdinalIgnoreCase)) return HardPoints;
+            return tagName.Equals("Max_Speed", StringComparison.OrdinalIgnoreCase) ? MaxSpeed : null;
         }
 
         public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
@@ -196,7 +231,7 @@ public sealed class EngineTextLimitTest
             return [];
         }
 
-        public IReadOnlyList<XmlTagDefinition> AllTags => [Speed];
+        public IReadOnlyList<XmlTagDefinition> AllTags => [HardPoints, MaxSpeed];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];

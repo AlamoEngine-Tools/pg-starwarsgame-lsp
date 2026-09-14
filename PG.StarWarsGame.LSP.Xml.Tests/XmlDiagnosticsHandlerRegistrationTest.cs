@@ -249,7 +249,19 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Keyed on (owner, tag) in code beside the handler rather than carried in the schema - the
         // required name is an engine fact with an address behind it, not something a schema author
         // could author correctly. Same reasoning as EngineValueRepairs.
-        const int expectedHandlerCount = 145;
+        // 145 -> 146: GrenadeProjectileHandler added - a Grenade_Attack_Ability's Grenade_Type and a
+        // Remote_Bomb_Ability's Bomb_Type must name a projectile whose Projectile_Category is
+        // GRENADE. From the assert seam, so there is no engine message: GrenadeAttackAbility.cpp:440
+        // and RemoteBombAbility.cpp:388 both read !type->Is_Projectile_Grenade(), and the BRANCH
+        // settles it - the assert fires when the call returns false, so the text states the failure
+        // and the rule is its opposite. Is_Projectile_Grenade is one comparison, ProjCategory ==
+        // PROJECTILE_CATEGORY_GRENADE.
+        // Reads the EFFECTIVE object, not the node: four of the ten shipped declarations name a
+        // projectile that inherits its category through Variant_Of_Existing_Type, and a node-level
+        // check would report every one of them.
+        // Keyed on (owner, tag) because Bomb_Type is declared on three ability types and only
+        // RemoteBombAbility asserts this - attribution follows the xref, never the schema.
+        const int expectedHandlerCount = 146;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

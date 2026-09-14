@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Schema;
+
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
 /// <summary>
@@ -26,7 +28,50 @@ public static class EngineTextLimits
     ///     <c>DatabaseMapClass::Map_Data_Of_Type</c> - <c>DatabaseMap.cpp</c> line 5582,
     ///     <c>CMP EAX, 0x2000</c>.
     /// </summary>
+    /// <remarks>
+    ///     Applies only to the value types listed in <see cref="CopiedToBuffer" /> - see
+    ///     <see cref="ValueIsCopiedToBuffer" />.
+    /// </remarks>
     public const int TagValue = 0x2000;
+
+    /// <summary>
+    ///     The engine type codes whose case in <c>Map_Data_Of_Type</c> copies the value into
+    ///     <c>strtok_string_buffer</c>, and which the <see cref="TagValue" /> limit therefore binds.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Map_Data_Of_Type</c> is one switch on the type code -
+    ///         <c>CMP 0x52; JA default; JMP [ECX*4 + 0xcbbed4]</c>, 83 entries - so the copy belongs
+    ///         to individual CASES and not to the function. Mapping all 50
+    ///         <c>strtok_string_buffer</c> assert sites through that jump table gives these codes:
+    ///         50 of the 83, and every one of them a composite. The 33 without it are the scalars
+    ///         and single references, read straight out of the node and never copied.
+    ///     </para>
+    ///     <para>
+    ///         Kept as CODES rather than as <see cref="XmlValueType" /> names on purpose.
+    ///         <c>(int)XmlValueType</c> is the engine type code, so this is the measurement itself
+    ///         rather than a transcription of it, and it can be re-derived against another build by
+    ///         re-reading the jump table - see <c>tools/map_type_code_cases.py</c> in the decompile
+    ///         repository.
+    ///     </para>
+    /// </remarks>
+    private static readonly HashSet<int> CopiedToBuffer =
+    [
+        0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x18, 0x19,
+        0x1a, 0x1b, 0x1e, 0x22, 0x23, 0x24, 0x25, 0x26, 0x28, 0x29,
+        0x2a, 0x2b, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x34, 0x35, 0x36,
+        0x37, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x44,
+        0x45, 0x46, 0x47, 0x48, 0x4c, 0x4d, 0x4e, 0x4f, 0x51, 0x52,
+    ];
+
+    /// <summary>
+    ///     Whether a value of this type is copied into the fixed buffer, and so whether
+    ///     <see cref="TagValue" /> applies to it at all.
+    /// </summary>
+    public static bool ValueIsCopiedToBuffer(XmlValueType type)
+    {
+        return CopiedToBuffer.Contains((int)type);
+    }
 
     /// <summary>
     ///     A tag's NAME, uppercased into <c>uppercase_key_name</c> by

@@ -360,14 +360,17 @@ public sealed class XmlDocumentFactProducer(
                 facts.Add(new XmlTagValueFact(documentUri, valLine, valCol, valLen, tagDef, rawValue,
                     context?.ObjectTypeName));
 
-                // The database mapper strcpy's this into a fixed stack buffer. Checked here rather
-                // than in a handler because it is a property of the TEXT, not of the tag's type -
-                // it applies to every value the engine reads, whatever the schema says it holds.
+                // The database mapper strcpy's this into a fixed stack buffer - but only for the
+                // value types whose case in Map_Data_Of_Type does that copy. It is one switch on
+                // the type code, so the check belongs to a CASE and not to the function: 50 of the
+                // 83 codes, every one a composite. A scalar or a single reference is read straight
+                // out of the node and never copied, so the limit does not bind it.
                 //
                 // Measured in BYTES: the engine tests std::string::size() and then copies bytes, so
                 // a character count is the wrong ruler as soon as the text leaves ASCII.
                 var valueBytes = EngineTextLimits.ByteCount(rawValue);
-                if (valueBytes >= EngineTextLimits.TagValue * EngineTextLimits.WarnAtFraction)
+                if (EngineTextLimits.ValueIsCopiedToBuffer(tagDef.ValueType) &&
+                    valueBytes >= EngineTextLimits.TagValue * EngineTextLimits.WarnAtFraction)
                     facts.Add(new EngineTextLimitFact(documentUri, valLine, valCol, valLen,
                         $"<{XmlUtility.GetOriginalTagName(child, text)}>",
                         EngineTextLimits.CharactersToRemove(rawValue, EngineTextLimits.TagValue),
