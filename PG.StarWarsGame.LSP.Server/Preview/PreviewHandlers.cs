@@ -1,18 +1,14 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using System.Globalization;
 using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.LSP.Assets.Models;
 using PG.StarWarsGame.LSP.Assets.Projection;
 using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Assets;
-
 using PG.StarWarsGame.LSP.Server.Icons;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
@@ -504,19 +500,15 @@ public sealed class GetParticleSystemHandler(
     ///     The object's uniform render scale, defaulting to 1.
     /// </summary>
     /// <remarks>
-    ///     Guarded exactly as the reference guards it (<c>GameObjectCatalog.cpp</c>): anything
-    ///     non-finite or non-positive falls back to 1, because a zero or negative scale collapses
-    ///     the object rather than sizing it. The variant chain is already walked by the resolver.
+    ///     Through <see cref="EngineScaleFactor" />, which the scene builder reads too - the two
+    ///     must not be able to disagree about one object. The variant chain is already walked by
+    ///     the resolver.
     /// </remarks>
     private static float ScaleFactorOf(EffectiveObject? effective)
     {
-        if (effective is null || Tag(effective, "Scale_Factor") is not { } raw)
-            return 1f;
-
-        return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-            && float.IsFinite(value) && value > 0f
-                ? value
-                : 1f;
+        return effective is null
+            ? EngineScaleFactor.None
+            : EngineScaleFactor.Of(Tag(effective, "Scale_Factor"));
     }
 
     private static string? Tag(EffectiveObject effective, string tagName)

@@ -90,7 +90,8 @@ public sealed class DialogDefinitionHandler : DefinitionHandlerBase
                     new Position(fact.Command.Line, arg.Column + arg.Text.Length));
                 _logger.LogDebug("Dialog go-to-def: '{Id}' -> {Uri}:{Line}", arg.Text, origin.Uri, origin.Line);
                 return Task.FromResult<LocationOrLocationLinks?>(
-                    new LocationOrLocationLinks(new LocationOrLocationLink(origin.ToLspLocationLink(originSelectionRange))));
+                    new LocationOrLocationLinks(
+                        new LocationOrLocationLink(origin.ToLspLocationLink(originSelectionRange))));
             }
         }
 

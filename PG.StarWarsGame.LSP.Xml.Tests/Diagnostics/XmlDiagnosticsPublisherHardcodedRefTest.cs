@@ -370,6 +370,7 @@ file sealed class StubStoryFactProducer : IStoryFactProducer
 file sealed class StubIndexService : IGameIndexService
 {
     public GameIndex Current => GameIndex.Empty;
+
     public event Action<GameIndex>? IndexChanged
     {
         add { }

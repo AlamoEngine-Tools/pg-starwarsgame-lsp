@@ -161,16 +161,18 @@ public sealed class GameIndexServiceTest
     // ── URI normalization - canonical form at the index boundary ────────────
 
     [Fact]
-    public async Task UpdateDocumentAsync_MixedCaseUri_DocumentKeyIsCanonicalLowercase()
+    public async Task UpdateDocumentAsync_MixedCaseUri_KeepsTheCaseAndIsFoundByEitherSpelling()
     {
-        // The index must store the canonical (lowercase file:///) key regardless of
-        // what case the LSP client or scanner sends.
+        // The key keeps the case the client or scanner sent, because that case is the file's real
+        // name and the only copy of it we hold. Finding it regardless of spelling is the
+        // dictionary's comparer, not a flattened key - see DocumentUris.
         var svc = Build(new FakeParser(Doc("", 0)));
 
         await svc.UpdateDocumentAsync("file:///C:/Data/Units.xml", "<X/>", 1, default);
 
+        Assert.Equal("file:///C:/Data/Units.xml", Assert.Single(svc.Current.Documents).Key);
         Assert.True(svc.Current.Documents.ContainsKey("file:///c:/data/units.xml"));
-        Assert.False(svc.Current.Documents.ContainsKey("file:///C:/Data/Units.xml"));
+        Assert.True(svc.Current.Documents.ContainsKey("file:///C:/Data/Units.xml"));
     }
 
     [Fact]
@@ -488,8 +490,10 @@ public sealed class GameIndexServiceTest
 
         svc.InjectDocument(Doc("file:///F.XML", 0, [Symbol("A")]));
 
+        // Normalizing is about the scheme and the separators; the name keeps its case, and either
+        // spelling finds it.
         Assert.True(svc.Current.Documents.ContainsKey("file:///f.xml"));
-        Assert.False(svc.Current.Documents.ContainsKey("file:///F.XML"));
+        Assert.True(svc.Current.Documents.ContainsKey("file:///F.XML"));
     }
 
     [Fact]

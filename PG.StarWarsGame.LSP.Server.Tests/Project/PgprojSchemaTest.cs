@@ -35,6 +35,43 @@ public sealed class PgprojSchemaTest
         Assert.True(result.IsValid, DescribeErrors(relativePath, result));
     }
 
+    // ── the identity fields ──────────────────────────────────────────────────
+
+    // The schema refuses properties it does not declare, so a project written by a newer extension
+    // would light up as an error in an older editor even where the server reads it happily. The
+    // field has to be declared here for the version gate to be usable at all.
+    [Fact]
+    public void IdentityFields_AreAccepted()
+    {
+        var result = Evaluate(
+            """{ "_type": "aetswg.ModProject", "_typeVersion": "aetswg-1.0.0", "name": "Mod" }""");
+
+        Assert.True(result.IsValid, DescribeErrors("identity fields", result));
+    }
+
+    // A file claiming to be some other document must not validate as a project either - the editor
+    // should say so at the same moment the server would.
+    [Fact]
+    public void TypeField_MustBeTheModProjectType()
+    {
+        Assert.False(Evaluate("""{ "_type": "aetswg.StoryLayout", "name": "Mod" }""").IsValid);
+    }
+
+    // It is the document's format, not the mod's version: a two-part or free-text value is the
+    // typo that would otherwise surface as "unreadable format version" on every open.
+    // It is the document's format, not the mod's version, and it carries its namespace: a bare
+    // semver or free text is the typo that would otherwise surface as "unreadable format version"
+    // on every open.
+    [Theory]
+    [InlineData("\"1.0.0\"")]
+    [InlineData("\"aetswg-1.0\"")]
+    [InlineData("\"banana\"")]
+    [InlineData("1")]
+    public void TypeVersion_MustBeANamespacedSemanticVersion(string value)
+    {
+        Assert.False(Evaluate($$"""{ "name": "Mod", "_typeVersion": {{value}} }""").IsValid);
+    }
+
     // ── localisation.credits ─────────────────────────────────────────────────
 
     private static EvaluationResults Evaluate(string json)

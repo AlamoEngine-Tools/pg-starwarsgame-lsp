@@ -6,7 +6,10 @@ import { describe, it } from 'node:test';
 
 import type { PreviewHardpoint, PreviewTargetDefence } from '../../protocol/modelPreview';
 
-import { hullPool, shieldGeneratorsDown, unitDestroyed, unitTargetable } from './unitPool';
+import {
+    hardpointPool, hullPool, shieldGeneratorsDown, unitDestroyed, unitTargetable,
+    hullAfterHardpointDeath,
+} from './unitPool';
 
 function hardpoint(over: Partial<PreviewHardpoint> = {}): PreviewHardpoint {
     return {
@@ -38,6 +41,8 @@ const DEFENCE: PreviewTargetDefence = {
     tacticalHealth: 2000,
     energyCapacity: null,
     hardpointHealthTotal: 1050,
+    diesWithHardpoints: true,
+    hullVsHardpointsConstraint: 0.2,
     hullFactors: {},
     shieldFactors: {},
     damageTypes: [],
@@ -49,43 +54,40 @@ const HARDPOINTS = [
     hardpoint({ id: 'C', health: 325 }),
 ];
 
-describe('hullPool', () => {
-    it('is the SUM of the hardpoints on a unit that has them', () => {
-        // The convention most mods author to. Nobody established what the engine's own
-        // Hull_Vs_Hard_Points_Health_Constraint computes, so the preview draws the rule modders
-        // actually use rather than inventing one from the constant.
-        const pool = hullPool(DEFENCE, HARDPOINTS, { A: 350, B: 375, C: 325 });
+describe('hardpointPool', () => {
+    it('is the SUM of the destroyable hardpoints', () => {
+        // The denominator the engine divides by in Get_Combined_Hard_Point_Health_Percent.
+        // Not the hull - that is the unit's own Tactical_Health and lives in `hullPool`.
+        const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 });
 
         assert.equal(pool.max, 1050);
         assert.equal(pool.current, 1050);
-        assert.equal(pool.fromHardpoints, true);
     });
 
     it('drains as hardpoints take damage', () => {
-        const pool = hullPool(DEFENCE, HARDPOINTS, { A: 100, B: 375, C: 0 });
+        const pool = hardpointPool(HARDPOINTS, { A: 100, B: 375, C: 0 });
 
         assert.equal(pool.current, 475);
         assert.equal(pool.max, 1050);
     });
 
     it('reaches zero exactly when the last hardpoint does', () => {
-        const pool = hullPool(DEFENCE, HARDPOINTS, { A: 0, B: 0, C: 0 });
+        const pool = hardpointPool(HARDPOINTS, { A: 0, B: 0, C: 0 });
 
         assert.equal(pool.current, 0);
     });
 
     it('uses the unit\'s OWN health where it has no hardpoints', () => {
         // A fighter takes damage on its own pool directly, which is the other half of the rule.
-        const pool = hullPool({ ...DEFENCE, hardpointHealthTotal: null }, [], {});
+        const pool = hullPool({ ...DEFENCE, hardpointHealthTotal: null });
 
         assert.equal(pool.max, 2000);
-        assert.equal(pool.fromHardpoints, false);
     });
 
     it('never counts a hardpoint that cannot die', () => {
         // An indestructible hardpoint would put a floor under the bar that nothing could remove.
         const hardpoints = [...HARDPOINTS, hardpoint({ id: 'Fixed', isDestroyable: false, health: 999 })];
-        const pool = hullPool(DEFENCE, hardpoints, { A: 350, B: 375, C: 325, Fixed: 999 });
+        const pool = hardpointPool(hardpoints, { A: 350, B: 375, C: 325, Fixed: 999 });
 
         assert.equal(pool.current, 1050);
     });
@@ -94,7 +96,7 @@ describe('hullPool', () => {
         // 210 of foc's hardpoints declare no Health at all - they are indestructible rather than
         // already dead, and reading a null as zero would show a ship starting at half strength.
         const hardpoints = [hardpoint({ id: 'A', health: 350 }), hardpoint({ id: 'N', health: null })];
-        const pool = hullPool(DEFENCE, hardpoints, { A: 350, N: null });
+        const pool = hardpointPool(hardpoints, { A: 350, N: null });
 
         assert.equal(pool.max, 350);
         assert.equal(pool.current, 350);
@@ -104,24 +106,24 @@ describe('hullPool', () => {
         // The two are one fact wearing two faces: a hardpoint ticked off in the Hardpoints list is
         // destroyed without anything ever subtracting its health, and reading the health alone left
         // the bar at full while the ship lost hardpoint after hardpoint.
-        const pool = hullPool(DEFENCE, HARDPOINTS, { A: 350, B: 375, C: 325 }, new Set(['A', 'B']));
+        const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 }, new Set(['A', 'B']));
 
         assert.equal(pool.current, 325);
     });
 
     it('is empty once every hardpoint has been destroyed by hand', () => {
-        const pool = hullPool(DEFENCE, HARDPOINTS, { A: 350, B: 375, C: 325 },
+        const pool = hardpointPool(HARDPOINTS, { A: 350, B: 375, C: 325 },
             new Set(['A', 'B', 'C']));
 
         assert.equal(pool.current, 0);
     });
 
     it('never reports more left than it started with', () => {
-        assert.equal(hullPool(DEFENCE, HARDPOINTS, { A: 9999, B: 375, C: 325 }).current, 1050);
+        assert.equal(hardpointPool(HARDPOINTS, { A: 9999, B: 375, C: 325 }).current, 1050);
     });
 });
 
-describe('the hull pool of a unit with no hardpoints', () => {
+describe('hullPool', () => {
     // 188 objects over the two trees carry their weapons as WEAPON behaviour and no hardpoints at
     // all, against 68 with hardpoints - so this is the COMMON unit, not an edge case.
     const NO_HARDPOINTS: PreviewHardpoint[] = [];
@@ -130,15 +132,14 @@ describe('the hull pool of a unit with no hardpoints', () => {
         // The bug. `hullPool` answered `tacticalHealth` for both ends of the bar, so the reader
         // could empty the pool with the attacker panel and watch a full hull bar the whole time -
         // the number that depletes and the number that is drawn were two different numbers.
-        const pool = hullPool(DEFENCE, NO_HARDPOINTS, {}, new Set(), 750);
+        const pool = hullPool(DEFENCE, 750);
 
         assert.equal(pool.current, 750);
         assert.equal(pool.max, 2000);
-        assert.equal(pool.fromHardpoints, false);
     });
 
     it('opens at full health when nothing has been fired yet', () => {
-        const pool = hullPool(DEFENCE, NO_HARDPOINTS, {}, new Set());
+        const pool = hullPool(DEFENCE);
 
         assert.equal(pool.current, 2000);
         assert.equal(pool.max, 2000);
@@ -148,17 +149,17 @@ describe('the hull pool of a unit with no hardpoints', () => {
         // Same reason the hardpoint sum is clamped: a repair that overshoots or a stale entry must
         // not report a ship in better condition than it was built in, and an overkill shot must not
         // draw a negative bar.
-        assert.equal(hullPool(DEFENCE, NO_HARDPOINTS, {}, new Set(), -400).current, 0);
-        assert.equal(hullPool(DEFENCE, NO_HARDPOINTS, {}, new Set(), 9999).current, 2000);
+        assert.equal(hullPool(DEFENCE, -400).current, 0);
+        assert.equal(hullPool(DEFENCE, 9999).current, 2000);
     });
 
-    it('leaves a unit WITH hardpoints reading its hardpoints', () => {
-        // The hardpoints are the authority there, and the live hull number is the panel's own
-        // running total for a pool that unit does not use.
-        const pool = hullPool(DEFENCE, HARDPOINTS, { A: 350, B: 375, C: 325 }, new Set(), 5);
+    it('reports the unit\'s own health even where there are hardpoints', () => {
+        // The pools are separate. A unit with hardpoints still has a Tactical_Health that takes
+        // hits nothing else claims, and it is what finally kills it.
+        const pool = hullPool(DEFENCE, 5);
 
-        assert.equal(pool.current, 1050);
-        assert.equal(pool.fromHardpoints, true);
+        assert.equal(pool.current, 5);
+        assert.equal(pool.max, 2000);
     });
 });
 
@@ -203,13 +204,13 @@ describe('a unit with no hardpoints dying', () => {
 
     it('dies when its hull pool is emptied', () => {
         assert.equal(
-            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 0, max: 2000, fromHardpoints: false }),
+            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 0, max: 2000 }),
             true);
     });
 
     it('lives while it has any hull left', () => {
         assert.equal(
-            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 1, max: 2000, fromHardpoints: false }),
+            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 1, max: 2000 }),
             false);
     });
 
@@ -218,7 +219,7 @@ describe('a unit with no hardpoints dying', () => {
         // rather than dropped: a pool with no maximum is a unit that does not use this channel, not
         // a unit at zero. Answering true would kill it the moment the preview opened.
         assert.equal(
-            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 0, max: 0, fromHardpoints: false }),
+            unitDestroyed(NO_HARDPOINTS, new Set(), { current: 0, max: 0 }),
             false);
     });
 
@@ -227,13 +228,29 @@ describe('a unit with no hardpoints dying', () => {
         assert.equal(unitDestroyed(NO_HARDPOINTS, new Set(), null), false);
     });
 
-    it('leaves the hardpoint rule alone where there are hardpoints', () => {
-        // An empty hull reading must not kill a ship that still has a hardpoint standing: for those
-        // the pool is the SUM of the hardpoints, and the hardpoints are what the engine offers.
-        const empty = { current: 0, max: 1050, fromHardpoints: true };
+    it('kills a unit whose hull is empty even with hardpoints standing', () => {
+        // The hull is what dies - Take_Direct_Damage is the only route to Kill - so a unit whose own
+        // health is gone is finished whatever its hardpoints are doing. This used to assert the
+        // opposite, on the reading that a unit with hardpoints could only die through them.
+        const empty = { current: 0, max: 2000 };
 
-        assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B']), empty), false);
-        assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B', 'C']), empty), true);
+        assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B']), empty), true);
+    });
+
+    it('still dies when the last destroyable hardpoint goes', () => {
+        const healthy = { current: 2000, max: 2000 };
+
+        assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B']), healthy), false);
+        assert.equal(unitDestroyed(HARDPOINTS, new Set(['A', 'B', 'C']), healthy), true);
+    });
+
+    it('does NOT die with its hardpoints when the tag says otherwise', () => {
+        // U_Ground_Palace. Its generators are destructible scenery: shoot every one off and the
+        // structure stands, because only its own health can finish it.
+        const healthy = { current: 2400, max: 2400 };
+
+        assert.equal(
+            unitDestroyed(HARDPOINTS, new Set(['A', 'B', 'C']), healthy, false), false);
     });
 });
 
@@ -304,5 +321,33 @@ describe('shieldGeneratorsDown', () => {
         ];
 
         assert.equal(shieldGeneratorsDown(hardpoints, new Set(['A', 'B'])), false);
+    });
+});
+
+describe('hullAfterHardpointDeath', () => {
+    const FULL = { current: 2000, max: 2000 };
+
+    it('zeroes the hull when the last destroyable hardpoint dies', () => {
+        // A flat assignment, not damage: the engine sets Health to zero and lets the hull path
+        // finish the object. Everything downstream reads the hull, so the bar has to empty too.
+        const after = hullAfterHardpointDeath(FULL, HARDPOINTS, new Set(['A', 'B', 'C']));
+
+        assert.equal(after.current, 0);
+        assert.equal(after.max, 2000);
+    });
+
+    it('leaves the hull alone while one still stands', () => {
+        assert.equal(hullAfterHardpointDeath(FULL, HARDPOINTS, new Set(['A', 'B'])).current, 2000);
+    });
+
+    it('leaves the hull alone when the unit does not die with its hardpoints', () => {
+        // The palace: shoot every generator off and the structure stands on its own health.
+        const after = hullAfterHardpointDeath(FULL, HARDPOINTS, new Set(['A', 'B', 'C']), false);
+
+        assert.equal(after.current, 2000);
+    });
+
+    it('leaves a unit with no destroyable hardpoints alone', () => {
+        assert.equal(hullAfterHardpointDeath(FULL, [], new Set()).current, 2000);
     });
 });

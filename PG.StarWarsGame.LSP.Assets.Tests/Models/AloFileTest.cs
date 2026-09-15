@@ -17,7 +17,7 @@ public sealed class AloFileTest
 {
     private static byte[] Root(uint type)
     {
-        return AloChunkFixture.Chunk(type, true, []);
+        return AloChunkFixture.Chunk(type, true);
     }
 
     [Fact]

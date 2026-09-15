@@ -63,7 +63,7 @@ public sealed class CreditsBatchHandlerTest
 
         var result = await apply.Handle(
             new ApplyCreditsBatchParams(Path, HashOf(fs),
-                [new LocEditCommandDto("moveRow", 0, ToIndex: 2)]),
+                [new LocEditCommandDto("moveRow", 0, 2)]),
             CancellationToken.None);
 
         Assert.True(result.Success, result.Error);

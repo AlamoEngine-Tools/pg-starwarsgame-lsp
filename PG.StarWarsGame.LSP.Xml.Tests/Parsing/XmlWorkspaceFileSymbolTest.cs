@@ -66,7 +66,7 @@ public sealed class XmlWorkspaceFileSymbolTest
     [Fact]
     public async Task WithoutXmlContext_NoWorkspaceFileSymbol()
     {
-        var index = await ParseAsync(XmlDir + "/story_plots_rebel.xml", ["StoryPlotManifest"], withContext: false);
+        var index = await ParseAsync(XmlDir + "/story_plots_rebel.xml", ["StoryPlotManifest"], false);
 
         Assert.DoesNotContain(index.Symbols, s => s.Kind == GameSymbolKind.WorkspaceFile);
     }

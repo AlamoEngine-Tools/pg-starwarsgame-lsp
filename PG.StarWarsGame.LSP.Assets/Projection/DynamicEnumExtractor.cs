@@ -218,7 +218,7 @@ public static class DynamicEnumExtractor
         var root = doc.Root;
         if (root is null) return [];
 
-        return [..root.Elements().Select(e => e.Name.LocalName)];
+        return [.. root.Elements().Select(e => e.Name.LocalName)];
     }
 
     internal static (ImmutableArray<string> all, ImmutableArray<string> hardcoded)
@@ -262,7 +262,7 @@ public static class DynamicEnumExtractor
             }
         }
 
-        return ([..all], [..hardcoded]);
+        return ([.. all], [.. hardcoded]);
     }
 
     internal static bool IsBoundaryComment(string commentText)

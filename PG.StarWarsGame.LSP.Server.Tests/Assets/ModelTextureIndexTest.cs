@@ -16,26 +16,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Assets;
 /// </remarks>
 public sealed class ModelTextureIndexTest
 {
-    /// <summary>Answers with whatever bytes the test hands it, and counts the reads.</summary>
-    private sealed class FakeResolver(byte[]? bytes) : IGameAssetResolver
-    {
-        public int Reads { get; private set; }
-
-        public GameAssetTiers Tiers => new(1, false, false, 0);
-
-        public GameAssetLocation? Locate(string gameRelativePath)
-        {
-            return bytes is null ? null : new GameAssetLocation(gameRelativePath, gameRelativePath,
-                GameAssetTier.Workspace);
-        }
-
-        public byte[]? Read(string gameRelativePath)
-        {
-            Reads++;
-            return bytes;
-        }
-    }
-
     private static ModelTextureIndex Sut(FakeResolver resolver)
     {
         return new ModelTextureIndex(resolver, NullLogger<ModelTextureIndex>.Instance);
@@ -99,5 +79,27 @@ public sealed class ModelTextureIndexTest
         sut.TexturesOf("ship.alo");
 
         Assert.Equal(2, resolver.Reads);
+    }
+
+    /// <summary>Answers with whatever bytes the test hands it, and counts the reads.</summary>
+    private sealed class FakeResolver(byte[]? bytes) : IGameAssetResolver
+    {
+        public int Reads { get; private set; }
+
+        public GameAssetTiers Tiers => new(1, false, false, 0);
+
+        public GameAssetLocation? Locate(string gameRelativePath)
+        {
+            return bytes is null
+                ? null
+                : new GameAssetLocation(gameRelativePath, gameRelativePath,
+                    GameAssetTier.Workspace);
+        }
+
+        public byte[]? Read(string gameRelativePath)
+        {
+            Reads++;
+            return bytes;
+        }
     }
 }

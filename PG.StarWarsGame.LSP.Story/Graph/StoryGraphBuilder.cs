@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
@@ -186,7 +187,7 @@ public sealed class StoryGraphBuilder(ISchemaProvider schema)
         foreach (var target in ResolveEventName(state, thread, slot.RawValue, slot.Range,
                      StoryGraphProblemKind.UnresolvedControlTarget,
                      $"'{slot.RawValue}' does not match any event in this campaign."))
-            if (target.ThreadUri == thread.DocumentUri)
+            if (target.ThreadUri is { } targetThread && DocumentUris.Same(targetThread, thread.DocumentUri))
             {
                 state.AddEdge(new StoryEdge(node.Id, target.Id, StoryEdgeKind.Control, typeName));
             }

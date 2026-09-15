@@ -116,22 +116,24 @@ describe('sweepAngles', () => {
         turretBone: 'B_Turret', barrelBone: 'B_Barrel',
     };
 
-    it('swings the turret between the extents its XML declares', () => {
-        // Not a full circle: a 90-degree traverse means 45 either side of rest, and drawing more
-        // would show a reach the unit does not have.
+    it('swings the turret the full extent EITHER SIDE of rest', () => {
+        // The extent is a plus-or-minus bound, not a full angle to be halved. The engine's own
+        // clamp is the evidence - Calculate_Desired_Turret_Angle builds min = -extent (FCHS) and
+        // max = +extent and clamps between them, and Can_Weapon_Point_At refuses only when
+        // `extent < |yaw|`. So a 90-degree extent is a 180-degree sweep.
         const at = (t: number) => sweepAngles(turret, t);
 
         assert.equal(at(0).rotate, 0);
-        assert.ok(Math.abs(at(0.25).rotate - 45) < 1e-6);
-        assert.ok(Math.abs(at(0.75).rotate + 45) < 1e-6);
+        assert.ok(Math.abs(at(0.25).rotate - 90) < 1e-6);
+        assert.ok(Math.abs(at(0.75).rotate + 90) < 1e-6);
     });
 
     it('elevates on its own extent, which is usually much smaller', () => {
         // AT_AA is 360 rotate by 45 elevate; using one number for both would tip a turret through
-        // the hull.
+        // the hull. Same plus-or-minus reading as the traverse.
         const peak = sweepAngles(turret, 0.25);
 
-        assert.ok(Math.abs(peak.elevate) <= 45 / 2 + 1e-6);
+        assert.ok(Math.abs(peak.elevate - 45) < 1e-6);
     });
 
     it('is centred on the rest angle the XML gives', () => {
@@ -149,11 +151,19 @@ describe('sweepAngles', () => {
         assert.deepEqual(still, { rotate: 0, elevate: 0 });
     });
 
-    it('treats a full 360 traverse as a continuous turn rather than a swing', () => {
-        // A 360 turret has no end stops, so swinging back and forth would misrepresent it.
-        const full = { ...turret, rotateExtentDegrees: 360 };
+    it('treats a traverse of 180 or more as a continuous turn rather than a swing', () => {
+        // The threshold is 180, not 360, and it comes from the engine: the motion clamp is skipped
+        // entirely once the extent reaches 180 (`FLD 180.0; FCOMIP; JBE skip`), because plus or
+        // minus 180 already covers the circle and there are then no end stops to swing between.
+        const full = { ...turret, rotateExtentDegrees: 180 };
 
         assert.ok(Math.abs(sweepAngles(full, 0.25).rotate - 90) < 1e-6);
+        assert.ok(Math.abs(sweepAngles(full, 0.5).rotate - 180) < 1e-6);
+    });
+
+    it('still turns continuously at 360, which is how the corpus writes "all round"', () => {
+        const full = { ...turret, rotateExtentDegrees: 360 };
+
         assert.ok(Math.abs(sweepAngles(full, 0.5).rotate - 180) < 1e-6);
     });
 });

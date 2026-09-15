@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Lua.Analysis.Annotations;
 
@@ -12,7 +13,7 @@ public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
         new(StringComparer.Ordinal);
 
     private readonly Dictionary<string, HashSet<string>> _functionsByUri =
-        new(StringComparer.Ordinal);
+        new(DocumentUris.Comparer);
 
     private readonly object _lock = new();
 
@@ -49,7 +50,7 @@ public sealed class LuaAnnotationRepository : ILuaAnnotationRepository
             {
                 if (!_functionAnnotationsMap.TryGetValue(name, out var byUri))
                     _functionAnnotationsMap[name] =
-                        byUri = new Dictionary<string, EmmyLuaAnnotations>(StringComparer.Ordinal);
+                        byUri = new Dictionary<string, EmmyLuaAnnotations>(DocumentUris.Comparer);
                 byUri[uri] = ann;
                 names.Add(name);
             }

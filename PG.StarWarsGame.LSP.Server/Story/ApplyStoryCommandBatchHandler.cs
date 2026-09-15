@@ -43,7 +43,7 @@ public sealed class ApplyStoryCommandBatchHandler(
         if (StoryEditingFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false, Error: rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false,
                 Error: $"Campaign '{request.Campaign}' was not found."));
@@ -56,7 +56,7 @@ public sealed class ApplyStoryCommandBatchHandler(
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, error) = executor.Compose(
-            model, request.Commands.Select(c => c.ToParams(request.Campaign)).ToList(), texts);
+            model, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (error is not null)
             return Task.FromResult(new ApplyStoryCommandBatchResult(false, failedIndex, error));
 

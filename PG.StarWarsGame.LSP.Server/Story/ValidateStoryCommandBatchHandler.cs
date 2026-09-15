@@ -44,7 +44,7 @@ public sealed class ValidateStoryCommandBatchHandler(
         if (StoryEditorFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new GetStoryDiagnosticsResult([], rejection));
 
-        var model = modelService.GetCampaignModel(request.Campaign);
+        var model = modelService.GetCampaignModel(request.Campaign, request.Faction);
         if (model is null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
                 $"Campaign '{request.Campaign}' was not found."));
@@ -55,7 +55,7 @@ public sealed class ValidateStoryCommandBatchHandler(
         var texts = new WorkingTextSet(textSource);
 
         var (failedIndex, composeError) = executor.Compose(
-            model, request.Commands.Select(c => c.ToParams(request.Campaign)).ToList(), texts);
+            model, request.Commands.Select(c => c.ToParams(request.Campaign, request.Faction)).ToList(), texts);
         if (composeError is not null)
             return Task.FromResult(new GetStoryDiagnosticsResult([],
                 $"Change {(failedIndex ?? 0) + 1} of {request.Commands.Count} can't be staged: {composeError}"));
@@ -63,8 +63,8 @@ public sealed class ValidateStoryCommandBatchHandler(
         // Validate every thread the campaign knows about (reading its staged text where present),
         // plus any new thread the batch created that already has events.
         var modelThreadUris = new HashSet<string>(
-            model.Threads.Select(t => fileHelper.NormalizeUri(t.DocumentUri)), StringComparer.Ordinal);
-        var candidates = new HashSet<string>(modelThreadUris, StringComparer.Ordinal);
+            model.Threads.Select(t => fileHelper.NormalizeUri(t.DocumentUri)), DocumentUris.Comparer);
+        var candidates = new HashSet<string>(modelThreadUris, DocumentUris.Comparer);
         foreach (var (uri, _, _) in texts.Changed())
             candidates.Add(fileHelper.NormalizeUri(uri));
 

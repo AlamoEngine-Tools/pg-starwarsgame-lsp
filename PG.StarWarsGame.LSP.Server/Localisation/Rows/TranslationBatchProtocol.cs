@@ -54,7 +54,11 @@ public sealed record ValidateTranslationBatchParams(
 ///     key - and a blank key is precisely the row worth pointing at.
 /// </param>
 public sealed record LocTranslationProblemDto(
-    string? Key, string? Language, string Severity, string Message, int? Index = null);
+    string? Key,
+    string? Language,
+    string Severity,
+    string Message,
+    int? Index = null);
 
 public sealed record ValidateTranslationBatchResult(
     IReadOnlyList<LocTranslationProblemDto> Problems,

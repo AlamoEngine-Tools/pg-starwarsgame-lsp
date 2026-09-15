@@ -28,7 +28,8 @@ public sealed partial class PrerequisiteExpressionHandler : SingleValueTypeHandl
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"<{fact.Tag.Tag}> expects a prerequisite expression; value must not be empty.", Id: DiagnosticIds.PrerequisiteExpressionEmpty)
+                    $"<{fact.Tag.Tag}> expects a prerequisite expression; value must not be empty.",
+                    Id: DiagnosticIds.PrerequisiteExpressionEmpty)
             ];
 
         if (!ExpressionPattern().IsMatch(trimmed))

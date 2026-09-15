@@ -388,10 +388,10 @@ internal sealed class StoryCommandExecutor(
         string label;
         if (request.Kind == "addPlotManifest")
         {
-            if (string.IsNullOrEmpty(request.Faction))
+            if (string.IsNullOrEmpty(request.TargetFaction))
                 return (null, "addPlotManifest needs the faction.");
             edits = StoryManifestWriter.AddCampaignStoryName(
-                text, request.Campaign, request.Faction!, request.File!);
+                text, request.Campaign, request.TargetFaction!, request.File!);
             if (edits.Count == 0)
                 return (null, $"Campaign '{request.Campaign}' was not found in '{campaignChain.SourceFile}'.");
 
@@ -484,7 +484,7 @@ internal sealed class StoryCommandExecutor(
         // file referenced by multiple faction manifests - common for shared tutorial threads), and
         // parsing it twice would emit the definition/reference edits twice, i.e. overlapping edits
         // that the client rejects wholesale.
-        var seenUris = new HashSet<string>(StringComparer.Ordinal);
+        var seenUris = new HashSet<string>(DocumentUris.Comparer);
         var threads = new List<(string Uri, StoryThread Thread)>();
         foreach (var modelThread in model.Threads)
         {
@@ -523,7 +523,7 @@ internal sealed class StoryCommandExecutor(
                    && string.Equals(referenceType, StoryReferenceTypes.EventName, StringComparison.Ordinal);
         }
 
-        var byUri = new Dictionary<string, List<StoryTextEdit>>(StringComparer.Ordinal);
+        var byUri = new Dictionary<string, List<StoryTextEdit>>(DocumentUris.Comparer);
 
         void AddEdit(string threadUri, StorySourceRange range)
         {

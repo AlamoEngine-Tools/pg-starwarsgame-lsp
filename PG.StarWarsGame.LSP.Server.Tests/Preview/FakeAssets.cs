@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Assets.Models;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Server.Assets;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
@@ -10,36 +9,12 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// <summary>Resolves only the asset names it was handed, from the model directory.</summary>
 internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolver
 {
-    private readonly HashSet<string> _resolvable =
-        new(resolvable.Select(r => "Data/Art/Models/" + r), StringComparer.OrdinalIgnoreCase);
+    private const int BoneCountChunkSize = 128;
 
     private readonly Dictionary<string, byte[]> _content = new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>
-    ///     Gives one asset a real root chunk, so classification has something to read.
-    /// </summary>
-    public FakeAssets WithRootChunk(string name, uint chunkType)
-    {
-        _content["Data/Art/Models/" + name] = BitConverter.GetBytes(chunkType);
-        return this;
-    }
-
-    public GameAssetTiers Tiers => new(1, false, false, 0);
-
-    public GameAssetLocation? Locate(string gameRelativePath)
-    {
-        return _resolvable.Contains(gameRelativePath)
-            ? new GameAssetLocation(gameRelativePath, gameRelativePath, GameAssetTier.Workspace)
-            : null;
-    }
-
-    public byte[]? Read(string gameRelativePath)
-    {
-        if (Locate(gameRelativePath) is null)
-            return null;
-
-        return _content.GetValueOrDefault(gameRelativePath, EmptyModel);
-    }
+    private readonly HashSet<string> _resolvable =
+        new(resolvable.Select(r => "Data/Art/Models/" + r), StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     ///     The smallest thing <see cref="AloModelReader" /> accepts: a skeleton declaring no bones.
@@ -68,5 +43,29 @@ internal sealed class FakeAssets(params string[] resolvable) : IGameAssetResolve
         }
     }
 
-    private const int BoneCountChunkSize = 128;
+    public GameAssetTiers Tiers => new(1, false, false, 0);
+
+    public GameAssetLocation? Locate(string gameRelativePath)
+    {
+        return _resolvable.Contains(gameRelativePath)
+            ? new GameAssetLocation(gameRelativePath, gameRelativePath, GameAssetTier.Workspace)
+            : null;
+    }
+
+    public byte[]? Read(string gameRelativePath)
+    {
+        if (Locate(gameRelativePath) is null)
+            return null;
+
+        return _content.GetValueOrDefault(gameRelativePath, EmptyModel);
+    }
+
+    /// <summary>
+    ///     Gives one asset a real root chunk, so classification has something to read.
+    /// </summary>
+    public FakeAssets WithRootChunk(string name, uint chunkType)
+    {
+        _content["Data/Art/Models/" + name] = BitConverter.GetBytes(chunkType);
+        return this;
+    }
 }

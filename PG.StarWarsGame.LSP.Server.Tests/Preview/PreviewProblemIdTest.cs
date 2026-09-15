@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Reflection;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;

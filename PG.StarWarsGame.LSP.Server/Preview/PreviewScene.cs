@@ -139,7 +139,17 @@ public sealed record PreviewWeapon(
     float? RechargeSeconds,
     IReadOnlyList<string> FireModes,
     PreviewTurret? Turret,
-    string? FireSfxEvent);
+    string? FireSfxEvent,
+    /// <summary>
+    ///     The arc while DEPLOYED, as full angles, or null for a weapon whose unit is never deployed.
+    /// </summary>
+    /// <remarks>
+    ///     Only a unit with <c>Deploys</c> and the walk locomotor is ever deployed, and while it is the
+    ///     engine reads <c>Deployed_Turret_*_Extent_Degrees</c> in place of the normal pair - defaults 360
+    ///     and 180, so unwritten means unrestricted. Same conventions as <see cref="ConeWidthDegrees" />.
+    /// </remarks>
+    float? DeployedConeWidthDegrees = null,
+    float? DeployedConeHeightDegrees = null);
 
 /// <summary>
 ///     How far a shot at one target category may stray from the aim point.
@@ -155,12 +165,19 @@ public sealed record PreviewWeapon(
 public sealed record PreviewInaccuracy(string Category, float Distance);
 
 /// <summary>A turret hardpoint's rest pose and how far it may swing.</summary>
+/// <param name="DeployedRotateExtentDegrees">
+///     How far a unit turret swings while DEPLOYED, or null when the unit is never deployed.
+///     <c>TurretBehaviorClass::Adjust_Turret_Facing</c> reads the deployed pair in place of the normal one
+///     whenever <c>Is_Deployed</c>, so the swing opens with the shot.
+/// </param>
 public sealed record PreviewTurret(
     float? RestAngle,
     float? RotateExtentDegrees,
     float? ElevateExtentDegrees,
     string? TurretBone,
-    string? BarrelBone);
+    string? BarrelBone,
+    float? DeployedRotateExtentDegrees = null,
+    float? DeployedElevateExtentDegrees = null);
 
 /// <summary>
 ///     One attached hardpoint, with everything needed to destroy and repair it in the preview.
@@ -475,7 +492,6 @@ public sealed record PreviewAbilityModifier(string Stat, float Factor);
 /// <param name="Particles">
 ///     The proxies the clone's own model carries - for the Star Destroyer's wreck, eight of them:
 ///     the explosions, the fire smoke and the debris trails that ARE the death.
-///
 ///     Their <c>PartId</c> names the CLONE OBJECT, not a part in the scene, because the server
 ///     cannot know what the client will call the instance it loads. It is a descriptor of a model,
 ///     and the client rewrites both it and the ids when it puts one in the scene.
@@ -490,8 +506,12 @@ public sealed record PreviewAbilityModifier(string Stat, float Factor);
 ///         speed, corkscrewing, and explodes at the end.
 ///     </para>
 ///     <para>
-///         Measured over both shipped trees: <b>34 objects declare it, all Yes, and not one of them
-///         also declares a Death_Clone.</b> The rule holds in the data. The engine's own parameter
+///         Measured over both shipped trees:
+///         <b>
+///             34 objects declare it, all Yes, and not one of them
+///             also declares a Death_Clone.
+///         </b>
+///         The rule holds in the data. The engine's own parameter
 ///         table names five tags in the family, so the time, the chance and the explosion are read
 ///         rather than invented; only the corkscrew itself has no number in any file.
 ///     </para>
@@ -525,7 +545,18 @@ public sealed record PreviewDeathClone(
     string? ModelFile,
     bool PlaysIdle,
     IReadOnlyList<string>? Animations = null,
-    IReadOnlyList<PreviewParticle>? Particles = null)
+    IReadOnlyList<PreviewParticle>? Particles = null,
+    /// <summary>
+    ///     The CLONE's own <c>Scale_Factor</c>, or 1 - not the ship's.
+    /// </summary>
+    /// <remarks>
+    ///     A death clone is spawned as its own object, so <c>Update_Transform</c> draws it at its own
+    ///     scale and nothing relates it to the ship's. The two usually agree but often do not:
+    ///     measured over 265 ship-to-clone pairs in <c>eaw/</c> and <c>foc/</c>, 206 declare the
+    ///     same scale and 59 differ - the Millennium Falcon is 0.5 and its clone 1.0, the slave
+    ///     infantry 1.5 against clones at 1.0.
+    /// </remarks>
+    float ScaleFactor = 1f)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<string> Animations { get; init; } = Animations ?? [];
@@ -592,14 +623,35 @@ public sealed record PreviewTargetDefence(
     ///     </para>
     ///     <para>
     ///         Sent ALONGSIDE <paramref name="TacticalHealth" /> rather than replacing it, because
-    ///         the two disagree in the shipped data - the Star Destroyer declares 2000 against 4075
-    ///         of hardpoint health - and nobody knows how the engine reconciles them.
-    ///         <c>Hull_Vs_Hard_Points_Health_Constraint</c> (0.2) is what ties them, and the
-    ///         community never established what it computes. Most mods simply author the unit's
-    ///         health as the sum, which is the convention the preview draws.
+    ///         the two are SEPARATE POOLS and disagree in the shipped data - the Star Destroyer
+    ///         declares 2000 against 4075 of hardpoint health. How the engine reconciles them was
+    ///         settled by decompiling the 2018 build: each pool is capped at the other's PERCENTAGE
+    ///         plus <see cref="HullVsHardpointsConstraint" />, so the absolute totals never have to
+    ///         agree. See <paramref name="DiesWithHardpoints" /> for the half that is gated.
     ///     </para>
     /// </remarks>
     float? HardpointHealthTotal,
+    /// <summary>
+    ///     <c>Should_Be_Destroyed_When_All_Hardpoints_Destroyed</c>, defaulting to true.
+    /// </summary>
+    /// <remarks>
+    ///     Gates three links from the hardpoints back to the hull: dying when the last destroyable
+    ///     hardpoint does, the per-tick pull of the hull down toward the hardpoints, and the health
+    ///     bar's use of the hardpoint pool. With it off - <c>U_Ground_Palace</c> is the one vanilla
+    ///     object that says so - hardpoints still absorb and still die, they just stop reaching the
+    ///     hull by any route. Absent means true: exactly one shipped object writes the tag.
+    /// </remarks>
+    bool DiesWithHardpoints,
+    /// <summary>
+    ///     <c>Hull_Vs_Hard_Points_Health_Constraint</c> from GameConstants, shipped at 0.2.
+    /// </summary>
+    /// <remarks>
+    ///     How far either pool may run ahead of the other, as a fraction. Read rather than assumed
+    ///     because it is a global a mod can change, and the change is drastic: at 1 every cap clamps
+    ///     to 100% and BOTH corrections stop running, leaving the pools fully independent. Drawing
+    ///     vanilla's 0.2 for such a mod would show a leash their game does not have.
+    /// </remarks>
+    float HullVsHardpointsConstraint,
     // Keyed by game data - a damage type name - which the camel-case naming strategy would otherwise
     // rewrite. See VerbatimKeyDictionaryConverter.
     [property: JsonConverter(typeof(VerbatimKeyDictionaryConverter))]
@@ -609,7 +661,10 @@ public sealed record PreviewTargetDefence(
     IReadOnlyList<string> DamageTypes);
 
 public sealed record PreviewFaction(
-    string Name, PreviewRgba? Color, PreviewRgba? NoColorizationColor, PreviewRgba? DisplayFontColor);
+    string Name,
+    PreviewRgba? Color,
+    PreviewRgba? NoColorizationColor,
+    PreviewRgba? DisplayFontColor);
 
 /// <summary>Something the author should see about this scene.</summary>
 /// <param name="DiagnosticId">
@@ -638,7 +693,10 @@ public sealed record PreviewFaction(
 public sealed record PreviewDamageBand(float Threshold, int Stage);
 
 public sealed record PreviewProblem(
-    DiagnosticId DiagnosticId, string Severity, string Message, string? HardpointId = null);
+    DiagnosticId DiagnosticId,
+    string Severity,
+    string Message,
+    string? HardpointId = null);
 
 /// <summary>
 ///     Everything needed to draw a preview, with no binary payload.
@@ -809,7 +867,33 @@ public sealed record PreviewScene(
     ///     missing - the pairing is positional, so half a table is not a table, and inventing an
     ///     alignment would put the wrong mesh on screen at the wrong health.
     /// </remarks>
-    IReadOnlyList<PreviewDamageBand>? DamageTable = null)
+    IReadOnlyList<PreviewDamageBand>? DamageTable = null,
+    /// <summary>
+    ///     The object's uniform render scale - <c>Scale_Factor</c> - or 1 where it declares none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         THE BRIDGE BETWEEN TWO SPACES, and without it the preview mixes them.
+    ///         <c>GameObjectClass::Update_Transform</c> builds the object's world matrix from a
+    ///         translation and three rotations with NO scale in it, then calls
+    ///         <c>Model-&gt;Set_Scale(Get_Scale_Factor(Type))</c> - so the scale lives on the MODEL
+    ///         alone. Geometry and bones are model units and reach the world multiplied by this;
+    ///         positions, and therefore every range and distance the XML declares, are already
+    ///         world units and are not.
+    ///     </para>
+    ///     <para>
+    ///         The two are otherwise the same unit, which the shipped data states outright:
+    ///         <c>TIE_Crawler</c> writes <c>&lt;Overall_Length&gt;25.0&lt;/...&gt;</c> with the
+    ///         comment "(35 by geometry)", and reading <c>Ev_tiecrawler.alo</c> gives 34.0.
+    ///     </para>
+    ///     <para>
+    ///         Measured: 118 of the 174 armed objects across <c>eaw/</c> and <c>foc/</c> declare a
+    ///         scale that is not 1 - the Corellian Corvette 0.5, the Tartan 0.56, the Nebulon-B and
+    ///         the TIE Fighter 0.7 - so drawing hulls unscaled put the MAJORITY of armed subjects
+    ///         at odds with their own weapon ranges.
+    ///     </para>
+    /// </remarks>
+    float ScaleFactor = 1f)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

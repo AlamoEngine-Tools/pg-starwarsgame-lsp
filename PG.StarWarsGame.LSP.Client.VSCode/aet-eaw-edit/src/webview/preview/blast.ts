@@ -24,10 +24,22 @@ export interface BlastHit {
     id: string;
     /** `Projectile_Damage`. Only ever non-zero for the hardpoint actually aimed at. */
     directDamage: number;
-    /** `Projectile_Blast_Area_Damage`, after any tier falloff. */
+    /**
+     * This victim's SHARE of `Projectile_Blast_Area_Damage`, after any falloff.
+     *
+     * A share, not the whole: the engine divides the blast among the destroyable hardpoints inside
+     * the radius, so the total delivered does not grow with the number caught.
+     */
     blastDamage: number;
     /** Which falloff band it fell in, or null where the blast is flat. */
     tier: number | null;
+    /**
+     * Whether this share lands on an already-destroyed hardpoint and is thrown away.
+     *
+     * Still counted in the division: the engine picks its victims by `Is_Destroyable` and never asks
+     * `Is_Destroyed`, so wreckage inside the radius keeps drawing shares that nothing receives.
+     */
+    wasted: boolean;
 }
 
 /**
@@ -52,7 +64,10 @@ export function blastVictims(
     const blast = projectile.blastAreaDamage ?? 0;
 
     if (range <= 0 || blast <= 0) {
-        return [{ id: targetId, directDamage: direct, blastDamage: 0, tier: null }];
+        return [{
+            id: targetId, directDamage: direct, blastDamage: 0, tier: null,
+            wasted: destroyed.has(targetId),
+        }];
     }
 
     const tiers = projectile.blastAreaDropoff ? projectile.blastAreaDropoffTiers ?? null : null;
@@ -66,16 +81,31 @@ export function blastVictims(
         ? candidates
         : [{ id: targetId, distance: 0 }, ...candidates];
 
-    const caught = withTarget
-        .filter(c => c.id === targetId || (c.distance <= range && !destroyed.has(c.id)))
-        .sort((a, b) => a.distance - b.distance)
-        .map(c => ({
-            id: c.id,
-            directDamage: c.id === targetId ? direct : 0,
-            blastDamage: blast * blastShare(
-                c.distance, range, projectile.blastAreaDropoff, projectile.blastAreaDropoffTiers),
-            tier: tiers === null ? null : bandOf(c.distance, range, tiers),
-        }));
+    // Everything in range, INCLUDING what is already destroyed. The engine collects the blast's
+    // victims by `Is_Destroyable` and never asks `Is_Destroyed`, so a dead hardpoint still draws its
+    // share - and that share then hits the discard case and evaporates. It is why a blast weakens
+    // against a ship that has already lost hardpoints: the more wreckage inside the radius, the more
+    // of every blast is thrown away.
+    const inRange = withTarget
+        .filter(c => c.id === targetId || c.distance <= range)
+        .sort((a, b) => a.distance - b.distance);
+
+    // DIVIDED, not repeated. `blast * falloff / count` per victim, so the total a blast delivers is
+    // the same whether it catches one hardpoint or eight - only its distribution changes. The
+    // falloff is the OBJECT's, computed once from its distance to the blast, which is why every
+    // hardpoint of one object takes an equal share however far apart they are; a hardpoint's own
+    // distance sets only the delay before its share lands.
+    const share = inRange.length > 0 ? 1 / inRange.length : 0;
+
+    const caught = inRange.map(c => ({
+        id: c.id,
+        directDamage: c.id === targetId ? direct : 0,
+        blastDamage: blast * share * blastShare(
+            0, range, projectile.blastAreaDropoff, projectile.blastAreaDropoffTiers),
+        tier: tiers === null ? null : bandOf(c.distance, range, tiers),
+        /** Whether this share lands on wreckage and is thrown away. */
+        wasted: destroyed.has(c.id),
+    }));
 
     const cap = projectile.blastAreaMaxVictims ?? null;
 

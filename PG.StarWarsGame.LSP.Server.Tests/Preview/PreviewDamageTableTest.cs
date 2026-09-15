@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -216,9 +215,11 @@ public sealed class PreviewTargetDefenceTest
         // Not the whole 2426-row table. The armor axis is fixed by the target - one Armor_Type and
         // one Shield_Armor_Type - so at most 81 rows per axis reach the wire instead of all of them.
         var scene = Scene(
-            [Tag("Damage_To_Armor_Mod", " Damage_Ion, Armor_Star_Destroyer, 4 "),
+            [
+                Tag("Damage_To_Armor_Mod", " Damage_Ion, Armor_Star_Destroyer, 4 "),
                 Tag("Damage_To_Armor_Mod", " Damage_Ion, Shield_Capital, 0.5 "),
-                Tag("Damage_To_Armor_Mod", " Damage_Ion, Armor_Bomber, 9 ")],
+                Tag("Damage_To_Armor_Mod", " Damage_Ion, Armor_Bomber, 9 ")
+            ],
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Armor_Type", "Armor_Star_Destroyer"),
             Tag("Shield_Armor_Type", "Shield_Capital"));
@@ -234,8 +235,10 @@ public sealed class PreviewTargetDefenceTest
         // The picker holds all of them. A type with no pair against this target is not an invalid
         // choice - it is a 1.0, which is exactly what a modder needs to be able to see.
         var scene = Scene(
-            [Tag("Damage_To_Armor_Mod", " Damage_Ion, Armor_Bomber, 9 "),
-                Tag("Damage_To_Armor_Mod", " Damage_Anti_Fighter, Armor_Bomber, 2 ")],
+            [
+                Tag("Damage_To_Armor_Mod", " Damage_Ion, Armor_Bomber, 9 "),
+                Tag("Damage_To_Armor_Mod", " Damage_Anti_Fighter, Armor_Bomber, 2 ")
+            ],
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Armor_Type", "Armor_Star_Destroyer"));
 
@@ -252,8 +255,10 @@ public sealed class PreviewTargetDefenceTest
         // so the preview carries BOTH numbers and lets the reader see them. The Star Destroyer
         // declares Tactical_Health 2000 against 4075 of hardpoint health, so they can differ wildly.
         var scene = Ship(
-            [Tag("Space_Model_Name", "hull.alo"), Tag("Tactical_Health", "2000"),
-                Tag("HardPoints", "HP_A, HP_B, HP_C")],
+            [
+                Tag("Space_Model_Name", "hull.alo"), Tag("Tactical_Health", "2000"),
+                Tag("HardPoints", "HP_A, HP_B, HP_C")
+            ],
             ("HP_A", [Tag("Health", "350"), Tag("Is_Destroyable", "Yes")]),
             ("HP_B", [Tag("Health", "375"), Tag("Is_Destroyable", "Yes")]),
             ("HP_C", [Tag("Health", "325"), Tag("Is_Destroyable", "Yes")]));
@@ -354,7 +359,7 @@ public sealed class PreviewTargetDefenceTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)

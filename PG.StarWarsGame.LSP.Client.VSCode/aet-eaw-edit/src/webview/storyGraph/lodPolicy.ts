@@ -36,3 +36,17 @@ export function shouldWindow(nodeCount: number): boolean {
 export function shouldShowOverview(zoom: number, detailZoom: number): boolean {
     return zoom < detailZoom;
 }
+
+/**
+ * Whether an auto-arrange must mount the rest of the model before elk runs.
+ *
+ * The third question, and it is answered by neither of the two above. elk lays out what rete has
+ * MOUNTED, and the model rebuild that captures the result reads the editor too - so a layout run
+ * against a partial mount both arranges a fragment and shrinks the model to it.
+ *
+ * A function of the mounted set alone. `windowed` is not the same question: it is about cost, while
+ * unmounting also happens for zoom, on graphs of every size, whenever the overview is up.
+ */
+export function needsFullMountForLayout(mountedCount: number, modelCount: number): boolean {
+    return mountedCount < modelCount;
+}

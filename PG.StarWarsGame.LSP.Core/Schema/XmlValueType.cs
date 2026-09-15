@@ -101,8 +101,10 @@ public enum XmlValueType
     /// <summary>Conditional SpeechEvent intro trigger with Or/And logic (unit type conditions + SpeechEvent name).</summary>
     ConditionalSpeechEvent = 40,
 
-    /// <summary>Per-faction music event map.</summary>
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
+    /// <summary>
+    ///     Per-faction music event map. Used by <c>Faction</c>'s four
+    ///     <c>Music_Event_Tactical_/Strategic_Win_/Lose_Vs_Faction</c> tags, across 8 shipped files.
+    /// </summary>
     MusicEventPerFactionMap = 41,
 
     /// <summary>A space-separated list of type references.</summary>
@@ -137,7 +139,10 @@ public enum XmlValueType
     /// <summary>Per-faction object list pair (faction name + space-separated object names).</summary>
     PerFactionObjectList = 53,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
+    /// <summary>
+    ///     List of ship-name text files. Used by <c>GameConstants</c>'s <c>ShipNameTextFiles</c> in
+    ///     both shipped games; the 2023 patch added a <c>Get_Name()</c> Lua accessor that reads it.
+    /// </summary>
     ShipNameTextFileList = 54,
 
     /// <summary>Campaign force deployment tuple (faction name, planet name, unit type name).</summary>
@@ -157,8 +162,13 @@ public enum XmlValueType
     /// </summary>
     GuiActivatedAbilityDefinitionSubObjectList = 57,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
-    Type58 = 58,
+    /// <summary>
+    ///     Sub-object list of action definitions - the third of the engine's three
+    ///     <c>SubObjectList="Yes"</c> containers, beside types 56 and 57. Used by
+    ///     <c>HeroClashType</c>'s <c>Clash_Actions</c>, which nests <c>Attack_Action</c> elements,
+    ///     in both shipped <c>Heroclash.xml</c> files.
+    /// </summary>
+    ActionDefinitionSubObjectList = 58,
 
     /// <summary>Death clone specification (condition + type pair).</summary>
     DeathCloneSpec = 59,
@@ -184,16 +194,26 @@ public enum XmlValueType
     /// <summary>Faction name reference (single faction identifier string).</summary>
     FactionReference = 67,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
-    Type68 = 68,
+    /// <summary>
+    ///     Comma-separated (category name, float weight) pairs - the float counterpart of
+    ///     <see cref="CategoryToIntegerMap" />. Used by <c>TargetingPrioritySet</c>'s
+    ///     <c>Attack_Priorities</c> across six shipped files, e.g.
+    ///     <c>LandHero, 0.5, Infantry, 1.0, Turret, 2.0</c>, where the float is the priority.
+    /// </summary>
+    CategoryToFloatMap = 68,
 
     /// <summary>
-    ///     A list of Galactic-Conquest victory-condition enum values (e.g.
-    ///     <c>Galactic_All_Planets_Controlled</c>). Used by <c>Campaign</c>'s
-    ///     <c>Good_/Evil_/Human_/AI_Victory_Conditions</c> and <c>TargetingPrioritySet</c>. The engine
-    ///     type number is 69; the value set is enum-driven via <c>enumName</c> in YAML.
+    ///     A comma-separated list of enum values, with the value set supplied per tag by
+    ///     <c>enumName</c> in YAML rather than fixed by the type.
     /// </summary>
-    Type69 = 69,
+    /// <remarks>
+    ///     Named for victory conditions when that was its only known use, but the engine applies it
+    ///     more widely: <c>Campaign</c>'s <c>Good_/Evil_/Human_/AI_Victory_Conditions</c> take
+    ///     <c>GalacticVictoryCondition</c>, while <c>TargetingPrioritySet</c>'s
+    ///     <c>Hard_Point_Priorities</c> and <c>Hard_Point_Exclusions</c> carry the same type over a
+    ///     different vocabulary. The handler was already generic; only the name was not.
+    /// </remarks>
+    EnumValueList = 69,
 
     /// <summary>
     ///     Comma-separated (unit type name, int count) tuple per tech level. Count of -1 means unlimited/default stack
@@ -207,7 +227,11 @@ public enum XmlValueType
     /// </summary>
     UnitSpawnProbabilityTable = 71,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
+    /// <summary>
+    ///     Comma-separated (category name, int value) pairs - the integer counterpart of
+    ///     <see cref="CategoryToFloatMap" />. Used by <c>GameConstants</c>'s
+    ///     <c>Default_Bounty_By_Category_SP</c> and <c>_MP</c>.
+    /// </summary>
     CategoryToIntegerMap = 72,
 
     /// <summary>
@@ -249,9 +273,17 @@ public enum XmlValueType
     /// <summary>CommandBarComponent boolean/numeric GUI property (property name + value pair).</summary>
     CommandBarProperty = 80,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
-    Type81 = 81,
+    /// <summary>
+    ///     Comma-separated list of projectile categories. Used by <c>LaserDefenseAbility</c>'s
+    ///     <c>Projectile_Types_Targeted</c> - the Juggernaut and the Crusader Gunship both shoot
+    ///     down <c>MISSILE, ROCKET, MPTL_ROCKET</c>.
+    /// </summary>
+    ProjectileCategoryList = 81,
 
-    [Obsolete("No usages found in EaW XML data files - see docs/xml_type_analysis.md.")]
-    Type82 = 82
+    /// <summary>
+    ///     A single combat-modifier identifier, from the engine's <c>COMBAT_MOD_*</c> set. Used by
+    ///     <c>GameObjectType</c>'s <c>Projectile_Combat_Mod</c>, e.g. <c>COMBAT_MOD_SPEED</c>,
+    ///     paired with <c>Projectile_Combat_Mod_Duration</c>.
+    /// </summary>
+    CombatModType = 82
 }

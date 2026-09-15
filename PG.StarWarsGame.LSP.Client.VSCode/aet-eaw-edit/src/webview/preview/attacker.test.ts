@@ -8,7 +8,8 @@ import type { PreviewProjectile, PreviewTargetDefence } from '../../protocol/mod
 
 import {
     DAMAGE_SWITCHES, DEFAULT_ATTACKER, armorFactor, attackerFromProjectile, fireAtHardpoint,
-    attackerProjectile, damageSwitches, fireBlast, poolRows, poolsFor, projectileChoices,
+    attackerProjectile, damageSwitches, fireBlast, poolRows, poolsFor, poolSummary,
+    projectileChoices,
     resolveHit, type Attacker,
 } from './attacker';
 import { blastVictims } from './blast';
@@ -22,6 +23,8 @@ const SHIELDED: PreviewTargetDefence = {
     shieldPoints: 2000,
     tacticalHealth: 7500,
     energyCapacity: 8000,
+    diesWithHardpoints: true,
+    hullVsHardpointsConstraint: 0.2,
     hullFactors: { Damage_Ion: 4, Damage_Anti_Fighter: 0.25 },
     shieldFactors: { Damage_Ion: 0.5 },
     damageTypes: ['Damage_Anti_Fighter', 'Damage_Default', 'Damage_Ion'],
@@ -328,22 +331,39 @@ describe('poolRows', () => {
      * pinned the bar to full: the damage landed in `pools.hull` every time and the row never moved,
      * which is exactly "units without hardpoints don't take any damage".
      */
-    it('shows the live pool for a unit whose hull is not summed from hardpoints', () => {
+    it('shows what the hull pool has left', () => {
+        // The pool is built from the live number before it gets here, so the row reads it rather
+        // than second-guessing it against the raw attacker total.
         const rows = poolRows(
             { ...SHIELDED, tacticalHealth: 1000 },
             { subject: 'Target', shield: 0, hull: 640, energy: 0 },
-            { current: 1000, max: 1000, fromHardpoints: false });
+            { current: 640, max: 1000 });
 
         assert.match(rows.find(r => r.id === 'hull')!.detail, /^640 of 1000/);
     });
 
-    it('still shows the summed hardpoints when the hull IS the hardpoints', () => {
+    it('draws ONE health bar for the two pools, as the game does', () => {
+        // Briefly this was two rows. The game draws one - the lower of the two - and the pools said
+        // separately belong in the damage log, where the reader wants the arithmetic.
         const rows = poolRows(
             { ...SHIELDED, tacticalHealth: 7500 },
             { subject: 'Target', shield: 0, hull: 7500, energy: 0 },
-            { current: 2525, max: 2850, fromHardpoints: true });
+            { current: 7500, max: 7500 },
+            undefined,
+            { current: 2525, max: 2850 });
 
-        assert.match(rows.find(r => r.id === 'hull')!.detail, /^2525 of 2850 - summed from hardpoints/);
+        assert.equal(rows.filter(r => r.id === 'hull').length, 1);
+        assert.equal(rows.find(r => r.id === 'hardpoints'), undefined);
+        assert.match(rows.find(r => r.id === 'hull')!.detail, /lower of hull and hardpoints/);
+    });
+
+    it('leaves the hardpoint row out for a unit with none', () => {
+        const rows = poolRows(
+            { ...SHIELDED, tacticalHealth: 1000 },
+            { subject: 'Target', shield: 0, hull: 1000, energy: 0 },
+            { current: 1000, max: 1000 });
+
+        assert.equal(rows.find(r => r.id === 'hardpoints'), undefined);
     });
 
     it('reads out each pool against its capacity', () => {
@@ -388,23 +408,27 @@ describe('poolRows', () => {
         // sum of its hardpoints - so the bar has to be that sum, not the Tactical_Health the file
         // happens to carry. On the Star Destroyer those are 4075 and 2000.
         const rows = poolRows(SHIELDED, { subject: 'Target', shield: 2000, hull: 7500, energy: 8000 },
-            { current: 3150, max: 4075, fromHardpoints: true });
+            { current: 3150, max: 4075 });
 
         assert.match(rows[1].detail, /3150 of 4075/);
     });
 
-    it('says WHERE that hull number came from', () => {
-        // The reader will see a number their XML does not contain. They have to be told which one
-        // it is, because nobody knows how the engine reconciles the two.
-        const rows = poolRows(SHIELDED, { subject: 'Target', shield: 2000, hull: 7500, energy: 8000 },
-            { current: 4075, max: 4075, fromHardpoints: true });
+    it('says the bar is the lower of the two, and what the stage follows instead', () => {
+        // The reader sees a percentage their XML does not contain, so the row has to say which
+        // number it is - and that the damage stage follows the HULL rather than this bar.
+        const rows = poolRows(
+            SHIELDED, { subject: 'Target', shield: 2000, hull: 7500, energy: 8000 },
+            { current: 7500, max: 7500 }, undefined, { current: 2035, max: 4075 });
 
-        assert.match(rows[1].detail + rows[1].title, /hardpoint/i);
+        const health = rows.find(r => r.id === 'hull')!;
+
+        assert.match(health.detail + health.title, /lower of/i);
+        assert.match(health.title, /stage/i);
     });
 
     it('keeps a unit with no hardpoints on its own health', () => {
         const rows = poolRows(SHIELDED, { subject: 'Target', shield: 2000, hull: 7500, energy: 8000 },
-            { current: 7500, max: 7500, fromHardpoints: false });
+            { current: 7500, max: 7500 });
 
         assert.match(rows[1].detail, /7500 of 7500/);
     });
@@ -457,8 +481,8 @@ describe('fireBlast', () => {
             { ...DEFAULT_ATTACKER, damage: 0 }, UNSHIELDED,
             { subject: 'Target', shield: 0, hull: 1000, energy: 0 },
             [
-                { id: 'A', directDamage: 0, blastDamage: 30, tier: null },
-                { id: 'B', directDamage: 0, blastDamage: 30, tier: null },
+                { id: 'A', directDamage: 0, blastDamage: 30, tier: null , wasted: false },
+                { id: 'B', directDamage: 0, blastDamage: 30, tier: null , wasted: false },
             ],
             hardpoints);
 
@@ -471,8 +495,8 @@ describe('fireBlast', () => {
         const after = fireBlast(
             DEFAULT_ATTACKER, UNSHIELDED, { subject: 'Target', shield: 0, hull: 1000, energy: 0 },
             [
-                { id: 'A', directDamage: 40, blastDamage: 30, tier: null },
-                { id: 'B', directDamage: 0, blastDamage: 30, tier: null },
+                { id: 'A', directDamage: 40, blastDamage: 30, tier: null , wasted: false },
+                { id: 'B', directDamage: 0, blastDamage: 30, tier: null , wasted: false },
             ],
             hardpoints);
 
@@ -484,8 +508,8 @@ describe('fireBlast', () => {
         const after = fireBlast(
             DEFAULT_ATTACKER, UNSHIELDED, { subject: 'Target', shield: 0, hull: 1000, energy: 0 },
             [
-                { id: 'A', directDamage: 200, blastDamage: 0, tier: null },
-                { id: 'B', directDamage: 0, blastDamage: 500, tier: null },
+                { id: 'A', directDamage: 200, blastDamage: 0, tier: null , wasted: false },
+                { id: 'B', directDamage: 0, blastDamage: 500, tier: null , wasted: false },
             ],
             hardpoints);
 
@@ -499,7 +523,7 @@ describe('fireBlast', () => {
         const after = fireBlast(
             { ...DEFAULT_ATTACKER, damage: 5000 }, UNSHIELDED,
             { subject: 'Target', shield: 0, hull: 1000, energy: 0 },
-            [{ id: 'A', directDamage: 5000, blastDamage: 0, tier: null }],
+            [{ id: 'A', directDamage: 5000, blastDamage: 0, tier: null , wasted: false }],
             hardpoints);
 
         assert.equal(after.hardpointHealth.A, 0);
@@ -513,8 +537,8 @@ describe('fireBlast', () => {
             { ...DEFAULT_ATTACKER, shield: true, hitpoint: true, damage: 0 }, SHIELDED,
             { subject: 'Target', shield: 50, hull: 1000, energy: 0 },
             [
-                { id: 'A', directDamage: 0, blastDamage: 40, tier: null },
-                { id: 'B', directDamage: 0, blastDamage: 40, tier: null },
+                { id: 'A', directDamage: 0, blastDamage: 40, tier: null , wasted: false },
+                { id: 'B', directDamage: 0, blastDamage: 40, tier: null , wasted: false },
             ],
             hardpoints);
 
@@ -527,7 +551,7 @@ describe('fireBlast', () => {
     it('leaves a hardpoint with no declared health alone', () => {
         const after = fireBlast(
             DEFAULT_ATTACKER, UNSHIELDED, { subject: 'Target', shield: 0, hull: 1000, energy: 0 },
-            [{ id: 'N', directDamage: 999, blastDamage: 0, tier: null }],
+            [{ id: 'N', directDamage: 999, blastDamage: 0, tier: null , wasted: false }],
             { N: null });
 
         assert.equal(after.hardpointHealth.N, null);
@@ -584,9 +608,9 @@ describe('poolsFor', () => {
     it('leaves a freshly opened unit at full health rather than dead', () => {
         const mounted = { subject: '', shield: 0, hull: 0, energy: 0 };
         const live = poolsFor({ subject: 'TIE_Fighter' }, mounted);
-        const hull = hullPool({ ...UNSHIELDED, tacticalHealth: 50 }, [], {}, new Set(), live?.hull);
+        const hull = hullPool({ ...UNSHIELDED, tacticalHealth: 50 }, live?.hull);
 
-        assert.deepEqual(hull, { current: 50, max: 50, fromHardpoints: false });
+        assert.deepEqual(hull, { current: 50, max: 50 });
         assert.equal(unitDestroyed([], new Set(), hull), false);
     });
 });
@@ -757,5 +781,186 @@ describe('the attacker carries its own blast', () => {
         assert.equal(filled.blastDamage, 0);
         assert.equal(filled.blastRange, 0);
         assert.equal(filled.blastDropoff, false);
+    });
+});
+
+describe('firing at a hardpoint that is already destroyed', () => {
+    // The discard case, measured. The engine finds the hardpoint by collision mesh, sees it at zero,
+    // and clears the flag that would otherwise pass the shot to the hull - so neither pool takes it.
+    // A ship whose surfaces are covered by dead hardpoints stops taking damage from those angles.
+    const HITPOINT: Attacker = {
+        ...DEFAULT_ATTACKER, damage: 500, shield: false, energy: false, hitpoint: true,
+    };
+
+    it('leaves the hardpoint at zero rather than driving it negative', () => {
+        const after = fireAtHardpoint(
+            HITPOINT, UNSHIELDED, { subject: 'T', shield: 0, hull: 2000, energy: 0 }, 0);
+
+        assert.equal(after.hardpointHealth, 0);
+    });
+
+    it('does not pass the shot to the hull', () => {
+        const after = fireAtHardpoint(
+            HITPOINT, UNSHIELDED, { subject: 'T', shield: 0, hull: 2000, energy: 0 }, 0);
+
+        assert.equal(after.pools.hull, 2000);
+    });
+});
+
+describe('overkill on a hardpoint', () => {
+    it('evaporates rather than carrying anywhere', () => {
+        // 500 into a hardpoint holding 100 destroys it and loses the other 400 - the surplus reaches
+        // neither the hull nor a neighbour.
+        const after = fireAtHardpoint(
+            { ...DEFAULT_ATTACKER, damage: 500, shield: false, energy: false, hitpoint: true },
+            UNSHIELDED, { subject: 'T', shield: 0, hull: 2000, energy: 0 }, 100);
+
+        assert.equal(after.hardpointHealth, 0);
+        assert.equal(after.destroyed, true);
+        assert.equal(after.pools.hull, 2000);
+    });
+});
+
+describe('the main display draws one health bar, as the game does', () => {
+    it('shows the LOWER of the two pools', () => {
+        // Get_Display_Health_Percent. The hull is at 90% and the hardpoints at 25%, so the bar
+        // reads 25% - and the reader is not shown two bars for one unit.
+        const rows = poolRows(
+            { ...SHIELDED, tacticalHealth: 1000 },
+            { subject: 'Target', shield: 0, hull: 900, energy: 0 },
+            { current: 900, max: 1000 },
+            undefined,
+            { current: 250, max: 1000 });
+
+        assert.equal(rows.filter(r => r.id === 'hull').length, 1);
+        assert.equal(rows.find(r => r.id === 'hardpoints'), undefined);
+        assert.equal(rows.find(r => r.id === 'hull')!.fraction, 0.25);
+    });
+
+    it('is the hull alone where the unit does not die with its hardpoints', () => {
+        const rows = poolRows(
+            { ...SHIELDED, tacticalHealth: 1000, diesWithHardpoints: false },
+            { subject: 'Target', shield: 0, hull: 900, energy: 0 },
+            { current: 900, max: 1000 },
+            undefined,
+            { current: 250, max: 1000 });
+
+        assert.equal(rows.find(r => r.id === 'hull')!.fraction, 0.9);
+    });
+});
+
+describe('poolSummary', () => {
+    it('says only the numbers that move', () => {
+        const summary = poolSummary(
+            { ...SHIELDED, tacticalHealth: 1000 },
+            { current: 900, max: 1000 },
+            { current: 250, max: 1000 })!;
+
+        assert.match(summary.text, /Hull 900 of 1000/);
+        assert.match(summary.text, /Hardpoints 250 of 1000/);
+    });
+
+    // Four rows of constant text pushed the log itself off the panel. None of this moves while a
+    // reader fires, so it costs no height.
+    it('keeps the fixed facts on the tooltip', () => {
+        const summary = poolSummary(
+            { ...SHIELDED, tacticalHealth: 1000 },
+            { current: 900, max: 1000 },
+            { current: 250, max: 1000 })!;
+
+        assert.match(summary.title, /Tactical_Health/);
+        assert.match(summary.title, /Hull_Vs_Hard_Points_Health_Constraint/);
+        assert.doesNotMatch(summary.text, /Hull_Vs_Hard_Points_Health_Constraint/);
+    });
+
+    it('names the workspace constraint rather than assuming 0.2', () => {
+        const summary = poolSummary(
+            { ...SHIELDED, tacticalHealth: 1000, hullVsHardpointsConstraint: 1 },
+            { current: 900, max: 1000 },
+            { current: 250, max: 1000 })!;
+
+        assert.match(summary.title, /Leash: 1,/);
+    });
+
+    it('says so where the unit does not die with its hardpoints', () => {
+        const summary = poolSummary(
+            { ...SHIELDED, tacticalHealth: 1000, diesWithHardpoints: false },
+            { current: 900, max: 1000 },
+            { current: 250, max: 1000 })!;
+
+        assert.match(summary.title, /Dies with hardpoints: no/);
+    });
+
+    it('leaves the hardpoints out for a unit with none', () => {
+        const summary = poolSummary(
+            { ...SHIELDED, tacticalHealth: 1000 }, { current: 900, max: 1000 })!;
+
+        assert.match(summary.text, /^Hull 900 of 1000$/);
+    });
+
+    it('is nothing at all for a subject with no health to report', () => {
+        assert.equal(poolSummary({ ...SHIELDED, tacticalHealth: 0 }, { current: 0, max: 0 }), null);
+    });
+});
+
+describe('the arithmetic the log shows', () => {
+    const ION: Attacker = {
+        ...DEFAULT_ATTACKER, damage: 100, damageType: 'Damage_Ion',
+        shield: false, energy: false, hitpoint: true,
+    };
+
+    const NO_POOLS = { subject: 'T', shield: 0, hull: 5000, energy: 0 };
+
+    it('names the factor, the damage type and the armour it was read against', () => {
+        // SHIELDED gives Damage_Ion a hull factor of 4 against Armor_Star_Destroyer, and a reader
+        // who does not know why 100 became 400 is exactly who the log is for.
+        const { workings } = fireAtHardpoint(ION, SHIELDED, NO_POOLS, 1000);
+
+        assert.match(
+            workings.join(' | '), /Armor factor: 100 x 4 = 400 - Damage_Ion vs Armor_Star_Destroyer/);
+    });
+
+    it('shows the pool before and after', () => {
+        const { workings } = fireAtHardpoint(ION, SHIELDED, NO_POOLS, 1000);
+
+        assert.match(workings.join(' | '), /Health 1000 -> 600/);
+    });
+
+    it('says how much overkill was lost', () => {
+        // 400 into a hardpoint holding 100: the other 300 reaches neither pool.
+        const { workings } = fireAtHardpoint(ION, SHIELDED, NO_POOLS, 100);
+
+        assert.match(workings.join(' | '), /overkill lost/);
+    });
+
+    it('explains a shot thrown away on wreckage', () => {
+        const { workings } = fireAtHardpoint(ION, SHIELDED, NO_POOLS, 0);
+
+        assert.match(workings.join(' | '), /already destroyed/);
+    });
+
+    it('shows how a blast was divided, and what evaporated', () => {
+        const hits = [
+            { id: 'A', directDamage: 0, blastDamage: 100, tier: null, wasted: false },
+            { id: 'B', directDamage: 0, blastDamage: 100, tier: null, wasted: false },
+            { id: 'C', directDamage: 0, blastDamage: 100, tier: null, wasted: true },
+        ];
+        const result = fireBlast(ION, SHIELDED, NO_POOLS, hits, { A: 500, B: 500, C: 0 });
+
+        assert.match(result.workings.join(' | '), /Blast 300 split across 3 in range - 100 each/);
+        assert.match(result.workings.join(' | '), /Wreckage in range: 1 of 3 - 100 lost/);
+        assert.match((result.perVictim.C ?? []).join(' | '), /Discarded 100 - already destroyed/);
+    });
+
+    it('shows the shield taking its own factor, and the spare re-scaled behind it', () => {
+        const through: Attacker = { ...ION, shield: true };
+        const { workings } = fireAtHardpoint(
+            through, SHIELDED, { subject: 'T', shield: 10, hull: 5000, energy: 0 }, 1000);
+
+        const text = workings.join(' | ');
+
+        assert.match(text, /Shield factor: /);
+        assert.match(text, /Shield 10 -> 0/);
+        assert.match(text, /Spare through the shield: /);
     });
 });

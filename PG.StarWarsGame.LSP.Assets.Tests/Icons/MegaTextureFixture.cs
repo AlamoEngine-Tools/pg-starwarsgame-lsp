@@ -45,13 +45,13 @@ internal static class MegaTextureFixture
     {
         var bytes = new byte[18 + width * height * 4];
 
-        bytes[2] = 2;     // image type: uncompressed true-colour
+        bytes[2] = 2; // image type: uncompressed true-colour
         bytes[12] = (byte)(width & 0xFF);
         bytes[13] = (byte)((width >> 8) & 0xFF);
         bytes[14] = (byte)(height & 0xFF);
         bytes[15] = (byte)((height >> 8) & 0xFF);
-        bytes[16] = 32;   // bits per pixel
-        bytes[17] = 0;    // descriptor: origin bottom-left, no alpha bits declared
+        bytes[16] = 32; // bits per pixel
+        bytes[17] = 0; // descriptor: origin bottom-left, no alpha bits declared
 
         for (var y = 0; y < height; y++)
         for (var x = 0; x < width; x++)

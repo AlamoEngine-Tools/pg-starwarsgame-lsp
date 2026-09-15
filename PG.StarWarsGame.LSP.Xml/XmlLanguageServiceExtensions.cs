@@ -43,6 +43,17 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, ContextNamePairHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, ContextNameListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageNonzeroHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, NonNegativeValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, PositiveValueHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, BonusPercentageHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AngleDegreesHalfTurnHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AngleDegreesFullTurnHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, NegativeFractionHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, FractionBelowOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, BelowOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, MissingRequiredTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ControlPointCurveHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, TagComparisonHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, PresenceInducedAnimationsHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, Audio3dProviderNameHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AudioParamIntHandler>();
@@ -124,6 +135,27 @@ public static class XmlLanguageServiceExtensions
 
         // XmlSymbolFact + XmlReferenceFact handlers (index-level)
         services.AddSingleton<IXmlDiagnosticsHandler, DuplicateSymbolHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, UnnamedObjectHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, UnknownTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, CaseSensitiveTagHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantBaseUnresolvedHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantChainTooDeepHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VariantTagNotSupportedHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AtLeastNegativeOneHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AtLeastOneSecondHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, FireConeDegreesHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, RespawnTimeListHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, EngineTextLimitHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, BooleanGatedRequirementHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, EitherOrRequirementHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AutomaticDespawnHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, OwnerIncomeShareHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, IncomeSplitConflictHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, SystemSpyDurationHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, RequiredFirstEntryHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, GrenadeProjectileHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AllowedValuesHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, ProjectileCategoryListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, UnresolvedReferenceHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, TypeMismatchHandler>();
 
@@ -155,13 +187,21 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, StoryDialogReferenceHandler>();
 
         // Cross-tag validation handler
+        services.AddSingleton<IXmlDiagnosticsHandler, DamageAbsorbsNothingHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, SpecialWeaponBehaviorHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, VehicleThiefCloneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CampaignStoryAttachmentHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointMissingAttachmentBoneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointBoneNotOnModelHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HardpointUnhittableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointModelBonesUnavailableHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, DamageStageNotOnModelHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HardpointAbilityNotOnOwnerHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, LandDamageTableMismatchHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, FiresForwardHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, AttackDistanceBeyondHardpointRangeHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, HullFiringArcHandler>();
 
         // Shared parse source: one HAP parse per (document, content) reused by indexing,
         // diagnostics, and every request handler. Capacity from ServerOptions.ParseCacheCapacity.
@@ -172,9 +212,60 @@ public static class XmlLanguageServiceExtensions
 
         // Fact producers
         services.AddSingleton<IXmlStructuralValidator, XmlStructuralValidator>();
+        services.AddSingleton<IXmlCrossTagRule, DamageAbsorbRule>();
         services.AddSingleton<IXmlCrossTagRule, SquadronOffsetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, LandDamageTableRule>();
+        services.AddSingleton<IXmlCrossTagRule, FiresForwardRule>();
+        services.AddSingleton<IXmlCrossTagRule, AttackDistanceRule>();
+        services.AddSingleton<IXmlCrossTagRule, HullFiringArcRule>();
         services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
         services.AddSingleton<IXmlCrossTagRule, CampaignStoryAttachmentRule>();
+        // The engine's "you must specify" asserts, each attributed to its owning class by the xref
+        // to the message string rather than by where our schema declares the tag - Bomb_Type is
+        // declared on three ability types and demanded by one.
+        services.AddSingleton<IXmlCrossTagRule, LeechShieldsRequiredTagsRule>();
+        services.AddSingleton<IXmlCrossTagRule, DemolitionBombTypeRule>();
+        services.AddSingleton<IXmlCrossTagRule, ArcSweepAttackAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, GenericAttackAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, EatAttackAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, BountyTargetFactionsRule>();
+        services.AddSingleton<IXmlCrossTagRule, GarrisonUpgradeUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, GrenadeTossAnimationRule>();
+        services.AddSingleton<IXmlCrossTagRule, RemoteBombTossAnimationRule>();
+        // From the assert seam rather than a message - a weapon hardpoint whose fire cone the
+        // engine's own default cannot satisfy. Gated on Type, because the asserts sit behind
+        // Is_Weapon().
+        services.AddSingleton<IXmlCrossTagRule, WeaponHardpointFireConeRule>();
+        // The engine's three "set either A or B, otherwise this ability won't do anything" pairs.
+        services.AddSingleton<IXmlCrossTagRule, HeroAssassinTargetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, BaseDestructionTargetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, NeutralizeHeroTargetsRule>();
+        // The same shape over lists - an ability applicable to no unit at all. Four messages across
+        // nine owning classes, so each rule carries the owners that reference its message.
+        services.AddSingleton<IXmlCrossTagRule, CombatBonusApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, ForceHealingApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, AbsorbBlasterApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, AttackAbilityApplicableUnitsRule>();
+        services.AddSingleton<IXmlCrossTagRule, RedirectBlasterApplicableUnitsRule>();
+        // Stated on the ability base class, so it is scoped by its two tags rather than by element.
+        services.AddSingleton<IXmlCrossTagRule, AutomaticAbilityDespawnRule>();
+        // The three conditional rules in IncomeStreamAbilityClass::Validate_Data.
+        services.AddSingleton<IXmlCrossTagRule, OwnerIncomeShareRule>();
+        services.AddSingleton<IXmlCrossTagRule, SplitFavorsOwnerIgnoredRule>();
+        services.AddSingleton<IXmlCrossTagRule, SplitFavorsOwnerVsFullAmountRule>();
+        // Opposite bounds on one tag depending on another - see SystemSpyDurationRule.
+        services.AddSingleton<IXmlCrossTagRule, SystemSpyDurationRule>();
+        services.AddSingleton<IXmlCrossTagRule, DamageRadiusWithinChaseRadiusRule>();
+        services.AddSingleton<IXmlCrossTagRule, RespawnTimeOrderRule>();
+        // The engine's six "if you set A you must also set B" rules - five on System_Spy_Ability,
+        // one on Galactic_Sabotage_Ability. Registered individually so each is suppressible and the
+        // registration test can count them like every other rule.
+        services.AddSingleton<IXmlCrossTagRule, SeeFleetContentsNeedsNumFleetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeeMostPowerfulShipNeedsNumFleetsRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeeGroundCompanyContentsNeedsNumCompaniesRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeeCreditIncomeBreakdownNeedsIncomeRule>();
+        services.AddSingleton<IXmlCrossTagRule, SeePoliticalControlBreakdownNeedsControlRule>();
+        services.AddSingleton<IXmlCrossTagRule, CreditHaltNeedsDurationRule>();
         services.AddSingleton<IXmlDocumentFactProducer, XmlDocumentFactProducer>();
         services.AddSingleton<IXmlIndexFactProducer, XmlIndexFactProducer>();
         services.AddSingleton<IStoryFactProducer, StoryFactProducer>();
@@ -212,6 +303,8 @@ public static class XmlLanguageServiceExtensions
         // Code action providers - add IXmlCodeActionProvider implementations here to register new providers
         services.AddSingleton<IXmlCodeActionRegistry, XmlCodeActionRegistry>();
         services.AddSingleton<IXmlCodeActionProvider, FixSuggestionCodeActionProvider>();
+        // The engine's own correction, where it edits a tag other than the one reported.
+        services.AddSingleton<IXmlCodeActionProvider, EngineRepairCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, CreateLocKeyCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, SquadronSyncCodeActionProvider>();
         services.AddSingleton<IXmlCodeActionProvider, RemoveRedundantOverrideCodeActionProvider>();
@@ -247,7 +340,11 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlHardpointFactProducer, XmlHardpointFactProducer>();
         services.AddSingleton<IXmlDamageStageFactProducer, XmlDamageStageFactProducer>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantCycleHandler>();
+        // Deprecated but still registered - see the handler for why. Warnings are errors in this
+        // project, so the obsolete reference is suppressed here rather than at every call site.
+#pragma warning disable CS0618
         services.AddSingleton<IXmlDiagnosticsHandler, VariantIgnoredOverrideHandler>();
+#pragma warning restore CS0618
         services.AddSingleton<IXmlDiagnosticsHandler, VariantRedundantOverrideHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VariantAdditiveMergeHandler>();
 

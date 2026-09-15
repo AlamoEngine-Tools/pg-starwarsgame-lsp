@@ -20,10 +20,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class PlanetModeExclusionListHandler : CommaSeparatedPairHandlerBase
 {
+    private const string ModeEnumName = "StoryBattleMode";
+
     /// <inheritdoc />
     public override DiagnosticId? DefaultId => DiagnosticIds.PlanetModeExclusionList;
-
-    private const string ModeEnumName = "StoryBattleMode";
 
     protected override XmlValueType TargetType => XmlValueType.TypeReferenceList;
 
@@ -59,7 +59,8 @@ public sealed class PlanetModeExclusionListHandler : CommaSeparatedPairHandlerBa
             results.Add(AtToken(
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
                     $"'{planet}' has no mode. <{fact.Tag.Tag}> is a flat list of (planet, mode) pairs, "
-                    + "so every planet must be followed by the mode it is excluded in.", Id: DiagnosticIds.PlanetModeMissingMode),
+                    + "so every planet must be followed by the mode it is excluded in.",
+                    Id: DiagnosticIds.PlanetModeMissingMode),
                 fact, offset, planet.Length));
         }
 

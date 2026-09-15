@@ -32,7 +32,7 @@ public sealed class SchemaVersionGateTest
     [InlineData("1.99.99")]
     public void VersionInRange_IsSupported(string version)
     {
-        var result = SchemaVersionGate.Check(version, ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check(version);
 
         Assert.Equal(SchemaVersionCompatibility.Supported, result.Compatibility);
         Assert.True(result.CanLoad);
@@ -48,7 +48,7 @@ public sealed class SchemaVersionGateTest
     [InlineData("11.0.0")]
     public void NewerMajor_IsUnsupported_AndBlocksLoading(string version)
     {
-        var result = SchemaVersionGate.Check(version, ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check(version);
 
         Assert.Equal(SchemaVersionCompatibility.Unsupported, result.Compatibility);
         Assert.False(result.CanLoad);
@@ -62,7 +62,7 @@ public sealed class SchemaVersionGateTest
     [Fact]
     public void OlderThanSupported_LoadsWithAWarning()
     {
-        var result = SchemaVersionGate.Check("0.9.0", ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check("0.9.0");
 
         Assert.Equal(SchemaVersionCompatibility.OutOfRange, result.Compatibility);
         Assert.True(result.CanLoad);
@@ -78,7 +78,7 @@ public sealed class SchemaVersionGateTest
     [InlineData("   ")]
     public void MissingVersion_IsUnversioned_AndLoads(string? version)
     {
-        var result = SchemaVersionGate.Check(version, ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check(version);
 
         Assert.Equal(SchemaVersionCompatibility.Unversioned, result.Compatibility);
         Assert.True(result.CanLoad);
@@ -95,7 +95,7 @@ public sealed class SchemaVersionGateTest
     [InlineData("1.0.0.0")]
     public void MalformedVersion_IsRefused(string version)
     {
-        var result = SchemaVersionGate.Check(version, ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check(version);
 
         Assert.Equal(SchemaVersionCompatibility.Malformed, result.Compatibility);
         Assert.False(result.CanLoad);
@@ -108,7 +108,7 @@ public sealed class SchemaVersionGateTest
     [Fact]
     public void PrereleaseOfNewerMajor_IsUnsupported()
     {
-        var result = SchemaVersionGate.Check("2.0.0-rc.1", ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check("2.0.0-rc.1");
 
         Assert.Equal(SchemaVersionCompatibility.Unsupported, result.Compatibility);
         Assert.False(result.CanLoad);
@@ -120,7 +120,7 @@ public sealed class SchemaVersionGateTest
     [Fact]
     public void UnsupportedMessage_NamesBothVersionsAndTheRemedy()
     {
-        var result = SchemaVersionGate.Check("2.0.0", ">=1.0.0 <2.0.0");
+        var result = SchemaVersionGate.Check("2.0.0");
 
         Assert.Contains("2.0.0", result.Message);
         Assert.Contains(">=1.0.0 <2.0.0", result.Message);
@@ -130,6 +130,6 @@ public sealed class SchemaVersionGateTest
     [Fact]
     public void SupportedResult_HasNoMessage()
     {
-        Assert.Empty(SchemaVersionGate.Check("1.2.3", ">=1.0.0 <2.0.0").Message);
+        Assert.Empty(SchemaVersionGate.Check("1.2.3").Message);
     }
 }

@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
@@ -519,6 +518,179 @@ public sealed class PreviewSceneBuilderTest
         Assert.Equal("TURRET_01", turret.TurretBone);
 
         Assert.Null(scene.Hardpoints.Single(h => h.Id == "HP_F").Turret);
+    }
+
+    /// <summary>
+    ///     A turret hardpoint that declares no extents still swings, and the numbers are the
+    ///     hardpoint's own defaults rather than the unit's.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         MEASURED, and the two owners genuinely differ.
+    ///         <c>HardPointDataClass::HardPointDataClass</c> (<c>00be1220</c>) writes
+    ///         <c>TurretRotateExtentDegrees = 180.0</c> and
+    ///         <c>TurretElevateExtentDegrees = 90.0</c>, where <c>GameObjectTypeClass</c>'s
+    ///         constructor writes 360 and 180. Sending the authored value and letting the client
+    ///         guess would have to guess differently per owner.
+    ///     </para>
+    ///     <para>
+    ///         180 is exactly the threshold at which
+    ///         <c>HardPointClass::Calculate_Desired_Turret_Angle</c> skips its clamp
+    ///         (<c>extent &lt; 180.0 &amp;&amp; extent &gt; 0.0</c>), so the default yaw is a free
+    ///         turn while the default pitch is a real stop at plus or minus 90.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_AppliesTheHardpointsOwnTurretExtentDefaults()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint")]);
+        var tags = new FakeVariantTagSource()
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T"))
+            .With("HP_T", Tag("Is_Turret", "Yes"), Tag("Turret_Bone_Name", "TURRET_01"));
+
+        var turret = Builder(index, tags, "hull.alo").BuildForObject("Ship")
+            .Hardpoints.Single(h => h.Id == "HP_T").Turret;
+
+        Assert.NotNull(turret);
+        Assert.Equal(180f, turret.RotateExtentDegrees);
+        Assert.Equal(90f, turret.ElevateExtentDegrees);
+    }
+
+    /// <summary>
+    ///     The subject's render scale reaches the client, because the preview draws its hull in
+    ///     MODEL units and every range it draws beside it in WORLD units.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GameObjectClass::Update_Transform</c> builds the object's world matrix with no
+    ///         scale in it and then calls <c>Model-&gt;Set_Scale(Get_Scale_Factor(Type))</c>, so the
+    ///         scale belongs to the model alone. Sending it is what lets the client put the two
+    ///         spaces together.
+    ///     </para>
+    ///     <para>
+    ///         Measured: 118 of 174 armed objects declare one that is not 1, so this is the
+    ///         majority case rather than an exception.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_SendsTheSubjectsRenderScale()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource()
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("Scale_Factor", "0.5"));
+
+        Assert.Equal(0.5f, Builder(index, tags, "hull.alo").BuildForObject("Ship").ScaleFactor);
+    }
+
+    /// <summary>An object that declares none is drawn at 1, which is the engine's own identity.</summary>
+    [Fact]
+    public void BuildForObject_DefaultsTheRenderScaleToOne()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource().With("Ship", Tag("Space_Model_Name", "hull.alo"));
+
+        Assert.Equal(1f, Builder(index, tags, "hull.alo").BuildForObject("Ship").ScaleFactor);
+    }
+
+    /// <summary>
+    ///     A zero or negative scale collapses the object rather than sizing it, so the reference
+    ///     falls back to 1 (<c>GameObjectCatalog.cpp</c>) and so does this.
+    /// </summary>
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-2")]
+    [InlineData("wide")]
+    [InlineData("")]
+    public void BuildForObject_RefusesARenderScaleThatWouldCollapseTheSubject(string raw)
+    {
+        var index = Index([Sym("Ship", "SpaceUnit")]);
+        var tags = new FakeVariantTagSource()
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("Scale_Factor", raw));
+
+        Assert.Equal(1f, Builder(index, tags, "hull.alo").BuildForObject("Ship").ScaleFactor);
+    }
+
+    /// <summary>An authored extent is still the authored extent, including a deliberate zero.</summary>
+    [Fact]
+    public void BuildForObject_DoesNotSubstituteADefaultOverAnAuthoredTurretExtent()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint")]);
+        var tags = new FakeVariantTagSource()
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T"))
+            .With("HP_T",
+                Tag("Is_Turret", "Yes"),
+                Tag("Turret_Rotate_Extent_Degrees", "0"),
+                Tag("Turret_Elevate_Extent_Degrees", "45"),
+                Tag("Turret_Bone_Name", "TURRET_01"));
+
+        var turret = Builder(index, tags, "hull.alo").BuildForObject("Ship")
+            .Hardpoints.Single(h => h.Id == "HP_T").Turret;
+
+        Assert.NotNull(turret);
+        Assert.Equal(0f, turret.RotateExtentDegrees);
+        Assert.Equal(45f, turret.ElevateExtentDegrees);
+    }
+
+    /// <summary>
+    ///     A TURRET hardpoint's firing arc comes from its rotate extent, not from its fire cone -
+    ///     and it has no pitch bound on the shot at all.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>HardPointClass::Can_Weapon_Point_At</c> branches: <c>if (Is_Turret)</c> it tests
+    ///         <c>Turret_Rotate_Extent_Degrees &lt; |yaw|</c> and nothing else, and the fire cone is
+    ///         tested only in the <c>ELSE</c>. The two are exclusive, so a turret's cone is never
+    ///         read - all 7 shipped turret hardpoints declare one anyway, and one of them
+    ///         (<c>HP_Gargantuan_Small_Turret_Front_Left</c>) declares a 450-degree height that has
+    ///         gone unnoticed in both games precisely because nothing reads it.
+    ///     </para>
+    ///     <para>
+    ///         The extent is a plus-or-minus bound and is NOT halved by the engine, while the cone
+    ///         is a full angle that IS - so 120 degrees of extent is a 240-degree arc.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_TakesATurretHardpointsArcFromTheExtentNotTheCone()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_T", "HardPoint")]);
+        var tags = new FakeVariantTagSource()
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_T"))
+            .With("HP_T",
+                Tag("Type", "HARD_POINT_WEAPON_LASER"),
+                Tag("Is_Turret", "Yes"),
+                Tag("Turret_Rotate_Extent_Degrees", "120"),
+                Tag("Turret_Elevate_Extent_Degrees", "45"),
+                Tag("Fire_Cone_Width", "20"),
+                Tag("Fire_Cone_Height", "5"),
+                Tag("Fire_Projectile_Type", "Proj"),
+                Tag("Fire_Bone_A", "FP_00"));
+
+        var weapon = Assert.Single(Builder(index, tags, "hull.alo").BuildForObject("Ship").Weapons);
+
+        // 120 either side, not the 20-degree cone it also declares.
+        Assert.Equal(240f, weapon.ConeWidthDegrees);
+        // No pitch test in the turret branch - the elevate extent bounds the BARREL, not the shot.
+        Assert.Equal(360f, weapon.ConeHeightDegrees);
+    }
+
+    /// <summary>A non-turret hardpoint is the other arm: the cone, unchanged, already a full angle.</summary>
+    [Fact]
+    public void BuildForObject_TakesANonTurretHardpointsArcFromTheCone()
+    {
+        var index = Index([Sym("Ship", "SpaceUnit"), Sym("HP_F", "HardPoint")]);
+        var tags = new FakeVariantTagSource()
+            .With("Ship", Tag("Space_Model_Name", "hull.alo"), Tag("HardPoints", "HP_F"))
+            .With("HP_F",
+                Tag("Type", "HARD_POINT_WEAPON_LASER"),
+                Tag("Fire_Cone_Width", "60"),
+                Tag("Fire_Cone_Height", "30"),
+                Tag("Fire_Projectile_Type", "Proj"),
+                Tag("Fire_Bone_A", "FP_00"));
+
+        var weapon = Assert.Single(Builder(index, tags, "hull.alo").BuildForObject("Ship").Weapons);
+
+        Assert.Equal(60f, weapon.ConeWidthDegrees);
+        Assert.Equal(30f, weapon.ConeHeightDegrees);
     }
 
     // ── problems ──────────────────────────────────────────────────────────────

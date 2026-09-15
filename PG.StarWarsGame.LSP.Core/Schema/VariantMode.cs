@@ -16,8 +16,11 @@ public enum VariantMode
     Replace = 0,
 
     /// <summary>
-    ///     The variant's value list is unioned/appended onto the base's list rather than replacing it.
-    ///     Typically applies to list-valued tags.
+    ///     The variant's values are APPENDED to the base's rather than replacing them - not
+    ///     unioned. A value the base already carries is contributed again, because the engine
+    ///     pushes into a plain vector with no reset and no membership test, and nothing ever
+    ///     removes a repeat. For the spawn tables, repeating an entry is how you ask for two of
+    ///     that unit.
     /// </summary>
     Merge,
 

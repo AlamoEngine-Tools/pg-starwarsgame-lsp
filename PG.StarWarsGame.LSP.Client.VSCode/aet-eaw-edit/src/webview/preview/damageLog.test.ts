@@ -106,3 +106,39 @@ describe('appendShot', () => {
         assert.equal(before.length, 1);
     });
 });
+
+describe('a repair line', () => {
+    // The log is a record of what happened to the unit, not of shots - destroying a hardpoint by
+    // hand has been logged for a while, and repairing it went unrecorded, so a reader who repaired
+    // mid-session read the numbers back with no sign of where they were refilled.
+    const repair = {
+        kind: 'repair' as const,
+        source: 'The Force',
+        amount: 325,
+        target: 'HP_Star_Destroyer_Weapon_FL',
+        armor: null,
+        pool: 'hull' as const,
+        destroyed: false,
+    };
+
+    it('says what was repaired and how much came back', () => {
+        assert.equal(
+            damageLine(repair),
+            'The Force repaired HP_Star_Destroyer_Weapon_FL - 325 restored');
+    });
+
+    it('leaves the number out where nothing was missing', () => {
+        assert.equal(
+            damageLine({ ...repair, amount: 0 }),
+            'The Force repaired HP_Star_Destroyer_Weapon_FL');
+    });
+
+    // A repair is not a shot: nothing was scaled and nothing defended against it, so the armour
+    // column and the pool have nothing to say.
+    it('names no armour and no pool', () => {
+        const line = damageLine({ ...repair, armor: 'Armor_Star_Destroyer', pool: 'shield' });
+
+        assert.doesNotMatch(line, /Armor_Star_Destroyer/);
+        assert.doesNotMatch(line, /shield/);
+    });
+});

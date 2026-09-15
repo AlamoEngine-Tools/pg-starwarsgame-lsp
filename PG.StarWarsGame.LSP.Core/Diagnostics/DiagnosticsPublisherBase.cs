@@ -7,6 +7,7 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -54,6 +55,11 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
         indexService.IndexChanged += OnIndexChanged;
     }
 
+    protected abstract string FileExtension { get; }
+
+    /// <summary>Feature-flag gate: while false, index changes publish nothing.</summary>
+    protected virtual bool DiagnosticsEnabled => true;
+
     /// <summary>
     ///     Republishes every open document of this language against the current index.
     ///     <para>
@@ -74,11 +80,6 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
         return Task.CompletedTask;
     }
-
-    protected abstract string FileExtension { get; }
-
-    /// <summary>Feature-flag gate: while false, index changes publish nothing.</summary>
-    protected virtual bool DiagnosticsEnabled => true;
 
     protected abstract void PublishForDocument(string uri, string text, GameIndex index);
 
@@ -174,7 +175,7 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
             .Where(d => d.PublishDiagnostics)
             .Where(d => Path.GetExtension(d.Uri).Equals(FileExtension, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var openUris = new HashSet<string>(openDocs.Select(d => d.Uri));
+        var openUris = new HashSet<string>(openDocs.Select(d => d.Uri), DocumentUris.Comparer);
 
         // Reference-diff against the last run: a document's diagnostics can only change when its
         // own Documents entry changed or when any cross-document input (symbols, references,

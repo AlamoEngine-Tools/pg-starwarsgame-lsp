@@ -42,11 +42,6 @@ public sealed class BoneNameCompletionHelperTest
         return new BoneNameCompletionHelper(schema, new EmptyTagSource());
     }
 
-    private sealed class EmptyTagSource : IVariantTagSource
-    {
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => null;
-    }
-
     // ── empty cases ───────────────────────────────────────────────────────────
 
     [Fact]
@@ -174,6 +169,14 @@ public sealed class BoneNameCompletionHelperTest
         var result = helper.GetProposals(bone, "", index);
 
         Assert.Contains("root", result.Select(p => p.Label));
+    }
+
+    private sealed class EmptyTagSource : IVariantTagSource
+    {
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return null;
+        }
     }
 
     // ── fake schema ───────────────────────────────────────────────────────────

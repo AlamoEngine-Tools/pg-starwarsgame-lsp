@@ -100,4 +100,34 @@ describe('drawnBounds', () => {
 
         assert.equal(box.max.x - box.min.x, 10);
     });
+
+    /**
+     * An overlay MESH, which the mesh test alone cannot catch: a firing-arc cone and a turret knob
+     * are both `THREE.Mesh`, both hang inside the model on a bone, and both are drawn. Measured on
+     * the Gargantuan with its arcs on: the framing radius went from 99 to 508.
+     */
+    it('prunes a whole subtree the caller marks as not the model', () => {
+        const root = new THREE.Object3D();
+        root.add(cube(10));
+
+        const overlay = new THREE.Object3D();
+        const cone = cube(1000);
+        overlay.add(cone);
+        root.add(overlay);
+        root.updateMatrixWorld(true);
+
+        const box = drawnBounds(root, () => true, node => node === overlay);
+
+        assert.equal(box.max.x - box.min.x, 10, 'the pruned subtree - and its children - are skipped');
+    });
+
+    it('measures everything when no prune is given, as before', () => {
+        const root = new THREE.Object3D();
+        const overlay = new THREE.Object3D();
+        overlay.add(cube(1000));
+        root.add(cube(10), overlay);
+        root.updateMatrixWorld(true);
+
+        assert.equal(drawnBounds(root, () => true).max.x, 500);
+    });
 });

@@ -3,6 +3,7 @@
 
 using System.Text.RegularExpressions;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Lua.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Lua.Tests.Diagnostics;
 
@@ -77,7 +78,7 @@ public sealed class LuaDiagnosticIdCoverageTest
             .Where(f => f.FieldType == typeof(DiagnosticId))
             .Select(f => (f.Name, Id: (DiagnosticId)f.GetValue(null)!))
             .Where(x => x.Id.Group == (int)DiagnosticGroup.Syntax
-                        && x.Id.Number < Lua.Diagnostics.LorettaDiagnosticIds.FirstOwnSyntaxNumber)
+                        && x.Id.Number < LorettaDiagnosticIds.FirstOwnSyntaxNumber)
             .Select(x => $"{x.Name} = {x.Id}")
             .ToList();
 

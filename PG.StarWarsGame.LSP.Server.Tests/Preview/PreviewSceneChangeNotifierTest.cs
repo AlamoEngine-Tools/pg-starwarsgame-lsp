@@ -59,10 +59,7 @@ public sealed class PreviewSceneChangeNotifierTest
             indexService, m => sent.Add(m),
             NullLogger<PreviewSceneChangeNotifier>.Instance, 40);
 
-        for (var at = 0; at < 20; at++)
-        {
-            indexService.Raise(GameIndex.Empty);
-        }
+        for (var at = 0; at < 20; at++) indexService.Raise(GameIndex.Empty);
 
         await Task.Delay(300);
 

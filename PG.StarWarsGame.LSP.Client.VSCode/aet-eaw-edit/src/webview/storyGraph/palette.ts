@@ -25,11 +25,50 @@ export const LIFECYCLE_TOKENS: Readonly<Record<Lifecycle, string>> = {
     Disabled: '--colour-data-red',
 };
 
-/** A junction has no lifecycle of its own; it takes the colour a fired event would. */
-export const JUNCTION_TOKEN = '--colour-data-purple';
+/**
+ * A junction has no lifecycle of its own, so it takes a NEUTRAL colour rather than a hue that
+ * means a state.
+ *
+ * It used to take purple - the colour a fired event takes - which said the one thing about a
+ * junction that cannot be true: it claimed a lifecycle. Zoomed out, where the shape was a plain
+ * rectangle like everything else, that was the only signal there was, and it was wrong. Structure
+ * is neutral here for the same reason a plain Prereq edge is (see EDGE_KINDS): the default
+ * relation is not a state, and colouring it says otherwise.
+ */
+export const JUNCTION_TOKEN = '--colour-data-neutral';
 
 /** An event whose lifecycle the server did not name. Quiet, because it says nothing. */
 export const UNKNOWN_LIFECYCLE_TOKEN = '--colour-faint';
+
+/**
+ * What an edge's colour and dash pattern mean.
+ *
+ * Node colour says lifecycle; edge colour says RELATION, and the two axes were never distinguished
+ * anywhere the reader could see. The legend was generated from LIFECYCLE_TOKENS alone, so orange
+ * and yellow appeared on screen documented nowhere - the reported bug. They are a relation: orange
+ * is a control edge, yellow a tactical attachment.
+ *
+ * One entry per kind, read by the stroke rules AND by the legend, so a swatch cannot come to
+ * disagree with the edge it describes. `dash` is an SVG stroke-dasharray; empty means solid.
+ * `Prereq` is the plain case and takes the chart foreground rather than a hue, because "A must
+ * happen first" is the default relation and colouring it would say something it does not mean.
+ * `LuaLink` is reserved and never produced yet, so it is deliberately absent and falls through to
+ * the default stroke.
+ */
+export interface EdgeKindStyle {
+    /** Matches StoryEdgeKind on the server; `TacticalEntry` shares the tactical presentation. */
+    readonly kind: string;
+    readonly token: string;
+    readonly dash: string;
+    readonly label: string;
+}
+
+export const EDGE_KINDS: readonly EdgeKindStyle[] = [
+    { kind: 'Prereq', token: '--colour-data-neutral', dash: '', label: 'Requires' },
+    { kind: 'Control', token: '--colour-data-orange', dash: '', label: 'Activates or suspends' },
+    { kind: 'Tactical', token: '--colour-data-yellow', dash: '8 4', label: 'Tactical battle' },
+    { kind: 'Flag', token: '--colour-data-blue', dash: '2 4', label: 'Story flag' },
+];
 
 /**
  * The hues a branch is hashed onto.

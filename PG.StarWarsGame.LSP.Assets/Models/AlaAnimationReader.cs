@@ -108,20 +108,6 @@ public static class AlaAnimationReader
             header.IsVersion2 ? 2 : 1);
     }
 
-    // ── header ────────────────────────────────────────────────────────────────
-
-    /// <param name="RotationSlots">
-    ///     Slots per frame in the shared rotation block, or zero for v1.
-    /// </param>
-    private readonly record struct Header(
-        int FrameCount,
-        float Fps,
-        int BoneCount,
-        bool IsVersion2,
-        int RotationSlots,
-        int TranslationSlots,
-        int ScaleSlots);
-
     private static Header ReadHeader(byte[] bytes, AloChunk info)
     {
         var minis = MiniChildren(bytes, info.BodyStart, info.BodyEnd);
@@ -167,10 +153,6 @@ public static class AlaAnimationReader
 
         return stride / shortsPerSample;
     }
-
-    // ── shared sample blocks (version 2) ──────────────────────────────────────
-
-    private readonly record struct SharedBlocks(AloChunk? Rotation, AloChunk? Translation);
 
     private static SharedBlocks ReadSharedBlocks(byte[] bytes, List<AloChunk> children, Header header)
     {
@@ -240,7 +222,8 @@ public static class AlaAnimationReader
         var name = ReadString(bytes, Require(by, MiniName, $"the name of bone {ordinal}"));
         var boneIndex = ReadInt32(bytes, Require(by, MiniBoneIndex, $"the index of bone '{name}'").BodyStart);
 
-        var translationOffset = ReadVector3(bytes, Require(by, MiniTranslationOffset, "a translation offset").BodyStart);
+        var translationOffset =
+            ReadVector3(bytes, Require(by, MiniTranslationOffset, "a translation offset").BodyStart);
         var translationScale = ReadVector3(bytes, Require(by, MiniTranslationScale, "a translation scale").BodyStart);
         var scaleOffset = ReadVector3(bytes, Require(by, MiniScaleOffset, "a scale offset").BodyStart);
         var scaleScale = ReadVector3(bytes, Require(by, MiniScaleScale, "a scale scale").BodyStart);
@@ -301,17 +284,6 @@ public static class AlaAnimationReader
 
         return new AlamoAnimationBone(boneIndex, name, frames);
     }
-
-    /// <param name="RotationIsConstant">
-    ///     A rotation block holding exactly one sample means the bone never rotates, rather than the
-    ///     animation having one frame. Chunk size is the only thing that distinguishes them.
-    /// </param>
-    private readonly record struct OwnTracks(
-        AloChunk? Translation,
-        AloChunk? Scale,
-        AloChunk? Rotation,
-        bool RotationIsConstant,
-        AloChunk? Visibility);
 
     private static OwnTracks ReadOwnTracks(
         byte[] bytes, List<AloChunk> children, string name, Header header)
@@ -466,4 +438,33 @@ public static class AlaAnimationReader
 
         return chunk;
     }
+
+    // ── header ────────────────────────────────────────────────────────────────
+
+    /// <param name="RotationSlots">
+    ///     Slots per frame in the shared rotation block, or zero for v1.
+    /// </param>
+    private readonly record struct Header(
+        int FrameCount,
+        float Fps,
+        int BoneCount,
+        bool IsVersion2,
+        int RotationSlots,
+        int TranslationSlots,
+        int ScaleSlots);
+
+    // ── shared sample blocks (version 2) ──────────────────────────────────────
+
+    private readonly record struct SharedBlocks(AloChunk? Rotation, AloChunk? Translation);
+
+    /// <param name="RotationIsConstant">
+    ///     A rotation block holding exactly one sample means the bone never rotates, rather than the
+    ///     animation having one frame. Chunk size is the only thing that distinguishes them.
+    /// </param>
+    private readonly record struct OwnTracks(
+        AloChunk? Translation,
+        AloChunk? Scale,
+        AloChunk? Rotation,
+        bool RotationIsConstant,
+        AloChunk? Visibility);
 }

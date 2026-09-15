@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -56,6 +55,41 @@ public sealed class PreviewDeathCloneTest
             Tag("Death_Clone", "Damage_Normal, Wreck"));
 
         Assert.Equal("EV_StarDestroyer_D.ALO", Assert.Single(scene.DeathClones).ModelFile);
+    }
+
+    /// <summary>
+    ///     The clone's OWN scale, because it is its own object - and the ship's is not the answer.
+    /// </summary>
+    /// <remarks>
+    ///     Measured over 265 ship-to-clone pairs: 59 disagree. The Millennium Falcon is 0.5 and its
+    ///     clone 1.0, so drawing a wreck at its ship's scale is wrong for a real share of the corpus.
+    /// </remarks>
+    [Fact]
+    public void DeathClones_CarryTheClonesOwnScale_NotTheShips()
+    {
+        var scene = Scene(
+            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            tags => tags.With("Wreck",
+                Tag("Space_Model_Name", "falcon_d.alo"), Tag("Scale_Factor", "1.0")),
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Scale_Factor", "0.5"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        Assert.Equal(0.5f, scene.ScaleFactor);
+        Assert.Equal(1f, Assert.Single(scene.DeathClones).ScaleFactor);
+    }
+
+    [Fact]
+    public void DeathClones_DefaultTheirScaleToOne_WhenTheCloneDeclaresNone()
+    {
+        var scene = Scene(
+            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            tags => tags.With("Wreck", Tag("Space_Model_Name", "wreck.alo")),
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Scale_Factor", "0.7"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        Assert.Equal(1f, Assert.Single(scene.DeathClones).ScaleFactor);
     }
 
     [Fact]
@@ -141,38 +175,12 @@ public sealed class PreviewDeathCloneTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)
     {
         return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
-    }
-
-    /// <summary>
-    ///     A schema that says what the real one says about <c>Death_Clone</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Not the bare <c>NullSchemaProvider</c>, deliberately. Reporting no schema makes the
-    ///     resolver treat every tag as <c>Replace</c>, which collapses the occurrence list to the
-    ///     last row - so a test on the null provider would prove the OPPOSITE of production, where
-    ///     <c>GameObjectType.yaml</c> declares this tag <c>variantMode: merge</c> plus
-    ///     <c>multipleAllowed</c>. That mode is also what makes a variant keep its base's clones.
-    /// </remarks>
-    private sealed class DeathCloneSchema : NullSchemaProvider
-    {
-        public override XmlTagDefinition? GetTag(string tagName)
-        {
-            return tagName.Equals("Death_Clone", StringComparison.OrdinalIgnoreCase)
-                ? new XmlTagDefinition
-                {
-                    Tag = "Death_Clone",
-                    ValueType = XmlValueType.DeathCloneSpec,
-                    MultipleAllowed = true,
-                    VariantMode = VariantMode.Merge
-                }
-                : null;
-        }
     }
 
     [Fact]
@@ -203,8 +211,12 @@ public sealed class PreviewDeathCloneTest
     ///         explodes at the end.
     ///     </para>
     ///     <para>
-    ///         Measured over both trees: <b>34 objects declare it and every one says Yes. NOT ONE of
-    ///         the 34 also declares a Death_Clone</b>, which is the rule holding in the data. All 34
+    ///         Measured over both trees:
+    ///         <b>
+    ///             34 objects declare it and every one says Yes. NOT ONE of
+    ///             the 34 also declares a Death_Clone
+    ///         </b>
+    ///         , which is the rule holding in the data. All 34
     ///         declare <c>Max_Speed</c>. The engine's own parameter table
     ///         (<c>DatabaseMapExport.xml</c>) names five tags in the family, not one - the chance,
     ///         the time, its own explosion and a start sound - so none of this is guessed.
@@ -257,5 +269,31 @@ public sealed class PreviewDeathCloneTest
         Assert.Null(Scene(
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Spin_Away_On_Death", "No")).SpinAway);
+    }
+
+    /// <summary>
+    ///     A schema that says what the real one says about <c>Death_Clone</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Not the bare <c>NullSchemaProvider</c>, deliberately. Reporting no schema makes the
+    ///     resolver treat every tag as <c>Replace</c>, which collapses the occurrence list to the
+    ///     last row - so a test on the null provider would prove the OPPOSITE of production, where
+    ///     <c>GameObjectType.yaml</c> declares this tag <c>variantMode: merge</c> plus
+    ///     <c>multipleAllowed</c>. That mode is also what makes a variant keep its base's clones.
+    /// </remarks>
+    private sealed class DeathCloneSchema : NullSchemaProvider
+    {
+        public override XmlTagDefinition? GetTag(string tagName)
+        {
+            return tagName.Equals("Death_Clone", StringComparison.OrdinalIgnoreCase)
+                ? new XmlTagDefinition
+                {
+                    Tag = "Death_Clone",
+                    ValueType = XmlValueType.DeathCloneSpec,
+                    MultipleAllowed = true,
+                    VariantMode = VariantMode.Merge
+                }
+                : null;
+        }
     }
 }

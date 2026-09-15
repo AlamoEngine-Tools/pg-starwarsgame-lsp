@@ -11,7 +11,7 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 ///     Source-agnostic: workspace tags come from the injected <see cref="IVariantTagSource" /> and shadow
 ///     baseline tags from <see cref="BaselineIndex.ObjectTags" />. Detects cycles in the base chain.
 /// </summary>
-public sealed class EffectiveObjectResolver
+public sealed class EffectiveObjectResolver : IEffectiveObjectSource
 {
     private static readonly char[] ListSeparators = [',', ' ', '\t', '\n', '\r'];
 
@@ -201,16 +201,28 @@ public sealed class EffectiveObjectResolver
             baseValue);
     }
 
+    /// <summary>
+    ///     Concatenates the base's tokens and the variant's, in that order, keeping repeats.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         An additive tag APPENDS - this is not a union. Measured in
+    ///         <c>DatabaseMapClass::Map_Data_Of_Type</c>: the 17 additive type codes push into a
+    ///         plain vector with no reset and no membership test on either path, and nothing in the
+    ///         engine ever removes a repeat. Deduplicating here would make the effective object
+    ///         disagree with the game, and for the spawn tables - where repeating an entry is how
+    ///         you ask for two of that unit - it would get the count wrong.
+    ///     </para>
+    ///     <para>
+    ///         Only reached for tags the schema marks <c>variantMode: merge</c>; every other tag
+    ///         replaces, including nearly all the list-shaped ones.
+    ///     </para>
+    /// </remarks>
     private static string MergeValues(string baseValue, string variantValue)
     {
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var tokens = new List<string>();
-        foreach (var token in baseValue.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)
-                     .Concat(variantValue.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)))
-            if (seen.Add(token))
-                tokens.Add(token);
-
-        return string.Join(", ", tokens);
+        return string.Join(", ",
+            baseValue.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)
+                .Concat(variantValue.Split(ListSeparators, StringSplitOptions.RemoveEmptyEntries)));
     }
 
     private sealed record Accum(

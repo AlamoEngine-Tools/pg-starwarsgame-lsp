@@ -123,7 +123,8 @@ public sealed class VariantOverrideInlayHintProviderTest
         var schema = new FakeSchema().Variant("Variant_Of_Existing_Type")
             .Plain("Death_Clone", VariantMode.Merge);
         var source = new FakeTagSource()
-            .With("V", Tag("Variant_Of_Existing_Type", "B", "file:///u.xml"), Tag("Death_Clone", "Hero", "file:///u.xml"))
+            .With("V", Tag("Variant_Of_Existing_Type", "B", "file:///u.xml"),
+                Tag("Death_Clone", "Hero", "file:///u.xml"))
             .With("B", Tag("Death_Clone", "Base", BaseUri, 3));
 
         var label = SingleLabel(Hints(text, "Death_Clone", source, schema,

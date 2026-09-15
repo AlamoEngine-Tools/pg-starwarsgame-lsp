@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using PG.Commons;
 using PG.StarWarsGame.Files.ALO;
 using PG.StarWarsGame.Files.ALO.Services;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
@@ -69,7 +70,7 @@ public static class BoneNameExtractor
 
             // Keyed by bare filename (ModelBoneKey), matching the MEG baseline catalog and how XML
             // references models. A loose workspace model overrides a shipped one of the same name.
-            result[Core.Symbols.ModelBoneKey.From(file)] = bones.ToArray();
+            result[ModelBoneKey.From(file)] = bones.ToArray();
         }
 
         return result;

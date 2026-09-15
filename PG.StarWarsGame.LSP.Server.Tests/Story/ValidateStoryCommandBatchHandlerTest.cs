@@ -27,7 +27,7 @@ public sealed class ValidateStoryCommandBatchHandlerTest
 
     private static ValidateStoryCommandBatchParams Batch(params StoryCommandDto[] commands)
     {
-        return new ValidateStoryCommandBatchParams("GC", commands);
+        return new ValidateStoryCommandBatchParams("GC", "Rebel", commands);
     }
 
     [Fact]

@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -17,9 +18,11 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private const string HardpointsTag = "HardPoints";
     private const string ModelToAttachTag = "Model_To_Attach";
     private const string IsTurretTag = "Is_Turret";
+    private const string DestroyableTag = "Is_Destroyable";
+    private const string CollisionMeshTag = "Collision_Mesh";
     private const string SpecialAbilityNameTag = "Special_Ability_Name";
 
-    // Bone-tag classification and cross-file mounting/model resolution are shared with the bone-model
+    // Bone-tag classification and cross-file attachment/model resolution are shared with the bone-model
     // inlay hint through HardpointBoneModelResolver, so the two can never disagree on a bone's target.
 
     public IReadOnlyList<XmlFact> Produce(string documentUri, ParsedXmlDocument document, GameIndex index)
@@ -43,7 +46,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             if (string.Equals(symbol.TypeName, HardpointTypeName, StringComparison.OrdinalIgnoreCase))
                 CheckHardpoint(symbol.Id, node, pass);
             else
-                CheckMountingObject(symbol.Id, node, pass);
+                CheckAttachingObject(symbol.Id, node, pass);
         }
 
         // One diagnostic per unreadable model rather than per bone pointing at it.
@@ -58,6 +61,16 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     private static void CheckHardpoint(string hardpointId, HtmlNode hardpointNode, Pass pass)
     {
+        // Before the bone checks, and deliberately before their early return: a hardpoint with no
+        // bone tags at all can still be a destroyable one with no collision mesh.
+        if (EngineBoolean.IsTrue(SingleValue(hardpointNode, DestroyableTag))
+            && SingleValue(hardpointNode, CollisionMeshTag) is null)
+            pass.Facts.Add(new HardpointUnhittableFact(pass.DocumentUri,
+                XmlUtility.GetLine(hardpointNode),
+                XmlUtility.GetTagBracketColumn(hardpointNode),
+                XmlUtility.GetOpeningTagLength(hardpointNode),
+                hardpointId, null));
+
         var bones = CollectBoneTags(hardpointNode, pass);
         if (bones.Count == 0) return;
 
@@ -65,25 +78,41 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         var turretModel = SingleValue(hardpointNode, ModelToAttachTag);
 
         // Turret-side bones resolve against the hardpoint's own attached model, so they can be
-        // checked without knowing anything about who mounts it.
+        // checked without knowing anything about who attaches it.
         foreach (var bone in bones.Where(b => TargetsTurretModel(b.Tag, isTurret)))
             CheckBoneAgainstModels(bone, [turretModel], hardpointId, hardpointId, pass);
 
-        // Parent-side bones and the special ability both need the mounting objects. A Collision_Mesh
+        // Parent-side bones and the special ability both need the attaching objects. A Collision_Mesh
         // that lives on the attached weapon model is already satisfied (hull UNION Model_To_Attach), so
-        // drop it before the per-hull check rather than flag it against every mounting hull.
-        var parentBones = bones
-            .Where(b => !TargetsTurretModel(b.Tag, isTurret))
-            .Where(b => !(HardpointBoneModelResolver.MayResolveAgainstAttachedModel(b.Tag)
-                          && HardpointBoneModelResolver.ModelHasBone(pass.Index, turretModel, b.Value)))
-            .ToList();
+        // drop it before the per-hull check rather than flag it against every hull attaching it.
+        // Each surviving bone carries the attached model it was ALSO checked against, so the report
+        // can say both were examined - and where that model cannot be read, the union cannot be
+        // ruled out and the bone is dropped instead of blamed on the hull.
+        var parentBones = new List<(BoneReference Bone, string? CheckedAttached)>();
+        foreach (var bone in bones.Where(b => !TargetsTurretModel(b.Tag, isTurret)))
+        {
+            string? checkedAttached = null;
+            if (HardpointBoneModelResolver.MayResolveAgainstAttachedModel(bone.Tag)
+                && !string.IsNullOrEmpty(turretModel))
+            {
+                if (HardpointBoneModelResolver.ModelHasBone(pass.Index, turretModel, bone.Value))
+                    continue;
+                if (!HardpointBoneModelResolver.ModelBonesKnown(pass.Index, turretModel))
+                    continue;
+
+                checkedAttached = turretModel;
+            }
+
+            parentBones.Add((bone, checkedAttached));
+        }
+
         var abilityNode = hardpointNode.ChildNodes.LastOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             n.Name.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase));
         var ability = abilityNode?.InnerText.Trim();
         if (parentBones.Count == 0 && string.IsNullOrEmpty(ability)) return;
 
-        foreach (var owner in pass.FindMountingObjects(hardpointId))
+        foreach (var owner in pass.FindAttachingObjects(hardpointId))
         {
             if (!string.IsNullOrEmpty(ability) && abilityNode is not null)
                 CheckSpecialAbility(hardpointId, ability, owner.Id,
@@ -94,13 +123,16 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             var models = pass.DeclaredModels(owner.Id);
             if (models.Count == 0) continue;
 
-            foreach (var bone in parentBones)
-                CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, pass);
+            // Anchored on the tag's VALUE (CollectBoneTags), so a quick fix replacing the range
+            // replaces exactly the name that is wrong.
+            foreach (var (bone, checkedAttached) in parentBones)
+                CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, pass, checkedAttached,
+                    true);
         }
     }
 
     /// <summary>
-    ///     The engine enables <c>Special_Ability_Name</c> on the object mounting the hardpoint, so the
+    ///     The engine enables <c>Special_Ability_Name</c> on the object attaching the hardpoint, so the
     ///     ability has to exist on that object - not merely somewhere in the workspace. Abilities are
     ///     indexed owner-scoped under whichever object declares them, and a variant inherits its base's
     ///     abilities without re-declaring them, so the whole variant chain counts as "this object".
@@ -116,25 +148,39 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             pass.Index.ResolveOwnerAgnostic(ability) is not null));
     }
 
-    // ── direction 2: a file mounting hardpoints is open ──────────────────────
+    // ── direction 2: a file attaching hardpoints is open ──────────────────────
 
-    private static void CheckMountingObject(string ownerId, HtmlNode objectNode, Pass pass)
+    private static void CheckAttachingObject(string ownerId, HtmlNode objectNode, Pass pass)
     {
         var hardpointsNode = objectNode.ChildNodes.FirstOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             n.Name.Equals(HardpointsTag, StringComparison.OrdinalIgnoreCase));
         if (hardpointsNode is null) return;
 
+        // Damage reaches a hardpoint through its collision mesh and the lookup returns the FIRST
+        // match, so two destroyable hardpoints claiming one mesh leave the later one unreachable.
+        // Per object, because that is the scope the lookup runs in - two units may reuse a mesh name
+        // freely.
+        var meshClaimedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         var models = pass.DeclaredModels(ownerId);
-        if (models.Count == 0) return;
 
         foreach (var (hardpointId, offset) in XmlUtility.SplitListWithOffsets(hardpointsNode.InnerText))
         {
             var hardpointTags = pass.TagSource.TryGetTags(hardpointId);
             if (hardpointTags is null) continue; // unresolved hardpoint: the reference pipeline owns that
 
-            var isTurret = IsTurretFromTags(hardpointTags);
             var position = pass.TokenPosition(hardpointsNode, offset, hardpointId);
+
+            // Which mesh each hardpoint claims is a question about the LIST, so it is asked before
+            // the model gate below: an object with no model declared still routes damage by mesh.
+            CheckCollisionMeshClaim(hardpointId, hardpointTags, position, meshClaimedBy, pass);
+
+            // Everything past here compares a bone against a model, so without one there is nothing
+            // to check. Unchanged in effect from the early return this replaced.
+            if (models.Count == 0) continue;
+
+            var isTurret = IsTurretFromTags(hardpointTags);
             var attachedModel = hardpointTags.LastOrDefault(t =>
                 t.TagName.Equals(ModelToAttachTag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
 
@@ -152,20 +198,38 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
                 if (bone.Length == 0) continue;
 
                 // Collision_Mesh on the attached weapon model is valid (hull UNION Model_To_Attach).
+                string? checkedAttachedModel = null;
                 if (HardpointBoneModelResolver.MayResolveAgainstAttachedModel(tag.TagName)
-                    && HardpointBoneModelResolver.ModelHasBone(pass.Index, attachedModel, bone))
-                    continue;
+                    && !string.IsNullOrEmpty(attachedModel))
+                {
+                    if (HardpointBoneModelResolver.ModelHasBone(pass.Index, attachedModel, bone))
+                        continue;
+
+                    // Its bones are unreadable, so the union cannot be ruled out. Reporting the
+                    // hull here would state as fact something nobody checked.
+                    if (!HardpointBoneModelResolver.ModelBonesKnown(pass.Index, attachedModel))
+                        continue;
+
+                    checkedAttachedModel = attachedModel;
+                }
 
                 CheckBoneAgainstModels(new BoneReference(tag.TagName, bone, position),
-                    models, hardpointId, ownerId, pass);
+                    models, hardpointId, ownerId, pass, checkedAttachedModel);
             }
         }
     }
 
     // ── shared ───────────────────────────────────────────────────────────────
 
+    /// <param name="anchoredOnValue">
+    ///     Whether the bone's position is the tag's own value - true from the hardpoint's file, false
+    ///     from the attaching object's, where it is the hardpoint's id in the <c>HardPoints</c> list. A
+    ///     suggestion is only ever attached in the first case; see
+    ///     <see cref="HardpointBoneNotOnModelFact.SuggestedName" />.
+    /// </param>
     private static void CheckBoneAgainstModels(BoneReference bone, IReadOnlyList<string?> models,
-        string hardpointId, string ownerId, Pass pass)
+        string hardpointId, string ownerId, Pass pass, string? checkedAttachedModel = null,
+        bool anchoredOnValue = false)
     {
         foreach (var model in models)
         {
@@ -188,10 +252,52 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
             if (modelBones.Contains(bone.Value, StringComparer.OrdinalIgnoreCase)) continue;
 
+            var suggestion = anchoredOnValue
+                ? SuggestCollisionMesh(bone, modelBones, checkedAttachedModel, pass)
+                : null;
+
             pass.Facts.Add(new HardpointBoneNotOnModelFact(pass.DocumentUri,
                 bone.Position.Line, bone.Position.Column, bone.Position.Length,
-                hardpointId, bone.Tag, bone.Value, model, ownerId));
+                hardpointId, bone.Tag, bone.Value, model, ownerId, checkedAttachedModel, suggestion));
         }
+    }
+
+    /// <summary>
+    ///     The one name the checked models carry that starts with a truncated <c>Collision_Mesh</c>, or
+    ///     null.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The failure this is for is measured, not guessed: all eight Gargantuan hardpoints write
+    ///         <c>..._COL</c> or <c>..._COLL</c> and their models carry <c>..._COLLISION</c>. So only
+    ///         <c>Collision_Mesh</c>, only a name that EXTENDS what was written, and only when exactly
+    ///         one does - a quick fix that picked between two candidates would be a guess dressed as a
+    ///         fix.
+    ///     </para>
+    ///     <para>
+    ///         Candidates are the hull being reported and the hardpoint's own model where that was also
+    ///         checked, because the tag is valid on either. The model's spelling is returned verbatim,
+    ///         since that is what the author should see written back.
+    ///     </para>
+    /// </remarks>
+    private static string? SuggestCollisionMesh(BoneReference bone, ImmutableArray<string> hullNames,
+        string? attachedModel, Pass pass)
+    {
+        if (!HardpointBoneModelResolver.MayResolveAgainstAttachedModel(bone.Tag)) return null;
+
+        IEnumerable<string> names = hullNames;
+        if (!string.IsNullOrEmpty(attachedModel)
+            && pass.Index.ModelBones.TryGetValue(ModelBoneKey.From(attachedModel), out var attachedNames))
+            names = names.Concat(attachedNames);
+
+        var candidates = names
+            .Where(n => n.Length > bone.Value.Length
+                        && n.StartsWith(bone.Value, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+            .ToList();
+
+        return candidates.Count == 1 ? candidates[0] : null;
     }
 
     private static List<BoneReference> CollectBoneTags(HtmlNode hardpointNode, Pass pass)
@@ -208,7 +314,10 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             // is wrong. Uses the document line index (HAP's per-node LinePosition is unreliable for some
             // nested elements, which produced invalid ranges the client silently dropped).
             var (line, column, length) = XmlUtility.GetValuePosition(child, pass.LineIndex);
-            result.Add(new BoneReference(child.Name, value, new Position(line, column, length)));
+
+            // OriginalName, not Name: HAP lower-cases Name, and the tag is quoted back in the message.
+            result.Add(new BoneReference(child.OriginalName ?? child.Name, value,
+                new Position(line, column, length)));
         }
 
         return result;
@@ -227,6 +336,38 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     private static bool IsTurret(HtmlNode hardpointNode)
     {
         return HardpointBoneModelResolver.IsTurret(hardpointNode);
+    }
+
+    /// <summary>
+    ///     Records which destroyable hardpoint claimed a collision mesh on this object, and reports
+    ///     the later ones that can therefore never be hit.
+    /// </summary>
+    /// <remarks>
+    ///     Only destroyable hardpoints compete: an indestructible one is never a damage target, so
+    ///     it takes nothing away from the one that matters.
+    /// </remarks>
+    private static void CheckCollisionMeshClaim(string hardpointId, IReadOnlyList<VariantTag> tags,
+        Position position, Dictionary<string, string> meshClaimedBy, Pass pass)
+    {
+        if (!EngineBoolean.IsTrue(LastTagValue(tags, DestroyableTag))) return;
+
+        var mesh = LastTagValue(tags, CollisionMeshTag);
+        if (string.IsNullOrEmpty(mesh)) return;
+
+        if (meshClaimedBy.TryGetValue(mesh, out var first))
+        {
+            pass.Facts.Add(new HardpointUnhittableFact(pass.DocumentUri,
+                position.Line, position.Column, position.Length, hardpointId, first));
+            return;
+        }
+
+        meshClaimedBy[mesh] = hardpointId;
+    }
+
+    private static string? LastTagValue(IReadOnlyList<VariantTag> tags, string tagName)
+    {
+        return tags.LastOrDefault(t =>
+            t.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
     }
 
     private static bool IsTurretFromTags(IReadOnlyList<VariantTag> tags)
@@ -259,9 +400,10 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     /// </summary>
     private sealed class Pass
     {
-        private readonly ParsedXmlDocument _document;
         private readonly Dictionary<string, IReadOnlyList<string>> _chainByOwner =
             new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly ParsedXmlDocument _document;
 
         private readonly HardpointBoneModelResolver _models;
         private readonly EffectiveObjectResolver _resolver;
@@ -290,6 +432,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         ///     6461-line file re-walked the whole tree 194 times).
         /// </summary>
         public Dictionary<string, HtmlNode> NodesById { get; }
+
+        /// <summary>The document's memoised line index, for value/token range computation.</summary>
+        public LineOffsetIndex LineIndex => _document.LineIndex;
 
         /// <summary>
         ///     Models the object declares, resolved through variant inheritance. Delegated to the shared
@@ -323,22 +468,19 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             var effective = _resolver.Resolve(ownerId);
             var chain = effective.Found && !effective.Cyclic
                 ? effective.Chain
-                : (IReadOnlyList<string>) [ownerId];
+                : (IReadOnlyList<string>)[ownerId];
 
             return _chainByOwner[ownerId] = chain;
         }
 
         /// <summary>
-        ///     Objects whose <c>HardPoints</c> list mounts <paramref name="hardpointId" />. Delegated to
+        ///     Objects whose <c>HardPoints</c> list attaches <paramref name="hardpointId" />. Delegated to
         ///     the shared <see cref="HardpointBoneModelResolver" />.
         /// </summary>
-        public IEnumerable<GameSymbol> FindMountingObjects(string hardpointId)
+        public IEnumerable<GameSymbol> FindAttachingObjects(string hardpointId)
         {
-            return _models.FindMountingObjects(hardpointId);
+            return _models.FindAttachingObjects(hardpointId);
         }
-
-        /// <summary>The document's memoised line index, for value/token range computation.</summary>
-        public LineOffsetIndex LineIndex => _document.LineIndex;
 
         /// <summary>
         ///     Position of one token inside a list element. Uses the document's memoised line index -
@@ -348,7 +490,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         {
             var (line, column) = _document.LineIndex.GetPosition(listNode.InnerStartIndex + offset);
             return new Position(line, column, token.Length);
-        } 
+        }
 
         private static Dictionary<string, HtmlNode> BuildNodeIndex(HtmlDocument doc)
         {

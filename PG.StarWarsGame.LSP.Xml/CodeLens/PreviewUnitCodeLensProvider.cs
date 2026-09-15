@@ -123,7 +123,7 @@ internal sealed class PreviewUnitCodeLensProvider : IXmlCodeLensProvider
 
     private static bool IsModelTag(string tagName)
     {
-        return HardpointBoneModelResolver.MountingObjectModelTags
+        return HardpointBoneModelResolver.AttachingObjectModelTags
             .Contains(tagName, StringComparer.OrdinalIgnoreCase);
     }
 }

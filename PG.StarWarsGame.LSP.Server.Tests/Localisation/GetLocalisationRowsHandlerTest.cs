@@ -154,8 +154,10 @@ public sealed class GetLocalisationRowsHandlerTest
     public async Task Handle_RegistryClassification_WinsOverTheConvention()
     {
         var registry = new LocalisationProjectRegistry();
-        registry.Set([new LocProjectInfo(
-            "creditstext.csv", CreditsPath, "Csv", "Root", 1, LocCategory.Text)]);
+        registry.Set([
+            new LocProjectInfo(
+                "creditstext.csv", CreditsPath, "Csv", "Root", 1)
+        ]);
         var handler = BuildHandler(Files(), registry: registry);
 
         var result = await handler.Handle(new GetLocalisationRowsParams(CreditsPath), CancellationToken.None);

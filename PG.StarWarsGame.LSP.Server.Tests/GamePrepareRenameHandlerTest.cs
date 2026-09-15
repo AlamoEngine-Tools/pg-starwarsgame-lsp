@@ -142,6 +142,7 @@ public sealed class GamePrepareRenameHandlerTest
     private sealed class FakeIndexService : IGameIndexService
     {
         public GameIndex Current { get; } = GameIndex.Empty;
+
         public event Action<GameIndex>? IndexChanged
         {
             add { }

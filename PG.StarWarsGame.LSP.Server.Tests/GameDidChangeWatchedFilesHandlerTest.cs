@@ -236,12 +236,12 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
     ///     That class is gone; this asserts the list that is actually registered.
     /// </remarks>
     [Theory]
-    [InlineData("**/*.xml")]      // game data AND dynamic enum sources
-    [InlineData("**/*.lua")]      // story scripts
-    [InlineData("**/*.pgproj")]   // project file - a change re-derives the whole configuration
-    [InlineData("**/*.csv")]      // localisation
+    [InlineData("**/*.xml")] // game data AND dynamic enum sources
+    [InlineData("**/*.lua")] // story scripts
+    [InlineData("**/*.pgproj")] // project file - a change re-derives the whole configuration
+    [InlineData("**/*.csv")] // localisation
     [InlineData("**/*.properties")]
-    [InlineData("**/*.dat")]      // the engine's own localisation format
+    [InlineData("**/*.dat")] // the engine's own localisation format
     public void WatchedGlobs_CoversEveryFileKindTheServerReactsTo(string glob)
     {
         Assert.Contains(glob, GameDidChangeWatchedFilesHandler.WatchedGlobs);
@@ -757,6 +757,7 @@ public sealed class GameDidChangeWatchedFilesHandlerTest
 
         public int AssetApplications { get; private set; }
         public GameIndex Current => GameIndex.Empty;
+
         public event Action<GameIndex>? IndexChanged
         {
             add { }

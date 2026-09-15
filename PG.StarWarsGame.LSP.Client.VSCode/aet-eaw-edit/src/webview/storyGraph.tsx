@@ -25,13 +25,15 @@ import {
 import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
 import { RightDock } from './shared/RightDock';
 import { ProblemsPanel, type ProblemFilterControl } from './shared/ProblemsPanel';
-import { filterProblems } from './shared/problemFilter';
+import { filterProblems, resolveProblemJump } from './shared/problemFilter';
 import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
 import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
-import { labelLayout, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
-import { shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
+import { createLabelSizer, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
+import { facetList } from './storyGraph/facets';
+import { lodShape } from './storyGraph/lodShape';
+import { needsFullMountForLayout, shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
 import { Extent, fitZoom } from './storyGraph/viewportFit';
 import { booleanParamLabel, shortParamLabel } from './storyGraph/paramLabels';
 import { paramRowSpecs } from './storyGraph/paramRows';
@@ -60,7 +62,7 @@ import { colourResolver } from './shared/resolveColour';
 import { SeverityTag } from './shared/SeverityTag';
 import { tokensRootCss } from './shared/tokens';
 import {
-    JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
+    EDGE_KINDS, JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
     branchToken, laneToken,
 } from './storyGraph/palette';
 
@@ -82,7 +84,11 @@ initPanelLayout(vscode);
  * what gets sent, and "no branch filter" travels as an absent field. Here every filter always has
  * a value, because every filter always has a control showing it.
  */
-interface FilterState { nameFilter: string; branch: string; lifecycle: string; reachableFrom: string; }
+interface FilterState {
+    nameFilter: string; branch: string; lifecycle: string; reachableFrom: string;
+    /** Active_Plot or Suspended_Plot, as the faction manifest registers the thread. */
+    plotState: string;
+}
 
 function sendSim(method: string, args?: Record<string, unknown>): void {
     vscode.postMessage({ type: 'sim', method, args });
@@ -109,7 +115,9 @@ function fetchParamOptions(
     });
 }
 
-const EMPTY_FILTERS: FilterState = { nameFilter: '', branch: '', lifecycle: '', reachableFrom: '' };
+const EMPTY_FILTERS: FilterState = {
+    nameFilter: '', branch: '', lifecycle: '', reachableFrom: '', plotState: '',
+};
 
 /** Event/reward type names flagged `untested` in the schema - set once, read during render. */
 const untestedTypes = new Set<string>();
@@ -567,7 +575,8 @@ const LABEL_MEASURE_PX = 100;
 const LABEL_PAD = 4;
 
 // Overview colour for a node: events by lifecycle (matching the node border + legend), junctions
-// the colour a fired event takes.
+// a neutral - they have no lifecycle, and the overview tells them apart by SHAPE instead (see
+// lodShape), which is what the mounted view already does.
 function lodToken(dto: StoryGraphNodeDto): string {
     if (dto.kind !== 'Event') { return JUNCTION_TOKEN; }
     return LIFECYCLE_TOKENS[dto.lifecycle as keyof typeof LIFECYCLE_TOKENS] ?? UNKNOWN_LIFECYCLE_TOKEN;
@@ -886,7 +895,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
         for (const m of graphModel.values()) {
             if (m.dto.kind !== 'Event') { continue; }
             entries.push({
-                file: baseName(m.dto.threadUri),
+                threadUri: m.dto.threadUri ?? '',
                 eventName: m.dto.label,
                 x: m.x,
                 y: m.y,
@@ -935,8 +944,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     // Original (static analysis) lifecycles, so ending a simulation restores the pre-sim view.
     const staticLifecycles = new Map<string, string | null | undefined>();
 
+    // Keyed on the thread's URI, not its base name: two threads can share a file name, and the
+    // server has to be able to re-derive this from the model - which it cannot do from a name the
+    // webview shortened.
     const layoutKey = (dto: StoryGraphNodeDto): string =>
-        `${baseName(dto.threadUri)} ${dto.label}`.toLowerCase();
+        `${dto.threadUri ?? ''} ${dto.label}`.toLowerCase();
 
     const connectionKey = (fromId: string, toId: string, kind: string): string =>
         `${fromId}>${toId}|${kind}`;
@@ -1028,7 +1040,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const buildModelFromLayout = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): boolean => {
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
         const events = nodes.filter(n => n.kind === 'Event');
         if (events.length === 0 || !canReuseStoredLayout(events.map(layoutKey), new Set(stored.keys()))) {
             return false;
@@ -1273,7 +1285,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
     const rebuildModelFromGraph = (
         nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[]
     ): void => {
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
         const oldPos = new Map<string, { x: number; y: number }>();
         for (const [id, m] of graphModel) { oldPos.set(id, { x: m.x, y: m.y }); }
         graphModel.clear();
@@ -1437,7 +1449,7 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
 
         // 3. Existing nodes update in place; nodes whose socket shape changed are rebuilt at
         //    their current position; genuinely new nodes appear beside a neighbour.
-        const stored = new Map(layout.map(e => [`${e.file} ${e.eventName}`.toLowerCase(), e]));
+        const stored = new Map(layout.map(e => [`${e.threadUri} ${e.eventName}`.toLowerCase(), e]));
         let placedPending = false;
         for (const dto of nodes) {
             const needsIn = hasIn.has(dto.id) || dto.kind === 'Event';
@@ -1557,12 +1569,29 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 // plugin's translations must pass, same as during setGraph.
                 applyingServerGraph = true;
                 const wasWindowed = windowed;
+                // Keyed on the MOUNTED set, never on `windowed` - see needsFullMountForLayout.
+                // Zooming out past K_DETAIL unmounts every graph, small ones included, so this was
+                // also true of an unwindowed graph showing the overview: elk arranged an empty
+                // editor, rebuildModel read that same empty editor, and the model - which is what
+                // the overview, the minimap and the lanes all draw - was cleared. The graph
+                // vanished until the next full rebuild put it back.
+                const needsMount = needsFullMountForLayout(mountedIds.size, graphModel.size);
                 try {
                     if (wasWindowed) {
-                        // elk lays out MOUNTED nodes + their connections, so mount the whole graph
-                        // first (windowed=false makes mountNodes add real connections).
+                        // A windowed mount deliberately carries NO rete connections - the LOD canvas
+                        // draws the edges instead - and elk lays out a graph, not a bag of boxes.
+                        // Dropping the window first is what makes the re-mount add them: mountNodes
+                        // skips ids it already holds, so a window that happened to cover the whole
+                        // graph would otherwise re-enter with nothing fresh, and elk would flow
+                        // sixty unconnected nodes into a grid and persist that as the layout.
+                        await unmountNodes([...mountedIds]);
+                        mountedConnKeys.clear();
                         windowed = false;
-                        await mountNodes(graphModel.keys());
+                        await mountAllFromModel();
+                    } else if (needsMount) {
+                        // elk lays out MOUNTED nodes + their connections, so mount the whole graph
+                        // first (windowed is already false here, so mountNodes adds them).
+                        await mountAllFromModel();
                     }
                     await arrange.layout({ options: ARRANGE_OPTIONS });
                     rebuildModel();      // capture the recomputed layout into the model
@@ -1578,7 +1607,11 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                     await fitModel();
                     await reconcileWindow();
                 } else {
-                    void AreaExtensions.zoomAt(area, editor.getNodes());
+                    await AreaExtensions.zoomAt(area, editor.getNodes());
+                    // A graph mounted only for the layout is still carrying whatever the zoom says
+                    // it should not: settle it here rather than waiting on the 'zoomed' pipe, so
+                    // the overview and the mounted nodes are never both up when this returns.
+                    if (needsMount) { await reconcileWindow(); }
                 }
             };
             // Same serialization as setGraph - arranging mid-patch would interleave mutations.
@@ -1739,9 +1772,9 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // Nodes: coloured rects; from K_LABEL up the event title is drawn inside too (mid stage).
             // Off-screen nodes skipped. Font/colour set once, labels truncated (no per-node clip).
             const showLabels = k >= K_LABEL;
-            let fontPx = 11;
-            let maxLines = 1;
             let advancePerPx = 0;
+            let sizeFor: ((width: number, height: number) => { fontPx: number; maxLines: number }) | null = null;
+            let lastFontPx = 0;
             // Resolved with the rest of the frame's colours rather than re-read here: it was the
             // one canvas colour that already followed the theme, and now they all do.
             const labelColor = colour('--colour-editor-ink');
@@ -1753,23 +1786,18 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 advancePerPx = ctx.measureText(LABEL_SAMPLE).width
                     / LABEL_SAMPLE.length / LABEL_MEASURE_PX;
 
-                // Sized so the graph's longest label fits a node - from the whole model, not just
-                // what is on screen, so the text does not resize while panning.
+                // Sized so the graph's longest label fits - from the whole model, not just what is
+                // on screen, so the text does not resize while panning. The BOX, though, is each
+                // node's own: they differ by several hundred pixels (an event's height follows its
+                // param count), and one size for all of them either overflowed the short ones or
+                // truncated them. See createLabelSizer.
                 let longest = '';
-                let nodeWidth = 0;
-                let nodeHeight = 0;
                 for (const m of graphModel.values()) {
                     if (m.dto.kind !== 'Event') { continue; }
                     if (m.dto.label.length > longest.length) { longest = m.dto.label; }
-                    if (m.w > nodeWidth) { nodeWidth = m.w; }
-                    if (m.h > nodeHeight) { nodeHeight = m.h; }
                 }
-                const fit = labelLayout(longest, Math.max(0, nodeWidth * k - LABEL_PAD * 2),
-                    Math.max(0, nodeHeight * k - LABEL_PAD * 2), advancePerPx,
+                sizeFor = createLabelSizer(longest, advancePerPx,
                     Math.min(13, Math.max(8, Math.round(k * 55))));
-                fontPx = fit.fontPx;
-                maxLines = fit.maxLines;
-                ctx.font = `${fontPx}px sans-serif`;
                 ctx.textBaseline = 'middle';
             }
             for (const m of graphModel.values()) {
@@ -1781,11 +1809,44 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
                 const sx = m.x * k + x, sy = m.y * k + y, sw = m.w * k, sh = m.h * k;
                 if (sx + sw < 0 || sy + sh < 0 || sx > w || sy > h) { continue; }
                 const color = colour(m.colorToken);
-                ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
-                ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.strokeRect(sx, sy, sw, sh);
-                if (showLabels && m.dto.kind === 'Event' && sw > 30) {
+                // A junction keeps the silhouette it has when mounted - a circle for AND, a
+                // rotated square for OR - so structure stays readable zoomed out instead of
+                // becoming another rectangle. Rects keep the cheap path: fillRect/strokeRect are
+                // measurably faster than a path, and they are the overwhelming majority.
+                const shape = lodShape(m.dto.kind);
+                if (shape === 'rect') {
+                    ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fillRect(sx, sy, sw, sh);
+                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+                    ctx.strokeRect(sx, sy, sw, sh);
+                } else {
+                    const cx = sx + sw / 2, cy = sy + sh / 2;
+                    ctx.beginPath();
+                    if (shape === 'circle') {
+                        ctx.ellipse(cx, cy, sw / 2, sh / 2, 0, 0, Math.PI * 2);
+                    } else {
+                        // The diamond is inset like the mounted node's inner square, so the two
+                        // read as the same figure rather than as two different sizes.
+                        const rx = sw * 0.35, ry = sh * 0.35;
+                        ctx.moveTo(cx, cy - ry);
+                        ctx.lineTo(cx + rx, cy);
+                        ctx.lineTo(cx, cy + ry);
+                        ctx.lineTo(cx - rx, cy);
+                        ctx.closePath();
+                    }
+                    ctx.globalAlpha = 0.28; ctx.fillStyle = color; ctx.fill();
+                    ctx.globalAlpha = 0.9; ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.stroke();
+                }
+                if (showLabels && sizeFor !== null && m.dto.kind === 'Event' && sw > 30) {
                     ctx.globalAlpha = 1;
                     ctx.fillStyle = labelColor;
+                    const { fontPx, maxLines } = sizeFor(
+                        Math.max(0, sw - LABEL_PAD * 2), Math.max(0, sh - LABEL_PAD * 2));
+                    // Only when it actually changes: parsing the font shorthand per node is the
+                    // cost that made one size per frame attractive, and nodes of a size cluster.
+                    if (fontPx !== lastFontPx) {
+                        ctx.font = `${fontPx}px sans-serif`;
+                        lastFontPx = fontPx;
+                    }
                     // Arithmetic from the measured advance rather than measureText per node -
                     // hundreds of these are drawn per frame.
                     const lines = wrapLabel(m.dto.label, sw - LABEL_PAD * 2, maxLines,
@@ -2859,10 +2920,13 @@ const ConnSvg = styled.svg`
         stroke: var(--vscode-charts-foreground, #999);
         marker-end: url(#story-arrow);
     }
-    &.k-Control path  { stroke: var(--vscode-charts-orange, #d18616); }
-    &.k-Tactical path,
-    &.k-TacticalEntry path { stroke: var(--vscode-charts-yellow, #cca700); stroke-dasharray: 8 4; }
-    &.k-Flag path     { stroke: var(--vscode-charts-blue, #3794ff);   stroke-dasharray: 2 4; }
+    /* Generated from EDGE_KINDS, which the legend swatches read too - a swatch and the edge it
+       describes cannot drift apart if both come from the one list. TacticalEntry deliberately
+       shares Tactical's presentation: it is the same relation seen from the stub side. */
+    ${EDGE_KINDS.filter(k => k.kind !== 'Prereq').map(k => {
+        const selector = k.kind === 'Tactical' ? '&.k-Tactical path, &.k-TacticalEntry path' : `&.k-${k.kind} path`;
+        return `${selector} { stroke: var(${k.token}); ${k.dash ? `stroke-dasharray: ${k.dash};` : ''} }`;
+    }).join('\n    ')}
     /* Sankey glow underlay: a fat translucent stroke UNDER the crisp edge. A plain wide path is
        far cheaper than an SVG filter (drop-shadow was the main pan/zoom perf sink on big
        campaigns) and still reads as a coloured halo. No arrowhead on the underlay. */
@@ -3300,6 +3364,18 @@ const Shell = styled.div`
         vertical-align: -1px;
         margin-right: var(--space-2);
     }
+    /* A real stroke rather than a bordered box: the dash pattern is part of what an edge kind
+       means, and a square cannot show it. */
+    .legend .edge-swatch {
+        vertical-align: middle;
+        margin-right: var(--space-2);
+    }
+    /* Names the axis the swatches after it belong to, so the two keys do not read as one list. */
+    .legend .legend-label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        opacity: 0.75;
+    }
 
     /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
        renders, so they are figures and not text - and the house rule keeps user-facing strings
@@ -3316,6 +3392,14 @@ const Shell = styled.div`
 `;
 
 const LIFECYCLES = ['Inactive', 'Waiting', 'Armed', 'Fired', 'Disabled'];
+
+/**
+ * How the faction's plot manifest registers a thread.
+ *
+ * Two stops and an 'any', so it is a dropdown rather than a slider - the two are not points on
+ * an axis, they are the two lists a manifest keeps.
+ */
+const PLOT_STATES = ['Active', 'Suspended'];
 
 function App(): React.JSX.Element {
     const containerRef = useRef<HTMLDivElement>(null);
@@ -3357,6 +3441,14 @@ function App(): React.JSX.Element {
      * with the filter.
      */
     const [graphNodeIds, setGraphNodeIds] = useState<Set<string> | null>(null);
+    /**
+     * A problem jump waiting for the graph that can show it (#129).
+     *
+     * Clicking a problem outside the current filter has to drop the filter and re-fetch before the
+     * node exists to centre on, so the id is parked here and {@link runSetGraph} spends it once the
+     * new graph has settled.
+     */
+    const pendingJumpRef = useRef<string | null>(null);
 
     /** The reader has asked to see the findings the view filter holds back. */
     const [showAllProblems, setShowAllProblems] = useState(false);
@@ -3531,19 +3623,26 @@ function App(): React.JSX.Element {
         if (g.full) { setLayouting(true); }
         // Re-apply staged edits once the (re)built graph settles, so a reconcile never reverts them.
         const done = handle.setGraph(g.nodes, g.edges, g.layout, g.full)
-            .then(() => reapplyStagedCommands());
+            .then(() => reapplyStagedCommands())
+            .then(() => {
+                // A jump parked by a problem click, now that its node is mounted and centreable.
+                const queued = pendingJumpRef.current;
+                if (queued === null) { return; }
+                pendingJumpRef.current = null;
+                handle.centerNode(queued);
+            });
         if (g.full) { void done.finally(() => setLayouting(false)); }
     }, []);
 
     const applyGraph = useCallback((
-        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[], full: boolean
+        nodes: StoryGraphNodeDto[], edges: StoryGraphEdgeDto[], layout: StoryLayoutEntryDto[], full: boolean,
+        facets: { branches?: string[]; threads?: string[] } = {}
     ) => {
-        setBranches(() => {
-            const found = [...new Set(nodes.map(n => n.branch).filter((b): b is string => !!b))].sort();
-            const active = filtersRef.current.branch;
-            return active && !found.includes(active) ? [...found, active].sort() : found;
-        });
-        setThreads([...new Set(nodes.map(n => n.threadUri).filter((u): u is string => !!u))].sort());
+        // Both lists describe the campaign, not this filtered result - see facetList. The thread
+        // list is not a filter, it backs the picker for placing a NEW event, which likewise has to
+        // be able to target a thread the current filter is hiding.
+        setBranches(facetList(facets.branches, nodes.map(n => n.branch), filtersRef.current.branch));
+        setThreads(facetList(facets.threads, nodes.map(n => n.threadUri), ''));
         if (!nodes.length) {
             setStatus('No events match the current filters.');
             return;
@@ -3617,7 +3716,11 @@ function App(): React.JSX.Element {
                         graphNodes,
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
                         (msg.layout as StoryLayoutEntryDto[] | undefined) ?? [],
-                        full);
+                        full,
+                        {
+                            branches: msg.branches as string[] | undefined,
+                            threads: msg.threads as string[] | undefined,
+                        });
                     // A running simulation keeps painting its lifecycles over fresh renders.
                     if (simRef.current?.running) { applySimOverlay(simRef.current); }
                     break;
@@ -3821,7 +3924,17 @@ function App(): React.JSX.Element {
                                 filterable: problemView.filterable,
                                 onToggle: () => setShowAllProblems(open => !open),
                             }}
-                            onJump={id => editorRef.current?.centerNode(id)}
+                            onJump={id => {
+                                // Centring on a node the server filtered out is a no-op, so a
+                                // problem from outside the view clears the filter and jumps when
+                                // the fuller graph lands.
+                                if (resolveProblemJump(id, graphNodeIds) === 'unfilter') {
+                                    pendingJumpRef.current = id;
+                                    clearFilters();
+                                    return;
+                                }
+                                editorRef.current?.centerNode(id);
+                            }}
                             onClose={() => setShowProblems(false)}
                         />
                     ) : null}
@@ -3829,6 +3942,10 @@ function App(): React.JSX.Element {
                         <SimLog state={simState} onClose={() => setShowSimLog(false)} />
                     ) : null}
                     <div className="legend">
+                        {/* Two axes, told apart. A node's colour is its lifecycle; an edge's is
+                            the relation it carries. Reading one key for both is what made yellow
+                            and orange look undocumented. */}
+                        <span className="legend-label">Node</span>
                         <span>
                             <span className="swatch" style={{ borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})` }} />
                             Inactive
@@ -3843,8 +3960,26 @@ function App(): React.JSX.Element {
                         ))}
                         <span><span className="shape-diamond" /> OR</span>
                         <span><span className="shape-circle" /> AND</span>
-                        <span>dashed = portal / tactical / untested</span>
-                        <span>drag socket to socket = prereq</span>
+
+                        {/* Edge colour is a second axis and used to be undocumented, so orange and
+                            yellow appeared on screen with nothing to explain them. Drawn as real
+                            strokes from EDGE_KINDS - same token, same dash array as the graph. */}
+                        <span className="legend-label">Edge</span>
+                        {EDGE_KINDS.map(kind => (
+                            <span key={kind.kind}>
+                                <svg className="edge-swatch" width="22" height="6" aria-hidden="true">
+                                    <line
+                                        x1="0" y1="3" x2="22" y2="3"
+                                        stroke={`var(${kind.token})`}
+                                        strokeWidth="2"
+                                        strokeDasharray={kind.dash || undefined}
+                                    />
+                                </svg>
+                                {kind.label}
+                            </span>
+                        ))}
+                        <span>Branch colour marks the branch only</span>
+                        <span>Drag socket to socket to add a prereq</span>
                     </div>
                 </div>
                 </div>
@@ -3948,6 +4083,14 @@ function App(): React.JSX.Element {
                             <select value={filters.lifecycle} onChange={e => setFilter({ lifecycle: e.target.value })} title="Lifecycle">
                                 <option value="">Any lifecycle</option>
                                 {LIFECYCLES.map(l => <option key={l} value={l}>{l}</option>)}
+                            </select>
+                            <select
+                                value={filters.plotState}
+                                onChange={e => setFilter({ plotState: e.target.value })}
+                                title="Plot state - how this faction's manifest registers the thread an event lives in"
+                            >
+                                <option value="">Any plot state</option>
+                                {PLOT_STATES.map(p => <option key={p} value={p}>{p}</option>)}
                             </select>
                         </div>
                     </>}

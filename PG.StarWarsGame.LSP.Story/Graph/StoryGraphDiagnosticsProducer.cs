@@ -3,6 +3,7 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
@@ -72,7 +73,7 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
             foreach (var id in cycle)
             {
                 var node = nodesById[id];
-                if (node.ThreadUri != documentUri) continue;
+                if (node.ThreadUri is not { } nodeThread || !DocumentUris.Same(nodeThread, documentUri)) continue;
                 diagnostics.Add(At(node.Event!.NameRange,
                     $"'{node.Label}' is part of a prerequisite cycle ({names}) - none of these events can arm.",
                     XmlDiagnosticSeverity.Warning));
@@ -92,7 +93,9 @@ public sealed class StoryGraphDiagnosticsProducer(ISchemaProvider schema)
         var reachable = evaluator.ComputeReachableEvents();
         foreach (var node in model.Graph.Nodes)
         {
-            if (node.Kind != StoryNodeKind.Event || node.ThreadUri != documentUri) continue;
+            if (node.Kind != StoryNodeKind.Event
+                || node.ThreadUri is not { } eventThread
+                || !DocumentUris.Same(eventThread, documentUri)) continue;
             if (reachable.Contains(node.Id) || cycleMembers.Contains(node.Id)) continue;
             diagnostics.Add(At(node.Event!.NameRange,
                 $"'{node.Label}' can never fire: no prerequisite line is satisfiable and nothing triggers it.",

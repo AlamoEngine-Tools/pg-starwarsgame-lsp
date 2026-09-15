@@ -20,13 +20,13 @@ public sealed class LocalisationRowReader : ILocalisationRowReader
 {
     private const string XmlNs = "urn:alamoenginetools:localisation:v1";
 
+    private readonly ILspConfigurationProvider _configProvider;
+
     private readonly IDatFileService _datFileService;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
     private readonly IPropertiesTranslationImporter _nlsImporter;
-
-    private readonly ILspConfigurationProvider _configProvider;
 
     public LocalisationRowReader(
         IPropertiesTranslationImporter nlsImporter,

@@ -406,8 +406,10 @@ public sealed class StoryChainScannerTest
 
         var campaign = Assert.Single(result.Campaigns);
         Assert.Equal(
-            [("Rebel", "Story_Plots_R.xml"), ("Empire", "Story_Plots_E.xml"),
-                ("Underworld", "Story_Plots_U.xml")],
+            [
+                ("Rebel", "Story_Plots_R.xml"), ("Empire", "Story_Plots_E.xml"),
+                ("Underworld", "Story_Plots_U.xml")
+            ],
             campaign.FactionManifests.Select(f => (f.Faction, f.ManifestFile)));
         Assert.Equal(["Story_Plots_R.xml", "Story_Plots_E.xml", "Story_Plots_U.xml"],
             result.ManifestFiles);

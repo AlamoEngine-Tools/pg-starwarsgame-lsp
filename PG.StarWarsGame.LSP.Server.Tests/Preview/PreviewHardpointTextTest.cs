@@ -25,18 +25,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </remarks>
 public sealed class PreviewHardpointTextTest
 {
-    private sealed class FakeLocalisation(params (string Key, string Value)[] rows) : ILocalisationIndex
-    {
-        private readonly Dictionary<string, string> _rows =
-            rows.ToDictionary(r => r.Key, r => r.Value, StringComparer.OrdinalIgnoreCase);
-
-        public IEnumerable<string> Keys => _rows.Keys;
-
-        public bool ContainsKey(string key) => _rows.ContainsKey(key);
-
-        public string? GetValue(string key) => _rows.GetValueOrDefault(key);
-    }
-
     [Fact]
     public void Hardpoint_KeepsTheKeyTheAuthorWrote()
     {
@@ -120,11 +108,29 @@ public sealed class PreviewHardpointTextTest
     private static GameSymbol Sym(string name, string type)
     {
         return new GameSymbol(name, GameSymbolKind.XmlObject, type,
-            new FileOrigin("file:///units.xml", 0, 0), null, null);
+            new FileOrigin("file:///units.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)
     {
         return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
+    }
+
+    private sealed class FakeLocalisation(params (string Key, string Value)[] rows) : ILocalisationIndex
+    {
+        private readonly Dictionary<string, string> _rows =
+            rows.ToDictionary(r => r.Key, r => r.Value, StringComparer.OrdinalIgnoreCase);
+
+        public IEnumerable<string> Keys => _rows.Keys;
+
+        public bool ContainsKey(string key)
+        {
+            return _rows.ContainsKey(key);
+        }
+
+        public string? GetValue(string key)
+        {
+            return _rows.GetValueOrDefault(key);
+        }
     }
 }

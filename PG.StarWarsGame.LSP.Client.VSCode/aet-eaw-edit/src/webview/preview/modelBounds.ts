@@ -26,13 +26,30 @@ import * as THREE from 'three';
  */
 export function drawnBounds(
     root: THREE.Object3D, isDrawn: (mesh: THREE.Mesh) => boolean,
+    prune: (node: THREE.Object3D) => boolean = () => false,
 ): THREE.Box3 {
     const box = new THREE.Box3();
     const corner = new THREE.Vector3();
 
     root.updateWorldMatrix(false, true);
 
-    root.traverse(node => {
+    // A manual walk rather than `traverse`, because an overlay has to be skipped WITH its children:
+    // a turret knob is a mesh inside an anchor, and a fire-arc cone carries its outline. The mesh
+    // test below keeps lines out, but a firing arc and a knob are meshes too, drawn, and hung inside
+    // the model on bones - so they need pruning by what they ARE, not by their type.
+    const visit = (node: THREE.Object3D): void => {
+        if (prune(node)) {
+            return;
+        }
+
+        measure(node);
+
+        for (const child of node.children) {
+            visit(child);
+        }
+    };
+
+    const measure = (node: THREE.Object3D): void => {
         // `instanceof Mesh` is doing real work here: LineSegments and Points are Object3Ds with
         // geometry, so anything that merely checks for a `geometry` property lets the overlays in.
         if (!(node instanceof THREE.Mesh) || !isDrawn(node)) {
@@ -61,7 +78,9 @@ export function drawnBounds(
 
             box.expandByPoint(corner);
         }
-    });
+    };
+
+    visit(root);
 
     return box;
 }

@@ -85,8 +85,8 @@ public sealed class AlaAnimationReaderTest
     {
         var ala = AnimationV1(2, 30f,
             BoneV1("ROOT", 0,
-                translationOffset: new Vector3(10, 20, 30),
-                translationScale: new Vector3(0.5f, 0.25f, 0.1f),
+                new Vector3(10, 20, 30),
+                new Vector3(0.5f, 0.25f, 0.1f),
                 translationSamples: [PackedVector(2, 4, 10), PackedVector(4, 8, 20)]));
 
         var frames = AlaAnimationReader.Read(ala).Bones[0].Frames;
@@ -147,7 +147,7 @@ public sealed class AlaAnimationReaderTest
         // reproduce; identity is the only sane answer.
         var ala = AnimationV1(3, 30f,
             BoneV1("ROOT", 0,
-                translationOffset: new Vector3(1, 2, 3),
+                new Vector3(1, 2, 3),
                 scaleOffset: new Vector3(4, 5, 6)));
 
         var frames = AlaAnimationReader.Read(ala).Bones[0].Frames;
@@ -218,13 +218,12 @@ public sealed class AlaAnimationReaderTest
             PackedQuaternion(0, 0, 0, 1), PackedQuaternion(1, 0, 0, 0),
             PackedQuaternion(0, 1, 0, 0), PackedQuaternion(0, 0, 1, 0));
 
-        var ala = AnimationV2(2, 30f, rotationSlots: 2, translationSlots: 0, scaleSlots: 0,
-            bones:
+        var ala = AnimationV2(2, 30f, 2, 0, 0,
             [
                 BoneV2("A", 0, rotationSlot: 0),
                 BoneV2("B", 1, rotationSlot: 1)
             ],
-            rotationBlock: rotation);
+            rotation);
 
         var bones = AlaAnimationReader.Read(ala).Bones;
 
@@ -239,9 +238,11 @@ public sealed class AlaAnimationReaderTest
     {
         var translation = AloChunkFixture.Concat(PackedVector(2, 0, 0), PackedVector(4, 0, 0));
 
-        var ala = AnimationV2(2, 30f, rotationSlots: 0, translationSlots: 1, scaleSlots: 0,
-            bones: [BoneV2("A", 0, translationOffset: new Vector3(1, 0, 0),
-                translationScale: new Vector3(0.5f, 0, 0), translationSlot: 0)],
+        var ala = AnimationV2(2, 30f, 0, 1, 0,
+            [
+                BoneV2("A", 0, new Vector3(1, 0, 0),
+                    new Vector3(0.5f, 0, 0), translationSlot: 0)
+            ],
             translationBlock: translation);
 
         var frames = AlaAnimationReader.Read(ala).Bones[0].Frames;
@@ -253,8 +254,8 @@ public sealed class AlaAnimationReaderTest
     [Fact]
     public void Read_V2_FallsBackToTheStoredDefaultRotationWhenABoneHasNoSlot()
     {
-        var ala = AnimationV2(2, 30f, rotationSlots: 0, translationSlots: 0, scaleSlots: 0,
-            bones: [BoneV2("A", 0, defaultRotation: (1, 0, 0, 0))]);
+        var ala = AnimationV2(2, 30f, 0, 0, 0,
+            [BoneV2("A", 0, defaultRotation: (1, 0, 0, 0))]);
 
         var frames = AlaAnimationReader.Read(ala).Bones[0].Frames;
 
@@ -264,8 +265,8 @@ public sealed class AlaAnimationReaderTest
     [Fact]
     public void Read_V2_ReadsVisibilityLikeVersionOne()
     {
-        var ala = AnimationV2(3, 30f, rotationSlots: 0, translationSlots: 0, scaleSlots: 0,
-            bones: [BoneV2("A", 0, visibility: [true, false, true])]);
+        var ala = AnimationV2(3, 30f, 0, 0, 0,
+            [BoneV2("A", 0, visibility: [true, false, true])]);
 
         Assert.Equal([true, false, true],
             AlaAnimationReader.Read(ala).Bones[0].Frames.Select(f => f.Visible));
@@ -285,9 +286,9 @@ public sealed class AlaAnimationReaderTest
     [Fact]
     public void Read_V2_RejectsASharedBlockThatDoesNotMatchItsDeclaredStride()
     {
-        var ala = AnimationV2(4, 30f, rotationSlots: 2, translationSlots: 0, scaleSlots: 0,
-            bones: [BoneV2("A", 0, rotationSlot: 0)],
-            rotationBlock: PackedQuaternion(0, 0, 0, 1));
+        var ala = AnimationV2(4, 30f, 2, 0, 0,
+            [BoneV2("A", 0, rotationSlot: 0)],
+            PackedQuaternion(0, 0, 0, 1));
 
         Assert.Throws<AloFormatException>(() => AlaAnimationReader.Read(ala));
     }
@@ -297,9 +298,9 @@ public sealed class AlaAnimationReaderTest
     {
         var rotation = AloChunkFixture.Concat(PackedQuaternion(0, 0, 0, 1));
 
-        var ala = AnimationV2(1, 30f, rotationSlots: 1, translationSlots: 0, scaleSlots: 0,
-            bones: [BoneV2("A", 0, rotationSlot: 5)],
-            rotationBlock: rotation);
+        var ala = AnimationV2(1, 30f, 1, 0, 0,
+            [BoneV2("A", 0, rotationSlot: 5)],
+            rotation);
 
         Assert.Throws<AloFormatException>(() => AlaAnimationReader.Read(ala));
     }
@@ -307,7 +308,7 @@ public sealed class AlaAnimationReaderTest
     [Fact]
     public void Read_RejectsABufferThatIsNotAnAnimation()
     {
-        Assert.Throws<AloFormatException>(
-            () => AlaAnimationReader.Read(AloChunkFixture.Chunk(0x200, true, AloChunkFixture.Zeros(4))));
+        Assert.Throws<AloFormatException>(() =>
+            AlaAnimationReader.Read(AloChunkFixture.Chunk(0x200, true, AloChunkFixture.Zeros(4))));
     }
 }

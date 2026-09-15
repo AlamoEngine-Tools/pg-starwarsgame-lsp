@@ -14,6 +14,13 @@ public sealed class MegaTextureIconExtractorTest
     private static readonly Rgba Blue = new(0, 0, 255);
     private static readonly Rgba Background = new(8, 8, 8);
 
+    private static readonly (string Name, Rectangle Area, bool Alpha)[] Entries =
+    [
+        ("I_RED.TGA", new Rectangle(0, 0, 4, 4), true),
+        ("I_GREEN.TGA", new Rectangle(6, 2, 4, 4), true),
+        ("I_BLUE.TGA", new Rectangle(12, 12, 4, 4), false)
+    ];
+
     /// <summary>
     ///     A 16x16 texture with three 4x4 blocks of flat colour at known positions, measured from the
     ///     TOP left. Anything else is <see cref="Background" />.
@@ -22,21 +29,17 @@ public sealed class MegaTextureIconExtractorTest
     {
         return MegaTextureFixture.BuildTga(16, 16, (x, y) =>
         {
-            if (x is >= 0 and < 4 && y is >= 0 and < 4) return Red;      // top-left corner
-            if (x is >= 6 and < 10 && y is >= 2 and < 6) return Green;   // interior
+            if (x is >= 0 and < 4 && y is >= 0 and < 4) return Red; // top-left corner
+            if (x is >= 6 and < 10 && y is >= 2 and < 6) return Green; // interior
             if (x is >= 12 and < 16 && y is >= 12 and < 16) return Blue; // bottom-right corner
             return Background;
         });
     }
 
-    private static readonly (string Name, Rectangle Area, bool Alpha)[] Entries =
-    [
-        ("I_RED.TGA", new Rectangle(0, 0, 4, 4), true),
-        ("I_GREEN.TGA", new Rectangle(6, 2, 4, 4), true),
-        ("I_BLUE.TGA", new Rectangle(12, 12, 4, 4), false)
-    ];
-
-    private static TestPng.Decoded DecodePng(byte[] png) => TestPng.Decode(png);
+    private static TestPng.Decoded DecodePng(byte[] png)
+    {
+        return TestPng.Decode(png);
+    }
 
     // ── Extraction ────────────────────────────────────────────────────────────
 
@@ -152,5 +155,3 @@ public sealed class MegaTextureIconExtractorTest
         Assert.Equal(((byte)10, (byte)20, (byte)30, (byte)128), image[0, 0]);
     }
 }
-
-

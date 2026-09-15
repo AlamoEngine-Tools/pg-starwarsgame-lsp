@@ -37,7 +37,7 @@ public sealed class AloModelReaderConnectionsTest
             Skel("ROOT", "HP_F-L_Bone", "HP_F-R_Bone"),
             Mesh("TURRET_L", [TrivialSubMesh()]),
             Mesh("TURRET_R", [TrivialSubMesh()]),
-            Connections(connections: [Connection(0, 1), Connection(1, 2)]));
+            Connections([Connection(0, 1), Connection(1, 2)]));
 
         var meshes = AloModelReader.Read(alo).Meshes;
 
@@ -56,7 +56,7 @@ public sealed class AloModelReaderConnectionsTest
             Mesh("HULL", [TrivialSubMesh()]),
             Light("GLOW"),
             Mesh("ENGINE", [TrivialSubMesh()]),
-            Connections(connections: [Connection(0, 1), Connection(1, 2), Connection(2, 3)]));
+            Connections([Connection(0, 1), Connection(1, 2), Connection(2, 3)]));
 
         var model = AloModelReader.Read(alo);
 
@@ -82,7 +82,7 @@ public sealed class AloModelReaderConnectionsTest
         var alo = Concat(
             Skel("ROOT"),
             Mesh("HULL", [TrivialSubMesh()]),
-            Connections(connections: [Connection(5, 0)]));
+            Connections([Connection(5, 0)]));
 
         Assert.Throws<AloFormatException>(() => AloModelReader.Read(alo));
     }
@@ -93,7 +93,7 @@ public sealed class AloModelReaderConnectionsTest
         var alo = Concat(
             Skel("ROOT"),
             Mesh("HULL", [TrivialSubMesh()]),
-            Connections(connections: [Connection(0, 9)]));
+            Connections([Connection(0, 9)]));
 
         Assert.Throws<AloFormatException>(() => AloModelReader.Read(alo));
     }
@@ -121,8 +121,8 @@ public sealed class AloModelReaderConnectionsTest
             Connections(proxies:
             [
                 Proxy("shown_by_default", 1),
-                Proxy("shown_explicitly", 2, hidden: 0),
-                Proxy("pi_damage_elec_SD00", 3, hidden: 1)
+                Proxy("shown_explicitly", 2, 0),
+                Proxy("pi_damage_elec_SD00", 3, 1)
             ]));
 
         var proxies = AloModelReader.Read(alo).Proxies;
@@ -180,9 +180,9 @@ public sealed class AloModelReaderConnectionsTest
     {
         var alo = Concat(
             Skel("ROOT"),
-            Light("ENGINE_GLOW", type: (int)AlamoLightType.Spot, color: new Vector3(1f, 0.5f, 0.25f),
-                intensity: 2f, farAttenuationEnd: 100f, farAttenuationStart: 50f,
-                hotspotSize: 10f, falloffSize: 20f),
+            Light("ENGINE_GLOW", (int)AlamoLightType.Spot, new Vector3(1f, 0.5f, 0.25f),
+                2f, 100f, 50f,
+                10f, 20f),
             Connections());
 
         var light = Assert.Single(AloModelReader.Read(alo).Lights);

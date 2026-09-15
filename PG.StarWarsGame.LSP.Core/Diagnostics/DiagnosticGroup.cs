@@ -72,7 +72,7 @@ public enum DiagnosticGroup
 
     /// <summary>
     ///     What the model preview found while assembling a subject: a hull that is not there, a
-    ///     hardpoint mounted on a bone the model does not have, a death clone named but never
+    ///     hardpoint attached to a bone the model does not have, a death clone named but never
     ///     defined.
     ///     <para>
     ///         Its own group because the findings are its own: they come from walking a unit's

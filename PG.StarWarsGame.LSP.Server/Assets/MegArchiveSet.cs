@@ -34,8 +34,8 @@ public sealed class MegArchiveSet(
     ILogger<MegArchiveSet> logger) : IMegArchiveSet
 {
     private readonly Lock _gate = new();
-    private Dictionary<string, MegDataEntryLocationReference>? _entries;
     private int _archiveCount;
+    private Dictionary<string, MegDataEntryLocationReference>? _entries;
 
     public int ArchiveCount
     {

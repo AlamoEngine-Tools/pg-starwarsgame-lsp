@@ -38,8 +38,8 @@ public sealed class ConvertLocalisationFormatHandler
     private readonly IDatFileService _datFileService;
     private readonly IDatTranslationImporter _datImporter;
     private readonly ITranslationDatabaseFactory _factory;
-    private readonly IModProjectFileWriter _fileWriter;
     private readonly IFileHelper _fileHelper;
+    private readonly IModProjectFileWriter _fileWriter;
     private readonly ILanguageService _langService;
     private readonly ILogger<ConvertLocalisationFormatHandler> _logger;
     private readonly IPropertiesTranslationImporter _nlsImporter;

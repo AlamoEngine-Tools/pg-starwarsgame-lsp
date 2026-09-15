@@ -41,7 +41,7 @@ public sealed class ModelGlbExporterTest
                 MasterVertex(new Vector3(1, 0, 0), new Vector3(0, 0, 1), new Vector2(1, 0)),
                 MasterVertex(new Vector3(0, 1, 0), new Vector3(0, 0, 1), new Vector2(0, 1))
             ],
-            [0, 1, 2], parameters: parameters);
+            [0, 1, 2], parameters);
     }
 
     private static byte[] SimpleModel(params byte[][] extra)
@@ -52,7 +52,7 @@ public sealed class ModelGlbExporterTest
                 Bone("HULL_BONE", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
             Concat(extra),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
     }
 
     /// <summary>
@@ -144,7 +144,7 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("HULL_BONE", 0, true, Translation(0, 0, 0))),
             Mesh("SHADOW", [ShadowVolumeWithOrphanSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
     }
 
     private static byte[] ShadowVolumeModel()
@@ -154,7 +154,7 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("HULL_BONE", 0, true, Translation(0, 0, 0))),
             Mesh("SHADOW", [ShadowVolumeSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
     }
 
     [Fact]
@@ -240,7 +240,7 @@ public sealed class ModelGlbExporterTest
                 Bone("CHILD", 0, true, Translation(0, 0, 0)),
                 Bone("GRANDCHILD", 1, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var gltf = Roundtrip(alo);
 
@@ -262,7 +262,7 @@ public sealed class ModelGlbExporterTest
                 Bone("p_hp_imperial_damage", 0, true, Translation(0, 0, 0)),
                 Bone("p_hp_imperial_damage", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var gltf = Roundtrip(alo);
 
@@ -280,7 +280,7 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("UP", 0, true, Translation(0, 0, 1))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var gltf = Roundtrip(alo);
         var up = gltf.LogicalNodes.Single(n => n.Name == "UP#1");
@@ -322,16 +322,18 @@ public sealed class ModelGlbExporterTest
     {
         var alo = Concat(
             Skeleton(Bone("ROOT", -1, true, Translation(0, 0, 0))),
-            Mesh("HULL", [SubMesh("MeshBumpColorize.fx", "alD3dVertNU2U3U3",
-                [
-                    MasterVertex(new Vector3(0, 0, 0), new Vector3(0, 0, 1),
-                        tangent: new Vector3(1, 0, 0), binormal: new Vector3(0, 1, 0)),
-                    MasterVertex(new Vector3(1, 0, 0), new Vector3(0, 0, 1),
-                        tangent: new Vector3(1, 0, 0), binormal: new Vector3(0, 1, 0)),
-                    MasterVertex(new Vector3(0, 1, 0), new Vector3(0, 0, 1),
-                        tangent: new Vector3(1, 0, 0), binormal: new Vector3(0, 1, 0))
-                ],
-                [0, 1, 2])]),
+            Mesh("HULL", [
+                SubMesh("MeshBumpColorize.fx", "alD3dVertNU2U3U3",
+                    [
+                        MasterVertex(new Vector3(0, 0, 0), new Vector3(0, 0, 1),
+                            tangent: new Vector3(1, 0, 0), binormal: new Vector3(0, 1, 0)),
+                        MasterVertex(new Vector3(1, 0, 0), new Vector3(0, 0, 1),
+                            tangent: new Vector3(1, 0, 0), binormal: new Vector3(0, 1, 0)),
+                        MasterVertex(new Vector3(0, 1, 0), new Vector3(0, 0, 1),
+                            tangent: new Vector3(1, 0, 0), binormal: new Vector3(0, 1, 0))
+                    ],
+                    [0, 1, 2])
+            ]),
             Connections());
 
         var gltf = Roundtrip(alo);
@@ -346,7 +348,7 @@ public sealed class ModelGlbExporterTest
         // mesh builder is one vertex type throughout.
         var alo = Concat(
             Skeleton(Bone("ROOT", -1, true, Translation(0, 0, 0))),
-            Mesh("HULL", [TriangleSubMesh("MeshAlpha.fx"), TriangleSubMesh("MeshAdditive.fx")]),
+            Mesh("HULL", [TriangleSubMesh(), TriangleSubMesh("MeshAdditive.fx")]),
             Connections());
 
         Assert.Equal(2, Roundtrip(alo).LogicalMeshes.Count);
@@ -373,13 +375,15 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("J0", 0, true, Translation(0, 0, 0)),
                 Bone("J1", 0, true, Translation(1, 0, 0))),
-            Mesh("BODY", [SubMesh("RSkinAlpha.fx", "alD3dVertRSkinNU2",
-                [
-                    MasterVertex(Vector3.Zero, boneIndices: [0, 0, 0, 0], boneWeights: [1, 0, 0, 0]),
-                    MasterVertex(Vector3.UnitX, boneIndices: [1, 0, 0, 0], boneWeights: [1, 0, 0, 0]),
-                    MasterVertex(Vector3.UnitY, boneIndices: [0, 0, 0, 0], boneWeights: [1, 0, 0, 0])
-                ],
-                [0, 1, 2], skinBones: [1, 2])]),
+            Mesh("BODY", [
+                SubMesh("RSkinAlpha.fx", "alD3dVertRSkinNU2",
+                    [
+                        MasterVertex(Vector3.Zero, boneIndices: [0, 0, 0, 0], boneWeights: [1, 0, 0, 0]),
+                        MasterVertex(Vector3.UnitX, boneIndices: [1, 0, 0, 0], boneWeights: [1, 0, 0, 0]),
+                        MasterVertex(Vector3.UnitY, boneIndices: [0, 0, 0, 0], boneWeights: [1, 0, 0, 0])
+                    ],
+                    [0, 1, 2], skinBones: [1, 2])
+            ]),
             Connections());
 
         var gltf = Roundtrip(alo);
@@ -413,7 +417,7 @@ public sealed class ModelGlbExporterTest
                 Bone("CARD", 0, true, Translation(0, 0, 0), (int)AlamoBillboardType.ZAxisView),
                 Bone("PLAIN", 0, true, Translation(0, 0, 0), (int)AlamoBillboardType.Disable)),
             Mesh("CARD", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var gltf = Roundtrip(alo);
 
@@ -433,13 +437,15 @@ public sealed class ModelGlbExporterTest
         // from these. Anything lost here cannot be recovered downstream.
         var alo = Concat(
             Skeleton(Bone("ROOT", -1, true, Translation(0, 0, 0))),
-            Mesh("HULL", [TriangleSubMesh("MeshBumpColorize.fx", parameters:
-            [
-                TextureParam("BaseTexture", "AI_Rancor.tga"),
-                Float4Param("Colorization", new Vector4(1, 0, 0, 1)),
-                FloatParam("Emissive", 0.25f),
-                IntParam("BlendMode", 3)
-            ])]),
+            Mesh("HULL", [
+                TriangleSubMesh("MeshBumpColorize.fx", parameters:
+                [
+                    TextureParam("BaseTexture", "AI_Rancor.tga"),
+                    Float4Param("Colorization", new Vector4(1, 0, 0, 1)),
+                    FloatParam("Emissive", 0.25f),
+                    IntParam("BlendMode", 3)
+                ])
+            ]),
             Connections());
 
         var extras = Roundtrip(alo).LogicalMaterials[0].Extras;
@@ -479,7 +485,7 @@ public sealed class ModelGlbExporterTest
         // back out of a string is exactly the kind of parsing that has already gone wrong here once.
         var alo = Concat(
             Skeleton(Bone("ROOT", -1, true, Translation(0, 0, 0))),
-            Mesh("HULL", [TriangleSubMesh("MeshBump.fx"), TriangleSubMesh("MeshAlpha.fx")]),
+            Mesh("HULL", [TriangleSubMesh("MeshBump.fx"), TriangleSubMesh()]),
             Connections());
 
         var materials = Roundtrip(alo).LogicalMaterials;
@@ -515,12 +521,12 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("TURRET", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(3, 30f,
             AlaChunkFixture.BoneV1("TURRET", 1,
-                translationOffset: new Vector3(1, 0, 0),
-                translationScale: new Vector3(1, 0, 0),
+                new Vector3(1, 0, 0),
+                new Vector3(1, 0, 0),
                 translationSamples:
                 [
                     AlaChunkFixture.PackedVector(0, 0, 0),
@@ -555,12 +561,12 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("TURRET", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(2, 30f,
             AlaChunkFixture.BoneV1("SOMETHING_ELSE", 1,
                 translationSamples:
-                    [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
+                [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
 
         var gltf = Roundtrip(alo, ("mismatched", ala));
 
@@ -578,12 +584,12 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("TURRET", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(2, 30f,
             AlaChunkFixture.BoneV1("MUZZLE", 9,
                 translationSamples:
-                    [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
+                [AlaChunkFixture.PackedVector(0, 0, 0), AlaChunkFixture.PackedVector(1, 0, 0)]));
 
         var gltf = Roundtrip(alo, ("beyond", ala));
 
@@ -602,7 +608,7 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("TURRET", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(visibility.Length, 30f,
             AlaChunkFixture.BoneV1("TURRET", 1, visibility: visibility));
@@ -686,7 +692,7 @@ public sealed class ModelGlbExporterTest
                 Bone("ROOT", -1, true, Translation(0, 0, 0)),
                 Bone("TURRET", 0, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(2, 30f,
             AlaChunkFixture.BoneV1("SOMETHING_ELSE", 1, visibility: [false, true]));
@@ -709,7 +715,7 @@ public sealed class ModelGlbExporterTest
                 Bone("TURRET", 0, true, Translation(0, 0, 0)),
                 Bone("MUZZLE", 1, true, Translation(0, 0, 0))),
             Mesh("HULL", [TriangleSubMesh()]),
-            Connections(connections: [Connection(0, 1)]));
+            Connections([Connection(0, 1)]));
 
         var ala = AlaChunkFixture.AnimationV1(2, 30f,
             AlaChunkFixture.BoneV1("TURRET", 1, visibility: [true, true]),

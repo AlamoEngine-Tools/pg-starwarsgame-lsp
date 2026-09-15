@@ -6,6 +6,7 @@ using System.IO.Abstractions.TestingHelpers;
 using System.Xml.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Csv;
@@ -357,7 +358,7 @@ public sealed class ConvertLocalisationFormatHandlerTest
             sp.GetRequiredService<IXmlTranslationImporter>(),
             sp.GetRequiredService<IPropertiesTranslationImporter>(),
             sp.GetRequiredService<IDatTranslationImporter>(),
-            sp.GetRequiredService<PG.StarWarsGame.Files.DAT.Services.IDatFileService>(),
+            sp.GetRequiredService<IDatFileService>(),
             sp.GetRequiredService<ITranslationDatabaseFactory>(),
             sp.GetRequiredService<ILanguageService>(),
             new LocalisationFormatConverter(

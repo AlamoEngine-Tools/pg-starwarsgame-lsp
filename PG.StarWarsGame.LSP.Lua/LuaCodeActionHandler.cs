@@ -2,13 +2,13 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Loretta.CodeAnalysis.Lua.Syntax;
+using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Client.Capabilities;
 using OmniSharp.Extensions.LanguageServer.Protocol.Document;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
-using OmniSharp.Extensions.LanguageServer.Protocol;
 using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Lua.Parsing;
@@ -75,18 +75,12 @@ public sealed class LuaCodeActionHandler : CodeActionHandlerBase
             yield return a;
 
         if (id == DiagnosticIds.LuaRedundantRequire)
-        {
             yield return BuildDeleteLineAction(docUri, d, "Remove redundant require");
-        }
         else if (id == DiagnosticIds.LuaDuplicateRequire)
-        {
             yield return BuildDeleteLineAction(docUri, d, "Remove duplicate require");
-        }
         else if (id == DiagnosticIds.LuaEngineUpvalue)
-        {
             foreach (var a in BuildUpvalueActions(docUri, d, allDiagnostics))
                 yield return a;
-        }
     }
 
     /// <summary>

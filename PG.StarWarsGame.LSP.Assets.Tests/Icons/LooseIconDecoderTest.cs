@@ -98,6 +98,3 @@ public sealed class LooseIconDecoderTest
         Assert.Empty(unsupported);
     }
 }
-
-
-

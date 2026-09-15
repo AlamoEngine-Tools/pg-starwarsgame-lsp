@@ -43,7 +43,8 @@ public sealed class SerializedIconPack
     ///     Hash of the game binaries this pack was cut from, matching the baseline built in the same
     ///     run. Lets a consumer notice a pack that has drifted from its baseline.
     /// </summary>
-    [Key(2)] public string SourceManifestHash { get; set; } = string.Empty;
+    [Key(2)]
+    public string SourceManifestHash { get; set; } = string.Empty;
 
     [Key(3)] public long BuiltAtMs { get; set; }
 }

@@ -39,7 +39,10 @@ internal static class LuaRequireResolver
 
         foreach (var (uri, doc) in documents)
         {
-            if (!uri.EndsWith(searchSuffix, StringComparison.Ordinal)) continue;
+            // Folded, not ordinal: the suffix is lowercased game-path form while the URI now keeps
+            // the file's real case, so an ordinal match would find a module only when the file
+            // happened to be named in lower case.
+            if (!uri.EndsWith(searchSuffix, StringComparison.OrdinalIgnoreCase)) continue;
             if (doc.LayerRank > bestRank)
             {
                 bestRank = doc.LayerRank;

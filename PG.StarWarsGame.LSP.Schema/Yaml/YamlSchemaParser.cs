@@ -95,6 +95,7 @@ internal static class YamlSchemaParser
                 ReferenceKind = rk,
                 ReferenceType = entry.ReferenceType,
                 EnumName = entry.EnumName,
+                AllowedValues = entry.AllowedValues ?? [],
                 SemanticType = st,
                 ValueGroups = ParseValueGroups(entry.ValueGroup),
                 Deprecated = entry.Deprecated,

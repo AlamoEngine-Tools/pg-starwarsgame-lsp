@@ -46,9 +46,6 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
     public event EventHandler? SchemaRefreshed;
 
     /// <inheritdoc />
-    public SchemaVersionCheck? LastVersionCheck { get; private set; }
-
-    /// <inheritdoc />
     public Task ReadyAsync => _readyTcs.Task;
 
     public XmlTagDefinition? GetTag(string tagName)
@@ -85,6 +82,9 @@ public sealed class HttpSchemaProvider : ISchemaProvider, IVersionedSchemaProvid
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
 
     public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
+
+    /// <inheritdoc />
+    public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
     public async Task LoadAsync(CancellationToken ct = default)
     {

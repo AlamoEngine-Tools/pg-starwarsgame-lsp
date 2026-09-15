@@ -48,23 +48,6 @@ public sealed class PreviewUnitCodeLensProviderTest
         return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
     }
 
-    private sealed class TagSource : IVariantTagSource
-    {
-        private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
-        {
-            return _byId.GetValueOrDefault(objectId);
-        }
-
-        public TagSource With(string id, params VariantTag[] tags)
-        {
-            _byId[id] = tags;
-            return this;
-        }
-    }
-
     [Fact]
     public void Handle_ObjectWithATacticalModel_EmitsLensCarryingTheObjectId()
     {
@@ -182,5 +165,22 @@ public sealed class PreviewUnitCodeLensProviderTest
             .With("EV_StarDestroyer.ALO", Tag("Space_Model_Name", "X.ALO"));
 
         Assert.Null(Provider(source).Handle(Ctx(asset, IndexWith(asset))));
+    }
+
+    private sealed class TagSource : IVariantTagSource
+    {
+        private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
+
+        public TagSource With(string id, params VariantTag[] tags)
+        {
+            _byId[id] = tags;
+            return this;
+        }
     }
 }

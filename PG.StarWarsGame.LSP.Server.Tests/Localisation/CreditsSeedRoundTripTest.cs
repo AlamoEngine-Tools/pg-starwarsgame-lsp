@@ -30,7 +30,7 @@ public sealed class CreditsSeedRoundTripTest
         ("CENTER", "ALICE"),
         ("CENTER", "BOB"),
         ("HEADER", "Produced by"),
-        ("CENTER", "CAROL"),
+        ("CENTER", "CAROL")
     ];
 
     // .xml is deliberately absent: an empty .xml file has no root element and is malformed rather

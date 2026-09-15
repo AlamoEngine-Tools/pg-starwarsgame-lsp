@@ -28,6 +28,22 @@ export interface DamageLogEntry {
     pool: DamagePool;
     /** This shot finished it off. */
     destroyed: boolean;
+    /**
+     * What this line records. A shot unless it says otherwise.
+     *
+     * Repairs belong here for the same reason destroying a hardpoint by hand does: the log is a
+     * record of what happened to the unit, not of shots. A reader who repairs mid-session and then
+     * reads the numbers back has to be able to see where the pools were refilled.
+     */
+    kind?: 'damage' | 'repair';
+    /**
+     * The arithmetic behind {@link amount}, one line each, or absent where there is none to show.
+     *
+     * The summary line says what happened; these say WHY, which is the question a reader actually
+     * brings to a damage log: which armour factor applied, what the shield took, how a blast was
+     * divided, and where each pool stood before and after.
+     */
+    workings?: readonly string[];
 }
 
 /** How many lines the log keeps. */
@@ -44,6 +60,14 @@ export const BY_HAND = 'The Force';
 
 /** One line, as the user asked for it. */
 export function damageLine(entry: DamageLogEntry): string {
+    if (entry.kind === 'repair') {
+        // No armour column and no pool: nothing was scaled and nothing was defended against. The
+        // numbers, where there are any, ride on the workings under the line.
+        return Number.isFinite(entry.amount) && entry.amount > 0
+            ? `${entry.source} repaired ${entry.target} - ${round(entry.amount)} restored`
+            : `${entry.source} repaired ${entry.target}`;
+    }
+
     // A shot that got through nothing still gets a line. Silence there reads as a broken button:
     // the reader pressed Fire and the panel said nothing at all.
     //

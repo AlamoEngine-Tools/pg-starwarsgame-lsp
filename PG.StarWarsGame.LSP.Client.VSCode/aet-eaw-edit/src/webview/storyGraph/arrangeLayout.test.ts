@@ -68,6 +68,47 @@ function branchAndMergeGraph() {
     };
 }
 
+/**
+ * The shape that made auto-arrange spread out: one event reaching a whole late group at once.
+ *
+ * `RESET_BRANCH` / `DISABLE_BRANCH` emit a control edge to EVERY event carrying that branch (157
+ * of them in the merged Empire campaign), so a single node acquires edges that span most of the
+ * layers between it and them. Every such edge is what elk's default node placement tries to
+ * straighten, and straightening means pushing whatever is in the way out of the way.
+ */
+function branchResetGraph(chainLength: number, members: number) {
+    const nodes = [eventNode('reset')];
+    const connections = [];
+    for (let i = 0; i < chainLength; i++) {
+        nodes.push(eventNode(`s${i}`, 300));
+        if (i > 0) { connections.push(connect(`sc${i}`, `s${i - 1}`, `s${i}`)); }
+    }
+    connections.push(connect('cr', 'reset', 's0'));
+    for (let i = 0; i < members; i++) {
+        nodes.push(eventNode(`m${i}`, 240));
+        connections.push(connect(`mr${i}`, 'reset', `m${i}`), connect(`ms${i}`, `s${chainLength - 1}`, `m${i}`));
+    }
+    return { nodes, connections };
+}
+
+/** The widest vertical hole inside a single layer - layers being the columns of an elk.direction RIGHT layout. */
+function largestGapInALayer(laid: readonly LaidOutNode[]): number {
+    const layers = new Map<number, LaidOutNode[]>();
+    for (const n of laid) {
+        const key = Math.round(n.x);
+        if (!layers.has(key)) { layers.set(key, []); }
+        layers.get(key)!.push(n);
+    }
+    let worst = 0;
+    for (const column of layers.values()) {
+        column.sort((a, b) => a.y - b.y);
+        for (let i = 1; i < column.length; i++) {
+            worst = Math.max(worst, column[i].y - (column[i - 1].y + column[i - 1].height));
+        }
+    }
+    return worst;
+}
+
 /** A long chain, which is what a linear campaign act actually looks like. */
 function chainGraph(length: number) {
     const nodes = Array.from({ length }, (_, i) => eventNode(`n${i}`, 140 + (i % 4) * 60));
@@ -157,6 +198,26 @@ describe('story graph auto-arrange', () => {
         assert.ok(e2 && e3);
         const gap = e3.y - (e2.y + e2.height);
         assert.ok(gap >= NODE_SPACING - 0.5, `siblings are at least ${NODE_SPACING}px apart (measured ${gap.toFixed(1)})`);
+    });
+
+    // The gap guard, and the reason ARRANGE_OPTIONS names a node placement at all.
+    //
+    // elk's default placement is BRANDES_KOEPF, which straightens long edges by moving nodes apart.
+    // Story nodes are 280x350-ish forms rather than boxes, and a campaign is full of edges that
+    // span most of it, so "apart" came out in thousands of pixels: the merged Empire campaign
+    // (672 events) arranged into a 60880 x 43332 box with a 22440px hole inside one layer, and
+    // 2.08% of that box had a node on it. The layout was correct and unreadable - you scrolled
+    // through empty space looking for the next event.
+    //
+    // Measured on this fixture: 1124px with the default placement, 60px - the configured spacing,
+    // exactly - with SIMPLE. The bound is deliberately loose; anything near the spacing passes,
+    // and a placement that spreads a layer out again cannot.
+    it('keeps a layer packed when one event reaches a whole late group', async () => {
+        const laid = await arrange(branchResetGraph(10, 6));
+
+        const gap = largestGapInALayer(laid);
+        assert.ok(gap <= NODE_SPACING * 1.5,
+            `no layer holds a hole wider than ${NODE_SPACING * 1.5}px (measured ${gap.toFixed(1)})`);
     });
 
     it('lays out a long chain in order', async () => {

@@ -20,6 +20,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
     private readonly ILogger<ModProjectReloadService> _logger;
+    private readonly PgprojMigrationOffer? _migrationOffer;
     private readonly IClientRefreshNotifier? _refresh;
     private readonly IProjectConfigurationResolver _resolver;
 
@@ -32,7 +33,8 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         ILocalisationLoader localisation,
         IProjectLayerMap layerMap,
         ILogger<ModProjectReloadService> logger,
-        IClientRefreshNotifier? refresh = null)
+        IClientRefreshNotifier? refresh = null,
+        PgprojMigrationOffer? migrationOffer = null)
     {
         _resolver = resolver;
         _indexer = indexer;
@@ -40,6 +42,7 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _layerMap = layerMap;
         _logger = logger;
         _refresh = refresh;
+        _migrationOffer = migrationOffer;
     }
 
     public IReadOnlyList<string>? LastAssetRoots { get; private set; }
@@ -76,6 +79,11 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         {
             _logger.LogError(ex, "Workspace localisation load failed.");
         }
+
+        // Last, and only once the workspace works: a project brought forward while loading has
+        // already been read as its current shape, so the question is whether to write that down -
+        // which is worth asking after the editor is usable, not in the middle of making it so.
+        if (_migrationOffer is not null) await _migrationOffer.OfferPendingAsync(ct);
     }
 
     public async Task ReloadAsync(CancellationToken ct)

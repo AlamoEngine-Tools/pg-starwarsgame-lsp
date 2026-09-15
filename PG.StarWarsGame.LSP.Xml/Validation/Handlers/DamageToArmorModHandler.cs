@@ -35,7 +35,8 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
             var damageValue = parts[0].Trim();
             if (!knownDamageTypes.Contains(damageValue))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{damageValue}' is not a known DamageType value.", Id: DiagnosticIds.DamageToArmorModUnknownDamageType));
+                    $"'{damageValue}' is not a known DamageType value.",
+                    Id: DiagnosticIds.DamageToArmorModUnknownDamageType));
         }
 
         var knownArmorTypes = MergedEnumValues(ctx, "ArmorType");
@@ -44,7 +45,8 @@ public sealed class DamageToArmorModHandler : SingleValueTypeHandlerBase
             var armorValue = parts[1].Trim();
             if (!knownArmorTypes.Contains(armorValue))
                 results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                    $"'{armorValue}' is not a known ArmorType value.", Id: DiagnosticIds.DamageToArmorModUnknownArmorType));
+                    $"'{armorValue}' is not a known ArmorType value.",
+                    Id: DiagnosticIds.DamageToArmorModUnknownArmorType));
         }
 
         return results;

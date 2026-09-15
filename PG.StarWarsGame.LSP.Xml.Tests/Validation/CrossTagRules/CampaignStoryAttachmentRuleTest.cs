@@ -68,7 +68,7 @@ public sealed class CampaignStoryAttachmentRuleTest
         var fact = Assert.Single(facts);
         Assert.Equal(CampaignStoryAttachmentProblem.TupleInFactionSpecificTag, fact.Problem);
         Assert.Equal(faction, fact.Faction);
-        Assert.Equal(tagName, fact.TagName, ignoreCase: true);
+        Assert.Equal(tagName, fact.TagName, true);
         Assert.Equal("test, Conquests\\Story_Plots_GCMenu.xml", fact.Value);
         Assert.Equal(Uri, fact.DocumentUri);
     }

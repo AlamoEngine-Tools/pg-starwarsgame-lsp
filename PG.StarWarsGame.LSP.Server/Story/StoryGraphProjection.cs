@@ -14,9 +14,27 @@ namespace PG.StarWarsGame.LSP.Server.Story;
 /// </summary>
 internal static class StoryGraphProjection
 {
+    /// <summary>
+    ///     Whether a plot is registered as <c>Active_Plot</c> or <c>Suspended_Plot</c> by the
+    ///     faction's manifest - a property of the THREAD, not of an event.
+    ///     <para>
+    ///         Not the same question as an event's lifecycle, which is why it is its own filter: a
+    ///         suspended plot's events read Inactive, and so does an event in a running plot whose
+    ///         prereq has not fired. Filtering by lifecycle cannot separate the two.
+    ///     </para>
+    /// </summary>
+    private const string Active = "Active";
+
+    private const string Suspended = "Suspended";
+
     public static GetStoryGraphResult Project(
-        StoryCampaignModel model, string? nameFilter, string? branch, string? lifecycle, string? reachableFrom)
+        StoryCampaignModel model, string? nameFilter, string? branch, string? lifecycle,
+        string? reachableFrom, string? plotState = null)
     {
+        // Null or empty is every plot the manifest registers, in either state - a suspended plot is
+        // part of the chain, waiting for something to resume it.
+        var wantSuspended = string.Equals(plotState, Suspended, StringComparison.OrdinalIgnoreCase);
+        var wantActive = string.Equals(plotState, Active, StringComparison.OrdinalIgnoreCase);
         var evaluator = new StoryEvaluator(model.Graph);
         var state = StoryRuntimeState.Initial with
         {
@@ -35,6 +53,16 @@ internal static class StoryGraphProjection
             if (lifecycle is { Length: > 0 } lifecycleFilter &&
                 !string.Equals(evaluator.GetLifecycle(node.Id, state).ToString(), lifecycleFilter,
                     StringComparison.OrdinalIgnoreCase)) continue;
+
+            // The node's own thread decides, so a virtual node follows the events it joins - which
+            // the pass below already arranges.
+            if (wantActive || wantSuspended)
+            {
+                var suspended = node.ThreadUri is not null
+                                && model.SuspendedThreadUris.Contains(node.ThreadUri);
+                if (suspended != wantSuspended) continue;
+            }
+
             keptEvents.Add(node.Id);
         }
 
@@ -73,7 +101,22 @@ internal static class StoryGraphProjection
             .Select(e => new StoryGraphEdgeDto(e.FromId, e.ToId, e.Kind.ToString(), e.Label))
             .ToList();
 
-        return new GetStoryGraphResult(keptNodes, edges);
+        // Facets describe the CAMPAIGN, so they are read off the whole model rather than off
+        // keptNodes - a list of what you could switch to is worthless once the filter has already
+        // removed everything you might switch to.
+        return new GetStoryGraphResult(keptNodes, edges, null, Facet(model, n => n.Event?.Branch),
+            Facet(model, n => n.ThreadUri));
+    }
+
+    private static List<string> Facet(StoryCampaignModel model, Func<StoryNode, string?> of)
+    {
+        return model.Graph.Nodes
+            .Select(of)
+            .Where(v => !string.IsNullOrEmpty(v))
+            .Select(v => v!)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
     }
 
     // Everything transitively downstream of the given node - "show me what this event leads to".

@@ -164,8 +164,8 @@ public sealed class XmlCodeLensHandlerTest
         var index = BuildIndex(doc) with
         {
             WorkspaceGroupMemberships =
-                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
-                    .Add("Story_Set", ImmutableArray.Create(memberA, memberB))
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Story_Set", ImmutableArray.Create(memberA, memberB))
         };
 
         var handler = BuildHandler(index);
@@ -318,6 +318,7 @@ public sealed class XmlCodeLensHandlerTest
     private sealed class FakeIndexService : IGameIndexService
     {
         public GameIndex Current { get; set; } = GameIndex.Empty;
+
         public event Action<GameIndex>? IndexChanged
         {
             add { }

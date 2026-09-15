@@ -12,8 +12,8 @@ namespace PG.StarWarsGame.LSP.Xml.Completion;
 /// <summary>
 ///     Produces bone-name completion proposals for <c>boneName</c> reference tags. Bones are
 ///     model-specific, and which model applies is context-dependent: inside a <c>HardPoint</c> a bone
-///     resolves by role (mounting hull vs the hardpoint's own <c>Model_To_Attach</c>, cross-file), so an
-///     <c>Attachment_Bone</c> is completed from the mounting hull and a <c>Turret_Bone_Name</c> from the
+///     resolves by role (attaching hull vs the hardpoint's own <c>Model_To_Attach</c>, cross-file), so an
+///     <c>Attachment_Bone</c> is completed from the attaching hull and a <c>Turret_Bone_Name</c> from the
 ///     attached model; elsewhere it is the union of the models named by sibling model tags on the owning
 ///     object or an ancestor. Resolution runs through <see cref="HardpointBoneModelResolver" />, the same
 ///     entry point as the bone-model inlay hint, so completion and validation cannot disagree.

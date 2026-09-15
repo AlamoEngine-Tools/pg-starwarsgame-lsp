@@ -23,7 +23,7 @@ namespace PG.StarWarsGame.LSP.Server.Localisation.Rows;
 ///         Keyed on the shipped directives. A file using its own vocabulary simply reports nothing
 ///         rather than guessing at structure it cannot see.
 ///     </para>
-/// </summary>
+///     </summary>
 public static class CreditsCoverageInspector
 {
     private const string Header = "HEADER";
@@ -48,7 +48,11 @@ public static class CreditsCoverageInspector
 
                 var hasContent = false;
                 for (var j = i + 1; j < rows.Count && !IsHeader(rows[j]); j++)
-                    if (HasText(rows[j], language)) { hasContent = true; break; }
+                    if (HasText(rows[j], language))
+                    {
+                        hasContent = true;
+                        break;
+                    }
 
                 if (!hasContent)
                     orphaned.Add((language, i, ValueOf(rows[i], language) ?? string.Empty));

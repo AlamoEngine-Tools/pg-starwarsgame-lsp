@@ -10,4 +10,6 @@ namespace PG.StarWarsGame.LSP.Core.Project;
 // Credits is optional and null means "use the naming convention", so an existing .pgproj that
 // declares nothing keeps working unchanged.
 public sealed record LocalisationProjectSettings(
-    string Type, string Directory, LocalisationCreditsSettings? Credits = null);
+    string Type,
+    string Directory,
+    LocalisationCreditsSettings? Credits = null);

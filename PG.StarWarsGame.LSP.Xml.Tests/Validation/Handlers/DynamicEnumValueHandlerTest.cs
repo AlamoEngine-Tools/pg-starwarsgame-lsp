@@ -29,6 +29,21 @@ public sealed class DynamicEnumValueHandlerTest
         Assert.Empty(results);
     }
 
+    // A per-owner subset is NOT this handler's business - see AllowedValuesHandlerTest. Pinned
+    // here because the check lived in this handler first, and putting it back would make it
+    // invisible to every tag that is not an enum.
+    [Fact]
+    public void AllowedValues_are_not_this_handlers_business()
+    {
+        var tag = XmlHandlerTestFixtures.MakeTag("Activation_Style", XmlValueType.DynamicEnumValue) with
+        {
+            AllowedValues = ["Galactic_Automatic"]
+        };
+
+        Assert.Empty(Sut.Handle(XmlHandlerTestFixtures.MakeFact(tag, "Ground_Automatic"),
+            XmlHandlerTestFixtures.EmptyCtx));
+    }
+
     [Theory]
     [InlineData("Infantry")]
     [InlineData("Infantry | Vehicle | Air")]

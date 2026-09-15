@@ -33,7 +33,8 @@ public sealed class IntValueHandler : NumberValueHandlerBase
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a valid integer.", Id: DiagnosticIds.IntValueOutOfRange)
+                $"'{trimmed}' is out of range for <{fact.Tag.Tag}>. Expected a valid integer.",
+                Id: DiagnosticIds.IntValueOutOfRange)
         ];
     }
 }

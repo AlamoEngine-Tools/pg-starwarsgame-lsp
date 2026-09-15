@@ -16,17 +16,20 @@ public sealed class FileHelperTest
     // ── PathToFileUri ─────────────────────────────────────────────────────────
 
     [Fact]
-    public void PathToFileUri_WindowsBackslash_ReturnsLowercaseFileUri()
+    public void PathToFileUri_WindowsBackslash_UnifiesSeparatorsAndKeepsCase()
     {
         var sut = Build();
-        Assert.Equal("file:///c:/game/data/file.xml", sut.PathToFileUri(@"C:\game\data\file.xml"));
+        Assert.Equal("file:///C:/game/data/file.xml", sut.PathToFileUri(@"C:\game\data\file.xml"));
     }
 
     [Fact]
-    public void PathToFileUri_WindowsForwardSlash_ReturnsLowercaseFileUri()
+    // The case in the value is the file's real name, and it is the only copy of it we have: a
+    // lowercased URI cannot be opened on a case-sensitive filesystem. Sameness is decided by
+    // DocumentUris, not by flattening the data.
+    public void PathToFileUri_WindowsForwardSlash_KeepsTheNameAsGiven()
     {
         var sut = Build();
-        Assert.Equal("file:///c:/game/data/file.xml", sut.PathToFileUri("C:/game/DATA/File.XML"));
+        Assert.Equal("file:///C:/game/DATA/File.XML", sut.PathToFileUri("C:/game/DATA/File.XML"));
     }
 
     [Fact]
@@ -47,10 +50,23 @@ public sealed class FileHelperTest
     // ── NormalizeUri ──────────────────────────────────────────────────────────
 
     [Fact]
-    public void NormalizeUri_FileTripleSlashMixedCase_ReturnsLowercase()
+    public void NormalizeUri_FileTripleSlashMixedCase_KeepsTheCase()
     {
         var sut = Build();
-        Assert.Equal("file:///c:/game/file.xml", sut.NormalizeUri("file:///C:/game/File.xml"));
+        Assert.Equal("file:///C:/game/File.xml", sut.NormalizeUri("file:///C:/game/File.xml"));
+    }
+
+    // ...and two spellings of one file are still one document, because that is now the comparer's
+    // job rather than a property of the string.
+    [Fact]
+    public void NormalizeUri_DifferingOnlyInCase_AreTheSameDocument()
+    {
+        var sut = Build();
+
+        Assert.True(DocumentUris.Same(
+            sut.NormalizeUri("file:///C:/game/File.xml"), sut.NormalizeUri("file:///c:/GAME/file.XML")));
+        Assert.NotEqual(
+            sut.NormalizeUri("file:///C:/game/File.xml"), sut.NormalizeUri("file:///c:/GAME/file.XML"));
     }
 
     [Fact]
@@ -68,7 +84,7 @@ public sealed class FileHelperTest
     }
 
     [Fact]
-    public void NormalizeUri_UnixFileUri_ReturnsLowercase()
+    public void NormalizeUri_UnixFileUri_IsUnchanged()
     {
         var sut = Build();
         Assert.Equal("file:///home/user/file.xml", sut.NormalizeUri("file:///home/user/file.xml"));
@@ -104,7 +120,7 @@ public sealed class FileHelperTest
     {
         var sut = Build();
         Assert.Equal(
-            "file:///c:/program files (x86)/steam/game.xml",
+            "file:///c:/Program Files (x86)/Steam/game.xml",
             sut.NormalizeUri("file:///c%3A/Program%20Files%20%28x86%29/Steam/game.xml"));
     }
 

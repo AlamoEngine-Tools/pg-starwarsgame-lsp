@@ -153,10 +153,10 @@ public sealed class XmlSmokeTest : IClassFixture<LspServerFixture>
     // ── helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Polls an LSP request until it answers with an indexed result, or the timeout expires. The
-    /// server indexes an opened document asynchronously, so the first answer after didOpen is
-    /// legitimately empty - a fixed delay only guesses at how long that takes. On timeout the last
-    /// response is returned, so the caller's own assertion reports the real shortfall.
+    ///     Polls an LSP request until it answers with an indexed result, or the timeout expires. The
+    ///     server indexes an opened document asynchronously, so the first answer after didOpen is
+    ///     legitimately empty - a fixed delay only guesses at how long that takes. On timeout the last
+    ///     response is returned, so the caller's own assertion reports the real shortfall.
     /// </summary>
     private static async Task<T?> PollUntilAsync<T>(Func<CancellationToken, Task<T?>> request,
         Func<T?, bool> isReady, TimeSpan? timeout = null)

@@ -32,7 +32,9 @@ public sealed record EncyclopediaLine(string Key, string? Text);
 ///     drawn. Null only when the unit names no icon at all, or is unknown.
 /// </param>
 public sealed record EncyclopediaReference(
-    string ObjectId, string? DisplayName, string? IconDataUri = null);
+    string ObjectId,
+    string? DisplayName,
+    string? IconDataUri = null);
 
 /// <summary>
 ///     One active ability from <c>Unit_Abilities_Data</c>, in the order the XML declares them.
@@ -60,7 +62,10 @@ public sealed record EncyclopediaReference(
 ///     to the icon's own dimensions, and a mod may ship these at other than the base game's 26.
 /// </param>
 public sealed record EncyclopediaAbility(
-    string Type, string? AbilityName, string? AlternateIconName, EncyclopediaImage? Icon = null);
+    string Type,
+    string? AbilityName,
+    string? AlternateIconName,
+    EncyclopediaImage? Icon = null);
 
 /// <summary>Result of <c>aet/getEncyclopediaEntry</c>.</summary>
 /// <param name="Found">Whether the object id resolved.</param>
@@ -144,7 +149,9 @@ public sealed record GetEncyclopediaEntryResult(
 /// </param>
 /// <param name="Names">Every name in the pool, in file order.</param>
 public sealed record EncyclopediaShipNames(
-    string SourcePath, bool FileFound, IReadOnlyList<string> Names);
+    string SourcePath,
+    bool FileFound,
+    IReadOnlyList<string> Names);
 
 /// <summary>A resolved icon, ready for the client to drop straight into an <c>img</c> element.</summary>
 /// <param name="Name">The icon name as written in <c>Icon_Name</c>.</param>
@@ -169,7 +176,12 @@ public sealed record EncyclopediaShipNames(
 ///     a mod may ship them at other than the base game's 26.
 /// </param>
 public sealed record EncyclopediaIcon(
-    string Name, string DataUri, string Source, bool IsMegaTextureStale, int Width = 0, int Height = 0);
+    string Name,
+    string DataUri,
+    string Source,
+    bool IsMegaTextureStale,
+    int Width = 0,
+    int Height = 0);
 
 /// <summary>
 ///     The popup's own chrome, cut from the mega texture: the pieces the engine draws the card out
@@ -238,7 +250,10 @@ public sealed record EncyclopediaChrome(
 /// </param>
 /// <param name="Image">The artwork, or <see langword="null" /> when the atlas has no such entry.</param>
 public sealed record EncyclopediaFactionFrame(
-    int Slot, string TextureName, string? SlotName, EncyclopediaImage? Image)
+    int Slot,
+    string TextureName,
+    string? SlotName,
+    EncyclopediaImage? Image)
 {
     /// <summary>
     ///     The slot names the base game's own data confirms, in slot order.

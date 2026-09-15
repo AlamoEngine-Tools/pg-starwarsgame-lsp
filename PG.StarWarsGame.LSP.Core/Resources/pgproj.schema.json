@@ -7,6 +7,16 @@
     "$schema": {
       "type": "string"
     },
+    "_type": {
+      "description": "What this document is. Written by aet-eaw-edit; leave it alone. A file declaring anything else is not opened as a mod project.",
+      "type": "string",
+      "const": "aetswg.ModProject"
+    },
+    "_typeVersion": {
+      "description": "The format of this project FILE, not the version of the mod (that lives in modinfo.version). Written by aet-eaw-edit as namespace-version, e.g. aetswg-1.0.0. aet-eaw-edit refuses to open a project whose format is newer than it understands, rather than reading it as best it can and writing its own shape back over it.",
+      "type": "string",
+      "pattern": "^aetswg-\\d+\\.\\d+\\.\\d+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
     "name": {
       "description": "Project display name and identity. When omitted, the server falls back to the .pgproj file name (without extension).",
       "type": "string",

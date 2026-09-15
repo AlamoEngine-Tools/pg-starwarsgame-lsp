@@ -1484,6 +1484,7 @@ public sealed class XmlCompletionHandlerTest
         }
 
         public GameIndex Current { get; }
+
         public event Action<GameIndex>? IndexChanged
         {
             add { }
@@ -1586,6 +1587,9 @@ public sealed class XmlCompletionHandlerTest
 
     private sealed class EmptyVariantTagSource : IVariantTagSource
     {
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => null;
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return null;
+        }
     }
 }

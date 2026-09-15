@@ -26,7 +26,8 @@ export function anyFilterSet(filters: GraphFilters): boolean {
     return (filters.nameFilter ?? '') !== ''
         || (filters.branch ?? '') !== ''
         || (filters.lifecycle ?? '') !== ''
-        || (filters.reachableFrom ?? '') !== '';
+        || (filters.reachableFrom ?? '') !== ''
+        || (filters.plotState ?? '') !== '';
 }
 
 export interface ClearFiltersButtonProps {

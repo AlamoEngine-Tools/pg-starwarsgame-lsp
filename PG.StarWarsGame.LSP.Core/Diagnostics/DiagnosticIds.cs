@@ -70,6 +70,23 @@ public static class DiagnosticIds
     /// <summary>A dialog command the schema's command set does not contain.</summary>
     public static readonly DiagnosticId DialogUnknownCommand = new(DiagnosticGroup.Enums, 16);
 
+    /// <summary>
+    ///     A value that the enum allows but this OWNER does not - the engine names the one style it
+    ///     supports and overwrites anything else.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="DynamicEnumValue" />, which reports a value no owner accepts.
+    ///     Suppressing "this ability is fussier than the enum" must not silence "that value does not
+    ///     exist".
+    /// </remarks>
+    public static readonly DiagnosticId EnumValueNotAllowedHere = new(DiagnosticGroup.Enums, 17);
+
+    /// <summary>
+    ///     An unknown projectile category in <c>Projectile_Types_Targeted</c>, which makes a point
+    ///     defence silently ignore that projectile.
+    /// </summary>
+    public static readonly DiagnosticId ProjectileCategoryList = new(DiagnosticGroup.Enums, 18);
+
     // ── Values ──
     public static readonly DiagnosticId AbilityModMultiplier = new(DiagnosticGroup.Values, 1);
     public static readonly DiagnosticId AudioParamInt = new(DiagnosticGroup.Values, 2);
@@ -132,6 +149,96 @@ public static class DiagnosticIds
     public static readonly DiagnosticId DialogCommandArity = new(DiagnosticGroup.Values, 57);
     public static readonly DiagnosticId DialogArgValue = new(DiagnosticGroup.Values, 58);
 
+    // Range rules the engine states about dozens of tags in its own error messages, opted into per
+    // tag by validationId rather than carried by a value type.
+    public static readonly DiagnosticId ValueMustBeNonNegative = new(DiagnosticGroup.Values, 59);
+    public static readonly DiagnosticId ValueMustBePositive = new(DiagnosticGroup.Values, 60);
+    public static readonly DiagnosticId BonusPercentageTooLow = new(DiagnosticGroup.Values, 61);
+
+    // Each range rule gets its own id rather than sharing one: a suppression targets an id, and a
+    // shared one would mean silencing an angle check also silences a fraction check.
+    public static readonly DiagnosticId AngleOutsideHalfTurn = new(DiagnosticGroup.Values, 62);
+    public static readonly DiagnosticId AngleOutsideFullTurn = new(DiagnosticGroup.Values, 63);
+    public static readonly DiagnosticId NegativeFractionOutOfRange = new(DiagnosticGroup.Values, 64);
+    public static readonly DiagnosticId FractionNotBelowOne = new(DiagnosticGroup.Values, 65);
+    public static readonly DiagnosticId ValueNotBelowOne = new(DiagnosticGroup.Values, 66);
+    public static readonly DiagnosticId CurveNeedsTwoControlPoints = new(DiagnosticGroup.Values, 67);
+
+    /// <summary>
+    ///     A value below -1.0 where the engine floors at -1.0 inclusive. Its own id rather than
+    ///     sharing <see cref="BonusPercentageTooLow" />: that rule excludes -1.0 and this one
+    ///     allows it, so a suppression aimed at one must not silence the other.
+    /// </summary>
+    public static readonly DiagnosticId ValueBelowNegativeOne = new(DiagnosticGroup.Values, 68);
+
+    /// <summary>
+    ///     A duration below the one second the engine insists on, which it then substitutes. Its own
+    ///     id rather than a shared minimum: the bound is a unit of time rather than a fraction, and
+    ///     it applies to one owner of a tag name three types share.
+    /// </summary>
+    public static readonly DiagnosticId DurationBelowOneSecond = new(DiagnosticGroup.Values, 69);
+
+    /// <summary>
+    ///     The owner's share of a split income outside <c>[0, 1)</c>. Its own id rather than a range
+    ///     rule's, because the engine only checks it while both split flags are on - a value the
+    ///     engine never reads is not a defect.
+    /// </summary>
+    public static readonly DiagnosticId OwnerIncomeShareOutOfRange = new(DiagnosticGroup.Values, 70);
+
+    /// <summary>
+    ///     A per-tech-level respawn table the engine refuses - wrong length, a negative entry, or a
+    ///     zero among non-zeros. One id for all three, because the engine discards the same thing
+    ///     whichever check fails.
+    /// </summary>
+    public static readonly DiagnosticId RespawnTimeList = new(DiagnosticGroup.Values, 71);
+
+    /// <summary>
+    ///     Text longer than the fixed buffer the engine copies it into. Not a validity rule but a
+    ///     crash: the copy is an unchecked <c>strcpy</c>, and the game does not start.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id, and one nobody should suppress lightly - unlike every other rule here, the
+    ///     consequence is not a silent behaviour change but a game that will not load.
+    /// </remarks>
+    public static readonly DiagnosticId EngineTextLimit = new(DiagnosticGroup.Values, 72);
+
+    /// <summary>
+    ///     Text approaching that buffer but still inside it. Warned about because these limits are
+    ///     reached by accumulation, so the useful moment to say something is while there is still
+    ///     room to act.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id so it can be silenced on its own. Someone who knows their file is large and
+    ///     deliberate should be able to stop the nagging without also silencing
+    ///     <see cref="EngineTextLimit" />, which reports a game that will not load.
+    /// </remarks>
+    public static readonly DiagnosticId EngineTextLimitApproaching = new(DiagnosticGroup.Values, 73);
+
+    /// <summary>
+    ///     A list whose first entry the engine requires to be a particular name, because index 0 is
+    ///     the fallback it hands out when a lookup misses - <c>Damage_Types</c> and
+    ///     <c>Armor_Types</c>.
+    /// </summary>
+    /// <remarks>
+    ///     One id for the family rather than one per list: it is a single concern from the author's
+    ///     side - the default entry has to stay at the front - and someone silencing it for damage
+    ///     types would mean it for armour types too.
+    /// </remarks>
+    public static readonly DiagnosticId RequiredFirstListEntry = new(DiagnosticGroup.Values, 74);
+
+    /// <summary>
+    ///     A weapon hardpoint's fire cone outside the span the engine can act on. Its own id rather
+    ///     than sharing <see cref="AngleOutsideFullTurn" />: that rule admits zero and this one
+    ///     cannot, because the engine asserts the cone is strictly greater than it.
+    /// </summary>
+    public static readonly DiagnosticId FireConeOutsideFullTurn = new(DiagnosticGroup.Values, 75);
+
+    /// <summary>
+    ///     A tag spelled in a casing its own parser will not accept. Rare by design: nearly every
+    ///     tag is case-insensitive, and the exceptions are the ones with a hand-rolled parser.
+    /// </summary>
+    public static readonly DiagnosticId CaseSensitiveTag = new(DiagnosticGroup.Structure, 13);
+
     // ── Assets ──
     public static readonly DiagnosticId AudioFileExistence = new(DiagnosticGroup.Assets, 1);
     public static readonly DiagnosticId AudioFileFormat = new(DiagnosticGroup.Assets, 2);
@@ -186,6 +293,18 @@ public static class DiagnosticIds
     /// <summary>A dialog command that works but has not been verified against the engine.</summary>
     public static readonly DiagnosticId DialogUntestedCommand = new(DiagnosticGroup.Structure, 11);
 
+    /// <summary>
+    ///     An element written where a tag belongs that the schema has no tag by that name for, so
+    ///     the engine reads and discards it.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id rather than a variant of <see cref="TypeMismatch" />: this one has to be
+    ///     silenceable on its own. A mod may carry tags meant for an external tool, and the shipped
+    ///     data itself is full of them - 458 distinct dead names over 3800 occurrences across foc/
+    ///     and eaw/.
+    /// </remarks>
+    public static readonly DiagnosticId UnknownTag = new(DiagnosticGroup.Structure, 12);
+
     // ── CrossTag ──
     public static readonly DiagnosticId DamageNonzero = new(DiagnosticGroup.CrossTag, 1);
     public static readonly DiagnosticId DisallowedOrOperator = new(DiagnosticGroup.CrossTag, 2);
@@ -195,7 +314,134 @@ public static class DiagnosticIds
     public static readonly DiagnosticId HardpointModelBonesUnavailable = new(DiagnosticGroup.CrossTag, 6);
     public static readonly DiagnosticId PlanetModeExclusionList = new(DiagnosticGroup.CrossTag, 7);
     public static readonly DiagnosticId SquadronOffsetsMismatch = new(DiagnosticGroup.CrossTag, 8);
+
     public static readonly DiagnosticId PlanetModeMissingMode = new(DiagnosticGroup.CrossTag, 9);
+
+    // 11, not 10: DamageStageNotOnModel already holds 10, further down this file.
+    public static readonly DiagnosticId DamageAbsorbsNothing = new(DiagnosticGroup.CrossTag, 11);
+    public static readonly DiagnosticId SpecialWeaponBehavior = new(DiagnosticGroup.CrossTag, 12);
+    public static readonly DiagnosticId VehicleThiefCloneAbility = new(DiagnosticGroup.CrossTag, 13);
+
+    /// <summary>
+    ///     <c>Land_Damage_Thresholds</c> and <c>Land_Damage_Alternates</c> carry a different number
+    ///     of entries, so the tail of the longer column pairs with nothing.
+    /// </summary>
+    /// <remarks>
+    ///     Two columns, not the three the tag family has. <c>Land_Damage_SFX</c> disagrees with the
+    ///     alternates on 42 of foc's 219 objects and 37 of eaw's 161, so an id covering all three
+    ///     would be one the base game trips - see <c>LandDamageTableRule</c> for the measurement.
+    /// </remarks>
+    public static readonly DiagnosticId LandDamageTableMismatch = new(DiagnosticGroup.CrossTag, 14);
+
+    public static readonly DiagnosticId MissingRequiredTag = new(DiagnosticGroup.CrossTag, 15);
+    public static readonly DiagnosticId TagComparison = new(DiagnosticGroup.CrossTag, 16);
+
+    /// <summary>
+    ///     A flag switched on without the tag the engine requires beside it - "If you set
+    ///     See_Fleet_Contents to true you must also set See_Num_Fleets to true", and five more.
+    /// </summary>
+    public static readonly DiagnosticId BooleanGatedRequirement = new(DiagnosticGroup.CrossTag, 17);
+
+    /// <summary>
+    ///     Both halves of an either/or flag pair are off, so the ability loads and does nothing -
+    ///     "You should set either Can_Assassinate_Minor_Heroes or Can_Assassinate_Major_Heroes to
+    ///     'Yes'", and two more.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="BooleanGatedRequirement" />: that one is a flag creating a
+    ///     requirement the engine then REPAIRS, this one is an object the engine leaves inert. A
+    ///     modder silencing "my ability deliberately covers neither case" must not thereby silence
+    ///     "the engine is about to overwrite your value".
+    /// </remarks>
+    public static readonly DiagnosticId EitherOrRequirement = new(DiagnosticGroup.CrossTag, 18);
+
+    /// <summary>
+    ///     An ability with an automatic activation style that also causes its owner to despawn. The
+    ///     engine states it once on the base class and then turns the flag off itself.
+    /// </summary>
+    public static readonly DiagnosticId AutomaticAbilityDespawn = new(DiagnosticGroup.CrossTag, 19);
+
+    /// <summary>
+    ///     A flag combination on an income stream the engine refuses and clears -
+    ///     <c>Split_Favors_Owner</c> with no allies split, or alongside
+    ///     <c>Full_Amount_To_Everyone</c>.
+    /// </summary>
+    /// <remarks>
+    ///     One id for both, because they are one concern from the author's side: that flag set where
+    ///     it cannot mean anything. Someone silencing one would mean the other.
+    /// </remarks>
+    public static readonly DiagnosticId IncomeSplitConflict = new(DiagnosticGroup.CrossTag, 20);
+
+    /// <summary>
+    ///     A destroyable hardpoint nothing can hit - no <c>Collision_Mesh</c>, or one another
+    ///     destroyable hardpoint on the same object already claims.
+    /// </summary>
+    /// <remarks>
+    ///     Derived from the damage-routing pass rather than from an engine message, which is why it
+    ///     has its own id: someone who trusts their own routing and wants this quiet should not have
+    ///     to silence the rules the engine itself states.
+    /// </remarks>
+    public static readonly DiagnosticId HardpointCannotBeHit = new(DiagnosticGroup.CrossTag, 21);
+
+    /// <summary>
+    ///     A system spy's <c>Duration_In_Secs</c> on the wrong side of zero for the
+    ///     <c>Activation_Style</c> it declares - the engine overwrites it either way.
+    /// </summary>
+    /// <remarks>
+    ///     One id for both arms of the branch. They are the same concern from the author's side -
+    ///     a duration whose sign does not match the style - and someone silencing one would mean
+    ///     the other.
+    /// </remarks>
+    public static readonly DiagnosticId SystemSpyDurationSign = new(DiagnosticGroup.CrossTag, 22);
+
+    /// <summary>
+    ///     A grenade or remote-bomb ability naming a projectile whose <c>Projectile_Category</c> is
+    ///     not <c>GRENADE</c>, which the ability refuses.
+    /// </summary>
+    /// <remarks>
+    ///     One id for both owners: it is one concern - the projectile is the wrong kind - and
+    ///     someone silencing it for grenades would mean it for remote bombs.
+    /// </remarks>
+    public static readonly DiagnosticId GrenadeProjectileCategory = new(DiagnosticGroup.CrossTag, 23);
+
+    /// <summary>
+    ///     A <c>Vehicle_Thief_Inside_Clone</c> that keeps <c>GARRISON_VEHICLE</c>, which the tag's
+    ///     description says the clone must not have.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id rather than <see cref="VehicleThiefCloneAbility" />: the ability half is an engine
+    ///     assert, this half is the documented requirement plus a shared container, and two vanilla
+    ///     clones trip it - someone silencing one should not lose the other.
+    /// </remarks>
+    public static readonly DiagnosticId VehicleThiefCloneGarrison = new(DiagnosticGroup.CrossTag, 24);
+
+    /// <summary>
+    ///     <c>Fires_Forward</c> on an object with no <c>WEAPON</c> behaviour, where nothing reads it.
+    /// </summary>
+    public static readonly DiagnosticId FiresForwardWithoutWeapon = new(DiagnosticGroup.CrossTag, 25);
+
+    /// <summary>
+    ///     <c>Fires_Forward</c> on a <c>WEAPON</c> object that also sets turret extents, which then no
+    ///     longer limit the shot.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="FiresForwardWithoutWeapon" />: one flags a flag doing nothing, the
+    ///     other two tags overruling each other on purpose, as vanilla's own bombing run does.
+    /// </remarks>
+    public static readonly DiagnosticId FiresForwardIgnoresArc = new(DiagnosticGroup.CrossTag, 26);
+
+    /// <summary>
+    ///     A unit without the WEAPON behaviour whose <c>Targeting_Max_Attack_Distance</c> exceeds the
+    ///     longest <c>Fire_Range_Distance</c> of its weapon hardpoints, so it can stop where none fires
+    ///     (#101).
+    /// </summary>
+    public static readonly DiagnosticId AttackDistanceBeyondHardpointRange = new(DiagnosticGroup.CrossTag, 27);
+
+    /// <summary>
+    ///     A WEAPON unit without the TURRET behaviour whose turret-extent tags restrict the shot - they are
+    ///     the hull's firing arc, not turret configuration (A5). A hint: fighters do it on purpose.
+    /// </summary>
+    public static readonly DiagnosticId HullFiringArc = new(DiagnosticGroup.CrossTag, 28);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
@@ -209,6 +455,24 @@ public static class DiagnosticIds
     public static readonly DiagnosticId VariantCycle = new(DiagnosticGroup.Variants, 2);
     public static readonly DiagnosticId VariantIgnoredOverride = new(DiagnosticGroup.Variants, 3);
     public static readonly DiagnosticId VariantRedundantOverride = new(DiagnosticGroup.Variants, 4);
+
+    /// <summary>
+    ///     A <c>Variant_Of_Existing_Type</c> naming a base that does not resolve. The engine ignores
+    ///     the tag without a word, so the object loads as a blank slate.
+    /// </summary>
+    public static readonly DiagnosticId VariantBaseUnresolved = new(DiagnosticGroup.Variants, 5);
+
+    /// <summary>
+    ///     A base chain longer than the ten sweeps the engine gives variant resolution, which
+    ///     therefore resolves or not depending on declaration order.
+    /// </summary>
+    public static readonly DiagnosticId VariantChainTooDeep = new(DiagnosticGroup.Variants, 6);
+
+    /// <summary>
+    ///     <c>Variant_Of_Existing_Type</c> on an object type that has no variant machinery, where the
+    ///     engine parses the tag, fails to recognise it and logs an "Unprocessed entry" warning.
+    /// </summary>
+    public static readonly DiagnosticId VariantTagNotSupported = new(DiagnosticGroup.Variants, 7);
 
     // ── Story ──
     public static readonly DiagnosticId StoryChain = new(DiagnosticGroup.Story, 1);
@@ -226,6 +490,7 @@ public static class DiagnosticIds
     public static readonly DiagnosticId DuplicateSymbol = new(DiagnosticGroup.Symbols, 1);
     public static readonly DiagnosticId CrossLayerShadow = new(DiagnosticGroup.Symbols, 2);
     public static readonly DiagnosticId CrossTypeShadow = new(DiagnosticGroup.Symbols, 3);
+    public static readonly DiagnosticId UnnamedObject = new(DiagnosticGroup.Symbols, 4);
 
     // ── Engine ──
     // Built directly by XmlDiagnosticsPublisher rather than by a handler: these check values the
@@ -284,7 +549,7 @@ public static class DiagnosticIds
     /// <summary>The object declares no tactical model, so there is nothing to draw.</summary>
     public static readonly DiagnosticId PreviewNoTacticalModel = new(DiagnosticGroup.Preview, 6);
 
-    /// <summary>A hardpoint is mounted but defined nowhere.</summary>
+    /// <summary>A hardpoint is attached but defined nowhere.</summary>
     public static readonly DiagnosticId PreviewHardpointNotDefined = new(DiagnosticGroup.Preview, 7);
 
     /// <summary>A hardpoint's attached model is not there.</summary>
@@ -314,11 +579,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PreviewUnboundAbilityEffect =
         new(DiagnosticGroup.Preview, 14);
 
-    /// <summary>GameConstants maps no targeting reticle for a hardpoint type the object mounts.</summary>
+    /// <summary>GameConstants maps no targeting reticle for a hardpoint type the object attaches.</summary>
     public static readonly DiagnosticId PreviewNoReticleForType = new(DiagnosticGroup.Preview, 15);
 
-    /// <summary>An animation override whose skeleton differs from the hull's. Informational: the
-    /// clips still play, bound by bone index.</summary>
+    /// <summary>
+    ///     An animation override whose skeleton differs from the hull's. Informational: the
+    ///     clips still play, bound by bone index.
+    /// </summary>
     public static readonly DiagnosticId PreviewAnimationSkeletonMismatch =
         new(DiagnosticGroup.Preview, 16);
 
@@ -352,4 +619,28 @@ public static class DiagnosticIds
     /// </remarks>
     public static readonly DiagnosticId PreviewDamageStageNotInModel =
         new(DiagnosticGroup.Preview, 20);
+
+    /// <summary>
+    ///     A destroyable hardpoint with NO <c>Collision_Mesh</c>, so no shot can ever reach it and the
+    ///     unit can never be finished through its hardpoints.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GameObjectClass::Take_Damage</c> finds a hardpoint by name, an exact
+    ///         <c>_stricmp</c> against each <c>Collision_Mesh</c>. An empty name fails the size check
+    ///         before that lookup (<c>00973ad9</c>) whether or not the hit was aimed, so the hardpoint
+    ///         never dies and the all-destroyed branch - which counts by <c>Is_Destroyable</c> and never
+    ///         asks whether a hardpoint was reachable - can never complete.
+    ///     </para>
+    ///     <para>
+    ///         A value the MODEL lacks is NOT this. <c>Take_Damage</c> replaces the name with the
+    ///         hardpoint's own value when the hit is aimed at it, so aimed fire still lands. That case
+    ///         once shared this id, as an error; it is reported by
+    ///         <see cref="HardpointBoneNotOnModel" /> instead, as a warning. Not reported where the
+    ///         object does not die with its hardpoints - the palace keeps its generators as scenery on
+    ///         purpose.
+    ///     </para>
+    /// </remarks>
+    public static readonly DiagnosticId PreviewHardpointUnreachable =
+        new(DiagnosticGroup.Preview, 21);
 }

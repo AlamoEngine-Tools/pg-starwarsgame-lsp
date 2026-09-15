@@ -77,6 +77,13 @@ export interface GetStoryGraphResult {
     nodes: StoryGraphNodeDto[];
     edges: StoryGraphEdgeDto[];
     error?: string | null;
+    /**
+     * Facets of the whole campaign, deliberately NOT of `nodes`. A filter dropdown lists what you
+     * could switch to, so deriving it from the filtered result leaves it offering only the value
+     * already selected. Optional so an older server degrades to the previous behaviour.
+     */
+    branches?: string[] | null;
+    threads?: string[] | null;
 }
 
 /**
@@ -92,6 +99,14 @@ export interface GraphFilters {
     branch?: string;
     lifecycle?: string;
     reachableFrom?: string;
+    /**
+     * `Active` or `Suspended` - how the faction's plot manifest registers the thread an event
+     * lives in. Absent or empty keeps both, which is the whole chain.
+     *
+     * Not the same question as `lifecycle`: a suspended plot's events are Inactive, and so is an
+     * event in a running plot whose prereq has not fired.
+     */
+    plotState?: string;
 }
 
 // ── aet/getStoryNodeDetail ───────────────────────────────────────────────────
@@ -197,7 +212,8 @@ export interface GetStoryDiagnosticsResult {
 // ── aet/getStoryLayout / aet/setStoryLayout ──────────────────────────────────
 
 export interface StoryLayoutEntryDto {
-    file: string;
+    /** The thread's document URI. The server keys the sidecar by a hash of it - see DocumentKey. */
+    threadUri: string;
     eventName: string;
     x: number;
     y: number;
@@ -268,4 +284,5 @@ export interface StoryGraphChangedParams {
 
 export interface StorySimChangedParams {
     campaign: string;
+    faction: string;
 }

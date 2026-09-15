@@ -9,8 +9,12 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 ///     Builds the shared symbol/reference id for a <see cref="ReferenceKind.WorkspaceFile" />
 ///     target, so a file-symbol (emitted when the file itself is parsed) and a reference to it
 ///     (emitted from a <c>workspaceFile</c> tag) agree on one key regardless of separator style,
-///     <c>DATA\XML\</c> prefix, or casing. Form: <c>&lt;lowercased file-type&gt;:&lt;normalized
-///     value&gt;</c>. XML file-types (<c>StoryPlotManifest</c>, <c>StoryParser</c>) normalize as
+///     <c>DATA\XML\</c> prefix, or casing. Form:
+///     <c>
+///         &lt;lowercased file-type&gt;:&lt;normalized
+///         value&gt;
+///     </c>
+///     . XML file-types (<c>StoryPlotManifest</c>, <c>StoryParser</c>) normalize as
 ///     xml-relative paths; <see cref="LuaScriptType" /> keys by extensionless base name, because
 ///     Lua scripts are referenced by bare name against the script roots.
 /// </summary>

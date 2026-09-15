@@ -5,10 +5,9 @@ using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
-
-using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -23,6 +22,26 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 /// </summary>
 public sealed class LocalisationDocumentEditorTest
 {
+    private const string Csv = "key,ENGLISH,GERMAN\nTEXT_A,Alpha,Alfa\nTEXT_B,Beta,Beta_DE\nTEXT_C,Gamma,Gamma_DE\n";
+
+    // ── XML ──────────────────────────────────────────────────────────────────
+
+    private const string Xml = """
+                               <?xml version="1.0" encoding="utf-8"?>
+                               <Localisations xmlns="urn:alamoenginetools:localisation:v1">
+                                 <Localisation key="TEXT_A">
+                                   <TranslationData>
+                                     <Translation Language="ENGLISH">Alpha</Translation>
+                                   </TranslationData>
+                                 </Localisation>
+                                 <Localisation key="TEXT_B">
+                                   <TranslationData>
+                                     <Translation Language="ENGLISH">Beta</Translation>
+                                   </TranslationData>
+                                 </Localisation>
+                               </Localisations>
+                               """;
+
     private static ILocalisationDocumentEditor Editor()
     {
         var services = new ServiceCollection();
@@ -46,8 +65,6 @@ public sealed class LocalisationDocumentEditorTest
     {
         return new LocEditCommandDto("setCell", index, Language: language, Value: value, ExpectedKey: expectedKey);
     }
-
-    private const string Csv = "key,ENGLISH,GERMAN\nTEXT_A,Alpha,Alfa\nTEXT_B,Beta,Beta_DE\nTEXT_C,Gamma,Gamma_DE\n";
 
     // ── round-trip fidelity ──────────────────────────────────────────────────
 
@@ -147,7 +164,7 @@ public sealed class LocalisationDocumentEditorTest
     [Fact]
     public void MoveRow_ReordersWithoutRewritingTheRow()
     {
-        var result = Apply(Csv, ".csv", new LocEditCommandDto("moveRow", 2, ToIndex: 0));
+        var result = Apply(Csv, ".csv", new LocEditCommandDto("moveRow", 2, 0));
 
         Assert.Equal(
             "key,ENGLISH,GERMAN\nTEXT_C,Gamma,Gamma_DE\nTEXT_A,Alpha,Alfa\nTEXT_B,Beta,Beta_DE\n",
@@ -312,24 +329,6 @@ public sealed class LocalisationDocumentEditorTest
         Assert.Contains("single-language", result.Error, StringComparison.OrdinalIgnoreCase);
     }
 
-    // ── XML ──────────────────────────────────────────────────────────────────
-
-    private const string Xml = """
-                               <?xml version="1.0" encoding="utf-8"?>
-                               <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-                                 <Localisation key="TEXT_A">
-                                   <TranslationData>
-                                     <Translation Language="ENGLISH">Alpha</Translation>
-                                   </TranslationData>
-                                 </Localisation>
-                                 <Localisation key="TEXT_B">
-                                   <TranslationData>
-                                     <Translation Language="ENGLISH">Beta</Translation>
-                                   </TranslationData>
-                                 </Localisation>
-                               </Localisations>
-                               """;
-
     [Fact]
     public void Xml_EmptyBatch_ReturnsTheDocumentUnchanged()
     {
@@ -350,16 +349,10 @@ public sealed class LocalisationDocumentEditorTest
     [InlineData("\n")]
     public void Xml_Save_KeepsTheFilesOwnLineEndings(string lineEnding)
     {
-        var text = string.Join(lineEnding, [
-            "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
-            "<Localisations xmlns=\"urn:alamoenginetools:localisation:v1\">",
-            "  <Localisation key=\"TEXT_A\">",
-            "    <TranslationData>",
-            "      <Translation Language=\"ENGLISH\">Alpha</Translation>",
-            "    </TranslationData>",
-            "  </Localisation>",
-            "</Localisations>"
-        ]);
+        var text = string.Join(lineEnding, "<?xml version=\"1.0\" encoding=\"utf-8\"?>",
+            "<Localisations xmlns=\"urn:alamoenginetools:localisation:v1\">", "  <Localisation key=\"TEXT_A\">",
+            "    <TranslationData>", "      <Translation Language=\"ENGLISH\">Alpha</Translation>",
+            "    </TranslationData>", "  </Localisation>", "</Localisations>");
 
         var result = Apply(text, ".xml", SetCell(0, "ENGLISH", "Changed"));
 
@@ -421,7 +414,7 @@ public sealed class LocalisationDocumentEditorTest
                 case 2:
                     var from = random.Next(count);
                     var to = random.Next(count);
-                    command = new LocEditCommandDto("moveRow", from, ToIndex: to);
+                    command = new LocEditCommandDto("moveRow", from, to);
                     var moved = model[from];
                     model.RemoveAt(from);
                     model.Insert(to, moved);

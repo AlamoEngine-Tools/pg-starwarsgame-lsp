@@ -23,7 +23,7 @@ public sealed class StoryGraphDiagnosticsProducerTest
         var parsed = threads
             .Select(t => StoryThreadParser.Parse($"<Story>{t.Inner}</Story>", t.Uri))
             .ToList();
-        return new StoryCampaignModel("GC", parsed,
+        return new StoryCampaignModel("GC", "Rebel", parsed,
             (suspendedUris ?? []).ToHashSet(StringComparer.Ordinal),
             new StoryGraphBuilder(Schema).Build(parsed)) { LuaScripts = luaScripts ?? [] };
     }

@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { shouldShowOverview, shouldWindow, WINDOW_NODE_COUNT } from './lodPolicy';
+import { needsFullMountForLayout, shouldShowOverview, shouldWindow, WINDOW_NODE_COUNT } from './lodPolicy';
 
 describe('shouldWindow', () => {
     it('mounts a small graph whole', () => {
@@ -48,5 +48,28 @@ describe('shouldShowOverview', () => {
     // about zoom; windowing is about cost. This function must not know about node counts at all.
     it('is a pure function of zoom, independent of graph size', () => {
         assert.equal(shouldShowOverview(0.1, DETAIL), true, 'same answer whatever the graph holds');
+    });
+});
+
+describe('needsFullMountForLayout', () => {
+    it('has nothing to mount when the whole model is already mounted', () => {
+        assert.equal(needsFullMountForLayout(12, 12), false);
+    });
+
+    it('mounts the rest when only a window is mounted', () => {
+        assert.equal(needsFullMountForLayout(9, 1300), true);
+    });
+
+    // The defect this exists to prevent: auto-arrange keyed the pre-layout mount on `windowed`,
+    // which is a node-COUNT decision. Zooming out past the detail threshold unmounts EVERY graph,
+    // however small, to draw the overview - so pressing Arrange on a zoomed-out small graph laid
+    // out an empty editor, and the model rebuild that follows the layout reads the editor, so the
+    // model was cleared and the whole graph vanished. Mounting is the only input that answers this.
+    it('mounts everything when the overview has unmounted an unwindowed graph', () => {
+        assert.equal(needsFullMountForLayout(0, 12), true);
+    });
+
+    it('has nothing to mount for an empty model', () => {
+        assert.equal(needsFullMountForLayout(0, 0), false);
     });
 });

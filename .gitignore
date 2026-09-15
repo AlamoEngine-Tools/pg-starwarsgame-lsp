@@ -516,3 +516,5 @@ docs/
 .vscode-test/
 shader-sources/
 tools/
+.claude/
+lua_debugger/

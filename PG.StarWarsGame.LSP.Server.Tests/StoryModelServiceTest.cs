@@ -44,6 +44,35 @@ public sealed class StoryModelServiceTest
         };
     }
 
+    /// <summary>
+    ///     One campaign, two factions, each with its own manifest and thread - the shape 48 shipped
+    ///     campaigns have. Both threads open with an event of the same name, which is what the
+    ///     merged model turned into a false ambiguity and a cross-faction edge.
+    /// </summary>
+    private static Dictionary<string, MockFileData> TwoFactionFixture()
+    {
+        return new Dictionary<string, MockFileData>
+        {
+            [Path.Combine(XmlDir, "campaignfiles.xml")] =
+                new("<Campaign_Files><File>Campaigns_Test.xml</File></Campaign_Files>"),
+            [Path.Combine(XmlDir, "Campaigns_Test.xml")] = new(
+                "<Campaigns><Campaign Name=\"GC_One\">" +
+                "<Rebel_Story_Name>Story_Plots_R.xml</Rebel_Story_Name>" +
+                "<Empire_Story_Name>Story_Plots_E.xml</Empire_Story_Name>" +
+                "</Campaign></Campaigns>"),
+            [Path.Combine(XmlDir, "Story_Plots_R.xml")] = new(
+                "<Story_Mode_Plots><Active_Plot>Story_Rebel.xml</Active_Plot></Story_Mode_Plots>"),
+            [Path.Combine(XmlDir, "Story_Plots_E.xml")] = new(
+                "<Story_Mode_Plots><Active_Plot>Story_Empire.xml</Active_Plot></Story_Mode_Plots>"),
+            [Path.Combine(XmlDir, "Story_Rebel.xml")] = new(
+                "<Story><Event Name=\"Universal_Story_Start\"/>" +
+                "<Event Name=\"Rebel_Only\"/></Story>"),
+            [Path.Combine(XmlDir, "Story_Empire.xml")] = new(
+                "<Story><Event Name=\"Universal_Story_Start\"/>" +
+                "<Event Name=\"Empire_Only\"/></Story>")
+        };
+    }
+
     private static (StoryModelService Service, MockFileSystem Fs, MutableIndexService Index,
         FakeHost Host, FileHelper FileHelper, StubReloadService Reload) Build(
             Dictionary<string, MockFileData>? files = null, IReadOnlyList<string>? xmlDirs = null,
@@ -79,11 +108,53 @@ public sealed class StoryModelServiceTest
     }
 
     [Fact]
+    public void GetModelKeys_ListsEveryCampaignFactionPair()
+    {
+        var (service, _, _, _, _, _) = Build(TwoFactionFixture());
+
+        Assert.Equal(
+            [new StoryModelKey("GC_One", "Rebel"), new StoryModelKey("GC_One", "Empire")],
+            service.GetModelKeys());
+    }
+
+    [Fact]
+    public void GetCampaignModel_TakesOnlyTheNamedFactionsThreads()
+    {
+        var (service, _, _, _, _, _) = Build(TwoFactionFixture());
+
+        var rebel = service.GetCampaignModel("GC_One", "Rebel")!;
+
+        Assert.Single(rebel.Threads);
+        Assert.Contains(rebel.Graph.Nodes, n => n.Label == "Rebel_Only");
+        Assert.DoesNotContain(rebel.Graph.Nodes, n => n.Label == "Empire_Only");
+    }
+
+    [Fact]
+    public void GetCampaignModel_EachFactionIsItsOwnCachedModel()
+    {
+        var (service, _, _, _, _, _) = Build(TwoFactionFixture());
+
+        var rebel = service.GetCampaignModel("GC_One", "Rebel");
+        var empire = service.GetCampaignModel("GC_One", "Empire");
+
+        Assert.NotSame(rebel, empire);
+        Assert.Same(rebel, service.GetCampaignModel("GC_One", "Rebel"));
+    }
+
+    [Fact]
+    public void GetCampaignModel_FactionTheCampaignDoesNotDeclare_ReturnsNull()
+    {
+        var (service, _, _, _, _, _) = Build(TwoFactionFixture());
+
+        Assert.Null(service.GetCampaignModel("GC_One", "Underworld"));
+    }
+
+    [Fact]
     public void GetCampaignModel_ParsesThreadsAndMarksSuspension()
     {
         var (service, _, _, _, fh, _) = Build();
 
-        var model = service.GetCampaignModel("GC_One")!;
+        var model = service.GetCampaignModel("GC_One", "Rebel")!;
 
         Assert.Equal(2, model.Threads.Count);
         Assert.Contains(model.Threads, t => t.Events.Any(e => e.Name == "Opening"));
@@ -97,7 +168,7 @@ public sealed class StoryModelServiceTest
     {
         var (service, _, _, _, _, _) = Build();
 
-        Assert.Null(service.GetCampaignModel("No_Such_Campaign"));
+        Assert.Null(service.GetCampaignModel("No_Such_Campaign", "Rebel"));
     }
 
     [Fact]
@@ -105,8 +176,8 @@ public sealed class StoryModelServiceTest
     {
         var (service, _, _, _, _, _) = Build();
 
-        var first = service.GetCampaignModel("GC_One");
-        var second = service.GetCampaignModel("GC_One");
+        var first = service.GetCampaignModel("GC_One", "Rebel");
+        var second = service.GetCampaignModel("GC_One", "Rebel");
 
         Assert.Same(first, second);
     }
@@ -116,13 +187,13 @@ public sealed class StoryModelServiceTest
     {
         var (service, _, index, host, fh, _) = Build();
         var threadUri = fh.NormalizeUri(Path.Combine(XmlDir, "Story_Act_I.xml"));
-        var stale = service.GetCampaignModel("GC_One")!;
+        var stale = service.GetCampaignModel("GC_One", "Rebel")!;
 
         // didChange: the host gets the new text, the index a new version for the document.
         host.AddOrUpdate(threadUri, "<Story><Event Name=\"Rewritten\"/></Story>", 2);
         index.SetDocumentVersion(threadUri, 2);
 
-        var fresh = service.GetCampaignModel("GC_One")!;
+        var fresh = service.GetCampaignModel("GC_One", "Rebel")!;
 
         Assert.NotSame(stale, fresh);
         Assert.Contains(fresh.Graph.Nodes, n => n.Label == "Rewritten");
@@ -139,7 +210,7 @@ public sealed class StoryModelServiceTest
             new MockFileData("<Story><Event Name=\"DependencyVersion\"/></Story>");
         var (service, _, _, _, _, _) = Build(files, [DepXmlDir, XmlDir]);
 
-        var model = service.GetCampaignModel("GC_One")!;
+        var model = service.GetCampaignModel("GC_One", "Rebel")!;
 
         Assert.Contains(model.Graph.Nodes, n => n.Label == "Opening");
         Assert.DoesNotContain(model.Graph.Nodes, n => n.Label == "DependencyVersion");

@@ -33,7 +33,10 @@ public static class IconPackSerializer
     ///     Path of the sidecar belonging to <paramref name="baselinePath" />. Follows the same
     ///     sibling-file convention as the existing <c>.manifest.json</c>.
     /// </summary>
-    public static string SidecarPathFor(string baselinePath) => baselinePath + ".icons";
+    public static string SidecarPathFor(string baselinePath)
+    {
+        return baselinePath + ".icons";
+    }
 
     public static byte[] Serialize(
         IReadOnlyDictionary<string, byte[]> icons,

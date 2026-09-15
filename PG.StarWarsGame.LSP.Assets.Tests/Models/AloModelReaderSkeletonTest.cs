@@ -98,7 +98,7 @@ public sealed class AloModelReaderSkeletonTest
         var alo = Skeleton(
             Bone("OLD_FORM", -1, true, Translation(0, 0, 0)),
             Bone("FACE_CAMERA", 0, true, Translation(0, 0, 0),
-                billboard: (int)AlamoBillboardType.Face));
+                (int)AlamoBillboardType.Face));
 
         var bones = AloModelReader.Read(alo).Bones;
 

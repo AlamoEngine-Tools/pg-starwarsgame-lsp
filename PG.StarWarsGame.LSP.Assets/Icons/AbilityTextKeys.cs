@@ -33,10 +33,16 @@ public static class AbilityTextKeys
     private const string Prefix = "TEXT_TOOLTIP_ABILITY_";
 
     /// <summary>The key holding the ability's display name, or null when no type was given.</summary>
-    public static string? NameKeyFor(string? type) => KeyFor(type, "_NAME");
+    public static string? NameKeyFor(string? type)
+    {
+        return KeyFor(type, "_NAME");
+    }
 
     /// <summary>The key holding the ability's tooltip text, or null when no type was given.</summary>
-    public static string? DescriptionKeyFor(string? type) => KeyFor(type, "_DESCRIPTION");
+    public static string? DescriptionKeyFor(string? type)
+    {
+        return KeyFor(type, "_DESCRIPTION");
+    }
 
     private static string? KeyFor(string? type, string suffix)
     {

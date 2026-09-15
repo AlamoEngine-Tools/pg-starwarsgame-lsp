@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -200,7 +199,7 @@ public sealed class PreviewProjectileTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static GameSymbol SymVariant(string id, string typeName, string baseId)

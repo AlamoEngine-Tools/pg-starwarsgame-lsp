@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections;
 using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Serialization;
 using PG.StarWarsGame.LSP.Assets.Models;
@@ -106,9 +107,10 @@ public sealed class VerbatimKeyDictionaryConverter : JsonConverter
     {
         ArgumentNullException.ThrowIfNull(objectType);
 
-        return typeof(System.Collections.IDictionary).IsAssignableFrom(objectType)
+        return typeof(IDictionary).IsAssignableFrom(objectType)
                || objectType.GetInterfaces().Any(face => face.IsGenericType
-                   && face.GetGenericTypeDefinition() == typeof(IReadOnlyDictionary<,>));
+                                                         && face.GetGenericTypeDefinition() ==
+                                                         typeof(IReadOnlyDictionary<,>));
     }
 
     public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
@@ -124,7 +126,7 @@ public sealed class VerbatimKeyDictionaryConverter : JsonConverter
 
         writer.WriteStartObject();
 
-        foreach (System.Collections.DictionaryEntry entry in (System.Collections.IDictionary)value)
+        foreach (DictionaryEntry entry in (IDictionary)value)
         {
             // The key as the game data spells it. Everything below it still goes through the
             // serializer, so a VALUE keeps the camel-cased field names the client reads.

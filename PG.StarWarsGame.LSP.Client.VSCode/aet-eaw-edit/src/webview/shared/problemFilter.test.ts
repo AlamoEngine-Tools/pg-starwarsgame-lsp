@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { filterProblems } from './problemFilter';
+import { filterProblems, resolveProblemJump } from './problemFilter';
 
 interface Row { id: string | null; message: string }
 
@@ -101,5 +101,29 @@ describe('filterProblems label', () => {
 
     it('says zero rather than nothing at all', () => {
         assert.equal(filterProblems([], inGraph('a'), false).label, '0');
+    });
+});
+
+describe('resolveProblemJump', () => {
+    // The bug this exists for (#129): with a branch selected, a problem outside it was reachable
+    // through show-all, and clicking it hit a centre-on-node call that returned immediately
+    // because the node was never in the filtered graph. Silently doing nothing is the one
+    // outcome a click must never have.
+    it('asks for the filter to be cleared when the node is not in view', () => {
+        assert.equal(resolveProblemJump('evt-9', new Set(['evt-1'])), 'unfilter');
+    });
+
+    it('centres directly when the node is already in view', () => {
+        assert.equal(resolveProblemJump('evt-1', new Set(['evt-1', 'evt-2'])), 'centre');
+    });
+
+    // Before the first graph arrives there is nothing to compare against, and clearing the filter
+    // on a click the view cannot yet judge would throw away the reader's filter for no reason.
+    it('centres when no graph has arrived yet', () => {
+        assert.equal(resolveProblemJump('evt-1', null), 'centre');
+    });
+
+    it('treats an empty graph as not in view', () => {
+        assert.equal(resolveProblemJump('evt-1', new Set()), 'unfilter');
     });
 });

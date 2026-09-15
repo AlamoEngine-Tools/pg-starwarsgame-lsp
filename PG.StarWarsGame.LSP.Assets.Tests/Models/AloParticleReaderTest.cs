@@ -51,7 +51,10 @@ public sealed class AloParticleReaderTest
         float first, float last, AlamoTrackInterpolation interpolation, bool byteValued,
         params (float Value, float Time)[] keys)
     {
-        byte[] Endpoint(float v) => byteValued ? [(byte)Math.Round(v * 255)] : F32(v);
+        byte[] Endpoint(float v)
+        {
+            return byteValued ? [(byte)Math.Round(v * 255)] : F32(v);
+        }
 
         var keyChunks = keys.Select(k => Mini(0x05,
             byteValued ? I32((int)Math.Round(k.Value * 255)) : F32(k.Value),
@@ -93,7 +96,7 @@ public sealed class AloParticleReaderTest
                 Volume(AlamoSpawnShape.Point),
                 Volume(AlamoSpawnShape.Point),
                 Volume(AlamoSpawnShape.Point))),
-            Chunk(0x0001, true, tracks ?? DefaultTracks()),
+            Chunk(0x0001, true, tracks ?? DefaultTracks())
         };
 
         if (spawn is { } links)
@@ -113,7 +116,7 @@ public sealed class AloParticleReaderTest
         {
             Chunk(0x0000, false, Str(name)),
             Chunk(0x0001, false, I32(0)),
-            Chunk(0x0800, true, Concat(emitters.Length == 0 ? [Emitter()] : emitters)),
+            Chunk(0x0800, true, Concat(emitters.Length == 0 ? [Emitter()] : emitters))
         };
 
         if (leaveParticles is { } leave)
@@ -188,7 +191,7 @@ public sealed class AloParticleReaderTest
         // One fixed record holds every shape's fields whatever the shape, so a field read at the
         // wrong offset still parses - only distinct values catch it.
         var volumes = Concat(
-            Volume(AlamoSpawnShape.Box, min: new Vector3(1, 2, 3), max: new Vector3(4, 5, 6)),
+            Volume(AlamoSpawnShape.Box, new Vector3(1, 2, 3), new Vector3(4, 5, 6)),
             Volume(AlamoSpawnShape.Sphere, sphereRadius: 7.5f, sphereEdge: true),
             Volume(AlamoSpawnShape.Cylinder,
                 cylinderRadius: 2.5f, cylinderEdge: true, cylinderHeight: 9f));
@@ -301,7 +304,7 @@ public sealed class AloParticleReaderTest
             [
                 AlamoTrackChannel.Red, AlamoTrackChannel.Green, AlamoTrackChannel.Blue,
                 AlamoTrackChannel.Alpha, AlamoTrackChannel.Scale, AlamoTrackChannel.TextureIndex,
-                AlamoTrackChannel.RotationSpeed,
+                AlamoTrackChannel.RotationSpeed
             ],
             emitter.Tracks.Select(t => t.Channel));
     }
@@ -327,7 +330,8 @@ public sealed class AloParticleReaderTest
     [Fact]
     public void Read_ReadsTheScalarPropertiesItIsGiven()
     {
-        var p = AloParticleReader.Read(System("p", null, Emitter(properties: [
+        var p = AloParticleReader.Read(System("p", null, Emitter(properties:
+        [
             Mini(0x04, I32((int)AlamoParticleBlendMode.DepthTransparent)),
             Mini(0x0F, F32(2.5f)),
             Mini(0x10, I32(128)),
@@ -335,7 +339,7 @@ public sealed class AloParticleReaderTest
             Mini(0x0C, F32(-9.8f)),
             Mini(0x0A, F32(1f, 2f, 3f)),
             Mini(0x41, [1]),
-            Mini(0x42, F32(12f)),
+            Mini(0x42, F32(12f))
         ]))).Emitters[0].Properties;
 
         Assert.Equal(AlamoParticleBlendMode.DepthTransparent, p.BlendMode);
@@ -370,9 +374,10 @@ public sealed class AloParticleReaderTest
     public void Read_InvertsTheInwardSpeeds()
     {
         // Stored positive, applied inward. Keeping the sign would blow every implosion outwards.
-        var p = AloParticleReader.Read(System("p", null, Emitter(properties: [
+        var p = AloParticleReader.Read(System("p", null, Emitter(properties:
+        [
             Mini(0x09, F32(5f)),
-            Mini(0x0B, F32(2f)),
+            Mini(0x0B, F32(2f))
         ]))).Emitters[0].Properties;
 
         Assert.Equal(-5f, p.InwardSpeed);
@@ -386,9 +391,10 @@ public sealed class AloParticleReaderTest
             Emitter(properties: [Mini(0x28, F32(0.8f))]))).Emitters[0].Properties;
         Assert.Equal(0f, withoutFlag.ParentLinkStrength);
 
-        var withFlag = AloParticleReader.Read(System("p", null, Emitter(properties: [
+        var withFlag = AloParticleReader.Read(System("p", null, Emitter(properties:
+        [
             Mini(0x28, F32(0.8f)),
-            Mini(0x43, [1]),
+            Mini(0x43, [1])
         ]))).Emitters[0].Properties;
         Assert.Equal(0.8f, withFlag.ParentLinkStrength);
     }

@@ -9,8 +9,13 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///     Named handler (ID: <c>presence-induced-animations</c>) for
 ///     <c>Presence_Induced_Animations</c> tags. Base-game entries use a single
 ///     animation state ID with a trailing comma (e.g. <c>Attention,</c>).
-///     Replaces the default PerFactionObjectList handler via <c>validationOverride</c>.
+///     Reached through <c>validationOverride</c> in YAML.
 /// </summary>
+/// <remarks>
+///     Its <c>mode: replace</c> supersedes the PerFactionObjectList shape check, but the mode is
+///     wider than that intent - see <see cref="ContextNamePairHandler" /> for what else it
+///     discards and the test that guards it.
+/// </remarks>
 public sealed class PresenceInducedAnimationsHandler : XmlDiagnosticsHandler<XmlTagValueFact>,
     IXmlNamedDiagnosticsHandler
 {

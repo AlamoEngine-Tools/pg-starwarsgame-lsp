@@ -145,16 +145,6 @@ public sealed class ModProjectReloadServiceTest
         Assert.Equal(0, refresh.CallCount);
     }
 
-    private sealed class RecordingClientRefreshNotifier : IClientRefreshNotifier
-    {
-        public int CallCount { get; private set; }
-
-        public void RefreshDerivedState()
-        {
-            CallCount++;
-        }
-    }
-
     [Fact]
     public async Task LoadAsync_PublishesConfigLayersToLayerMapBeforeIndexing()
     {
@@ -173,6 +163,16 @@ public sealed class ModProjectReloadServiceTest
 
         Assert.NotNull(layerMap.LastLayers);
         Assert.Equal(["Core", "Root"], layerMap.LastLayers!.Select(l => l.Name));
+    }
+
+    private sealed class RecordingClientRefreshNotifier : IClientRefreshNotifier
+    {
+        public int CallCount { get; private set; }
+
+        public void RefreshDerivedState()
+        {
+            CallCount++;
+        }
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

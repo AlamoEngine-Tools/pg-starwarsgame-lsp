@@ -552,6 +552,7 @@ public sealed class LuaHoverHandlerTest
     private sealed class FakeIndexService : IGameIndexService
     {
         public GameIndex Current { get; set; } = GameIndex.Empty;
+
         public event Action<GameIndex>? IndexChanged
         {
             add { }

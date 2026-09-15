@@ -18,13 +18,44 @@ import type {
 import type { TreeItem } from './previewTree';
 
 import { PREVIEW_WEAPON_SOURCE } from '../../protocol/modelPreview';
+import { axisRange, turretEnvelopes } from './turretHandles';
 
 /** One cone the viewport draws, tagged with the weapon it belongs to. */
+/**
+ * Which frame an arc is measured in, because the two firing paths genuinely disagree.
+ *
+ * - `bone` - the arc is measured in the FIRE BONE's own space, so rotating the bone rotates the
+ *   arc. `HardPointClass::Can_Weapon_Point_At` builds its frame from
+ *   `Get_Hard_Point_Coordinate_System`, which is the hardpoint's own.
+ * - `hull` - the arc takes its POSITION from the bone and its ORIENTATION from the object.
+ *   `WeaponBehaviorClass::Is_In_Cone_Of_Fire` reads the muzzle matrix for its translation and then
+ *   discards its rotation, rebuilding the frame from `owner->Get_Facing()`. A rotated `MuzzleA`
+ *   bone therefore moves where the shot STARTS and not which way the unit may shoot.
+ */
+export type WeaponArcFrame = 'bone' | 'hull';
+
+/**
+ * Which envelope an arc is, because a turret hardpoint keeps two that are not the same shape.
+ *
+ * - `fire` - where the weapon may SHOOT. `HardPointClass::Can_Weapon_Point_At`.
+ * - `rotation` - where the BARREL may point. `HardPointClass::Calculate_Desired_Turret_Angle`.
+ *
+ * They differ in pitch and only in pitch: the turret branch of the firing gate tests the yaw extent
+ * and has no elevation test at all, while the motion clamp applies both. So the barrel is
+ * elevation-limited and the shot is not - the opposite way round from what the tag names suggest,
+ * and invisible unless the two are drawn apart.
+ */
+export type WeaponArcKind = 'fire' | 'rotation';
+
 export interface WeaponArc {
     /** The `PreviewWeapon.id` this came from, so a weapon can be switched without a rebuild. */
     weaponId: string;
     partId: string;
     bone: string;
+    /** See {@link WeaponArcFrame}. The bone supplies the position either way. */
+    frame: WeaponArcFrame;
+    /** See {@link WeaponArcKind}. Everything that is not a turret hardpoint is `fire` only. */
+    kind: WeaponArcKind;
     widthDegrees: number;
     heightDegrees: number;
     range: number;
@@ -55,6 +86,13 @@ export interface WeaponRow {
     damage: string | null;
     reach: string | null;
     cone: string | null;
+    /**
+     * How far a shot strays, per target category - or that none of it is applied.
+     *
+     * See {@link inaccuracyText}: `Fires_Forward` replaces the figures rather than joining them,
+     * because the engine returns before it reaches the spread at all.
+     */
+    inaccuracy: string | null;
     projectileId: string | null;
     fireModes: string[];
     /** The turret this weapon sits on, when it declares one. Read by the sweep. */
@@ -100,6 +138,7 @@ export function weaponRows(
             damage: damageText(weapon),
             reach: reachText(weapon),
             cone: coneText(weapon),
+            inaccuracy: inaccuracyText(weapon),
             projectileId: weapon.projectileType ?? null,
             fireModes: [...weapon.fireModes],
             turret: weapon.turret ?? null,
@@ -183,9 +222,23 @@ export function boneRowIndex(items: readonly TreeItem[]): Map<string, string> {
 /**
  * One cone per fire bone, or none at all.
  *
- * Reach is the gate rather than the cone tags. A `Fires_Forward` weapon declares no traverse and
- * the zero-width cone collapses to a ray down the bone, which is the honest picture of it; without
- * a range there is no length to draw and the gizmo would be a point at the muzzle.
+ * Reach is the gate rather than the cone tags: without a range there is no length to draw and the
+ * gizmo would be a point at the muzzle.
+ *
+ * The angles arrive RESOLVED. The server applies the engine's defaults and normalises the two
+ * conventions - a unit weapon's `Turret_*_Extent_Degrees` are plus-or-minus bounds while a
+ * hardpoint's `Fire_Cone_*` are full angles - so there is no policy left to apply here. Three
+ * distinct states reach us and each means something different:
+ *
+ * - a number: the arc, as a full angle;
+ * - `null` on a `Fires_Forward` weapon: it HAS no arc, because the engine returns the hull's facing
+ *   before the check is reached. A ray is the honest picture, and it is the only reading of null
+ *   that is not an invention;
+ * - `null` on a hardpoint that authored no cone: the engine's default is 0.0, which it then asserts
+ *   against, so the hardpoint can point nowhere. A ray again, for a different reason.
+ *
+ * Both null cases collapse to the same zero-width ray, which is why one fallback serves both - but
+ * they are not the same fact, and a future change that makes them differ has to split this.
  */
 function arcsOf(weapon: PreviewWeapon, partId: string): WeaponArc[] {
     const range = weapon.range ?? 0;
@@ -193,15 +246,58 @@ function arcsOf(weapon: PreviewWeapon, partId: string): WeaponArc[] {
         return [];
     }
 
-    return weapon.fireBones.map(bone => ({
+    const frame: WeaponArcFrame =
+        weapon.source === PREVIEW_WEAPON_SOURCE.hardpoint ? 'bone' : 'hull';
+
+    const fire = weapon.fireBones.map((bone): WeaponArc => ({
         weaponId: weapon.id,
         partId,
         bone,
+        frame,
+        kind: 'fire',
         widthDegrees: weapon.coneWidthDegrees ?? 0,
         heightDegrees: weapon.coneHeightDegrees ?? 0,
         range,
     }));
+
+    return [...fire, ...rotationArcsOf(weapon, fire)];
 }
+
+/**
+ * The second envelope, where the engine keeps one.
+ *
+ * A HARDPOINT turret only. On the `WEAPON` path the same two numbers bound both the shot and the
+ * motion, so there is nothing to differentiate and one arc stays correct - and drawing a second
+ * identical outline over the first is not a comparison. That is also why this drops out when the
+ * elevation is unbounded: same shape, no second envelope.
+ */
+function rotationArcsOf(weapon: PreviewWeapon, fire: readonly WeaponArc[]): WeaponArc[] {
+    const turret = weapon.turret;
+
+    if (weapon.source !== PREVIEW_WEAPON_SOURCE.hardpoint
+        || turret === null || turret === undefined) {
+        return [];
+    }
+
+    const { rotation } = turretEnvelopes({
+        yaw: axisRange('yaw', turret.rotateExtentDegrees),
+        pitch: axisRange('pitch', turret.elevateExtentDegrees),
+    });
+
+    if (rotation.pitchDegrees >= FULL_TURN_DEGREES) {
+        return [];
+    }
+
+    return fire.map(arc => ({
+        ...arc,
+        kind: 'rotation' as const,
+        widthDegrees: rotation.yawDegrees,
+        heightDegrees: rotation.pitchDegrees,
+    }));
+}
+
+/** A full angle covers everything at 360, which is the same as having no bound. */
+const FULL_TURN_DEGREES = 360;
 
 function cadenceText(weapon: PreviewWeapon): string | null {
     const parts: string[] = [];
@@ -259,6 +355,36 @@ function coneText(weapon: PreviewWeapon): string | null {
     }
 
     return `${num(width ?? 0)} x ${num(height ?? 0)} deg`;
+}
+
+/**
+ * What the shot's spread actually is, which for one kind of weapon is nothing.
+ *
+ * `WeaponBehaviorClass::Calculate_Projectile_Facing` returns the OBJECT's own heading the moment
+ * `Fires_Forward` is set, and that return sits above both `Intercept` (which leads a moving target)
+ * and `Add_Random_Inaccuracy_To_Fire_At_Position` (which is this figure). So the engine reads
+ * neither, and printing the authored number would claim a behaviour that never runs. Saying "none"
+ * and saying WHY is the disable-don't-hide rule applied to a fact instead of to a control.
+ *
+ * The tag is unit-only: `Fires_Forward` lives on `GameObjectType` and a hardpoint never carries
+ * one, which the server already settles - a hardpoint weapon arrives with it false.
+ */
+function inaccuracyText(weapon: PreviewWeapon): string | null {
+    if (weapon.firesForward) {
+        return 'None - Fires_Forward skips spread and target leading';
+    }
+
+    // Defended rather than trusted, though the type says it is always there: a scene from an older
+    // server predates the field, and reading `.length` off the gap threw before anything rendered.
+    // Found by a probe running against a stored fixture, which is exactly the shape a stale cache
+    // or a version-skewed server would have.
+    const rows = weapon.inaccuracy ?? [];
+
+    if (rows.length === 0) {
+        return null;
+    }
+
+    return rows.map(row => `${row.category} ${num(row.distance)}`).join(', ');
 }
 
 /** A number as a person writes it: the XML's `2.0000` is `2`, and `0.10` is `0.1`. */

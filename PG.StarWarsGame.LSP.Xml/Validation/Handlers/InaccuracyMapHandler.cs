@@ -32,7 +32,8 @@ public sealed class InaccuracyMapHandler : CommaSeparatedPairHandlerBase
             return
             [
                 AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{category}' is not a known GameObjectCategoryType value for <{fact.Tag.Tag}>.", Id: DiagnosticIds.InaccuracyMapUnknownCategory),
+                        $"'{category}' is not a known GameObjectCategoryType value for <{fact.Tag.Tag}>.",
+                        Id: DiagnosticIds.InaccuracyMapUnknownCategory),
                     fact, 0)
             ];
 

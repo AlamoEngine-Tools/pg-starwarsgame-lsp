@@ -8,13 +8,13 @@ using PG.StarWarsGame.LSP.Xml.Util;
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
 /// <summary>
-///     Cross-validates a hardpoint's bone tags against the models of the game objects that mount it
-///     (#53): a bone the hardpoint names must exist on every model the mounting object declares.
+///     Cross-validates a hardpoint's bone tags against the models of the game objects that attach it
+///     (#53): a bone the hardpoint names must exist on every model the attaching object declares.
 ///     <para>
 ///         Works in both directions because LSP publishes diagnostics per document - a producer running
 ///         for <c>Hardpoints.xml</c> cannot put a squiggle in <c>Spaceunitscapital.xml</c>. So when a
-///         hardpoint file is validated the mounting objects are looked up, and when a unit file is
-///         validated the hardpoints it mounts are looked up.
+///         hardpoint file is validated the attaching objects are looked up, and when a unit file is
+///         validated the hardpoints it attaches are looked up.
 ///     </para>
 /// </summary>
 public interface IXmlHardpointFactProducer

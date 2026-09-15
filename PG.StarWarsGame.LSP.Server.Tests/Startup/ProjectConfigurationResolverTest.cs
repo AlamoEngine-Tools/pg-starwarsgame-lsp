@@ -114,5 +114,4 @@ public sealed class ProjectConfigurationResolverTest
         Assert.Contains("mymod.pgproj", message);
         Assert.Contains("projectReferences", message, StringComparison.OrdinalIgnoreCase);
     }
-
 }

@@ -95,14 +95,31 @@ export interface SweepPose {
 /**
  * Where a turret points at `phase` through a sweep, with `phase` running 0 to 1.
  *
- * The extents are HALF-ANGLES about the rest angle: a 90-degree traverse is 45 either side, and
- * treating the number as a full swing would draw a reach the unit has not got. A turret that
- * declares no extent does not move at all - 53 of foc's weapon objects declare them and the rest do
- * not, and inventing one would be a claim about the unit.
+ * The extents are PLUS-OR-MINUS bounds, so a 90-degree extent swings 90 EITHER SIDE of rest - a
+ * 180-degree sweep. The engine is explicit about it in two places:
+ * `HardPointClass::Calculate_Desired_Turret_Angle` builds `min = -extent` (an `FCHS` on the value it
+ * just read) and `max = +extent` and clamps between them, and both `Can_Weapon_Point_At` and
+ * `Is_In_Cone_Of_Fire` refuse only when `extent < |yaw|`. Nothing halves it.
  *
- * A 360-degree traverse is the exception and is treated as a continuous turn: it has no end stops,
- * so swinging it back and forth would misrepresent what it does.
+ * That is the opposite of `Fire_Cone_Width`, which the engine DOES halve - the two conventions sit
+ * on adjacent tags and an earlier reading of this function halved the wrong one, costing every
+ * turret half its travel.
+ *
+ * A turret that declares no extent does not move at all - 53 of foc's weapon objects declare them
+ * and the rest do not, and inventing one would be a claim about the unit.
+ *
+ * At 180 or more the swing becomes a continuous turn. That threshold is the engine's too: the motion
+ * clamp is skipped once the extent reaches 180 (`FLD 180.0; FCOMIP; JBE`), because plus or minus 180
+ * already covers the circle and there are no end stops left to swing between.
  */
+/**
+ * The extent at which a traverse stops having end stops.
+ *
+ * The engine's own threshold: `Calculate_Desired_Turret_Angle` skips its clamp entirely once the
+ * extent reaches this, since plus or minus 180 is already the whole circle.
+ */
+const CONTINUOUS_TURN_DEGREES = 180;
+
 export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
     const rest = turret.restAngle ?? 0;
     const rotateExtent = turret.rotateExtentDegrees ?? 0;
@@ -112,15 +129,15 @@ export function sweepAngles(turret: PreviewTurret, phase: number): SweepPose {
         return { rotate: rest, elevate: 0 };
     }
 
-    const rotate = rotateExtent >= 360
+    const rotate = rotateExtent >= CONTINUOUS_TURN_DEGREES
         ? rest + phase * 360
-        : rest + Math.sin(phase * 2 * Math.PI) * (rotateExtent / 2);
+        : rest + Math.sin(phase * 2 * Math.PI) * rotateExtent;
 
     // Elevation runs on its OWN extent, which is usually far smaller - AT_AA is 360 by 45 - so one
     // number for both would tip a turret through the hull it stands on.
     return {
         rotate,
-        elevate: Math.sin(phase * 2 * Math.PI) * (elevateExtent / 2),
+        elevate: Math.sin(phase * 2 * Math.PI) * elevateExtent,
     };
 }
 

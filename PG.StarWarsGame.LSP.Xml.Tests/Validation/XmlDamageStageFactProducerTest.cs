@@ -39,7 +39,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """<Land_Damage_Alternates>0, 1, 2</Land_Damage_Alternates></GroundStructure></X>""",
-            model: ["Root", "hull"]);
+            ["Root", "hull"]);
 
         var fact = Assert.Single(facts.OfType<DamageStageNotOnModelFact>());
 
@@ -55,7 +55,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """<Land_Damage_Alternates>0, 1, 2</Land_Damage_Alternates></GroundStructure></X>""",
-            model: ["Root", "hull_ALT1", "p_smoke_ALT2"]);
+            ["Root", "hull_ALT1", "p_smoke_ALT2"]);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -67,7 +67,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """<Land_Damage_Alternates>0, 1</Land_Damage_Alternates></GroundStructure></X>""",
-            model: ["Root", "hull_ALT1", "hull_ALT2", "hull_ALT3"]);
+            ["Root", "hull_ALT1", "hull_ALT2", "hull_ALT3"]);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -80,7 +80,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """<Land_Damage_Alternates>0</Land_Damage_Alternates></GroundStructure></X>""",
-            model: ["Root"]);
+            ["Root"]);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -94,7 +94,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """<Land_Damage_Alternates>0, 1, 2</Land_Damage_Alternates></GroundStructure></X>""",
-            model: ["Root", "p_smoke_small_thin_ALT1", "p_electricalstatic_ALT2"]);
+            ["Root", "p_smoke_small_thin_ALT1", "p_electricalstatic_ALT2"]);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -107,7 +107,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """<Land_Damage_Alternates>0, 1, 2</Land_Damage_Alternates></GroundStructure></X>""",
-            model: null, otherModel: ["Root"]);
+            null, otherModel: ["Root"]);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -118,7 +118,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER">"""
             + """<Land_Damage_Alternates>0, 1, 2</Land_Damage_Alternates></GroundStructure></X>""",
-            model: ["Root"], declaresModel: false);
+            ["Root"], false);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -130,7 +130,7 @@ public sealed class XmlDamageStageFactProducerTest
         var facts = Produce(
             """<X><GroundStructure Name="BUNKER"><Land_Model_Name>bunker.alo</Land_Model_Name>"""
             + """</GroundStructure></X>""",
-            model: ["Root"]);
+            ["Root"]);
 
         Assert.Empty(facts.OfType<DamageStageNotOnModelFact>());
     }
@@ -145,7 +145,7 @@ public sealed class XmlDamageStageFactProducerTest
             + """<Land_Damage_Alternates>0, 1, 2</Land_Damage_Alternates></GroundStructure></X>""";
 
         var fact = Assert.Single(
-            Produce(text, model: ["Root", "hull_ALT1"]).OfType<DamageStageNotOnModelFact>());
+            Produce(text, ["Root", "hull_ALT1"]).OfType<DamageStageNotOnModelFact>());
 
         Assert.Equal(1, fact.Length);
 
@@ -162,7 +162,7 @@ public sealed class XmlDamageStageFactProducerTest
         IEnumerable<string>? otherModel = null)
     {
         var symbol = new GameSymbol("BUNKER", GameSymbolKind.XmlObject, "GroundStructure",
-            new FileOrigin(Uri, 0, 0), null, null);
+            new FileOrigin(Uri, 0, 0), null);
 
         var tags = new List<VariantTag>();
         if (declaresModel)
@@ -221,12 +221,30 @@ public sealed class XmlDamageStageFactProducerTest
                 : null;
         }
 
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];

@@ -93,7 +93,7 @@ public sealed class StorySimulatorTest
         var schema = new SimSchemaProvider();
         var threadA = StoryThreadParser.Parse(ThreadAText, ThreadAUri);
         var threadB = StoryThreadParser.Parse(ThreadBText, ThreadBUri);
-        var model = new StoryCampaignModel("GC", [threadA, threadB],
+        var model = new StoryCampaignModel("GC", "Rebel", [threadA, threadB],
             new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ThreadBUri },
             new StoryGraphBuilder(schema).Build([threadA, threadB]));
         return (new StorySimulator(model, schema), model);

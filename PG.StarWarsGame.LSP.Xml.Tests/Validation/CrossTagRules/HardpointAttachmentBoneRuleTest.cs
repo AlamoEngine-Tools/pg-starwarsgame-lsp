@@ -47,6 +47,38 @@ public sealed class HardpointAttachmentBoneRuleTest
         Assert.Empty(Produce(xml).OfType<HardpointMissingAttachmentBoneFact>());
     }
 
+    /// <summary>
+    ///     A fire bone satisfies the engine just as an attachment bone does.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Measured in the 2018 binary.
+    ///         <c>HardPointClass::Get_Transformed_World_Position</c> (<c>009c92a0</c>) asserts
+    ///         <c>AttachmentBoneIndex &gt;= 0 || FireBoneAIndex &gt;= 0</c> and falls back to the
+    ///         fire bone when the attachment bone is absent - the error at <c>014d6160</c> fires
+    ///         only when BOTH are -1.
+    ///     </para>
+    ///     <para>
+    ///         That is the whole basis of the rule: <c>HardPointClass::Take_Damage</c>
+    ///         (<c>009c8510</c>) never consults a bone at all - it checks <c>Is_Destroyable()</c>
+    ///         and health. A boneless hardpoint is indestructible because it has no world position
+    ///         and so cannot be targeted, not because destruction reads the bone. Give it a fire
+    ///         bone and it has a position again.
+    ///     </para>
+    ///     <para>
+    ///         No shipped hardpoint is in this shape, so this changes nothing for the base game -
+    ///         it stops the rule firing on a configuration the engine accepts.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void DestroyableHardpointWithOnlyAFireBone_EmitsNoFact()
+    {
+        const string xml =
+            """<HardPoints><HardPoint Name="HP_Fire"><Is_Destroyable>Yes</Is_Destroyable><Fire_Bone_A>MUZZLE_A</Fire_Bone_A></HardPoint></HardPoints>""";
+
+        Assert.Empty(Produce(xml).OfType<HardpointMissingAttachmentBoneFact>());
+    }
+
     [Fact]
     public void DestroyableHardpointWithoutAttachmentBone_EmitsFactNamingIt()
     {

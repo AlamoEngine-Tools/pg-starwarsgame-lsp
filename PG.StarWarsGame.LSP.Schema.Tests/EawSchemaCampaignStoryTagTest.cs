@@ -17,6 +17,7 @@ public sealed class EawSchemaCampaignStoryTagTest
 {
     private static readonly IReadOnlyList<RawTagDefinition> CampaignTags = LoadTags("Campaign.yaml");
     private static readonly IReadOnlyList<RawTagDefinition> ManifestTags = LoadTags("StoryPlotManifest.yaml");
+    private static readonly IReadOnlyList<RawTagDefinition> ConstantsTags = LoadTags("GameConstants.yaml");
 
     [Theory]
     [InlineData("Rebel_Story_Name")]
@@ -52,6 +53,41 @@ public sealed class EawSchemaCampaignStoryTagTest
         Assert.NotNull(tag);
         Assert.Equal(ReferenceKind.WorkspaceFile, tag!.ReferenceKind);
         Assert.Equal(expectedReferenceType, tag.ReferenceType);
+    }
+
+    /// <summary>
+    ///     The debug hot-key that loads a plot is the same kind of reference as everything above,
+    ///     and was the one that had no <c>referenceKind</c> at all - so its value was never
+    ///     indexed: no go-to, no unresolved-reference validation, no completion.
+    /// </summary>
+    /// <remarks>
+    ///     Measured, not inferred: the value in vanilla is
+    ///     <c>Story_Plots_UM00_CIN_Test.xml</c>, and that file's root is
+    ///     <c>&lt;Story_Mode_Plots&gt;</c> carrying <c>Active_Plot</c> and <c>Lua_Script</c> - a
+    ///     plot MANIFEST, spelled exactly as <c>Empire_Story_Name</c> spells its own. So it takes
+    ///     the manifest file-type, not the thread one.
+    /// </remarks>
+    [Fact]
+    public void DebugHotKeyLoadMapScript_IsAWorkspaceFileReferenceToAPlotManifest()
+    {
+        var tag = ConstantsTags.FirstOrDefault(t =>
+            string.Equals(t.Tag, "Debug_Hot_Key_Load_Map_Script", StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(tag);
+        Assert.Equal(ReferenceKind.WorkspaceFile, tag!.ReferenceKind);
+        Assert.Equal("StoryPlotManifest", tag.ReferenceType);
+    }
+
+    // Its sibling points at a .ted map and has always been right; kept beside it so the pair stays
+    // visibly a pair, and so that a future edit to one is measured against the other.
+    [Fact]
+    public void DebugHotKeyLoadMap_StillPointsAtAMapFile()
+    {
+        var tag = ConstantsTags.FirstOrDefault(t =>
+            string.Equals(t.Tag, "Debug_Hot_Key_Load_Map", StringComparison.OrdinalIgnoreCase));
+
+        Assert.NotNull(tag);
+        Assert.Equal(ReferenceKind.MapFile, tag!.ReferenceKind);
     }
 
     private static IReadOnlyList<RawTagDefinition> LoadTags(string tagFile)

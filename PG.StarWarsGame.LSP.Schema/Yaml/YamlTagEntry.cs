@@ -11,6 +11,7 @@ internal sealed class YamlTagEntry
     public string? ReferenceKind { get; set; }
     public string? ReferenceType { get; set; }
     public string? EnumName { get; set; }
+    public List<string>? AllowedValues { get; set; }
     public string? SemanticType { get; set; }
     public object? ValueGroup { get; set; } // scalar string or YAML sequence - coerced in parser
     public bool Deprecated { get; set; }

@@ -91,7 +91,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
 
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
         var objDoc = new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty);
@@ -190,7 +190,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
         var objDoc = new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty);
 
@@ -254,7 +254,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
@@ -282,7 +282,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         const string objUri = "file:///object.xml";
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
 
         var index = GameIndex.Empty with
         {
@@ -298,6 +298,123 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         return new XmlHardpointFactProducer(schema, source)
             .Produce(Uri, ParsedXmlDocument.Parse(hpText), index);
+    }
+
+    /// <summary>
+    ///     The Gargantuan's shape: the XML writes a truncated collision mesh name and the model carries
+    ///     the full one, so the fix is the one name the model actually has.
+    /// </summary>
+    /// <remarks>
+    ///     All eight Gargantuan hardpoints write <c>..._COL</c> or <c>..._COLL</c> where their models
+    ///     carry <c>..._COLLISION</c> - <c>HP_turret_front_00_COL</c> against
+    ///     <c>HP_turret_front_00_COLLISION</c>. The suggestion is the model's own spelling, verbatim.
+    /// </remarks>
+    [Fact]
+    public void HardpointFileOpen_TruncatedCollisionMesh_SuggestsTheOneMeshTheModelHas()
+    {
+        var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
+            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            GargantuanBones("HP_turret_front_00_COLLISION"));
+
+        var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
+        Assert.Equal("HP_turret_front_00_COLLISION", fact.SuggestedName);
+    }
+
+    /// <summary>
+    ///     The tag name is reported as the author wrote it. HAP lower-cases element names, so reading
+    ///     <c>Name</c> made the hardpoint's own file say <c>&lt;collision_mesh&gt;</c> while the attaching
+    ///     object's file, fed from resolved tags, said <c>&lt;Collision_Mesh&gt;</c> - measured on the
+    ///     Gargantuan's <c>Hardpoints_underworld.xml</c>.
+    /// </summary>
+    [Fact]
+    public void HardpointFileOpen_Fact_KeepsTheTagNameAsWritten()
+    {
+        var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
+            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            GargantuanBones("HP_turret_front_00_COLLISION"));
+
+        Assert.Equal("Collision_Mesh", Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>()).TagName);
+    }
+
+    /// <summary>
+    ///     From the ATTACHING object's file the diagnostic sits on the hardpoint's id in the
+    ///     <c>HardPoints</c> list, and a quick fix replaces the diagnostic's range - so a suggestion
+    ///     there would overwrite the hardpoint id with a mesh name. Never offered from that side.
+    /// </summary>
+    [Fact]
+    public void AttachingObjectFileOpen_TruncatedCollisionMesh_OffersNoSuggestion()
+    {
+        const string text =
+            """<X><UniqueUnit Name="PALACE"><Space_Model_Name>rv_gargantuan.alo</Space_Model_Name>""" +
+            """<HardPoints>HP_A</HardPoints></UniqueUnit></X>""";
+
+        var facts = Produce(text, new ModelSchema("Space_Model_Name"),
+            GargantuanSource("HP_turret_front_00_COL"), GargantuanBones("HP_turret_front_00_COLLISION"),
+            Sym("PALACE", "UniqueUnit"));
+
+        var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
+        Assert.Null(fact.SuggestedName);
+    }
+
+    /// <summary>Two names starting with what was written is a guess, and a quick fix must not guess.</summary>
+    [Fact]
+    public void HardpointFileOpen_AmbiguousPrefix_OffersNoSuggestion()
+    {
+        var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
+            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            GargantuanBones("HP_turret_front_00_COLLISION", "HP_turret_front_00_COLLISION_B"));
+
+        Assert.Null(Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>()).SuggestedName);
+    }
+
+    /// <summary>
+    ///     Only <c>Collision_Mesh</c>: the truncated-suffix pattern is what was measured, and a prefix
+    ///     of an attachment or decal bone name is not evidence of the same mistake.
+    /// </summary>
+    [Fact]
+    public void HardpointFileOpen_PrefixOnAnotherBoneTag_OffersNoSuggestion()
+    {
+        const string hpText =
+            """<X><HardPoint Name="HP_A"><Model_To_Attach>hp_turret_front_00.alo</Model_To_Attach>""" +
+            """<Damage_Decal>HP_Bl</Damage_Decal></HardPoint></X>""";
+
+        var source = new HardpointTagSource()
+            .With("PALACE", new VariantTag("Space_Model_Name", "rv_gargantuan.alo", "", 0),
+                new VariantTag("HardPoints", "HP_A", "", 0))
+            .With("HP_A", new VariantTag("Model_To_Attach", "hp_turret_front_00.alo", "", 0),
+                new VariantTag("Damage_Decal", "HP_Bl", "", 0));
+
+        var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("rv_gargantuan.alo", ["HP_Blast", "Root"])
+            .Add("hp_turret_front_00.alo", ["Root"]);
+
+        var fact = Assert.Single(HardpointFileOpen(hpText, new ModelSchema("Space_Model_Name"), source, bones)
+            .OfType<HardpointBoneNotOnModelFact>());
+        Assert.Null(fact.SuggestedName);
+    }
+
+    private static string GargantuanHardpoint(string collisionMesh)
+    {
+        return """<X><HardPoint Name="HP_A"><Model_To_Attach>hp_turret_front_00.alo</Model_To_Attach>""" +
+               $"<Collision_Mesh>{collisionMesh}</Collision_Mesh></HardPoint></X>";
+    }
+
+    private static HardpointTagSource GargantuanSource(string collisionMesh)
+    {
+        return new HardpointTagSource()
+            .With("PALACE", new VariantTag("Space_Model_Name", "rv_gargantuan.alo", "", 0),
+                new VariantTag("HardPoints", "HP_A", "", 0))
+            .With("HP_A", new VariantTag("Model_To_Attach", "hp_turret_front_00.alo", "", 0),
+                new VariantTag("Collision_Mesh", collisionMesh, "", 0));
+    }
+
+    /// <summary>The hull carries no collision mesh for the turret; the turret's own model does.</summary>
+    private static ImmutableDictionary<string, ImmutableArray<string>> GargantuanBones(
+        params string[] attachedNames)
+    {
+        return ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("rv_gargantuan.alo", ["HP_turret_front_00_BONE", "Root"])
+            .Add("hp_turret_front_00.alo", ["Root", .. attachedNames]);
     }
 
     private static IReadOnlyList<XmlFact> Produce(string text, ISchemaProvider schema,
@@ -321,7 +438,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
     private static GameSymbol Sym(string id, string typeName)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(Uri, 0, 0), null, null);
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(Uri, 0, 0), null);
     }
 
     private sealed class HardpointTagSource : IVariantTagSource
@@ -329,7 +446,10 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => _byId.GetValueOrDefault(objectId);
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
 
         public HardpointTagSource With(string id, params VariantTag[] tags)
         {
@@ -351,12 +471,30 @@ public sealed class XmlHardpointFactProducerModelKeyTest
                 : null;
         }
 
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];

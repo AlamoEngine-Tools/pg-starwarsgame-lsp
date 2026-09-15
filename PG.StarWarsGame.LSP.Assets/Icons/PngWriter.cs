@@ -59,8 +59,8 @@ public static class PngWriter
         var header = new byte[13];
         BinaryPrimitives.WriteUInt32BigEndian(header, (uint)width);
         BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4), (uint)height);
-        header[8] = 8;  // bit depth
-        header[9] = 6;  // colour type: truecolour with alpha
+        header[8] = 8; // bit depth
+        header[9] = 6; // colour type: truecolour with alpha
         header[10] = 0; // compression: deflate
         header[11] = 0; // filter method
         header[12] = 0; // interlace: none
@@ -73,14 +73,14 @@ public static class PngWriter
         var stride = width * 4;
         var raw = new byte[height * (stride + 1)];
         for (var y = 0; y < height; y++)
-        {
             // raw[y * (stride + 1)] is the filter byte, already 0.
             rgba.Slice(y * stride, stride).CopyTo(raw.AsSpan(y * (stride + 1) + 1));
-        }
 
         using var compressed = new MemoryStream();
         using (var deflate = new ZLibStream(compressed, CompressionLevel.SmallestSize, true))
+        {
             deflate.Write(raw);
+        }
 
         return compressed.ToArray();
     }

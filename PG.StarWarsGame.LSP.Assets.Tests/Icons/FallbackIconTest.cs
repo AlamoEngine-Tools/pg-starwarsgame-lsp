@@ -48,7 +48,7 @@ public sealed class FallbackIconTest
         var image = TestPng.Decode(FallbackIcon.Png);
 
         var fill = image[25, 5];
-        Assert.NotEqual(fill, image[0, 0]);   // border
+        Assert.NotEqual(fill, image[0, 0]); // border
         Assert.NotEqual(fill, image[25, 25]); // the diagonals cross at the centre
     }
 
@@ -59,4 +59,3 @@ public sealed class FallbackIconTest
         Assert.Same(FallbackIcon.Png, FallbackIcon.Png);
     }
 }
-

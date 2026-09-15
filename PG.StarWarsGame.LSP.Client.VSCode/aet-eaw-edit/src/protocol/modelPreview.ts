@@ -132,6 +132,13 @@ export interface PreviewWeapon {
     fireModes: string[];
     turret?: PreviewTurret | null;
     fireSfxEvent?: string | null;
+    /**
+     * The arc while DEPLOYED, as full angles, or null when the unit is never deployed. Only a unit with
+     * `Deploys` and the walk locomotor is, and the engine then reads `Deployed_Turret_*` - 360 / 180 when
+     * unwritten, i.e. unrestricted. See `weaponsInState`.
+     */
+    deployedConeWidthDegrees?: number | null;
+    deployedConeHeightDegrees?: number | null;
 }
 
 /** How the engine puts a projectile on screen. Mirrors `PreviewProjectileRender`. */
@@ -248,6 +255,14 @@ export interface PreviewDeathClone {
     modelFile?: string | null;
     playsIdle: boolean;
     /**
+     * The CLONE's own `Scale_Factor`, or 1 - not the ship's.
+     *
+     * A clone is spawned as its own object and drawn at its own scale. Measured over 265
+     * ship-to-clone pairs, 59 disagree with their ship - the Millennium Falcon is 0.5 and its clone
+     * 1.0 - so it cannot simply inherit the subject's.
+     */
+    scaleFactor?: number | null;
+    /**
      * The clips of the CLONE'S OWN model, by file name.
      *
      * Its own, because the scene's list describes the SUBJECT. That a clone ever played at all was
@@ -351,12 +366,29 @@ export interface PreviewTargetDefence {
     /**
      * The summed `Health` of every destructible hardpoint, or absent where there are none.
      *
-     * A unit with hardpoints cannot be targeted itself and dies when its last hardpoint does, so this
-     * is the pool that actually drains. Sent alongside `tacticalHealth` rather than replacing it -
-     * the two disagree in the shipped data (2000 against 4075 on the Star Destroyer) and nobody
-     * knows how the engine reconciles them.
+     * Sent alongside `tacticalHealth`, not instead of it: they are SEPARATE POOLS and the shipped
+     * data disagrees freely (2000 against 4075 on the Star Destroyer, and ratios from 0.06x to
+     * 3.40x across the corpus). Each pool is capped at the other's PERCENTAGE plus
+     * `hullVsHardpointsConstraint`, so the absolute totals never have to agree.
      */
     hardpointHealthTotal?: number | null;
+    /**
+     * `Should_Be_Destroyed_When_All_Hardpoints_Destroyed`, defaulting to true.
+     *
+     * Gates every link from the hardpoints back to the hull: dying when the last destroyable
+     * hardpoint does, the pull of the hull down toward the hardpoints, and the health bar's use of
+     * the hardpoint pool. With it off, hardpoints still absorb and still die - they just stop
+     * reaching the hull.
+     */
+    diesWithHardpoints: boolean;
+    /**
+     * `Hull_Vs_Hard_Points_Health_Constraint` from GameConstants, shipped at 0.2.
+     *
+     * How far either pool may run ahead of the other. Read from the workspace rather than assumed,
+     * because at 1 every cap clamps to 100% and both corrections stop entirely - some mods ship
+     * exactly that, and drawing 0.2 for them would show a leash their game does not have.
+     */
+    hullVsHardpointsConstraint: number;
     /** Damage type to factor, against the target's `Armor_Type`. Absent means 1.0. */
     hullFactors: Record<string, number>;
     /** Damage type to factor, against the target's `Shield_Armor_Type`. Absent means 1.0. */
@@ -418,6 +450,9 @@ export interface PreviewTurret {
     elevateExtentDegrees?: number | null;
     turretBone?: string | null;
     barrelBone?: string | null;
+    /** How far a unit turret swings while DEPLOYED, or null when the unit is never deployed. */
+    deployedRotateExtentDegrees?: number | null;
+    deployedElevateExtentDegrees?: number | null;
 }
 
 /**
@@ -692,6 +727,20 @@ export interface PreviewScene {
      * what health". See `stageForHull`.
      */
     damageTable: PreviewDamageBand[];
+    /**
+     * The subject's uniform render scale - `Scale_Factor` - or 1 where it declares none.
+     *
+     * **The bridge between two spaces.** `GameObjectClass::Update_Transform` builds the object's
+     * world matrix from a translation and three rotations with NO scale in it, then calls
+     * `Model->Set_Scale(Get_Scale_Factor(Type))` - so the scale lives on the model alone. Geometry
+     * and bones are MODEL units and reach the world multiplied by this; every range and distance
+     * the XML declares is already in WORLD units and is not.
+     *
+     * Applied at the model root, so an arc drawn at its declared range is correct by construction
+     * and nothing has to do arc arithmetic. Two things then need counter-scaling - see
+     * `Viewport.setModelScale`.
+     */
+    scaleFactor?: number | null;
     factions: PreviewFaction[];
     problems: PreviewProblem[];
     /** The cameras the subject's own model declares. Empty for the 87% that carry none. */

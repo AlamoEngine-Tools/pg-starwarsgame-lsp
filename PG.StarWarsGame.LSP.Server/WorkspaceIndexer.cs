@@ -474,11 +474,13 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             schemaFingerprint += ";story-symbols-off";
 
         // (pgprojPath → overallHash) for writing dependency hashes into later layers' snapshots.
-        var layerOverallHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        // Folded: a dependency is looked up here by the path a DIFFERENT project spelled in its
+        // projectReferences, so the two sides only agree by luck under an ordinal comparison.
+        var layerOverallHashes = new Dictionary<string, string>(DocumentUris.Comparer);
 
         // (pgprojPath → OverallHash) of snapshots that survived dependency validation - when the
         // recomputed hash matches, the snapshot on disk is already current and is not re-saved.
-        var validSnapshotHashes = new Dictionary<string, string>(StringComparer.Ordinal);
+        var validSnapshotHashes = new Dictionary<string, string>(DocumentUris.Comparer);
 
         // Collect per-layer results for snapshot writing after the bulk update.
         var layerResults = new List<(ProjectLayer Layer, List<(string RelPath, string AbsUri, string Hash)> Entries)>();
@@ -524,7 +526,19 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
 
                 // Build lookup from relPath → cached entry.
                 var projectDir = pgprojPath is not null ? GetDirectory(pgprojPath) : null;
-                var cacheHits = snapshot?.Files.ToDictionary(e => e.RelativePath, StringComparer.Ordinal);
+                // Folded, like every other lookup keyed by a document path: the snapshot may spell
+                // a path in a case neither this scan nor this version would produce, and the
+                // engine calls those the same file. Built by hand rather than with ToDictionary
+                // because a case-sensitive host can hold Units.xml and units.xml at once - two
+                // distinct entries that collide under the fold, which ToDictionary would throw on
+                // in the middle of indexing. The engine cannot tell them apart either, so keeping
+                // one of the two is the honest answer; a re-parse is the worst case.
+                Dictionary<string, ProjectFileEntry>? cacheHits = null;
+                if (snapshot is not null)
+                {
+                    cacheHits = new Dictionary<string, ProjectFileEntry>(DocumentUris.Comparer);
+                    foreach (var cached in snapshot.Files) cacheHits[cached.RelativePath] = cached;
+                }
 
                 var layerEntries = new ConcurrentBag<(string RelPath, string AbsUri, string Hash)>();
 
@@ -633,9 +647,12 @@ public sealed class WorkspaceIndexer : IWorkspaceIndexer
             .ToList();
     }
 
+    // Separators only. The fold that used to live here belongs to the COMPARISON - see
+    // DocumentUris - because this value is a project-relative path we hand back to the filesystem,
+    // and a case-sensitive host cannot open a name we flattened on the way in.
     private static string NormalizePath(string path)
     {
-        return path.Replace('\\', '/').ToLowerInvariant();
+        return path.Replace('\\', '/');
     }
 
     private static string GetDirectory(string normalizedPath)

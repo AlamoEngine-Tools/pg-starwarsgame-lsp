@@ -19,9 +19,27 @@ namespace PG.StarWarsGame.LSP.Server;
 
 public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHandlerBase
 {
+    /// <summary>
+    ///     Every file pattern the server reacts to on DISK, as opposed to in an editor buffer.
+    /// </summary>
+    /// <remarks>
+    ///     DAT is a localisation format like the rest - a project can declare it, and the engine's
+    ///     own files are DAT. Leaving it unwatched meant the one format that is genuinely split per
+    ///     language never noticed a change on disk.
+    ///     <para>
+    ///         THE CLIENT KEEPS ITS OWN COPY of this list, in <c>extension.ts</c>'s
+    ///         <c>synchronize.fileEvents</c>, and that copy is the one that actually creates the
+    ///         watchers - this registration was never delivered, so for a long time nothing watched
+    ///         anything and every on-disk reaction only ran at startup. Change one list, change the
+    ///         other.
+    ///     </para>
+    /// </remarks>
+    public static readonly string[] WatchedGlobs =
+        ["**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat"];
+
     private readonly IFileHelper _fileHelper;
-    private readonly IWorkspaceIndexer _indexer;
     private readonly IGameIndexService _indexService;
+    private readonly IWorkspaceIndexer _indexer;
     private readonly ILogger<GameDidChangeWatchedFilesHandler> _logger;
     private readonly IModProjectReloadService _reloadService;
     private readonly ISchemaProvider _schema;
@@ -229,33 +247,13 @@ public sealed class GameDidChangeWatchedFilesHandler : DidChangeWatchedFilesHand
 
         var directoryUri = _fileHelper.PathToFileUri(directory).TrimEnd('/');
         foreach (var root in textRoots)
-        {
             if (string.Equals(
                     _fileHelper.PathToFileUri(root).TrimEnd('/'), directoryUri,
                     StringComparison.Ordinal))
                 return true;
-        }
 
         return false;
     }
-
-    /// <summary>
-    ///     Every file pattern the server reacts to on DISK, as opposed to in an editor buffer.
-    /// </summary>
-    /// <remarks>
-    ///     DAT is a localisation format like the rest - a project can declare it, and the engine's
-    ///     own files are DAT. Leaving it unwatched meant the one format that is genuinely split per
-    ///     language never noticed a change on disk.
-    ///     <para>
-    ///         THE CLIENT KEEPS ITS OWN COPY of this list, in <c>extension.ts</c>'s
-    ///         <c>synchronize.fileEvents</c>, and that copy is the one that actually creates the
-    ///         watchers - this registration was never delivered, so for a long time nothing watched
-    ///         anything and every on-disk reaction only ran at startup. Change one list, change the
-    ///         other.
-    ///     </para>
-    /// </remarks>
-    public static readonly string[] WatchedGlobs =
-        ["**/*.xml", "**/*.lua", "**/*.pgproj", "**/*.csv", "**/*.properties", "**/*.dat"];
 
     protected override DidChangeWatchedFilesRegistrationOptions CreateRegistrationOptions(
         DidChangeWatchedFilesCapability capability, ClientCapabilities clientCapabilities)

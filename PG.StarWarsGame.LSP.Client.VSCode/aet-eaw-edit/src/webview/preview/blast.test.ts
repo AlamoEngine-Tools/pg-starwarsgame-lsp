@@ -61,12 +61,14 @@ describe('blastVictims', () => {
         assert.deepEqual(hits.map(h => h.id), ['target', 'near', 'mid']);
     });
 
-    it('applies FULL blast damage everywhere inside a flat blast', () => {
-        // 53 of the 63 declare no dropoff at all, so flat is the normal case.
+    it('splits a flat blast equally among everything inside it', () => {
+        // 53 of the 63 declare no dropoff at all, so flat is the normal case. It used to apply the
+        // FULL blast to each victim, which made a blast stronger against a ship with more
+        // hardpoints; the engine divides it instead, so the total delivered is constant.
         const hits = blastVictims(
             projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
 
-        assert.deepEqual(hits.map(h => h.blastDamage), [30, 30, 30]);
+        assert.deepEqual(hits.map(h => h.blastDamage), [10, 10, 10]);
     });
 
     it('gives the target its direct damage AND the blast', () => {
@@ -77,7 +79,8 @@ describe('blastVictims', () => {
             projectile({ damage: 50, blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS);
 
         assert.equal(hits[0].directDamage, 50);
-        assert.equal(hits[0].blastDamage, 30);
+        // Its SHARE of the blast - three victims, so a third each.
+        assert.equal(hits[0].blastDamage, 10);
         assert.equal(hits[1].directDamage, 0);
     });
 
@@ -99,30 +102,40 @@ describe('blastVictims', () => {
         assert.deepEqual(hits.map(h => h.id), ['mid']);
     });
 
-    it('drops off by tier where the projectile declares tiers', () => {
+    it('reports the tier each victim fell in, without varying their damage by it', () => {
         // 5 tiers over 200 units: bands of 40. Proj_Ship_Diamond_Boron_Missile is the real one.
+        //
+        // The BAND is still worth showing - it is what the dropoff tags describe - but within one
+        // object every in-radius hardpoint takes an equal share. The falloff the engine applies is
+        // the OBJECT's, taken once from its distance to the blast, and a hardpoint's own distance
+        // sets only the delay before its share lands. This test used to assert a per-hardpoint
+        // falloff, which is what the preview drew before the routing was decompiled.
         const missile = projectile({
             blastAreaDamage: 150, blastAreaRange: 200,
             blastAreaDropoff: true, blastAreaDropoffTiers: 5,
         });
 
         const hits = blastVictims(missile, 'a', [
-            { id: 'a', distance: 0 },    // tier 0
-            { id: 'b', distance: 50 },   // tier 1
-            { id: 'c', distance: 170 },  // tier 4
+            { id: 'a', distance: 0 },
+            { id: 'b', distance: 60 },
+            { id: 'c', distance: 190 },
         ]);
 
-        assert.equal(hits[0].blastDamage, 150);
-        assert.equal(hits[1].blastDamage, 120);
-        assert.equal(hits[2].blastDamage, 30);
+        assert.deepEqual(hits.map(h => h.tier), [0, 1, 4]);
+        assert.deepEqual(hits.map(h => h.blastDamage), [50, 50, 50]);
     });
 
-    it('ignores a hardpoint already destroyed', () => {
+    it('still counts a destroyed hardpoint, whose share is then thrown away', () => {
+        // It used to be filtered out, which quietly handed its share to the survivors. The engine
+        // collects victims by Is_Destroyable and never asks Is_Destroyed, so the share is drawn and
+        // lost - and the blast delivers less against a ship that has already lost hardpoints.
         const hits = blastVictims(
             projectile({ blastAreaDamage: 30, blastAreaRange: 100 }), 'target', HARDPOINTS,
             new Set(['near']));
 
-        assert.deepEqual(hits.map(h => h.id), ['target', 'mid']);
+        assert.deepEqual(hits.map(h => h.id), ['target', 'near', 'mid']);
+        assert.equal(hits.find(h => h.id === 'near')!.wasted, true);
+        assert.equal(hits.find(h => h.id === 'mid')!.blastDamage, 10);
     });
 });
 
@@ -217,5 +230,79 @@ describe('blastVictims, when nothing can be located', () => {
         const hits = blastVictims(bomb, 'HP_A', [{ id: 'HP_A', distance: 0 }]);
 
         assert.equal(hits.filter(h => h.id === 'HP_A').length, 1);
+    });
+});
+
+describe('a blast against a ship that has already lost hardpoints', () => {
+    // Measured in Area_Blast_Surrounding_Objects: the victim list is collected by Is_Destroyable and
+    // never asks Is_Destroyed, so wreckage inside the radius keeps drawing shares that nothing
+    // receives. It is why splash decays against a battered ship.
+    const PROJECTILE = projectile({
+        damage: 0,
+        blastAreaDamage: 400,
+        blastAreaRange: 100,
+        blastAreaDropoff: false,
+    });
+
+    const CANDIDATES = [
+        { id: 'A', distance: 0 },
+        { id: 'B', distance: 20 },
+        { id: 'C', distance: 40 },
+        { id: 'D', distance: 60 },
+    ];
+
+    it('still counts a destroyed hardpoint among the victims', () => {
+        const hits = blastVictims(PROJECTILE, 'A', CANDIDATES, new Set(['C']));
+
+        assert.deepEqual(hits.map(h => h.id), ['A', 'B', 'C', 'D']);
+    });
+
+    it('marks the share that lands on wreckage as wasted', () => {
+        const hits = blastVictims(PROJECTILE, 'A', CANDIDATES, new Set(['C']));
+
+        assert.equal(hits.find(h => h.id === 'C')!.wasted, true);
+        assert.equal(hits.find(h => h.id === 'B')!.wasted, false);
+    });
+
+    it('does not hand the wasted share to anybody else', () => {
+        // The division is over everything in range, wreckage included, so the survivors do NOT get
+        // a bigger slice for the dead one - the blast simply delivers less.
+        const hits = blastVictims(PROJECTILE, 'A', CANDIDATES, new Set(['C']));
+
+        assert.equal(hits.find(h => h.id === 'B')!.blastDamage, 100);
+    });
+});
+
+describe('a blast dividing its damage', () => {
+    const PROJECTILE = projectile({
+        damage: 0,
+        blastAreaDamage: 400,
+        blastAreaRange: 100,
+        blastAreaDropoff: false,
+    });
+
+    it('splits the blast among everything it catches, rather than repeating it', () => {
+        // The total delivered is the same whether it catches one hardpoint or four: `blast / count`
+        // each. Repeating the full amount per victim would make a blast stronger against a ship
+        // with more hardpoints, which is the opposite of what the engine does.
+        const four = blastVictims(PROJECTILE, 'A', [
+            { id: 'A', distance: 0 }, { id: 'B', distance: 20 },
+            { id: 'C', distance: 40 }, { id: 'D', distance: 60 },
+        ]);
+        const one = blastVictims(PROJECTILE, 'A', [{ id: 'A', distance: 0 }]);
+
+        assert.equal(four.reduce((sum, h) => sum + h.blastDamage, 0), 400);
+        assert.equal(one[0].blastDamage, 400);
+    });
+
+    it('gives every hardpoint of one object an EQUAL share, however far apart', () => {
+        // The falloff is the object's, taken once from its distance to the blast. A hardpoint's own
+        // distance sets only the delay before its share lands, never the amount.
+        const hits = blastVictims(PROJECTILE, 'A', [
+            { id: 'A', distance: 0 }, { id: 'B', distance: 95 },
+        ]);
+
+        assert.equal(hits.find(h => h.id === 'A')!.blastDamage, 200);
+        assert.equal(hits.find(h => h.id === 'B')!.blastDamage, 200);
     });
 });

@@ -147,7 +147,10 @@ public class LspServerFixture : IAsyncLifetime
     {
         var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        void Handler() => tcs.TrySetResult(true);
+        void Handler()
+        {
+            tcs.TrySetResult(true);
+        }
 
         PreviewSceneChanged += Handler;
         try

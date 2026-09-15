@@ -17,8 +17,8 @@ namespace PG.StarWarsGame.LSP.Server.Abilities;
 /// </remarks>
 public sealed class UnitAbility
 {
-    private readonly IReadOnlyDictionary<string, string> _tags;
     private readonly IReadOnlyDictionary<string, List<string>> _repeated;
+    private readonly IReadOnlyDictionary<string, string> _tags;
 
     internal UnitAbility(
         string type,

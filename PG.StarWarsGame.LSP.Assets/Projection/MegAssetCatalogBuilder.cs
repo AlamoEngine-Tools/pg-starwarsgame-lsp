@@ -4,6 +4,7 @@
 using System.Collections.Immutable;
 using System.IO.Abstractions;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
@@ -219,7 +220,7 @@ public static class MegAssetCatalogBuilder
             if (bones.Count > 0)
                 // Keyed by bare filename: XML references models by name and the engine resolves them
                 // by name across the VFS. Later archives override earlier ones at the same filename.
-                bonesBuilder[Core.Symbols.ModelBoneKey.From(normalizedPath)] = bones.ToImmutableArray();
+                bonesBuilder[ModelBoneKey.From(normalizedPath)] = bones.ToImmutableArray();
         }
         catch
         {

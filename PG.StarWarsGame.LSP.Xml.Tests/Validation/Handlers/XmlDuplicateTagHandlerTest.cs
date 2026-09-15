@@ -43,7 +43,7 @@ public sealed class XmlDuplicateTagHandlerTest
     {
         // The engine ignores everything but the last occurrence - grey out the dead ones so the
         // user is prompted to investigate.
-        var fact = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4], false);
+        var fact = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4]);
         var d = Assert.Single(Sut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
         Assert.NotNull(d.Tags);
         Assert.Contains(XmlDiagnosticTag.Unnecessary, d.Tags!);
@@ -60,7 +60,7 @@ public sealed class XmlDuplicateTagHandlerTest
     [Fact]
     public void Every_occurrence_offers_the_remove_earlier_duplicates_fix()
     {
-        var earlier = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4], false);
+        var earlier = new XmlDuplicateTagFact("file:///test.xml", 2, 0, 11, Tag, [4]);
         var last = new XmlDuplicateTagFact("file:///test.xml", 4, 0, 11, Tag, [2], true);
 
         Assert.True(Assert.Single(Sut.Handle(earlier, XmlHandlerTestFixtures.EmptyCtx)).OfferRemoveEarlierDuplicates);

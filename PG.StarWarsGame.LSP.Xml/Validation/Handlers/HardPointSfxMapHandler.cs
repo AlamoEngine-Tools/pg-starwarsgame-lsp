@@ -34,7 +34,8 @@ public sealed class HardPointSfxMapHandler : CommaSeparatedPairHandlerBase
             var known = hardPointEnum.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (!known.Contains(hardPointType))
                 results.Add(AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{hardPointType}' is not a known HardPointType value for <{fact.Tag.Tag}>.", Id: DiagnosticIds.HardPointSfxMapUnknownType), fact, 0));
+                    $"'{hardPointType}' is not a known HardPointType value for <{fact.Tag.Tag}>.",
+                    Id: DiagnosticIds.HardPointSfxMapUnknownType), fact, 0));
         }
 
         var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index);

@@ -6,13 +6,17 @@ using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging.Abstractions;
+using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.Localisation.Data;
+using PG.StarWarsGame.Localisation.IO.Dat;
+using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Project;
-using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -150,16 +154,18 @@ public sealed class CreateLocalisationLanguageFileHandlerTest
         var sp2 = services.BuildServiceProvider();
 
         var registry = new LocalisationProjectRegistry();
-        registry.Set([new LocProjectInfo(
-            "mastertextfile_english.properties", EnglishNls, "Nls", "Root", 1)]);
+        registry.Set([
+            new LocProjectInfo(
+                "mastertextfile_english.properties", EnglishNls, "Nls", "Root", 1)
+        ]);
 
         var handler = new CreateLocalisationLanguageFileHandler(
             sp2.GetRequiredService<ILocalisationRowReader>(),
             sp2.GetRequiredService<ILocalisationFormatConverter>(),
-            sp2.GetRequiredService<PG.StarWarsGame.Localisation.Data.ITranslationDatabaseFactory>(),
-            sp2.GetRequiredService<PG.StarWarsGame.Localisation.IO.Dat.IDatTranslationExporter>(),
-            sp2.GetRequiredService<PG.StarWarsGame.Files.DAT.Services.IDatFileService>(),
-            sp2.GetRequiredService<PG.StarWarsGame.Localisation.Services.ILanguageService>(),
+            sp2.GetRequiredService<ITranslationDatabaseFactory>(),
+            sp2.GetRequiredService<IDatTranslationExporter>(),
+            sp2.GetRequiredService<IDatFileService>(),
+            sp2.GetRequiredService<ILanguageService>(),
             new FileHelper(fs),
             registry,
             new NoopReloadService(),

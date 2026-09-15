@@ -23,6 +23,9 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
 public sealed class LocalisationLoaderTest
 {
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private const string BilingualCsvPath = "/mod/text/my_text.csv";
     // ── LocalisationConfig defaults ──────────────────────────────────────────
 
     [Fact]
@@ -706,10 +709,6 @@ public sealed class LocalisationLoaderTest
 
         Assert.Null(Assert.Single(registry.Projects).Language);
     }
-
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    private const string BilingualCsvPath = "/mod/text/my_text.csv";
 
     /// <summary>
     ///     A loader over one CSV carrying the same key in two languages, so a test can tell which

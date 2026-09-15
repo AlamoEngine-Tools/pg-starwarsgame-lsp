@@ -9,6 +9,7 @@ using PG.StarWarsGame.Files.MEG.Services;
 using PG.StarWarsGame.Files.MTD.Services;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
+using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests;
@@ -166,6 +167,20 @@ public sealed class ServerConfiguratorRegistrationTest
         using var provider = BuildProviderWithHostStubs();
 
         Assert.NotNull(ActivatorUtilities.CreateInstance<ResolveReferenceHandler>(provider));
+    }
+
+    /// <summary>
+    ///     The layout handlers, because the read side gained a dependency when the sidecar stopped
+    ///     naming threads by file name: keys only turn back into documents against the campaign's
+    ///     own threads, so the handler needs the model service to supply them.
+    /// </summary>
+    [Fact]
+    public void StoryLayoutHandlers_Resolve()
+    {
+        using var provider = BuildProviderWithHostStubs();
+
+        Assert.NotNull(ActivatorUtilities.CreateInstance<GetStoryLayoutHandler>(provider));
+        Assert.NotNull(ActivatorUtilities.CreateInstance<SetStoryLayoutHandler>(provider));
     }
 
     /// <summary>
