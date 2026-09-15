@@ -170,6 +170,23 @@ export interface ConvertLocalisationFormatResult {
     error?: string | null;
 }
 
+// ── aet/setLocalisationProjectFormat ─────────────────────────────────────────
+
+/**
+ * Which format the root project loads, changed without converting any file (#121).
+ *
+ * @param changed False when the project already loaded that format; nothing was written.
+ * @param filesInFormat Registered files in the new format after the reload. Zero means the project now
+ *     loads nothing, which has to be said while it is one step from being undone.
+ */
+export interface SetLocalisationProjectFormatResult {
+    changed: boolean;
+    previousFormat?: string | null;
+    format?: string | null;
+    filesInFormat: number;
+    error?: string | null;
+}
+
 // ── aet/exportLocalisationToDat ──────────────────────────────────────────────
 
 export interface ExportLocalisationToDatResult {

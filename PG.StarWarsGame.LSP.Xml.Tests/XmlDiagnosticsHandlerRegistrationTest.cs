@@ -285,7 +285,11 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // distance above the longest weapon-hardpoint range can park the unit out of reach. Units with
         // the WEAPON behaviour are out of scope: there the attack distance IS the shot's flight distance.
         // Measured: equal on 22 eaw and 43 foc units, above on 3 and 4 (Tantive_IV 2000 against 800).
-        const int expectedHandlerCount = 149;
+        // 149 -> 150: HullFiringArcHandler added, fed by HullFiringArcRule (A5). On a WEAPON unit without
+        // the TURRET behaviour the Turret_*_Extent_Degrees tags are the hull's firing arc - the only
+        // readers are Is_In_Cone_Of_Fire and TurretBehaviorClass. A HINT: the plan expected three vanilla
+        // objects, the corpus has 86 foc and 41 eaw, fighters and speeders doing it on purpose.
+        const int expectedHandlerCount = 150;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

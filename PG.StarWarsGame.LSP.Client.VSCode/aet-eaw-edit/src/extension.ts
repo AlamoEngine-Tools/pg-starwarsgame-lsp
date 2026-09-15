@@ -31,9 +31,10 @@ import { vscodeMessageSink } from './lsp/vscodeMessageSink';
 import {
     ConvertLocalisationFormatResult, ExportLocalisationToDatResult, GetEffectiveObjectResult,
     GetEncyclopediaEntryResult, GetLocalisationProjectsResult, GetRootLocalisationConfigResult,
-    GetStoryPlotsResult, LOC_CATEGORY, LocProjectInfo, StoryGraphChangedParams,
-    StorySimChangedParams,
+    GetStoryPlotsResult, LOC_CATEGORY, LocProjectInfo, SetLocalisationProjectFormatResult,
+    StoryGraphChangedParams, StorySimChangedParams,
 } from './protocol';
+import { formatChoices, formatOutcome } from './localisationProjectFormat';
 import { StoryGraphPanel } from './storyGraphPanel';
 import { graphTargets, type StoryGraphTarget } from './storyGraphTarget';
 import { StoryNavigatorViewProvider, StoryTreeItem } from './storyNavigatorViewProvider';
@@ -836,6 +837,33 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 						result.writtenPath, path.basename(result.writtenPath),
 						category ?? LOC_CATEGORY.text, context.extensionUri, lsp);
 				}
+			}),
+		// Which format the project LOADS (#121), as opposed to converting a file. The palette entry and
+		// the navigator's title-bar button are this one command. Nothing is converted: the .pgproj is
+		// repointed and the project reloads, so the message has to say how many files that leaves.
+		vscode.commands.registerCommand('aet-eaw-edit.lsp.setLocalisationProjectFormat',
+			async () => {
+				if (!lsp.requireRunning()) { return; }
+
+				const config = await lsp.request<GetRootLocalisationConfigResult>('aet/getRootLocalisationConfig');
+				const current = config.ok && config.value.configured ? config.value.type : null;
+
+				const picked = await vscode.window.showQuickPick(formatChoices(current), {
+					title: 'Set Localisation Project Format',
+					placeHolder: 'Load the project\'s text from which format? No files are converted',
+				});
+				if (!picked) { return; }
+
+				const result = await lsp.requestOrReport<SetLocalisationProjectFormatResult>(
+					'aet/setLocalisationProjectFormat', { format: picked.format },
+					`could not set the localisation format to ${picked.format}`);
+				if (!result) { return; }
+
+				const outcome = formatOutcome(result);
+				if (outcome.kind === 'error') { vscode.window.showErrorMessage(outcome.text); return; }
+				if (outcome.kind === 'warning') { vscode.window.showWarningMessage(outcome.text); }
+				else { vscode.window.showInformationMessage(outcome.text); }
+				if (result.changed) { localisationNavigatorProvider?.refresh(); }
 			}),
 		vscode.commands.registerCommand('aet-eaw-edit.lsp.exportLocalisationToDat',
 			async (arg?: LocTreeItem) => {

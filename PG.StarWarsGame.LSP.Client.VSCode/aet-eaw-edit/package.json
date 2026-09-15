@@ -87,6 +87,11 @@
           "group": "navigation"
         },
         {
+          "command": "aet-eaw-edit.lsp.setLocalisationProjectFormat",
+          "when": "view == aet-eaw-edit.lsp.localisationNavigator",
+          "group": "navigation"
+        },
+        {
           "command": "aet-eaw-edit.lsp.refreshLocalisationNavigator",
           "when": "view == aet-eaw-edit.lsp.localisationNavigator",
           "group": "navigation"
@@ -200,6 +205,12 @@
       {
         "command": "aet-eaw-edit.lsp.convertLocalisationFormat",
         "title": "EaWEdit: Convert Localisation File to Another Format",
+        "enablement": "config.aet-eaw-edit.features.tools.localisation"
+      },
+      {
+        "command": "aet-eaw-edit.lsp.setLocalisationProjectFormat",
+        "title": "EaWEdit: Set Localisation Project Format",
+        "icon": "$(symbol-file)",
         "enablement": "config.aet-eaw-edit.features.tools.localisation"
       },
       {
@@ -374,7 +385,7 @@
             "order": 1200,
             "type": "string",
             "default": "format-dat",
-            "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node - an existing project's own declared format always wins.",
+            "markdownDescription": "Default format offered when initialising a new localisation project. Only used when the `.pgproj` does not already declare a `localisation` node - an existing project's own declared format always wins.\n\nTo change an existing project's format, run **EaWEdit: Set Localisation Project Format**, or use the button in the Localisation view's title bar.",
             "enum": [
               "format-dat",
               "format-csv",
