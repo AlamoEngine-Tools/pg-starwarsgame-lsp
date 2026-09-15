@@ -132,6 +132,13 @@ export interface PreviewWeapon {
     fireModes: string[];
     turret?: PreviewTurret | null;
     fireSfxEvent?: string | null;
+    /**
+     * The arc while DEPLOYED, as full angles, or null when the unit is never deployed. Only a unit with
+     * `Deploys` and the walk locomotor is, and the engine then reads `Deployed_Turret_*` - 360 / 180 when
+     * unwritten, i.e. unrestricted. See `weaponsInState`.
+     */
+    deployedConeWidthDegrees?: number | null;
+    deployedConeHeightDegrees?: number | null;
 }
 
 /** How the engine puts a projectile on screen. Mirrors `PreviewProjectileRender`. */
@@ -443,6 +450,9 @@ export interface PreviewTurret {
     elevateExtentDegrees?: number | null;
     turretBone?: string | null;
     barrelBone?: string | null;
+    /** How far a unit turret swings while DEPLOYED, or null when the unit is never deployed. */
+    deployedRotateExtentDegrees?: number | null;
+    deployedElevateExtentDegrees?: number | null;
 }
 
 /**

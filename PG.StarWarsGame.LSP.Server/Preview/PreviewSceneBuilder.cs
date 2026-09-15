@@ -1296,7 +1296,25 @@ public sealed class PreviewSceneBuilder(
             Number(effective, "Projectile_Fire_Recharge_Seconds"),
             [],
             turret,
-            null);
+            null,
+            UnitArcYawDegrees(effective, deployed: true),
+            UnitArcPitchDegrees(effective, deployed: true));
+    }
+
+    /// <summary>
+    ///     Whether the engine can ever put this unit in the deployed state.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GameObjectClass::Is_Deployed</c> (<c>0096ed30</c>) requires the type's <c>Deploys</c> flag
+    ///     (<c>Is_Deployable</c>, field <c>+0xf6</c>) and then asks the locomotor. The base
+    ///     <c>LocomotorInterfaceClass::Is_Deployed</c> returns false; only
+    ///     <c>WalkLocomotorBehaviorClass</c> answers yes, in <c>LST_WALK_DEPLOYED</c>. Any other locomotor
+    ///     with <c>Deploys</c> set is never deployed, so it has no second arc to draw.
+    /// </remarks>
+    private static bool CanDeploy(EffectiveObject effective)
+    {
+        return EngineBoolean.IsTrue(Tag(effective, "Deploys"))
+               && ObjectBehaviors.Has(effective, "WALK_LOCOMOTOR");
     }
 
     /// <summary>
@@ -1355,12 +1373,16 @@ public sealed class PreviewSceneBuilder(
     ///         thing and must not be confused with the default.
     ///     </para>
     /// </remarks>
-    private static float? UnitArcYawDegrees(EffectiveObject effective)
+    /// <param name="deployed">
+    ///     The arc while deployed: <c>Deployed_Turret_Rotate_Extent_Degrees</c>, whose default is the same
+    ///     360, and null for a unit that is never deployed (<see cref="CanDeploy" />).
+    /// </param>
+    private static float? UnitArcYawDegrees(EffectiveObject effective, bool deployed = false)
     {
-        if (FiresForward(effective)) return null;
+        if (FiresForward(effective) || (deployed && !CanDeploy(effective))) return null;
 
-        return FullAngle(Number(effective, "Turret_Rotate_Extent_Degrees")
-                         ?? DefaultTurretRotateExtentDegrees);
+        var tag = deployed ? "Deployed_Turret_Rotate_Extent_Degrees" : "Turret_Rotate_Extent_Degrees";
+        return FullAngle(Number(effective, tag) ?? DefaultTurretRotateExtentDegrees);
     }
 
     /// <summary>
@@ -1389,15 +1411,17 @@ public sealed class PreviewSceneBuilder(
     ///     <c>Turret_XY_Only</c> makes <c>Is_In_Cone_Of_Fire</c> skip the pitch test ENTIRELY rather
     ///     than flattening it, so the elevation is unbounded however the extent is authored.
     /// </remarks>
-    private static float? UnitArcPitchDegrees(EffectiveObject effective)
+    /// <param name="deployed">As for <see cref="UnitArcYawDegrees" />.</param>
+    private static float? UnitArcPitchDegrees(EffectiveObject effective, bool deployed = false)
     {
-        if (FiresForward(effective)) return null;
+        if (FiresForward(effective) || (deployed && !CanDeploy(effective))) return null;
 
+        // Tested before the pitch is read in Is_In_Cone_Of_Fire, so it drops the deployed test too.
         if (EngineBoolean.IsTrue(Tag(effective, "Turret_XY_Only")))
             return FullTurnDegrees;
 
-        return FullAngle(Number(effective, "Turret_Elevate_Extent_Degrees")
-                         ?? DefaultTurretElevateExtentDegrees);
+        var tag = deployed ? "Deployed_Turret_Elevate_Extent_Degrees" : "Turret_Elevate_Extent_Degrees";
+        return FullAngle(Number(effective, tag) ?? DefaultTurretElevateExtentDegrees);
     }
 
     /// <summary>
@@ -1479,7 +1503,10 @@ public sealed class PreviewSceneBuilder(
         if (string.IsNullOrEmpty(turretBone) && string.IsNullOrEmpty(barrelBone))
             return null;
 
-        // EFFECTIVE, like the hardpoint's - but off the UNIT's defaults, which are 360 and 180.
+        // EFFECTIVE, like the hardpoint's - but off the UNIT's defaults, which are 360 and 180. The
+        // deployed pair has the same defaults, and TurretBehaviorClass::Adjust_Turret_Facing swaps it in
+        // whenever the unit is deployed - so only a unit that can deploy gets one.
+        var canDeploy = CanDeploy(effective);
         return new PreviewTurret(
             null,
             Number(effective, "Turret_Rotate_Extent_Degrees")
@@ -1487,7 +1514,13 @@ public sealed class PreviewSceneBuilder(
             Number(effective, "Turret_Elevate_Extent_Degrees")
             ?? DefaultTurretElevateExtentDegrees,
             string.IsNullOrEmpty(turretBone) ? null : turretBone,
-            string.IsNullOrEmpty(barrelBone) ? null : barrelBone);
+            string.IsNullOrEmpty(barrelBone) ? null : barrelBone,
+            canDeploy
+                ? Number(effective, "Deployed_Turret_Rotate_Extent_Degrees") ?? DefaultTurretRotateExtentDegrees
+                : null,
+            canDeploy
+                ? Number(effective, "Deployed_Turret_Elevate_Extent_Degrees") ?? DefaultTurretElevateExtentDegrees
+                : null);
     }
 
     /// <summary>

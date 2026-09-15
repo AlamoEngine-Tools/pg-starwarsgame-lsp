@@ -139,7 +139,17 @@ public sealed record PreviewWeapon(
     float? RechargeSeconds,
     IReadOnlyList<string> FireModes,
     PreviewTurret? Turret,
-    string? FireSfxEvent);
+    string? FireSfxEvent,
+    /// <summary>
+    ///     The arc while DEPLOYED, as full angles, or null for a weapon whose unit is never deployed.
+    /// </summary>
+    /// <remarks>
+    ///     Only a unit with <c>Deploys</c> and the walk locomotor is ever deployed, and while it is the
+    ///     engine reads <c>Deployed_Turret_*_Extent_Degrees</c> in place of the normal pair - defaults 360
+    ///     and 180, so unwritten means unrestricted. Same conventions as <see cref="ConeWidthDegrees" />.
+    /// </remarks>
+    float? DeployedConeWidthDegrees = null,
+    float? DeployedConeHeightDegrees = null);
 
 /// <summary>
 ///     How far a shot at one target category may stray from the aim point.
@@ -155,12 +165,19 @@ public sealed record PreviewWeapon(
 public sealed record PreviewInaccuracy(string Category, float Distance);
 
 /// <summary>A turret hardpoint's rest pose and how far it may swing.</summary>
+/// <param name="DeployedRotateExtentDegrees">
+///     How far a unit turret swings while DEPLOYED, or null when the unit is never deployed.
+///     <c>TurretBehaviorClass::Adjust_Turret_Facing</c> reads the deployed pair in place of the normal one
+///     whenever <c>Is_Deployed</c>, so the swing opens with the shot.
+/// </param>
 public sealed record PreviewTurret(
     float? RestAngle,
     float? RotateExtentDegrees,
     float? ElevateExtentDegrees,
     string? TurretBone,
-    string? BarrelBone);
+    string? BarrelBone,
+    float? DeployedRotateExtentDegrees = null,
+    float? DeployedElevateExtentDegrees = null);
 
 /// <summary>
 ///     One attached hardpoint, with everything needed to destroy and repair it in the preview.

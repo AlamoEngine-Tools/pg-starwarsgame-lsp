@@ -292,7 +292,111 @@ public sealed class PreviewUnitWeaponTest
         Assert.Equal(360f, weapon.ConeHeightDegrees);
     }
 
+    // ── the deployed arc (P5) ──────────────────────────────────────────────────
+
+    /// <summary>
+    ///     A deploying walker carries a second arc, and unwritten it is UNRESTRICTED.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Measured: <c>GameObjectClass::Is_Deployed</c> needs the type's <c>Deploys</c> flag and
+    ///         the locomotor's answer, and only <c>WalkLocomotorBehaviorClass</c> ever answers yes. While
+    ///         it does, the shot (<c>Is_In_Cone_Of_Fire</c>), the swing (<c>Adjust_Turret_Facing</c>)
+    ///         and <c>Can_Point_At</c> all read <c>Deployed_Turret_*_Extent_Degrees</c> instead - whose
+    ///         constructor defaults are 360 and 180.
+    ///     </para>
+    ///     <para>
+    ///         So the AT-AT, at 55 / 60 normally and writing no deployed pair, fires in every direction
+    ///         while deployed. 19 foc and 8 eaw deploying walkers are in that shape.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_GivesADeployingWalkerAnUnrestrictedDeployedArcByDefault()
+    {
+        var weapon = Assert.Single(Walker().Weapons);
+
+        Assert.Equal(110f, weapon.ConeWidthDegrees);
+        Assert.Equal(360f, weapon.DeployedConeWidthDegrees);
+        Assert.Equal(360f, weapon.DeployedConeHeightDegrees);
+        Assert.Equal(360f, weapon.Turret!.DeployedRotateExtentDegrees);
+        Assert.Equal(180f, weapon.Turret.DeployedElevateExtentDegrees);
+    }
+
+    /// <summary>An authored deployed pair follows the same conventions as the normal one.</summary>
+    [Fact]
+    public void BuildForObject_DoublesAnAuthoredDeployedPairLikeTheNormalOne()
+    {
+        var weapon = Assert.Single(Walker(("Deployed_Turret_Rotate_Extent_Degrees", "30"),
+            ("Deployed_Turret_Elevate_Extent_Degrees", "20")).Weapons);
+
+        Assert.Equal(60f, weapon.DeployedConeWidthDegrees);
+        Assert.Equal(40f, weapon.DeployedConeHeightDegrees);
+        Assert.Equal(30f, weapon.Turret!.DeployedRotateExtentDegrees);
+        Assert.Equal(20f, weapon.Turret.DeployedElevateExtentDegrees);
+    }
+
+    // Deploys alone is not enough: the base locomotor always answers "not deployed".
+    [Fact]
+    public void BuildForObject_GivesNoDeployedArcWithoutAWalkLocomotor()
+    {
+        var weapon = Assert.Single(Build(
+            hull: "ev_atat.alo",
+            bones: ["MuzzleA_00"],
+            unitTags:
+            [
+                ("LandBehavior", "WEAPON, TURRET"),
+                ("Deploys", "Yes"),
+                ("Turret_Rotate_Extent_Degrees", "55")
+            ]).Weapons);
+
+        Assert.Null(weapon.DeployedConeWidthDegrees);
+        Assert.Null(weapon.DeployedConeHeightDegrees);
+    }
+
+    [Fact]
+    public void BuildForObject_GivesNoDeployedArcToAWalkerThatDoesNotDeploy()
+    {
+        var weapon = Assert.Single(Build(
+            hull: "ev_atat.alo",
+            bones: ["MuzzleA_00"],
+            unitTags:
+            [
+                ("LandBehavior", "WALK_LOCOMOTOR, WEAPON, TURRET"),
+                ("Turret_Bone_Name", "Turret"),
+                ("Turret_Rotate_Extent_Degrees", "55")
+            ]).Weapons);
+
+        Assert.Null(weapon.DeployedConeWidthDegrees);
+        Assert.Null(weapon.Turret!.DeployedRotateExtentDegrees);
+    }
+
+    // Both switches apply to the deployed test exactly as to the normal one.
+    [Fact]
+    public void BuildForObject_AppliesFiresForwardAndXyOnlyToTheDeployedArc()
+    {
+        Assert.Null(Assert.Single(Walker(("Fires_Forward", "Yes")).Weapons).DeployedConeWidthDegrees);
+        Assert.Equal(360f, Assert.Single(Walker(("Turret_XY_Only", "Yes"),
+            ("Deployed_Turret_Elevate_Extent_Degrees", "10")).Weapons).DeployedConeHeightDegrees);
+    }
+
     // ── fixture ───────────────────────────────────────────────────────────────
+
+    private static PreviewScene Walker(params (string Name, string Value)[] extra)
+    {
+        return Build(
+            hull: "ev_atat.alo",
+            bones: ["MuzzleA_00", "MuzzleA_01", "Turret"],
+            unitTags:
+            [
+                ("LandBehavior", "WALK_LOCOMOTOR, WEAPON, TURRET, SELECTABLE"),
+                ("Deploys", "Yes"),
+                ("Targeting_Max_Attack_Distance", "500"),
+                ("Turret_Bone_Name", "Turret"),
+                ("Turret_Rotate_Extent_Degrees", "55"),
+                ("Turret_Elevate_Extent_Degrees", "60"),
+                .. extra
+            ]);
+    }
 
     private static PreviewScene Fighter()
     {

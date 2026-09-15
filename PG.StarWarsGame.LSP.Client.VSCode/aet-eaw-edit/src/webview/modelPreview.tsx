@@ -162,8 +162,9 @@ import { useEdgeResize } from './useEdgeResize';
 import { readPanelSize, writePanelSize } from './shared/panelLayout';
 import { poolSummary } from './preview/attacker';
 import {
-    clipNamingModel, groupAnimations, playheadLabel, type AnimationAction,
+    clipNamingModel, groupAnimations, playheadLabel, readClip, type AnimationAction,
 } from './preview/animationNames';
+import { isDeployedClip, weaponsInState } from './preview/deployedState';
 import { pickTake } from './preview/takeRoulette';
 import { AnimationTile } from './preview/AnimationTile';
 import { type ChoiceOption } from './shared/choice';
@@ -4849,6 +4850,29 @@ function ModelPreview(): React.JSX.Element {
     }, [scene]);
 
     /**
+     * Whether the clip on the playhead shows the unit DEPLOYED (P5).
+     *
+     * The preview keeps no deployed state of its own - the clip is the model being shown in that state.
+     * A `deployed_*` clip counts throughout, the deploy clip once it is held at its end, and nothing else.
+     * Recomputed as the playhead moves, but it is a boolean, so what hangs off it changes only at the
+     * moment the state does.
+     */
+    const deployed = useMemo(
+        () => animation !== null && isDeployedClip(
+            readClip(clipNamingModel(scene), animation),
+            playhead.duration > 0 && playhead.time >= playhead.duration - 1e-4),
+        [scene, animation, playhead.time, playhead.duration]);
+
+    /**
+     * The scene's weapons as the engine reads them in that state: a deploying walker's arc and turret
+     * limits swap to the deployed pair, which is unrestricted unless written. Everything below - the
+     * rows, the cones, the handles, the cards - reads this rather than `scene.weapons`, so none of them
+     * needs to know deployment exists.
+     */
+    const stateWeapons = useMemo(
+        () => weaponsInState(scene?.weapons ?? [], deployed), [scene?.weapons, deployed]);
+
+    /**
      * The weapon weapons, as both the dock and the viewport see them.
      *
      * One derivation feeding both. Building the dock's rows and the viewport's cones separately is
@@ -4857,8 +4881,8 @@ function ModelPreview(): React.JSX.Element {
      */
     const weapons = useMemo(
         () => weaponRows(
-            { weapons: scene?.weapons ?? [], hardpoints: scene?.hardpoints ?? [] }, destroyed),
-        [scene?.weapons, scene?.hardpoints, destroyed]);
+            { weapons: stateWeapons, hardpoints: scene?.hardpoints ?? [] }, destroyed),
+        [stateWeapons, scene?.hardpoints, destroyed]);
 
     /**
      * Every turret that can actually be swung, from BOTH places one can be declared.
@@ -4894,8 +4918,8 @@ function ModelPreview(): React.JSX.Element {
     /* One card per hardpoint, each carrying the weapon on it, and whatever weapons are left over. */
     const cards = useMemo(
         () => hardpointCards(
-            { weapons: scene?.weapons ?? [], hardpoints: scene?.hardpoints ?? [] }, destroyed),
-        [scene, destroyed]);
+            { weapons: stateWeapons, hardpoints: scene?.hardpoints ?? [] }, destroyed),
+        [stateWeapons, scene?.hardpoints, destroyed]);
 
     const looseWeapons = useMemo(() => unitWeapons(weapons), [weapons]);
 
