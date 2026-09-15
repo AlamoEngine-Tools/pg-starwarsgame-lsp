@@ -12,6 +12,7 @@ import {
     LANE_PALETTE,
     LIFECYCLE_TOKENS,
     UNKNOWN_LIFECYCLE_TOKEN,
+    branchColours,
     branchToken,
     laneToken,
 } from './palette';
@@ -76,9 +77,9 @@ describe('the story graph palettes', () => {
         assert.equal(LIFECYCLE_TOKENS.Disabled, '--colour-data-red');
     });
 
-    // Order is load-bearing: a branch keeps its colour across sessions only because the hash indexes
-    // this list, so reordering it repaints every graph.
-    it('keeps the branch palette in the order the hash already indexed', () => {
+    // Order is load-bearing: the campaign's first branch takes the first slot, so reordering this list
+    // repaints every graph.
+    it('keeps the branch palette in its slot order', () => {
         assert.deepEqual(BRANCH_PALETTE, [
             '--colour-data-blue',
             '--colour-data-green',
@@ -105,8 +106,62 @@ describe('the story graph palettes', () => {
         ]);
     });
 
-    it('gives a branch the same slot the old hash gave it', () => {
-        // Reproduces the shipped hash so a rename here cannot silently repaint a graph.
+    /**
+     * Issue #128, second pass. A hash of the name put 5 branches on 4 colours in Empire Act I and 14
+     * on 5 in the Underworld campaign, so two branches shared a colour well before the six ran out.
+     * Slots are handed out in campaign order instead - the order the server's branch facet and the
+     * branch dropdown already use.
+     */
+    it('hands the campaign`s branches consecutive slots, in campaign order', () => {
+        const colourOf = branchColours(['Act2', 'Act1', 'Act3']);
+
+        assert.equal(colourOf('Act1'), BRANCH_PALETTE[0]);
+        assert.equal(colourOf('Act2'), BRANCH_PALETTE[1]);
+        assert.equal(colourOf('Act3'), BRANCH_PALETTE[2]);
+    });
+
+    it('orders by character code, the way the server sorts the facet', () => {
+        // Ordinal: every capital sorts before every lower-case letter.
+        const colourOf = branchColours(['alpha', 'Beta']);
+
+        assert.equal(colourOf('Beta'), BRANCH_PALETTE[0]);
+        assert.equal(colourOf('alpha'), BRANCH_PALETTE[1]);
+    });
+
+    it('gives six branches six different colours', () => {
+        const names = ['A', 'B', 'C', 'D', 'E', 'F'];
+        const colourOf = branchColours(names);
+
+        assert.equal(new Set(names.map(colourOf)).size, 6);
+    });
+
+    it('cycles from the first slot once the six are used', () => {
+        const colourOf = branchColours(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']);
+
+        assert.equal(colourOf('G'), BRANCH_PALETTE[0]);
+        assert.equal(colourOf('H'), BRANCH_PALETTE[1]);
+    });
+
+    /**
+     * The point of taking the CAMPAIGN list: what a filter hides does not move anyone's slot, because
+     * the list does not change when the filter does.
+     */
+    it('ignores duplicates and blanks, so they cannot shift a slot', () => {
+        const colourOf = branchColours(['Act2', '', 'Act1', 'Act2']);
+
+        assert.equal(colourOf('Act1'), BRANCH_PALETTE[0]);
+        assert.equal(colourOf('Act2'), BRANCH_PALETTE[1]);
+    });
+
+    // A branch typed into an edit reaches the graph before the server's next facet list does.
+    it('falls back to the name hash for a branch the campaign list does not name yet', () => {
+        const colourOf = branchColours(['Act1']);
+
+        assert.equal(colourOf('Brand_New'), branchToken('Brand_New'));
+    });
+
+    it('hashes a branch the same way the shipped hash did', () => {
+        // Reproduces the shipped hash so a rename here cannot silently repaint the fallback.
         const legacy = (branch: string): string => {
             let hash = 0;
             for (let i = 0; i < branch.length; i++) { hash = (hash * 31 + branch.charCodeAt(i)) | 0; }

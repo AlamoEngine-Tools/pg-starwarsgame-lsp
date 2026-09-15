@@ -20,7 +20,7 @@ import {
 } from 'react';
 import {
     dockBodyCss, dockChromeCss, dockHeaderCss, dockOverviewCss, problemsPanelCss, rightDockCss,
-    rotarySwitchCss,
+    rotarySwitchCss, stageChromeCss, stageFlyoutCss,
 } from './shared/dockChrome';
 import { RotaryModeSwitch, type RotaryMode } from './shared/RotaryModeSwitch';
 import { RightDock } from './shared/RightDock';
@@ -28,6 +28,9 @@ import { ProblemsPanel, type ProblemFilterControl } from './shared/ProblemsPanel
 import { filterProblems, resolveProblemJump } from './shared/problemFilter';
 import { ARRANGE_OPTIONS } from './storyGraph/arrangeOptions';
 import { ClearFiltersButton } from './storyGraph/ClearFiltersButton';
+import { canvasEdgeStyle, MUTED_EDGE_TOKEN, type CanvasEdgeStyle } from './storyGraph/canvasEdgeStyle';
+import { branchKey, type BranchKeyEntry } from './storyGraph/colourKey';
+import { ColourKeyFlyout } from './storyGraph/ColourKeyFlyout';
 import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
 import { createLabelSizer, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
@@ -63,7 +66,7 @@ import { SeverityTag } from './shared/SeverityTag';
 import { tokensRootCss } from './shared/tokens';
 import {
     EDGE_KINDS, JUNCTION_TOKEN, LANE_PALETTE, LIFECYCLE_TOKENS, UNKNOWN_LIFECYCLE_TOKEN,
-    branchToken, laneToken,
+    branchColours, laneToken, type BranchColour,
 } from './storyGraph/palette';
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -190,13 +193,19 @@ const autoRenameKey = (threadUri: string | null | undefined, name: string): stri
 const renameDrafts = new Map<string, string>();
 
 /**
- * VS Code's themed categorical chart palette - these track the active colour theme (and invert with
- * light/dark), so branch colours belong to the theme rather than being hard-coded hues. Branches
- * beyond the palette length reuse a colour; that's fine for the handful of branches a thread has.
+ * The branch colour assignment every branch-coloured thing reads: the node glow, the Requires edge
+ * stroke, the overview rect and the colour key.
+ *
+ * Built from the campaign's branch list (`branchColours`), and replaced only when that list changes -
+ * which a filter never does. The graph message sets it before the graph is applied, so a build reads
+ * the new assignment; a patch that keeps nodes alive also calls `repaintBranchColours`.
  */
-/** Stable themed chart colour per branch name - shared by the node glow and the edge glow. */
+let branchColourOf: BranchColour = branchColours([]);
+let branchColourList: readonly string[] = [];
+
+/** Themed chart colour for a branch - shared by the node glow and the edge glow. */
 function branchColor(branch: string): string {
-    return `var(${branchToken(branch)})`;
+    return `var(${branchColourOf(branch)})`;
 }
 
 /**
@@ -435,6 +444,12 @@ interface EditorHandle {
      * instead of re-rendering every node like `refreshMode`.
      */
     repaintNodes(nodeIds: Iterable<string>): void;
+    /**
+     * Repaints everything drawn in a branch colour, after the campaign's branch list changed and so
+     * moved branches to other slots. Nodes that stay alive through a patch would otherwise keep the
+     * colour they were rendered with. Walks the whole graph, so it is for that change only.
+     */
+    repaintBranchColours(): void;
     destroy(): void;
 }
 
@@ -574,7 +589,7 @@ const LABEL_MEASURE_PX = 100;
 /** Inset between a node's rect and its label text, in screen pixels. */
 const LABEL_PAD = 4;
 
-// Overview colour for a node: events by lifecycle (matching the node border + legend), junctions
+// Overview colour for a node: events by lifecycle (matching the node border + colour key), junctions
 // a neutral - they have no lifecycle, and the overview tells them apart by SHAPE instead (see
 // lodShape), which is what the mounted view already does.
 function lodToken(dto: StoryGraphNodeDto): string {
@@ -591,7 +606,7 @@ function lodToken(dto: StoryGraphNodeDto): string {
  * branch palette this used to index is gone.
  */
 function overviewToken(dto: StoryGraphNodeDto, branch: string | null): string {
-    return branch ? branchToken(branch) : lodToken(dto);
+    return branch ? branchColourOf(branch) : lodToken(dto);
 }
 
 async function createEditor(container: HTMLElement): Promise<EditorHandle> {
@@ -1749,26 +1764,41 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             // → input (left) to match the left-to-right layout. Drawn for ALL edges (windowed mode
             // mounts no rete connections), so connections are consistent regardless of what's on screen.
             const bezier = k >= K_LABEL;
-            ctx.globalAlpha = 0.4;
-            ctx.strokeStyle = colour('--colour-muted');
-            ctx.lineWidth = 1;
-            ctx.beginPath();
+            // Coloured as a mounted connection is - Requires in its branch's colour, other kinds in
+            // theirs (see canvasEdgeStyle) - and bucketed by style, so a frame is one stroke per
+            // distinct style rather than one per edge. No glow: that is what was too slow.
+            const branches = branchIndex([...graphModel.values()].map(m => m.dto));
+            const buckets = new Map<string, { style: CanvasEdgeStyle; edges: StoryGraphEdgeDto[] }>();
             for (const e of lastEdges) {
-                const a = graphModel.get(e.fromId), b = graphModel.get(e.toId);
-                if (!a || !b) { continue; }
-                const x1 = (a.x + a.w) * k + x, y1 = (a.y + a.h / 2) * k + y;
-                const x2 = b.x * k + x, y2 = (b.y + b.h / 2) * k + y;
-                if ((x1 < 0 && x2 < 0) || (x1 > w && x2 > w)
-                    || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) { continue; } // fully off one side
-                ctx.moveTo(x1, y1);
-                if (bezier) {
-                    const dx = Math.max(20, Math.abs(x2 - x1) * 0.4);
-                    ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
-                } else {
-                    ctx.lineTo(x2, y2);
-                }
+                const style = canvasEdgeStyle(e.kind, edgeBranchFrom(e.fromId, e.toId, e.kind, branches), branchColourOf);
+                const bucket = buckets.get(style.key);
+                if (bucket) { bucket.edges.push(e); } else { buckets.set(style.key, { style, edges: [e] }); }
             }
-            ctx.stroke();
+            for (const { style, edges: bucketEdges } of buckets.values()) {
+                const plain = style.token === MUTED_EDGE_TOKEN;
+                ctx.globalAlpha = plain ? 0.4 : 0.85;
+                ctx.strokeStyle = colour(style.token);
+                ctx.lineWidth = plain ? 1 : 1.5;
+                ctx.setLineDash(style.dash as number[]);
+                ctx.beginPath();
+                for (const e of bucketEdges) {
+                    const a = graphModel.get(e.fromId), b = graphModel.get(e.toId);
+                    if (!a || !b) { continue; }
+                    const x1 = (a.x + a.w) * k + x, y1 = (a.y + a.h / 2) * k + y;
+                    const x2 = b.x * k + x, y2 = (b.y + b.h / 2) * k + y;
+                    if ((x1 < 0 && x2 < 0) || (x1 > w && x2 > w)
+                        || (y1 < 0 && y2 < 0) || (y1 > h && y2 > h)) { continue; } // fully off one side
+                    ctx.moveTo(x1, y1);
+                    if (bezier) {
+                        const dx = Math.max(20, Math.abs(x2 - x1) * 0.4);
+                        ctx.bezierCurveTo(x1 + dx, y1, x2 - dx, y2, x2, y2);
+                    } else {
+                        ctx.lineTo(x2, y2);
+                    }
+                }
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
             // Nodes: coloured rects; from K_LABEL up the event title is drawn inside too (mid stage).
             // Off-screen nodes skipped. Font/colour set once, labels truncated (no per-node clip).
             const showLabels = k >= K_LABEL;
@@ -1947,6 +1977,20 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             for (const id of nodeIds) {
                 if (editor.getNode(id)) { void area.update('node', id); }
             }
+        },
+        repaintBranchColours(): void {
+            const branches = branchIndex([...graphModel.values()].map(m => m.dto));
+            for (const m of graphModel.values()) {
+                m.colorToken = overviewToken(m.dto, branchOfNodeId(m.dto.id, branches));
+            }
+            for (const node of editor.getNodes()) {
+                if (node.branchGlow) { void area.update('node', node.id); }
+            }
+            for (const connection of editor.getConnections()) {
+                if (connection.branch) { void area.update('connection', connection.id); }
+            }
+            // The overview reads colorToken in its draw pass.
+            scheduleAreaChanged();
         },
         destroy(): void {
             area.destroy();
@@ -2175,7 +2219,7 @@ const EventBody = styled.div<{ selected?: boolean; $w: number; $h: number }>`
     cursor: default;
     ${p => p.selected ? 'outline: 2px solid var(--vscode-focusBorder); outline-offset: 2px;' : ''}
 
-    /* Generated from LIFECYCLE_TOKENS, which the legend swatches and the overview rects also read.
+    /* Generated from LIFECYCLE_TOKENS, which the colour key swatches and the overview rects also read.
        These four rules, those swatches and a hex mirror for the canvas used to be three separate
        copies of one mapping, kept in step by hand. */
     ${Object.entries(LIFECYCLE_TOKENS)
@@ -2920,7 +2964,7 @@ const ConnSvg = styled.svg`
         stroke: var(--vscode-charts-foreground, #999);
         marker-end: url(#story-arrow);
     }
-    /* Generated from EDGE_KINDS, which the legend swatches read too - a swatch and the edge it
+    /* Generated from EDGE_KINDS, which the colour key swatches read too - a swatch and the edge it
        describes cannot drift apart if both come from the one list. TacticalEntry deliberately
        shares Tactical's presentation: it is the same relation seen from the stub side. */
     ${EDGE_KINDS.filter(k => k.kind !== 'Prereq').map(k => {
@@ -3105,6 +3149,8 @@ const GlobalStyle = createGlobalStyle`
 const Shell = styled.div`
     ${dockChromeCss}
     ${rotarySwitchCss}
+    ${stageChromeCss}
+    ${stageFlyoutCss}
 
     height: 100%;
     display: flex;
@@ -3345,37 +3391,45 @@ const Shell = styled.div`
     }
     .problem-row button:hover { background: transparent; color: var(--vscode-editor-foreground); }
 
-    .legend {
-        padding: var(--space-2) var(--space-8);
+    /* The colour key's corner plate - bottom right, where the legend strip used to end. */
+    .key-corner { right: 8px; bottom: 8px; }
+
+    /* The colour key (storyGraph/ColourKeyFlyout). One row per swatch, the swatch in a fixed-width
+       cell so every label starts at the same x whether it follows a box, a stroke or a shape. */
+    .colour-key .key-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
         display: flex;
-        gap: var(--space-12);
-        font-size: var(--font-size-11);
-        color: var(--vscode-descriptionForeground);
-        background: var(--vscode-sideBar-background);
-        border-top: var(--space-1) solid var(--vscode-panel-border);
-        flex-shrink: 0;
-        flex-wrap: wrap;
+        flex-direction: column;
+        gap: var(--space-6);
     }
-    .legend .swatch {
+    .colour-key .key-list li {
+        display: grid;
+        grid-template-columns: 22px 1fr;
+        align-items: center;
+        column-gap: var(--space-8);
+    }
+    .colour-key .key-label { min-width: 0; overflow-wrap: anywhere; }
+    /* Under its label, not beside it: a branch name can be long. */
+    .colour-key .key-shared {
+        grid-column: 2;
+        color: var(--vscode-descriptionForeground);
+        font-size: var(--font-size-11);
+    }
+    .colour-key .swatch {
         display: inline-block;
         width: 10px; height: 10px;
         border-radius: var(--radius-3);
         border: 2px solid;
-        vertical-align: -1px;
-        margin-right: var(--space-2);
+        justify-self: center;
     }
+    /* The overview draws a node as a filled rect with a stroke, so a branch swatch is one too. */
+    .colour-key .branch-swatch { width: 14px; height: 10px; border-width: 1.5px; }
     /* A real stroke rather than a bordered box: the dash pattern is part of what an edge kind
        means, and a square cannot show it. */
-    .legend .edge-swatch {
-        vertical-align: middle;
-        margin-right: var(--space-2);
-    }
-    /* Names the axis the swatches after it belong to, so the two keys do not read as one list. */
-    .legend .legend-label {
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-        opacity: 0.75;
-    }
+    .colour-key .edge-swatch { justify-self: center; }
+    .colour-key .shape-circle, .colour-key .shape-diamond { justify-self: center; }
 
     /* The AND/OR socket shapes, drawn rather than typed. They stand for the shapes the graph
        renders, so they are figures and not text - and the house rule keeps user-facing strings
@@ -3413,6 +3467,10 @@ function App(): React.JSX.Element {
 
     const [filters, setFiltersState] = useState<FilterState>({ ...EMPTY_FILTERS });
     const [branches, setBranches] = useState<string[]>([]);
+    // The branches the graph on screen actually draws, for the colour key - not the campaign-wide
+    // facet list above, which also names branches the current filter is hiding.
+    const [branchEntries, setBranchEntries] = useState<BranchKeyEntry[]>([]);
+    const [colourKeyOpen, setColourKeyOpen] = useState(false);
     const [threads, setThreads] = useState<string[]>([]);
     const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [rewardTypes, setRewardTypes] = useState<string[]>([]);
@@ -3712,6 +3770,17 @@ function App(): React.JSX.Element {
                         }
                     }
                     setGraphNodeIds(new Set(graphNodes.map(n => n.id)));
+                    // Colours follow the CAMPAIGN's branches, so a filter leaves them alone. Set
+                    // before the graph is applied: the build reads the assignment as it goes.
+                    const campaignBranches = facetList(
+                        msg.branches as string[] | undefined, graphNodes.map(n => n.branch),
+                        filtersRef.current.branch);
+                    const coloursMoved = campaignBranches.join('\n') !== branchColourList.join('\n');
+                    if (coloursMoved) {
+                        branchColourList = campaignBranches;
+                        branchColourOf = branchColours(campaignBranches);
+                    }
+                    setBranchEntries(branchKey(graphNodes, branchColourOf));
                     applyGraph(
                         graphNodes,
                         (msg.edges as StoryGraphEdgeDto[] | undefined) ?? [],
@@ -3721,6 +3790,9 @@ function App(): React.JSX.Element {
                             branches: msg.branches as string[] | undefined,
                             threads: msg.threads as string[] | undefined,
                         });
+                    // A full build repaints everything anyway; a patch keeps nodes that were
+                    // rendered in the old slots.
+                    if (coloursMoved && !full) { editorRef.current?.repaintBranchColours(); }
                     // A running simulation keeps painting its lifecycles over fresh renders.
                     if (simRef.current?.running) { applySimOverlay(simRef.current); }
                     break;
@@ -3912,6 +3984,20 @@ function App(): React.JSX.Element {
                         onDragOver={onCanvasDragOver} onDrop={onCanvasDrop}
                     />
                     {status || layouting ? <p className="status">{status ?? 'Arranging layout...'}</p> : null}
+                    {/* The colour key, on a corner plate like the preview's stage controls. After
+                        the status cover, so the key can still be opened while a layout runs. */}
+                    <div className="stage-chrome key-corner">
+                        <IconButton
+                            icon="details"
+                            title="Colour key"
+                            className={colourKeyOpen ? 'active' : undefined}
+                            expanded={colourKeyOpen}
+                            onClick={() => setColourKeyOpen(open => !open)}
+                        />
+                    </div>
+                    {colourKeyOpen ? (
+                        <ColourKeyFlyout branches={branchEntries} onClose={() => setColourKeyOpen(false)} />
+                    ) : null}
                 </div>
                 <div className="bottom-panels">
                     {showProblems && problems.length ? (
@@ -3941,46 +4027,6 @@ function App(): React.JSX.Element {
                     {simState?.running && showSimLog ? (
                         <SimLog state={simState} onClose={() => setShowSimLog(false)} />
                     ) : null}
-                    <div className="legend">
-                        {/* Two axes, told apart. A node's colour is its lifecycle; an edge's is
-                            the relation it carries. Reading one key for both is what made yellow
-                            and orange look undocumented. */}
-                        <span className="legend-label">Node</span>
-                        <span>
-                            <span className="swatch" style={{ borderColor: `var(${UNKNOWN_LIFECYCLE_TOKEN})` }} />
-                            Inactive
-                        </span>
-                        {/* The same mapping the node borders are generated from, so a swatch cannot
-                            come to disagree with the node it is describing. */}
-                        {Object.entries(LIFECYCLE_TOKENS).map(([lifecycle, token]) => (
-                            <span key={lifecycle}>
-                                <span className="swatch" style={{ borderColor: `var(${token})` }} />
-                                {lifecycle}
-                            </span>
-                        ))}
-                        <span><span className="shape-diamond" /> OR</span>
-                        <span><span className="shape-circle" /> AND</span>
-
-                        {/* Edge colour is a second axis and used to be undocumented, so orange and
-                            yellow appeared on screen with nothing to explain them. Drawn as real
-                            strokes from EDGE_KINDS - same token, same dash array as the graph. */}
-                        <span className="legend-label">Edge</span>
-                        {EDGE_KINDS.map(kind => (
-                            <span key={kind.kind}>
-                                <svg className="edge-swatch" width="22" height="6" aria-hidden="true">
-                                    <line
-                                        x1="0" y1="3" x2="22" y2="3"
-                                        stroke={`var(${kind.token})`}
-                                        strokeWidth="2"
-                                        strokeDasharray={kind.dash || undefined}
-                                    />
-                                </svg>
-                                {kind.label}
-                            </span>
-                        ))}
-                        <span>Branch colour marks the branch only</span>
-                        <span>Drag socket to socket to add a prereq</span>
-                    </div>
                 </div>
                 </div>
                 <RightDock

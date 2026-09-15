@@ -14,10 +14,13 @@
 // canvas resolves it to a concrete colour through resolveColour, because a 2D context cannot take a
 // var(). Both start from the same name.
 
-/** The lifecycles an event node can be in, in the order the legend lists them. */
+/** The lifecycles an event node can be in, in the order the colour key lists them. */
 export type Lifecycle = 'Waiting' | 'Armed' | 'Fired' | 'Disabled';
 
-/** The colour a node's border, its legend swatch and its overview rect all take. */
+/**
+ * The colour a node's border and its colour key swatch take - and its overview rect, unless the node
+ * belongs to a branch, which then wins there (see BRANCH_PALETTE).
+ */
 export const LIFECYCLE_TOKENS: Readonly<Record<Lifecycle, string>> = {
     Waiting: '--colour-data-blue',
     Armed: '--colour-data-green',
@@ -44,11 +47,11 @@ export const UNKNOWN_LIFECYCLE_TOKEN = '--colour-faint';
  * What an edge's colour and dash pattern mean.
  *
  * Node colour says lifecycle; edge colour says RELATION, and the two axes were never distinguished
- * anywhere the reader could see. The legend was generated from LIFECYCLE_TOKENS alone, so orange
- * and yellow appeared on screen documented nowhere - the reported bug. They are a relation: orange
- * is a control edge, yellow a tactical attachment.
+ * anywhere the reader could see: the old legend was generated from LIFECYCLE_TOKENS alone. Orange is
+ * a control edge, yellow a tactical attachment. (The orange and yellow in issue #128's screenshot
+ * turned out to be BRANCH colours on zoomed-out nodes - see BRANCH_PALETTE - not these.)
  *
- * One entry per kind, read by the stroke rules AND by the legend, so a swatch cannot come to
+ * One entry per kind, read by the stroke rules AND by the colour key, so a swatch cannot come to
  * disagree with the edge it describes. `dash` is an SVG stroke-dasharray; empty means solid.
  * `Prereq` is the plain case and takes the chart foreground rather than a hue, because "A must
  * happen first" is the default relation and colouring it would say something it does not mean.
@@ -71,10 +74,15 @@ export const EDGE_KINDS: readonly EdgeKindStyle[] = [
 ];
 
 /**
- * The hues a branch is hashed onto.
+ * The hues a branch is given, slot by slot (see branchColours).
  *
- * Order is load-bearing. A branch keeps its colour between sessions only because the hash indexes
- * this list, so reordering it repaints every graph anyone has looked at.
+ * Order is load-bearing. The campaign's first branch takes the first slot, so reordering this list
+ * repaints every graph anyone has looked at.
+ *
+ * These are the lifecycle hues again, and zoomed out a branched node takes its branch hue INSTEAD of
+ * its lifecycle, so a green rect there may be a branch rather than Armed. Separating them by glow or
+ * outline cost the overview its frame rate, so the colour key (colourKey.ts) names each branch's hue
+ * and says which one wins instead.
  */
 export const BRANCH_PALETTE: readonly string[] = [
     '--colour-data-blue',
@@ -103,11 +111,37 @@ export const LANE_PALETTE: readonly string[] = [
     '--colour-data-neutral',
 ];
 
+/** The token a branch is drawn in. */
+export type BranchColour = (branch: string) => string;
+
 /**
- * The branch hash, unchanged.
+ * Hands out branch colours in campaign order: the first branch takes the first slot, the seventh
+ * cycles back to the first.
+ *
+ * The list is the whole CAMPAIGN's branches - the server's unfiltered branch facet - never the ones
+ * in view, so filtering cannot move a branch to another colour. Only adding or removing a branch in
+ * the campaign itself does. It replaced a hash of the name (issue #128), which put 5 branches on 4
+ * colours in Empire Act I and 14 on 5 in the Underworld campaign.
+ *
+ * Ordinal order, the order the server sorts the facet in and the branch dropdown shows. A branch the
+ * list does not name yet - typed into an edit, ahead of the server's next facet list - falls back to
+ * its name hash, so it still gets a colour and the same one every time.
+ */
+export function branchColours(campaignBranches: readonly string[]): BranchColour {
+    const order = [...new Set(campaignBranches.filter(branch => branch !== ''))].sort();
+    const slot = new Map(order.map((branch, index) => [branch, index]));
+
+    return branch => {
+        const index = slot.get(branch);
+        return index === undefined ? branchToken(branch) : BRANCH_PALETTE[index % BRANCH_PALETTE.length];
+    };
+}
+
+/**
+ * The branch name hash - now only the fallback for a branch outside the campaign list.
  *
  * Signed 32-bit wraparound then Math.abs, which is not the same distribution as the lane hash below
- * and is deliberately left alone: both are load-bearing for which colour an existing graph shows.
+ * and is deliberately left alone.
  */
 export function branchToken(branch: string): string {
     let hash = 0;

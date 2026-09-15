@@ -871,6 +871,110 @@ export const rotarySwitchCss = `
 `;
 
 /**
+ * The plate a control sits on when it is docked to a stage corner rather than to the dock.
+ *
+ * Shared because the story graph's colour key button (#128) sits on the same plate the preview's
+ * corners use. The host places it; this is only what it looks like.
+ */
+export const stageChromeCss = `
+    /* One shared plate so every corner reads as the same kind of thing. Semi-transparent, since
+       a solid panel over a viewport looks like a hole in it. */
+    .stage-chrome {
+        position: absolute;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-2);
+        border-radius: var(--radius-6);
+        background: color-mix(in srgb,
+            var(--vscode-editorWidget-background, #202020) 82%, transparent);
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        /* Never wider than the stage; a long faction roster wraps rather than running off it. */
+        max-width: calc(100% - 16px);
+        flex-wrap: wrap;
+    }
+`;
+
+/**
+ * The panel a stage-corner button opens beside itself.
+ *
+ * Shared for the same reason as the plate: the story graph's colour key is this flyout, not a
+ * lookalike. The preview's "less cramped" rules for fields inside a flyout stay in its own sheet -
+ * they are about the preview's settings, not about what a flyout is.
+ */
+export const stageFlyoutCss = `
+    /* One box, several corners. Which side a panel is on says which button it belongs to before a
+       word of it is read. */
+    .stage-flyout {
+        position: absolute;
+        top: 40px;
+        z-index: 3;
+        /* Wide enough that a two-line checkbox label is the exception rather than the rule. At 270
+           nearly every note and half the labels wrapped, which is what made the panel read as
+           cramped even before the sections went in. */
+        width: 304px;
+        /* Never past the bottom of the stage; the body scrolls inside instead. */
+        max-height: calc(100% - 56px);
+        display: flex;
+        flex-direction: column;
+        border: var(--space-1) solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
+        border-radius: var(--radius-6);
+        background: var(--vscode-editorWidget-background, #202020);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+    }
+    /* A flyout the reader can size. The max-height above still caps it against the stage, so a
+       remembered height from a taller window cannot push it off the top. */
+    .stage-flyout.sizeable { position: absolute; }
+    .stage-flyout.sizeable .stage-flyout-body { flex: 1 1 auto; min-height: 0; }
+    .stage-flyout.on-left { left: 8px; }
+    .stage-flyout.on-right { right: 8px; }
+    /* Centred on the stage, like the bar it belongs to. */
+    .stage-flyout.on-mid { left: 50%; transform: translateX(-50%); }
+
+    /* Opens UPWARDS from the bottom edge, because that is where its button is. A flyout that
+       appears at the top of the stage when you pressed something at the bottom reads as a
+       different panel opening rather than this one, and the eye has to go and find it.
+
+       The clearance is bigger than the top edge's 40px: the preview's bottom row can be two plates
+       tall once the shader corner shows its source line under the switch. */
+    .stage-flyout.from-bottom {
+        top: auto;
+        bottom: 56px;
+        max-height: calc(100% - 72px);
+    }
+
+    .stage-flyout-head {
+        display: flex;
+        align-items: center;
+        gap: var(--space-4);
+        padding: var(--space-6) var(--space-6) var(--space-6) var(--space-12);
+        border-bottom: var(--space-1) solid var(--vscode-panel-border);
+        font-size: var(--font-size-11);
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: var(--vscode-descriptionForeground, #999);
+    }
+    /* Whatever comes first after the title takes the space. A count claims it where there is one,
+       and the close button then follows it rather than fighting it for a second auto margin -
+       two of those split the gap and left the count stranded in the middle. */
+    .stage-flyout-head .section-count { margin-left: auto; }
+    .stage-flyout-head .icon-btn:first-of-type { margin-left: auto; }
+    .stage-flyout-head .section-count ~ .icon-btn { margin-left: var(--space-4); }
+    /* The gap here is BETWEEN sections and is deliberately larger than the one inside them
+       (see .dock-section-body): that difference is what makes a heading read as the start of a
+       group rather than as one more row in a list. */
+    .stage-flyout-body {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-16);
+        padding: var(--space-12) var(--space-12) var(--space-16);
+        overflow-y: auto;
+    }
+`;
+
+/**
  * The item inspector: what the selected row IS, and its bulk geometry tables.
  *
  * Shared because the inspector is its own editor tab and the preview still hosts the same rows -
