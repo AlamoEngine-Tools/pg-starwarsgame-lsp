@@ -450,6 +450,12 @@ public static class DiagnosticIds
     public static readonly DiagnosticId SpecialWeaponIndex = new(DiagnosticGroup.CrossTag, 29);
 
     /// <summary>
+    ///     <c>Specific_Death_Anim_Type</c> names a type the model has no clip for, or an index past its last
+    ///     take, so no death animation plays - and with <c>Remove_Upon_Death</c> the unit vanishes at once (#104).
+    /// </summary>
+    public static readonly DiagnosticId DeathAnimationClip = new(DiagnosticGroup.CrossTag, 30);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

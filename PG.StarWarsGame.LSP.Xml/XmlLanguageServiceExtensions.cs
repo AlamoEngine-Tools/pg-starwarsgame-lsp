@@ -203,6 +203,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, FiresForwardHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AttackDistanceBeyondHardpointRangeHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, HullFiringArcHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, DeathAnimationClipHandler>();
 
         // Shared parse source: one HAP parse per (document, content) reused by indexing,
         // diagnostics, and every request handler. Capacity from ServerOptions.ParseCacheCapacity.
@@ -219,6 +220,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, FiresForwardRule>();
         services.AddSingleton<IXmlCrossTagRule, AttackDistanceRule>();
         services.AddSingleton<IXmlCrossTagRule, HullFiringArcRule>();
+        services.AddSingleton<IXmlCrossTagRule, DeathAnimationClipRule>();
         services.AddSingleton<IXmlCrossTagRule, HardpointAttachmentBoneRule>();
         services.AddSingleton<IXmlCrossTagRule, CampaignStoryAttachmentRule>();
         // The engine's "you must specify" asserts, each attributed to its owning class by the xref
