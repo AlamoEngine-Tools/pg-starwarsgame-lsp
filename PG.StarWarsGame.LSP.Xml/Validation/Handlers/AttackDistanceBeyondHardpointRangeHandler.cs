@@ -57,9 +57,9 @@ public sealed class AttackDistanceBeyondHardpointRangeHandler : XmlDiagnosticsHa
         // On the WEAPON path the attack distance is the shot's own flight distance.
         if (ObjectBehaviors.Has(unit, WeaponBehavior)) return [];
 
-        if (!TryNumber(Value(unit, AttackDistanceTag), out var attackDistance)) return [];
+        if (!TryNumber(unit.ValueOf(AttackDistanceTag), out var attackDistance)) return [];
 
-        var hardpoints = Value(unit, HardpointsTag);
+        var hardpoints = unit.ValueOf(HardpointsTag);
         if (hardpoints is null) return [];
 
         string? longestId = null;
@@ -70,11 +70,11 @@ public sealed class AttackDistanceBeyondHardpointRangeHandler : XmlDiagnosticsHa
             var hardpoint = ctx.Objects.Resolve(hardpointId);
             if (!hardpoint.Found) continue;
 
-            var type = Value(hardpoint, TypeTag);
+            var type = hardpoint.ValueOf(TypeTag);
             if (type is null || !type.StartsWith(WeaponTypePrefix, StringComparison.OrdinalIgnoreCase)) continue;
 
             // Unwritten reads as the constructor's 0.0, which can never be the longest.
-            var rangeText = Value(hardpoint, RangeTag);
+            var rangeText = hardpoint.ValueOf(RangeTag);
             if (!TryNumber(rangeText, out var range) || range <= longest) continue;
 
             longest = range;
@@ -96,11 +96,6 @@ public sealed class AttackDistanceBeyondHardpointRangeHandler : XmlDiagnosticsHa
                 Id: DiagnosticIds.AttackDistanceBeyondHardpointRange,
                 FixTitle: fact.AnchoredOnAttackDistance ? $"Set to the longest hardpoint range ({longestText})" : null)
         ];
-    }
-
-    private static string? Value(EffectiveObject obj, string tag)
-    {
-        return obj.Tags.LastOrDefault(t => t.TagName.Equals(tag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
     }
 
     private static bool TryNumber(string? text, out double value)

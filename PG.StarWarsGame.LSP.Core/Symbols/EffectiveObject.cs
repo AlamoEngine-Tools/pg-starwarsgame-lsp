@@ -25,4 +25,16 @@ public sealed record EffectiveObject(
     string? CycleObjectId,
     ImmutableArray<string> Chain,
     ImmutableArray<EffectiveTag> Tags
-);
+)
+{
+    /// <summary>
+    ///     The trimmed value of a scalar tag, or null when the object does not carry it. Tag names match
+    ///     case-insensitively, and a repeated tag gives its last value - the write the engine keeps.
+    /// </summary>
+    public string? ValueOf(string tagName)
+    {
+        if (Tags.IsDefaultOrEmpty) return null;
+
+        return Tags.LastOrDefault(t => t.TagName.Equals(tagName, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
+    }
+}

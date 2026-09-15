@@ -19,26 +19,32 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 ///         implements, and both vanilla weapons carry <c>SPECIAL_WEAPON</c>.
 ///     </para>
 ///     <para>
+///         Measured in the 2018 build: <c>GameModeClass::Add_Special_Weapon</c> registers the weapon
+///         only if it behaves like <c>SPECIAL_WEAPON</c> or <c>LOBBING_SUPERWEAPON</c>, and otherwise
+///         returns false without an assert - the weapon is never registered, so there is nothing to
+///         fire. <see cref="SpecialWeaponIndexHandler" /> covers the index test on the same path.
+///     </para>
+///     <para>
 ///         Warning rather than error: the reference resolves and the file loads, but the weapon
-///         will not behave as one in a standalone battle.
+///         is silently missing in a standalone battle.
+///     </para>
+///     <para>
+///         A only. The engine builds B too, but the command bar reads only A, so B never gets a button
+///         and cannot be fired - its deprecation is the warning it gets.
 ///     </para>
 /// </remarks>
 public sealed class SpecialWeaponBehaviorHandler : XmlDiagnosticsHandler<XmlTagValueFact>
 {
-    private const string RequiredBehavior = "SPECIAL_WEAPON";
+    private const string WeaponTag = "Standalone_Space_Maps_Special_Weapon_A";
 
-    private static readonly string[] WeaponTags =
-    [
-        "Standalone_Space_Maps_Special_Weapon_A",
-        "Standalone_Space_Maps_Special_Weapon_B"
-    ];
+    private static readonly string[] AcceptedBehaviors = ["SPECIAL_WEAPON", "LOBBING_SUPERWEAPON"];
 
     /// <inheritdoc />
     public override DiagnosticId? DefaultId => DiagnosticIds.SpecialWeaponBehavior;
 
     protected override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
-        if (!WeaponTags.Contains(fact.Tag.Tag, StringComparer.OrdinalIgnoreCase)) return [];
+        if (!string.Equals(fact.Tag.Tag, WeaponTag, StringComparison.OrdinalIgnoreCase)) return [];
 
         // No resolver means the question cannot be answered here. Silence is the honest answer:
         // treating "cannot tell" as "fails" would report every faction in a narrow context.
@@ -53,13 +59,13 @@ public sealed class SpecialWeaponBehaviorHandler : XmlDiagnosticsHandler<XmlTagV
         // behaviour fault would put two diagnostics on one typo and name the wrong cause.
         if (!resolved.Found) return [];
 
-        if (ObjectBehaviors.Has(resolved, RequiredBehavior)) return [];
+        if (AcceptedBehaviors.Any(behavior => ObjectBehaviors.Has(resolved, behavior))) return [];
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"'{value}' is not a special weapon - it has no {RequiredBehavior} behaviour, so it " +
-                "will not fire in a standalone battle.")
+                $"'{value}' has neither the SPECIAL_WEAPON nor the LOBBING_SUPERWEAPON behaviour, so the " +
+                "game never registers it as a special weapon.")
         ];
     }
 }
