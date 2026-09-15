@@ -517,3 +517,4 @@ docs/
 shader-sources/
 tools/
 .claude/
+lua_debugger/
