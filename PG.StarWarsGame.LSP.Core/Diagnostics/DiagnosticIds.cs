@@ -444,6 +444,12 @@ public static class DiagnosticIds
     public static readonly DiagnosticId HullFiringArc = new(DiagnosticGroup.CrossTag, 28);
 
     /// <summary>
+    ///     A faction's standalone special weapon names an object whose <c>Special_Weapon_Index</c> is unset
+    ///     or outside 0 to 2, so the engine asserts and never registers the weapon (#98).
+    /// </summary>
+    public static readonly DiagnosticId SpecialWeaponIndex = new(DiagnosticGroup.CrossTag, 29);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.

@@ -53,14 +53,14 @@ public sealed class HullFiringArcHandler : XmlDiagnosticsHandler<HullFiringArcFa
 
         var behaviours = ObjectBehaviors.Of(unit);
         if (!behaviours.Contains(WeaponBehavior) || behaviours.Contains(TurretBehavior)) return [];
-        if (EngineBoolean.IsTrue(Value(unit, "Fires_Forward"))) return [];
+        if (EngineBoolean.IsTrue(unit.ValueOf("Fires_Forward"))) return [];
 
-        var xyOnly = EngineBoolean.IsTrue(Value(unit, "Turret_XY_Only"));
+        var xyOnly = EngineBoolean.IsTrue(unit.ValueOf("Turret_XY_Only"));
         var restricting = new List<string>();
         foreach (var (tag, unrestricted, pitch) in Extents)
         {
             if (pitch && xyOnly) continue;
-            if (!double.TryParse(Value(unit, tag), NumberStyles.Float, CultureInfo.InvariantCulture,
+            if (!double.TryParse(unit.ValueOf(tag), NumberStyles.Float, CultureInfo.InvariantCulture,
                     out var bound)) continue;
             if (bound >= unrestricted) continue;
 
@@ -77,10 +77,5 @@ public sealed class HullFiringArcHandler : XmlDiagnosticsHandler<HullFiringArcFa
             $"its facing: {string.Join(", ", restricting)}.";
 
         return [new XmlDiagnosticResult(XmlDiagnosticSeverity.Hint, message, Id: DiagnosticIds.HullFiringArc)];
-    }
-
-    private static string? Value(EffectiveObject obj, string tag)
-    {
-        return obj.Tags.LastOrDefault(t => t.TagName.Equals(tag, StringComparison.OrdinalIgnoreCase))?.Value.Trim();
     }
 }

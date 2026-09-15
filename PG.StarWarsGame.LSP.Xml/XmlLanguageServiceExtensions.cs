@@ -189,6 +189,7 @@ public static class XmlLanguageServiceExtensions
         // Cross-tag validation handler
         services.AddSingleton<IXmlDiagnosticsHandler, DamageAbsorbsNothingHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SpecialWeaponBehaviorHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, SpecialWeaponIndexHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, VehicleThiefCloneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, SquadronOffsetsMismatchHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, CampaignStoryAttachmentHandler>();

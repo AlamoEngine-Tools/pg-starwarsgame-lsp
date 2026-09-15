@@ -289,7 +289,11 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // the TURRET behaviour the Turret_*_Extent_Degrees tags are the hull's firing arc - the only
         // readers are Is_In_Cone_Of_Fire and TurretBehaviorClass. A HINT: the plan expected three vanilla
         // objects, the corpus has 86 foc and 41 eaw, fighters and speeders doing it on purpose.
-        const int expectedHandlerCount = 150;
+        // 150 -> 151: SpecialWeaponIndexHandler added (#98). Every reader of a faction's standalone
+        // special weapon tests Get_Special_Weapon_Index() >= 0, and Add_Special_Weapon asserts it is below
+        // Get_Max_Special_Weapons (3); outside 0 to 2 the weapon is never registered. The index defaults
+        // to -1. None of the readers checks the description's "faction must be able to build" claim.
+        const int expectedHandlerCount = 151;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }
