@@ -42,6 +42,25 @@ public abstract class NumericRangeHandlerBase : XmlDiagnosticsHandler<XmlTagValu
     /// </summary>
     protected abstract string Expectation { get; }
 
+    /// <summary>
+    ///     What the engine does with a value outside the range, as a sentence. Nearly every bound
+    ///     here comes from a message the engine prints while refusing to load the value, so that is
+    ///     the default.
+    /// </summary>
+    protected virtual string Consequence => "The engine rejects this value on load";
+
+    /// <summary>What a value under <see cref="Minimum" /> costs the author.</summary>
+    /// <remarks>
+    ///     Split from <see cref="AboveMaximumConsequence" /> because a range can be asymmetric in
+    ///     where it comes from: a fire cone's floor is an assert the engine states and its ceiling
+    ///     is arithmetic saturation it says nothing about. Telling the author "rejected" for the
+    ///     second would be stating an inference as a fact.
+    /// </remarks>
+    protected virtual string BelowMinimumConsequence => Consequence;
+
+    /// <inheritdoc cref="BelowMinimumConsequence" />
+    protected virtual string AboveMaximumConsequence => Consequence;
+
     /// <inheritdoc />
     public abstract string ValidationId { get; }
 
@@ -62,11 +81,12 @@ public abstract class NumericRangeHandlerBase : XmlDiagnosticsHandler<XmlTagValu
         // The repair belongs to the (owner, tag) pair rather than to this rule - see
         // EngineValueRepairs. An unmeasured pair offers no fix at all.
         var repair = EngineValueRepairs.For(fact.OwningType, fact.Tag.Tag);
+        var consequence = belowMinimum ? BelowMinimumConsequence : AboveMaximumConsequence;
 
         return
         [
             new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.Tag.Tag}> {Expectation}. The engine rejects this value on load",
+                $"<{fact.Tag.Tag}> {Expectation}. {consequence}",
                 SuggestedFix: repair,
                 FixTitle: repair is null ? null : $"Apply the engine's own value: {repair}")
         ];

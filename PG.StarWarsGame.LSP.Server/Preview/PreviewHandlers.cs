@@ -504,19 +504,15 @@ public sealed class GetParticleSystemHandler(
     ///     The object's uniform render scale, defaulting to 1.
     /// </summary>
     /// <remarks>
-    ///     Guarded exactly as the reference guards it (<c>GameObjectCatalog.cpp</c>): anything
-    ///     non-finite or non-positive falls back to 1, because a zero or negative scale collapses
-    ///     the object rather than sizing it. The variant chain is already walked by the resolver.
+    ///     Through <see cref="EngineScaleFactor" />, which the scene builder reads too - the two
+    ///     must not be able to disagree about one object. The variant chain is already walked by
+    ///     the resolver.
     /// </remarks>
     private static float ScaleFactorOf(EffectiveObject? effective)
     {
-        if (effective is null || Tag(effective, "Scale_Factor") is not { } raw)
-            return 1f;
-
-        return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var value)
-            && float.IsFinite(value) && value > 0f
-                ? value
-                : 1f;
+        return effective is null
+            ? EngineScaleFactor.None
+            : EngineScaleFactor.Of(Tag(effective, "Scale_Factor"));
     }
 
     private static string? Tag(EffectiveObject effective, string tagName)

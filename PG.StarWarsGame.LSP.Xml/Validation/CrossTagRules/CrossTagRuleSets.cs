@@ -40,7 +40,8 @@ public static class CrossTagRuleSets
             new BountyTargetFactionsRule(),
             new GarrisonUpgradeUnitsRule(),
             new GrenadeTossAnimationRule(),
-            new RemoteBombTossAnimationRule()
+            new RemoteBombTossAnimationRule(),
+            new WeaponHardpointFireConeRule()
         ];
     }
 

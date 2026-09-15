@@ -92,6 +92,8 @@ describe('weaponRows', () => {
                 weaponId: 'hardpoint:HP_Turbolaser',
                 partId: 'HP_Turbolaser',
                 bone: 'FP_00',
+                frame: 'bone',
+                kind: 'fire',
                 widthDegrees: 60,
                 heightDegrees: 30,
                 range: 2000,
@@ -100,6 +102,8 @@ describe('weaponRows', () => {
                 weaponId: 'hardpoint:HP_Turbolaser',
                 partId: 'HP_Turbolaser',
                 bone: 'FP_01',
+                frame: 'bone',
+                kind: 'fire',
                 widthDegrees: 60,
                 heightDegrees: 30,
                 range: 2000,
@@ -108,8 +112,12 @@ describe('weaponRows', () => {
     });
 
     it('draws a bare ray for a weapon that declares reach but no cone', () => {
-        // Fires_Forward weapons have no traverse at all, so a cone would be an invention. The ray
-        // still answers the question the gizmo exists for - which way does this point.
+        // A Fires_Forward weapon is not a narrow arc, it is NO arc: the engine returns the hull's
+        // facing and never reaches the check, so the server sends null rather than a number. The
+        // ray still answers the question the gizmo exists for - which way does this point.
+        //
+        // The server guards this even when extents ARE authored, which vanilla does:
+        // Landbombingrununits.xml ships Fires_Forward beside a 20/20 arc it never uses.
         const rows = weaponRows({
             weapons: [weapon({ range: 500, firesForward: true })],
             hardpoints: [hardpoint()],
@@ -118,6 +126,27 @@ describe('weaponRows', () => {
         assert.equal(rows[0].arcs.length, 1);
         assert.equal(rows[0].arcs[0].widthDegrees, 0);
         assert.equal(rows[0].arcs[0].heightDegrees, 0);
+    });
+
+    it('hangs a UNIT weapon`s arc in the hull frame, not the bone`s', () => {
+        // The engine reads the muzzle matrix for its TRANSLATION and discards its rotation, taking
+        // the orientation from the object - `Is_In_Cone_Of_Fire` builds its frame from
+        // `owner->Get_Facing()` at the muzzle position. So a rotated MuzzleA bone moves where the
+        // shot STARTS and not which way the arc points.
+        //
+        // A hardpoint is the opposite: `Can_Weapon_Point_At` measures in the hardpoint's own
+        // coordinate system, so there the bone's rotation IS the aim. One flag, because the two
+        // paths genuinely disagree.
+        const rows = weaponRows({
+            weapons: [weapon({
+                id: 'weapon:A', source: 'Unit', hardpointId: null,
+                range: 450, coneWidthDegrees: 40, coneHeightDegrees: 80,
+            })],
+            hardpoints: [hardpoint()],
+        }, new Set());
+
+        assert.equal(rows[0].arcs.length, 1);
+        assert.equal(rows[0].arcs[0].frame, 'hull');
     });
 
     it('draws nothing for a weapon with no reach, rather than a zero-length stub', () => {
@@ -190,11 +219,140 @@ describe('weaponRows', () => {
             assert.equal(row({}).cone, null);
         });
 
+        // Fire_Inaccuracy_Distance is REPEATED, one row per target category, and the server sends
+        // all of them. 1017 of these ship and not one of them reached the card before.
+        it('states the spread per target category', () => {
+            assert.equal(
+                row({ inaccuracy: [
+                    { category: 'Fighter', distance: 30 },
+                    { category: 'Capital', distance: 12.5 },
+                ] }).inaccuracy,
+                'Fighter 30, Capital 12.5');
+            assert.equal(row({}).inaccuracy, null);
+        });
+
+        // Calculate_Projectile_Facing returns the object's own heading BEFORE it reaches
+        // Add_Random_Inaccuracy_To_Fire_At_Position and before Intercept, so a Fires_Forward weapon
+        // has no spread and does not lead. Printing the authored figure would claim an engine
+        // behaviour that never runs.
+        it('says a Fires_Forward weapon applies none of it, whatever the file declares', () => {
+            const forward = row({
+                source: 'Unit',
+                hardpointId: null,
+                firesForward: true,
+                inaccuracy: [{ category: 'Fighter', distance: 30 }],
+            });
+
+            assert.equal(forward.inaccuracy, 'None - Fires_Forward skips spread and target leading');
+        });
+
+        it('says so even when a Fires_Forward weapon declares no spread at all', () => {
+            // The fact worth reading is that it does not LEAD, which holds with an empty list.
+            assert.equal(
+                row({ source: 'Unit', hardpointId: null, firesForward: true }).inaccuracy,
+                'None - Fires_Forward skips spread and target leading');
+        });
+
+        /**
+         * A scene from an older server has no `inaccuracy` at all, and reading `.length` off the
+         * gap threw before the panel rendered anything. Caught by a probe on a stored fixture,
+         * which is the same shape a stale cache or a version-skewed server would have.
+         */
+        it('survives a scene that predates the field entirely', () => {
+            const stale = weapon();
+            delete (stale as { inaccuracy?: unknown }).inaccuracy;
+
+            assert.equal(
+                weaponRows({ weapons: [stale], hardpoints: [hardpoint()] }, new Set())[0].inaccuracy,
+                null);
+        });
+
         it('never writes a trailing zero at a modder', () => {
             // The XML says 2.0000 and 0.10; the row says 2 and 0.1.
             assert.equal(row({ range: 2000.0, minRange: 0 }).reach, '2000 units');
             assert.equal(row({ damage: 24.5 }).damage, '24.5 damage');
         });
+    });
+});
+
+describe('the two envelopes a turret hardpoint keeps', () => {
+    function turretRow(elevateExtentDegrees: number | null) {
+        return weaponRows({
+            weapons: [weapon({
+                range: 2000,
+                coneWidthDegrees: 90,
+                coneHeightDegrees: 360,
+                turret: {
+                    rotateExtentDegrees: 45,
+                    elevateExtentDegrees,
+                    turretBone: 'TURRET_01',
+                    barrelBone: 'BARREL_01',
+                },
+            })],
+            hardpoints: [hardpoint()],
+        }, new Set())[0];
+    }
+
+    /**
+     * The payoff, and it is specific to this engine. `Can_Weapon_Point_At`'s turret branch tests
+     * the yaw extent and NOTHING else, so the shot has no pitch bound; `Calculate_Desired_Turret_Angle`
+     * clamps both, so the barrel does. One arc cannot say that.
+     */
+    it('draws the barrel envelope as well as the firing one', () => {
+        const kinds = turretRow(30).arcs.map(arc => arc.kind);
+
+        assert.deepEqual(kinds, ['fire', 'rotation']);
+    });
+
+    it('bounds the barrel in pitch where the shot is unbounded', () => {
+        const [fire, rotation] = turretRow(30).arcs;
+
+        assert.equal(fire.heightDegrees, 360);
+        assert.equal(rotation.heightDegrees, 60);
+    });
+
+    it('shares the yaw, because one number bounds both', () => {
+        const [fire, rotation] = turretRow(30).arcs;
+
+        assert.equal(fire.widthDegrees, rotation.widthDegrees);
+    });
+
+    // Drawing the same shape twice is not a comparison, it is a double outline.
+    it('draws one envelope when the two would be the same shape', () => {
+        assert.deepEqual(turretRow(180).arcs.map(arc => arc.kind), ['fire']);
+        assert.deepEqual(turretRow(null).arcs.map(arc => arc.kind), ['fire']);
+    });
+
+    // On the WEAPON path the same two numbers bound both, so there is nothing to differentiate.
+    it('leaves a unit weapon with the single arc it already had', () => {
+        const rows = weaponRows({
+            weapons: [weapon({
+                id: 'weapon:A',
+                source: 'Unit',
+                hardpointId: null,
+                fireBones: ['MuzzleA_00'],
+                range: 2000,
+                coneWidthDegrees: 90,
+                coneHeightDegrees: 60,
+                turret: {
+                    rotateExtentDegrees: 45,
+                    elevateExtentDegrees: 30,
+                    turretBone: 'B_Turret_Base',
+                },
+            })],
+            hardpoints: [],
+        }, new Set());
+
+        assert.deepEqual(rows[0].arcs.map(arc => arc.kind), ['fire']);
+    });
+
+    it('leaves a hardpoint that declares no turret alone', () => {
+        const rows = weaponRows({
+            weapons: [weapon({ range: 2000, coneWidthDegrees: 60, coneHeightDegrees: 30 })],
+            hardpoints: [hardpoint()],
+        }, new Set());
+
+        assert.deepEqual(rows[0].arcs.map(arc => arc.kind), ['fire']);
     });
 });
 

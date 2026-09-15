@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using HtmlAgilityPack;
+
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
 /// <summary>
@@ -122,4 +124,51 @@ public sealed class RemoteBombTossAnimationRule : RequiredTagsRuleBase
     protected override string ElementName => "remote_bomb_ability";
     protected override string OwningType => "RemoteBombAbility";
     protected override IReadOnlyList<string> RequiredTags => ["Toss_Anim"];
+}
+
+/// <summary>
+///     A weapon hardpoint must declare both fire-cone angles.
+/// </summary>
+/// <remarks>
+///     <para>
+///         From the ASSERT seam rather than an engine message.
+///         <c>HardPointClass::Can_Weapon_Point_At</c> asserts
+///         <c>Data-&gt;Get_Fire_Cone_Width() &gt; 0.0f</c> (<c>HardPoint.cpp:0x741</c>) and the same
+///         for the height (<c>:0x742</c>) before it does anything else, and
+///         <c>HardPointDataClass</c>'s constructor leaves both at <c>0.0</c>. The default therefore
+///         cannot satisfy the check: a weapon hardpoint that declares neither can point at nothing.
+///     </para>
+///     <para>
+///         Gated on <c>Type</c> because the asserts sit behind <c>Is_Weapon()</c>. A shield
+///         generator, an engine or a fighter bay is never asked for a cone, and demanding one would
+///         report objects the engine does not look at - 118 of the 557 shipped hardpoints.
+///     </para>
+///     <para>
+///         Measured: 439 <c>HARD_POINT_WEAPON_*</c> definitions across <c>eaw/</c> and <c>foc/</c>,
+///         exactly ONE declaring neither - <c>HP_KEDALBE_SHIELD_LEECH_00</c>. The game asserting on
+///         its own data is the established pattern and not a veto.
+///     </para>
+///     <para>
+///         No repair: the engine substitutes nothing, so there is no value to offer as a fix.
+///     </para>
+/// </remarks>
+public sealed class WeaponHardpointFireConeRule : RequiredTagsRuleBase
+{
+    /// <summary>The prefix every weapon hardpoint type shares, and no other type does.</summary>
+    private const string WeaponTypePrefix = "HARD_POINT_WEAPON";
+
+    protected override string ElementName => "hardpoint";
+    protected override string OwningType => "HardPoint";
+    protected override IReadOnlyList<string> RequiredTags => ["Fire_Cone_Width", "Fire_Cone_Height"];
+
+    protected override bool Applies(
+        IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
+    {
+        // The LAST occurrence, matching the engine's keep-the-last rule for a repeated tag.
+        if (!childrenByName.TryGetValue("Type", out var nodes) || nodes.Count == 0)
+            return false;
+
+        return nodes[^1].InnerText.Trim()
+            .StartsWith(WeaponTypePrefix, StringComparison.OrdinalIgnoreCase);
+    }
 }

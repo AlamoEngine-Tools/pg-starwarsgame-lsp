@@ -13,11 +13,13 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Damage is routed by the COLLISION MESH a projectile struck, matched with <c>_stricmp</c>
-///         against each hardpoint's <c>Collision_Mesh</c>. A destroyable hardpoint whose value
-///         matches nothing in the model can therefore never be hit - and because the all-destroyed
-///         branch counts by <c>Is_Destroyable</c> and never asks whether a hardpoint was reachable,
-///         one such hardpoint blocks that branch forever.
+///         Damage finds its hardpoint by NAME, an exact <c>_stricmp</c> against each hardpoint's
+///         <c>Collision_Mesh</c> - but <c>Take_Damage</c> replaces the name with the hardpoint's own
+///         value when the hit is aimed at it, so a value the model lacks is still reachable by aimed
+///         fire. What is NOT reachable is a destroyable hardpoint with no <c>Collision_Mesh</c> at
+///         all: the empty name fails the size check before the lookup (<c>00973ad9</c>), aimed or
+///         not. Because the all-destroyed branch counts by <c>Is_Destroyable</c> and never asks
+///         whether a hardpoint was reachable, one such hardpoint blocks that branch forever.
 ///     </para>
 ///     <para>
 ///         The value may name a MESH or a BONE: vanilla writes <c>Collision_Mesh</c> identical to
@@ -32,8 +34,29 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </remarks>
 public sealed class PreviewUnkillableTest
 {
+    /// <summary>
+    ///     A <c>Collision_Mesh</c> naming nothing on the model is NOT an unkillable hardpoint, and the
+    ///     preview no longer says it is.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>GameObjectClass::Take_Damage</c> replaces the name it looks a hardpoint up by with
+    ///         the hardpoint's OWN <c>Collision_Mesh</c> when the hit is aimed at that hardpoint
+    ///         (<c>0097386a</c>), and in a second path taken from the attacker (<c>009738cc</c>). The
+    ///         exact <c>_stricmp</c> then compares the value with itself and matches whether or not the
+    ///         model has it, so aimed fire lands. The Gargantuan proves it in the shipped data: all
+    ///         eight hardpoints write <c>..._COL</c> or <c>..._COLL</c> against models carrying
+    ///         <c>..._COLLISION</c>, and it dies through them.
+    ///     </para>
+    ///     <para>
+    ///         The mismatch is still real, and still reported - once, by
+    ///         <c>HardpointBoneNotOnModelHandler</c> in the editor, as a warning with a quick fix.
+    ///         The preview repeated it as an error on a second surface, which is what made every
+    ///         Gargantuan hardpoint show up twice.
+    ///     </para>
+    /// </remarks>
     [Fact]
-    public void ReportsADestroyableHardpointWhoseCollisionMeshMatchesNothing()
+    public void LeavesACollisionMeshTheModelLacksToTheEditor()
     {
         var scene = Ship(
             ("HP_Gun", [
@@ -41,11 +64,7 @@ public sealed class PreviewUnkillableTest
                 Tag("Attachment_Bone", "HP_GUN"), Tag("Collision_Mesh", "HP_GUN_COL")
             ]));
 
-        var problem = Assert.Single(
-            scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
-
-        Assert.Equal("error", problem.Severity);
-        Assert.Contains("HP_GUN_COL", problem.Message);
+        Assert.Empty(scene.Problems.Where(p => p.DiagnosticId == DiagnosticIds.PreviewHardpointUnreachable));
     }
 
     [Fact]

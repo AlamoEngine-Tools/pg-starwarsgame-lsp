@@ -36,8 +36,11 @@ public sealed class PreviewUnitWeaponTest
         Assert.Equal(3, weapon.PulseCount);
         Assert.Equal(0.1f, weapon.PulseDelaySeconds!.Value, 3);
         Assert.Equal(2f, weapon.RechargeSeconds);
-        Assert.Equal(20f, weapon.ConeWidthDegrees);
-        Assert.Equal(40f, weapon.ConeHeightDegrees);
+
+        // The two arc angles are deliberately NOT asserted here. They are not a pass-through of the
+        // authored tags - the extents are plus-or-minus bounds and the DTO carries a full angle -
+        // so they belong with the test that states that conversion and its reason, rather than as
+        // two bare numbers in a tag-reading test.
     }
 
     [Fact]
@@ -144,6 +147,149 @@ public sealed class PreviewUnitWeaponTest
             unitTags: [("SpaceBehavior", "DUMMY_STARSHIP, SELECTABLE")]);
 
         Assert.Empty(scene.Weapons);
+    }
+
+    // ── the firing arc: engine defaults and the half/full angle convention ────
+
+    /// <summary>
+    ///     A unit weapon's arc comes from the turret EXTENTS, which are a plus-or-minus bound - so
+    ///     the full angle the DTO carries is twice the authored number.
+    /// </summary>
+    /// <remarks>
+    ///     <c>WeaponBehaviorClass::Is_In_Cone_Of_Fire</c> tests
+    ///     <c>|yaw| &gt; Turret_Rotate_Extent_Degrees</c> WITHOUT halving it, while the hardpoint
+    ///     path tests <c>|yaw| &gt; Fire_Cone_Width / 2.0</c>. Two conventions on one DTO field, so
+    ///     the conversion has to happen here rather than at a consumer that cannot tell them apart.
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_DoublesTheTurretExtentIntoAFullAngle()
+    {
+        var weapon = Assert.Single(Fighter().Weapons);
+
+        Assert.Equal(40f, weapon.ConeWidthDegrees);
+        Assert.Equal(80f, weapon.ConeHeightDegrees);
+    }
+
+    /// <summary>
+    ///     An object that sets no extent fires in ANY direction, because the constructor defaults
+    ///     are 360 and 180 - not zero.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         Measured at <c>00a87243</c> and <c>00a87256</c>: <c>Turret_Rotate_Extent_Degrees</c>
+    ///         starts at 360.0 and <c>Turret_Elevate_Extent_Degrees</c> at 180.0, so both
+    ///         comparisons are always true. 175 of the 291 objects with a <c>WEAPON</c> behaviour
+    ///         set neither, which makes this the COMMON case rather than an edge.
+    ///     </para>
+    ///     <para>
+    ///         Doubling those would give 720 and 360; a full angle saturates at 360, which is
+    ///         already "everything", so the clamp loses nothing.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_TreatsAnAbsentExtentAsUnrestricted()
+    {
+        var scene = Build(
+            hull: "rv_XWing.ALO",
+            bones: ["MuzzleA_00"],
+            unitTags:
+            [
+                ("SpaceBehavior", "WEAPON"),
+                ("Targeting_Max_Attack_Distance", "450")
+            ]);
+
+        var weapon = Assert.Single(scene.Weapons);
+
+        Assert.Equal(360f, weapon.ConeWidthDegrees);
+        Assert.Equal(360f, weapon.ConeHeightDegrees);
+    }
+
+    /// <summary>
+    ///     An authored zero is NOT the default. It is a weapon that can only fire dead ahead, and
+    ///     conflating the two is what made an absent tag read as the most restrictive arc possible.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_KeepsAnAuthoredZeroExtent()
+    {
+        var scene = Build(
+            hull: "rv_XWing.ALO",
+            bones: ["MuzzleA_00"],
+            unitTags:
+            [
+                ("SpaceBehavior", "WEAPON"),
+                ("Targeting_Max_Attack_Distance", "450"),
+                ("Turret_Rotate_Extent_Degrees", "0"),
+                ("Turret_Elevate_Extent_Degrees", "0")
+            ]);
+
+        var weapon = Assert.Single(scene.Weapons);
+
+        Assert.Equal(0f, weapon.ConeWidthDegrees);
+        Assert.Equal(0f, weapon.ConeHeightDegrees);
+    }
+
+    /// <summary>
+    ///     A <c>Fires_Forward</c> weapon has no arc AT ALL, even when it authors extents.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Calculate_Projectile_Facing</c> returns the object's own facing and returns TRUE
+    ///         before <c>Is_In_Cone_Of_Fire</c> is ever called, so the extents are not widened or
+    ///         narrowed - they are not consulted. Null says "no arc concept here", which is a
+    ///         different statement from 360 ("unrestricted") and from 0 ("dead ahead only").
+    ///     </para>
+    ///     <para>
+    ///         This exact combination ships: <c>Landbombingrununits.xml</c> sets
+    ///         <c>Fires_Forward</c> together with a 20/20 arc, and carries a comment saying the flag
+    ///         exists to skip the check that would read it. Without this guard the preview would
+    ///         draw that vanilla object a 40-degree cone it does not have.
+    ///     </para>
+    /// </remarks>
+    [Fact]
+    public void BuildForObject_GivesAFiresForwardWeaponNoArcEvenWhenExtentsAreAuthored()
+    {
+        var scene = Build(
+            hull: "rv_XWing.ALO",
+            bones: ["MuzzleA_00"],
+            unitTags:
+            [
+                ("SpaceBehavior", "WEAPON"),
+                ("Targeting_Max_Attack_Distance", "450"),
+                ("Fires_Forward", "Yes"),
+                ("Turret_Rotate_Extent_Degrees", "20"),
+                ("Turret_Elevate_Extent_Degrees", "20")
+            ]);
+
+        var weapon = Assert.Single(scene.Weapons);
+
+        Assert.True(weapon.FiresForward);
+        Assert.Null(weapon.ConeWidthDegrees);
+        Assert.Null(weapon.ConeHeightDegrees);
+    }
+
+    /// <summary>
+    ///     <c>Turret_XY_Only</c> drops the pitch test ENTIRELY rather than flattening it, so the
+    ///     elevation is unbounded however the extent is authored.
+    /// </summary>
+    [Fact]
+    public void BuildForObject_TreatsXyOnlyAsUnboundedPitch()
+    {
+        var scene = Build(
+            hull: "rv_XWing.ALO",
+            bones: ["MuzzleA_00"],
+            unitTags:
+            [
+                ("SpaceBehavior", "WEAPON"),
+                ("Targeting_Max_Attack_Distance", "450"),
+                ("Turret_Rotate_Extent_Degrees", "30"),
+                ("Turret_Elevate_Extent_Degrees", "5"),
+                ("Turret_XY_Only", "Yes")
+            ]);
+
+        var weapon = Assert.Single(scene.Weapons);
+
+        Assert.Equal(60f, weapon.ConeWidthDegrees);
+        Assert.Equal(360f, weapon.ConeHeightDegrees);
     }
 
     // ── fixture ───────────────────────────────────────────────────────────────

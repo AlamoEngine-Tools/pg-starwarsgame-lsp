@@ -7,6 +7,33 @@
 export type Point = [number, number, number];
 
 /**
+ * The orientation of a HULL-frame arc - a `WEAPON` behaviour's - as the three axes the cone's own
+ * local X, Y and Z land on in the model root's space.
+ *
+ * Every cone is built along local +X with its width across Y and its height across Z, because that
+ * is how a FIRE BONE aims, and a hardpoint arc hangs on its fire bone and inherits the bone's frame.
+ * A `WEAPON` arc does not: `WeaponBehaviorClass::Is_In_Cone_Of_Fire` keeps only the muzzle's
+ * position and rebuilds the frame from `owner->Get_Facing()`. The model root's raw axes are not that
+ * frame. The hull's NOSE is +Z there - the same travel axis `spinAway` uses - so an arc that took
+ * the root's orientation unrotated pointed along +X, a quarter turn off.
+ *
+ * Measured on the X-Wing: its four MuzzleA bones sit 8.1 units ahead of the hull's centre along
+ * +Z, and each of their own +X axes points along +Z. Up stays +Y, and the width opens across the
+ * remaining horizontal axis - X - so a wide, flat arc stays wide and flat.
+ */
+export function hullFrameBasis(): [Point, Point, Point] {
+    return [
+        // Local X, the cone's axis: down the nose.
+        [0, 0, 1],
+        // Local Y, the width: across the horizontal. Up x forward, so the basis stays a proper
+        // rotation and cannot mirror the cone.
+        [1, 0, 0],
+        // Local Z, the height: up.
+        [0, 1, 0],
+    ];
+}
+
+/**
  * The apex and rim of one firing cone.
  *
  * Built along local **+X**, which is where an Alamo fire bone points. That is measured rather than

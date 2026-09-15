@@ -269,7 +269,17 @@ function meshPanel(source: MeshInspection, detail?: ModelDetail): InspectorPanel
     // hit-tests against this, so a box that disagrees with the geometry is itself the finding.
     if (stored !== undefined) {
         mesh.push(
-            { label: 'Bounds min', value: vector(stored.boundsMin), kind: 'vector' },
+            {
+                label: 'Bounds min',
+                value: vector(stored.boundsMin),
+                kind: 'vector',
+                // Said out loud because the viewport now draws the subject in WORLD units, scaled
+                // by its Scale_Factor, and these are the file's own numbers. A reader comparing
+                // the two on a scaled object would otherwise find a disagreement with no
+                // explanation attached to either side.
+                hint: 'Model units, as the file stores them. The viewport draws the subject at '
+                    + 'its Scale_Factor, so these are not what you measure on screen.',
+            },
             { label: 'Bounds max', value: vector(stored.boundsMax), kind: 'vector' },
             {
                 label: 'Sub-meshes',

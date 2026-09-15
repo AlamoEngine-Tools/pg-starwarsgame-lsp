@@ -4,7 +4,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { drawnConeRange, fireConeOutline, fireConePoints, fireConeSurface } from './fireArc';
+import {
+    drawnConeRange, fireConeOutline, fireConePoints, fireConeSurface, hullFrameBasis,
+} from './fireArc';
 
 describe('fireConePoints', () => {
     const length = (p: readonly number[]) => Math.hypot(p[0], p[1], p[2]);
@@ -294,5 +296,33 @@ describe('fireConeOutline', () => {
 
     it('draws nothing for an arc with no reach', () => {
         assert.deepEqual(fireConeOutline(90, 90, 0, 8, 4), []);
+    });
+});
+
+describe('hullFrameBasis', () => {
+    // Where a cone axis ends up in the model root's space: the columns of the basis ARE the images
+    // of the cone's local X (forward), Y (width) and Z (height) axes.
+    const [forward, lateral, up] = hullFrameBasis();
+
+    // Measured on the X-Wing in the rig: its MuzzleA bones sit 8.1 units ahead of the hull's centre
+    // along +Z, and every one of their own +X axes points along +Z. The cone used to point along +X,
+    // which is exactly the 90 degrees that was reported.
+    it('points a WEAPON-behaviour cone down the nose, which is +Z in the model root', () => {
+        assert.deepEqual(forward, [0, 0, 1]);
+    });
+
+    it('opens the width across the horizontal and the height up the vertical', () => {
+        assert.equal(lateral[1], 0, 'the width spread must not tilt out of the horizontal');
+        assert.deepEqual(up, [0, 1, 0]);
+    });
+
+    it('is a proper rotation, so it cannot mirror the cone', () => {
+        const cross = [
+            forward[1] * lateral[2] - forward[2] * lateral[1],
+            forward[2] * lateral[0] - forward[0] * lateral[2],
+            forward[0] * lateral[1] - forward[1] * lateral[0],
+        ];
+
+        assert.deepEqual(cross, up, 'forward x lateral must be up, as local X x Y is Z');
     });
 });

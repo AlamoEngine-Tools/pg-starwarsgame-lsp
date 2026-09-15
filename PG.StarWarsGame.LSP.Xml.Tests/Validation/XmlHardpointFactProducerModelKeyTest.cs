@@ -300,6 +300,107 @@ public sealed class XmlHardpointFactProducerModelKeyTest
             .Produce(Uri, ParsedXmlDocument.Parse(hpText), index);
     }
 
+    /// <summary>
+    ///     The Gargantuan's shape: the XML writes a truncated collision mesh name and the model carries
+    ///     the full one, so the fix is the one name the model actually has.
+    /// </summary>
+    /// <remarks>
+    ///     All eight Gargantuan hardpoints write <c>..._COL</c> or <c>..._COLL</c> where their models
+    ///     carry <c>..._COLLISION</c> - <c>HP_turret_front_00_COL</c> against
+    ///     <c>HP_turret_front_00_COLLISION</c>. The suggestion is the model's own spelling, verbatim.
+    /// </remarks>
+    [Fact]
+    public void HardpointFileOpen_TruncatedCollisionMesh_SuggestsTheOneMeshTheModelHas()
+    {
+        var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
+            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            GargantuanBones("HP_turret_front_00_COLLISION"));
+
+        var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
+        Assert.Equal("HP_turret_front_00_COLLISION", fact.SuggestedName);
+    }
+
+    /// <summary>
+    ///     From the ATTACHING object's file the diagnostic sits on the hardpoint's id in the
+    ///     <c>HardPoints</c> list, and a quick fix replaces the diagnostic's range - so a suggestion
+    ///     there would overwrite the hardpoint id with a mesh name. Never offered from that side.
+    /// </summary>
+    [Fact]
+    public void AttachingObjectFileOpen_TruncatedCollisionMesh_OffersNoSuggestion()
+    {
+        const string text =
+            """<X><UniqueUnit Name="PALACE"><Space_Model_Name>rv_gargantuan.alo</Space_Model_Name>""" +
+            """<HardPoints>HP_A</HardPoints></UniqueUnit></X>""";
+
+        var facts = Produce(text, new ModelSchema("Space_Model_Name"),
+            GargantuanSource("HP_turret_front_00_COL"), GargantuanBones("HP_turret_front_00_COLLISION"),
+            Sym("PALACE", "UniqueUnit"));
+
+        var fact = Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>());
+        Assert.Null(fact.SuggestedName);
+    }
+
+    /// <summary>Two names starting with what was written is a guess, and a quick fix must not guess.</summary>
+    [Fact]
+    public void HardpointFileOpen_AmbiguousPrefix_OffersNoSuggestion()
+    {
+        var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
+            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            GargantuanBones("HP_turret_front_00_COLLISION", "HP_turret_front_00_COLLISION_B"));
+
+        Assert.Null(Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>()).SuggestedName);
+    }
+
+    /// <summary>
+    ///     Only <c>Collision_Mesh</c>: the truncated-suffix pattern is what was measured, and a prefix
+    ///     of an attachment or decal bone name is not evidence of the same mistake.
+    /// </summary>
+    [Fact]
+    public void HardpointFileOpen_PrefixOnAnotherBoneTag_OffersNoSuggestion()
+    {
+        const string hpText =
+            """<X><HardPoint Name="HP_A"><Model_To_Attach>hp_turret_front_00.alo</Model_To_Attach>""" +
+            """<Damage_Decal>HP_Bl</Damage_Decal></HardPoint></X>""";
+
+        var source = new HardpointTagSource()
+            .With("PALACE", new VariantTag("Space_Model_Name", "rv_gargantuan.alo", "", 0),
+                new VariantTag("HardPoints", "HP_A", "", 0))
+            .With("HP_A", new VariantTag("Model_To_Attach", "hp_turret_front_00.alo", "", 0),
+                new VariantTag("Damage_Decal", "HP_Bl", "", 0));
+
+        var bones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("rv_gargantuan.alo", ["HP_Blast", "Root"])
+            .Add("hp_turret_front_00.alo", ["Root"]);
+
+        var fact = Assert.Single(HardpointFileOpen(hpText, new ModelSchema("Space_Model_Name"), source, bones)
+            .OfType<HardpointBoneNotOnModelFact>());
+        Assert.Null(fact.SuggestedName);
+    }
+
+    private static string GargantuanHardpoint(string collisionMesh)
+    {
+        return """<X><HardPoint Name="HP_A"><Model_To_Attach>hp_turret_front_00.alo</Model_To_Attach>""" +
+               $"<Collision_Mesh>{collisionMesh}</Collision_Mesh></HardPoint></X>";
+    }
+
+    private static HardpointTagSource GargantuanSource(string collisionMesh)
+    {
+        return new HardpointTagSource()
+            .With("PALACE", new VariantTag("Space_Model_Name", "rv_gargantuan.alo", "", 0),
+                new VariantTag("HardPoints", "HP_A", "", 0))
+            .With("HP_A", new VariantTag("Model_To_Attach", "hp_turret_front_00.alo", "", 0),
+                new VariantTag("Collision_Mesh", collisionMesh, "", 0));
+    }
+
+    /// <summary>The hull carries no collision mesh for the turret; the turret's own model does.</summary>
+    private static ImmutableDictionary<string, ImmutableArray<string>> GargantuanBones(
+        params string[] attachedNames)
+    {
+        return ImmutableDictionary<string, ImmutableArray<string>>.Empty
+            .Add("rv_gargantuan.alo", ["HP_turret_front_00_BONE", "Root"])
+            .Add("hp_turret_front_00.alo", ["Root", .. attachedNames]);
+    }
+
     private static IReadOnlyList<XmlFact> Produce(string text, ISchemaProvider schema,
         IVariantTagSource source, ImmutableDictionary<string, ImmutableArray<string>> bones,
         params GameSymbol[] symbols)

@@ -85,6 +85,29 @@ public sealed class NumericRangeHandlerBaseTest
                 XmlHandlerTestFixtures.EmptyCtx));
     }
 
+    /// <summary>
+    ///     The sentence every range in this family ends on, at BOTH bounds.
+    /// </summary>
+    /// <remarks>
+    ///     <c>FireConeDegreesHandler</c> needed a different consequence at each end - its floor is
+    ///     an assert the engine states and its ceiling is arithmetic saturation it says nothing
+    ///     about - so the base grew a hook per bound. These rules all take the default, and this is
+    ///     what stops that change from having quietly reworded thirty messages.
+    /// </remarks>
+    [Theory]
+    [InlineData("angle-degrees-half-turn", "-1")]
+    [InlineData("angle-degrees-half-turn", "181")]
+    [InlineData("positive-value", "0")]
+    [InlineData("below-one", "1")]
+    public void The_default_consequence_is_unchanged_at_both_bounds(string id, string value)
+    {
+        var d = Assert.Single(ById(id).Handle(
+            XmlHandlerTestFixtures.MakeFact(XmlHandlerTestFixtures.MakeTag("T", XmlValueType.Float), value),
+            XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.EndsWith("The engine rejects this value on load", d.Message, StringComparison.Ordinal);
+    }
+
     // The schema refers to these by name; renaming one silently disables every tag using it.
     [Fact]
     public void Validation_ids_are_stable()

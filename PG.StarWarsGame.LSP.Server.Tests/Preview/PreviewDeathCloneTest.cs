@@ -58,6 +58,41 @@ public sealed class PreviewDeathCloneTest
         Assert.Equal("EV_StarDestroyer_D.ALO", Assert.Single(scene.DeathClones).ModelFile);
     }
 
+    /// <summary>
+    ///     The clone's OWN scale, because it is its own object - and the ship's is not the answer.
+    /// </summary>
+    /// <remarks>
+    ///     Measured over 265 ship-to-clone pairs: 59 disagree. The Millennium Falcon is 0.5 and its
+    ///     clone 1.0, so drawing a wreck at its ship's scale is wrong for a real share of the corpus.
+    /// </remarks>
+    [Fact]
+    public void DeathClones_CarryTheClonesOwnScale_NotTheShips()
+    {
+        var scene = Scene(
+            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            tags => tags.With("Wreck",
+                Tag("Space_Model_Name", "falcon_d.alo"), Tag("Scale_Factor", "1.0")),
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Scale_Factor", "0.5"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        Assert.Equal(0.5f, scene.ScaleFactor);
+        Assert.Equal(1f, Assert.Single(scene.DeathClones).ScaleFactor);
+    }
+
+    [Fact]
+    public void DeathClones_DefaultTheirScaleToOne_WhenTheCloneDeclaresNone()
+    {
+        var scene = Scene(
+            [Sym("Ship", "SpaceUnit"), Sym("Wreck", "SpaceUnit")],
+            tags => tags.With("Wreck", Tag("Space_Model_Name", "wreck.alo")),
+            Tag("Space_Model_Name", "hull.alo"),
+            Tag("Scale_Factor", "0.7"),
+            Tag("Death_Clone", "Damage_Normal, Wreck"));
+
+        Assert.Equal(1f, Assert.Single(scene.DeathClones).ScaleFactor);
+    }
+
     [Fact]
     public void DeathClones_ReportACloneThatIsNotDefined()
     {

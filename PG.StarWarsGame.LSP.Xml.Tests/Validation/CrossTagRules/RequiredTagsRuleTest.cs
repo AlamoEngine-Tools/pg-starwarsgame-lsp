@@ -129,6 +129,82 @@ public sealed class RequiredTagsRuleTest
         Assert.Equal(7, Missing(Run("<Leech_Shields_Ability Name='K'></Leech_Shields_Ability>")).Count);
     }
 
+    /// <summary>
+    ///     A WEAPON hardpoint has to declare both fire-cone angles, because the engine's defaults
+    ///     cannot satisfy the check it then makes.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>HardPointDataClass</c>'s constructor leaves <c>FireConeWidth</c> and
+    ///         <c>FireConeHeight</c> at <c>0.0</c>, and <c>Can_Weapon_Point_At</c> asserts both are
+    ///         <c>&gt; 0</c> (<c>HardPoint.cpp:0x741</c> and <c>:0x742</c>) before it does anything
+    ///         else. A weapon hardpoint that declares neither can therefore point at nothing.
+    ///     </para>
+    ///     <para>
+    ///         Gated on the hardpoint's <c>Type</c>, because the asserts sit behind
+    ///         <c>Is_Weapon()</c>: a shield generator or an engine has no business declaring a cone.
+    ///     </para>
+    ///     <para>
+    ///         Measured: 439 <c>HARD_POINT_WEAPON_*</c> definitions across the two trees, ONE of
+    ///         which declares neither - <c>HP_KEDALBE_SHIELD_LEECH_00</c>. The game asserting on its
+    ///         own data is not a veto here.
+    ///     </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("HARD_POINT_WEAPON_LASER")]
+    [InlineData("HARD_POINT_WEAPON_ION_CANNON")]
+    [InlineData("HARD_POINT_WEAPON_MISSILE")]
+    public void A_weapon_hardpoint_without_a_fire_cone_is_reported(string type)
+    {
+        var missing = Missing(Run(
+            $"<HardPoint Name='HP'><Type>{type}</Type></HardPoint>"));
+
+        Assert.Equal(
+            ["Fire_Cone_Width", "Fire_Cone_Height"],
+            missing.Select(f => f.TagName).ToArray());
+    }
+
+    [Fact]
+    public void A_weapon_hardpoint_with_both_angles_is_silent()
+    {
+        Assert.Empty(Missing(Run(
+            "<HardPoint Name='HP'><Type>HARD_POINT_WEAPON_LASER</Type>"
+            + "<Fire_Cone_Width>60</Fire_Cone_Width>"
+            + "<Fire_Cone_Height>30</Fire_Cone_Height></HardPoint>")));
+    }
+
+    /// <summary>Only one of the two is just as broken as neither.</summary>
+    [Fact]
+    public void A_weapon_hardpoint_with_only_one_angle_is_reported_for_the_other()
+    {
+        var missing = Missing(Run(
+            "<HardPoint Name='HP'><Type>HARD_POINT_WEAPON_LASER</Type>"
+            + "<Fire_Cone_Width>60</Fire_Cone_Width></HardPoint>"));
+
+        Assert.Equal("Fire_Cone_Height", Assert.Single(missing).TagName);
+    }
+
+    /// <summary>
+    ///     The gate: the asserts sit behind <c>Is_Weapon()</c>, so a hardpoint that is not one is
+    ///     not this rule's business however little it declares.
+    /// </summary>
+    [Theory]
+    [InlineData("HARD_POINT_SHIELD_GENERATOR")]
+    [InlineData("HARD_POINT_ENGINE")]
+    [InlineData("HARD_POINT_FIGHTER_BAY")]
+    [InlineData("HARD_POINT_DUMMY_ART")]
+    public void A_non_weapon_hardpoint_needs_no_fire_cone(string type)
+    {
+        Assert.Empty(Missing(Run($"<HardPoint Name='HP'><Type>{type}</Type></HardPoint>")));
+    }
+
+    /// <summary>A hardpoint that names no type at all cannot be judged either way.</summary>
+    [Fact]
+    public void A_hardpoint_with_no_type_is_left_alone()
+    {
+        Assert.Empty(Missing(Run("<HardPoint Name='HP'></HardPoint>")));
+    }
+
     private static IReadOnlyList<MissingRequiredTagFact> Missing(IEnumerable<XmlFact> facts)
     {
         return facts.OfType<MissingRequiredTagFact>().ToList();

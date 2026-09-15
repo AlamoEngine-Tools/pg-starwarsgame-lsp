@@ -261,7 +261,19 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // check would report every one of them.
         // Keyed on (owner, tag) because Bomb_Type is declared on three ability types and only
         // RemoteBombAbility asserts this - attribution follows the xref, never the schema.
-        const int expectedHandlerCount = 146;
+        // 146 -> 147: FireConeDegreesHandler added - a weapon hardpoint's Fire_Cone_Width and
+        // Fire_Cone_Height, opted into per tag on HardPoint. Its own handler rather than the
+        // existing angle-degrees-full-turn because the two differ at the floor: that rule admits
+        // zero and this one cannot. HardPointClass::Can_Weapon_Point_At asserts both angles are
+        // > 0.0f (HardPoint.cpp:1857 and :1858) above the branch, and the non-turret branch then
+        // tests cone / 2.0 against the bearing, so a cone of zero points at nothing.
+        // The ceiling is INFERRED, not stated: the halved cone is compared against a deviation that
+        // cannot exceed 180 degrees, so 360 already passes everywhere and more is inert. That
+        // asymmetry is why NumericRangeHandlerBase now carries a consequence per bound - saying
+        // "the engine rejects this" about the upper end would state an inference as a fact.
+        // Measured: 866 cone values across eaw/ and foc/, none <= 0, two > 360 - HP_MC30_LASER_00
+        // at 364.0 and HP_Gargantuan_Small_Turret_Front_Left at 450.0 beside three siblings at 45.0.
+        const int expectedHandlerCount = 147;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

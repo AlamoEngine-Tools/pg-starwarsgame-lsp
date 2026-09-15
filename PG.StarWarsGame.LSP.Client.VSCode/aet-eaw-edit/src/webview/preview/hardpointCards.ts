@@ -239,7 +239,8 @@ export function muzzleLabel(index: number): string {
  * five hardpoints of that is a wall of prose nobody reads a number out of.
  *
  * Pairs, not an object, because the ORDER is part of it: reach first because it is the number most
- * often being checked, then the shape of the cone, then how fast it fires, then what it fires.
+ * often being checked, then the shape of the cone, then how fast it fires, then what a shot does
+ * and where it lands, then what it fires.
  */
 export function weaponFacts(weapon: WeaponRow): [string, string][] {
     const rows: [string, string | null][] = [
@@ -247,6 +248,9 @@ export function weaponFacts(weapon: WeaponRow): [string, string][] {
         ['Cone', weapon.cone],
         ['Cadence', weapon.cadence],
         ['Damage', weapon.damage],
+        // Under Damage rather than beside Cone: it is about where a shot LANDS, which is the same
+        // question as how much it does, and not about where the weapon may point.
+        ['Spread', weapon.inaccuracy],
         ['Projectile', weapon.projectileId],
         ['Fires when', weapon.fireModes.length > 0 ? weapon.fireModes.join(', ') : null],
     ];

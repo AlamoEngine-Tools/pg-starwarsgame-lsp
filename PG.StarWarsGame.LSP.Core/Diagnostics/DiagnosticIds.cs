@@ -227,6 +227,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId RequiredFirstListEntry = new(DiagnosticGroup.Values, 74);
 
     /// <summary>
+    ///     A weapon hardpoint's fire cone outside the span the engine can act on. Its own id rather
+    ///     than sharing <see cref="AngleOutsideFullTurn" />: that rule admits zero and this one
+    ///     cannot, because the engine asserts the cone is strictly greater than it.
+    /// </summary>
+    public static readonly DiagnosticId FireConeOutsideFullTurn = new(DiagnosticGroup.Values, 75);
+
+    /// <summary>
     ///     A tag spelled in a casing its own parser will not accept. Rare by design: nearly every
     ///     tag is case-insensitive, and the exceptions are the ones with a hand-rolled parser.
     /// </summary>
@@ -570,23 +577,24 @@ public static class DiagnosticIds
         new(DiagnosticGroup.Preview, 20);
 
     /// <summary>
-    ///     A destroyable hardpoint whose <c>Collision_Mesh</c> names nothing the model has, so no
-    ///     shot can ever reach it and the unit can never be finished through its hardpoints.
+    ///     A destroyable hardpoint with NO <c>Collision_Mesh</c>, so no shot can ever reach it and the
+    ///     unit can never be finished through its hardpoints.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///         Damage is routed by the collision mesh a projectile struck, matched with
-    ///         <c>_stricmp</c> - exact but case-insensitive. A value matching nothing behaves exactly
-    ///         like an absent one: every shot meant for that hardpoint lands on the hull instead, the
-    ///         hardpoint never dies, and the all-destroyed branch - which counts by
-    ///         <c>Is_Destroyable</c> and never asks whether a hardpoint was reachable - can never
-    ///         complete.
+    ///         <c>GameObjectClass::Take_Damage</c> finds a hardpoint by name, an exact
+    ///         <c>_stricmp</c> against each <c>Collision_Mesh</c>. An empty name fails the size check
+    ///         before that lookup (<c>00973ad9</c>) whether or not the hit was aimed, so the hardpoint
+    ///         never dies and the all-destroyed branch - which counts by <c>Is_Destroyable</c> and never
+    ///         asks whether a hardpoint was reachable - can never complete.
     ///     </para>
     ///     <para>
-    ///         The value may name a MESH or a BONE: vanilla points <c>Collision_Mesh</c> at the
-    ///         hardpoint's own <c>Attachment_Bone</c> 22 times in foc and 6 in eaw, so the check is
-    ///         against the union of both. Not reported where the object does not die with its
-    ///         hardpoints - the palace keeps its generators as scenery on purpose.
+    ///         A value the MODEL lacks is NOT this. <c>Take_Damage</c> replaces the name with the
+    ///         hardpoint's own value when the hit is aimed at it, so aimed fire still lands. That case
+    ///         once shared this id, as an error; it is reported by
+    ///         <see cref="HardpointBoneNotOnModel" /> instead, as a warning. Not reported where the
+    ///         object does not die with its hardpoints - the palace keeps its generators as scenery on
+    ///         purpose.
     ///     </para>
     /// </remarks>
     public static readonly DiagnosticId PreviewHardpointUnreachable =

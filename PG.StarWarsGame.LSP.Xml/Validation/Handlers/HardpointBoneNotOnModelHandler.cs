@@ -13,6 +13,9 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 /// </summary>
 public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<HardpointBoneNotOnModelFact>
 {
+    /// <summary>The one tag that may name a mesh as well as a bone, and whose mismatch has a cost to state.</summary>
+    private const string CollisionMeshTag = "Collision_Mesh";
+
     /// <inheritdoc />
     public override DiagnosticId? DefaultId => DiagnosticIds.HardpointBoneNotOnModel;
 
@@ -30,10 +33,34 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
             ? string.Empty
             : $", nor on '{fact.AttachedModelName}', the hardpoint's own Model_To_Attach";
 
+        if (!string.Equals(fact.TagName, CollisionMeshTag, StringComparison.OrdinalIgnoreCase))
+        {
+            return
+            [
+                new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+                    $"<{fact.TagName}> names bone '{fact.BoneName}', which does not exist on {owner}{also}.")
+            ];
+        }
+
+        // Collision_Mesh says what the mismatch COSTS, because the obvious reading - nothing can hit
+        // the hardpoint - is wrong. GameObjectClass::Take_Damage replaces the name it looks a hardpoint
+        // up by with the hardpoint's OWN Collision_Mesh when a hit is aimed at it, and on land with the
+        // nearest live targetable hardpoint's (Find_Closest_Hard_Point, SUB_GAME_MODE_LAND); the exact
+        // _stricmp then matches that value against itself. So aimed fire and land projectiles land: the
+        // Gargantuan's eight hardpoints all write such a name and still die. Only untargeted space fire
+        // is looked up by the struck renderable's name, and that is always a mesh name
+        // (alRenderableMesh::Get_Name, vtable slot 0x18) - a name on no model never comes back.
+        //
+        // "Does not exist" is kept on purpose: the hardpoint E2E smoke test keys on it.
+        var message = $"<{fact.TagName}> names '{fact.BoneName}', which does not exist as a mesh or a bone "
+                      + $"on {owner}{also}. Aimed fire and land projectiles still reach it; untargeted "
+                      + "space fire never does.";
+
         return
         [
-            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
-                $"<{fact.TagName}> names bone '{fact.BoneName}', which does not exist on {owner}{also}.")
+            new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning, message,
+                SuggestedFix: fact.SuggestedName,
+                FixTitle: fact.SuggestedName is null ? null : $"Use the model's mesh '{fact.SuggestedName}'")
         ];
     }
 }

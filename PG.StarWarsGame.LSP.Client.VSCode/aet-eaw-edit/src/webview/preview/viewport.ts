@@ -19,7 +19,7 @@ import type { AlamoParticleContent, PreviewSpinAway } from '../../protocol/model
 import { spinAwayPose } from './spinAway';
 import type { NormalisedColour } from './colour';
 import { attachmentProblem, type AttachmentRequest } from './attachments';
-import { drawnConeRange, fireConeOutline, fireConeSurface } from './fireArc';
+import { drawnConeRange, fireConeOutline, fireConeSurface, hullFrameBasis } from './fireArc';
 import type { FxMaterialState } from './fx/renderState';
 import { costByLevel, definedLevels, proxyVisibleAt, type DefinedLevels, type LevelCost,
     type LevelTagged } from './levels';
@@ -47,6 +47,11 @@ import { breakoffLifetime, breakoffPose, type BreakoffAnchor } from './breakoff'
 import type { PreviewBreakoffProp } from '../../protocol/modelPreview';
 import { sweepAngles } from './deathClone';
 import type { PreviewTurret } from '../../protocol/modelPreview';
+import {
+    TURRET_AT_REST, dragToAim, type TurretAim, type TurretAxis, type TurretAxisRange,
+    type TurretHandle,
+} from './turretHandles';
+import { knobPoint, stopTicks, trackRadius, trackSegments } from './turretTrack';
 import { type Inspection } from './inspector';
 import { emissionMeshFor } from './emissionSource';
 import { billboardLocalRotation, billboardRotation, billboardTypeOf } from './billboards';
@@ -122,6 +127,142 @@ const FIRE_ARC_OUTLINE_MATERIAL = new THREE.LineBasicMaterial({
     opacity: 0.55,
     depthWrite: false,
 });
+
+/**
+ * The BARREL's envelope, where a turret hardpoint keeps one the shot does not share.
+ *
+ * The same hue at a lower weight, not a second colour. Both envelopes belong to one weapon, and
+ * giving the second its own hue would read as a second gun rather than as a second limit on the
+ * first. It sits INSIDE the firing envelope in pitch and exactly on it in yaw, so what the reader
+ * sees is the fire arc with a narrower band drawn through it - which is the relationship.
+ */
+const ROTATION_ARC_MATERIAL = new THREE.MeshBasicMaterial({
+    color: 0xff9d3c,
+    transparent: true,
+    opacity: 0.03,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+});
+
+/** Dashed would be better still; at these lengths a lighter line reads more cleanly than a dash. */
+const ROTATION_ARC_OUTLINE_MATERIAL = new THREE.LineBasicMaterial({
+    color: 0xffc98a,
+    transparent: true,
+    opacity: 0.3,
+    depthWrite: false,
+});
+
+/**
+ * The turret handle's track, and the knob that rides it.
+ *
+ * Cool against the arcs' warm orange, because they are answers to different questions sitting in
+ * the same space: the arc is where the weapon may SHOOT and the track is where the bone may TURN.
+ * Drawn over everything - a manipulator you cannot see behind the hull is one you cannot grab - and
+ * with no depth write, so it never occludes the model it is attached to.
+ */
+const TURRET_TRACK_MATERIAL = new THREE.LineBasicMaterial({
+    color: 0x5ec8e0,
+    transparent: true,
+    opacity: 0.5,
+    depthTest: false,
+    depthWrite: false,
+});
+
+/** The track under the pointer, brightened. Hover highlights the axis; it does not gate it. */
+const TURRET_TRACK_HOVER_MATERIAL = new THREE.LineBasicMaterial({
+    color: 0x9fe8ff,
+    transparent: true,
+    opacity: 1,
+    depthTest: false,
+    depthWrite: false,
+});
+
+/** The end stops, at full strength: the whole point of a stop is that it reads as a limit. */
+const TURRET_STOP_MATERIAL = new THREE.LineBasicMaterial({
+    color: 0x5ec8e0,
+    transparent: true,
+    opacity: 0.95,
+    depthTest: false,
+    depthWrite: false,
+});
+
+const TURRET_KNOB_MATERIAL = new THREE.MeshBasicMaterial({
+    color: 0x5ec8e0,
+    transparent: true,
+    opacity: 0.9,
+    depthTest: false,
+    depthWrite: false,
+});
+
+const TURRET_KNOB_HOVER_MATERIAL = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    depthTest: false,
+    depthWrite: false,
+});
+
+/** Enough to read a 45-degree arc as a curve; a full ring gets the same step. */
+const TURRET_TRACK_SEGMENTS = 48;
+
+/** The knob, and the stop ticks, as a fraction of the track radius. */
+const TURRET_KNOB_FRACTION = 0.08;
+const TURRET_STOP_TICK_FRACTION = 0.18;
+
+/** How far a drag turns the turret. A degree every two pixels is a full sweep across a wide panel. */
+const TURRET_DEGREES_PER_PIXEL = 0.5;
+
+/** How near the pointer has to be to a knob to take it. The joints' own threshold. */
+const TURRET_KNOB_PICK_RADIUS = 14;
+
+/** Over the arcs, which are already over the hull. A manipulator is the frontmost thing there is. */
+const TURRET_HANDLE_RENDER_ORDER = 3;
+
+/** The two axes, in the order a reader meets them: traverse first, then elevation. */
+const TURRET_AXES: readonly TurretAxis[] = ['yaw', 'pitch'];
+
+/** One axis of one handle: its track, its stops, its knob, and the range it was built for. */
+interface TurretHandleParts {
+    /**
+     * The frame the axis is MEASURED against, which the track hangs on - never the bone that moves.
+     *
+     * A sibling of `bone`, re-placed every frame from the bone's position and REST orientation. The
+     * track used to hang on the moving bone itself, so a turret yawed 40 degrees carried its own stop
+     * ticks round by 40 - an indicator of how far it may go that moved every time it went anywhere -
+     * and the knob, placed at the aim inside that already-turned track, showed 80. See
+     * `placeTurretAnchors`.
+     */
+    anchor: THREE.Object3D;
+    /** The bone this axis turns: the turret for yaw, the barrel - or the turret again - for pitch. */
+    bone: THREE.Object3D;
+    /**
+     * A pitch track on a bone that ALSO carries the yaw, which has to swing round by that yaw
+     * explicitly. Decided once, when the handle is built. See `placeTurretAnchor`.
+     */
+    followsYaw: boolean;
+    track: THREE.LineSegments;
+    stops: THREE.LineSegments;
+    knob: THREE.Mesh;
+    radius: number;
+    range: TurretAxisRange;
+}
+
+/** A flat `[x, y, z, ...]` buffer as a geometry, which is all any of these lines need. */
+function positionGeometry(positions: readonly number[]): THREE.BufferGeometry {
+    const geometry = new THREE.BufferGeometry();
+
+    geometry.setAttribute(
+        'position', new THREE.Float32BufferAttribute(Float32Array.from(positions), 3));
+
+    return geometry;
+}
+
+/** Takes one handle off the model and frees what it owns. The materials are shared and are not. */
+function disposeTurretHandle(parts: TurretHandleParts): void {
+    // The ANCHOR is what hangs on the model; the track goes with it.
+    parts.anchor.removeFromParent();
+    parts.track.geometry.dispose();
+    parts.stops.geometry.dispose();
+    parts.knob.geometry.dispose();
+}
 
 /**
  * A cone from a fire bone's origin out to its range: a faint fill inside a drawn outline.
@@ -337,6 +478,14 @@ export interface AddPartOptions {
      * of it - so it captures where its hardpoint WAS and is placed there under the model root.
      */
     pose?: { position: THREE.Vector3; quaternion: THREE.Quaternion };
+    /**
+     * The model's OWN render scale, for a part that is its own object - a death clone.
+     *
+     * Such a part is placed beside the subject's scaled geometry, not inside it, and carries this
+     * instead: it is spawned as a separate object, so the engine draws it at its own
+     * `Scale_Factor` and nothing relates that to the ship's.
+     */
+    scale?: number;
 }
 
 /**
@@ -576,6 +725,36 @@ export class PreviewViewport {
     private readonly parts = new Map<string, LoadedPart>();
     private readonly modelRoot = new THREE.Group();
 
+    /**
+     * The subject's GEOMETRY, carrying the object's `Scale_Factor`.
+     *
+     * Between `modelRoot` and the parts rather than on `modelRoot` itself, and the split is the
+     * engine's own. `GameObjectClass::Update_Transform` puts no scale in the object's world matrix
+     * and then calls `Model->Set_Scale`, so the scale belongs to the MODEL: geometry and bones are
+     * model units and reach the world multiplied by it, while positions - and every range the XML
+     * declares - are already world units.
+     *
+     * What that buys is that the things which must NOT scale stay on `modelRoot` and need no
+     * correction at all:
+     *
+     * - **particle systems**, whose own scale is the `<Particle>` object's, not the ship's. The
+     *   engine divides the parent's out explicitly - `Attach_To_Other_Game_Object` builds
+     *   `Scale(child / parent) * Translate(offset)` - so an attached effect ends at its own scale
+     *   while its POSITION still rides the scaled bone. A root-level scale would also have been
+     *   unfixable here: `frameOf` overwrites the instance root's matrix every frame.
+     * - **breakoff wrecks**, posed at a world position they captured themselves, whose drift is a
+     *   per-frame world velocity.
+     * - **hull-frame fire arcs**, which take their position from a bone and their length from a
+     *   world range.
+     *
+     * Only what is parented INSIDE this node and must stay a world length needs undoing: the
+     * bone-frame arcs and the turret handles, both of which counter-scale by `1 / scale`.
+     */
+    private readonly scaledRoot = new THREE.Group();
+
+    /** The subject's `Scale_Factor`, or 1. Read by everything that counter-scales. */
+    private modelScale = 1;
+
     /** Effects that translated, by lower-cased shader name. */
     private readonly translated = new Map<string, TranslatedEffect>();
 
@@ -796,6 +975,31 @@ export class PreviewViewport {
     }[] = [];
     private sweepPhase = 0;
 
+    /**
+     * The turrets the reader can drag, and where each one is currently pointed.
+     *
+     * The aim is held HERE rather than in the shell because it is the pose of a bone: a re-render
+     * that cleared it would snap every turret back to rest mid-drag. The shell is told about it
+     * through {@link onTurretAimed} so the row can read it out, which is a copy for display and
+     * never the source.
+     */
+    private turretHandles: TurretHandle[] = [];
+    private readonly turretAims = new Map<string, TurretAim>();
+
+    /** The knob under the pointer, and the one being dragged. At most one of each. */
+    private hoveredTurretAxis: { id: string; axis: TurretAxis } | null = null;
+    private turretDrag: {
+        id: string; axis: TurretAxis; startAim: TurretAim; startX: number; startY: number;
+    } | null = null;
+
+    /** The drawn handles, so they can be rebuilt or repositioned without a scene walk. */
+    private readonly turretHandleNodes = new Map<string, {
+        yaw: TurretHandleParts; pitch: TurretHandleParts;
+    }>();
+
+    /** Raised when a turret is dragged, so the row can read out where it now points. */
+    onTurretAimed: ((id: string, aim: TurretAim) => void) | null = null;
+
     /** Raised when a joint is clicked, so the tree can follow the viewport. */
     onBoneSelected: ((index: number | null) => void) | null = null;
 
@@ -914,6 +1118,20 @@ export class PreviewViewport {
 
     /** Firing-arc gizmos, attached to their fire bones so they follow the turret. */
     private readonly arcs: THREE.Mesh[] = [];
+
+    /**
+     * The HULL-frame arcs and the muzzle each one belongs to, re-placed every frame.
+     *
+     * A bone-frame arc is a child of its bone and follows it for free. A hull-frame one cannot be:
+     * it takes its orientation from the hull's facing, so it lives on the model root - and a copy of
+     * the muzzle's position taken when the arc was built goes stale the moment a clip moves the bone.
+     * The X-Wing's deploy carries its MuzzleA bones 3.4 units, and the cones stayed behind. The
+     * engine reads the muzzle fresh on every check, so this does too.
+     */
+    private readonly hullArcs: { mesh: THREE.Mesh; muzzle: THREE.Object3D }[] = [];
+
+    /** Scratch for {@link followHullArcs}, which runs every frame and should not allocate. */
+    private readonly muzzleScratch = new THREE.Vector3();
     private arcsVisible = false;
 
     /**
@@ -962,6 +1180,7 @@ export class PreviewViewport {
         this.controls.addEventListener('start', () => this.onCameraMoved?.());
 
         this.scene.background = new THREE.Color(VIEWPORT_BACKGROUND);
+        this.modelRoot.add(this.scaledRoot);
         this.scene.add(this.modelRoot);
         this.addLighting();
 
@@ -1068,7 +1287,14 @@ export class PreviewViewport {
         this.jointLines.frustumCulled = false;
         this.scene.add(this.joints, this.jointLines);
 
-        canvas.addEventListener('pointerdown', this.onPointerDown);
+        // CAPTURE phase, so a grabbed turret knob is claimed before `OrbitControls` - registered on
+        // this canvas above - can start an orbit. See the grab branch of `onPointerDown`.
+        canvas.addEventListener('pointerdown', this.onPointerDown, { capture: true });
+        canvas.addEventListener('pointermove', this.onPointerMove);
+        // On the WINDOW, not the canvas: a drag that leaves the canvas must still end, and a
+        // release outside it is the ordinary way a fast drag finishes.
+        window.addEventListener('pointerup', this.onPointerUp);
+        window.addEventListener('pointercancel', this.onPointerUp);
 
         this.resize();
         this.loop();
@@ -1465,14 +1691,32 @@ export class PreviewViewport {
             }
         });
 
-        // A posed part is placed under the model root at a world transform it captured itself.
-        const parent = options.pose === undefined
-            ? this.attachmentFor(attachToPartId, attachBone)
-            : this.modelRoot;
+        // A posed part is placed under the model root at a world transform it captured itself -
+        // and stays OUTSIDE the scale, because a wreck is its own object with its own scale and
+        // its drift is a world velocity. An unattached part of the ACTIVE subject is the hull,
+        // which is the geometry the scale is for; an attached one inherits it through the bone it
+        // hangs on, which is right because a hardpoint declares no scale of its own - 0 shipped
+        // hardpoints do.
+        //
+        // An unattached PASSIVE part - a death clone - is neither. It is spawned as its own object,
+        // so it goes beside the scaled geometry and carries its OWN scale. It used to fall through
+        // to the hull's branch and take the SHIP's, which is wrong for 59 of 265 shipped pairs.
+        const parent = options.pose !== undefined
+            ? this.modelRoot
+            : attachToPartId !== undefined
+                ? this.attachmentFor(attachToPartId, attachBone)
+                : passive
+                    ? this.modelRoot
+                    : this.scaledRoot;
+
+        if (options.scale !== undefined && Number.isFinite(options.scale) && options.scale > 0) {
+            root.scale.setScalar(options.scale);
+        }
 
         // A part attached to a BONE of another part is already inside that part's Z-up-to-Y-up
         // correction, so its own copy would apply the rotation twice - see `cancelRootCorrection`.
-        // The hull goes under the model root, which is uncorrected, and keeps its own.
+        // The hull goes under the scaled geometry node, which - like the model root above it - is
+        // uncorrected, and keeps its own.
         //
         // A posed part is in the same position for the same reason: the world transform it copies
         // ALREADY contains the correction of the part it was taken from, so its own copy is the
@@ -2278,7 +2522,7 @@ export class PreviewViewport {
         // on its own: the billboards were still being handed model materials, and still turning up
         // in the mesh list as if they were geometry.
         const walk = (node: THREE.Object3D): void => {
-            if (node.userData.aetParticleSystem === true) {
+            if (node.userData.aetParticleSystem === true || isOverlay(node)) {
                 return;
             }
 
@@ -2504,6 +2748,13 @@ export class PreviewViewport {
         }
 
         this.clearFireArcs();
+        this.clearTurretHandles();
+
+        // The scale belongs to the SUBJECT. Left standing, the next one would be drawn at the last
+        // one's - and a 0.5 ship followed by a 2.0 one is a four-fold error that looks like a
+        // broken model rather than stale state.
+        this.modelScale = 1;
+        this.scaledRoot.scale.setScalar(1);
 
         // A new subject asks for its own bones. Keeping the old subject's requests would report a
         // Star Destroyer's missing hardpoint against a Mon Calamari Cruiser for the rest of the session.
@@ -2600,6 +2851,52 @@ export class PreviewViewport {
     }
 
     /**
+     * Puts the subject's geometry at the size the game draws it.
+     *
+     * See {@link scaledRoot} for why this is one node down rather than on the model root. Anything
+     * already drawn is rebuilt, because the two gizmos that counter-scale were built against the
+     * old value.
+     */
+    setModelScale(scale: number): void {
+        const next = Number.isFinite(scale) && scale > 0 ? scale : 1;
+
+        if (next === this.modelScale) {
+            return;
+        }
+
+        this.modelScale = next;
+        this.scaledRoot.scale.setScalar(next);
+
+        // The span is measured off world matrices, so it changes with the scale - and everything
+        // sized against the subject reads it.
+        this.cachedSpan = null;
+
+        for (const arc of this.arcs) {
+            this.applyArcScale(arc);
+        }
+
+        for (const nodes of this.turretHandleNodes.values()) {
+            nodes.yaw.track.scale.setScalar(1 / next);
+            nodes.pitch.track.scale.setScalar(1 / next);
+        }
+
+        this.applyClipPlanes(this.boundingSphere(), this.fitDistance);
+    }
+
+    /**
+     * Undoes the geometry scale on an arc that lives inside it.
+     *
+     * A bone-frame arc hangs on a bone of the scaled model, so it would be drawn at `range * scale`
+     * - and a range is already a world distance. A hull-frame one is a child of the unscaled model
+     * root and needs nothing.
+     */
+    private applyArcScale(arc: THREE.Mesh): void {
+        const inside = arc.userData.aetArcFrame === 'bone';
+
+        arc.scale.setScalar(inside ? 1 / this.modelScale : 1);
+    }
+
+    /**
      * Draws the firing arcs, replacing whatever was there.
      *
      * Off by default, and for good reason: a Star Destroyer's arcs reach 2000 units on a hull about
@@ -2609,6 +2906,8 @@ export class PreviewViewport {
         arcs: readonly {
             partId: string;
             bone: string;
+            frame: 'bone' | 'hull';
+            kind: 'fire' | 'rotation';
             widthDegrees: number;
             heightDegrees: number;
             range: number;
@@ -2621,22 +2920,76 @@ export class PreviewViewport {
         const modelSize = this.modelSpan();
 
         for (const arc of arcs) {
-            const parent = this.fireBoneAttachment(arc.partId, arc.bone);
+            const boneNode = this.fireBoneAttachment(arc.partId, arc.bone);
             const drawn = {
                 ...arc,
                 range: drawnConeRange(
                     arc.range, modelSize, arc.widthDegrees, arc.heightDegrees),
             };
-            const mesh = new THREE.Mesh(coneGeometry(drawn), FIRE_ARC_MATERIAL.clone());
+            // Two envelopes, told apart by weight rather than by hue: they describe the SAME
+            // weapon, and a second colour would read as a second weapon. The solid one is where it
+            // may shoot; the lighter one is where the barrel may point.
+            const rotation = arc.kind === 'rotation';
+            const mesh = new THREE.Mesh(
+                coneGeometry(drawn),
+                (rotation ? ROTATION_ARC_MATERIAL : FIRE_ARC_MATERIAL).clone());
+
+            // Which frame the arc is measured in is the engine's choice, not ours, and the two
+            // firing paths disagree:
+            //
+            //   bone - HardPointClass::Can_Weapon_Point_At measures in the hardpoint's OWN
+            //          coordinate system, so the bone's rotation IS the aim and parenting to it is
+            //          exactly right.
+            //   hull - WeaponBehaviorClass::Is_In_Cone_Of_Fire reads the muzzle matrix for its
+            //          TRANSLATION and then discards the rotation, rebuilding the frame from
+            //          owner->Get_Facing(). The arc starts at the bone and points where the HULL
+            //          points, so a rotated MuzzleA must not carry it round.
+            //
+            // Parenting to the model root and placing the mesh at the bone's position in that space
+            // gives exactly that: the bone supplies the origin, and the HULL'S FACING supplies the
+            // orientation. Not the root's raw axes - the nose is +Z there, and the cone is built
+            // along +X. See `hullFrameBasis`.
+            const parent = arc.frame === 'hull' ? this.modelRoot : boneNode;
+
+            if (arc.frame === 'hull') {
+                boneNode.updateWorldMatrix(true, false);
+                this.modelRoot.updateWorldMatrix(true, false);
+                mesh.position.copy(
+                    this.modelRoot.worldToLocal(
+                        boneNode.getWorldPosition(new THREE.Vector3())));
+
+                // And the HULL's facing, not the root's raw axes. The cone is built along +X for a
+                // fire bone; the hull's nose is +Z here. Leaving this out is what put every
+                // WEAPON-behaviour arc a quarter turn off. See `hullFrameBasis`.
+                const [forward, lateral, up] = hullFrameBasis();
+                mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+                    new THREE.Vector3(...forward),
+                    new THREE.Vector3(...lateral),
+                    new THREE.Vector3(...up)));
+
+                // The position above is only the starting point; `followHullArcs` keeps it on the
+                // muzzle once a clip starts moving the bone.
+                this.hullArcs.push({ mesh, muzzle: boneNode });
+            }
 
             mesh.visible = this.arcsVisible;
             // The gizmo is a hint, not geometry: it must never occlude the hull it describes.
             mesh.renderOrder = 1;
 
+            // A range is a WORLD distance, so an arc parented inside the scaled geometry has to
+            // undo that scale. Recorded on the mesh so a later `setModelScale` can redo it without
+            // rebuilding every cone.
+            mesh.userData.aetArcFrame = arc.frame;
+            // Not the model. A hardpoint arc hangs on a fire bone inside the hull, where every walk
+            // over the model's meshes reaches it - see `isOverlay`.
+            mesh.userData.aetOverlay = true;
+            this.applyArcScale(mesh);
+
             // A CHILD of the fill, so one visible flag governs both and an outline can never be
             // left burning over an arc that has been switched off.
             const outline = new THREE.LineSegments(
-                coneOutlineGeometry(drawn), FIRE_ARC_OUTLINE_MATERIAL.clone());
+                coneOutlineGeometry(drawn),
+                (rotation ? ROTATION_ARC_OUTLINE_MATERIAL : FIRE_ARC_OUTLINE_MATERIAL).clone());
             outline.renderOrder = 2;
             mesh.add(outline);
 
@@ -2688,6 +3041,31 @@ export class PreviewViewport {
         }
 
         this.arcs.length = 0;
+        // The meshes are gone, and the muzzles may be about to be: a stale entry here would keep
+        // a disposed bone alive and place a removed cone every frame.
+        this.hullArcs.length = 0;
+    }
+
+    /**
+     * Puts every hull-frame arc back on its muzzle, after the clip has moved the bones this frame.
+     *
+     * Position only. The orientation is the hull's facing, set once when the arc was built, and a
+     * wing that rotates as it deploys must not carry the cone round with it - the engine discards
+     * the muzzle's rotation too.
+     */
+    private followHullArcs(): void {
+        if (this.hullArcs.length === 0) {
+            return;
+        }
+
+        this.modelRoot.updateWorldMatrix(true, false);
+
+        for (const { mesh, muzzle } of this.hullArcs) {
+            // Fresh, because the mixer has moved the bone but world matrices are only recomputed at
+            // render time.
+            muzzle.updateWorldMatrix(true, false);
+            mesh.position.copy(this.modelRoot.worldToLocal(muzzle.getWorldPosition(this.muzzleScratch)));
+        }
     }
 
     /**
@@ -2763,6 +3141,276 @@ export class PreviewViewport {
     }
 
     /**
+     * Puts drag handles on the turrets whose arcs are shown, and takes them off the rest.
+     *
+     * Two axes and no third: the engine has no roll on a turret -
+     * `Calculate_Desired_Turret_Angle` returns `Vector3(0.0, pitch, yaw)` with X a literal zero.
+     *
+     * Each track spans only what the engine allows, so the stop is visible before it is reached.
+     * Which turrets these are is {@link turretHandles}' decision, off the arc toggle, and not this
+     * class's.
+     */
+    setTurretHandles(handles: readonly TurretHandle[]): void {
+        this.turretHandles = [...handles];
+
+        const wanted = new Set(handles.map(handle => handle.id));
+
+        for (const [id, nodes] of [...this.turretHandleNodes]) {
+            if (!wanted.has(id)) {
+                disposeTurretHandle(nodes.yaw);
+                disposeTurretHandle(nodes.pitch);
+                this.turretHandleNodes.delete(id);
+            }
+        }
+
+        // The aim OUTLIVES the handle being taken off and put back: switching an arc off and on
+        // again is not a request to re-centre a turret the reader deliberately pointed somewhere.
+        // Same rule the arc toggles already follow. A SUBJECT SWITCH is the case where the aims
+        // really should go, and `clearTurretHandles` is where that happens.
+        if (handles.length === 0) {
+            this.hoveredTurretAxis = null;
+            this.turretDrag = null;
+        }
+
+        const radius = trackRadius(this.modelSpan());
+
+        for (const handle of handles) {
+            if (this.turretHandleNodes.has(handle.id)) {
+                continue;
+            }
+
+            const yawBone = this.turretBoneNode(handle.partId, handle.turretBone);
+            // The barrel carries elevation when the model separates the two; 2 of 19 do not, and
+            // then one bone does both - exactly as the sweep already handles it.
+            const pitchBone = handle.barrelBone === null
+                ? yawBone
+                : this.turretBoneNode(handle.partId, handle.barrelBone) ?? yawBone;
+
+            if (yawBone === undefined || pitchBone === undefined) {
+                continue;
+            }
+
+            this.turretHandleNodes.set(handle.id, {
+                yaw: this.buildTurretHandle(handle, 'yaw', yawBone, radius),
+                // One bone doing both - the model names no barrel, or names one it does not carry -
+                // so the pitch track has to follow the yaw itself. With a barrel, the hierarchy
+                // carries it.
+                pitch: this.buildTurretHandle(
+                    handle, 'pitch', pitchBone, radius, pitchBone === yawBone),
+            });
+        }
+
+        this.applyTurretAims();
+    }
+
+    /** Where the reader has pointed each turret, for the shell to read back out. */
+    turretAim(id: string): TurretAim {
+        return this.turretAims.get(id) ?? TURRET_AT_REST;
+    }
+
+    /**
+     * Everything this class holds about turrets, for a SUBJECT SWITCH.
+     *
+     * A handle's track is parented to a bone of the part about to be disposed, and its aim is a
+     * pose for a bone the next subject does not have. `setTurretHandles([])` alone would not do:
+     * that keeps the aims on purpose, so switching an arc off and on again does not re-centre a
+     * turret the reader deliberately pointed somewhere. A new subject is the case where they SHOULD
+     * go - the same distinction `clear()` already draws for the fading particles.
+     */
+    private clearTurretHandles(): void {
+        for (const nodes of this.turretHandleNodes.values()) {
+            disposeTurretHandle(nodes.yaw);
+            disposeTurretHandle(nodes.pitch);
+        }
+
+        this.turretHandleNodes.clear();
+        this.turretHandles = [];
+        this.turretAims.clear();
+        this.hoveredTurretAxis = null;
+        this.turretDrag = null;
+    }
+
+    /**
+     * Puts one turret back where the model authored it.
+     *
+     * Needed because releasing a drag deliberately does NOT spring back - a handle that reset
+     * itself would be a momentary readout rather than a control - so there has to be a way home.
+     */
+    resetTurretAim(id: string): void {
+        this.turretAims.delete(id);
+        this.applyTurretAims();
+        this.onTurretAimed?.(id, TURRET_AT_REST);
+    }
+
+    /**
+     * One track plus its stops and its knob, parented to the bone it turns.
+     *
+     * Parented, so the yaw track rides the hull and the pitch track rides the traverse that is
+     * already under it - which is what makes the two axes compose the way the bones do without this
+     * class having to compose them.
+     */
+    private buildTurretHandle(
+        handle: TurretHandle, axis: TurretAxis, bone: THREE.Object3D, radius: number,
+        followsYaw = false,
+    ): TurretHandleParts {
+        const range = axis === 'yaw' ? handle.yaw : handle.pitch;
+
+        const track = new THREE.LineSegments(
+            positionGeometry(trackSegments(range, radius, TURRET_TRACK_SEGMENTS)),
+            TURRET_TRACK_MATERIAL);
+        track.renderOrder = TURRET_HANDLE_RENDER_ORDER;
+
+        const stops = new THREE.LineSegments(
+            positionGeometry(stopTicks(range, radius, radius * TURRET_STOP_TICK_FRACTION)),
+            TURRET_STOP_MATERIAL);
+        stops.renderOrder = TURRET_HANDLE_RENDER_ORDER;
+
+        const knob = new THREE.Mesh(
+            new THREE.SphereGeometry(radius * TURRET_KNOB_FRACTION, 12, 8),
+            TURRET_KNOB_MATERIAL);
+        knob.renderOrder = TURRET_HANDLE_RENDER_ORDER;
+
+        // A CHILD of the track, so one parent carries the whole handle and nothing can be left
+        // behind when it is removed.
+        track.add(stops);
+        track.add(knob);
+
+        // The bone is inside the scaled geometry and the radius is a world length - it comes from
+        // the subject's world span - so the handle undoes the scale exactly as a bone-frame arc
+        // does. Without this a 0.5-scale ship's handles would be drawn at half their size.
+        track.scale.setScalar(1 / this.modelScale);
+
+        // On an ANCHOR beside the bone, not on the bone: the track shows the stops, and the stops do
+        // not move when the turret does. A bone always has a parent inside a loaded model; the
+        // fallback only keeps a malformed tree from dropping the handle altogether.
+        const anchor = new THREE.Object3D();
+        // Not the model, and the flag sits on the anchor so the whole handle - track, stops, knob -
+        // is pruned in one place. See `isOverlay`.
+        anchor.userData.aetOverlay = true;
+        anchor.add(track);
+        (bone.parent ?? bone).add(anchor);
+
+        const parts = { anchor, bone, followsYaw, track, stops, knob, radius, range };
+        this.placeTurretAnchor(parts);
+
+        return parts;
+    }
+
+    /**
+     * Every handle's anchors, re-placed from where their bones are now. Called every frame.
+     *
+     * Every frame rather than only when a knob moves, because three other things move turret bones:
+     * the sweep, a clip, and the rest angle the XML declares. A track that only caught up on a drag
+     * would lag behind all three.
+     */
+    private placeTurretAnchors(): void {
+        for (const nodes of this.turretHandleNodes.values()) {
+            this.placeTurretAnchor(nodes.yaw);
+            this.placeTurretAnchor(nodes.pitch);
+        }
+    }
+
+    /**
+     * One anchor, in the frame its axis is measured against.
+     *
+     * The bone's POSITION and scale, which clips may move, and its REST orientation - the pose
+     * `aimBone` measures every angle from - never its live one. That is what holds a yaw track
+     * still while the turret yaws.
+     *
+     * A pitch track needs one thing more when there is no barrel and the turret bone carries both
+     * axes (2 of 19 models). Its rest frame is the same as the yaw track's, but elevation turns
+     * WITH the turret, so the track has to swing round by the yaw and still not tilt with the pitch.
+     * The yaw is recovered from the bone's live pose rather than from the reader's aim, so a sweep
+     * or a clip turning that bone is followed too: the twist of `rest^-1 * pose` about the traverse
+     * axis. `aimBone` composes `Rz(yaw) * Ry(pitch)`, and the twist of that product about Z is
+     * exactly `Rz(yaw)`.
+     *
+     * With a barrel none of that is needed. The barrel's rest frame already hangs below the turret
+     * bone, so the yaw reaches the pitch track through the hierarchy, and the pitch - which is the
+     * barrel's own rotation - does not.
+     */
+    private placeTurretAnchor(parts: TurretHandleParts): void {
+        const { anchor, bone } = parts;
+        const rest = this.sweepRest.get(bone) ?? bone.quaternion;
+
+        anchor.position.copy(bone.position);
+        anchor.scale.copy(bone.scale);
+        anchor.quaternion.copy(rest);
+
+        if (parts.followsYaw) {
+            const live = this.twistScratch.copy(rest).invert().multiply(bone.quaternion);
+            // Swing-twist about Z: keep only the Z component and renormalise. Guarded, because a
+            // pure 180-degree swing leaves nothing to normalise.
+            const length = Math.hypot(live.w, live.z);
+
+            if (length > 1e-6) {
+                live.set(0, 0, live.z / length, live.w / length);
+                anchor.quaternion.multiply(live);
+            }
+        }
+    }
+
+    /** Scratch for {@link placeTurretAnchor}, which runs every frame and should not allocate. */
+    private readonly twistScratch = new THREE.Quaternion();
+
+    /**
+     * The bone an axis turns about, looking on the hull before the attached model.
+     *
+     * Same rule as {@link fireBoneAttachment} and for the same measured reason: a hardpoint's model
+     * carries a copy of the hull's skeleton, and resolving a bone there applies the attachment
+     * offset twice.
+     */
+    private turretBoneNode(partId: string, bone: string): THREE.Object3D | undefined {
+        return this.parts.get('hull')?.bones.get(bone.toLowerCase())
+            ?? this.parts.get(partId)?.bones.get(bone.toLowerCase());
+    }
+
+    /** Poses every handled turret from its stored aim, and moves the knobs to match. */
+    private applyTurretAims(): void {
+        for (const handle of this.turretHandles) {
+            const aim = this.turretAim(handle.id);
+            const nodes = this.turretHandleNodes.get(handle.id);
+
+            if (nodes !== undefined) {
+                nodes.yaw.knob.position.set(
+                    ...knobPoint(handle.yaw, aim.yaw, nodes.yaw.radius));
+                nodes.pitch.knob.position.set(
+                    ...knobPoint(handle.pitch, aim.pitch, nodes.pitch.radius));
+            }
+
+            this.poseTurret(handle, aim);
+        }
+    }
+
+    /**
+     * Turns one turret's bones to an aim.
+     *
+     * The same composition the sweep uses, and deliberately the same method: two things posing one
+     * bone is the bug pattern this repo already paid for once, with a resting pose fighting a clip.
+     * Dragging pauses the sweep for exactly this reason - see {@link advanceTurretSweep}.
+     */
+    private poseTurret(handle: TurretHandle, aim: TurretAim): void {
+        const turret = this.turretBoneNode(handle.partId, handle.turretBone);
+
+        if (turret === undefined) {
+            return;
+        }
+
+        const barrel = handle.barrelBone === null
+            ? undefined
+            : this.turretBoneNode(handle.partId, handle.barrelBone);
+
+        // NEGATIVE elevation, so a positive pitch is nose up: rotating about +Y takes local +X,
+        // which is forward, towards -Z, and Z is up.
+        if (barrel !== undefined) {
+            this.aimBone(turret, TRAVERSE_AXIS, aim.yaw);
+            this.aimBone(barrel, ELEVATION_AXIS, -aim.pitch);
+        } else {
+            this.aimBone(turret, TRAVERSE_AXIS, aim.yaw, ELEVATION_AXIS, -aim.pitch);
+        }
+    }
+
+    /**
      * The pose the MODEL authored for each bone this class swings, captured before it first moves.
      *
      * A sweep is an angle ON TOP of that, not an angle instead of it. The old code assigned
@@ -2795,7 +3443,16 @@ export class PreviewViewport {
         // reader checking a traverse is actually doing.
         this.sweepPhase = (this.sweepPhase + deltaSeconds / 12) % 1;
 
+        // A bone the reader has taken hold of is theirs until they let go. Two things posing one
+        // bone is the bug pattern this repo already paid for, with a resting pose fighting a clip -
+        // and here the sweep would simply win every frame, so the handle would not appear to move.
+        const held = this.turretDrag?.id ?? null;
+
         for (const sweep of this.turretSweeps) {
+            if (held !== null && this.sweepIsHandled(sweep, held)) {
+                continue;
+            }
+
             const pose = sweepAngles(sweep.turret, this.sweepPhase);
             const part = this.parts.get(sweep.partId);
 
@@ -2821,6 +3478,23 @@ export class PreviewViewport {
                 this.aimBone(turret, TRAVERSE_AXIS, pose.rotate, ELEVATION_AXIS, -pose.elevate);
             }
         }
+    }
+
+    /**
+     * Whether a sweep would move the BONES a held handle is holding.
+     *
+     * Matched on the bone rather than on the id, because the two lists are keyed differently: a
+     * sweep carries the weapon or hardpoint that declared it, and one hardpoint's turret bone can
+     * be reached through both. Same part, same bone, same bone node.
+     */
+    private sweepIsHandled(
+        sweep: { partId: string; turretBone: string }, heldId: string,
+    ): boolean {
+        const handle = this.turretHandles.find(one => one.id === heldId);
+
+        return handle !== undefined
+            && handle.partId === sweep.partId
+            && handle.turretBone.toLowerCase() === sweep.turretBone.toLowerCase();
     }
 
     /**
@@ -3078,10 +3752,18 @@ export class PreviewViewport {
             // Offsets are in the model's own space, and the exporter's Z-up to Y-up rotation lives
             // on a node INSIDE the part - so adding them to the part root is adding them in the
             // space the numbers were computed in.
+            //
+            // Divided by the geometry scale, because the travel term is
+            // `Max_Speed * frames` - an XML speed, and therefore a WORLD distance - while the part
+            // root sits inside the scaled node. Without it the wreck and the explosion that marks
+            // where it stopped part company on any subject that declares a scale: `spinAwayEnd`
+            // hands that same offset to a particle anchored on the UNSCALED model root.
+            const travel = 1 / this.modelScale;
+
             part.root.position.set(
-                home.position.x + pose.offset.x,
-                home.position.y + pose.offset.y,
-                home.position.z + pose.offset.z);
+                home.position.x + pose.offset.x * travel,
+                home.position.y + pose.offset.y * travel,
+                home.position.z + pose.offset.z * travel);
 
             // Roll about the TRAVEL axis, which is Z - the blue one. Rolling about X while flying
             // along Z is a tumble end over end, not a corkscrew.
@@ -4353,7 +5035,12 @@ export class PreviewViewport {
         // have the camera measure the subject by it.
         const box = drawnBounds(
             this.modelRoot,
-            mesh => this.drawn(mesh) && !isShadowVolume(mesh));
+            mesh => this.drawn(mesh) && !isShadowVolume(mesh),
+            // The arcs and handles are drawn and are meshes, so `drawn` alone let them in whenever
+            // they were on screen: measured on the Gargantuan with its arcs showing, the framing
+            // radius was 508 against a hull of 99, and every camera preset stood five times too far
+            // off. The defect this function exists for, still open whenever the arcs were visible.
+            isOverlay);
         const sphere = box.isEmpty()
             ? { center: { x: 0, y: 0, z: 0 }, radius: 0 }
             : (() => {
@@ -6011,7 +6698,8 @@ export class PreviewViewport {
      *
      * `Box3.setFromObject` walks every vertex, so anything asking per frame - the bone axes did -
      * turns a size lookup into a full geometry traversal. The hull does not change size while it is
-     * loaded; an animation moves it, and a scale that mattered would arrive as a new scene.
+     * loaded; an animation moves it. The one thing that does change it is `setModelScale`, which
+     * drops the cache, because the span is measured in WORLD units.
      */
     private modelSpan(): number {
         if (this.cachedSpan !== null) {
@@ -6023,7 +6711,11 @@ export class PreviewViewport {
             return 100;
         }
 
-        const bounds = new THREE.Box3().setFromObject(hull.root);
+        // Every mesh the hull carries, drawn or not, as before - but NOT the overlays hung inside it.
+        // `setFromObject` measured those too, and on the Gargantuan with its arcs on the span came out
+        // at 1015 against a hull of 204. The span sizes the turret handles and caps how long an arc
+        // is drawn, so that fed back: handles sized against the arcs, arcs capped against themselves.
+        const bounds = drawnBounds(hull.root, () => true, isOverlay);
         this.cachedSpan = bounds.isEmpty()
             ? 100
             : bounds.getSize(new THREE.Vector3()).length();
@@ -6093,7 +6785,156 @@ export class PreviewViewport {
     }
 
     /** Picks the nearest joint to the pointer, so clicking a bone selects it. */
+    /**
+     * The knob nearest the pointer, if one is near enough to mean it.
+     *
+     * Projected to the screen and measured in pixels, exactly as the joints are picked: a knob is a
+     * small sphere the reader aims at with a cursor, so screen distance is the honest metric and a
+     * ray through a 12-segment sphere is not. It also lets a knob be grabbed through the hull,
+     * which is the whole reason the handle draws with `depthTest: false`.
+     */
+    private turretKnobAt(x: number, y: number): { id: string; axis: TurretAxis } | null {
+        const rect = this.canvas.getBoundingClientRect();
+        const world = new THREE.Vector3();
+        let best: { id: string; axis: TurretAxis; distance: number } | null = null;
+
+        for (const [id, nodes] of this.turretHandleNodes) {
+            for (const axis of TURRET_AXES) {
+                const knob = nodes[axis].knob;
+
+                knob.getWorldPosition(world);
+                const ndc = world.project(this.camera);
+
+                // Behind the camera. Projection mirrors such a point to the front, so without this
+                // a turret on the far side of the ship is pickable at a place it is not.
+                if (ndc.z > 1) {
+                    continue;
+                }
+
+                const distance = Math.hypot(
+                    (ndc.x * 0.5 + 0.5) * rect.width - x,
+                    (-ndc.y * 0.5 + 0.5) * rect.height - y);
+
+                if (best === null || distance < best.distance) {
+                    best = { id, axis, distance };
+                }
+            }
+        }
+
+        return best !== null && best.distance <= TURRET_KNOB_PICK_RADIUS
+            ? { id: best.id, axis: best.axis }
+            : null;
+    }
+
+    /**
+     * Brightens the axis under the pointer.
+     *
+     * Hover HIGHLIGHTS rather than decides. Which handles exist is the arc toggle's answer, because
+     * a manipulator the pointer has to travel to cannot be gated on where the pointer is now. What
+     * hover is genuinely for is telling twenty overlapping handles on a station apart.
+     */
+    private onPointerMove = (event: PointerEvent): void => {
+        if (this.turretDrag !== null) {
+            this.dragTurret(event);
+            return;
+        }
+
+        const rect = this.canvas.getBoundingClientRect();
+        const found = this.turretKnobAt(event.clientX - rect.left, event.clientY - rect.top);
+
+        if (found?.id === this.hoveredTurretAxis?.id
+            && found?.axis === this.hoveredTurretAxis?.axis) {
+            return;
+        }
+
+        this.hoveredTurretAxis = found;
+        this.paintTurretHandles();
+    };
+
+    /** The hovered or dragged axis in its bright materials, everything else in its quiet ones. */
+    private paintTurretHandles(): void {
+        const active = this.turretDrag ?? this.hoveredTurretAxis;
+
+        for (const [id, nodes] of this.turretHandleNodes) {
+            for (const axis of TURRET_AXES) {
+                const on = active !== null && active.id === id && active.axis === axis;
+
+                nodes[axis].track.material = on
+                    ? TURRET_TRACK_HOVER_MATERIAL
+                    : TURRET_TRACK_MATERIAL;
+                nodes[axis].knob.material = on
+                    ? TURRET_KNOB_HOVER_MATERIAL
+                    : TURRET_KNOB_MATERIAL;
+            }
+        }
+    }
+
+    /** Moves the dragged turret to follow the pointer, clamped to what the engine allows. */
+    private dragTurret(event: PointerEvent): void {
+        const drag = this.turretDrag;
+        const handle = this.turretHandles.find(one => one.id === drag?.id);
+
+        if (drag === undefined || drag === null || handle === undefined) {
+            return;
+        }
+
+        const aim = dragToAim(
+            handle, drag.startAim,
+            drag.axis === 'yaw' ? event.clientX - drag.startX : 0,
+            drag.axis === 'pitch' ? event.clientY - drag.startY : 0,
+            TURRET_DEGREES_PER_PIXEL);
+
+        this.turretAims.set(drag.id, aim);
+        this.applyTurretAims();
+        this.onTurretAimed?.(drag.id, aim);
+    }
+
+    private onPointerUp = (): void => {
+        if (this.turretDrag === null) {
+            return;
+        }
+
+        // The turret stays where it was put. Springing back to rest on release would make the
+        // handle a momentary readout rather than a control.
+        this.turretDrag = null;
+        this.paintTurretHandles();
+    };
+
     private onPointerDown = (event: PointerEvent): void => {
+        const rect0 = this.canvas.getBoundingClientRect();
+        const grabbed = this.turretKnobAt(
+            event.clientX - rect0.left, event.clientY - rect0.top);
+
+        if (grabbed !== null) {
+            // Before anything else, and it takes the event: a drag that also orbited the camera
+            // would move the turret and the view at once, and neither would be readable.
+            //
+            // IMMEDIATE propagation, and this listener runs in the CAPTURE phase - both required.
+            // `OrbitControls` listens for `pointerdown` on this same canvas and was registered
+            // first, and plain `stopPropagation` does not stop another listener on the same
+            // element. It only starts tracking a drag from that one listener (three 0.185 adds its
+            // document move/up listeners there), so keeping it from seeing the grab is the whole
+            // fix. Measured with a real mouse on the Gargantuan: the turret turned 40 degrees and
+            // the camera swung 173 units with it.
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            // Keep the moves coming when the drag leaves the canvas, which a fast one does; the
+            // controls would have captured the pointer here and no longer do.
+            this.canvas.setPointerCapture(event.pointerId);
+
+            this.turretDrag = {
+                id: grabbed.id,
+                axis: grabbed.axis,
+                startAim: this.turretAim(grabbed.id),
+                startX: event.clientX,
+                startY: event.clientY,
+            };
+
+            this.paintTurretHandles();
+            return;
+        }
+
         if (!this.skeletonVisible || this.onBoneSelected === null) {
             return;
         }
@@ -6269,6 +7110,12 @@ export class PreviewViewport {
         this.advanceTurretSweep(dt);
         this.advanceBreakoffs(dt);
         this.advanceSpinAway(dt);
+        // LAST among the things that move bones: the clip, the sweep and the spin-away have all had
+        // their say, so the muzzle this reads is the one that will be drawn.
+        this.followHullArcs();
+        // Same reason and same place: the turret bones have been moved for this frame, so the
+        // tracks can now be put back in the frames their angles are measured against.
+        this.placeTurretAnchors();
 
         this.advancePassiveSubjects(dt);
         this.controls.update();
@@ -6579,7 +7426,11 @@ export class PreviewViewport {
 
     dispose(): void {
         this.disposed = true;
-        this.canvas.removeEventListener('pointerdown', this.onPointerDown);
+        // The capture flag has to match, or this silently removes nothing.
+        this.canvas.removeEventListener('pointerdown', this.onPointerDown, { capture: true });
+        this.canvas.removeEventListener('pointermove', this.onPointerMove);
+        window.removeEventListener('pointerup', this.onPointerUp);
+        window.removeEventListener('pointercancel', this.onPointerUp);
         cancelAnimationFrame(this.frameHandle);
         this.clear();
         this.controls.dispose();
@@ -6598,6 +7449,25 @@ function decodeBase64(value: string): ArrayBuffer {
         bytes[i] = binary.charCodeAt(i);
     }
     return bytes.buffer;
+}
+
+/**
+ * The root of something this viewport DRAWS OVER the model - a firing arc, a turret handle - rather
+ * than part of it.
+ *
+ * One flag for every overlay, checked everywhere the model is walked or measured: the mesh walk the
+ * tree, the stats, the shader rebuild, the wireframe and the tint go through, plus the framing sphere
+ * and the subject span. Both kinds of overlay hang INSIDE the model on bones, and both are meshes, so
+ * neither a type test nor scoping to the part roots keeps them out - the same trap the particle
+ * systems fell into first.
+ *
+ * Measured on the Gargantuan with both showing, before this: 24 overlay meshes walked as geometry,
+ * 24 phantom tree rows, shader coverage counting 35 meshes where the model has 11, the knob handed a
+ * model material on a shader rebuild and swept by the wireframe, the span five times the hull's and
+ * the camera framing five times too far.
+ */
+function isOverlay(node: THREE.Object3D): boolean {
+    return node.userData.aetOverlay === true;
 }
 
 /** A mesh the exporter marked as a shadow volume, rather than part of the model's own shape. */

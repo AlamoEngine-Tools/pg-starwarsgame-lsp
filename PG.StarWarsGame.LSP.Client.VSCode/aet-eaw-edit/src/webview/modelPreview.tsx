@@ -146,6 +146,9 @@ import {
 } from './preview/abilityRows';
 import { problemLook, problemTag, problemWhere } from './shared/problemLook';
 import { cloneForDamage, deathCloneRows, turretSweeps } from './preview/deathClone';
+import {
+    TURRET_AT_REST, aimText, handlesForShownArcs, type TurretAim,
+} from './preview/turretHandles';
 import { spinAwayEnd, spinAwaySummary } from './preview/spinAway';
 import { BY_HAND, appendShot, damageLine, type DamageLogEntry } from './preview/damageLog';
 import { breakoffAnchor, breakoffFor, type BreakoffAnchor } from './preview/breakoff';
@@ -561,6 +564,16 @@ const Shell = styled.div`
        were inline pills showing the bone alone, which says where a shot leaves from but not which
        of Fire_Bone_A and _B declared it. */
     .bone-picks { display: flex; flex-direction: column; gap: var(--space-4); }
+
+    /* Where the turret is pointed, with the way back to rest beside it. A readout rather than a
+       control, so the numbers lead and the button sits at the end of the row. */
+    .turret-aim {
+        display: flex;
+        align-items: center;
+        gap: var(--space-6);
+        margin-top: var(--space-4);
+    }
+    .turret-aim .detail { flex: 1; font-variant-numeric: tabular-nums; }
     .muzzle-row {
         display: flex;
         align-items: center;
@@ -2631,6 +2644,14 @@ function ModelPreview(): React.JSX.Element {
      */
     const [hiddenWeapons, setHiddenWeapons] = useState<ReadonlySet<string>>(new Set());
 
+    /**
+     * Where the reader has pointed each turret by hand, for the ROW to read out.
+     *
+     * A copy. The pose itself lives on the bone, in the viewport - see `onTurretAimed` - and this
+     * is only what the dock prints beside the extents it is bounded by.
+     */
+    const [turretAims, setTurretAims] = useState<ReadonlyMap<string, TurretAim>>(new Map());
+
     /** Empty means the model's own colours; otherwise the faction whose tint is applied. */
     const [faction, setFaction] = useState('');
     const [customColour, setCustomColour] = useState<string | null>(null);
@@ -2854,6 +2875,15 @@ function ModelPreview(): React.JSX.Element {
                 });
             }
         };
+
+        // The viewport owns the POSE - it is a bone quaternion, and a re-render that cleared it
+        // would snap a turret back to rest mid-drag. What comes back here is a copy for the row to
+        // read out, never the source.
+        viewport.onTurretAimed = (id, aim) => setTurretAims(current => {
+            const next = new Map(current);
+            next.set(id, aim);
+            return next;
+        });
 
         // Orbiting leaves the preset behind, so the preset stops claiming to be where you are.
         viewport.onCameraMoved = () => setCameraView(null);
@@ -3770,8 +3800,14 @@ function ModelPreview(): React.JSX.Element {
                     // Its own PASSIVE SUBJECT - a wreck is a replacement subject, not another piece
                     // of the ship being previewed, and the active subject's hardpoint answers must
                     // not reach it by mesh name.
-                    await viewport.addPart(message.partId, glb, undefined, undefined,
-                        { subjectId: message.partId });
+                    await viewport.addPart(message.partId, glb, undefined, undefined, {
+                        subjectId: message.partId,
+                        // Its OWN scale: a clone is spawned as its own object, so it is not drawn
+                        // at the ship's. 59 of 265 shipped pairs disagree.
+                        scale: sceneRef.current?.deathClones?.find(
+                            c => `${DEATH_CLONE_PART}${c.objectId}` === message.partId)
+                            ?.scaleFactor ?? 1,
+                    });
 
                     // The explosions, the fire smoke and the debris trails the clone's own model
                     // carries - eight of them on the Star Destroyer's wreck, and not one reached
@@ -4838,6 +4874,23 @@ function ModelPreview(): React.JSX.Element {
             weapons.map(w => ({ id: w.id, partId: w.partId, turret: w.turret }))),
         [scene, weapons]);
 
+    /**
+     * The turrets the reader can drag, which is exactly the turrets whose arcs are shown.
+     *
+     * No new selection concept and no new control. The arc state already exists at three levels -
+     * the stage pill, a toggle per weapon row, a fire bone in the tree - and it is persistent by
+     * design, which hover is not: a manipulator lives on the turret in the viewport while the row
+     * lives in the dock, so the pointer has to travel between them and any hover that gated the
+     * handles would be gone before it arrived.
+     */
+    // From the WEAPONS, in the arc toggle's own ids - not from `sweepable`, whose hardpoint turrets
+    // are keyed by the bare hardpoint id and so never matched. See `handlesForShownArcs`.
+    const draggableTurrets = useMemo(
+        () => handlesForShownArcs(
+            weapons,
+            new Set(visibleArcs(weapons, fireArcs, hiddenWeapons).map(arc => arc.weaponId))),
+        [weapons, fireArcs, hiddenWeapons]);
+
     /* One card per hardpoint, each carrying the weapon on it, and whatever weapons are left over. */
     const cards = useMemo(
         () => hardpointCards(
@@ -4966,6 +5019,41 @@ function ModelPreview(): React.JSX.Element {
     };
 
     /**
+     * Where this turret is pointed right now, beside the numbers that bound it.
+     *
+     * Only for a row that HAS handles, because it is a readout of a control: printing "Yaw 0 deg"
+     * on a turret nobody can drag says nothing. It names its stops out loud - a handle that will
+     * not move is otherwise indistinguishable from a dropped pointer event - and offers the way
+     * back to the pose the model authored, which dragging deliberately does not do on release.
+     */
+    const turretAimRow = (row: WeaponRow): React.JSX.Element | null => {
+        const handle = draggableTurrets.find(one => one.id === row.id);
+
+        if (handle === undefined) {
+            return null;
+        }
+
+        const aim = turretAims.get(row.id) ?? TURRET_AT_REST;
+        const moved = aim.yaw !== 0 || aim.pitch !== 0;
+
+        return (
+            <span className="view-row turret-aim">
+                <span className="detail">{aimText(handle, aim)}</span>
+                <IconButton
+                    icon="reset"
+                    title="Return this turret to the pose the model authored"
+                    disabled={!moved}
+                    disabledReason="This turret is already at its authored pose"
+                    onClick={event => {
+                        event.stopPropagation();
+                        viewportRef.current?.resetTurretAim(row.id);
+                    }}
+                />
+            </span>
+        );
+    };
+
+    /**
      * The fire bones, as buttons that point at them in the model.
      *
      * They TOGGLE into the selection rather than replacing it, which is what was wrong before: a
@@ -5006,6 +5094,11 @@ function ModelPreview(): React.JSX.Element {
             return;
         }
 
+        // BEFORE the arcs and the handles, both of which are sized against the subject's span and
+        // counter-scale against this. The subject's geometry is in MODEL units and every range
+        // drawn beside it is in WORLD units; this is what reconciles them.
+        viewport.setModelScale(scene?.scaleFactor ?? 1);
+
         // Which cones exist is decided in one place, `weaponRows`, off the same rows the dock is
         // showing - so a weapon switched off in the dock, and a hardpoint that has been shot away, are
         // the same answer in both. Weapons live on the scene rather than on the hardpoint, so a
@@ -5035,6 +5128,10 @@ function ModelPreview(): React.JSX.Element {
 
         viewport.setTurretSweep(sweepable.filter(sweep => sweeping.has(sweep.id)));
 
+        // Gated on the lens for the same reason the arcs are: a manipulator is an annotation over
+        // the model, and Gameplay is the only lens that carries the pill that switches it off.
+        viewport.setTurretHandles(annotate ? draggableTurrets : []);
+
         viewport.setTurretRestAngles((scene?.hardpoints ?? []).flatMap(hardpoint => {
             const turret = hardpoint.turret;
             const bone = turret?.turretBone ?? '';
@@ -5048,7 +5145,8 @@ function ModelPreview(): React.JSX.Element {
                     restAngleDegrees: turret.restAngle,
                 }];
         }));
-    }, [scene, stats, mode, fireArcs, hiddenWeapons, weapons, sweeping, sweepable]);
+    }, [scene, stats, mode, fireArcs, hiddenWeapons, weapons, sweeping, sweepable,
+        draggableTurrets]);
 
     /**
      * The targeting marks, and how big the game would draw them.
@@ -8286,6 +8384,8 @@ ${becauseText(node.because)}`}
                                                 <span className="detail" key={fact}>{fact}</span>
                                             ))}
 
+                                            {turretAimRow(row)}
+
                                             {fireBoneButtons(row)}
 
                                             <span className="view-row card-actions">
@@ -8546,6 +8646,8 @@ ${becauseText(node.because)}`}
                                                     </span>
                                                 </span>
                                             )}
+
+                                            {card.weapon !== null && turretAimRow(card.weapon)}
 
                                             {card.weapon !== null
                                                 && fireBoneButtons(card.weapon)}

@@ -143,6 +143,7 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlDiagnosticsHandler, VariantTagNotSupportedHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastNegativeOneHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, AtLeastOneSecondHandler>();
+        services.AddSingleton<IXmlDiagnosticsHandler, FireConeDegreesHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, RespawnTimeListHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, EngineTextLimitHandler>();
         services.AddSingleton<IXmlDiagnosticsHandler, BooleanGatedRequirementHandler>();
@@ -225,6 +226,10 @@ public static class XmlLanguageServiceExtensions
         services.AddSingleton<IXmlCrossTagRule, GarrisonUpgradeUnitsRule>();
         services.AddSingleton<IXmlCrossTagRule, GrenadeTossAnimationRule>();
         services.AddSingleton<IXmlCrossTagRule, RemoteBombTossAnimationRule>();
+        // From the assert seam rather than a message - a weapon hardpoint whose fire cone the
+        // engine's own default cannot satisfy. Gated on Type, because the asserts sit behind
+        // Is_Weapon().
+        services.AddSingleton<IXmlCrossTagRule, WeaponHardpointFireConeRule>();
         // The engine's three "set either A or B, otherwise this ability won't do anything" pairs.
         services.AddSingleton<IXmlCrossTagRule, HeroAssassinTargetsRule>();
         services.AddSingleton<IXmlCrossTagRule, BaseDestructionTargetsRule>();

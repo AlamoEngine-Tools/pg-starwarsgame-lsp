@@ -525,7 +525,18 @@ public sealed record PreviewDeathClone(
     string? ModelFile,
     bool PlaysIdle,
     IReadOnlyList<string>? Animations = null,
-    IReadOnlyList<PreviewParticle>? Particles = null)
+    IReadOnlyList<PreviewParticle>? Particles = null,
+    /// <summary>
+    ///     The CLONE's own <c>Scale_Factor</c>, or 1 - not the ship's.
+    /// </summary>
+    /// <remarks>
+    ///     A death clone is spawned as its own object, so <c>Update_Transform</c> draws it at its own
+    ///     scale and nothing relates it to the ship's. The two usually agree but often do not:
+    ///     measured over 265 ship-to-clone pairs in <c>eaw/</c> and <c>foc/</c>, 206 declare the
+    ///     same scale and 59 differ - the Millennium Falcon is 0.5 and its clone 1.0, the slave
+    ///     infantry 1.5 against clones at 1.0.
+    /// </remarks>
+    float ScaleFactor = 1f)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<string> Animations { get; init; } = Animations ?? [];
@@ -830,7 +841,33 @@ public sealed record PreviewScene(
     ///     missing - the pairing is positional, so half a table is not a table, and inventing an
     ///     alignment would put the wrong mesh on screen at the wrong health.
     /// </remarks>
-    IReadOnlyList<PreviewDamageBand>? DamageTable = null)
+    IReadOnlyList<PreviewDamageBand>? DamageTable = null,
+    /// <summary>
+    ///     The object's uniform render scale - <c>Scale_Factor</c> - or 1 where it declares none.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         THE BRIDGE BETWEEN TWO SPACES, and without it the preview mixes them.
+    ///         <c>GameObjectClass::Update_Transform</c> builds the object's world matrix from a
+    ///         translation and three rotations with NO scale in it, then calls
+    ///         <c>Model-&gt;Set_Scale(Get_Scale_Factor(Type))</c> - so the scale lives on the MODEL
+    ///         alone. Geometry and bones are model units and reach the world multiplied by this;
+    ///         positions, and therefore every range and distance the XML declares, are already
+    ///         world units and are not.
+    ///     </para>
+    ///     <para>
+    ///         The two are otherwise the same unit, which the shipped data states outright:
+    ///         <c>TIE_Crawler</c> writes <c>&lt;Overall_Length&gt;25.0&lt;/...&gt;</c> with the
+    ///         comment "(35 by geometry)", and reading <c>Ev_tiecrawler.alo</c> gives 34.0.
+    ///     </para>
+    ///     <para>
+    ///         Measured: 118 of the 174 armed objects across <c>eaw/</c> and <c>foc/</c> declare a
+    ///         scale that is not 1 - the Corellian Corvette 0.5, the Tartan 0.56, the Nebulon-B and
+    ///         the TIE Fighter 0.7 - so drawing hulls unscaled put the MAJORITY of armed subjects
+    ///         at odds with their own weapon ranges.
+    ///     </para>
+    /// </remarks>
+    float ScaleFactor = 1f)
 {
     /// <summary>Never null, so the client has one shape to walk.</summary>
     public IReadOnlyList<int> DamageStages { get; init; } = DamageStages ?? [];

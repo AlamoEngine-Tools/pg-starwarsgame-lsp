@@ -74,6 +74,71 @@ public sealed class HardpointBoneNotOnModelHandlerTest
         Assert.DoesNotContain("which attaches it", message, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    ///     A <c>Collision_Mesh</c> naming nothing on the model is a WARNING that says what it costs -
+    ///     and what it does not.
+    /// </summary>
+    /// <remarks>
+    ///     <c>GameObjectClass::Take_Damage</c> replaces the name it looks a hardpoint up by with the
+    ///     hardpoint's own <c>Collision_Mesh</c> when the hit is aimed at that hardpoint, and on land
+    ///     with the nearest live targetable hardpoint's, so aimed fire and land projectiles land. Only
+    ///     untargeted space fire uses the struck renderable's name, and that is always a MESH name
+    ///     (<c>alRenderableMesh::Get_Name</c>, vtable slot 0x18) - so a name on no model never comes back
+    ///     from geometry. Measured, hence "never" rather than the earlier "may not".
+    /// </remarks>
+    [Fact]
+    public void A_collision_mesh_absent_from_both_models_says_which_fire_still_reaches_it()
+    {
+        var result = Assert.Single(Handler.Handle(Fact("weapon.alo"), XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, result.Severity);
+        Assert.Contains("Aimed fire and land projectiles still reach it", result.Message, StringComparison.Ordinal);
+        Assert.Contains("untargeted space fire never does", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("may not", result.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("no shot", result.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>A collision mesh may name a mesh or a bone, so the report does not call it a bone.</summary>
+    [Fact]
+    public void A_collision_mesh_is_not_called_a_bone()
+    {
+        Assert.Contains("which does not exist as a mesh or a bone", Report(Fact()), StringComparison.Ordinal);
+    }
+
+    /// <summary>The other bone tags keep the wording they had: no consequence is claimed for them.</summary>
+    [Fact]
+    public void Other_bone_tags_keep_their_wording()
+    {
+        var fact = Fact() with { TagName = "Damage_Decal", BoneName = "HP_F_BLAST" };
+
+        var message = Report(fact);
+
+        Assert.Contains("<Damage_Decal> names bone 'HP_F_BLAST'", message, StringComparison.Ordinal);
+        Assert.DoesNotContain("Aimed fire", message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    ///     The one name the model actually has, offered as the fix - the Gargantuan's
+    ///     <c>HP_turret_front_00_COL</c> becomes <c>HP_turret_front_00_COLLISION</c>.
+    /// </summary>
+    [Fact]
+    public void A_suggested_name_is_offered_as_the_fix()
+    {
+        var result = Assert.Single(Handler.Handle(
+            Fact("weapon.alo") with { SuggestedName = "HP_F_COLLISION" }, XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.Equal("HP_F_COLLISION", result.SuggestedFix);
+        Assert.Equal("Use the model's mesh 'HP_F_COLLISION'", result.FixTitle);
+    }
+
+    [Fact]
+    public void No_fix_is_offered_without_a_suggestion()
+    {
+        var result = Assert.Single(Handler.Handle(Fact("weapon.alo"), XmlHandlerTestFixtures.EmptyCtx));
+
+        Assert.Null(result.SuggestedFix);
+    }
+
     private static HardpointBoneNotOnModelFact Fact(string? attached = null)
     {
         return new HardpointBoneNotOnModelFact(

@@ -306,7 +306,8 @@ public sealed class PreviewSceneBuilder(
             NoColorizationColor: Colour(effective, "No_Colorization_Color"),
             Affiliation: FirstToken(Tag(effective, "Affiliation")),
             DamageStages: stages,
-            DamageTable: DamageTable(effective));
+            DamageTable: DamageTable(effective),
+            ScaleFactor: EngineScaleFactor.Of(Tag(effective, "Scale_Factor")));
     }
 
     /// <summary>
@@ -401,7 +402,10 @@ public sealed class PreviewSceneBuilder(
             // and a clone is a replacement for it rather than a piece of it.
             clones.Add(new PreviewDeathClone(Blank(row[0]), row[1], model, playsIdle,
                 model is null ? [] : AnimationsFor(model),
-                model is null ? [] : ProxiesOf(model, row[1], [], problems)));
+                model is null ? [] : ProxiesOf(model, row[1], [], problems),
+                // The clone's OWN scale, read off the resolved clone - variants included - through
+                // the same reader the subject's scale uses.
+                EngineScaleFactor.Of(Tag(clone, "Scale_Factor"))));
         }
 
         return clones;
@@ -1161,38 +1165,31 @@ public sealed class PreviewSceneBuilder(
                 $"Hardpoint '{hardpointId}' attaches to bone '{attachBone}', which model '{hull}' " +
                 "does not have.", hardpointId));
 
-        // Can a shot ever REACH this hardpoint? Damage is routed by the collision mesh a projectile
-        // struck, matched with _stricmp against Collision_Mesh - exact but case-insensitive - so a
-        // value naming nothing behaves exactly like an absent one: every shot meant for it lands on
-        // the hull, the hardpoint never dies, and the all-destroyed branch can never complete.
+        // Can a shot ever REACH this hardpoint? Only one shape makes it impossible: no Collision_Mesh
+        // at all.
         //
-        // Against the union of BONES and mesh names, because vanilla points Collision_Mesh at the
-        // hardpoint's own Attachment_Bone 28 times across the two trees. The hardpoint's attached
-        // model counts as well as the hull's: 29 of the Executor's 30 meshes are in both, and one is
-        // in the attached model only.
+        // GameObjectClass::Take_Damage finds the hardpoint by NAME, an exact _stricmp against each
+        // Collision_Mesh - but first replaces the name with the hardpoint's OWN value when the hit is
+        // aimed at it (0097386a), and in a second path taken from the attacker (009738cc). The lookup
+        // then compares a value with itself, so a Collision_Mesh the model lacks is still reachable
+        // by aimed fire: the Gargantuan's eight hardpoints all write one, and it dies through them.
+        // An EMPTY name fails the size check before the lookup (00973ad9), aimed or not, so that
+        // hardpoint never dies and the all-destroyed branch can never complete.
+        //
+        // The mismatched-name case used to be reported here as well, as an error saying no shot could
+        // reach it. It is reported once, by HardpointBoneNotOnModelHandler in the editor, as a warning
+        // with a quick fix - repeating it here put every Gargantuan hardpoint on two surfaces.
         //
         // Silent where the object does not die with its hardpoints - the palace keeps its
         // generators as destructible scenery, so one that cannot be shot takes nothing away.
         if (EngineBoolean.IsTrue(Tag(effective, "Is_Destroyable"))
-            && diesWithHardpoints)
+            && diesWithHardpoints
+            && string.IsNullOrWhiteSpace(Tag(effective, "Collision_Mesh")))
         {
-            var collisionMesh = Tag(effective, "Collision_Mesh");
-            var reachable = !string.IsNullOrWhiteSpace(collisionMesh)
-                            && (HardpointBoneModelResolver.ModelHasBone(
-                                    indexService.Current, hull, collisionMesh)
-                                || HardpointBoneModelResolver.ModelHasBone(
-                                    indexService.Current, model, collisionMesh));
-
-            if (!reachable)
-                problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointUnreachable, "error",
-                    string.IsNullOrWhiteSpace(collisionMesh)
-                        ? $"Hardpoint '{hardpointId}' is destroyable but names no Collision_Mesh, so "
-                          + "no shot can reach it. The unit can never be finished through its "
-                          + "hardpoints."
-                        : $"Hardpoint '{hardpointId}' names Collision_Mesh '{collisionMesh}', which "
-                          + "is neither a mesh nor a bone of its model. No shot can reach it, and "
-                          + "the unit can never be finished through its hardpoints.",
-                    hardpointId));
+            problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointUnreachable, "error",
+                $"Hardpoint '{hardpointId}' is destroyable but names no Collision_Mesh, so no shot can "
+                + "reach it. The unit can never be finished through its hardpoints.",
+                hardpointId));
         }
 
         var tooltipKey = Tag(effective, "Tooltip_Text");
@@ -1231,10 +1228,14 @@ public sealed class PreviewSceneBuilder(
         if (!EngineBoolean.IsTrue(Tag(effective, "Is_Turret")))
             return null;
 
+        // EFFECTIVE, not authored: the client clamps a drag handle to these, and the two owners
+        // default differently. See DefaultHardpointRotateExtentDegrees.
         return new PreviewTurret(
             Number(effective, "Turret_Rest_Angle"),
-            Number(effective, "Turret_Rotate_Extent_Degrees"),
-            Number(effective, "Turret_Elevate_Extent_Degrees"),
+            Number(effective, "Turret_Rotate_Extent_Degrees")
+            ?? DefaultHardpointRotateExtentDegrees,
+            Number(effective, "Turret_Elevate_Extent_Degrees")
+            ?? DefaultHardpointElevateExtentDegrees,
             Tag(effective, "Turret_Bone_Name"),
             Tag(effective, "Barrel_Bone_Name"));
     }
@@ -1287,8 +1288,8 @@ public sealed class PreviewSceneBuilder(
             Tag(effective, "Damage_Type") is { Length: > 0 } dmg ? dmg : null,
             Number(effective, "Targeting_Max_Attack_Distance"),
             null,
-            Number(effective, "Turret_Rotate_Extent_Degrees"),
-            Number(effective, "Turret_Elevate_Extent_Degrees"),
+            UnitArcYawDegrees(effective),
+            UnitArcPitchDegrees(effective),
             Inaccuracy(effective.ObjectId),
             Integer(effective, "Projectile_Fire_Pulse_Count"),
             Number(effective, "Projectile_Fire_Pulse_Delay_Seconds"),
@@ -1296,6 +1297,160 @@ public sealed class PreviewSceneBuilder(
             [],
             turret,
             null);
+    }
+
+    /// <summary>
+    ///     The engine's defaults for the two turret extents, from the
+    ///     <c>GameObjectTypeClass</c> constructor at <c>00a87243</c> and <c>00a87256</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Both comparisons in <c>Is_In_Cone_Of_Fire</c> are then always true, so an object that
+    ///     sets neither fires in ANY direction. 175 of the 291 objects with a <c>WEAPON</c>
+    ///     behaviour set neither, which makes unrestricted the COMMON case - reading an absent tag
+    ///     as zero gave the majority of armed units the narrowest arc possible.
+    /// </remarks>
+    private const float DefaultTurretRotateExtentDegrees = 360f;
+
+    private const float DefaultTurretElevateExtentDegrees = 180f;
+
+    /// <summary>
+    ///     The same two defaults for a HARDPOINT turret, which are not the same numbers.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>HardPointDataClass::HardPointDataClass</c> (<c>00be1220</c>) writes
+    ///         <c>TurretRotateExtentDegrees = 180.0</c> and
+    ///         <c>TurretElevateExtentDegrees = 90.0</c>. A hardpoint's turret fields are a parallel
+    ///         set to the unit's rather than the same ones, and so are their defaults.
+    ///     </para>
+    ///     <para>
+    ///         180 is the exact threshold at which
+    ///         <c>HardPointClass::Calculate_Desired_Turret_Angle</c> skips its motion clamp - the
+    ///         gate is <c>extent &lt; 180.0 &amp;&amp; extent &gt; 0.0</c> - so the default yaw is a
+    ///         free turn and the default pitch is a real stop at plus or minus 90.
+    ///     </para>
+    /// </remarks>
+    private const float DefaultHardpointRotateExtentDegrees = 180f;
+
+    private const float DefaultHardpointElevateExtentDegrees = 90f;
+
+    /// <summary>A full angle covers everything at 360; there is nothing past a whole turn.</summary>
+    private const float FullTurnDegrees = 360f;
+
+    /// <summary>
+    ///     The unit weapon's horizontal arc as a FULL angle, which is what
+    ///     <see cref="PreviewWeapon.ConeWidthDegrees" /> carries.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The conversion is the point. <c>Is_In_Cone_Of_Fire</c> tests
+    ///         <c>|yaw| &gt; Turret_Rotate_Extent_Degrees</c> WITHOUT halving, so the extent is a
+    ///         plus-or-minus bound and the swept angle is twice it. The hardpoint path on the same
+    ///         DTO field tests <c>|yaw| &gt; Fire_Cone_Width / 2.0</c>, so THAT number is already a
+    ///         full angle. Two conventions, one field - so the normalisation belongs here, where
+    ///         both are known, rather than at a consumer that cannot tell which it was handed.
+    ///     </para>
+    ///     <para>
+    ///         An authored zero survives as zero: a weapon that can only fire dead ahead is a real
+    ///         thing and must not be confused with the default.
+    ///     </para>
+    /// </remarks>
+    private static float? UnitArcYawDegrees(EffectiveObject effective)
+    {
+        if (FiresForward(effective)) return null;
+
+        return FullAngle(Number(effective, "Turret_Rotate_Extent_Degrees")
+                         ?? DefaultTurretRotateExtentDegrees);
+    }
+
+    /// <summary>
+    ///     Whether the weapon skips the arc check entirely, in which case it HAS no arc.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>Calculate_Projectile_Facing</c> returns the object's own facing and returns true
+    ///         before <c>Is_In_Cone_Of_Fire</c> is reached, so authored extents are not widened or
+    ///         narrowed - they are never read. Null then means "no arc concept", which is a
+    ///         different statement from 360 ("unrestricted") and 0 ("dead ahead only").
+    ///     </para>
+    ///     <para>
+    ///         The guard is not hypothetical: <c>Landbombingrununits.xml</c> ships
+    ///         <c>Fires_Forward</c> alongside a 20/20 arc, with a comment saying the flag exists to
+    ///         skip the check that reads it.
+    ///     </para>
+    /// </remarks>
+    private static bool FiresForward(EffectiveObject effective)
+    {
+        return EngineBoolean.IsTrue(Tag(effective, "Fires_Forward"));
+    }
+
+    /// <summary>The vertical arc, as a full angle.</summary>
+    /// <remarks>
+    ///     <c>Turret_XY_Only</c> makes <c>Is_In_Cone_Of_Fire</c> skip the pitch test ENTIRELY rather
+    ///     than flattening it, so the elevation is unbounded however the extent is authored.
+    /// </remarks>
+    private static float? UnitArcPitchDegrees(EffectiveObject effective)
+    {
+        if (FiresForward(effective)) return null;
+
+        if (EngineBoolean.IsTrue(Tag(effective, "Turret_XY_Only")))
+            return FullTurnDegrees;
+
+        return FullAngle(Number(effective, "Turret_Elevate_Extent_Degrees")
+                         ?? DefaultTurretElevateExtentDegrees);
+    }
+
+    /// <summary>
+    ///     A plus-or-minus bound as the full angle it sweeps, saturating at a whole turn.
+    /// </summary>
+    /// <remarks>
+    ///     The defaults double to 720 and 360; both mean "everything", and a full angle cannot
+    ///     usefully exceed 360, so the clamp discards nothing.
+    /// </remarks>
+    private static float FullAngle(float halfAngleDegrees)
+    {
+        return Math.Min(halfAngleDegrees * 2f, FullTurnDegrees);
+    }
+
+    /// <summary>
+    ///     A hardpoint's horizontal arc as a full angle - from its turret extent when it is one,
+    ///     and from its fire cone when it is not.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>HardPointClass::Can_Weapon_Point_At</c> branches and the two arms are EXCLUSIVE:
+    ///         <c>if (Is_Turret)</c> it tests <c>Turret_Rotate_Extent_Degrees &lt; |yaw|</c>, and
+    ///         the fire cone is tested only in the <c>else</c>. A turret's cone is therefore never
+    ///         read - all seven shipped turret hardpoints declare one anyway, and
+    ///         <c>HP_Gargantuan_Small_Turret_Front_Left</c>'s 450-degree height has survived in both
+    ///         games precisely because nothing looks at it.
+    ///     </para>
+    ///     <para>
+    ///         The extent is a plus-or-minus bound the engine does not halve; the cone is a full
+    ///         angle it does. Hence one doubled and the other passed through.
+    ///     </para>
+    /// </remarks>
+    private static float? HardpointArcYawDegrees(EffectiveObject effective)
+    {
+        if (!EngineBoolean.IsTrue(Tag(effective, "Is_Turret")))
+            return Number(effective, "Fire_Cone_Width");
+
+        return FullAngle(Number(effective, "Turret_Rotate_Extent_Degrees") ?? 0f);
+    }
+
+    /// <summary>The vertical arc, which a turret hardpoint simply does not have.</summary>
+    /// <remarks>
+    ///     The turret arm of that branch tests yaw and then returns - there is no elevation test on
+    ///     the SHOT at all. <c>Turret_Elevate_Extent_Degrees</c> is read only by
+    ///     <c>Calculate_Desired_Turret_Angle</c>, which bounds where the BARREL may point. Reporting
+    ///     the barrel's limit as the shot's would draw an arc the engine does not enforce.
+    /// </remarks>
+    private static float? HardpointArcPitchDegrees(EffectiveObject effective)
+    {
+        if (!EngineBoolean.IsTrue(Tag(effective, "Is_Turret")))
+            return Number(effective, "Fire_Cone_Height");
+
+        return FullTurnDegrees;
     }
 
     /// <summary>Whether either behaviour list names <c>WEAPON</c>.</summary>
@@ -1324,10 +1479,13 @@ public sealed class PreviewSceneBuilder(
         if (string.IsNullOrEmpty(turretBone) && string.IsNullOrEmpty(barrelBone))
             return null;
 
+        // EFFECTIVE, like the hardpoint's - but off the UNIT's defaults, which are 360 and 180.
         return new PreviewTurret(
             null,
-            Number(effective, "Turret_Rotate_Extent_Degrees"),
-            Number(effective, "Turret_Elevate_Extent_Degrees"),
+            Number(effective, "Turret_Rotate_Extent_Degrees")
+            ?? DefaultTurretRotateExtentDegrees,
+            Number(effective, "Turret_Elevate_Extent_Degrees")
+            ?? DefaultTurretElevateExtentDegrees,
             string.IsNullOrEmpty(turretBone) ? null : turretBone,
             string.IsNullOrEmpty(barrelBone) ? null : barrelBone);
     }
@@ -1507,8 +1665,8 @@ public sealed class PreviewSceneBuilder(
             Tag(effective, "Damage_Type") is { Length: > 0 } dmg ? dmg : null,
             Number(effective, "Fire_Range_Distance"),
             Number(effective, "Fire_Min_Range_Distance"),
-            Number(effective, "Fire_Cone_Width"),
-            Number(effective, "Fire_Cone_Height"),
+            HardpointArcYawDegrees(effective),
+            HardpointArcPitchDegrees(effective),
             Inaccuracy(hardpointId),
             Integer(effective, "Fire_Pulse_Count"),
             Number(effective, "Fire_Pulse_Delay_Seconds"),

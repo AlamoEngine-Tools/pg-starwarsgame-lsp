@@ -248,6 +248,14 @@ export interface PreviewDeathClone {
     modelFile?: string | null;
     playsIdle: boolean;
     /**
+     * The CLONE's own `Scale_Factor`, or 1 - not the ship's.
+     *
+     * A clone is spawned as its own object and drawn at its own scale. Measured over 265
+     * ship-to-clone pairs, 59 disagree with their ship - the Millennium Falcon is 0.5 and its clone
+     * 1.0 - so it cannot simply inherit the subject's.
+     */
+    scaleFactor?: number | null;
+    /**
      * The clips of the CLONE'S OWN model, by file name.
      *
      * Its own, because the scene's list describes the SUBJECT. That a clone ever played at all was
@@ -709,6 +717,20 @@ export interface PreviewScene {
      * what health". See `stageForHull`.
      */
     damageTable: PreviewDamageBand[];
+    /**
+     * The subject's uniform render scale - `Scale_Factor` - or 1 where it declares none.
+     *
+     * **The bridge between two spaces.** `GameObjectClass::Update_Transform` builds the object's
+     * world matrix from a translation and three rotations with NO scale in it, then calls
+     * `Model->Set_Scale(Get_Scale_Factor(Type))` - so the scale lives on the model alone. Geometry
+     * and bones are MODEL units and reach the world multiplied by this; every range and distance
+     * the XML declares is already in WORLD units and is not.
+     *
+     * Applied at the model root, so an arc drawn at its declared range is correct by construction
+     * and nothing has to do arc arithmetic. Two things then need counter-scaling - see
+     * `Viewport.setModelScale`.
+     */
+    scaleFactor?: number | null;
     factions: PreviewFaction[];
     problems: PreviewProblem[];
     /** The cameras the subject's own model declares. Empty for the 87% that carry none. */

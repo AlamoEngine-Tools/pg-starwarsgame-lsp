@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -121,8 +122,11 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             var models = pass.DeclaredModels(owner.Id);
             if (models.Count == 0) continue;
 
+            // Anchored on the tag's VALUE (CollectBoneTags), so a quick fix replacing the range
+            // replaces exactly the name that is wrong.
             foreach (var (bone, checkedAttached) in parentBones)
-                CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, pass, checkedAttached);
+                CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, pass, checkedAttached,
+                    anchoredOnValue: true);
         }
     }
 
@@ -216,8 +220,15 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
     // ── shared ───────────────────────────────────────────────────────────────
 
+    /// <param name="anchoredOnValue">
+    ///     Whether the bone's position is the tag's own value - true from the hardpoint's file, false
+    ///     from the attaching object's, where it is the hardpoint's id in the <c>HardPoints</c> list. A
+    ///     suggestion is only ever attached in the first case; see
+    ///     <see cref="HardpointBoneNotOnModelFact.SuggestedName" />.
+    /// </param>
     private static void CheckBoneAgainstModels(BoneReference bone, IReadOnlyList<string?> models,
-        string hardpointId, string ownerId, Pass pass, string? checkedAttachedModel = null)
+        string hardpointId, string ownerId, Pass pass, string? checkedAttachedModel = null,
+        bool anchoredOnValue = false)
     {
         foreach (var model in models)
         {
@@ -240,10 +251,52 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
             if (modelBones.Contains(bone.Value, StringComparer.OrdinalIgnoreCase)) continue;
 
+            var suggestion = anchoredOnValue
+                ? SuggestCollisionMesh(bone, modelBones, checkedAttachedModel, pass)
+                : null;
+
             pass.Facts.Add(new HardpointBoneNotOnModelFact(pass.DocumentUri,
                 bone.Position.Line, bone.Position.Column, bone.Position.Length,
-                hardpointId, bone.Tag, bone.Value, model, ownerId, checkedAttachedModel));
+                hardpointId, bone.Tag, bone.Value, model, ownerId, checkedAttachedModel, suggestion));
         }
+    }
+
+    /// <summary>
+    ///     The one name the checked models carry that starts with a truncated <c>Collision_Mesh</c>, or
+    ///     null.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The failure this is for is measured, not guessed: all eight Gargantuan hardpoints write
+    ///         <c>..._COL</c> or <c>..._COLL</c> and their models carry <c>..._COLLISION</c>. So only
+    ///         <c>Collision_Mesh</c>, only a name that EXTENDS what was written, and only when exactly
+    ///         one does - a quick fix that picked between two candidates would be a guess dressed as a
+    ///         fix.
+    ///     </para>
+    ///     <para>
+    ///         Candidates are the hull being reported and the hardpoint's own model where that was also
+    ///         checked, because the tag is valid on either. The model's spelling is returned verbatim,
+    ///         since that is what the author should see written back.
+    ///     </para>
+    /// </remarks>
+    private static string? SuggestCollisionMesh(BoneReference bone, ImmutableArray<string> hullNames,
+        string? attachedModel, Pass pass)
+    {
+        if (!HardpointBoneModelResolver.MayResolveAgainstAttachedModel(bone.Tag)) return null;
+
+        IEnumerable<string> names = hullNames;
+        if (!string.IsNullOrEmpty(attachedModel)
+            && pass.Index.ModelBones.TryGetValue(ModelBoneKey.From(attachedModel), out var attachedNames))
+            names = names.Concat(attachedNames);
+
+        var candidates = names
+            .Where(n => n.Length > bone.Value.Length
+                        && n.StartsWith(bone.Value, StringComparison.OrdinalIgnoreCase))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Take(2)
+            .ToList();
+
+        return candidates.Count == 1 ? candidates[0] : null;
     }
 
     private static List<BoneReference> CollectBoneTags(HtmlNode hardpointNode, Pass pass)
