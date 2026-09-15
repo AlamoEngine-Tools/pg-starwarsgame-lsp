@@ -70,15 +70,16 @@ public sealed class MegaTextureIconExtractorRealDataTest
     ///     18-byte header, BGRA samples, and rows stored bottom-up so the image row <c>y</c> counted
     ///     from the top lives at file row <c>height - 1 - y</c>. MTD coordinates are top-origin.
     /// </summary>
-    private static (byte R, byte G, byte B, byte A)[] ReadRegionDirectly(byte[] tga, int x, int y, int width, int height)
+    private static (byte R, byte G, byte B, byte A)[] ReadRegionDirectly(byte[] tga, int x, int y, int width,
+        int height)
     {
         const int headerSize = 18;
-        int textureWidth = tga[12] | (tga[13] << 8);
-        int textureHeight = tga[14] | (tga[15] << 8);
+        var textureWidth = tga[12] | (tga[13] << 8);
+        var textureHeight = tga[14] | (tga[15] << 8);
 
-        Assert.Equal(2, tga[2]);   // uncompressed true-colour
+        Assert.Equal(2, tga[2]); // uncompressed true-colour
         Assert.Equal(32, tga[16]); // BGRA
-        Assert.Equal(0, tga[17]);  // origin bottom-left
+        Assert.Equal(0, tga[17]); // origin bottom-left
 
         var pixels = new (byte R, byte G, byte B, byte A)[width * height];
         for (var j = 0; j < height; j++)
@@ -158,7 +159,3 @@ public sealed class MegaTextureIconExtractorRealDataTest
         return null;
     }
 }
-
-
-
-

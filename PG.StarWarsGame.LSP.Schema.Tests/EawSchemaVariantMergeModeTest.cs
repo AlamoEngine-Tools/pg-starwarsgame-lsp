@@ -29,11 +29,11 @@ public sealed class EawSchemaVariantMergeModeTest
     // DynamicVectorClass or std::vector, which nothing clears on the overlay path.
     [Theory]
     [InlineData("GameObjectType.yaml", "Starting_Spawned_Units_Tech_0")] // 0x46 spawn table
-    [InlineData("GameObjectType.yaml", "Land_Terrain_Model_Mapping")]    // 0x34
-    [InlineData("GameObjectType.yaml", "SFXEvent_Attack_Override")]      // 0x22
-    [InlineData("GameObjectType.yaml", "Faction_Anim_Subindex")]         // 0x3c
-    [InlineData("Faction.yaml", "Music_Event_Tactical_Win_Vs_Faction")]  // 0x29
-    [InlineData("GameConstants.yaml", "ShipNameTextFiles")]              // 0x36
+    [InlineData("GameObjectType.yaml", "Land_Terrain_Model_Mapping")] // 0x34
+    [InlineData("GameObjectType.yaml", "SFXEvent_Attack_Override")] // 0x22
+    [InlineData("GameObjectType.yaml", "Faction_Anim_Subindex")] // 0x3c
+    [InlineData("Faction.yaml", "Music_Event_Tactical_Win_Vs_Faction")] // 0x29
+    [InlineData("GameConstants.yaml", "ShipNameTextFiles")] // 0x36
     public void AdditiveTags_DeclareMergeMode(string file, string tag)
     {
         Assert.Equal(VariantMode.Merge, Tag(file, tag).VariantMode);
@@ -59,12 +59,12 @@ public sealed class EawSchemaVariantMergeModeTest
     ///     </para>
     /// </remarks>
     [Theory]
-    [InlineData("GameObjectType.yaml", "Death_Explosions")]            // 0x1e
-    [InlineData("GameObjectType.yaml", "Projectile_Types")]            // 0x1e
-    [InlineData("GameObjectType.yaml", "Squadron_Units")]              // 0x1e
+    [InlineData("GameObjectType.yaml", "Death_Explosions")] // 0x1e
+    [InlineData("GameObjectType.yaml", "Projectile_Types")] // 0x1e
+    [InlineData("GameObjectType.yaml", "Squadron_Units")] // 0x1e
     [InlineData("GameObjectType.yaml", "Presence_Induced_Animations")] // 0x35
-    [InlineData("GameObjectType.yaml", "Death_Clone")]                 // 0x3b
-    [InlineData("HeroClashType.yaml", "Involved_Hero_Types")]          // 0x1e
+    [InlineData("GameObjectType.yaml", "Death_Clone")] // 0x3b
+    [InlineData("HeroClashType.yaml", "Involved_Hero_Types")] // 0x1e
     public void DeferredClearTags_AreNotAdditive(string file, string tag)
     {
         Assert.Equal(VariantMode.Replace, Tag(file, tag).VariantMode);

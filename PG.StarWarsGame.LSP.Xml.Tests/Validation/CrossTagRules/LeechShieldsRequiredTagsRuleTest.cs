@@ -27,14 +27,14 @@ public sealed class LeechShieldsRequiredTagsRuleTest
 
     // Every tag the engine demands, as the one shipped instance (Kadalbe_Leech_Shields) sets them.
     private const string Complete = """
-        <Shield_Damage_Per_Second>100.0</Shield_Damage_Per_Second>
-        <Damage_Multiplier>3.0</Damage_Multiplier>
-        <Beam_Bone_Name>HP_SHL_00_BONE</Beam_Bone_Name>
-        <Beam_Frames>10</Beam_Frames>
-        <Beam_Width>40.0</Beam_Width>
-        <Beam_Texture_Name>tractor_beam00.tga</Beam_Texture_Name>
-        <Beam_Effect_Name>Leech_Shields</Beam_Effect_Name>
-        """;
+                                    <Shield_Damage_Per_Second>100.0</Shield_Damage_Per_Second>
+                                    <Damage_Multiplier>3.0</Damage_Multiplier>
+                                    <Beam_Bone_Name>HP_SHL_00_BONE</Beam_Bone_Name>
+                                    <Beam_Frames>10</Beam_Frames>
+                                    <Beam_Width>40.0</Beam_Width>
+                                    <Beam_Texture_Name>tractor_beam00.tga</Beam_Texture_Name>
+                                    <Beam_Effect_Name>Leech_Shields</Beam_Effect_Name>
+                                    """;
 
     [Fact]
     public void A_complete_ability_is_silent()

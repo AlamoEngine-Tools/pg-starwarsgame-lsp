@@ -2,10 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
-
-using PG.StarWarsGame.LSP.Core.Util;
 
 namespace PG.StarWarsGame.LSP.Story.Model;
 
@@ -95,7 +94,7 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
 
             if (tacticalManifestFiles.Contains(manifestFile))
                 tacticalManifestThreadFiles[manifestFile] =
-                    [..contents.ActiveThreads, ..contents.SuspendedThreads];
+                    [.. contents.ActiveThreads, .. contents.SuspendedThreads];
 
             foreach (var thread in contents.ActiveThreads)
             {

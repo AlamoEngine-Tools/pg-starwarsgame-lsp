@@ -4,7 +4,6 @@
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;

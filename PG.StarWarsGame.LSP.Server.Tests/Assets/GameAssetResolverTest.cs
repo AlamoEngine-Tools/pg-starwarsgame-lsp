@@ -4,11 +4,9 @@
 using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.StarWarsGame.LSP.Core.Configuration;
-using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Assets;
-using PG.StarWarsGame.LSP.Server.Project;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Assets;
 
@@ -54,8 +52,11 @@ public sealed class GameAssetResolverTest
             : WorkspaceConfiguration.Empty with
             {
                 AssetRoots = assetRoots,
-                Layers = [.. assetRoots.Select((r, i) => new ProjectLayer(
-                    assetRoots.Count - i, $"layer{i}", [], [], [], [r], null))]
+                Layers =
+                [
+                    .. assetRoots.Select((r, i) => new ProjectLayer(
+                        assetRoots.Count - i, $"layer{i}", [], [], [], [r], null))
+                ]
             });
 
         return new GameAssetResolver(new FileHelper(fs), config, projects,
@@ -76,7 +77,7 @@ public sealed class GameAssetResolverTest
     public void Locate_FindsAnAssetInAWorkspaceRoot()
     {
         var fs = FileSystemWith(@"C:\mod\Data\Art\Models\Ev_stardestroyer.alo");
-        var resolver = Build(fs, assetRoots: [@"C:\mod"]);
+        var resolver = Build(fs, [@"C:\mod"]);
 
         var found = resolver.Locate(ModelPath);
 
@@ -93,7 +94,7 @@ public sealed class GameAssetResolverTest
         // `<project>/data/art/Data/Art/Models/...`, which never exists, and every model in the
         // modder's own workspace reports "not found".
         var fs = FileSystemWith(@"C:\mod\data\art\Models\Ev_stardestroyer.alo");
-        var resolver = Build(fs, assetRoots: [@"C:\mod\data\art"]);
+        var resolver = Build(fs, [@"C:\mod\data\art"]);
 
         var found = resolver.Locate(ModelPath);
 
@@ -105,7 +106,7 @@ public sealed class GameAssetResolverTest
     public void Locate_FindsATextureUnderAnArtRoot()
     {
         var fs = FileSystemWith(@"C:\mod\data\art\Textures\Ai_rancor.tga");
-        var resolver = Build(fs, assetRoots: [@"C:\mod\data\art"]);
+        var resolver = Build(fs, [@"C:\mod\data\art"]);
 
         Assert.NotNull(resolver.Locate("Data/Art/Textures/Ai_rancor.tga"));
     }
@@ -117,7 +118,7 @@ public sealed class GameAssetResolverTest
         // that does point at a game directory keeps working.
         var fs = FileSystemWith(@"C:\mod\Data\Art\Models\Ev_stardestroyer.alo");
 
-        Assert.NotNull(Build(fs, assetRoots: [@"C:\mod"]).Locate(ModelPath));
+        Assert.NotNull(Build(fs, [@"C:\mod"]).Locate(ModelPath));
     }
 
     [Fact]
@@ -126,7 +127,7 @@ public sealed class GameAssetResolverTest
         // Dropping the prefix must not turn an unrelated file into a match.
         var fs = FileSystemWith(@"C:\mod\data\art\Something\Else.alo");
 
-        Assert.Null(Build(fs, assetRoots: [@"C:\mod\data\art"]).Locate(ModelPath));
+        Assert.Null(Build(fs, [@"C:\mod\data\art"]).Locate(ModelPath));
     }
 
     [Fact]
@@ -186,7 +187,7 @@ public sealed class GameAssetResolverTest
         // A game tree exists on disk but was never configured, so it must be invisible. Probing for it
         // would mean registry reads, and Linux has no registry.
         var fs = FileSystemWith(@"C:\games\eaw\Data\Art\Models\Ev_stardestroyer.alo");
-        var resolver = Build(fs, assetRoots: [@"C:\mod"]);
+        var resolver = Build(fs, [@"C:\mod"]);
 
         Assert.Null(resolver.Locate(ModelPath));
     }
@@ -194,7 +195,7 @@ public sealed class GameAssetResolverTest
     [Fact]
     public void Tiers_ReportWhyShippedAssetsCannotResolve()
     {
-        var resolver = Build(new MockFileSystem(), assetRoots: [@"C:\mod"]);
+        var resolver = Build(new MockFileSystem(), [@"C:\mod"]);
 
         var tiers = resolver.Tiers;
 

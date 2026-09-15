@@ -8,8 +8,12 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 /// </summary>
 /// <remarks>
 ///     <para>
-///         Seven tags, each with its own message in the binary - <c>Error: (%s) Beam_Bone_Name has
-///         not been set.</c> (<c>0155803c</c>), and the same for <c>Beam_Effect_Name</c>,
+///         Seven tags, each with its own message in the binary -
+///         <c>
+///             Error: (%s) Beam_Bone_Name has
+///             not been set.
+///         </c>
+///         (<c>0155803c</c>), and the same for <c>Beam_Effect_Name</c>,
 ///         <c>Beam_Texture_Name</c>, <c>Beam_Frames</c>, <c>Beam_Width</c>,
 ///         <c>Damage_Multiplier</c> and <c>Shield_Damage_Per_Second</c>.
 ///     </para>
@@ -38,6 +42,6 @@ public sealed class LeechShieldsRequiredTagsRule : RequiredTagsRuleBase
         "Beam_Texture_Name",
         "Beam_Width",
         "Damage_Multiplier",
-        "Shield_Damage_Per_Second",
+        "Shield_Damage_Per_Second"
     ];
 }

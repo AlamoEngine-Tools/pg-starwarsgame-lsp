@@ -335,7 +335,8 @@ public sealed class XmlGoToSmokeTest : IClassFixture<EawLspServerFixture>
 
             Assert.NotNull(result);
             var uris = result!.Select(l => l.Uri.ToString()).ToList();
-            Assert.Contains(uris, u => u.Contains("story_plots_campaign_empire.xml", StringComparison.OrdinalIgnoreCase));
+            Assert.Contains(uris,
+                u => u.Contains("story_plots_campaign_empire.xml", StringComparison.OrdinalIgnoreCase));
         }
         finally
         {

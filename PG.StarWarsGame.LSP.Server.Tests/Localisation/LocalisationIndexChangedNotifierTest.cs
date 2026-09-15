@@ -95,6 +95,7 @@ public sealed class LocalisationIndexChangedNotifierTest
 
         public event Action<GameIndex>? IndexChanged;
         public event Action<ILocalisationIndex>? LocalisationChanged;
+
         public event Action<GameIndex>? DynamicEnumChanged
         {
             add { }

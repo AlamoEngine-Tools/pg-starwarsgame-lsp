@@ -6,10 +6,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
-
-using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -139,8 +138,10 @@ public sealed class DatRowRoundTripTest
 
         await editor.ApplyToFileAsync(
             path,
-            [new LocEditCommandDto("insertRow", 0, Key: "TEST_INSERTED",
-                Values: [new LocValueDto("ENGLISH", "Inserted")])],
+            [
+                new LocEditCommandDto("insertRow", 0, Key: "TEST_INSERTED",
+                    Values: [new LocValueDto("ENGLISH", "Inserted")])
+            ],
             CancellationToken.None);
 
         var afterInsert = reader.ReadFile(path).Rows;

@@ -92,7 +92,7 @@ public sealed class CampaignStoryAttachmentRule : IXmlCrossTagRule
         }
 
         attachments.Add(new Attachment(faction, value, StoryNameTagSyntax.FactionTagFor(faction),
-            FactionSpecific: true, line, column, length, XmlUtility.GetPrintableLine(node)));
+            true, line, column, length, XmlUtility.GetPrintableLine(node)));
     }
 
     /// <summary>
@@ -118,7 +118,7 @@ public sealed class CampaignStoryAttachmentRule : IXmlCrossTagRule
                 var (line, column, length) =
                     XmlUtility.GetInnerOffsetValuePosition(node, offset, token.Length, lineIndex);
                 attachments.Add(new Attachment(faction, token, StoryNameTagSyntax.GenericTag,
-                    FactionSpecific: false, line, column, length, XmlUtility.GetPrintableLine(node)));
+                    false, line, column, length, XmlUtility.GetPrintableLine(node)));
                 faction = null;
             }
     }

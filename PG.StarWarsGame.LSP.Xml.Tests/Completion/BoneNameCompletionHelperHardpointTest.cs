@@ -95,13 +95,14 @@ public sealed class BoneNameCompletionHelperHardpointTest
         (string Hardpoint, string Owner)[] mounts)
     {
         var owners = mounts.Select(m => m.Owner).Distinct(StringComparer.OrdinalIgnoreCase)
-            .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin(ObjUri, 0, 0), null, null))
+            .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin(ObjUri, 0, 0), null))
             .ToList();
 
         var references = mounts
             .GroupBy(m => m.Hardpoint, StringComparer.OrdinalIgnoreCase)
             .ToImmutableDictionary(g => g.Key,
-                g => ImmutableArray.Create(new GameReference(g.Key, GameSymbolKind.XmlObject, "HardPoint", ObjUri, 0, 0, 0)),
+                g => ImmutableArray.Create(new GameReference(g.Key, GameSymbolKind.XmlObject, "HardPoint", ObjUri, 0, 0,
+                    0)),
                 StringComparer.OrdinalIgnoreCase);
 
         return GameIndex.Empty with
@@ -118,7 +119,11 @@ public sealed class BoneNameCompletionHelperHardpointTest
     private sealed class TagSource : IVariantTagSource
     {
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId = new(StringComparer.OrdinalIgnoreCase);
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => _byId.GetValueOrDefault(objectId);
+
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
 
         public TagSource With(string id, params (string Tag, string Value)[] tags)
         {
@@ -129,13 +134,35 @@ public sealed class BoneNameCompletionHelperHardpointTest
 
     private sealed class EmptySchema : ISchemaProvider
     {
-        public XmlTagDefinition? GetTag(string tagName) => null;
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public XmlTagDefinition? GetTag(string tagName)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];

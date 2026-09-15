@@ -189,37 +189,6 @@ public sealed class ModProjectLoaderTest
         Assert.Empty(sink.Calls);
     }
 
-    /// <summary>A fixture step: version 0.9.0 called the project's name something else.</summary>
-    private sealed class RenameToName : IDocumentMigration
-    {
-        public string TypeName => PgprojFormat.TypeName;
-        public TypeVersion From => TypeVersion.Of("aetswg", 0, 9);
-        public TypeVersion To => PgprojFormat.Current;
-        public string? UserNotice => "The 'renamedName' field is called 'name' now.";
-
-        public JsonNode Migrate(JsonNode document)
-        {
-            var root = document.AsObject();
-            if (root["renamedName"] is { } renamed)
-            {
-                root.Remove("renamedName");
-                root["name"] = renamed.DeepClone();
-            }
-
-            return root;
-        }
-    }
-
-    private sealed class RecordingSink : IPgprojMigrationSink
-    {
-        public List<(string Path, JsonObject Migrated, IReadOnlyList<string> Notices)> Calls { get; } = [];
-
-        public void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices)
-        {
-            Calls.Add((pgprojPath, migrated.AsObject(), notices));
-        }
-    }
-
     [Fact]
     public void Load_Name_ComesFromTopLevelField_IndependentOfModinfo()
     {
@@ -1019,6 +988,37 @@ public sealed class ModProjectLoaderTest
         });
         return new ModProjectLoader(
             new FileHelper(fs), new ListLogger(), sink ?? new NullPgprojMigrationSink(), migrations);
+    }
+
+    /// <summary>A fixture step: version 0.9.0 called the project's name something else.</summary>
+    private sealed class RenameToName : IDocumentMigration
+    {
+        public string TypeName => PgprojFormat.TypeName;
+        public TypeVersion From => TypeVersion.Of("aetswg", 0, 9);
+        public TypeVersion To => PgprojFormat.Current;
+        public string? UserNotice => "The 'renamedName' field is called 'name' now.";
+
+        public JsonNode Migrate(JsonNode document)
+        {
+            var root = document.AsObject();
+            if (root["renamedName"] is { } renamed)
+            {
+                root.Remove("renamedName");
+                root["name"] = renamed.DeepClone();
+            }
+
+            return root;
+        }
+    }
+
+    private sealed class RecordingSink : IPgprojMigrationSink
+    {
+        public List<(string Path, JsonObject Migrated, IReadOnlyList<string> Notices)> Calls { get; } = [];
+
+        public void Migrated(string pgprojPath, JsonNode migrated, IReadOnlyList<string> notices)
+        {
+            Calls.Add((pgprojPath, migrated.AsObject(), notices));
+        }
     }
 
     private sealed record LogEntry(LogLevel Level, string Message);

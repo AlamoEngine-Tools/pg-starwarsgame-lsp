@@ -21,7 +21,7 @@ public sealed class CreditsCoverageInspectorTest
         var rows = new[]
         {
             Row(0, "HEADER", "Lead Designer", "Chefdesigner"),
-            Row(1, "CENTER", "Alice", "Alice"),
+            Row(1, "CENTER", "Alice", "Alice")
         };
 
         Assert.Empty(CreditsCoverageInspector.Inspect(rows, Languages));
@@ -36,7 +36,7 @@ public sealed class CreditsCoverageInspectorTest
         {
             Row(0, "HEADER", "Voice Cast", "Sprecher"),
             Row(1, "CENTER", "Alice", ""),
-            Row(2, "CENTER", "Bob", ""),
+            Row(2, "CENTER", "Bob", "")
         };
 
         var problem = Assert.Single(CreditsCoverageInspector.Inspect(rows, Languages));
@@ -54,7 +54,7 @@ public sealed class CreditsCoverageInspectorTest
             Row(0, "HEADER", "Voice Cast", "Sprecher"),
             Row(1, "CENTER", "Alice", "Anja"),
             Row(2, "CENTER", "Bob", ""),
-            Row(3, "CENTER", "Carol", ""),
+            Row(3, "CENTER", "Carol", "")
         };
 
         Assert.Empty(CreditsCoverageInspector.Inspect(rows, Languages));
@@ -68,7 +68,7 @@ public sealed class CreditsCoverageInspectorTest
         var rows = new[]
         {
             Row(0, "HEADER", "Voice Cast", ""),
-            Row(1, "CENTER", "Alice", ""),
+            Row(1, "CENTER", "Alice", "")
         };
 
         Assert.Empty(CreditsCoverageInspector.Inspect(rows, Languages));
@@ -83,7 +83,7 @@ public sealed class CreditsCoverageInspectorTest
             Row(0, "HEADER", "Voice Cast", ""),
             Row(1, "CENTER", "Alice", ""),
             Row(2, "HEADER", "Art", ""),
-            Row(3, "CENTER", "Bob", ""),
+            Row(3, "CENTER", "Bob", "")
         };
 
         Assert.Empty(CreditsCoverageInspector.Inspect(rows, Languages));
@@ -98,7 +98,7 @@ public sealed class CreditsCoverageInspectorTest
             Row(0, "HEADER", "Voice Cast", "Sprecher"),
             Row(1, "CENTER", "[TBL]", "[TBL]"),
             Row(2, "HEADER", "Art", "Grafik"),
-            Row(3, "CENTER", "Bob", "Bob"),
+            Row(3, "CENTER", "Bob", "Bob")
         };
 
         // Both languages, because the section is only spacers in both - a spacer is not content.
@@ -115,7 +115,7 @@ public sealed class CreditsCoverageInspectorTest
         {
             Row(0, "HEADER", "Art", "Grafik"),
             Row(1, "CENTER", "Bob", "Bob"),
-            Row(2, "HEADER", "Voice Cast", "Sprecher"),
+            Row(2, "HEADER", "Voice Cast", "Sprecher")
         };
 
         // Trailing in both languages, so both are reported.
@@ -132,7 +132,7 @@ public sealed class CreditsCoverageInspectorTest
         var rows = new[]
         {
             Row(0, "TITLE", "Voice Cast", "Sprecher"),
-            Row(1, "LINE", "Alice", ""),
+            Row(1, "LINE", "Alice", "")
         };
 
         Assert.Empty(CreditsCoverageInspector.Inspect(rows, Languages));

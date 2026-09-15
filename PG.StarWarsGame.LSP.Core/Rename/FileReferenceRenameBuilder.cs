@@ -20,6 +20,11 @@ namespace PG.StarWarsGame.LSP.Core.Rename;
 /// </summary>
 public static class FileReferenceRenameBuilder
 {
+    // The characters no major file system accepts in a name, folded together so the guard is the
+    // same on every platform: the Windows-reserved set plus the POSIX separator. '\' and '/' are
+    // both included so a stem never silently turns into a path.
+    private static readonly char[] InvalidStemChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
+
     public static WorkspaceEdit? Build(string id, string newStem, GameIndex index,
         IDocumentTextSource textSource, ILogger logger)
     {
@@ -101,11 +106,6 @@ public static class FileReferenceRenameBuilder
         var startCol = column + baseStart;
         return new LspRange(new Position(line, startCol), new Position(line, startCol + stemLength));
     }
-
-    // The characters no major file system accepts in a name, folded together so the guard is the
-    // same on every platform: the Windows-reserved set plus the POSIX separator. '\' and '/' are
-    // both included so a stem never silently turns into a path.
-    private static readonly char[] InvalidStemChars = ['/', '\\', ':', '*', '?', '"', '<', '>', '|'];
 
     private static bool IsValidFileStem(string stem)
     {

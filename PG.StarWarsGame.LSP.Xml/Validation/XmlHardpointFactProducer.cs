@@ -105,6 +105,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
 
             parentBones.Add((bone, checkedAttached));
         }
+
         var abilityNode = hardpointNode.ChildNodes.LastOrDefault(n =>
             n.NodeType == HtmlNodeType.Element &&
             n.Name.Equals(SpecialAbilityNameTag, StringComparison.OrdinalIgnoreCase));
@@ -126,7 +127,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             // replaces exactly the name that is wrong.
             foreach (var (bone, checkedAttached) in parentBones)
                 CheckBoneAgainstModels(bone, models, hardpointId, owner.Id, pass, checkedAttached,
-                    anchoredOnValue: true);
+                    true);
         }
     }
 
@@ -399,9 +400,10 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
     /// </summary>
     private sealed class Pass
     {
-        private readonly ParsedXmlDocument _document;
         private readonly Dictionary<string, IReadOnlyList<string>> _chainByOwner =
             new(StringComparer.OrdinalIgnoreCase);
+
+        private readonly ParsedXmlDocument _document;
 
         private readonly HardpointBoneModelResolver _models;
         private readonly EffectiveObjectResolver _resolver;
@@ -430,6 +432,9 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         ///     6461-line file re-walked the whole tree 194 times).
         /// </summary>
         public Dictionary<string, HtmlNode> NodesById { get; }
+
+        /// <summary>The document's memoised line index, for value/token range computation.</summary>
+        public LineOffsetIndex LineIndex => _document.LineIndex;
 
         /// <summary>
         ///     Models the object declares, resolved through variant inheritance. Delegated to the shared
@@ -463,7 +468,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             var effective = _resolver.Resolve(ownerId);
             var chain = effective.Found && !effective.Cyclic
                 ? effective.Chain
-                : (IReadOnlyList<string>) [ownerId];
+                : (IReadOnlyList<string>)[ownerId];
 
             return _chainByOwner[ownerId] = chain;
         }
@@ -477,9 +482,6 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             return _models.FindAttachingObjects(hardpointId);
         }
 
-        /// <summary>The document's memoised line index, for value/token range computation.</summary>
-        public LineOffsetIndex LineIndex => _document.LineIndex;
-
         /// <summary>
         ///     Position of one token inside a list element. Uses the document's memoised line index -
         ///     building a fresh <see cref="LineOffsetIndex" /> here re-scanned the whole file per token.
@@ -488,7 +490,7 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
         {
             var (line, column) = _document.LineIndex.GetPosition(listNode.InnerStartIndex + offset);
             return new Position(line, column, token.Length);
-        } 
+        }
 
         private static Dictionary<string, HtmlNode> BuildNodeIndex(HtmlDocument doc)
         {

@@ -314,7 +314,9 @@ public static class DiagnosticIds
     public static readonly DiagnosticId HardpointModelBonesUnavailable = new(DiagnosticGroup.CrossTag, 6);
     public static readonly DiagnosticId PlanetModeExclusionList = new(DiagnosticGroup.CrossTag, 7);
     public static readonly DiagnosticId SquadronOffsetsMismatch = new(DiagnosticGroup.CrossTag, 8);
+
     public static readonly DiagnosticId PlanetModeMissingMode = new(DiagnosticGroup.CrossTag, 9);
+
     // 11, not 10: DamageStageNotOnModel already holds 10, further down this file.
     public static readonly DiagnosticId DamageAbsorbsNothing = new(DiagnosticGroup.CrossTag, 11);
     public static readonly DiagnosticId SpecialWeaponBehavior = new(DiagnosticGroup.CrossTag, 12);
@@ -330,6 +332,7 @@ public static class DiagnosticIds
     ///     would be one the base game trips - see <c>LandDamageTableRule</c> for the measurement.
     /// </remarks>
     public static readonly DiagnosticId LandDamageTableMismatch = new(DiagnosticGroup.CrossTag, 14);
+
     public static readonly DiagnosticId MissingRequiredTag = new(DiagnosticGroup.CrossTag, 15);
     public static readonly DiagnosticId TagComparison = new(DiagnosticGroup.CrossTag, 16);
 
@@ -579,8 +582,10 @@ public static class DiagnosticIds
     /// <summary>GameConstants maps no targeting reticle for a hardpoint type the object attaches.</summary>
     public static readonly DiagnosticId PreviewNoReticleForType = new(DiagnosticGroup.Preview, 15);
 
-    /// <summary>An animation override whose skeleton differs from the hull's. Informational: the
-    /// clips still play, bound by bone index.</summary>
+    /// <summary>
+    ///     An animation override whose skeleton differs from the hull's. Informational: the
+    ///     clips still play, bound by bone index.
+    /// </summary>
     public static readonly DiagnosticId PreviewAnimationSkeletonMismatch =
         new(DiagnosticGroup.Preview, 16);
 

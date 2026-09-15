@@ -63,7 +63,7 @@ public sealed class EawSchemaNormalizedChanceTagTest
             { "EatAttackAbility.yaml", "Damage_Percentage" },
             { "ForceTelekinesisAbility.yaml", "Activation_Chance" },
             { "ForceTelekinesisAbility.yaml", "Damage_Percentage" },
-            { "GenericAttackAbility.yaml", "Damage_Percentage" },
+            { "GenericAttackAbility.yaml", "Damage_Percentage" }
         };
 
     [Theory]

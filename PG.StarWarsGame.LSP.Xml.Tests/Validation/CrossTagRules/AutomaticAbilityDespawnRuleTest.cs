@@ -41,14 +41,14 @@ public sealed class AutomaticAbilityDespawnRuleTest
     public static TheoryData<string> AutomaticStyles =>
     [
         "Global_Automatic", "Combat_Automatic", "Galactic_Automatic",
-        "Space_Automatic", "Ground_Automatic", "Skirmish_Automatic",
+        "Space_Automatic", "Ground_Automatic", "Skirmish_Automatic"
     ];
 
     /// <summary>The six cases that break out of the switch without a word.</summary>
     public static TheoryData<string> ManualStyles =>
     [
         "Ground_Activated", "Hero_Detected", "Combat_Imminent",
-        "Special_Attack", "Take_Damage", "User_Input",
+        "Special_Attack", "Take_Damage", "User_Input"
     ];
 
     [Theory]

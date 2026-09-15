@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Text;
 using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
@@ -35,6 +36,31 @@ public static class EngineTextLimits
     public const int TagValue = 0x2000;
 
     /// <summary>
+    ///     A tag's NAME, uppercased into <c>uppercase_key_name</c> by
+    ///     <c>DatabaseMapClass::Map_DB_Data_To_Class</c> - <c>DatabaseMap.cpp</c> line 4563,
+    ///     <c>CMP EAX, 0x100</c>. Not reported today: a name that long resolves to no tag at all, so
+    ///     the unknown-tag rule reaches it first and says something more useful.
+    /// </summary>
+    public const int TagName = 0x100;
+
+    /// <summary>
+    ///     An object's name, copied and uppercased for hashing by
+    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> - <c>GameObjectType.cpp</c> line 2225.
+    /// </summary>
+    public const int ObjectName = 128;
+
+    /// <summary>
+    ///     The fraction of a limit at which it is worth warning, before anything is wrong.
+    /// </summary>
+    /// <remarks>
+    ///     These limits are reached by ACCUMULATION - another hardpoint, another planet, a rename
+    ///     from <c>HP01</c> to something readable. By the time the limit is crossed the change that
+    ///     crossed it is rarely the change that caused it, so the useful moment to say something is
+    ///     while there is still room to act.
+    /// </remarks>
+    public const double WarnAtFraction = 0.9;
+
+    /// <summary>
     ///     The engine type codes whose case in <c>Map_Data_Of_Type</c> copies the value into
     ///     <c>strtok_string_buffer</c>, and which the <see cref="TagValue" /> limit therefore binds.
     /// </summary>
@@ -61,7 +87,7 @@ public static class EngineTextLimits
         0x1a, 0x1b, 0x1e, 0x22, 0x23, 0x24, 0x25, 0x26, 0x28, 0x29,
         0x2a, 0x2b, 0x2d, 0x2e, 0x2f, 0x30, 0x31, 0x34, 0x35, 0x36,
         0x37, 0x3b, 0x3c, 0x3d, 0x3e, 0x3f, 0x40, 0x41, 0x42, 0x44,
-        0x45, 0x46, 0x47, 0x48, 0x4c, 0x4d, 0x4e, 0x4f, 0x51, 0x52,
+        0x45, 0x46, 0x47, 0x48, 0x4c, 0x4d, 0x4e, 0x4f, 0x51, 0x52
     ];
 
     /// <summary>
@@ -73,35 +99,10 @@ public static class EngineTextLimits
         return CopiedToBuffer.Contains((int)type);
     }
 
-    /// <summary>
-    ///     A tag's NAME, uppercased into <c>uppercase_key_name</c> by
-    ///     <c>DatabaseMapClass::Map_DB_Data_To_Class</c> - <c>DatabaseMap.cpp</c> line 4563,
-    ///     <c>CMP EAX, 0x100</c>. Not reported today: a name that long resolves to no tag at all, so
-    ///     the unknown-tag rule reaches it first and says something more useful.
-    /// </summary>
-    public const int TagName = 0x100;
-
-    /// <summary>
-    ///     An object's name, copied and uppercased for hashing by
-    ///     <c>GameObjectTypeClass::Get_Name_CRC</c> - <c>GameObjectType.cpp</c> line 2225.
-    /// </summary>
-    public const int ObjectName = 128;
-
-    /// <summary>
-    ///     The fraction of a limit at which it is worth warning, before anything is wrong.
-    /// </summary>
-    /// <remarks>
-    ///     These limits are reached by ACCUMULATION - another hardpoint, another planet, a rename
-    ///     from <c>HP01</c> to something readable. By the time the limit is crossed the change that
-    ///     crossed it is rarely the change that caused it, so the useful moment to say something is
-    ///     while there is still room to act.
-    /// </remarks>
-    public const double WarnAtFraction = 0.9;
-
     /// <summary>Bytes, as the engine counts them - not characters. UTF-8, matching how the files are read.</summary>
     public static int ByteCount(string text)
     {
-        return System.Text.Encoding.UTF8.GetByteCount(text);
+        return Encoding.UTF8.GetByteCount(text);
     }
 
     /// <summary>

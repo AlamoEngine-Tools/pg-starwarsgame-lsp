@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Assets.Icons;
-using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Project;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
@@ -21,26 +20,6 @@ public sealed class GetEncyclopediaEntryIconTest
 
     private static readonly byte[] Png = [0x89, 0x50, 0x4E, 0x47];
 
-    private sealed class StubIconCatalogProvider(IconCatalog catalog) : IIconCatalogProvider
-    {
-        public Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct)
-            => Task.FromResult(catalog);
-
-        public IReadOnlySet<string> IconsAwaitingRepack => catalog.IconsAwaitingRepack;
-
-        public void Invalidate() { }
-    }
-
-    private sealed class ThrowingIconCatalogProvider : IIconCatalogProvider
-    {
-        public Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct)
-            => throw new IOException("atlas unreadable");
-
-        public IReadOnlySet<string> IconsAwaitingRepack => new HashSet<string>();
-
-        public void Invalidate() { }
-    }
-
     private static GameIndex IndexWith(params GameSymbol[] symbols)
     {
         var defs = symbols.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
@@ -48,11 +27,16 @@ public sealed class GetEncyclopediaEntryIconTest
         return GameIndex.Empty with { WorkspaceDefinitions = defs };
     }
 
-    private static GameSymbol Sym() =>
-        new(ObjectId, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin("file:///u.xml", 0, 0), null, null);
+    private static GameSymbol Sym()
+    {
+        return new GameSymbol(ObjectId, GameSymbolKind.XmlObject, "SpaceUnit", new FileOrigin("file:///u.xml", 0, 0),
+            null);
+    }
 
-    private static VariantTag Tag(string name, string value) =>
-        new(name, value, $"<{name}>{value}</{name}>", 0);
+    private static VariantTag Tag(string name, string value)
+    {
+        return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
+    }
 
     private static IconCatalog CatalogWith(params string[] baselineNames)
     {
@@ -335,7 +319,7 @@ public sealed class GetEncyclopediaEntryIconTest
         params VariantTag[] objectTags)
     {
         var component = new GameSymbol(componentId, GameSymbolKind.XmlObject, "CommandBarComponent",
-            new FileOrigin("file:///Commandbarcomponents.xml", 0, 0), null, null);
+            new FileOrigin("file:///Commandbarcomponents.xml", 0, 0), null);
 
         var source = new FakeVariantTagSource()
             .With(ObjectId, objectTags)
@@ -474,5 +458,33 @@ public sealed class GetEncyclopediaEntryIconTest
         Assert.NotNull(result.Chrome);
         Assert.Equal(2, result.Chrome.FactionFrames.Count);
         Assert.All(result.Chrome.FactionFrames, f => Assert.Null(f.Image));
+    }
+
+    private sealed class StubIconCatalogProvider(IconCatalog catalog) : IIconCatalogProvider
+    {
+        public Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct)
+        {
+            return Task.FromResult(catalog);
+        }
+
+        public IReadOnlySet<string> IconsAwaitingRepack => catalog.IconsAwaitingRepack;
+
+        public void Invalidate()
+        {
+        }
+    }
+
+    private sealed class ThrowingIconCatalogProvider : IIconCatalogProvider
+    {
+        public Task<IconCatalog> GetAsync(string projectRoot, IconProjectSettings? settings, CancellationToken ct)
+        {
+            throw new IOException("atlas unreadable");
+        }
+
+        public IReadOnlySet<string> IconsAwaitingRepack => new HashSet<string>();
+
+        public void Invalidate()
+        {
+        }
     }
 }

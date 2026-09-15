@@ -13,8 +13,10 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 ///         <c>Overlay_Object_Type</c> and <c>Overlay_Types</c> are the only derivation path in the
 ///         engine, and the tag has exactly one row in the parser table, under that type. Every
 ///         other class parses its own tags and warns about whatever it does not recognise:
-///         <c>HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
-///         'Variant_Of_Existing_Type' in object 'HP_Whatever'.</c>
+///         <c>
+///             HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
+///             'Variant_Of_Existing_Type' in object 'HP_Whatever'.
+///         </c>
 ///     </para>
 ///     <para>
 ///         So this failure does at least tell you about itself, unlike an unresolvable base - but

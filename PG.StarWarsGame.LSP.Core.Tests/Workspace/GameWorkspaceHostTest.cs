@@ -183,7 +183,7 @@ public sealed class GameWorkspaceHostTest
     {
         var host = Build();
         host.AddOrUpdate("file:///a.xml", "<Root/>", 1, false);
-        host.AddOrUpdate("file:///a.xml", "<Root/>", 2, true);
+        host.AddOrUpdate("file:///a.xml", "<Root/>", 2);
 
         Assert.True(host.TryGet("file:///a.xml", out var doc));
         Assert.True(doc.PublishDiagnostics);

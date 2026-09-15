@@ -11,8 +11,12 @@ namespace PG.StarWarsGame.LSP.Schema.Tests;
 /// <remarks>
 ///     <para>
 ///         The shape, from <c>ReduceProductionTimeAbilityClass::Validate_Data</c>
-///         (<c>010180b0</c>): <c>if (style != 3) { Message_Popup("The only currently supported
-///         Activation_Style is Galactic_Automatic."); style = 3; }</c>. The object still loads, so
+///         (<c>010180b0</c>):
+///         <c>
+///             if (style != 3) { Message_Popup("The only currently supported
+///             Activation_Style is Galactic_Automatic."); style = 3; }
+///         </c>
+///         . The object still loads, so
 ///         the ability runs under a trigger the author did not write and nothing on screen says so.
 ///     </para>
 ///     <para>

@@ -44,7 +44,7 @@ public sealed class GrenadeProjectileHandler : XmlDiagnosticsHandler<XmlTagValue
     private static readonly (string Owner, string Tag)[] Owners =
     [
         ("Grenade_Attack_Ability", "Grenade_Type"),
-        ("Remote_Bomb_Ability", "Bomb_Type"),
+        ("Remote_Bomb_Ability", "Bomb_Type")
     ];
 
     /// <inheritdoc />

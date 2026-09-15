@@ -16,6 +16,18 @@ public sealed class XmlDocumentFactProducerTest
 {
     private const string Uri = "file:///units/SpaceUnitData.xml";
 
+    // ── unnamed objects (issue #122) ──────────────────────────────────────────
+
+    /// <summary>
+    ///     An object whose name attribute is empty is dead content: the parser skips it with a
+    ///     debug log, so it produces no symbol, cannot be referenced, cannot be overridden, and
+    ///     never appears anywhere the author might notice it is gone.
+    /// </summary>
+    private const string SfxUri = "file:///audio/SFXEventFiles.xml";
+
+    private const string HardPointUri = "file:///units/HardPoints.xml";
+    private const string GameObjectUri = "file:///units/SpaceUnits.xml";
+
     private static XmlDocumentFactProducer Build(
         ISchemaProvider? schema = null,
         IFileTypeRegistry? registry = null,
@@ -355,17 +367,6 @@ public sealed class XmlDocumentFactProducerTest
         Assert.Empty(facts.OfType<SquadronOffsetsMismatchFact>());
     }
 
-    // ── unnamed objects (issue #122) ──────────────────────────────────────────
-
-    /// <summary>
-    ///     An object whose name attribute is empty is dead content: the parser skips it with a
-    ///     debug log, so it produces no symbol, cannot be referenced, cannot be overridden, and
-    ///     never appears anywhere the author might notice it is gone.
-    /// </summary>
-    private const string SfxUri = "file:///audio/SFXEventFiles.xml";
-    private const string HardPointUri = "file:///units/HardPoints.xml";
-    private const string GameObjectUri = "file:///units/SpaceUnits.xml";
-
     [Fact]
     public void Empty_name_attribute_emits_UnnamedObjectFact()
     {
@@ -621,8 +622,11 @@ public sealed class XmlDocumentFactProducerTest
     ///     The whole derivation machinery - <c>Overlay_Object_Type</c>, <c>Overlay_Types</c> -
     ///     exists only for that class, and there is no second derivation path in the engine. Every
     ///     other class parses its own tags and warns about what it does not recognise:
-    ///     <c>HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
-    ///     'Variant_Of_Existing_Type'</c>. The object loads anyway, with the tag ignored.
+    ///     <c>
+    ///         HardPointDataClass::Parse_Database_Entry() - Unprocessed entry
+    ///         'Variant_Of_Existing_Type'
+    ///     </c>
+    ///     . The object loads anyway, with the tag ignored.
     /// </remarks>
     [Fact]
     public void Variant_tag_on_a_type_without_variants_emits_a_fact()

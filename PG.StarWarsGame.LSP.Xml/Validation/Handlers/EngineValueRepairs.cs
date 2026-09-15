@@ -55,7 +55,7 @@ internal static class EngineValueRepairs
 
             // GrenadeAttackAbilityClass::Validate_Data (0100b330) - the message names the default
             // itself, "Defaulting to 10.0 seconds".
-            [("GrenadeAttackAbility", "Grenade_Explode_Timer_In_Secs")] = "10.0",
+            [("GrenadeAttackAbility", "Grenade_Explode_Timer_In_Secs")] = "10.0"
         };
 
     /// <summary>

@@ -1,14 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.IO.Abstractions;
+using System.IO.Abstractions.TestingHelpers;
 using Microsoft.Extensions.DependencyInjection;
 using PG.Commons.Hashing;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
-
-using System.IO.Abstractions;
-
-using System.IO.Abstractions.TestingHelpers;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -40,8 +38,12 @@ public sealed class TranslationKeyInspectorTest
     ///     bytes, and the writer refuses one that is not.
     ///     <para>
     ///         Reported here so it appears while the file is being edited. It used to surface only
-    ///         when Save reached the writer, as <c>Value contains non-ASCII characters (Parameter
-    ///         'value')</c> - which names the wrong field, since it is the KEY being rejected, and
+    ///         when Save reached the writer, as
+    ///         <c>
+    ///             Value contains non-ASCII characters (Parameter
+    ///             'value')
+    ///         </c>
+    ///         - which names the wrong field, since it is the KEY being rejected, and
     ///         arrives once per language file after every edit has been made.
     ///     </para>
     /// </summary>

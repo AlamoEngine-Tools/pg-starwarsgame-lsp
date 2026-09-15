@@ -14,8 +14,10 @@ namespace PG.StarWarsGame.LSP.Core.Symbols;
 public sealed class GameIndexService : IGameIndexService
 {
     private readonly IFileHelper _fileHelper;
+
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _inflightCts =
         new(DocumentUris.Comparer);
+
     private readonly IProjectLayerMap? _layerMap;
     private readonly ILogger<GameIndexService> _logger;
     private readonly object _mergeLock = new();

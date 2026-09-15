@@ -6,6 +6,7 @@ using OmniSharp.Extensions.JsonRpc;
 using PG.StarWarsGame.Files.DAT.Services;
 using PG.StarWarsGame.Localisation.Data;
 using PG.StarWarsGame.Localisation.IO.Dat;
+using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -28,8 +29,8 @@ public sealed class CreateLocalisationLanguageFileHandler
 {
     private readonly ILspConfigurationProvider _config;
     private readonly ILocalisationFormatConverter _converter;
-    private readonly IDatFileService _datFileService;
     private readonly IDatTranslationExporter _datExporter;
+    private readonly IDatFileService _datFileService;
     private readonly ITranslationDatabaseFactory _factory;
     private readonly IFileHelper _fileHelper;
     private readonly ILanguageService _langService;
@@ -154,7 +155,7 @@ public sealed class CreateLocalisationLanguageFileHandler
 
     private async Task<bool> WriteAsync(
         ITranslationDatabase db, string extension, string targetPath,
-        PG.StarWarsGame.Localisation.Languages.IAlamoLanguageDefinition language, CancellationToken ct)
+        IAlamoLanguageDefinition language, CancellationToken ct)
     {
         if (extension != ".dat")
             return await _converter.WriteAsync(db, "nls", targetPath, ct);

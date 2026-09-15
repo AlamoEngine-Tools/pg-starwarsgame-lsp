@@ -29,7 +29,10 @@ public sealed record AbilityIcon(IconResolution? Icon, AbilityIconOutcome Outcom
 
     public static AbilityIcon Missing { get; } = new(null, AbilityIconOutcome.DeclaredButMissing);
 
-    public static AbilityIcon Found(IconResolution icon) => new(icon, AbilityIconOutcome.Resolved);
+    public static AbilityIcon Found(IconResolution icon)
+    {
+        return new AbilityIcon(icon, AbilityIconOutcome.Resolved);
+    }
 }
 
 /// <summary>

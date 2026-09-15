@@ -18,6 +18,7 @@ public record LspConfiguration
     ///     redistributed with this extension, so this points at wherever the user put their own copy.
     /// </remarks>
     public string? ShaderPath { get; init; }
+
     public string Locale { get; init; } = "en";
     public SchemaSourceConfig SchemaSource { get; init; } = new();
     public BaselineSourceConfig BaselineSource { get; init; } = new();

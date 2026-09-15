@@ -42,7 +42,7 @@ public sealed class HardpointBoneNotOnModelHandlerTest
     [Fact]
     public void Both_models_are_named_when_both_were_checked()
     {
-        var message = Report(Fact(attached: "NV_pirate_turret.alo"));
+        var message = Report(Fact("NV_pirate_turret.alo"));
 
         Assert.Contains("NV_pirate_frigate.alo", message, StringComparison.Ordinal);
         Assert.Contains("NV_pirate_turret.alo", message, StringComparison.Ordinal);

@@ -78,10 +78,7 @@ public sealed class AloModelReaderStarDestroyerTest
     {
         var model = LoadOrSkip();
 
-        foreach (var mesh in model.Meshes)
-        {
-            Assert.InRange(mesh.BoneIndex, 0, model.Bones.Count - 1);
-        }
+        foreach (var mesh in model.Meshes) Assert.InRange(mesh.BoneIndex, 0, model.Bones.Count - 1);
     }
 
     [Fact]

@@ -17,7 +17,7 @@ public sealed class EncyclopediaLayoutResolverTest
     private static GameSymbol Component(string id)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, "CommandBarComponent",
-            new FileOrigin("file:///Commandbarcomponents.xml", 0, 0), null, null);
+            new FileOrigin("file:///Commandbarcomponents.xml", 0, 0), null);
     }
 
     private static GameIndex IndexWith(params string[] componentIds)

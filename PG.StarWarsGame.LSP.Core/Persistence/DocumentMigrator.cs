@@ -10,7 +10,9 @@ namespace PG.StarWarsGame.LSP.Core.Persistence;
 /// <param name="Failure">Why, when <paramref name="Document" /> is null. Names the versions involved.</param>
 /// <param name="Notices">What each step that ran wants the user told, in the order they ran.</param>
 public sealed record DocumentMigrationResult(
-    JsonNode? Document, string? Failure, IReadOnlyList<string> Notices);
+    JsonNode? Document,
+    string? Failure,
+    IReadOnlyList<string> Notices);
 
 /// <summary>
 ///     Runs a document's migration chain: the shared half of reading any versioned document,
@@ -37,9 +39,8 @@ public static class DocumentMigrator
 
         while (version.CompareTo(current) < 0)
         {
-            var step = migrations.FirstOrDefault(
-                m => string.Equals(m.TypeName, typeName, StringComparison.Ordinal)
-                     && m.From.Equals(version));
+            var step = migrations.FirstOrDefault(m => string.Equals(m.TypeName, typeName, StringComparison.Ordinal)
+                                                      && m.From.Equals(version));
 
             // A gap is a bug in our registration, not a fact about the file. Reading the document
             // at a version whose shape it does not have would paper over it.

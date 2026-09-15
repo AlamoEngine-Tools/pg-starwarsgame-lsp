@@ -61,7 +61,8 @@ public sealed class StorySimSetFlagHandler(IStorySimulationService sim, ILspConf
     {
         if (StorySimFeature.Rejection(config) is { } rejection)
             return Task.FromResult(new StorySimStateResult(null, rejection));
-        var (state, error) = sim.SetFlag(new StoryModelKey(request.Campaign, request.Faction), request.Flag, request.Value);
+        var (state, error) =
+            sim.SetFlag(new StoryModelKey(request.Campaign, request.Faction), request.Flag, request.Value);
         return Task.FromResult(new StorySimStateResult(state, error));
     }
 }

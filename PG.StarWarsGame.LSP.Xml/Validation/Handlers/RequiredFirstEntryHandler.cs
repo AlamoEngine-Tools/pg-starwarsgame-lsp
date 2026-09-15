@@ -37,7 +37,7 @@ public sealed class RequiredFirstEntryHandler : XmlDiagnosticsHandler<XmlTagValu
             // GameConstants.cpp:1170 - DamageTypeNames[ 0 ] == "Damage_Default"
             [("GameConstants", "Damage_Types")] = "Damage_Default",
             // GameConstants.cpp:1180 - ArmorTypeNames[ 0 ] == "Armor_Default"
-            [("GameConstants", "Armor_Types")] = "Armor_Default",
+            [("GameConstants", "Armor_Types")] = "Armor_Default"
         };
 
     /// <inheritdoc />

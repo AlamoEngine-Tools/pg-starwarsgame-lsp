@@ -31,10 +31,10 @@ public sealed class PreviewModelDetailTest
     private static AlamoMesh Mesh(string name, int bone, int? alt = null, int? lod = null)
     {
         return new AlamoMesh(
-            0, name,
-            new AlamoBoundingBox(new Vector3(-1, -2, -3), new Vector3(4, 5, 6)),
-            true, true, alt, lod, [])
-        { BoneIndex = bone };
+                0, name,
+                new AlamoBoundingBox(new Vector3(-1, -2, -3), new Vector3(4, 5, 6)),
+                true, true, alt, lod, [])
+            { BoneIndex = bone };
     }
 
     private static AlamoModelContent Model(
@@ -52,7 +52,7 @@ public sealed class PreviewModelDetailTest
     {
         var detail = PreviewModelDetail.From("Ev_test", Model([
             Bone(0, "Root", -1),
-            Bone(1, "HP_F-L", 0, visible: false),
+            Bone(1, "HP_F-L", 0, visible: false)
         ]));
 
         Assert.Equal(2, detail.Bones.Count);
@@ -80,7 +80,7 @@ public sealed class PreviewModelDetailTest
         // Never the ordinal: the wire has already cost one bug where an enum crossed as a number and
         // the client read it as a name.
         var detail = PreviewModelDetail.From("Ev_test", Model([
-            Bone(0, "Root", -1, billboard: AlamoBillboardType.ZAxisView),
+            Bone(0, "Root", -1, billboard: AlamoBillboardType.ZAxisView)
         ]));
 
         Assert.Equal("ZAxisView", detail.Bones[0].Billboard);
@@ -100,9 +100,10 @@ public sealed class PreviewModelDetailTest
     {
         // "No ALT declared" and "ALT 0" are different statements about the file, and defaulting one
         // to the other would tell an author they pinned a mesh to the undamaged state.
-        var detail = PreviewModelDetail.From("Ev_test", Model(meshes: [
+        var detail = PreviewModelDetail.From("Ev_test", Model(meshes:
+        [
             Mesh("hull", 0),
-            Mesh("hull_ALT2", 0, alt: 2, lod: 1),
+            Mesh("hull_ALT2", 0, 2, 1)
         ]));
 
         Assert.Null(detail.Meshes[0].Alt);
@@ -116,8 +117,9 @@ public sealed class PreviewModelDetailTest
     {
         // `altDecreaseStayHidden` exists nowhere else in the client: the exporter does not write
         // proxies into the glTF at all, so without this the flag is unreadable.
-        var detail = PreviewModelDetail.From("Ev_test", Model(proxies: [
-            new AlamoProxy("p_smoke", 3, true, true, 2, null),
+        var detail = PreviewModelDetail.From("Ev_test", Model(proxies:
+        [
+            new AlamoProxy("p_smoke", 3, true, true, 2, null)
         ]));
 
         var proxy = Assert.Single(detail.Proxies);
@@ -132,8 +134,9 @@ public sealed class PreviewModelDetailTest
     {
         // Measured: they are 3ds Max export residue, and no shipped effect declares a point or spot
         // uniform that could consume one. The count exists only so the panel can say so.
-        var detail = PreviewModelDetail.From("Ev_test", Model(lights: [
-            new AlamoLight("Spot01", AlamoLightType.Spot, Vector3.One, 1, 200, 80, 0.75f, 0.78f),
+        var detail = PreviewModelDetail.From("Ev_test", Model(lights:
+        [
+            new AlamoLight("Spot01", AlamoLightType.Spot, Vector3.One, 1, 200, 80, 0.75f, 0.78f)
         ]));
 
         Assert.Equal(1, detail.LightCount);

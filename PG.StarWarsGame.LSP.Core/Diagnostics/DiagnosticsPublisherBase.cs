@@ -7,9 +7,8 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Core.Workspace;
-
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Core.Workspace;
 
 namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 
@@ -56,6 +55,11 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
         indexService.IndexChanged += OnIndexChanged;
     }
 
+    protected abstract string FileExtension { get; }
+
+    /// <summary>Feature-flag gate: while false, index changes publish nothing.</summary>
+    protected virtual bool DiagnosticsEnabled => true;
+
     /// <summary>
     ///     Republishes every open document of this language against the current index.
     ///     <para>
@@ -76,11 +80,6 @@ public abstract class DiagnosticsPublisherBase : IDiagnosticsRepublisher
 
         return Task.CompletedTask;
     }
-
-    protected abstract string FileExtension { get; }
-
-    /// <summary>Feature-flag gate: while false, index changes publish nothing.</summary>
-    protected virtual bool DiagnosticsEnabled => true;
 
     protected abstract void PublishForDocument(string uri, string text, GameIndex index);
 

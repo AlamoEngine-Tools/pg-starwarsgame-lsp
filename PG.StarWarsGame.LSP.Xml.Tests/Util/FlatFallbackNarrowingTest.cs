@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Xml.Util;
 
@@ -87,7 +88,7 @@ public sealed class FlatFallbackNarrowingTest
             new TagResolutionContext(typeName, 0, HtmlNode()));
     }
 
-    private static HtmlAgilityPack.HtmlNode HtmlNode()
+    private static HtmlNode HtmlNode()
     {
         return XmlUtility.CreateHtmlDocument("<Root/>").DocumentNode;
     }
@@ -100,7 +101,7 @@ public sealed class FlatFallbackNarrowingTest
             Tag = Tag,
             ValueType = XmlValueType.DynamicEnumValue,
             AllowedValues = ["GROUND_ACTIVATED"],
-            ValidationOverride = new TagValidationOverride { ValidationId = "some-rule" },
+            ValidationOverride = new TagValidationOverride { ValidationId = "some-rule" }
         };
 
         public XmlTagDefinition? GetTag(string tagName)

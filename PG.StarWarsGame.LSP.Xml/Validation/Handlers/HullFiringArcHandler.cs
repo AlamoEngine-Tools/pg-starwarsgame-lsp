@@ -60,7 +60,8 @@ public sealed class HullFiringArcHandler : XmlDiagnosticsHandler<HullFiringArcFa
         foreach (var (tag, unrestricted, pitch) in Extents)
         {
             if (pitch && xyOnly) continue;
-            if (!double.TryParse(Value(unit, tag), NumberStyles.Float, CultureInfo.InvariantCulture, out var bound)) continue;
+            if (!double.TryParse(Value(unit, tag), NumberStyles.Float, CultureInfo.InvariantCulture,
+                    out var bound)) continue;
             if (bound >= unrestricted) continue;
 
             var text = bound.ToString("0.###", CultureInfo.InvariantCulture);

@@ -12,7 +12,10 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 /// <param name="ProposedText">The migrated file, verbatim - what will be written if they accept.</param>
 /// <param name="Notices">What each migration that ran wants the user told.</param>
 public sealed record PgprojMigrationProposal(
-    string Path, string FileName, string ProposedText, IReadOnlyList<string> Notices);
+    string Path,
+    string FileName,
+    string ProposedText,
+    IReadOnlyList<string> Notices);
 
 /// <summary>
 ///     Puts a project migration in front of the user and reports what they decided.
@@ -40,7 +43,8 @@ public interface IPgprojMigrationPrompt
 ///     itself is the only version of this that stays stopped.
 /// </remarks>
 public sealed class WindowPgprojMigrationPrompt(
-    ILanguageServerFacade facade, ILogger<WindowPgprojMigrationPrompt> logger) : IPgprojMigrationPrompt
+    ILanguageServerFacade facade,
+    ILogger<WindowPgprojMigrationPrompt> logger) : IPgprojMigrationPrompt
 {
     public const string Method = "aet/pgprojMigrationProposal";
 

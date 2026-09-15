@@ -126,8 +126,10 @@ public sealed class SpecialWeaponBehaviorHandlerTest
             return new EffectiveObject(
                 match.Id, "GameObjectType", true, false, null,
                 ImmutableArray<string>.Empty,
-                [new EffectiveTag(match.BehaviorTag, match.Value, match.Value,
-                    VariantProvenance.Own, match.Id, null)]);
+                [
+                    new EffectiveTag(match.BehaviorTag, match.Value, match.Value,
+                        VariantProvenance.Own, match.Id, null)
+                ]);
         }
     }
 }

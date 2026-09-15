@@ -44,23 +44,6 @@ public sealed class EncyclopediaCodeLensProviderTest
         return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
     }
 
-    private sealed class TagSource : IVariantTagSource
-    {
-        private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
-            new(StringComparer.OrdinalIgnoreCase);
-
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
-        {
-            return _byId.GetValueOrDefault(objectId);
-        }
-
-        public TagSource With(string id, params VariantTag[] tags)
-        {
-            _byId[id] = tags;
-            return this;
-        }
-    }
-
     [Fact]
     public void Handle_ObjectWithEncyclopediaText_EmitsLensCarryingTheObjectId()
     {
@@ -127,5 +110,22 @@ public sealed class EncyclopediaCodeLensProviderTest
             new FeatureFlags { Tools = new ToolsFeatureFlags { Encyclopedia = false } });
 
         Assert.Null(Provider(source, config).Handle(Ctx(symbol, IndexWith(symbol))));
+    }
+
+    private sealed class TagSource : IVariantTagSource
+    {
+        private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
+
+        public TagSource With(string id, params VariantTag[] tags)
+        {
+            _byId[id] = tags;
+            return this;
+        }
     }
 }

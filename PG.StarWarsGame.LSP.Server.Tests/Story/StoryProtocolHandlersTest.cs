@@ -104,8 +104,8 @@ public sealed class StoryProtocolHandlersTest
         {
             WorkspaceDefinitions = GameIndex.Empty.WorkspaceDefinitions.Add("GC", [campaignSym]),
             WorkspaceGroupMemberships =
-                ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
-                    .Add("Story_Set", [member])
+            ImmutableDictionary.Create<string, ImmutableArray<GroupMembership>>(StringComparer.OrdinalIgnoreCase)
+                .Add("Story_Set", [member])
         };
 
         var result = await new GetStoryPlotsHandler(Models(), new FiringIndexService { Current = index }, Config())

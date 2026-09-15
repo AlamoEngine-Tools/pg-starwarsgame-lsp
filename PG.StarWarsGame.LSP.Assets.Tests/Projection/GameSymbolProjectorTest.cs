@@ -13,6 +13,11 @@ public sealed class GameSymbolProjectorTest
     private static readonly FakeSchemaProvider Schema = new(
         "CombatBonusAbility", "SFXEvent", "GameObjectType", "SpawnAbility");
 
+    // ── Singletons ───────────────────────────────────────────────────────────
+
+    private static readonly FakeSchemaProvider SchemaWithSingleton = new(
+        "CombatBonusAbility", "SFXEvent", "GameObjectType", "GameConstants");
+
     private static GameSymbolProjector Build()
     {
         return new GameSymbolProjector(Schema);
@@ -250,11 +255,6 @@ public sealed class GameSymbolProjectorTest
         Assert.Empty(result.HardcodedEnumValues);
     }
 
-    // ── Singletons ───────────────────────────────────────────────────────────
-
-    private static readonly FakeSchemaProvider SchemaWithSingleton = new(
-        "CombatBonusAbility", "SFXEvent", "GameObjectType", "GameConstants");
-
     private static ProjectableEntry Singleton(params BaselineTag[] tags)
     {
         return new ProjectableEntry("GameConstants", "GameConstants",
@@ -285,9 +285,12 @@ public sealed class GameSymbolProjectorTest
     public void Project_Singleton_CarriesItsTagsIntoObjectTags()
     {
         var result = new GameSymbolProjector(SchemaWithSingleton).Project([], [], "hash",
-            singletons: [Singleton(
-                Tag("ShipNameTextFiles", "Star_Destroyer, Data\\SD.txt"),
-                Tag("Credits_Per_CP", "50"))]);
+            singletons:
+            [
+                Singleton(
+                    Tag("ShipNameTextFiles", "Star_Destroyer, Data\\SD.txt"),
+                    Tag("Credits_Per_CP", "50"))
+            ]);
 
         var tags = result.ObjectTags["GameConstants"];
         Assert.Contains(tags, t => t.TagName == "ShipNameTextFiles");

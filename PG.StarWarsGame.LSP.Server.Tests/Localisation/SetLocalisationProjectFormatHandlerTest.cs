@@ -24,7 +24,7 @@ public sealed class SetLocalisationProjectFormatHandlerTest
     [Fact]
     public async Task Switching_csv_to_dat_repoints_the_project_and_keeps_its_directory()
     {
-        var (handler, reload, writer) = Build(declaredFormat: "CSV");
+        var (handler, reload, writer) = Build("CSV");
 
         var result = await handler.Handle(new SetLocalisationProjectFormatParams("Dat"), CancellationToken.None);
 
@@ -44,8 +44,10 @@ public sealed class SetLocalisationProjectFormatHandlerTest
         registry.Set(
         [
             new LocProjectInfo("MasterTextFile.csv", "/mod/data/text/MasterTextFile.csv", "Csv", "Root", 1),
-            new LocProjectInfo("mastertextfile_english.dat", "/mod/data/text/mastertextfile_english.dat", "Dat", "Root", 1),
-            new LocProjectInfo("mastertextfile_german.dat", "/mod/data/text/mastertextfile_german.dat", "Dat", "Root", 1)
+            new LocProjectInfo("mastertextfile_english.dat", "/mod/data/text/mastertextfile_english.dat", "Dat", "Root",
+                1),
+            new LocProjectInfo("mastertextfile_german.dat", "/mod/data/text/mastertextfile_german.dat", "Dat", "Root",
+                1)
         ]);
         var (handler, _, _) = Build(registry: registry);
 
@@ -59,7 +61,7 @@ public sealed class SetLocalisationProjectFormatHandlerTest
     [InlineData("CSV")]
     public async Task The_format_it_already_loads_writes_nothing(string format)
     {
-        var (handler, reload, writer) = Build(declaredFormat: "CSV");
+        var (handler, reload, writer) = Build("CSV");
 
         var result = await handler.Handle(new SetLocalisationProjectFormatParams(format), CancellationToken.None);
 
@@ -129,7 +131,10 @@ public sealed class SetLocalisationProjectFormatHandlerTest
         {
             LastWorkspaceConfig = WorkspaceConfiguration.Empty with
             {
-                Layers = [layer ?? new ProjectLayer(0, "Root", [], [], ["/mod/data/text"], [], declaredFormat, PgprojPath)]
+                Layers =
+                [
+                    layer ?? new ProjectLayer(0, "Root", [], [], ["/mod/data/text"], [], declaredFormat, PgprojPath)
+                ]
             }
         };
         var writer = new SpyFileWriter();

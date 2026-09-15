@@ -49,9 +49,11 @@ public sealed class AttackDistanceBeyondHardpointRangeHandlerTest
         return XmlHandlerTestFixtures.EmptyCtx with { Objects = new FakeObjects(objects) };
     }
 
-    private static (string, EffectiveTag[]) Unit(string attackDistance, string hardpoints, string behaviours = "SELECTABLE")
+    private static (string, EffectiveTag[]) Unit(string attackDistance, string hardpoints,
+        string behaviours = "SELECTABLE")
     {
-        var tags = new List<EffectiveTag> { T("Tantive_IV", "SpaceBehavior", behaviours), T("Tantive_IV", "HardPoints", hardpoints) };
+        var tags = new List<EffectiveTag>
+            { T("Tantive_IV", "SpaceBehavior", behaviours), T("Tantive_IV", "HardPoints", hardpoints) };
         if (attackDistance.Length > 0) tags.Add(T("Tantive_IV", "Targeting_Max_Attack_Distance", attackDistance));
         return ("Tantive_IV", tags.ToArray());
     }
@@ -122,7 +124,7 @@ public sealed class AttackDistanceBeyondHardpointRangeHandlerTest
     [Fact]
     public void Anchored_on_the_hardpoint_list_it_offers_no_fix()
     {
-        var d = Assert.Single(Sut.Handle(Fact(onValue: false), Ctx(
+        var d = Assert.Single(Sut.Handle(Fact(false), Ctx(
             Unit("2000", "HP_Laser"),
             Hardpoint("HP_Laser", "HARD_POINT_WEAPON_LASER", "800"))).ToList());
 

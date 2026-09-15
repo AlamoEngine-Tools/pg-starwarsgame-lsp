@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using HtmlAgilityPack;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Xml.InlayHints;
@@ -29,8 +30,8 @@ public sealed class BoneModelInlayHintProviderHardpointTest
             "<Model_To_Attach>turret.alo</Model_To_Attach>" +
             "<Turret_Bone_Name>Turret_Root</Turret_Bone_Name></HardPoint></X>";
         var index = Index(
-            bones: Bones(("turret.alo", ["Turret_Root"])),
-            mounts: []); // turret bones need no mounting object
+            Bones(("turret.alo", ["Turret_Root"])),
+            []); // turret bones need no mounting object
         var hint = Single(hp, "//turret_bone_name", index, new TagSource());
 
         Assert.Equal("turret.alo::", hint);
@@ -48,8 +49,8 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         var source = new TagSource()
             .With("PALACE", ("Land_Model_Name", "hull.alo"), ("HardPoints", "HP_A"));
         var index = Index(
-            bones: Bones(("hull.alo", ["HP_Bone", "Root"]), ("turret.alo", ["HP_Bone"])),
-            mounts: [("HP_A", "PALACE")]);
+            Bones(("hull.alo", ["HP_Bone", "Root"]), ("turret.alo", ["HP_Bone"])),
+            [("HP_A", "PALACE")]);
 
         var hint = Single(hp, "//attachment_bone", index, source);
 
@@ -67,8 +68,8 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         var source = new TagSource()
             .With("PALACE", ("Land_Model_Name", "hull.alo"), ("HardPoints", "HP_A"));
         var index = Index(
-            bones: Bones(("hull.alo", ["Root"]), ("turret.alo", ["Turret_Root"])),
-            mounts: [("HP_A", "PALACE")]);
+            Bones(("hull.alo", ["Root"]), ("turret.alo", ["Turret_Root"])),
+            [("HP_A", "PALACE")]);
 
         Assert.Empty(Hints(hp, "//attachment_bone", index, source));
     }
@@ -84,8 +85,8 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         var source = new TagSource()
             .With("PALACE", ("Land_Model_Name", "hull.alo"), ("HardPoints", "HP_A"));
         var index = Index(
-            bones: Bones(("hull.alo", ["Root"]), ("weapon.alo", ["HP_Coll"])),
-            mounts: [("HP_A", "PALACE")]);
+            Bones(("hull.alo", ["Root"]), ("weapon.alo", ["HP_Coll"])),
+            [("HP_A", "PALACE")]);
 
         var hint = Single(hp, "//collision_mesh", index, source);
 
@@ -103,11 +104,11 @@ public sealed class BoneModelInlayHintProviderHardpointTest
             .With("UB2", ("Space_Model_Name", "ub_02_station.alo"), ("HardPoints", "HP_A"))
             .With("UB3", ("Space_Model_Name", "ub_03_station.alo"), ("HardPoints", "HP_A"));
         var index = Index(
-            bones: Bones(
+            Bones(
                 ("ub_01_station.alo", ["HP01_COM_BONE"]),
                 ("ub_02_station.alo", ["HP01_COM_BONE"]),
                 ("ub_03_station.alo", ["HP01_COM_BONE"])),
-            mounts: [("HP_A", "UB1"), ("HP_A", "UB2"), ("HP_A", "UB3")]);
+            [("HP_A", "UB1"), ("HP_A", "UB2"), ("HP_A", "UB3")]);
 
         var hint = Single(hp, "//attachment_bone", index, source);
 
@@ -125,10 +126,10 @@ public sealed class BoneModelInlayHintProviderHardpointTest
             .With("UB1", ("Space_Model_Name", "ub_01_station.alo"), ("HardPoints", "HP_A"))
             .With("UB5", ("Space_Model_Name", "ub_05_station.alo"), ("HardPoints", "HP_A"));
         var index = Index(
-            bones: Bones(
+            Bones(
                 ("ub_01_station.alo", ["HP01_SHG_COLL"]),
                 ("ub_05_station.alo", ["Root"])), // stripped on the big mesh
-            mounts: [("HP_A", "UB1"), ("HP_A", "UB5")]);
+            [("HP_A", "UB1"), ("HP_A", "UB5")]);
 
         var hint = Single(hp, "//attachment_bone", index, source);
 
@@ -143,7 +144,7 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         return hint.Label.String!;
     }
 
-    private static IReadOnlyList<OmniSharp.Extensions.LanguageServer.Protocol.Models.InlayHint> Hints(
+    private static IReadOnlyList<InlayHint> Hints(
         string xml, string xpath, GameIndex index, IVariantTagSource source)
     {
         var hapDoc = new HtmlDocument();
@@ -173,7 +174,7 @@ public sealed class BoneModelInlayHintProviderHardpointTest
     {
         var ownerSymbols = mounts.Select(m => m.Owner).Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(o => new GameSymbol(o, GameSymbolKind.XmlObject, "SpaceUnit",
-                new FileOrigin(ObjUri, 0, 0), null, null))
+                new FileOrigin(ObjUri, 0, 0), null))
             .ToList();
 
         var references = mounts
@@ -207,7 +208,10 @@ public sealed class BoneModelInlayHintProviderHardpointTest
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => _byId.GetValueOrDefault(objectId);
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
 
         public TagSource With(string id, params (string Tag, string Value)[] tags)
         {

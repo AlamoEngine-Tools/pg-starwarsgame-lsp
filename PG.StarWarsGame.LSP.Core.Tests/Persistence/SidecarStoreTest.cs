@@ -14,44 +14,6 @@ public sealed class SidecarStoreTest
     private const string TypeName = "aetswg.TestDocument";
     private const string SidecarPath = "C:/mod/.aetswg/test-document.json";
 
-    /// <summary>The document under test - a payload property plus a list, like the real sidecars.</summary>
-    private sealed record TestDocument
-    {
-        public string Title { get; init; } = string.Empty;
-        public List<string> Entries { get; init; } = [];
-    }
-
-    /// <summary>Locates the sidecar, or reports that there is no project to hold one.</summary>
-    private sealed class FixedLocator(string? path) : ISidecarLocator
-    {
-        public string? TryLocate(string fileName)
-        {
-            return path;
-        }
-    }
-
-    /// <summary>A migration declared inline, so each test states the chain it is exercising.</summary>
-    private sealed class InlineMigration(
-        string from, string to, Func<JsonNode, JsonNode> migrate, string? userNotice = null)
-        : IDocumentMigration
-    {
-        public string TypeName => SidecarStoreTest.TypeName;
-        public TypeVersion From { get; } = Parse(from);
-        public TypeVersion To { get; } = Parse(to);
-        public string? UserNotice { get; } = userNotice;
-
-        public JsonNode Migrate(JsonNode document)
-        {
-            return migrate(document);
-        }
-
-        private static TypeVersion Parse(string raw)
-        {
-            Assert.True(TypeVersion.TryParse(raw, out var version));
-            return version;
-        }
-    }
-
     private static SidecarStore<TestDocument> Store(
         MockFileSystem fs, string currentVersion, string? path = SidecarPath,
         params IDocumentMigration[] migrations)
@@ -365,5 +327,46 @@ public sealed class SidecarStoreTest
 
         Assert.Empty(fs.AllFiles);
         Assert.Equal("session only", store.Load().Value.Title);
+    }
+
+    /// <summary>The document under test - a payload property plus a list, like the real sidecars.</summary>
+    private sealed record TestDocument
+    {
+        public string Title { get; init; } = string.Empty;
+        public List<string> Entries { get; init; } = [];
+    }
+
+    /// <summary>Locates the sidecar, or reports that there is no project to hold one.</summary>
+    private sealed class FixedLocator(string? path) : ISidecarLocator
+    {
+        public string? TryLocate(string fileName)
+        {
+            return path;
+        }
+    }
+
+    /// <summary>A migration declared inline, so each test states the chain it is exercising.</summary>
+    private sealed class InlineMigration(
+        string from,
+        string to,
+        Func<JsonNode, JsonNode> migrate,
+        string? userNotice = null)
+        : IDocumentMigration
+    {
+        public string TypeName => SidecarStoreTest.TypeName;
+        public TypeVersion From { get; } = Parse(from);
+        public TypeVersion To { get; } = Parse(to);
+        public string? UserNotice { get; } = userNotice;
+
+        public JsonNode Migrate(JsonNode document)
+        {
+            return migrate(document);
+        }
+
+        private static TypeVersion Parse(string raw)
+        {
+            Assert.True(TypeVersion.TryParse(raw, out var version));
+            return version;
+        }
     }
 }

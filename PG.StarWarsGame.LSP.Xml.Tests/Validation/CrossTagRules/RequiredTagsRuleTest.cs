@@ -42,7 +42,7 @@ public sealed class RequiredTagsRuleTest
     {
         { "Arc_Sweep_Attack_Ability", "ArcSweepAttackAbility" },
         { "Generic_Attack_Ability", "GenericAttackAbility" },
-        { "Eat_Attack_Ability", "EatAttackAbility" },
+        { "Eat_Attack_Ability", "EatAttackAbility" }
     };
 
     [Theory]

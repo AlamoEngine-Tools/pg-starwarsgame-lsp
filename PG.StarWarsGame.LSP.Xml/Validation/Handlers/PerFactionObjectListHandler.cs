@@ -22,7 +22,8 @@ public sealed class PerFactionObjectListHandler : SingleValueTypeHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'' is not a valid per-faction object list for <{fact.Tag.Tag}>. Expected: FactionName[, ObjectName, ...].", Id: DiagnosticIds.PerFactionObjectListEmpty)
+                    $"'' is not a valid per-faction object list for <{fact.Tag.Tag}>. Expected: FactionName[, ObjectName, ...].",
+                    Id: DiagnosticIds.PerFactionObjectListEmpty)
             ];
 
         // Baseline absent → index not yet loaded, skip semantic faction check.

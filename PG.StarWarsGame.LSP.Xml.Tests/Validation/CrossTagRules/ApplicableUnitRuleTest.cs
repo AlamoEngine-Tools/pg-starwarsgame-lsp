@@ -3,6 +3,7 @@
 
 using System.Collections.Immutable;
 using System.IO.Abstractions.TestingHelpers;
+using System.Reflection;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -49,7 +50,7 @@ public sealed class ApplicableUnitRuleTest
         { "Ion_Cannon_Shot_Attack_Ability", "cannot activate" },
         { "Hack_Ability", "cannot activate" },
         { "Repair_Ability", "cannot activate" },
-        { "Redirect_Blaster_Ability", "cannot block or redirect fire" },
+        { "Redirect_Blaster_Ability", "cannot block or redirect fire" }
     };
 
     /// <summary>
@@ -72,7 +73,7 @@ public sealed class ApplicableUnitRuleTest
         // The element list is the rule's own; reading it back is the only way to count coverage
         // without restating all thirty names here and calling that a test.
         var property = typeof(EitherOrRequirementRuleBase).GetProperty("ElementNames",
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            BindingFlags.Instance | BindingFlags.NonPublic);
 
         return (IReadOnlyList<string>)property!.GetValue(rule)!;
     }

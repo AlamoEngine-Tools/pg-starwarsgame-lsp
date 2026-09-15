@@ -32,12 +32,6 @@ namespace PG.StarWarsGame.LSP.Assets.Models;
 public static class ModelGlbExporter
 {
     /// <summary>
-    ///     Alamo is Z-up right-handed; glTF is Y-up. One rotation on the root covers the whole scene.
-    /// </summary>
-    private static readonly Matrix4x4 ZUpToYUp =
-        Matrix4x4.CreateRotationX(-MathF.PI / 2f);
-
-    /// <summary>
     ///     Vertex-format substring marking the tangent/binormal pair. Only these formats bind them;
     ///     the rest leave the stored fields zero, and writing a zero tangent produces a degenerate
     ///     TBN that a glTF validator rejects and a normal map renders black through.
@@ -56,6 +50,12 @@ public static class ModelGlbExporter
 
     /// <summary>A file vertex the mesh builder never told us the position of.</summary>
     private const int Unmapped = -1;
+
+    /// <summary>
+    ///     Alamo is Z-up right-handed; glTF is Y-up. One rotation on the root covers the whole scene.
+    /// </summary>
+    private static readonly Matrix4x4 ZUpToYUp =
+        Matrix4x4.CreateRotationX(-MathF.PI / 2f);
 
     /// <summary>Exports <paramref name="model" /> to GLB bytes.</summary>
     /// <param name="animations">
@@ -85,15 +85,6 @@ public static class ModelGlbExporter
         gltf.WriteGLB(buffer);
         return buffer.ToArray();
     }
-
-    /// <summary>
-    ///     Every face of one sub-mesh, in the glTF's own vertex numbering.
-    /// </summary>
-    /// <param name="Indices">
-    ///     The file's whole index list, remapped through the welding the mesh builder did, so it is
-    ///     usable as an index accessor as it stands.
-    /// </param>
-    private sealed record SubMeshFaces(int MeshIndex, int SubMeshIndex, IReadOnlyList<int> Indices);
 
     /// <summary>
     ///     Puts back the faces SharpGLTF's mesh builder refuses to carry.
@@ -134,7 +125,7 @@ public static class ModelGlbExporter
             var subMeshIndex = extras[SubMeshIndexExtra]?.GetValue<int>();
 
             if (meshIndex is null || subMeshIndex is null
-                || !bySubMesh.TryGetValue((meshIndex.Value, subMeshIndex.Value), out var whole))
+                                  || !bySubMesh.TryGetValue((meshIndex.Value, subMeshIndex.Value), out var whole))
                 continue;
 
             // Only when something actually went missing: rewriting an accessor that already holds
@@ -672,4 +663,13 @@ public static class ModelGlbExporter
             _ => JsonValue.Create(parameter.Texture)
         };
     }
+
+    /// <summary>
+    ///     Every face of one sub-mesh, in the glTF's own vertex numbering.
+    /// </summary>
+    /// <param name="Indices">
+    ///     The file's whole index list, remapped through the welding the mesh builder did, so it is
+    ///     usable as an index accessor as it stands.
+    /// </param>
+    private sealed record SubMeshFaces(int MeshIndex, int SubMeshIndex, IReadOnlyList<int> Indices);
 }

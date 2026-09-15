@@ -3,8 +3,8 @@
 
 using System.Collections.Concurrent;
 using System.IO.Abstractions.TestingHelpers;
-using System.Text.Json.Nodes;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;

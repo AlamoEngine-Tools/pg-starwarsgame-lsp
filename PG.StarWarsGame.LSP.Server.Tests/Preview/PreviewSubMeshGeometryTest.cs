@@ -54,7 +54,7 @@ public sealed class PreviewSubMeshGeometryTest
                 new AlamoModelBone(0, "Root", -1, true, AlamoBillboardType.Disable,
                     Matrix4x4.Identity, Matrix4x4.Identity),
                 new AlamoModelBone(1, "B_Spine", 0, true, AlamoBillboardType.Disable,
-                    Matrix4x4.Identity, Matrix4x4.Identity),
+                    Matrix4x4.Identity, Matrix4x4.Identity)
             ],
             [mesh], [], [], []);
     }
@@ -62,7 +62,7 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void Vertices_ComeBackAsAPageWithTheTotalBesideThem()
     {
-        var page = PreviewSubMeshGeometry.From("m", Model(vertices: 8), 0, 0, "vertices", 2, 3);
+        var page = PreviewSubMeshGeometry.From("m", Model(8), 0, 0, "vertices", 2, 3);
 
         Assert.Equal(8, page.TotalVertices);
         Assert.Equal(3, page.Vertices.Count);
@@ -92,7 +92,7 @@ public sealed class PreviewSubMeshGeometryTest
     public void APageAskingBeyondTheEnd_ComesBackEmptyRatherThanThrowing()
     {
         // The panel can ask for a page that a reload has since made out of range.
-        var page = PreviewSubMeshGeometry.From("m", Model(vertices: 4), 0, 0, "vertices", 99, 10);
+        var page = PreviewSubMeshGeometry.From("m", Model(4), 0, 0, "vertices", 99, 10);
 
         Assert.Empty(page.Vertices);
         Assert.Equal(4, page.TotalVertices);
@@ -101,7 +101,7 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void APageIsCapped_SoOneRequestCannotAskForEverything()
     {
-        var page = PreviewSubMeshGeometry.From("m", Model(vertices: 5000), 0, 0, "vertices", 0,
+        var page = PreviewSubMeshGeometry.From("m", Model(5000), 0, 0, "vertices", 0,
             100_000);
 
         Assert.Equal(PreviewSubMeshGeometry.MaxPage, page.Vertices.Count);
@@ -158,8 +158,9 @@ public sealed class PreviewSubMeshGeometryTest
     [Fact]
     public void AMissingSubMesh_IsRefusedByNameRatherThanReturningTheWrongOne()
     {
-        var missing = Assert.Throws<ArgumentOutOfRangeException>(
-            () => PreviewSubMeshGeometry.From("m", Model(), 0, 7, "vertices", 0, 10));
+        var missing =
+            Assert.Throws<ArgumentOutOfRangeException>(() =>
+                PreviewSubMeshGeometry.From("m", Model(), 0, 7, "vertices", 0, 10));
 
         Assert.Contains("subMeshIndex", missing.Message, StringComparison.OrdinalIgnoreCase);
     }

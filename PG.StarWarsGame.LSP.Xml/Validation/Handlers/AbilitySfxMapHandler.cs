@@ -35,7 +35,8 @@ public sealed class AbilitySfxMapHandler : CommaSeparatedPairHandlerBase
             var known = abilityTypeSet.Values.Select(v => v.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             if (!known.Contains(abilityCode))
                 results.Add(AtPairSlot(new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{abilityCode}' is not a known AbilityType value for <{fact.Tag.Tag}>.", Id: DiagnosticIds.AbilitySfxMapUnknownAbilityType), fact, 0));
+                    $"'{abilityCode}' is not a known AbilityType value for <{fact.Tag.Tag}>.",
+                    Id: DiagnosticIds.AbilitySfxMapUnknownAbilityType), fact, 0));
         }
 
         var sfxResult = TryValidateSfxEvent(sfxEventName, fact.Tag.Tag, ctx.Index);

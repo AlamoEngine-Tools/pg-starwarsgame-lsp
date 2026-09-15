@@ -3,16 +3,16 @@
 
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Assets.Icons;
-using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Xml.Util;
 using PG.StarWarsGame.LSP.Xml.Validation;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -42,6 +42,50 @@ public sealed class PreviewSceneBuilder(
     IGameAssetResolver assets)
 {
     private const string HardPointsTag = "HardPoints";
+    private const string ModelToAttachTag = "Model_To_Attach";
+    private const string AttachmentBoneTag = "Attachment_Bone";
+    private const string FactionTypeName = "Faction";
+
+    /// <summary>What both shipped corpora write, and what the engine falls back to.</summary>
+    private const float DefaultHullVsHardpointsConstraint = 0.2f;
+
+    /// <summary>
+    ///     The engine's defaults for the two turret extents, from the
+    ///     <c>GameObjectTypeClass</c> constructor at <c>00a87243</c> and <c>00a87256</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Both comparisons in <c>Is_In_Cone_Of_Fire</c> are then always true, so an object that
+    ///     sets neither fires in ANY direction. 175 of the 291 objects with a <c>WEAPON</c>
+    ///     behaviour set neither, which makes unrestricted the COMMON case - reading an absent tag
+    ///     as zero gave the majority of armed units the narrowest arc possible.
+    /// </remarks>
+    private const float DefaultTurretRotateExtentDegrees = 360f;
+
+    private const float DefaultTurretElevateExtentDegrees = 180f;
+
+    /// <summary>
+    ///     The same two defaults for a HARDPOINT turret, which are not the same numbers.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         <c>HardPointDataClass::HardPointDataClass</c> (<c>00be1220</c>) writes
+    ///         <c>TurretRotateExtentDegrees = 180.0</c> and
+    ///         <c>TurretElevateExtentDegrees = 90.0</c>. A hardpoint's turret fields are a parallel
+    ///         set to the unit's rather than the same ones, and so are their defaults.
+    ///     </para>
+    ///     <para>
+    ///         180 is the exact threshold at which
+    ///         <c>HardPointClass::Calculate_Desired_Turret_Angle</c> skips its motion clamp - the
+    ///         gate is <c>extent &lt; 180.0 &amp;&amp; extent &gt; 0.0</c> - so the default yaw is a
+    ///         free turn and the default pitch is a real stop at plus or minus 90.
+    ///     </para>
+    /// </remarks>
+    private const float DefaultHardpointRotateExtentDegrees = 180f;
+
+    private const float DefaultHardpointElevateExtentDegrees = 90f;
+
+    /// <summary>A full angle covers everything at 360; there is nothing past a whole turn.</summary>
+    private const float FullTurnDegrees = 360f;
 
     /// <summary>
     ///     The animation-set overrides, land first.
@@ -52,9 +96,44 @@ public sealed class PreviewSceneBuilder(
     /// </remarks>
     private static readonly string[] AnimationOverrideTags =
         ["Land_Model_Anim_Override_Name", "Space_Model_Anim_Override_Name"];
-    private const string ModelToAttachTag = "Model_To_Attach";
-    private const string AttachmentBoneTag = "Attachment_Bone";
-    private const string FactionTypeName = "Faction";
+
+    private static readonly string[] ShieldBehaviorTags = ["Behavior", "SpaceBehavior", "LandBehavior"];
+
+    /// <summary>
+    ///     Every projectile the tree defines, resolved.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///         The attacker panel picks from all of them, not from the handful this subject happens
+    ///         to fire - you are building a weapon to shoot AT the subject, so its own armament is
+    ///         the wrong list entirely.
+    ///     </para>
+    ///     <para>
+    ///         NAMES only. Resolving all 105 through the variant chain was measured at 830ms added
+    ///         to every scene open - a real cost for a list most readers scroll past - against about
+    ///         nothing for the behaviour scan that finds them. The values for the ones this subject
+    ///         actually fires are already on the wire; the rest are fetched when one is picked.
+    ///     </para>
+    /// </remarks>
+    /// <summary>
+    ///     Cached per index, because finding the catalogue costs a parse of the whole workspace.
+    /// </summary>
+    /// <remarks>
+    ///     <c>TryGetTags</c> parses a document the first time anything asks about an object in it,
+    ///     so reading a behaviour off EVERY object pulls every XML file through the parser -
+    ///     measured at about 830ms on the eaw tree. Cached against the index instance, the cost is
+    ///     paid once rather than on every scene open. It should really move off the scene request
+    ///     altogether and onto one the panel makes when the attacker section first opens.
+    /// </remarks>
+    private static readonly ConditionalWeakTable<GameIndex, List<string>> CatalogCache = new();
+
+    private static readonly string[] BehaviorTags = ["SpaceBehavior", "LandBehavior"];
+
+    private static readonly string[] FireModeTags =
+    [
+        "Fire_When_Deployed", "Fire_When_Undeployed", "Fire_When_In_Rocket_Attack_Mode",
+        "Fire_When_In_Normal_Attack_Mode", "Fire_When_In_Defend_Mode"
+    ];
 
     /// <summary>
     ///     A scene for a single <c>.alo</c>, opened directly - a model or a particle system.
@@ -293,21 +372,21 @@ public sealed class PreviewSceneBuilder(
             // NAMED from here on. The positional list is twenty arguments long and every optional
             // one is a list or a record, so inserting in the wrong slot type-checks against its
             // neighbour often enough to be dangerous - it did, once.
-            Defence: Defence(effective, hardpoints),
-            Abilities: Abilities(effective, particles,
+            Defence(effective, hardpoints),
+            Abilities(effective, particles,
                 AnimationsFor(animationSource ?? hull ?? string.Empty), problems,
                 icons, index.Localisation),
-            DeathClones: DeathClones(resolver, effective, problems),
-            SpinAway: SpinAway(effective),
-            DeathExplosions: Tag(effective, "Death_Explosions"),
-            ProjectileCatalog: ProjectileCatalog(),
+            DeathClones(resolver, effective, problems),
+            SpinAway(effective),
+            Tag(effective, "Death_Explosions"),
+            ProjectileCatalog(),
             // What it wears when no faction colour applies, which is most of the time - its own
             // colour first, and whose fallback to use when it declares none.
-            NoColorizationColor: Colour(effective, "No_Colorization_Color"),
-            Affiliation: FirstToken(Tag(effective, "Affiliation")),
-            DamageStages: stages,
-            DamageTable: DamageTable(effective),
-            ScaleFactor: EngineScaleFactor.Of(Tag(effective, "Scale_Factor")));
+            Colour(effective, "No_Colorization_Color"),
+            FirstToken(Tag(effective, "Affiliation")),
+            stages,
+            DamageTable(effective),
+            EngineScaleFactor.Of(Tag(effective, "Scale_Factor")));
     }
 
     /// <summary>
@@ -608,9 +687,6 @@ public sealed class PreviewSceneBuilder(
         return DefaultHullVsHardpointsConstraint;
     }
 
-    /// <summary>What both shipped corpora write, and what the engine falls back to.</summary>
-    private const float DefaultHullVsHardpointsConstraint = 0.2f;
-
     /// <summary>Whether any behaviour list names <c>SHIELDED</c>.</summary>
     /// <remarks>
     ///     <para>
@@ -631,36 +707,6 @@ public sealed class PreviewSceneBuilder(
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Any(token => token.Equals("SHIELDED", StringComparison.OrdinalIgnoreCase));
     }
-
-    private static readonly string[] ShieldBehaviorTags = ["Behavior", "SpaceBehavior", "LandBehavior"];
-
-    /// <summary>
-    ///     Every projectile the tree defines, resolved.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         The attacker panel picks from all of them, not from the handful this subject happens
-    ///         to fire - you are building a weapon to shoot AT the subject, so its own armament is
-    ///         the wrong list entirely.
-    ///     </para>
-    ///     <para>
-    ///         NAMES only. Resolving all 105 through the variant chain was measured at 830ms added
-    ///         to every scene open - a real cost for a list most readers scroll past - against about
-    ///         nothing for the behaviour scan that finds them. The values for the ones this subject
-    ///         actually fires are already on the wire; the rest are fetched when one is picked.
-    ///     </para>
-    /// </remarks>
-    /// <summary>
-    ///     Cached per index, because finding the catalogue costs a parse of the whole workspace.
-    /// </summary>
-    /// <remarks>
-    ///     <c>TryGetTags</c> parses a document the first time anything asks about an object in it,
-    ///     so reading a behaviour off EVERY object pulls every XML file through the parser -
-    ///     measured at about 830ms on the eaw tree. Cached against the index instance, the cost is
-    ///     paid once rather than on every scene open. It should really move off the scene request
-    ///     altogether and onto one the panel makes when the attacker section first opens.
-    /// </remarks>
-    private static readonly ConditionalWeakTable<GameIndex, List<string>> CatalogCache = new();
 
     private List<string> ProjectileCatalog()
     {
@@ -746,11 +792,11 @@ public sealed class PreviewSceneBuilder(
     private bool DeclaresProjectileBehavior(GameIndex index, string objectId)
     {
         foreach (var tagName in ShieldBehaviorTags)
-            foreach (var value in RepeatedTagReader.Values(index, tagSource, objectId, tagName))
-                foreach (var token in value.Split(
-                             ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
-                    if (token.Equals("PROJECTILE", StringComparison.OrdinalIgnoreCase))
-                        return true;
+        foreach (var value in RepeatedTagReader.Values(index, tagSource, objectId, tagName))
+        foreach (var token in value.Split(
+                     ',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            if (token.Equals("PROJECTILE", StringComparison.OrdinalIgnoreCase))
+                return true;
 
         return false;
     }
@@ -938,7 +984,6 @@ public sealed class PreviewSceneBuilder(
     ///     model under a <c>&lt;model&gt;_</c> prefix, which is the same rule
     ///     <see cref="BuildForAnimation" /> uses in reverse. The separator matters -
     ///     <c>Ei_bobafettish_wave.ala</c> is not Boba Fett's.
-    ///
     ///     Offered, not verified: each is checked against the skeleton when it is actually loaded,
     ///     and 50 of the shipped animations sit beside a model they do not fit. Listing one that
     ///     turns out not to match costs an entry in a picker; listing none at all - which is what
@@ -970,19 +1015,19 @@ public sealed class PreviewSceneBuilder(
                 .GetByExtension(".ala")
                 .Select(Path.GetFileName)
                 .Where(name => name is not null
-                    && name.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase)
-                    // The LONGEST model name that prefixes a clip owns it, which is the rule
-                    // `BuildForAnimation` already uses coming the other way. Without it a hull
-                    // collects its own death clone's clips - `rv_gargantuan_` prefixes
-                    // `rv_gargantuan_dc_die_00` - and since a clip binds by INDEX and carries
-                    // VISIBILITY tracks, the clone's clip switched off whichever hull bones sat at
-                    // the indices its own skeleton hides. Two of the Gargantuan's turrets were
-                    // mounted on those bones and went with them.
-                    //
-                    // Harmless only while the strict name check dropped such a clip downstream.
-                    // Relaxing that check to bind by index is what made this reachable.
-                    && !longer.Any(other =>
-                        name.StartsWith(other, StringComparison.OrdinalIgnoreCase)))
+                               && name.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase)
+                               // The LONGEST model name that prefixes a clip owns it, which is the rule
+                               // `BuildForAnimation` already uses coming the other way. Without it a hull
+                               // collects its own death clone's clips - `rv_gargantuan_` prefixes
+                               // `rv_gargantuan_dc_die_00` - and since a clip binds by INDEX and carries
+                               // VISIBILITY tracks, the clone's clip switched off whichever hull bones sat at
+                               // the indices its own skeleton hides. Two of the Gargantuan's turrets were
+                               // mounted on those bones and went with them.
+                               //
+                               // Harmless only while the strict name check dropped such a clip downstream.
+                               // Relaxing that check to bind by index is what made this reachable.
+                               && !longer.Any(other =>
+                                   name.StartsWith(other, StringComparison.OrdinalIgnoreCase)))
                 .Select(name => name!)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Order(StringComparer.OrdinalIgnoreCase)
@@ -1082,7 +1127,7 @@ public sealed class PreviewSceneBuilder(
 
         // Only compare when both are catalogued; an unknown model is already reported elsewhere.
         if (!hullBones.IsDefaultOrEmpty && !overrideBones.IsDefaultOrEmpty
-            && !hullBones.SequenceEqual(overrideBones, StringComparer.OrdinalIgnoreCase))
+                                        && !hullBones.SequenceEqual(overrideBones, StringComparer.OrdinalIgnoreCase))
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewAnimationSkeletonMismatch, "info",
                 $"'{effective.ObjectId}' takes its animations from '{override_}', whose skeleton "
                 + $"differs from '{hull}' ({overrideBones.Length} bones against "
@@ -1185,12 +1230,10 @@ public sealed class PreviewSceneBuilder(
         if (EngineBoolean.IsTrue(Tag(effective, "Is_Destroyable"))
             && diesWithHardpoints
             && string.IsNullOrWhiteSpace(Tag(effective, "Collision_Mesh")))
-        {
             problems.Add(new PreviewProblem(DiagnosticIds.PreviewHardpointUnreachable, "error",
                 $"Hardpoint '{hardpointId}' is destroyable but names no Collision_Mesh, so no shot can "
                 + "reach it. The unit can never be finished through its hardpoints.",
                 hardpointId));
-        }
 
         var tooltipKey = Tag(effective, "Tooltip_Text");
 
@@ -1297,8 +1340,8 @@ public sealed class PreviewSceneBuilder(
             [],
             turret,
             null,
-            UnitArcYawDegrees(effective, deployed: true),
-            UnitArcPitchDegrees(effective, deployed: true));
+            UnitArcYawDegrees(effective, true),
+            UnitArcPitchDegrees(effective, true));
     }
 
     /// <summary>
@@ -1316,44 +1359,6 @@ public sealed class PreviewSceneBuilder(
         return EngineBoolean.IsTrue(Tag(effective, "Deploys"))
                && ObjectBehaviors.Has(effective, "WALK_LOCOMOTOR");
     }
-
-    /// <summary>
-    ///     The engine's defaults for the two turret extents, from the
-    ///     <c>GameObjectTypeClass</c> constructor at <c>00a87243</c> and <c>00a87256</c>.
-    /// </summary>
-    /// <remarks>
-    ///     Both comparisons in <c>Is_In_Cone_Of_Fire</c> are then always true, so an object that
-    ///     sets neither fires in ANY direction. 175 of the 291 objects with a <c>WEAPON</c>
-    ///     behaviour set neither, which makes unrestricted the COMMON case - reading an absent tag
-    ///     as zero gave the majority of armed units the narrowest arc possible.
-    /// </remarks>
-    private const float DefaultTurretRotateExtentDegrees = 360f;
-
-    private const float DefaultTurretElevateExtentDegrees = 180f;
-
-    /// <summary>
-    ///     The same two defaults for a HARDPOINT turret, which are not the same numbers.
-    /// </summary>
-    /// <remarks>
-    ///     <para>
-    ///         <c>HardPointDataClass::HardPointDataClass</c> (<c>00be1220</c>) writes
-    ///         <c>TurretRotateExtentDegrees = 180.0</c> and
-    ///         <c>TurretElevateExtentDegrees = 90.0</c>. A hardpoint's turret fields are a parallel
-    ///         set to the unit's rather than the same ones, and so are their defaults.
-    ///     </para>
-    ///     <para>
-    ///         180 is the exact threshold at which
-    ///         <c>HardPointClass::Calculate_Desired_Turret_Angle</c> skips its motion clamp - the
-    ///         gate is <c>extent &lt; 180.0 &amp;&amp; extent &gt; 0.0</c> - so the default yaw is a
-    ///         free turn and the default pitch is a real stop at plus or minus 90.
-    ///     </para>
-    /// </remarks>
-    private const float DefaultHardpointRotateExtentDegrees = 180f;
-
-    private const float DefaultHardpointElevateExtentDegrees = 90f;
-
-    /// <summary>A full angle covers everything at 360; there is nothing past a whole turn.</summary>
-    private const float FullTurnDegrees = 360f;
 
     /// <summary>
     ///     The unit weapon's horizontal arc as a FULL angle, which is what
@@ -1485,8 +1490,6 @@ public sealed class PreviewSceneBuilder(
                 .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
             .Any(token => token.Equals("WEAPON", StringComparison.OrdinalIgnoreCase));
     }
-
-    private static readonly string[] BehaviorTags = ["SpaceBehavior", "LandBehavior"];
 
     /// <summary>
     ///     The turret pose for a unit weapon, or null when the unit names no turret bone.
@@ -1631,8 +1634,6 @@ public sealed class PreviewSceneBuilder(
         return [.. stages.Select((stage, at) => new PreviewDamageBand(thresholds[at], stage))];
     }
 
-    private delegate bool ParseNumber<T>(string written, out T value);
-
     /// <summary>
     ///     Every entry of a comma-separated list that parses, in written order.
     /// </summary>
@@ -1733,9 +1734,7 @@ public sealed class PreviewSceneBuilder(
             if (row[0].Length == 0
                 || !float.TryParse(row[1], NumberStyles.Float, CultureInfo.InvariantCulture,
                     out var distance))
-            {
                 continue;
-            }
 
             rows.Add(new PreviewInaccuracy(row[0], distance));
         }
@@ -1750,12 +1749,6 @@ public sealed class PreviewSceneBuilder(
             .Where(tag => EngineBoolean.IsTrue(Tag(effective, tag)))
             .ToList();
     }
-
-    private static readonly string[] FireModeTags =
-    [
-        "Fire_When_Deployed", "Fire_When_Undeployed", "Fire_When_In_Rocket_Attack_Mode",
-        "Fire_When_In_Normal_Attack_Mode", "Fire_When_In_Defend_Mode"
-    ];
 
     private static int? Integer(EffectiveObject effective, string tagName)
     {
@@ -1883,9 +1876,9 @@ public sealed class PreviewSceneBuilder(
     private static bool IsYes(string? value)
     {
         return value is not null
-            && (value.Equals("yes", StringComparison.OrdinalIgnoreCase)
-                || value.Equals("true", StringComparison.OrdinalIgnoreCase)
-                || value.Equals("1", StringComparison.Ordinal));
+               && (value.Equals("yes", StringComparison.OrdinalIgnoreCase)
+                   || value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                   || value.Equals("1", StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -1953,4 +1946,5 @@ public sealed class PreviewSceneBuilder(
         return new PreviewRgba(channels[0], channels[1], channels[2], channels[3]);
     }
 
+    private delegate bool ParseNumber<T>(string written, out T value);
 }

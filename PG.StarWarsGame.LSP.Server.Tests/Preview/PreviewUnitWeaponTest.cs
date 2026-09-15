@@ -2,9 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
@@ -79,9 +77,8 @@ public sealed class PreviewUnitWeaponTest
         // T2B_Tank names MuzzleA_00 as its Barrel_Bone_Name. The two conventions overlap and the
         // same point must not be reported twice.
         var scene = Build(
-            hull: "RV_T2BTank.alo",
-            bones: ["Turret_00", "MuzzleA_00", "MuzzleA_01"],
-            unitTags:
+            "RV_T2BTank.alo",
+            ["Turret_00", "MuzzleA_00", "MuzzleA_01"],
             [
                 ("SpaceBehavior", "WEAPON"),
                 ("Targeting_Max_Attack_Distance", "200"),
@@ -111,9 +108,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_CarriesFiresForward()
     {
         var scene = Build(
-            hull: "rv_XWing.ALO",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "rv_XWing.ALO",
+            ["MuzzleA_00"],
             [
                 ("SpaceBehavior", "WEAPON"),
                 ("Targeting_Max_Attack_Distance", "450"),
@@ -129,9 +125,9 @@ public sealed class PreviewUnitWeaponTest
         // A real authoring gap: the unit is armed but the artist shipped no fire points, so the
         // engine has nowhere to put the bolt.
         var scene = Build(
-            hull: "bare.alo",
-            bones: ["Root"],
-            unitTags: [("SpaceBehavior", "WEAPON"), ("Targeting_Max_Attack_Distance", "450")]);
+            "bare.alo",
+            ["Root"],
+            [("SpaceBehavior", "WEAPON"), ("Targeting_Max_Attack_Distance", "450")]);
 
         Assert.Empty(scene.Weapons);
         Assert.Contains(scene.Problems, p =>
@@ -142,9 +138,9 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_IgnoresAUnitWithNoWeaponBehaviour()
     {
         var scene = Build(
-            hull: "transport.alo",
-            bones: ["MuzzleA_00"],
-            unitTags: [("SpaceBehavior", "DUMMY_STARSHIP, SELECTABLE")]);
+            "transport.alo",
+            ["MuzzleA_00"],
+            [("SpaceBehavior", "DUMMY_STARSHIP, SELECTABLE")]);
 
         Assert.Empty(scene.Weapons);
     }
@@ -190,9 +186,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_TreatsAnAbsentExtentAsUnrestricted()
     {
         var scene = Build(
-            hull: "rv_XWing.ALO",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "rv_XWing.ALO",
+            ["MuzzleA_00"],
             [
                 ("SpaceBehavior", "WEAPON"),
                 ("Targeting_Max_Attack_Distance", "450")
@@ -212,9 +207,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_KeepsAnAuthoredZeroExtent()
     {
         var scene = Build(
-            hull: "rv_XWing.ALO",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "rv_XWing.ALO",
+            ["MuzzleA_00"],
             [
                 ("SpaceBehavior", "WEAPON"),
                 ("Targeting_Max_Attack_Distance", "450"),
@@ -249,9 +243,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_GivesAFiresForwardWeaponNoArcEvenWhenExtentsAreAuthored()
     {
         var scene = Build(
-            hull: "rv_XWing.ALO",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "rv_XWing.ALO",
+            ["MuzzleA_00"],
             [
                 ("SpaceBehavior", "WEAPON"),
                 ("Targeting_Max_Attack_Distance", "450"),
@@ -275,9 +268,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_TreatsXyOnlyAsUnboundedPitch()
     {
         var scene = Build(
-            hull: "rv_XWing.ALO",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "rv_XWing.ALO",
+            ["MuzzleA_00"],
             [
                 ("SpaceBehavior", "WEAPON"),
                 ("Targeting_Max_Attack_Distance", "450"),
@@ -340,9 +332,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_GivesNoDeployedArcWithoutAWalkLocomotor()
     {
         var weapon = Assert.Single(Build(
-            hull: "ev_atat.alo",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "ev_atat.alo",
+            ["MuzzleA_00"],
             [
                 ("LandBehavior", "WEAPON, TURRET"),
                 ("Deploys", "Yes"),
@@ -357,9 +348,8 @@ public sealed class PreviewUnitWeaponTest
     public void BuildForObject_GivesNoDeployedArcToAWalkerThatDoesNotDeploy()
     {
         var weapon = Assert.Single(Build(
-            hull: "ev_atat.alo",
-            bones: ["MuzzleA_00"],
-            unitTags:
+            "ev_atat.alo",
+            ["MuzzleA_00"],
             [
                 ("LandBehavior", "WALK_LOCOMOTOR, WEAPON, TURRET"),
                 ("Turret_Bone_Name", "Turret"),
@@ -384,9 +374,8 @@ public sealed class PreviewUnitWeaponTest
     private static PreviewScene Walker(params (string Name, string Value)[] extra)
     {
         return Build(
-            hull: "ev_atat.alo",
-            bones: ["MuzzleA_00", "MuzzleA_01", "Turret"],
-            unitTags:
+            "ev_atat.alo",
+            ["MuzzleA_00", "MuzzleA_01", "Turret"],
             [
                 ("LandBehavior", "WALK_LOCOMOTOR, WEAPON, TURRET, SELECTABLE"),
                 ("Deploys", "Yes"),
@@ -401,13 +390,11 @@ public sealed class PreviewUnitWeaponTest
     private static PreviewScene Fighter()
     {
         return Build(
-            hull: "rv_XWing.ALO",
-            bones:
+            "rv_XWing.ALO",
             [
                 "MuzzleA_02", "MuzzleA_00", "MuzzleA_01", "MuzzleA_00_flash", "MuzzleB_00",
                 "MuzzleC_00", "Root"
             ],
-            unitTags:
             [
                 ("SpaceBehavior", "DUMMY_STARSHIP, WEAPON, SELECTABLE"),
                 ("Targeting_Max_Attack_Distance", "450"),
@@ -439,7 +426,7 @@ public sealed class PreviewUnitWeaponTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)

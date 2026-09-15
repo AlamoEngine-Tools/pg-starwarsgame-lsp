@@ -32,7 +32,7 @@ public sealed class LanguageCoverageInspectorTest
         {
             Row(0, "HEADER", "Lead", "Chef"),
             Row(1, "CENTER", "Alice", ""),
-            Row(2, "CENTER", "Bob", null),
+            Row(2, "CENTER", "Bob", null)
         };
 
         var problem = Assert.Single(LanguageCoverageInspector.Inspect(rows, Languages));

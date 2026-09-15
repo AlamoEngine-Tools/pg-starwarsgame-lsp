@@ -458,6 +458,7 @@ public sealed class DiagnosticsPublisherBaseTest
     {
         public GameIndex Current => GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
+
         public event Action<ILocalisationIndex>? LocalisationChanged
         {
             add { }

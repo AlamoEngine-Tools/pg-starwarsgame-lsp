@@ -160,7 +160,7 @@ public sealed class HardpointCollisionMeshTest
             WorkspaceDefinitions = defs,
             // Non-empty so the producer does not bail out as "no models catalogued at all".
             ModelBones = ImmutableDictionary<string, ImmutableArray<string>>.Empty
-                .Add("ship.alo", ["Root"]),
+                .Add("ship.alo", ["Root"])
         };
 
         return new XmlHardpointFactProducer(new BareSchema(), source)
@@ -169,22 +169,22 @@ public sealed class HardpointCollisionMeshTest
 
     private static GameSymbol Sym(string id, string typeName)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(Uri, 0, 0), null, null);
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(Uri, 0, 0), null);
     }
 
     private sealed class HardpointTagSource : IVariantTagSource
     {
         private readonly Dictionary<string, List<VariantTag>> _tags = new(StringComparer.OrdinalIgnoreCase);
 
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _tags.GetValueOrDefault(objectId);
+        }
+
         public HardpointTagSource With(string id, params VariantTag[] tags)
         {
             _tags[id] = [.. tags];
             return this;
-        }
-
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
-        {
-            return _tags.GetValueOrDefault(objectId);
         }
     }
 

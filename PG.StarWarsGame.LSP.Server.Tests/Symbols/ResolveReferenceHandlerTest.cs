@@ -1,7 +1,6 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Symbols;
@@ -16,19 +15,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Symbols;
 /// </remarks>
 public sealed class ResolveReferenceHandlerTest
 {
-    private sealed class StubLocator(DefinitionLocation answer) : IDefinitionLocator
-    {
-        public string? SawValue { get; private set; }
-        public string? SawReferenceType { get; private set; }
-
-        public DefinitionLocation Locate(string? value, string? referenceType)
-        {
-            SawValue = value;
-            SawReferenceType = referenceType;
-            return answer;
-        }
-    }
-
     [Fact]
     public async Task Located_ReturnsTheFilePositionAndPassesTheTypeThrough()
     {
@@ -57,5 +43,18 @@ public sealed class ResolveReferenceHandlerTest
 
         Assert.Null(result.Uri);
         Assert.Equal("defined in the base game", result.Error);
+    }
+
+    private sealed class StubLocator(DefinitionLocation answer) : IDefinitionLocator
+    {
+        public string? SawValue { get; private set; }
+        public string? SawReferenceType { get; private set; }
+
+        public DefinitionLocation Locate(string? value, string? referenceType)
+        {
+            SawValue = value;
+            SawReferenceType = referenceType;
+            return answer;
+        }
     }
 }

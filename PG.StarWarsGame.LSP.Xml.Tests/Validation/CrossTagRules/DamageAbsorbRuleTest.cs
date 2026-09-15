@@ -55,9 +55,12 @@ public sealed class DamageAbsorbRuleTest
     }
 
     [Theory]
-    [InlineData("<Damage_Absorb_Percentage>0.2</Damage_Absorb_Percentage><Damage_Absorb_Amount>1</Damage_Absorb_Amount>")]
-    [InlineData("<Damage_Absorb_Percentage>0.1</Damage_Absorb_Percentage><Damage_Absorb_Amount>0</Damage_Absorb_Amount>")]
-    [InlineData("<Damage_Absorb_Percentage>0</Damage_Absorb_Percentage><Damage_Absorb_Amount>.8</Damage_Absorb_Amount>")]
+    [InlineData(
+        "<Damage_Absorb_Percentage>0.2</Damage_Absorb_Percentage><Damage_Absorb_Amount>1</Damage_Absorb_Amount>")]
+    [InlineData(
+        "<Damage_Absorb_Percentage>0.1</Damage_Absorb_Percentage><Damage_Absorb_Amount>0</Damage_Absorb_Amount>")]
+    [InlineData(
+        "<Damage_Absorb_Percentage>0</Damage_Absorb_Percentage><Damage_Absorb_Amount>.8</Damage_Absorb_Amount>")]
     [InlineData("<Damage_Absorb_Amount>1</Damage_Absorb_Amount>")]
     public void One_non_zero_is_enough(string body)
     {

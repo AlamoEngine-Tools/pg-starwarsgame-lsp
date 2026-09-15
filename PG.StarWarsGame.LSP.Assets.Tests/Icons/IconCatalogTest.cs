@@ -11,14 +11,20 @@ public sealed class IconCatalogTest
     private static readonly byte[] FromLoose = [2];
     private static readonly byte[] FromBaseline = [3];
 
-    private static Dictionary<string, byte[]> Packed(params string[] names) =>
-        names.ToDictionary(n => n, _ => FromMegaTexture, StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, byte[]> Packed(params string[] names)
+    {
+        return names.ToDictionary(n => n, _ => FromMegaTexture, StringComparer.OrdinalIgnoreCase);
+    }
 
-    private static Dictionary<string, byte[]> Loose(params string[] names) =>
-        names.ToDictionary(n => n, _ => FromLoose, StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, byte[]> Loose(params string[] names)
+    {
+        return names.ToDictionary(n => n, _ => FromLoose, StringComparer.OrdinalIgnoreCase);
+    }
 
-    private static Dictionary<string, byte[]> Baseline(params string[] names) =>
-        names.ToDictionary(n => n, _ => FromBaseline, StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, byte[]> Baseline(params string[] names)
+    {
+        return names.ToDictionary(n => n, _ => FromBaseline, StringComparer.OrdinalIgnoreCase);
+    }
 
     // ── pixel dimensions ─────────────────────────────────────────────────────
 

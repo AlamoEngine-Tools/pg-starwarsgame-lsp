@@ -9,10 +9,11 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
 {
+    private static readonly char[] ValueSeparators = ['|', ','];
+
     /// <inheritdoc />
     public override DiagnosticId? DefaultId => DiagnosticIds.DynamicEnumValue;
 
-    private static readonly char[] ValueSeparators = ['|', ','];
     protected override XmlValueType TargetType => XmlValueType.DynamicEnumValue;
 
     protected override IEnumerable<XmlDiagnosticResult> HandleValue(XmlTagValueFact fact, DiagnosticsContext ctx)
@@ -31,7 +32,8 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"<{fact.Tag.Tag}> expects a single enum identifier; '|' is not allowed here.", Id: DiagnosticIds.DynamicEnumOrNotAllowed)
+                    $"<{fact.Tag.Tag}> expects a single enum identifier; '|' is not allowed here.",
+                    Id: DiagnosticIds.DynamicEnumOrNotAllowed)
             ];
 
         foreach (var segment in trimmed.Split(isFlagList ? ValueSeparators : [',']))
@@ -41,7 +43,8 @@ public sealed partial class DynamicEnumValueHandler : NamedEnumValueHandlerBase
                 return
                 [
                     new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                        $"'{trimmed}' is not a valid enum identifier for <{fact.Tag.Tag}>.", Id: DiagnosticIds.DynamicEnumInvalidIdentifier)
+                        $"'{trimmed}' is not a valid enum identifier for <{fact.Tag.Tag}>.",
+                        Id: DiagnosticIds.DynamicEnumInvalidIdentifier)
                 ];
         }
 

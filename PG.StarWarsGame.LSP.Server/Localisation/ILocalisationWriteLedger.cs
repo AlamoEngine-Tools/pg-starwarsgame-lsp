@@ -35,8 +35,8 @@ public interface ILocalisationWriteLedger
 
 public sealed class LocalisationWriteLedger : ILocalisationWriteLedger
 {
-    private readonly ConcurrentDictionary<string, string> _lastWritten = new(StringComparer.OrdinalIgnoreCase);
     private readonly IFileHelper _fileHelper;
+    private readonly ConcurrentDictionary<string, string> _lastWritten = new(StringComparer.OrdinalIgnoreCase);
 
     public LocalisationWriteLedger(IFileHelper fileHelper)
     {

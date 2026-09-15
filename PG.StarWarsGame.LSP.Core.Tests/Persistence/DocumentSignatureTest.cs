@@ -12,50 +12,6 @@ namespace PG.StarWarsGame.LSP.Core.Tests.Persistence;
 /// </summary>
 public sealed class DocumentSignatureTest
 {
-    private sealed record Entry
-    {
-        public string File { get; init; } = string.Empty;
-        public double X { get; init; }
-    }
-
-    private sealed record Layout
-    {
-        public string Campaign { get; init; } = string.Empty;
-        public List<Entry> Entries { get; init; } = [];
-    }
-
-    // Same shape, properties declared in a different order.
-    private sealed record LayoutReordered
-    {
-        public List<Entry> Entries { get; init; } = [];
-        public string Campaign { get; init; } = string.Empty;
-    }
-
-    private sealed record LayoutRenamedProperty
-    {
-        public string CampaignName { get; init; } = string.Empty;
-        public List<Entry> Entries { get; init; } = [];
-    }
-
-    private sealed record LayoutChangedType
-    {
-        public int Campaign { get; init; }
-        public List<Entry> Entries { get; init; } = [];
-    }
-
-    private sealed record EntryWithExtraField
-    {
-        public string File { get; init; } = string.Empty;
-        public double X { get; init; }
-        public double Y { get; init; }
-    }
-
-    private sealed record LayoutWithChangedNestedType
-    {
-        public string Campaign { get; init; } = string.Empty;
-        public List<EntryWithExtraField> Entries { get; init; } = [];
-    }
-
     // ── stability ────────────────────────────────────────────────────────────
 
     [Fact]
@@ -125,5 +81,49 @@ public sealed class DocumentSignatureTest
             Version = bumped, Signature = DocumentSignature.Of(typeof(LayoutWithChangedNestedType))
         };
         Assert.True(repinned.Matches(typeof(LayoutWithChangedNestedType), bumped));
+    }
+
+    private sealed record Entry
+    {
+        public string File { get; init; } = string.Empty;
+        public double X { get; init; }
+    }
+
+    private sealed record Layout
+    {
+        public string Campaign { get; init; } = string.Empty;
+        public List<Entry> Entries { get; init; } = [];
+    }
+
+    // Same shape, properties declared in a different order.
+    private sealed record LayoutReordered
+    {
+        public List<Entry> Entries { get; init; } = [];
+        public string Campaign { get; init; } = string.Empty;
+    }
+
+    private sealed record LayoutRenamedProperty
+    {
+        public string CampaignName { get; init; } = string.Empty;
+        public List<Entry> Entries { get; init; } = [];
+    }
+
+    private sealed record LayoutChangedType
+    {
+        public int Campaign { get; init; }
+        public List<Entry> Entries { get; init; } = [];
+    }
+
+    private sealed record EntryWithExtraField
+    {
+        public string File { get; init; } = string.Empty;
+        public double X { get; init; }
+        public double Y { get; init; }
+    }
+
+    private sealed record LayoutWithChangedNestedType
+    {
+        public string Campaign { get; init; } = string.Empty;
+        public List<EntryWithExtraField> Entries { get; init; } = [];
     }
 }

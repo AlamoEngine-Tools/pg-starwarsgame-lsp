@@ -37,19 +37,6 @@ public sealed class PgprojMigrationOfferTest
             NullLogger<PgprojMigrationOffer>.Instance), fs, prompt);
     }
 
-    /// <summary>Answers the proposal, and keeps what the user would have been shown.</summary>
-    private sealed class FakePrompt : IPgprojMigrationPrompt
-    {
-        public bool Accept { get; init; }
-        public List<PgprojMigrationProposal> Proposals { get; } = [];
-
-        public Task<bool> ProposeAsync(PgprojMigrationProposal proposal, CancellationToken ct)
-        {
-            Proposals.Add(proposal);
-            return Task.FromResult(Accept);
-        }
-    }
-
     // ── declining ────────────────────────────────────────────────────────────
 
     // Nothing is asked until the workspace has settled, and nothing is written until the user says
@@ -157,5 +144,18 @@ public sealed class PgprojMigrationOfferTest
         await offer.OfferPendingAsync(CancellationToken.None);
 
         Assert.Single(prompt.Proposals);
+    }
+
+    /// <summary>Answers the proposal, and keeps what the user would have been shown.</summary>
+    private sealed class FakePrompt : IPgprojMigrationPrompt
+    {
+        public bool Accept { get; init; }
+        public List<PgprojMigrationProposal> Proposals { get; } = [];
+
+        public Task<bool> ProposeAsync(PgprojMigrationProposal proposal, CancellationToken ct)
+        {
+            Proposals.Add(proposal);
+            return Task.FromResult(Accept);
+        }
     }
 }

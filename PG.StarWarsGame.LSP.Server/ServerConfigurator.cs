@@ -9,10 +9,14 @@ using Newtonsoft.Json;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using OmniSharp.Extensions.LanguageServer.Protocol.Server;
 using OmniSharp.Extensions.LanguageServer.Server;
+using PG.StarWarsGame.Files.MEG;
+using PG.StarWarsGame.Files.MTD;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Caching;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
@@ -22,23 +26,20 @@ using PG.StarWarsGame.LSP.Lua.Diagnostics;
 using PG.StarWarsGame.LSP.Schema;
 using PG.StarWarsGame.LSP.Schema.Cache;
 using PG.StarWarsGame.LSP.Schema.Providers;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Caching;
 using PG.StarWarsGame.LSP.Server.Commands;
+using PG.StarWarsGame.LSP.Server.Encyclopedia;
+using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 using PG.StarWarsGame.LSP.Server.Preview;
 using PG.StarWarsGame.LSP.Server.Project;
+using PG.StarWarsGame.LSP.Server.ShipNames;
 using PG.StarWarsGame.LSP.Server.Startup;
-using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
-using PG.StarWarsGame.Files.MEG;
-using PG.StarWarsGame.Files.MTD;
-using PG.StarWarsGame.LSP.Server.Encyclopedia;
-using PG.StarWarsGame.LSP.Server.Icons;
-using PG.StarWarsGame.LSP.Server.ShipNames;
+using PG.StarWarsGame.LSP.Server.Symbols;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -220,7 +221,7 @@ public static class ServerConfigurator
                     new FacadeWorkspaceEditApplier(() => sp.GetRequiredService<ILanguageServerFacade>()));
                 services.AddSingleton<IStoryLayoutStore, StoryLayoutStore>();
                 services
-                    .AddSingleton<Core.Diagnostics.Suppression.IGlobalSuppressionStore,
+                    .AddSingleton<IGlobalSuppressionStore,
                         GlobalSuppressionStore>();
                 services.AddSingleton<IWorkspaceSettingsStore, WorkspaceSettingsStore>();
                 services.AddSingleton<IStorySimulationService>(sp => new StorySimulationService(
@@ -243,7 +244,7 @@ public static class ServerConfigurator
                 services.AddSingleton<DialogDiagnosticsPublisher>();
                 services.AddSingleton<IDialogDiagnosticsRevalidator>(sp =>
                     sp.GetRequiredService<DialogDiagnosticsPublisher>());
-                services.AddSingleton<Core.Diagnostics.IDiagnosticsRepublisher>(sp =>
+                services.AddSingleton<IDiagnosticsRepublisher>(sp =>
                     sp.GetRequiredService<DialogDiagnosticsPublisher>());
 
                 // The inbound event gate: buffers client notifications while the linear startup
@@ -383,11 +384,11 @@ public static class ServerConfigurator
                 // Tells an open model preview the tree it was built from has moved on. Same shape
                 // as the notifier above; see PreviewSceneChangeNotifier for why it is driven by the
                 // index rather than off a watcher in the client.
-                services.AddSingleton<Preview.PreviewSceneChangeNotifier>(sp =>
-                    new Preview.PreviewSceneChangeNotifier(
+                services.AddSingleton<PreviewSceneChangeNotifier>(sp =>
+                    new PreviewSceneChangeNotifier(
                         sp.GetRequiredService<IGameIndexService>(),
                         method => sp.GetRequiredService<ILanguageServerFacade>().SendNotification(method),
-                        sp.GetRequiredService<ILogger<Preview.PreviewSceneChangeNotifier>>()));
+                        sp.GetRequiredService<ILogger<PreviewSceneChangeNotifier>>()));
 
                 // GameHoverHandler routes by extension to one of these providers. Registered as
                 // interfaces only so DryIoc does not see them as competing IHoverHandler
@@ -460,7 +461,7 @@ public static class ServerConfigurator
                 server.Services.GetRequiredService<LuaDiagnosticsPublisher>();
                 server.Services.GetRequiredService<LocalisationIndexChangedNotifier>();
                 server.Services.GetRequiredService<StoryGraphChangeNotifier>();
-                server.Services.GetRequiredService<Preview.PreviewSceneChangeNotifier>();
+                server.Services.GetRequiredService<PreviewSceneChangeNotifier>();
                 var schema = server.Services.GetRequiredService<ISchemaBootstrapper>();
                 var baseline = server.Services.GetRequiredService<IBaselineBootstrapper>();
                 var reload = server.Services.GetRequiredService<IModProjectReloadService>();

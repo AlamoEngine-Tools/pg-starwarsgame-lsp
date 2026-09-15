@@ -36,7 +36,7 @@ internal sealed class EngineRepairCodeActionProvider : IXmlCodeActionProvider
             .Select(e => new TextEdit
             {
                 NewText = (string?)e["newText"] ?? string.Empty,
-                Range = RangeOf((int?)e["line"] ?? 0, (int?)e["column"] ?? 0, (int?)e["length"] ?? 0),
+                Range = RangeOf((int?)e["line"] ?? 0, (int?)e["column"] ?? 0, (int?)e["length"] ?? 0)
             })
             .ToList();
 
@@ -56,9 +56,9 @@ internal sealed class EngineRepairCodeActionProvider : IXmlCodeActionProvider
                 {
                     Changes = new Dictionary<DocumentUri, IEnumerable<TextEdit>>
                     {
-                        [ctx.DocumentUri] = edits,
-                    },
-                },
+                        [ctx.DocumentUri] = edits
+                    }
+                }
             })
         ];
     }

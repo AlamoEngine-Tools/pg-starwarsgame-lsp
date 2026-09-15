@@ -29,7 +29,9 @@ public enum GameAssetTier
 ///     The absolute file path, or the archive-relative entry path for <see cref="GameAssetTier.Archive" />.
 /// </param>
 public sealed record GameAssetLocation(
-    string RequestedPath, string ResolvedPath, GameAssetTier Tier);
+    string RequestedPath,
+    string ResolvedPath,
+    GameAssetTier Tier);
 
 /// <summary>
 ///     Which tiers this workspace can currently resolve from.
@@ -40,7 +42,10 @@ public sealed record GameAssetLocation(
 ///     is not.
 /// </remarks>
 public sealed record GameAssetTiers(
-    int WorkspaceRootCount, bool HasBaseGamePath, bool HasExpansionPath, int ArchiveCount)
+    int WorkspaceRootCount,
+    bool HasBaseGamePath,
+    bool HasExpansionPath,
+    int ArchiveCount)
 {
     /// <summary>Whether anything shipped with the game could be found at all.</summary>
     public bool CanResolveShippedAssets => HasBaseGamePath || HasExpansionPath;
@@ -140,6 +145,11 @@ public sealed class GameAssetResolver(
     ///     alone would leave most shipped models untextured.
     /// </summary>
     private static readonly string[] InterchangeableTextureExtensions = [".tga", ".dds"];
+
+    /// <summary>
+    ///     The directories a <c>.pgproj</c> can name as asset roots, as game-relative prefixes.
+    /// </summary>
+    private static readonly string[] AssetRootPrefixes = ["data/art/", "data/audio/"];
 
     public GameAssetTiers Tiers => new(
         WorkspaceRoots().Count,
@@ -260,11 +270,6 @@ public sealed class GameAssetResolver(
                 yield break;
             }
     }
-
-    /// <summary>
-    ///     The directories a <c>.pgproj</c> can name as asset roots, as game-relative prefixes.
-    /// </summary>
-    private static readonly string[] AssetRootPrefixes = ["data/art/", "data/audio/"];
 
     /// <summary>
     ///     The workspace's asset roots, highest-precedence layer first.

@@ -15,11 +15,26 @@ namespace PG.StarWarsGame.LSP.Xml.Parsing;
 
 public sealed class XmlGameDocumentParser : IGameDocumentParser
 {
+    // Markup_Filename: slot 0 is a Faction, slot 1 (the markup file) is not indexable and not emitted.
+    private const string FactionTypeName = "Faction";
+
+    /// <summary>The schema enum a <c>Death_Clone</c>'s first slot names.</summary>
+    private const string DamageTypeEnum = "DamageType";
+
     // Registered file-types that are referenced as workspace files by workspaceFile tags (campaign
     // *_Story_Name → StoryPlotManifest; manifest Active_Plot/Suspended_Plot → StoryParser). A doc
     // typed one of these is indexed as a navigable file-symbol so those references resolve to it.
     private static readonly string[] WorkspaceFileTypes =
         [StoryReferenceTypes.PlotManifestFileTypeName, StoryReferenceTypes.ThreadFileTypeName];
+
+    // Fixed-meaning slot types per Campaign tuple ValueType, indexed by comma slot. A null entry
+    // marks a slot that is not an object reference (the per-faction numeric value) and is left to
+    // the shape handler; an absent index (slot beyond the array) is likewise not emitted.
+    private static readonly string?[] PerFactionPlanetSlotTypes = ["Faction", "GameObjectType"];
+    private static readonly string?[] PerFactionValueSlotTypes = ["Faction"];
+    private static readonly string?[] ForceDeploymentSlotTypes = ["Faction", "GameObjectType", "GameObjectType"];
+
+    private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
 
     private readonly ILspConfigurationProvider? _configProvider;
     private readonly IEaWXmlContext? _eaWXmlContext;
@@ -437,18 +452,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
             length));
     }
 
-    // Fixed-meaning slot types per Campaign tuple ValueType, indexed by comma slot. A null entry
-    // marks a slot that is not an object reference (the per-faction numeric value) and is left to
-    // the shape handler; an absent index (slot beyond the array) is likewise not emitted.
-    private static readonly string?[] PerFactionPlanetSlotTypes = ["Faction", "GameObjectType"];
-    private static readonly string?[] PerFactionValueSlotTypes = ["Faction"];
-    private static readonly string?[] ForceDeploymentSlotTypes = ["Faction", "GameObjectType", "GameObjectType"];
-
-    // Markup_Filename: slot 0 is a Faction, slot 1 (the markup file) is not indexable and not emitted.
-    private const string FactionTypeName = "Faction";
-
-    private static readonly string?[] FactionOnlySlotTypes = [FactionTypeName];
-
     private static IReadOnlyList<string?> FactionTupleSlotTypes(XmlValueType valueType)
     {
         return valueType switch
@@ -663,9 +666,6 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 prefix + token, kind, type, documentUri, line, column, length));
         }
     }
-
-    /// <summary>The schema enum a <c>Death_Clone</c>'s first slot names.</summary>
-    private const string DamageTypeEnum = "DamageType";
 
     private static void CollectEnumReferences(HtmlNode child, string enumName,
         LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)

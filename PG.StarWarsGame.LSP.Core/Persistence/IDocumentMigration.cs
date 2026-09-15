@@ -89,4 +89,7 @@ public enum SidecarStatus
 /// <param name="Message">Why, when the outcome was not a plain success. User-facing.</param>
 /// <param name="UserNotices">What each migration that ran wants the user told, in the order they ran.</param>
 public sealed record SidecarLoad<T>(
-    T Value, SidecarStatus Status, string? Message, IReadOnlyList<string> UserNotices);
+    T Value,
+    SidecarStatus Status,
+    string? Message,
+    IReadOnlyList<string> UserNotices);

@@ -91,7 +91,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
 
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
         var objDoc = new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty);
@@ -190,7 +190,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
         var hpDoc = new DocumentIndex(Uri, 1, [hpSym], ImmutableArray<GameReference>.Empty);
         var objDoc = new DocumentIndex(objUri, 1, [objSym], ImmutableArray<GameReference>.Empty);
 
@@ -254,7 +254,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
         var index = GameIndex.Empty with
         {
             Documents = ImmutableDictionary<string, DocumentIndex>.Empty
@@ -282,7 +282,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         const string objUri = "file:///object.xml";
         var hpSym = Sym("HP_A", "HardPoint");
         var objSym = new GameSymbol("PALACE", GameSymbolKind.XmlObject, "SpecialStructure",
-            new FileOrigin(objUri, 0, 0), null, null);
+            new FileOrigin(objUri, 0, 0), null);
 
         var index = GameIndex.Empty with
         {
@@ -438,7 +438,7 @@ public sealed class XmlHardpointFactProducerModelKeyTest
 
     private static GameSymbol Sym(string id, string typeName)
     {
-        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(Uri, 0, 0), null, null);
+        return new GameSymbol(id, GameSymbolKind.XmlObject, typeName, new FileOrigin(Uri, 0, 0), null);
     }
 
     private sealed class HardpointTagSource : IVariantTagSource
@@ -446,7 +446,10 @@ public sealed class XmlHardpointFactProducerModelKeyTest
         private readonly Dictionary<string, IReadOnlyList<VariantTag>> _byId =
             new(StringComparer.OrdinalIgnoreCase);
 
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => _byId.GetValueOrDefault(objectId);
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return _byId.GetValueOrDefault(objectId);
+        }
 
         public HardpointTagSource With(string id, params VariantTag[] tags)
         {
@@ -468,12 +471,30 @@ public sealed class XmlHardpointFactProducerModelKeyTest
                 : null;
         }
 
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName) => [];
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string tagName)
+        {
+            return [];
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [];
-        public GameObjectTypeDefinition? GetObjectType(string typeName) => null;
+
+        public GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName) => [];
-        public EnumDefinition? GetEnum(string enumName) => null;
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string typeName)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string enumName)
+        {
+            return null;
+        }
+
         public IReadOnlyList<EnumDefinition> AllEnums => [];
         public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => [];
         public IReadOnlyList<MetafileDefinition> AllMetafiles => [];

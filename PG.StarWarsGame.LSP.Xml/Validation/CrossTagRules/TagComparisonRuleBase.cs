@@ -33,9 +33,6 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
     /// <summary>The relation as a sentence fragment completing "&lt;Left&gt; ... &lt;Right&gt;".</summary>
     protected abstract string Expectation { get; }
 
-    /// <summary>Whether the pair is acceptable.</summary>
-    protected abstract bool IsAcceptable(double left, double right);
-
     /// <summary>
     ///     Whether the engine repairs a violation by EXCHANGING the two values, as measured in its
     ///     own code rather than assumed from the relation.
@@ -82,6 +79,9 @@ public abstract class TagComparisonRuleBase : IXmlCrossTagRule
                 SwapEdits(leftNode, rightNode, lineIndex))
         ];
     }
+
+    /// <summary>Whether the pair is acceptable.</summary>
+    protected abstract bool IsAcceptable(double left, double right);
 
     /// <summary>
     ///     The two edits that exchange the values, or null where this rule's engine does not swap or

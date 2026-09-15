@@ -51,7 +51,7 @@ public sealed class EitherOrRequirementRuleTest
         {
             "Neutralize_Hero_Ability", "NeutralizeHeroAbility",
             "Can_Neutralize_Minor_Heroes", "Can_Neutralize_Major_Heroes"
-        },
+        }
     };
 
     [Theory]

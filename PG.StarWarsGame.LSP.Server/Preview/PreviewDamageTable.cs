@@ -77,11 +77,9 @@ public sealed class PreviewDamageTable
         // field count, which is exactly the shape of silence this bug arrived as.
         foreach (var value in RepeatedTagReader.Values(
                      index, tagSource, EncyclopediaTags.GameConstantsId, ListTagName))
-        {
-            foreach (var name in value.Split(',', StringSplitOptions.TrimEntries
-                                                  | StringSplitOptions.RemoveEmptyEntries))
-                damageTypes.Add(name);
-        }
+        foreach (var name in value.Split(',', StringSplitOptions.TrimEntries
+                                              | StringSplitOptions.RemoveEmptyEntries))
+            damageTypes.Add(name);
 
         foreach (var row in RepeatedTagReader.Rows(
                      index, tagSource, EncyclopediaTags.GameConstantsId, TagName, 3))

@@ -11,9 +11,6 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Diagnostics;
 /// </summary>
 public sealed class DiagnosticCodeWiringTest
 {
-    private sealed record ProbeFact(string DocumentUri, int Line, int Column, int Length)
-        : XmlFact(DocumentUri, Line, Column, Length);
-
     [Fact]
     public void ResultWithId_PublishesItAsTheDiagnosticCode()
     {
@@ -47,4 +44,7 @@ public sealed class DiagnosticCodeWiringTest
 
         Assert.Equal(DiagnosticIds.StoryChain, result.Id);
     }
+
+    private sealed record ProbeFact(string DocumentUri, int Line, int Column, int Length)
+        : XmlFact(DocumentUri, Line, Column, Length);
 }

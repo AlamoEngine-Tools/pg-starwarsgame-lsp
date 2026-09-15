@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
@@ -30,9 +31,9 @@ public record DiagnosticsContext(
     string DocumentUri,
     string Locale,
     IReadOnlySet<string>? IconsAwaitingRepack = null,
-    Assets.IModelTextureIndex? ModelTextures = null,
-    Assets.IIconNameIndex? IconNames = null,
-    Symbols.IEffectiveObjectSource? Objects = null);
+    IModelTextureIndex? ModelTextures = null,
+    IIconNameIndex? IconNames = null,
+    IEffectiveObjectSource? Objects = null);
 
 /// <summary>
 ///     Supplies the icons a workspace has drawn but not yet repacked.

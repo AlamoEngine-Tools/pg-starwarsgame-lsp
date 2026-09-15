@@ -3,7 +3,6 @@
 
 using System.Globalization;
 using HtmlAgilityPack;
-using PG.StarWarsGame.LSP.Core.Schema;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 
@@ -51,7 +50,7 @@ public sealed class CombatBonusApplicableUnitsRule : ApplicableUnitRuleBase
         "combat_bonus_ability",
         "reduce_production_time_ability",
         "reduce_production_price_ability",
-        "find_weakness_ability",
+        "find_weakness_ability"
     ];
 
     protected override string Consequence => "affects no units at all";
@@ -124,7 +123,7 @@ public sealed class AttackAbilityApplicableUnitsRule : ApplicableUnitRuleBase
         "repair_ability",
         "super_laser_ability",
         "tractor_beam_attack_ability",
-        "vehicle_thief_ability",
+        "vehicle_thief_ability"
     ];
 
     protected override string Consequence => "cannot activate";

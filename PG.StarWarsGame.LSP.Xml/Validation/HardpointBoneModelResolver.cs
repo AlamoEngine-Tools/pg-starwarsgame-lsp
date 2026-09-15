@@ -4,9 +4,8 @@
 using HtmlAgilityPack;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Xml.Util;
-
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Xml.Util;
 
 namespace PG.StarWarsGame.LSP.Xml.Validation;
 
@@ -26,6 +25,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation;
 public sealed class HardpointBoneModelResolver
 {
     public const string HardpointElementName = "HardPoint";
+
+    private const string ModelToAttachTag = "Model_To_Attach";
+    private const string IsTurretTag = "Is_Turret";
+    private const string HardpointsTag = "HardPoints";
 
     /// <summary>Bones that live on the model of the object attaching the hardpoint.</summary>
     public static readonly string[] ParentModelBoneTags =
@@ -61,14 +64,13 @@ public sealed class HardpointBoneModelResolver
     public static readonly string[] AttachingObjectModelTags =
         ["Space_Model_Name", "Land_Model_Name", "Model_Name"];
 
-    private const string ModelToAttachTag = "Model_To_Attach";
-    private const string IsTurretTag = "Is_Turret";
-    private const string HardpointsTag = "HardPoints";
     private static readonly char[] ListSeparators = [',', ' ', '\t', '\r', '\n'];
 
     private readonly GameIndex _index;
+
     private readonly Dictionary<string, IReadOnlyList<string?>> _modelsByOwner =
         new(StringComparer.OrdinalIgnoreCase);
+
     private readonly EffectiveObjectResolver _resolver;
     private readonly ISchemaProvider _schema;
     private readonly IVariantTagSource _tagSource;

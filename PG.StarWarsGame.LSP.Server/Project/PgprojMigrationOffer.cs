@@ -23,7 +23,9 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 ///     </para>
 /// </summary>
 public sealed class PgprojMigrationOffer(
-    IFileHelper fileHelper, IPgprojMigrationPrompt prompt, IUserNotifier notifier,
+    IFileHelper fileHelper,
+    IPgprojMigrationPrompt prompt,
+    IUserNotifier notifier,
     ILogger<PgprojMigrationOffer> logger)
     : IPgprojMigrationSink
 {

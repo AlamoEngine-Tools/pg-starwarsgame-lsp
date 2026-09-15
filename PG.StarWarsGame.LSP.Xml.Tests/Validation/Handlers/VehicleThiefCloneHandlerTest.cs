@@ -34,8 +34,6 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// </remarks>
 public sealed class VehicleThiefCloneHandlerTest
 {
-    private static readonly VehicleThiefCloneHandler Sut = new();
-
     private const string Abilities =
         "<Unit_Abilities_Data SubObjectList=\"Yes\">" +
         "<Unit_Ability><Type>HUNT</Type></Unit_Ability>" +
@@ -46,6 +44,8 @@ public sealed class VehicleThiefCloneHandlerTest
         "<Unit_Abilities_Data SubObjectList=\"Yes\">" +
         "<Unit_Ability><Type>HUNT</Type></Unit_Ability>" +
         "</Unit_Abilities_Data>";
+
+    private static readonly VehicleThiefCloneHandler Sut = new();
 
     private static XmlTagDefinition CloneTag()
     {
@@ -183,7 +183,9 @@ public sealed class VehicleThiefCloneHandlerTest
         Assert.Empty(Sut.Handle(fact, Ctx("Bare", string.Empty)));
     }
 
-    private sealed class FakeObjects(string objectId, string abilitiesFragment,
+    private sealed class FakeObjects(
+        string objectId,
+        string abilitiesFragment,
         (string Tag, string Value)[] behaviours) : IEffectiveObjectSource
     {
         public EffectiveObject Resolve(string id)

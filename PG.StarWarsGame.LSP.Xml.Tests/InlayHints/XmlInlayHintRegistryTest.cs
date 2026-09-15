@@ -34,7 +34,8 @@ public sealed class XmlInlayHintRegistryTest
     [Fact]
     public void SingleProvider_ReturnsItsHints()
     {
-        var hint = new InlayHint { Position = new Position(0, 0), Label = ((StringOrInlayHintLabelParts?)"= \"test\"")! };
+        var hint = new InlayHint
+            { Position = new Position(0, 0), Label = ((StringOrInlayHintLabelParts?)"= \"test\"")! };
         var provider = new StubProvider([hint]);
         var registry = new XmlInlayHintRegistry([provider]);
 

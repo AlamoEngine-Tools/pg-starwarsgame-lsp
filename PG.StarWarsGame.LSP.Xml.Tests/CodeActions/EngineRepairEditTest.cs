@@ -117,10 +117,10 @@ public sealed class EngineRepairEditTest
                     edits = new[]
                     {
                         new { line = 1, column = 20, length = 4, newText = "10.0" },
-                        new { line = 2, column = 20, length = 4, newText = "30.0" },
-                    },
-                },
-            }),
+                        new { line = 2, column = 20, length = 4, newText = "30.0" }
+                    }
+                }
+            })
         };
 
         var action = Assert.Single(new EngineRepairCodeActionProvider()

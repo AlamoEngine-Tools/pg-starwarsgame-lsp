@@ -28,7 +28,9 @@ namespace PG.StarWarsGame.LSP.Server.Preview;
 ///     </para>
 /// </remarks>
 public sealed record PreviewCamera(
-    string Name, IReadOnlyList<float> Position, IReadOnlyList<float> Target);
+    string Name,
+    IReadOnlyList<float> Position,
+    IReadOnlyList<float> Target);
 
 /// <summary>
 ///     Reads the cameras out of a model's skeleton.

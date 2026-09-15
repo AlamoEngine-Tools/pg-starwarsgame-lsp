@@ -192,13 +192,17 @@ public sealed class EffectiveObjectResolverTest
         var clones = result.Tags.Where(t => t.TagName == "Death_Clone").ToList();
         Assert.Equal(4, clones.Count);
         Assert.Equal(
-            ["Damage_Fire, A_Fire_Clone", "Damage_Force_Lightning, A_Lightning_Clone",
-                "Damage_Fire, B_Fire_Clone", "Damage_Force_Lightning, B_Lightning_Clone"],
+            [
+                "Damage_Fire, A_Fire_Clone", "Damage_Force_Lightning, A_Lightning_Clone",
+                "Damage_Fire, B_Fire_Clone", "Damage_Force_Lightning, B_Lightning_Clone"
+            ],
             clones.Select(c => c.Value));
         // The base's own entries are inherited; only the variant's are the additive ones.
         Assert.Equal(
-            [VariantProvenance.Inherited, VariantProvenance.Inherited,
-                VariantProvenance.Merged, VariantProvenance.Merged],
+            [
+                VariantProvenance.Inherited, VariantProvenance.Inherited,
+                VariantProvenance.Merged, VariantProvenance.Merged
+            ],
             clones.Select(c => c.Provenance));
     }
 

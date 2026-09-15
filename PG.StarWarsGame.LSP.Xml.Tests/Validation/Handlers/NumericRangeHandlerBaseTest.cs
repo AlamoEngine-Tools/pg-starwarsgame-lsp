@@ -55,7 +55,7 @@ public sealed class NumericRangeHandlerBaseTest
             { "below-one", "0.999", true },
             { "below-one", "1", false },
             // No lower bound stated, so a negative is not this rule's business.
-            { "below-one", "-500", true },
+            { "below-one", "-500", true }
         };
 
     [Theory]
@@ -116,7 +116,7 @@ public sealed class NumericRangeHandlerBaseTest
             new[]
             {
                 "angle-degrees-full-turn", "angle-degrees-half-turn", "below-one", "bonus-percentage",
-                "fraction-below-one", "negative-fraction", "non-negative-value", "positive-value",
+                "fraction-below-one", "negative-fraction", "non-negative-value", "positive-value"
             },
             All().Select(h => h.ValidationId).OrderBy(s => s, StringComparer.Ordinal).ToArray());
     }

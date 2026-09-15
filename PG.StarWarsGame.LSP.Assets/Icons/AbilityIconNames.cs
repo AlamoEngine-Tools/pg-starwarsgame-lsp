@@ -70,6 +70,9 @@ public static class AbilityIconNames
             ["TARGETED_REPAIR"] = "I_SA_REPAIR_VEHICLE.TGA"
         }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Every mapped ability type. Exposed for tests and tooling.</summary>
+    public static IEnumerable<KeyValuePair<string, string>> All => ByType;
+
     /// <summary>
     ///     The atlas entry for <paramref name="abilityType" />, or <see langword="null" /> when the
     ///     type is not one of the exceptions - in which case <c>I_SA_&lt;TYPE&gt;</c> applies.
@@ -80,7 +83,4 @@ public static class AbilityIconNames
             ? null
             : ByType.GetValueOrDefault(abilityType.Trim());
     }
-
-    /// <summary>Every mapped ability type. Exposed for tests and tooling.</summary>
-    public static IEnumerable<KeyValuePair<string, string>> All => ByType;
 }

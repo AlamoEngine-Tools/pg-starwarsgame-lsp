@@ -43,7 +43,8 @@ public sealed class ContextNamePairHandler : XmlDiagnosticsHandler<XmlTagValueFa
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Error,
-                    $"'{name}' could not be resolved as a music event for <{fact.Tag.Tag}>.", Id: DiagnosticIds.ContextNamePairUnresolvedMusicEvent)
+                    $"'{name}' could not be resolved as a music event for <{fact.Tag.Tag}>.",
+                    Id: DiagnosticIds.ContextNamePairUnresolvedMusicEvent)
             ];
 
         return [];

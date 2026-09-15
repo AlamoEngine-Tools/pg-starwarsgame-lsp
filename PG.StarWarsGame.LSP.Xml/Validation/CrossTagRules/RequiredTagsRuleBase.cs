@@ -49,22 +49,6 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
     /// </summary>
     protected virtual string? DefaultValue => null;
 
-    /// <summary>
-    ///     Whether the engine actually demands these tags of THIS object, beyond it being the right
-    ///     element.
-    /// </summary>
-    /// <remarks>
-    ///     Most of these asserts are unconditional once the class is right, so the default is yes.
-    ///     Some sit behind a test on the object's own data - a hardpoint's fire cone is demanded
-    ///     only after <c>Is_Weapon()</c> passes - and a rule that ignored the gate would report
-    ///     objects the engine never asks. Same shape as the gate on
-    ///     <c>ForceHealingApplicableUnitsRule</c>.
-    /// </remarks>
-    protected virtual bool Applies(IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
-    {
-        return true;
-    }
-
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
@@ -97,6 +81,22 @@ public abstract class RequiredTagsRuleBase : IXmlCrossTagRule
         }
 
         return facts;
+    }
+
+    /// <summary>
+    ///     Whether the engine actually demands these tags of THIS object, beyond it being the right
+    ///     element.
+    /// </summary>
+    /// <remarks>
+    ///     Most of these asserts are unconditional once the class is right, so the default is yes.
+    ///     Some sit behind a test on the object's own data - a hardpoint's fire cone is demanded
+    ///     only after <c>Is_Weapon()</c> passes - and a rule that ignored the gate would report
+    ///     objects the engine never asks. Same shape as the gate on
+    ///     <c>ForceHealingApplicableUnitsRule</c>.
+    /// </remarks>
+    protected virtual bool Applies(IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
+    {
+        return true;
     }
 
     /// <summary>

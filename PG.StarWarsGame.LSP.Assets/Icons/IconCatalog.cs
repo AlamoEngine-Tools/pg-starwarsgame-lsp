@@ -149,7 +149,7 @@ public sealed class IconCatalog
             // Drawn but not repacked: render it so the author can see their work, and flag the
             // discrepancy so they learn the game would not show it yet.
             return _loose.TryGetValue(bare, out var stale)
-                ? new IconResolution(stale, IconSource.LooseSource, IsMegaTextureStale: true)
+                ? new IconResolution(stale, IconSource.LooseSource, true)
                 : null;
         }
 

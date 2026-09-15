@@ -99,7 +99,8 @@ public sealed class DialogCodeActionHandlerTest
         var handler = Handler("[CHAPTER 0]\n  BOGUS 1\n");
 
         var action = (await Actions(handler, Request(1, Unknown.ToString()))).First();
-        var edit = Assert.Single(action.Edit!.Changes![new DocumentUri("file", "", "/ws/dialogs/dialog_test.txt", "", "")]);
+        var edit = Assert.Single(
+            action.Edit!.Changes![new DocumentUri("file", "", "/ws/dialogs/dialog_test.txt", "", "")]);
 
         // Indented to match the line it guards, so the file needs no reformatting afterwards.
         Assert.Equal($"  # aetswg:suppress {Unknown}\n", edit.NewText);

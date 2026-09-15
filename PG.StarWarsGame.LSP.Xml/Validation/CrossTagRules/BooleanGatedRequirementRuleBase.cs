@@ -42,15 +42,6 @@ public abstract class BooleanGatedRequirementRuleBase : IXmlCrossTagRule
     /// <summary>What the engine silently does instead when the requirement is unmet.</summary>
     protected virtual string Repair => "turns it on for you";
 
-    /// <summary>
-    ///     Whether the required tag's value satisfies the engine. Absent is never satisfied, so
-    ///     this is only asked about a value that is actually present.
-    /// </summary>
-    protected virtual bool IsSatisfied(string value)
-    {
-        return EngineBoolean.IsTrue(value);
-    }
-
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
@@ -80,6 +71,15 @@ public abstract class BooleanGatedRequirementRuleBase : IXmlCrossTagRule
                 Requirement,
                 Repair)
         ];
+    }
+
+    /// <summary>
+    ///     Whether the required tag's value satisfies the engine. Absent is never satisfied, so
+    ///     this is only asked about a value that is actually present.
+    /// </summary>
+    protected virtual bool IsSatisfied(string value)
+    {
+        return EngineBoolean.IsTrue(value);
     }
 
     /// <summary>The last occurrence, matching the engine's keep-the-last rule for repeated tags.</summary>

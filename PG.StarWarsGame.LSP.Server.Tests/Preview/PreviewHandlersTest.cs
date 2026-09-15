@@ -56,7 +56,7 @@ public sealed class PreviewHandlersTest
     {
         // A panel that says why it is empty beats a failed request the user cannot interpret.
         var assets = new StubAssets();
-        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(modelPreview: false));
+        var handler = new GetPreviewSceneHandler(Builder(assets), assets, Config(false));
 
         var result = await handler.Handle(
             new GetPreviewSceneParams { ModelReference = "x.alo" }, CancellationToken.None);
@@ -352,43 +352,8 @@ public sealed class PreviewHandlersTest
         return null;
     }
 
-    /// <summary>Keeps what was logged, so a test can assert the preview said what it did.</summary>
-    private sealed class ListLogger<T> : ILogger<T>
-    {
-        private readonly List<string> messages = [];
-
-        public IReadOnlyList<string> Messages => messages;
-
-        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
-        {
-            return null;
-        }
-
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
-
-        public void Log<TState>(
-            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
-            Func<TState, Exception?, string> formatter)
-        {
-            messages.Add(formatter(state, exception));
-        }
-    }
-
-    private sealed class StubConfig(LspConfiguration current) : ILspConfigurationProvider
-    {
-        public LspConfiguration Current { get; } = current;
-
-        public void LoadFrom(object? initializationOptions)
-        {
-        }
-    }
-
     /// <summary>Serves the exact game-relative paths it was given.</summary>
     // ── the particle endpoint ──────────────────────────────────────────────
-
     [Fact]
     public async Task GetParticleSystem_ResolvesAGameObjectToItsModel()
     {
@@ -610,6 +575,40 @@ public sealed class PreviewHandlersTest
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
             new FileOrigin($"file:///{id}.xml", 0, 0), null);
+    }
+
+    /// <summary>Keeps what was logged, so a test can assert the preview said what it did.</summary>
+    private sealed class ListLogger<T> : ILogger<T>
+    {
+        private readonly List<string> messages = [];
+
+        public IReadOnlyList<string> Messages => messages;
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull
+        {
+            return null;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(
+            LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            messages.Add(formatter(state, exception));
+        }
+    }
+
+    private sealed class StubConfig(LspConfiguration current) : ILspConfigurationProvider
+    {
+        public LspConfiguration Current { get; } = current;
+
+        public void LoadFrom(object? initializationOptions)
+        {
+        }
     }
 
     private sealed class StubAssets : IGameAssetResolver

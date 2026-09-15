@@ -2,12 +2,11 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Globalization;
-using HtmlAgilityPack;
 using OmniSharp.Extensions.JsonRpc;
+using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Icons;
@@ -37,21 +36,28 @@ namespace PG.StarWarsGame.LSP.Server.Encyclopedia;
 public sealed class GetEncyclopediaEntryHandler
     : IJsonRpcRequestHandler<GetEncyclopediaEntryParams, GetEncyclopediaEntryResult>
 {
-    private readonly ILspConfigurationProvider _config;
-    private readonly IGameIndexService _indexService;
+    /// <summary>
+    ///     Reported as the icon's source when the built-in placeholder stood in. Not a member of
+    ///     <see cref="IconSource" />, which describes where real pixels came from - this says the
+    ///     opposite, that none were found.
+    /// </summary>
+    private const string FallbackSource = "Fallback";
+
     // Resolving the workspace root and asking for its catalog is shared with the XML diagnostics
     // and the model preview - see WorkspaceIconCatalog, which is also where the bug lived that had
     // this asking DI for a concrete type nothing registers.
     private readonly IWorkspaceIconCatalog? _catalog;
+    private readonly ILspConfigurationProvider _config;
+    private readonly IGameIndexService _indexService;
 
     // Still needed for the ship-name catalog, which resolves its own root. The INTERFACE, not the
     // concrete service: only `IModProjectReloadService` is registered, so asking for the class
     // handed this a permanent null and every project-configured path silently fell back.
     private readonly IModProjectReloadService? _projects;
     private readonly ISchemaProvider _schema;
-    private readonly IVariantTagSource _tagSource;
 
     private readonly IShipNameCatalogProvider? _shipNames;
+    private readonly IVariantTagSource _tagSource;
 
     public GetEncyclopediaEntryHandler(IGameIndexService indexService, ISchemaProvider schema,
         IVariantTagSource tagSource, ILspConfigurationProvider config,
@@ -91,7 +97,9 @@ public sealed class GetEncyclopediaEntryHandler
         var multiplayerBody = TagValue(effective, EncyclopediaTags.MultiplayerBody);
         var useMultiplayerBody = request.Multiplayer && !string.IsNullOrWhiteSpace(multiplayerBody);
         var body = XmlUtility
-            .SplitList(useMultiplayerBody ? multiplayerBody! : TagValue(effective, EncyclopediaTags.Body) ?? string.Empty)
+            .SplitList(useMultiplayerBody
+                ? multiplayerBody!
+                : TagValue(effective, EncyclopediaTags.Body) ?? string.Empty)
             .Select(key => new EncyclopediaLine(key, loca.GetValue(key)))
             .ToList();
 
@@ -207,18 +215,16 @@ public sealed class GetEncyclopediaEntryHandler
         }
     }
 
-    /// <summary>
-    ///     Reported as the icon's source when the built-in placeholder stood in. Not a member of
-    ///     <see cref="IconSource" />, which describes where real pixels came from - this says the
-    ///     opposite, that none were found.
-    /// </summary>
-    private const string FallbackSource = "Fallback";
-
-    private static string DataUri(byte[] png) => "data:image/png;base64," + Convert.ToBase64String(png);
+    private static string DataUri(byte[] png)
+    {
+        return "data:image/png;base64," + Convert.ToBase64String(png);
+    }
 
     /// <summary>Packages a resolved icon with the natural size the card lays out against.</summary>
-    private static EncyclopediaImage Image(IconResolution resolved) =>
-        new(DataUri(resolved.Png), resolved.Width, resolved.Height);
+    private static EncyclopediaImage Image(IconResolution resolved)
+    {
+        return new EncyclopediaImage(DataUri(resolved.Png), resolved.Width, resolved.Height);
+    }
 
     /// <summary>The same for bytes with no resolution behind them - the built-in placeholder.</summary>
     private static EncyclopediaImage Image(byte[] png)
@@ -327,7 +333,7 @@ public sealed class GetEncyclopediaEntryHandler
         return chrome is
                {
                    Background: null, TopBar: null, TopBarNoBlip: null,
-                   Line: null, AgainstFrame: null, UnitAgainst: null,
+                   Line: null, AgainstFrame: null, UnitAgainst: null
                }
                && frames.All(f => f.Image is null)
             ? null
@@ -405,7 +411,7 @@ public sealed class GetEncyclopediaEntryHandler
                 // than anything on the object being previewed.
                 var target = resolver.Resolve(id);
                 if (!target.Found)
-                    return new EncyclopediaReference(id, null, null);
+                    return new EncyclopediaReference(id, null);
 
                 // Each entry is a unit reference, so its slot art is just that unit's own icon -
                 // the same resolution the card's portrait goes through, placeholder included.
@@ -417,4 +423,3 @@ public sealed class GetEncyclopediaEntryHandler
             .ToList();
     }
 }
-

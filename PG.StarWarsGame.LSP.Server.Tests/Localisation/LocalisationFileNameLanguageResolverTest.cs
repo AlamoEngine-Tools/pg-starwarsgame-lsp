@@ -4,6 +4,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using PG.StarWarsGame.Localisation.Baseline;
 using PG.StarWarsGame.Localisation.Services;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Server.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
@@ -105,7 +106,7 @@ public sealed class LocalisationFileNameLanguageResolverTest
     public void Configured_KnownIdentifier_ResolvesIt()
     {
         var language = LocalisationFileNameLanguageResolver.Configured(
-            LangService(), new Core.Configuration.LocalisationConfig { Language = "GERMAN" });
+            LangService(), new LocalisationConfig { Language = "GERMAN" });
 
         Assert.Equal("GERMAN", language.LanguageIdentifier);
     }
@@ -116,7 +117,7 @@ public sealed class LocalisationFileNameLanguageResolverTest
         var langService = LangService();
 
         var language = LocalisationFileNameLanguageResolver.Configured(
-            langService, new Core.Configuration.LocalisationConfig { Language = "KLINGON" });
+            langService, new LocalisationConfig { Language = "KLINGON" });
 
         Assert.Equal(langService.Default.LanguageIdentifier, language.LanguageIdentifier);
     }
@@ -131,7 +132,7 @@ public sealed class LocalisationFileNameLanguageResolverTest
         var langService = LangService();
 
         var language = LocalisationFileNameLanguageResolver.Configured(
-            langService, new Core.Configuration.LocalisationConfig { Language = "de" });
+            langService, new LocalisationConfig { Language = "de" });
 
         Assert.Equal(langService.Default.LanguageIdentifier, language.LanguageIdentifier);
     }

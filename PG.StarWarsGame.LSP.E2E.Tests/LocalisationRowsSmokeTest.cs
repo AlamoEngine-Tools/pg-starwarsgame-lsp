@@ -135,7 +135,7 @@ public sealed class LocalisationRowsSmokeTest : IClassFixture<LocalisationServer
                 before.ContentHash,
                 [
                     new LocKeyedCommandDto("addLanguage", Language: "GERMAN"),
-                    new LocKeyedCommandDto("setValue", "TEXT_E2E_XML", Language: "GERMAN", Value: "Alfa"),
+                    new LocKeyedCommandDto("setValue", "TEXT_E2E_XML", Language: "GERMAN", Value: "Alfa")
                 ]),
             cts.Token);
 

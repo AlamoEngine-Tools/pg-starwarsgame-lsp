@@ -1,6 +1,8 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using PG.StarWarsGame.LSP.Assets.Models;
+
 namespace PG.StarWarsGame.LSP.Assets.Projection;
 
 /// <summary>
@@ -70,13 +72,13 @@ public static class ModelNameCatalog
     {
         try
         {
-            return Models.AloModelReader
-                .Read(aloBytes, Models.AloReadOptions.SkipGeometry)
+            return AloModelReader
+                .Read(aloBytes, AloReadOptions.SkipGeometry)
                 .Meshes.Select(m => m.Name)
                 .Where(n => n.Length > 0)
                 .ToList();
         }
-        catch (Models.AloFormatException)
+        catch (AloFormatException)
         {
             return [];
         }

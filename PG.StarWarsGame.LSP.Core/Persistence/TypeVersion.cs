@@ -2,6 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
+using System.Security.Cryptography;
+using System.Text;
 using Semver;
 
 namespace PG.StarWarsGame.LSP.Core.Persistence;
@@ -10,8 +13,12 @@ namespace PG.StarWarsGame.LSP.Core.Persistence;
 ///     The version a persisted document carries in its own <c>_typeVersion</c> field: a namespace
 ///     and a semantic version, written <c>aetswg-1.2.0</c>.
 ///     <para>
-///         Eclipse Scout's shape, deliberately - it serializes <c>{"_type": "lorem.ExampleEntity",
-///         "_typeVersion": "lorem-1.2.0"}</c>, and this framework is modelled on its data object
+///         Eclipse Scout's shape, deliberately - it serializes
+///         <c>
+///             {"_type": "lorem.ExampleEntity",
+///             "_typeVersion": "lorem-1.2.0"}
+///         </c>
+///         , and this framework is modelled on its data object
 ///         migration. The namespace says who owns the shape; the version says which revision of it
 ///         the file on disk holds.
 ///     </para>
@@ -23,6 +30,13 @@ namespace PG.StarWarsGame.LSP.Core.Persistence;
 public readonly record struct TypeVersion(string Namespace, SemVersion Version)
     : IComparable<TypeVersion>
 {
+    /// <summary>Namespace first, so the ordering is total; within one namespace it is the version.</summary>
+    public int CompareTo(TypeVersion other)
+    {
+        var ns = string.CompareOrdinal(Namespace, other.Namespace);
+        return ns != 0 ? ns : Version.ComparePrecedenceTo(other.Version);
+    }
+
     /// <summary>
     ///     The version of a document written before any of this existed - one with no
     ///     <c>_typeVersion</c> at all. It is what the first migration of each document declares as
@@ -60,13 +74,6 @@ public readonly record struct TypeVersion(string Namespace, SemVersion Version)
 
         value = new TypeVersion(ns, version);
         return true;
-    }
-
-    /// <summary>Namespace first, so the ordering is total; within one namespace it is the version.</summary>
-    public int CompareTo(TypeVersion other)
-    {
-        var ns = string.CompareOrdinal(Namespace, other.Namespace);
-        return ns != 0 ? ns : Version.ComparePrecedenceTo(other.Version);
     }
 
     public override string ToString()
@@ -115,8 +122,8 @@ public static class DocumentSignature
     /// <summary>The shape as a stable hash - what gets pinned.</summary>
     public static string Of(Type type)
     {
-        var bytes = System.Security.Cryptography.SHA256.HashData(
-            System.Text.Encoding.UTF8.GetBytes(Describe(type)));
+        var bytes = SHA256.HashData(
+            Encoding.UTF8.GetBytes(Describe(type)));
         return Convert.ToHexStringLower(bytes);
     }
 
@@ -145,7 +152,7 @@ public static class DocumentSignature
         if (!seen.Add(underlying)) return underlying.Name + ":recursive";
 
         var members = underlying
-            .GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
             .Where(p => p.GetIndexParameters().Length == 0 && p.CanRead)
             .Select(p => $"{Camel(p.Name)}:{Describe(p.PropertyType, seen)}")
             .OrderBy(text => text, StringComparer.Ordinal);

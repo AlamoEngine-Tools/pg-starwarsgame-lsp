@@ -8,11 +8,11 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.Handlers;
 
 public sealed class AbilityModFlagHandler : CommaSeparatedPairHandlerBase
 {
-    /// <inheritdoc />
-    public override DiagnosticId? DefaultId => DiagnosticIds.AbilityModFlag;
-
     private static readonly HashSet<string> ValidBoolValues =
         new(StringComparer.OrdinalIgnoreCase) { "true", "false", "yes", "no", "1", "0" };
+
+    /// <inheritdoc />
+    public override DiagnosticId? DefaultId => DiagnosticIds.AbilityModFlag;
 
     protected override XmlValueType TargetType => XmlValueType.AbilityModFlag;
 

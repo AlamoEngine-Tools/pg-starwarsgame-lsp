@@ -34,13 +34,11 @@ public sealed class HardpointBoneNotOnModelHandler : XmlDiagnosticsHandler<Hardp
             : $", nor on '{fact.AttachedModelName}', the hardpoint's own Model_To_Attach";
 
         if (!string.Equals(fact.TagName, CollisionMeshTag, StringComparison.OrdinalIgnoreCase))
-        {
             return
             [
                 new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
                     $"<{fact.TagName}> names bone '{fact.BoneName}', which does not exist on {owner}{also}.")
             ];
-        }
 
         // Collision_Mesh says what the mismatch COSTS, because the obvious reading - nothing can hit
         // the hardpoint - is wrong. GameObjectClass::Take_Damage replaces the name it looks a hardpoint

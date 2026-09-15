@@ -76,7 +76,8 @@ public sealed class HullFiringArcRuleTest
     [Fact]
     public void An_unnamed_object_emits_nothing()
     {
-        Assert.Empty(Produce("<X><SpaceUnit><Turret_Rotate_Extent_Degrees>20</Turret_Rotate_Extent_Degrees></SpaceUnit></X>"));
+        Assert.Empty(
+            Produce("<X><SpaceUnit><Turret_Rotate_Extent_Degrees>20</Turret_Rotate_Extent_Degrees></SpaceUnit></X>"));
     }
 }
 

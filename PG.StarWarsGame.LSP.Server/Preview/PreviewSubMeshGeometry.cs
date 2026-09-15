@@ -98,12 +98,12 @@ public sealed record PreviewSubMeshGeometry(
                 [vertex.Color.X, vertex.Color.Y, vertex.Color.Z, vertex.Color.W],
                 [
                     (int)vertex.BoneIndices.I0, (int)vertex.BoneIndices.I1,
-                    (int)vertex.BoneIndices.I2, (int)vertex.BoneIndices.I3,
+                    (int)vertex.BoneIndices.I2, (int)vertex.BoneIndices.I3
                 ],
                 [
                     vertex.BoneWeights.X, vertex.BoneWeights.Y,
-                    vertex.BoneWeights.Z, vertex.BoneWeights.W,
-                ])),
+                    vertex.BoneWeights.Z, vertex.BoneWeights.W
+                ]))
         ];
     }
 
@@ -140,7 +140,7 @@ public sealed record PreviewSubMeshGeometry(
 
                     // Said plainly rather than thrown: a mod's own exporter can write anything here,
                     // and a slot pointing nowhere is precisely the fault worth surfacing.
-                    : $"(no such bone: {bone})")),
+                    : $"(no such bone: {bone})"))
         ];
     }
 

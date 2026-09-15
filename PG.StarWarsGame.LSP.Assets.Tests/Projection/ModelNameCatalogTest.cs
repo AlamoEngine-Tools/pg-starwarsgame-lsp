@@ -11,7 +11,6 @@ namespace PG.StarWarsGame.LSP.Assets.Tests.Projection;
 // loader, which exposes none); mesh names come from AloModelReader, read without geometry.
 public sealed class ModelNameCatalogTest
 {
-
     [Fact]
     public void ReadBoneReferenceTargets_UnionsBonesAndMeshNames()
     {

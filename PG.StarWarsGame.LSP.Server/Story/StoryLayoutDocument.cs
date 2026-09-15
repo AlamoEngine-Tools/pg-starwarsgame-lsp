@@ -32,6 +32,16 @@ public static class StoryLayoutDocument
         TypeName, Version, "dabc4f8e400faa4c19a93300b8ab5a1956644acfb41068fc10fdf64117aba9c4");
 
     /// <summary>
+    ///     The chain, given a way to resolve the base names version zero used. The resolver is
+    ///     passed in because it needs the workspace, which a document type has no business holding.
+    /// </summary>
+    public static IReadOnlyList<IDocumentMigration> MigrationsUsing(
+        Func<string, string, Guid?> nodeKeyForBaseName, Func<string, Guid> graphKey)
+    {
+        return [new NameNodesByKey(nodeKeyForBaseName, graphKey)];
+    }
+
+    /// <summary>
     ///     One node's position. Which node it is - the thread and the event together - is the key,
     ///     hashed whole; nothing beside it names either part.
     /// </summary>
@@ -52,22 +62,13 @@ public static class StoryLayoutDocument
     }
 
     /// <summary>
-    ///     The chain, given a way to resolve the base names version zero used. The resolver is
-    ///     passed in because it needs the workspace, which a document type has no business holding.
-    /// </summary>
-    public static IReadOnlyList<IDocumentMigration> MigrationsUsing(
-        Func<string, string, Guid?> nodeKeyForBaseName, Func<string, Guid> graphKey)
-    {
-        return [new NameNodesByKey(nodeKeyForBaseName, graphKey)];
-    }
-
-    /// <summary>
     ///     Version zero was <c>{ "campaign/faction": [ { file, eventName, x, y } ] }</c> - a bare
     ///     map with no envelope, naming threads by file name. This gives it a root object to carry
     ///     one and swaps every file name for the thread's key.
     /// </summary>
     private sealed class NameNodesByKey(
-        Func<string, string, Guid?> nodeKeyForBaseName, Func<string, Guid> graphKey) : IDocumentMigration
+        Func<string, string, Guid?> nodeKeyForBaseName,
+        Func<string, Guid> graphKey) : IDocumentMigration
     {
         private int _dropped;
 

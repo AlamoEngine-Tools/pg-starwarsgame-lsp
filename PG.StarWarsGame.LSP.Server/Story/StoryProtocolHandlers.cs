@@ -210,7 +210,9 @@ public sealed class GetStoryNodeDetailHandler(IStoryModelService modelService, I
 }
 
 public sealed class GetStoryLayoutHandler(
-    IStoryLayoutStore store, IStoryModelService models, ILspConfigurationProvider config)
+    IStoryLayoutStore store,
+    IStoryModelService models,
+    ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<GetStoryLayoutParams, GetStoryLayoutResult>
 {
     public Task<GetStoryLayoutResult> Handle(GetStoryLayoutParams request, CancellationToken ct)
@@ -312,7 +314,8 @@ public sealed class GetStoryParamOptionsHandler(
 
         // Story-scoped names resolve campaign-wide - the campaign model gives a far tighter
         // candidate set than the index (which mixes every campaign's names together).
-        var campaignScoped = CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, request.Faction, prefix);
+        var campaignScoped =
+            CampaignScopedOptions(paramDef.ReferenceTypeName, request.Campaign, request.Faction, prefix);
         if (campaignScoped is not null)
             return Task.FromResult(new GetStoryParamOptionsResult(campaignScoped.Take(limit).ToList()));
 
@@ -340,7 +343,7 @@ public sealed class GetStoryParamOptionsHandler(
         if (model is null) return [];
 
         var events = model.Threads.SelectMany(t => t.Events);
-        IEnumerable<string> names = referenceType switch
+        var names = referenceType switch
         {
             StoryReferenceTypes.EventName => events.Select(e => e.Name),
             StoryReferenceTypes.Branch => events

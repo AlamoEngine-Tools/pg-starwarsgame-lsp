@@ -241,7 +241,7 @@ public sealed class TagNameHoverStrategyTest
 
         public void Register(string uri, string[] types)
         {
-            _map[uri] = [..types];
+            _map[uri] = [.. types];
         }
     }
 }

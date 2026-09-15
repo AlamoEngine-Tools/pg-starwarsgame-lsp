@@ -24,15 +24,17 @@ public sealed class LiveStoryChainProblemStore : IStoryChainProblemStore
 {
     private readonly ILspConfigurationProvider _configProvider;
 
+    private readonly object _gate = new();
+
     // Lazily resolved: IStoryModelService -> IModProjectReloadService -> IWorkspaceIndexer ->
     // IStoryChainProblemStore, so taking the service in the constructor would close a DI cycle.
     private readonly Func<IStoryModelService> _modelService;
     private readonly StoryChainProblemStore _startupSnapshot = new();
 
-    private readonly object _gate = new();
-    private StoryChainScanResult? _cachedFor;
     private IReadOnlyDictionary<string, IReadOnlyList<StoryChainProblem>> _byUri =
         new Dictionary<string, IReadOnlyList<StoryChainProblem>>(StringComparer.OrdinalIgnoreCase);
+
+    private StoryChainScanResult? _cachedFor;
 
     public LiveStoryChainProblemStore(
         Func<IStoryModelService> modelService, ILspConfigurationProvider configProvider)

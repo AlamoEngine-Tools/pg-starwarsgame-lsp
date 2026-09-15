@@ -15,6 +15,9 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 // them to write back out.
 public sealed class ModProjectFileWriter : IModProjectFileWriter
 {
+    private const string TypeField = "_type";
+    private const string VersionField = "_typeVersion";
+
     private static readonly JsonDocumentOptions ParseOptions = new()
     {
         CommentHandling = JsonCommentHandling.Skip,
@@ -23,14 +26,37 @@ public sealed class ModProjectFileWriter : IModProjectFileWriter
 
     private static readonly JsonSerializerOptions WriteOptions = new() { WriteIndented = true };
 
-    private const string TypeField = "_type";
-    private const string VersionField = "_typeVersion";
-
     private readonly IFileHelper _fileHelper;
 
     public ModProjectFileWriter(IFileHelper fileHelper)
     {
         _fileHelper = fileHelper;
+    }
+
+    public async Task SetLocalisationAsync(
+        string pgprojPath, string type, string directory, CancellationToken ct)
+    {
+        var fs = _fileHelper.FileSystem;
+        var text = await fs.File.ReadAllTextAsync(pgprojPath, ct);
+        var root = JsonNode.Parse(text, documentOptions: ParseOptions)?.AsObject()
+                   ?? throw new InvalidOperationException($"'{pgprojPath}' is not a valid JSON object.");
+
+        // Written into the existing node rather than over it. Replacing it wholesale discarded any
+        // 'credits' settings the user had hand-written - nothing in the server ever writes that node,
+        // so an import or a format conversion silently undid the only way to configure it.
+        var localisation = root["localisation"]?.AsObject();
+        if (localisation is null)
+        {
+            localisation = new JsonObject();
+            root["localisation"] = localisation;
+        }
+
+        localisation["type"] = type;
+        localisation["directory"] = directory;
+
+        Stamp(root);
+
+        await fs.File.WriteAllTextAsync(pgprojPath, root.ToJsonString(WriteOptions), ct);
     }
 
     /// <summary>
@@ -64,31 +90,5 @@ public sealed class ModProjectFileWriter : IModProjectFileWriter
             ordered.Remove(property.Key);
             root[property.Key] = property.Value;
         }
-    }
-
-    public async Task SetLocalisationAsync(
-        string pgprojPath, string type, string directory, CancellationToken ct)
-    {
-        var fs = _fileHelper.FileSystem;
-        var text = await fs.File.ReadAllTextAsync(pgprojPath, ct);
-        var root = JsonNode.Parse(text, documentOptions: ParseOptions)?.AsObject()
-                   ?? throw new InvalidOperationException($"'{pgprojPath}' is not a valid JSON object.");
-
-        // Written into the existing node rather than over it. Replacing it wholesale discarded any
-        // 'credits' settings the user had hand-written - nothing in the server ever writes that node,
-        // so an import or a format conversion silently undid the only way to configure it.
-        var localisation = root["localisation"]?.AsObject();
-        if (localisation is null)
-        {
-            localisation = new JsonObject();
-            root["localisation"] = localisation;
-        }
-
-        localisation["type"] = type;
-        localisation["directory"] = directory;
-
-        Stamp(root);
-
-        await fs.File.WriteAllTextAsync(pgprojPath, root.ToJsonString(WriteOptions), ct);
     }
 }

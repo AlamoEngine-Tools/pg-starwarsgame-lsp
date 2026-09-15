@@ -45,7 +45,8 @@ public sealed class FileReferenceRenameBuilderTest
         var changes = edit.DocumentChanges!.ToList();
         var rename = changes.Where(c => c.IsRenameFile).Select(c => c.RenameFile!).FirstOrDefault();
         var edits = changes.Where(c => c.IsTextDocumentEdit)
-            .SelectMany(c => c.TextDocumentEdit!.Edits.Select(e => (c.TextDocumentEdit!.TextDocument.Uri.ToString(), e)))
+            .SelectMany(c =>
+                c.TextDocumentEdit!.Edits.Select(e => (c.TextDocumentEdit!.TextDocument.Uri.ToString(), e)))
             .ToList();
         return (rename, edits);
     }
@@ -132,16 +133,16 @@ public sealed class FileReferenceRenameBuilderTest
     }
 
     [Theory]
-    [InlineData("Foo:Bar")]  // drive/stream separator
-    [InlineData("Foo*Bar")]  // wildcard
-    [InlineData("Foo?Bar")]  // wildcard
+    [InlineData("Foo:Bar")] // drive/stream separator
+    [InlineData("Foo*Bar")] // wildcard
+    [InlineData("Foo?Bar")] // wildcard
     [InlineData("Foo\"Bar")] // quote
     [InlineData("Foo<Bar")]
     [InlineData("Foo>Bar")]
-    [InlineData("Foo|Bar")]  // pipe
+    [InlineData("Foo|Bar")] // pipe
     [InlineData("Foo\tBar")] // control character
-    [InlineData("Foo.")]     // trailing dot (Windows strips it → on-disk name desyncs)
-    [InlineData("Foo ")]     // trailing space (same)
+    [InlineData("Foo.")] // trailing dot (Windows strips it → on-disk name desyncs)
+    [InlineData("Foo ")] // trailing space (same)
     public void Build_NewNameWithInvalidFileNameChar_ReturnsNull(string newStem)
     {
         var index = IndexWith(ManifestKey, ManifestUri, "StoryPlotManifest");

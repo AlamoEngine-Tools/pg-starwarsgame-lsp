@@ -31,9 +31,9 @@ public sealed class ModelGlbExporterCorpusTest
     private static readonly string[] Interesting =
     [
         "Ev_stardestroyer.alo", // the reference hull: 71 bones, 15 meshes, 22 proxies
-        "Ai_rancor.alo",        // RSkin + bump + colorize, a real skinned creature
-        "Alttest.alo",          // ALT-tagged meshes and proxies
-        "Rb_commandcenter.alo"  // the largest shipped model at 7.3 MB
+        "Ai_rancor.alo", // RSkin + bump + colorize, a real skinned creature
+        "Alttest.alo", // ALT-tagged meshes and proxies
+        "Rb_commandcenter.alo" // the largest shipped model at 7.3 MB
     ];
 
     [Fact]

@@ -27,18 +27,6 @@ public sealed class AssetFileExistenceHandlerTest
         return new DiagnosticsContext(new EmptySchemaProvider(), index, "file:///test.xml", "en");
     }
 
-        /// <summary>A stand-in mega texture holding <paramref name="names" />, as a .mtd records them.</summary>
-    private sealed class FakeIconNames(params string[] names) : IIconNameIndex
-    {
-        private readonly HashSet<string> _names = new(names, StringComparer.OrdinalIgnoreCase);
-
-        public bool Contains(string reference)
-        {
-            var dot = reference.LastIndexOf('.');
-            return _names.Contains(dot > 0 ? reference[..dot] : reference);
-        }
-    }
-
     private static DiagnosticsContext CtxWithIcons(IIconNameIndex icons, params string[] paths)
     {
         var index = GameIndex.Empty with { AssetFiles = new MergedAssetFileIndex(paths) };
@@ -252,5 +240,17 @@ public sealed class AssetFileExistenceHandlerTest
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.TextureFile), "foo.tga");
 
         Assert.Single(TextureSut.Handle(fact, XmlHandlerTestFixtures.EmptyCtx));
+    }
+
+    /// <summary>A stand-in mega texture holding <paramref name="names" />, as a .mtd records them.</summary>
+    private sealed class FakeIconNames(params string[] names) : IIconNameIndex
+    {
+        private readonly HashSet<string> _names = new(names, StringComparer.OrdinalIgnoreCase);
+
+        public bool Contains(string reference)
+        {
+            var dot = reference.LastIndexOf('.');
+            return _names.Contains(dot > 0 ? reference[..dot] : reference);
+        }
     }
 }

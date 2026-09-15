@@ -9,7 +9,6 @@ using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Project;
-using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Suppression;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Suppression;
@@ -34,7 +33,7 @@ public sealed class GlobalSuppressionStoreTest
         RecordingUserNotifier notifier, bool withProject = true, string? existingJson = null)
     {
         var files = new Dictionary<string, MockFileData> { [PgprojPath] = new("{}") };
-        if (existingJson is not null) files[SidecarPath] = new(existingJson);
+        if (existingJson is not null) files[SidecarPath] = new MockFileData(existingJson);
 
         var layers = withProject
             ? new[] { new ProjectLayer(1, "Mod", [], [], [], [], null, PgprojPath.Replace('\\', '/')) }

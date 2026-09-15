@@ -206,13 +206,13 @@ public sealed class EngineTextLimitTest
     {
         private static readonly XmlTagDefinition HardPoints = new()
         {
-            Tag = "HardPoints", ValueType = XmlValueType.NameReferenceList,
+            Tag = "HardPoints", ValueType = XmlValueType.NameReferenceList
         };
 
         // A scalar, for the narrowing: its case in Map_Data_Of_Type never copies into the buffer.
         private static readonly XmlTagDefinition MaxSpeed = new()
         {
-            Tag = "Max_Speed", ValueType = XmlValueType.Float,
+            Tag = "Max_Speed", ValueType = XmlValueType.Float
         };
 
         public XmlTagDefinition? GetTag(string tagName)

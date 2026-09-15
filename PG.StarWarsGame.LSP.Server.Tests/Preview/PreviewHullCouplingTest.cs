@@ -129,7 +129,7 @@ public sealed class PreviewHullCouplingTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)

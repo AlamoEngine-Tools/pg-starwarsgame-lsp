@@ -48,9 +48,6 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
 
     public event EventHandler? SchemaRefreshed;
 
-    /// <inheritdoc />
-    public SchemaVersionCheck? LastVersionCheck { get; private set; }
-
     public XmlTagDefinition? GetTag(string tagName)
     {
         return _current.GetTag(tagName);
@@ -85,6 +82,9 @@ public sealed class LocalFileSchemaProvider : ISchemaProvider, IVersionedSchemaP
     public IReadOnlyList<HardcodedReferenceSet> AllHardcodedSets => _current.AllHardcodedSets;
 
     public IReadOnlyList<MetafileDefinition> AllMetafiles => _current.AllMetafiles;
+
+    /// <inheritdoc />
+    public SchemaVersionCheck? LastVersionCheck { get; private set; }
 
     public void Load()
     {

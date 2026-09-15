@@ -1319,10 +1319,10 @@ public sealed class WorkspaceIndexerTest
 
     private sealed class FakeProjectIndexCache : IProjectIndexCache
     {
-        private readonly Dictionary<string, ProjectIndexSnapshot> _snapshots = [];
         public readonly HashSet<string> HygienePaths = [];
         public readonly Dictionary<string, ProjectIndexSnapshot> Saved = [];
         public readonly HashSet<string> SavedPaths = [];
+        private readonly Dictionary<string, ProjectIndexSnapshot> _snapshots = [];
 
         public ProjectIndexSnapshot? this[string pgprojPath]
         {

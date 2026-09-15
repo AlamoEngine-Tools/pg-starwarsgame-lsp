@@ -2,10 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Symbols;
-using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
@@ -32,7 +30,7 @@ public sealed class PreviewHardpointAttachmentTest
     [Fact]
     public void TargetableHardpointWithNoAttachmentBone_IsAnError()
     {
-        var scene = SceneWith(targetable: true, attachmentBone: null);
+        var scene = SceneWith(true, null);
 
         var problem = Assert.Single(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewTargetableHardpointNoBone);
@@ -47,7 +45,7 @@ public sealed class PreviewHardpointAttachmentTest
     [Fact]
     public void TargetableHardpointWithNoAttachmentBone_SaysWhatItCosts()
     {
-        var scene = SceneWith(targetable: true, attachmentBone: null);
+        var scene = SceneWith(true, null);
 
         var problem = Assert.Single(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewTargetableHardpointNoBone);
@@ -63,7 +61,7 @@ public sealed class PreviewHardpointAttachmentTest
     [Fact]
     public void TargetableHardpointWithNoAttachmentBone_DoesNotAlsoRaiseTheGeneralFinding()
     {
-        var scene = SceneWith(targetable: true, attachmentBone: null);
+        var scene = SceneWith(true, null);
 
         Assert.DoesNotContain(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone);
@@ -72,7 +70,7 @@ public sealed class PreviewHardpointAttachmentTest
     [Fact]
     public void UntargetableHardpointWithNoAttachmentBone_StaysAWarning()
     {
-        var scene = SceneWith(targetable: false, attachmentBone: null);
+        var scene = SceneWith(false, null);
 
         var problem = Assert.Single(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone);
@@ -89,7 +87,7 @@ public sealed class PreviewHardpointAttachmentTest
     {
         foreach (var targetable in new[] { true, false })
         {
-            var scene = SceneWith(targetable, attachmentBone: null);
+            var scene = SceneWith(targetable, null);
 
             Assert.DoesNotContain(scene.Problems,
                 p => p.Message.Contains("hull's origin", StringComparison.OrdinalIgnoreCase));
@@ -99,7 +97,7 @@ public sealed class PreviewHardpointAttachmentTest
     [Fact]
     public void AHardpointThatNamesItsBone_ReportsNeitherFinding()
     {
-        var scene = SceneWith(targetable: true, attachmentBone: "HP_Gun_BONE");
+        var scene = SceneWith(true, "HP_Gun_BONE");
 
         Assert.DoesNotContain(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewHardpointNoBone
@@ -137,7 +135,7 @@ public sealed class PreviewHardpointAttachmentTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)

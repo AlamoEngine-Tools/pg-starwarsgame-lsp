@@ -192,7 +192,7 @@ public sealed class PreviewDamageStagesTest
     [Fact]
     public void BuildForObject_SaysNothingWhenTheModelIsNotCatalogued()
     {
-        var scene = Build("1, 0.66", "0, 1", null);
+        var scene = Build("1, 0.66", "0, 1");
 
         Assert.DoesNotContain(scene.Problems,
             p => p.DiagnosticId == DiagnosticIds.PreviewDamageStageNotInModel);
@@ -206,8 +206,10 @@ public sealed class PreviewDamageStagesTest
         var index = GameIndex.Empty with
         {
             WorkspaceDefinitions = ImmutableDictionary<string, ImmutableArray<GameSymbol>>.Empty
-                .Add("Bunker", [new GameSymbol("Bunker", GameSymbolKind.XmlObject, "GroundStructure",
-                    new FileOrigin("file:///structures.xml", 0, 0), null, null)]),
+                .Add("Bunker", [
+                    new GameSymbol("Bunker", GameSymbolKind.XmlObject, "GroundStructure",
+                        new FileOrigin("file:///structures.xml", 0, 0), null)
+                ]),
 
             // Bones UNION mesh names, which is what the catalogue holds. Measured across 1957
             // shipped models: every level an ALT-tagged proxy declares is also tagged by a bone or a

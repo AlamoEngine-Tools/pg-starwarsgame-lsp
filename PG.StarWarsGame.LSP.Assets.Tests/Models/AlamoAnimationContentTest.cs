@@ -92,7 +92,6 @@ public sealed class AlamoAnimationContentTest
     ///     differs" fires all over the BASE GAME, on units that animate perfectly well in the engine.
     ///     So an identical skeleton is not what the engine requires, and treating a name disagreement
     ///     as fatal dropped clips the game plays.
-    ///
     ///     An index past the end of the bone list is different in kind: there is no node to drive, so
     ///     the track cannot be written whatever anyone decides about names.
     /// </remarks>

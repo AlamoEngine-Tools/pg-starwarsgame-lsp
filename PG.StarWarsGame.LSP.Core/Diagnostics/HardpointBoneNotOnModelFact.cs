@@ -13,7 +13,10 @@ namespace PG.StarWarsGame.LSP.Core.Diagnostics;
 /// <param name="TagName">The tag the bone came from (Attachment_Bone, Fire_Bone_A, ...).</param>
 /// <param name="BoneName">The bone that is missing.</param>
 /// <param name="ModelName">The model that lacks it.</param>
-/// <param name="OwnerId">The object whose model it is - the object attaching the hardpoint, or the hardpoint itself for its own Model_To_Attach.</param>
+/// <param name="OwnerId">
+///     The object whose model it is - the object attaching the hardpoint, or the hardpoint itself for
+///     its own Model_To_Attach.
+/// </param>
 /// <param name="AttachedModelName">
 ///     The hardpoint's own <c>Model_To_Attach</c>, where that was ALSO checked and also lacks the
 ///     bone. Only set for a tag that may resolve against either model - <c>Collision_Mesh</c> - and

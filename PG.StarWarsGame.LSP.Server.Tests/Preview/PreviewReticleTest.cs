@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Preview;
 
@@ -49,9 +48,11 @@ public sealed class PreviewReticleTest
         var map = Build();
 
         Assert.Equal(
-            ["I_Hard_Point_Reticle_Engines", "I_Hard_Point_Reticle_Engines_Repair",
+            [
+                "I_Hard_Point_Reticle_Engines", "I_Hard_Point_Reticle_Engines_Repair",
                 "I_Hard_Point_Reticle_Engines_Tracked", "I_Hard_Point_Reticle_Weapons",
-                "I_Hard_Point_Reticle_Weapons_Repair", "I_Hard_Point_Reticle_Weapons_Tracked"],
+                "I_Hard_Point_Reticle_Weapons_Repair", "I_Hard_Point_Reticle_Weapons_Tracked"
+            ],
             map.IconNames.OrderBy(n => n, StringComparer.Ordinal));
     }
 
@@ -113,7 +114,7 @@ public sealed class PreviewReticleTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static GameIndex Index(IEnumerable<GameSymbol> symbols)
@@ -132,22 +133,30 @@ public sealed class PreviewReticleTest
         var tags = new FakeVariantTagSource().With("GameConstants",
             Tag("HardPoint_Target_Reticle_Enemy_Screen_Size", " 0.03 "),
             Tag("HardPoint_Target_Reticle_Friendly_Screen_Size", " 0.03 "),
-
             Tag("HardPoint_Target_Reticle_Enemy_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines "),
-            Tag("HardPoint_Target_Reticle_Enemy_Tracked_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Tracked "),
+            Tag("HardPoint_Target_Reticle_Enemy_Tracked_Texture",
+                " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Tracked "),
             Tag("HardPoint_Target_Reticle_Friendly_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines "),
-            Tag("HardPoint_Target_Reticle_Friendly_Tracked_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Tracked "),
-            Tag("HardPoint_Target_Reticle_Friendly_Repairing_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Repair "),
-            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines "),
-            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Tracked_Texture", " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Tracked "),
-
+            Tag("HardPoint_Target_Reticle_Friendly_Tracked_Texture",
+                " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Tracked "),
+            Tag("HardPoint_Target_Reticle_Friendly_Repairing_Texture",
+                " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Repair "),
+            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Texture",
+                " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines "),
+            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Tracked_Texture",
+                " HARD_POINT_ENGINE, I_Hard_Point_Reticle_Engines_Tracked "),
             Tag("HardPoint_Target_Reticle_Enemy_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons "),
-            Tag("HardPoint_Target_Reticle_Enemy_Tracked_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Tracked "),
+            Tag("HardPoint_Target_Reticle_Enemy_Tracked_Texture",
+                " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Tracked "),
             Tag("HardPoint_Target_Reticle_Friendly_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons "),
-            Tag("HardPoint_Target_Reticle_Friendly_Tracked_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Tracked "),
-            Tag("HardPoint_Target_Reticle_Friendly_Repairing_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Repair "),
-            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons "),
-            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Tracked_Texture", " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Tracked "));
+            Tag("HardPoint_Target_Reticle_Friendly_Tracked_Texture",
+                " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Tracked "),
+            Tag("HardPoint_Target_Reticle_Friendly_Repairing_Texture",
+                " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Repair "),
+            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Texture",
+                " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons "),
+            Tag("HardPoint_Target_Reticle_Friendly_Disabled_Tracked_Texture",
+                " HARD_POINT_WEAPON_LASER, I_Hard_Point_Reticle_Weapons_Tracked "));
 
         return PreviewReticleMap.From(GameIndex.Empty, tags);
     }

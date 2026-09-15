@@ -1,6 +1,7 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Globalization;
 using PG.StarWarsGame.LSP.Core.Symbols;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
@@ -122,8 +123,8 @@ public sealed class PreviewReticleMap
             index, source, EncyclopediaTags.GameConstantsId, tagName);
 
         return values.Count > 0 &&
-               float.TryParse(values[0], System.Globalization.NumberStyles.Float,
-                   System.Globalization.CultureInfo.InvariantCulture, out var value)
+               float.TryParse(values[0], NumberStyles.Float,
+                   CultureInfo.InvariantCulture, out var value)
             ? value
             : null;
     }

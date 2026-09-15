@@ -145,10 +145,26 @@ file sealed class ProbeSchemaProvider : ISchemaProvider
         return tagName.Equals(Health.Tag, StringComparison.OrdinalIgnoreCase) ? Health : null;
     }
 
-    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-    public GameObjectTypeDefinition? GetObjectType(string _) => null;
-    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-    public EnumDefinition? GetEnum(string _) => null;
+    public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+    {
+        return [];
+    }
+
+    public GameObjectTypeDefinition? GetObjectType(string _)
+    {
+        return null;
+    }
+
+    public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+    {
+        return [];
+    }
+
+    public EnumDefinition? GetEnum(string _)
+    {
+        return null;
+    }
+
     public IReadOnlyList<XmlTagDefinition> AllTags => [Health];
     public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
     public IReadOnlyList<EnumDefinition> AllEnums => [];
@@ -164,12 +180,18 @@ file sealed class ProbeSchemaProvider : ISchemaProvider
 
 file sealed class ProbeIndexFactProducer : IXmlIndexFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index) => [];
+    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+    {
+        return [];
+    }
 }
 
 file sealed class ProbeStoryFactProducer : IStoryFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri) => [];
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    {
+        return [];
+    }
 }
 
 file sealed class ProbeIndexService : IGameIndexService
@@ -194,8 +216,10 @@ file sealed class ProbeIndexService : IGameIndexService
         remove { }
     }
 
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
-        Task.CompletedTask;
+    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return Task.CompletedTask;
+    }
 
     public void InjectDocument(DocumentIndex document)
     {
@@ -230,7 +254,10 @@ file sealed class ProbeIndexService : IGameIndexService
     {
     }
 
-    public IDisposable BeginBulkUpdate() => NullProbeDisposable.Instance;
+    public IDisposable BeginBulkUpdate()
+    {
+        return NullProbeDisposable.Instance;
+    }
 }
 
 file sealed class NullProbeDisposable : IDisposable
@@ -251,7 +278,10 @@ file sealed class ProbeWorkspaceHost : IGameWorkspaceHost
         _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
     }
 
-    public void Remove(string uri) => _docs.Remove(uri);
+    public void Remove(string uri)
+    {
+        _docs.Remove(uri);
+    }
 
     public bool TryGet(string uri, out TrackedDocument doc)
     {
@@ -270,7 +300,10 @@ file sealed class ProbeWorkspaceHost : IGameWorkspaceHost
 
 file sealed class ProbeFileTypeRegistry : IFileTypeRegistry
 {
-    public ImmutableArray<string> GetTypesForFile(string normalizedPath) => ImmutableArray<string>.Empty;
+    public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+    {
+        return ImmutableArray<string>.Empty;
+    }
 
     public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
     {

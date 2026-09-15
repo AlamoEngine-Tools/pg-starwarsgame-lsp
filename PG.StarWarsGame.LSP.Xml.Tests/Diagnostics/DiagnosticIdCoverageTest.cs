@@ -52,7 +52,7 @@ public sealed class DiagnosticIdCoverageTest
         // a `};`, so its body came out empty and was skipped - and it turned into a failure the
         // moment an unrelated object initialiser was added further down. An initialiser is
         // identified by the `{` that follows the type name.
-        var blocks = source.Split("new Diagnostic", StringSplitOptions.None)
+        var blocks = source.Split("new Diagnostic")
             .Skip(1)
             .Where(b => b.TrimStart().StartsWith('{'))
             .ToList();

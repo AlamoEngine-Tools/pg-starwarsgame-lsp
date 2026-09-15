@@ -2,8 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Assets.Icons;
-using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Localisation;
 
 namespace PG.StarWarsGame.LSP.Server.Preview;
 
@@ -104,5 +104,8 @@ public static class PreviewAbilityText
         }
     }
 
-    private static string DataUri(byte[] png) => "data:image/png;base64," + Convert.ToBase64String(png);
+    private static string DataUri(byte[] png)
+    {
+        return "data:image/png;base64," + Convert.ToBase64String(png);
+    }
 }

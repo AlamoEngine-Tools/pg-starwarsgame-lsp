@@ -20,18 +20,6 @@ public sealed class PreviewAbilityTextTest
 {
     private static readonly byte[] SomeIcon = [1];
 
-    private sealed class FakeLocalisation(params (string Key, string Value)[] rows) : ILocalisationIndex
-    {
-        private readonly Dictionary<string, string> _rows =
-            rows.ToDictionary(r => r.Key, r => r.Value, StringComparer.OrdinalIgnoreCase);
-
-        public IEnumerable<string> Keys => _rows.Keys;
-
-        public bool ContainsKey(string key) => _rows.ContainsKey(key);
-
-        public string? GetValue(string key) => _rows.GetValueOrDefault(key);
-    }
-
     private static IconCatalog CatalogWith(params string[] names)
     {
         return new IconCatalog(
@@ -40,8 +28,10 @@ public sealed class PreviewAbilityTextTest
             new Dictionary<string, byte[]>());
     }
 
-    private static PreviewAbility Ability(string type) =>
-        new(type, null, null, null, null, null, [], null, null, []);
+    private static PreviewAbility Ability(string type)
+    {
+        return new PreviewAbility(type, null, null, null, null, null, [], null, null, []);
+    }
 
     // ── names ────────────────────────────────────────────────────────────────
 
@@ -150,5 +140,23 @@ public sealed class PreviewAbilityTextTest
         var filled = PreviewAbilityText.Fill(Ability("ROCKET_ATTACK"), null, null, null, null, []);
 
         Assert.Null(filled.IconDataUri);
+    }
+
+    private sealed class FakeLocalisation(params (string Key, string Value)[] rows) : ILocalisationIndex
+    {
+        private readonly Dictionary<string, string> _rows =
+            rows.ToDictionary(r => r.Key, r => r.Value, StringComparer.OrdinalIgnoreCase);
+
+        public IEnumerable<string> Keys => _rows.Keys;
+
+        public bool ContainsKey(string key)
+        {
+            return _rows.ContainsKey(key);
+        }
+
+        public string? GetValue(string key)
+        {
+            return _rows.GetValueOrDefault(key);
+        }
     }
 }

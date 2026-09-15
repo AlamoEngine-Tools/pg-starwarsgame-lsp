@@ -3,7 +3,6 @@
 
 using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Assets;
-using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Assets;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -35,6 +34,10 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 /// </remarks>
 public sealed class PreviewPassiveSubjectTest
 {
+    // ── fixture ───────────────────────────────────────────────────────────────
+
+    private const string Models = "eaw";
+
     [Fact]
     public void DeathClone_CarriesTheClipsOfItsOwnModel_NotTheSubjects()
     {
@@ -146,10 +149,6 @@ public sealed class PreviewPassiveSubjectTest
             p => Assert.Null(p.HardpointId));
     }
 
-    // ── fixture ───────────────────────────────────────────────────────────────
-
-    private const string Models = "eaw";
-
     private static string? ModelsDirectory()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
@@ -168,8 +167,8 @@ public sealed class PreviewPassiveSubjectTest
     {
         var models = ModelsDirectory();
         available = models is not null
-            && File.Exists(Path.Combine(models, "Ev_stardestroyer_d.alo"))
-            && File.Exists(Path.Combine(models, "Ev_stardestroyer_dead.alo"));
+                    && File.Exists(Path.Combine(models, "Ev_stardestroyer_d.alo"))
+                    && File.Exists(Path.Combine(models, "Ev_stardestroyer_dead.alo"));
 
         if (!available)
             return PreviewScene.NotFound("", "", new GameAssetTiers(0, false, false, 0));
@@ -224,7 +223,7 @@ public sealed class PreviewPassiveSubjectTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)

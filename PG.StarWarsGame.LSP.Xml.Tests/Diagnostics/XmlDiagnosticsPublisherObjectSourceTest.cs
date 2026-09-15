@@ -39,7 +39,7 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             "<Factions><Faction Name=\"Rebel\">" +
             "<Standalone_Space_Maps_Special_Weapon_A>Ground_Barracks</Standalone_Space_Maps_Special_Weapon_A>" +
             "</Faction></Factions>",
-            behaviourOfWeapon: "SELECTABLE, REVEAL");
+            "SELECTABLE, REVEAL");
 
         var d = Assert.Single(diagnostics);
         Assert.Contains("Ground_Barracks", d.Message);
@@ -53,7 +53,7 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             "<Factions><Faction Name=\"Rebel\">" +
             "<Standalone_Space_Maps_Special_Weapon_A>Ground_Barracks</Standalone_Space_Maps_Special_Weapon_A>" +
             "</Faction></Factions>",
-            behaviourOfWeapon: "SPECIAL_WEAPON");
+            "SPECIAL_WEAPON");
 
         Assert.Empty(diagnostics);
     }
@@ -67,8 +67,8 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             "<Factions><Faction Name=\"Rebel\">" +
             "<Standalone_Space_Maps_Special_Weapon_A>Ground_Barracks</Standalone_Space_Maps_Special_Weapon_A>" +
             "</Faction></Factions>",
-            behaviourOfWeapon: "SELECTABLE",
-            wireTagSource: false);
+            "SELECTABLE",
+            false);
 
         Assert.Empty(diagnostics);
     }
@@ -132,10 +132,26 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
             return tagName.Equals(WeaponA.Tag, StringComparison.OrdinalIgnoreCase) ? WeaponA : null;
         }
 
-        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _) => [];
-        public GameObjectTypeDefinition? GetObjectType(string _) => null;
-        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _) => [];
-        public EnumDefinition? GetEnum(string _) => null;
+        public IReadOnlyList<XmlTagDefinition> GetAllTagDefinitions(string _)
+        {
+            return [];
+        }
+
+        public GameObjectTypeDefinition? GetObjectType(string _)
+        {
+            return null;
+        }
+
+        public IReadOnlyList<XmlTagDefinition> GetTagsForType(string _)
+        {
+            return [];
+        }
+
+        public EnumDefinition? GetEnum(string _)
+        {
+            return null;
+        }
+
         public IReadOnlyList<XmlTagDefinition> AllTags => [WeaponA];
         public IReadOnlyList<GameObjectTypeDefinition> AllObjectTypes => [];
         public IReadOnlyList<EnumDefinition> AllEnums => [];
@@ -155,17 +171,26 @@ public sealed class XmlDiagnosticsPublisherObjectSourceTest
 
 file sealed class ObjSrcIndexFactProducer : IXmlIndexFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index) => [];
+    public IReadOnlyList<XmlFact> Produce(string documentUri, GameIndex index)
+    {
+        return [];
+    }
 }
 
 file sealed class ObjSrcStoryFactProducer : IStoryFactProducer
 {
-    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri) => [];
+    public IReadOnlyList<XmlFact> Produce(ParsedXmlDocument document, string documentUri)
+    {
+        return [];
+    }
 }
 
 file sealed class ObjSrcFileTypeRegistry : IFileTypeRegistry
 {
-    public ImmutableArray<string> GetTypesForFile(string normalizedPath) => ImmutableArray<string>.Empty;
+    public ImmutableArray<string> GetTypesForFile(string normalizedPath)
+    {
+        return ImmutableArray<string>.Empty;
+    }
 
     public void RegisterFile(string normalizedPath, ImmutableArray<string> typeNames)
     {
@@ -188,7 +213,10 @@ file sealed class ObjSrcWorkspaceHost : IGameWorkspaceHost
         _docs[uri] = new TrackedDocument(uri, text, version, publishDiagnostics);
     }
 
-    public void Remove(string uri) => _docs.Remove(uri);
+    public void Remove(string uri)
+    {
+        _docs.Remove(uri);
+    }
 
     public bool TryGet(string uri, out TrackedDocument doc)
     {
@@ -227,8 +255,10 @@ file sealed class ObjSrcIndexService : IGameIndexService
         remove { }
     }
 
-    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct) =>
-        Task.CompletedTask;
+    public Task UpdateDocumentAsync(string uri, string text, int version, CancellationToken ct)
+    {
+        return Task.CompletedTask;
+    }
 
     public void InjectDocument(DocumentIndex document)
     {
@@ -263,7 +293,10 @@ file sealed class ObjSrcIndexService : IGameIndexService
     {
     }
 
-    public IDisposable BeginBulkUpdate() => NullDisposable.Instance;
+    public IDisposable BeginBulkUpdate()
+    {
+        return NullDisposable.Instance;
+    }
 
     private sealed class NullDisposable : IDisposable
     {

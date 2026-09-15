@@ -96,7 +96,7 @@ public sealed class NotesAmbiguityTest
                     ValueType = XmlValueType.Float,
                     Notes = note is null
                         ? new Dictionary<string, string>()
-                        : new Dictionary<string, string> { ["en"] = note },
+                        : new Dictionary<string, string> { ["en"] = note }
                 });
         }
 

@@ -6,7 +6,6 @@ using OmniSharp.Extensions.LanguageServer.Protocol;
 using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Xml;
 using PG.StarWarsGame.LSP.Xml.CodeActions;
 using PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 using PG.StarWarsGame.LSP.Xml.Validation.Handlers;
@@ -46,7 +45,7 @@ public sealed class EngineRepairFixTest
         var tag = XmlHandlerTestFixtures.MakeTag("Activation_Style", XmlValueType.DynamicEnumValue)
             with
             {
-                AllowedValues = ["GROUND_ACTIVATED"],
+                AllowedValues = ["GROUND_ACTIVATED"]
             };
 
         var d = Assert.Single(new AllowedValuesHandler()
@@ -67,7 +66,7 @@ public sealed class EngineRepairFixTest
         var tag = XmlHandlerTestFixtures.MakeTag("Activation_Style", XmlValueType.DynamicEnumValue)
             with
             {
-                AllowedValues = ["GROUND_ACTIVATED", "USER_INPUT"],
+                AllowedValues = ["GROUND_ACTIVATED", "USER_INPUT"]
             };
 
         var d = Assert.Single(new AllowedValuesHandler()
@@ -120,8 +119,8 @@ public sealed class EngineRepairFixTest
             Data = JToken.FromObject(new
             {
                 fix = "GROUND_ACTIVATED",
-                fixTitle = "Apply the engine's own value: GROUND_ACTIVATED",
-            }),
+                fixTitle = "Apply the engine's own value: GROUND_ACTIVATED"
+            })
         };
 
         var action = Assert.Single(new FixSuggestionCodeActionProvider(new EmptyFixCache())

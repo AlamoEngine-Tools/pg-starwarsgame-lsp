@@ -149,6 +149,3 @@ public sealed class IconCatalogLoaderTest
         Assert.NotNull(catalog.Resolve("I_BUTTON_LUKE.TGA"));
     }
 }
-
-
-

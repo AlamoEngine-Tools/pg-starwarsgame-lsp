@@ -158,14 +158,14 @@ public sealed class PreviewUnkillableTest
             // Bones UNION mesh names, which is what the engine matches against.
             ModelBones = new Dictionary<string, ImmutableArray<string>>
             {
-                [ModelBoneKey.From("hull.alo")] = ["HP_GUN", "HP_GUN_COLL"],
-            }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase),
+                [ModelBoneKey.From("hull.alo")] = ["HP_GUN", "HP_GUN_COLL"]
+            }.ToImmutableDictionary(StringComparer.OrdinalIgnoreCase)
         };
 
         var shipTags = new List<VariantTag>
         {
             Tag("Space_Model_Name", "hull.alo"),
-            Tag("HardPoints", string.Join(", ", hardpoints.Select(h => h.Id))),
+            Tag("HardPoints", string.Join(", ", hardpoints.Select(h => h.Id)))
         };
         shipTags.AddRange(extra);
 
@@ -180,7 +180,7 @@ public sealed class PreviewUnkillableTest
     private static GameSymbol Sym(string id, string typeName)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, typeName,
-            new FileOrigin($"file:///{id}.xml", 0, 0), null, null);
+            new FileOrigin($"file:///{id}.xml", 0, 0), null);
     }
 
     private static VariantTag Tag(string name, string value)

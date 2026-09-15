@@ -2,10 +2,10 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
+using System.Text;
 using PG.StarWarsGame.LSP.Assets.ShipNames;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Encyclopedia;
-using PG.StarWarsGame.LSP.Server.Icons;
 using PG.StarWarsGame.LSP.Server.ShipNames;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
@@ -18,37 +18,22 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 {
     private const string ObjectId = "STAR_DESTROYER";
 
-    private sealed class StubShipNames(ShipNameCatalog catalog) : IShipNameCatalogProvider
+    private static GameSymbol Sym(string id, string type)
     {
-        public string? LastTagValue { get; private set; }
-
-        public ShipNameCatalog Get(string projectRoot, string? rawTagValue)
-        {
-            LastTagValue = rawTagValue;
-            // Honours the real provider's contract: no wiring, no pools. Returning the catalog
-            // regardless would let a test pass that the production path could not.
-            return string.IsNullOrWhiteSpace(rawTagValue) ? ShipNameCatalog.Empty : catalog;
-        }
+        return new GameSymbol(id, GameSymbolKind.XmlObject, type, new FileOrigin("file:///u.xml", 0, 0), null);
     }
 
-    private sealed class ThrowingShipNames : IShipNameCatalogProvider
+    private static VariantTag Tag(string name, string value)
     {
-        public ShipNameCatalog Get(string projectRoot, string? rawTagValue)
-            => throw new IOException("name file unreadable");
+        return new VariantTag(name, value, $"<{name}>{value}</{name}>", 0);
     }
-
-    private static GameSymbol Sym(string id, string type) =>
-        new(id, GameSymbolKind.XmlObject, type, new FileOrigin("file:///u.xml", 0, 0), null, null);
-
-    private static VariantTag Tag(string name, string value) =>
-        new(name, value, $"<{name}>{value}</{name}>", 0);
 
     private static ShipNameCatalog CatalogWith(params string[] names)
     {
         return ShipNameCatalog.Build(
             $"{ObjectId}, Data\\SD.txt",
-            _ => System.Text.Encoding.Unicode.GetPreamble()
-                .Concat(System.Text.Encoding.Unicode.GetBytes(string.Join("\r\n", names)))
+            _ => Encoding.Unicode.GetPreamble()
+                .Concat(Encoding.Unicode.GetBytes(string.Join("\r\n", names)))
                 .ToArray());
     }
 
@@ -117,7 +102,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 
         Assert.Null(result.ShipNames);
         Assert.Null(result.UnitClass); // untouched: the class line is a loca key and
-                                       // this fixture loads no translations
+        // this fixture loads no translations
     }
 
     /// <summary>
@@ -175,7 +160,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 
         Assert.Null(result.ShipNames);
         Assert.Null(result.UnitClass); // untouched: the class line is a loca key and
-                                       // this fixture loads no translations
+        // this fixture loads no translations
     }
 
     [Fact]
@@ -187,7 +172,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
 
         Assert.Empty(result.ShipNames!.Names);
         Assert.Null(result.UnitClass); // untouched: the class line is a loca key and
-                                       // this fixture loads no translations
+        // this fixture loads no translations
     }
 
     [Fact]
@@ -198,7 +183,7 @@ public sealed class GetEncyclopediaEntryShipNamesTest
         Assert.True(result.Found);
         Assert.Null(result.ShipNames);
         Assert.Null(result.UnitClass); // untouched: the class line is a loca key and
-                                       // this fixture loads no translations
+        // this fixture loads no translations
     }
 
     [Fact]
@@ -209,6 +194,27 @@ public sealed class GetEncyclopediaEntryShipNamesTest
         Assert.True(result.Found);
         Assert.Null(result.ShipNames);
         Assert.Null(result.UnitClass); // untouched: the class line is a loca key and
-                                       // this fixture loads no translations
+        // this fixture loads no translations
+    }
+
+    private sealed class StubShipNames(ShipNameCatalog catalog) : IShipNameCatalogProvider
+    {
+        public string? LastTagValue { get; private set; }
+
+        public ShipNameCatalog Get(string projectRoot, string? rawTagValue)
+        {
+            LastTagValue = rawTagValue;
+            // Honours the real provider's contract: no wiring, no pools. Returning the catalog
+            // regardless would let a test pass that the production path could not.
+            return string.IsNullOrWhiteSpace(rawTagValue) ? ShipNameCatalog.Empty : catalog;
+        }
+    }
+
+    private sealed class ThrowingShipNames : IShipNameCatalogProvider
+    {
+        public ShipNameCatalog Get(string projectRoot, string? rawTagValue)
+        {
+            throw new IOException("name file unreadable");
+        }
     }
 }

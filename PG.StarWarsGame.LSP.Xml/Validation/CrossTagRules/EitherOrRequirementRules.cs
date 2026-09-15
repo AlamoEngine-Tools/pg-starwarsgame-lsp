@@ -7,8 +7,10 @@ namespace PG.StarWarsGame.LSP.Xml.Validation.CrossTagRules;
 ///     A <c>Hero_Assassin_Ability</c> that can assassinate nobody.
 /// </summary>
 /// <remarks>
-///     <c>Error: (%s) You should set either Can_Assassinate_Minor_Heroes or
-///     Can_Assassinate_Major_Heroes to 'Yes', otherwise this ability won't do anything.</c>
+///     <c>
+///         Error: (%s) You should set either Can_Assassinate_Minor_Heroes or
+///         Can_Assassinate_Major_Heroes to 'Yes', otherwise this ability won't do anything.
+///     </c>
 ///     (<c>01554898</c>), referenced by <c>HeroAssassinAbilityClass::Validate_Data</c>
 ///     (<c>0100df66</c>). No vanilla object uses this ability class at all - it is one of the three
 ///     abandoned hero abilities - so the rule exists for mods, which are the only things that can
@@ -42,8 +44,10 @@ public sealed class BaseDestructionTargetsRule : EitherOrRequirementRuleBase
 /// </summary>
 /// <remarks>
 ///     <para>
-///         <c>Warning: (%s) You should set either Can_Neutralize_Minor_Heroes or
-///         Can_Neutralize_Major_Heroes to "Yes", otherwise this ability won't do anything!</c>
+///         <c>
+///             Warning: (%s) You should set either Can_Neutralize_Minor_Heroes or
+///             Can_Neutralize_Major_Heroes to "Yes", otherwise this ability won't do anything!
+///         </c>
 ///         (<c>015431b8</c>), referenced by <c>NeutralizeHeroAbilityClass::Validate_Data</c>
 ///         (<c>00f24027</c>).
 ///     </para>

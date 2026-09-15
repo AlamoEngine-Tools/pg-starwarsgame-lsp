@@ -26,19 +26,6 @@ namespace PG.StarWarsGame.LSP.Assets.Tests.Icons;
 /// </remarks>
 internal static class TestPng
 {
-    internal sealed record Decoded(int Width, int Height, byte[] Rgba)
-    {
-        /// <summary>The RGBA quadruple at (x, y), top row first.</summary>
-        public (byte R, byte G, byte B, byte A) this[int x, int y]
-        {
-            get
-            {
-                var i = (y * Width + x) * 4;
-                return (Rgba[i], Rgba[i + 1], Rgba[i + 2], Rgba[i + 3]);
-            }
-        }
-    }
-
     public static Decoded Decode(byte[] png)
     {
         ArgumentNullException.ThrowIfNull(png);
@@ -61,8 +48,8 @@ internal static class TestPng
                 case "IHDR":
                     width = (int)BinaryPrimitives.ReadUInt32BigEndian(data);
                     height = (int)BinaryPrimitives.ReadUInt32BigEndian(data[4..]);
-                    Assert.Equal(8, data[8]);  // bit depth
-                    Assert.Equal(6, data[9]);  // colour type: RGBA
+                    Assert.Equal(8, data[8]); // bit depth
+                    Assert.Equal(6, data[9]); // colour type: RGBA
                     Assert.Equal(0, data[12]); // interlace: none
                     break;
                 case "IDAT":
@@ -93,5 +80,18 @@ internal static class TestPng
         }
 
         return new Decoded(width, height, rgba);
+    }
+
+    internal sealed record Decoded(int Width, int Height, byte[] Rgba)
+    {
+        /// <summary>The RGBA quadruple at (x, y), top row first.</summary>
+        public (byte R, byte G, byte B, byte A) this[int x, int y]
+        {
+            get
+            {
+                var i = (y * Width + x) * 4;
+                return (Rgba[i], Rgba[i + 1], Rgba[i + 2], Rgba[i + 3]);
+            }
+        }
     }
 }

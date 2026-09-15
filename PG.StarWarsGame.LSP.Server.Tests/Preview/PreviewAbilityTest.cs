@@ -2,7 +2,6 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Immutable;
-using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Server.Abilities;
 using PG.StarWarsGame.LSP.Server.Preview;
@@ -19,19 +18,19 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Preview;
 public sealed class UnitAbilityReaderTest
 {
     private const string Abilities = """
-        <Unit_Abilities_Data SubObjectList="Yes">
-            <Unit_Ability>
-                <Type>POWER_TO_WEAPONS</Type>
-                <GUI_Activated_Ability_Name>Ev_Power_Ability</GUI_Activated_Ability_Name>
-                <Recharge_Seconds>60</Recharge_Seconds>
-            </Unit_Ability>
-            <Unit_Ability>
-                <Type>DEPLOY_TROOPERS</Type>
-                <Owner_Attachment_Bone>B_Trooper_00</Owner_Attachment_Bone>
-                <Particle_Effect>Home_One_Target_Particles</Particle_Effect>
-            </Unit_Ability>
-        </Unit_Abilities_Data>
-        """;
+                                     <Unit_Abilities_Data SubObjectList="Yes">
+                                         <Unit_Ability>
+                                             <Type>POWER_TO_WEAPONS</Type>
+                                             <GUI_Activated_Ability_Name>Ev_Power_Ability</GUI_Activated_Ability_Name>
+                                             <Recharge_Seconds>60</Recharge_Seconds>
+                                         </Unit_Ability>
+                                         <Unit_Ability>
+                                             <Type>DEPLOY_TROOPERS</Type>
+                                             <Owner_Attachment_Bone>B_Trooper_00</Owner_Attachment_Bone>
+                                             <Particle_Effect>Home_One_Target_Particles</Particle_Effect>
+                                         </Unit_Ability>
+                                     </Unit_Abilities_Data>
+                                     """;
 
     [Fact]
     public void Reader_ReturnsEveryAbilityInDocumentOrder()
@@ -68,11 +67,11 @@ public sealed class UnitAbilityReaderTest
     {
         // Type is the identity. An entry without one cannot be bound to anything or drawn.
         var read = UnitAbilityReader.Read(Fragment("""
-            <Unit_Abilities_Data>
-                <Unit_Ability><Recharge_Seconds>5</Recharge_Seconds></Unit_Ability>
-                <Unit_Ability><Type>TURBO</Type></Unit_Ability>
-            </Unit_Abilities_Data>
-            """));
+                                                   <Unit_Abilities_Data>
+                                                       <Unit_Ability><Recharge_Seconds>5</Recharge_Seconds></Unit_Ability>
+                                                       <Unit_Ability><Type>TURBO</Type></Unit_Ability>
+                                                   </Unit_Abilities_Data>
+                                                   """));
 
         Assert.Equal(["TURBO"], read.Select(a => a.Type));
     }
@@ -101,15 +100,15 @@ public sealed class PreviewAbilityTest
         var scene = Scene(
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Unit_Abilities_Data", string.Empty, """
-                <Unit_Abilities_Data>
-                    <Unit_Ability>
-                        <Type>DEPLOY_TROOPERS</Type>
-                        <Owner_Attachment_Bone>B_Trooper_00</Owner_Attachment_Bone>
-                        <Particle_Effect>Home_One_Target_Particles</Particle_Effect>
-                        <Recharge_Seconds>45</Recharge_Seconds>
-                    </Unit_Ability>
-                </Unit_Abilities_Data>
-                """));
+                                                     <Unit_Abilities_Data>
+                                                         <Unit_Ability>
+                                                             <Type>DEPLOY_TROOPERS</Type>
+                                                             <Owner_Attachment_Bone>B_Trooper_00</Owner_Attachment_Bone>
+                                                             <Particle_Effect>Home_One_Target_Particles</Particle_Effect>
+                                                             <Recharge_Seconds>45</Recharge_Seconds>
+                                                         </Unit_Ability>
+                                                     </Unit_Abilities_Data>
+                                                     """));
 
         var ability = Assert.Single(scene.Abilities);
         Assert.Equal("DEPLOY_TROOPERS", ability.Type);
@@ -127,14 +126,14 @@ public sealed class PreviewAbilityTest
         var scene = Scene(
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Unit_Abilities_Data", string.Empty, """
-                <Unit_Abilities_Data>
-                    <Unit_Ability>
-                        <Type>DEFEND</Type>
-                        <Mod_Multiplier>WEAPON_DELAY_MULTIPLIER, 3.0f</Mod_Multiplier>
-                        <Mod_Multiplier>SPEED_MULTIPLIER, 0.8f</Mod_Multiplier>
-                    </Unit_Ability>
-                </Unit_Abilities_Data>
-                """));
+                                                     <Unit_Abilities_Data>
+                                                         <Unit_Ability>
+                                                             <Type>DEFEND</Type>
+                                                             <Mod_Multiplier>WEAPON_DELAY_MULTIPLIER, 3.0f</Mod_Multiplier>
+                                                             <Mod_Multiplier>SPEED_MULTIPLIER, 0.8f</Mod_Multiplier>
+                                                         </Unit_Ability>
+                                                     </Unit_Abilities_Data>
+                                                     """));
 
         var ability = Assert.Single(scene.Abilities);
         Assert.Equal(["WEAPON_DELAY_MULTIPLIER", "SPEED_MULTIPLIER"],
@@ -150,15 +149,15 @@ public sealed class PreviewAbilityTest
         var scene = Scene(
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Unit_Abilities_Data", string.Empty, """
-                <Unit_Abilities_Data>
-                    <Unit_Ability>
-                        <Type>DEFEND</Type>
-                        <Mod_Multiplier>A, 1</Mod_Multiplier>
-                        <Mod_Multiplier>B, 2</Mod_Multiplier>
-                        <Mod_Multiplier>C, 3</Mod_Multiplier>
-                    </Unit_Ability>
-                </Unit_Abilities_Data>
-                """));
+                                                     <Unit_Abilities_Data>
+                                                         <Unit_Ability>
+                                                             <Type>DEFEND</Type>
+                                                             <Mod_Multiplier>A, 1</Mod_Multiplier>
+                                                             <Mod_Multiplier>B, 2</Mod_Multiplier>
+                                                             <Mod_Multiplier>C, 3</Mod_Multiplier>
+                                                         </Unit_Ability>
+                                                     </Unit_Abilities_Data>
+                                                     """));
 
         Assert.Equal(3, Assert.Single(scene.Abilities).Modifiers.Count);
     }
@@ -171,14 +170,14 @@ public sealed class PreviewAbilityTest
         var scene = Scene(
             Tag("Space_Model_Name", "hull.alo"),
             Tag("Unit_Abilities_Data", string.Empty, """
-                <Unit_Abilities_Data>
-                    <Unit_Ability>
-                        <Type>DEFEND</Type>
-                        <Mod_Multiplier>SPEED_MULTIPLIER, lots</Mod_Multiplier>
-                        <Mod_Multiplier>SPEED_MULTIPLIER, 0.8f</Mod_Multiplier>
-                    </Unit_Ability>
-                </Unit_Abilities_Data>
-                """));
+                                                     <Unit_Abilities_Data>
+                                                         <Unit_Ability>
+                                                             <Type>DEFEND</Type>
+                                                             <Mod_Multiplier>SPEED_MULTIPLIER, lots</Mod_Multiplier>
+                                                             <Mod_Multiplier>SPEED_MULTIPLIER, 0.8f</Mod_Multiplier>
+                                                         </Unit_Ability>
+                                                     </Unit_Abilities_Data>
+                                                     """));
 
         Assert.Equal([0.8f], Assert.Single(scene.Abilities).Modifiers.Select(m => m.Factor));
     }
@@ -197,7 +196,7 @@ public sealed class PreviewAbilityTest
             WorkspaceDefinitions = new[]
             {
                 new GameSymbol("Ship", GameSymbolKind.XmlObject, "SpaceUnit",
-                    new FileOrigin("file:///Ship.xml", 0, 0), null, null)
+                    new FileOrigin("file:///Ship.xml", 0, 0), null)
             }.ToImmutableDictionary(s => s.Id, s => ImmutableArray.Create(s),
                 StringComparer.OrdinalIgnoreCase)
         };
@@ -211,7 +210,6 @@ public sealed class PreviewAbilityTest
     {
         return new VariantTag(name, value, fragment ?? $"<{name}>{value}</{name}>", 0);
     }
-
 }
 
 /// <summary>

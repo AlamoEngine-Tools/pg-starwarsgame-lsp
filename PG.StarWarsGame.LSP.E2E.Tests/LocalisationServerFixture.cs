@@ -21,8 +21,10 @@ public sealed class LocalisationServerFixture : LspServerFixture
 
     public string TextDirectory => Path.Combine(WorkspaceRoot, "data", "text");
     public string MasterTextPath => Path.Combine(TextDirectory, "MasterTextFile.csv");
+
     /// <summary>An eaw-translation XML file, where a language exists only where a value does.</summary>
     public string XmlTextPath => Path.Combine(TextDirectory, "Translations.xml");
+
     public string CreditsPath => Path.Combine(TextDirectory, "creditstext_english.csv");
 
     protected override string ResolveWorkspacePath()

@@ -152,7 +152,10 @@ public sealed class BoneModelInlayHintProviderTest
     // consulted and the tag source is irrelevant to these inline cases.
     private sealed class EmptyTagSource : IVariantTagSource
     {
-        public IReadOnlyList<VariantTag>? TryGetTags(string objectId) => null;
+        public IReadOnlyList<VariantTag>? TryGetTags(string objectId)
+        {
+            return null;
+        }
     }
 
     // ── fake schema ───────────────────────────────────────────────────────────

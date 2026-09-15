@@ -98,7 +98,7 @@ public sealed class WorkspaceVariantTagSource : IVariantTagSource
 
     private static string? GetNameAttribute(HtmlNode node)
     {
-        return XmlUtility.GetNameAttributeValue(node, NameAttribute);
+        return XmlUtility.GetNameAttributeValue(node);
     }
 
     private static List<VariantTag> CollectChildTags(HtmlNode objectNode, string uri, string text)

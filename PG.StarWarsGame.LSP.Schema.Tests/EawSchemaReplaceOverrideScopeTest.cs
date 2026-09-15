@@ -46,7 +46,7 @@ public sealed class EawSchemaReplaceOverrideScopeTest
                 "Land_Terrain_Model_Mapping",
                 "Music_Event_List_Ambient",
                 "Music_Event_List_Battle",
-                "Presence_Induced_Animations",
+                "Presence_Induced_Animations"
             ],
             ReplaceTags().Select(t => t.Tag.Tag).Order(StringComparer.Ordinal).ToArray());
     }

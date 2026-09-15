@@ -980,6 +980,7 @@ public sealed class XmlDiagnosticsPublisherTest
     {
         public GameIndex Current { get; set; } = GameIndex.Empty;
         public event Action<GameIndex>? IndexChanged;
+
         public event Action<ILocalisationIndex>? LocalisationChanged
         {
             add { }

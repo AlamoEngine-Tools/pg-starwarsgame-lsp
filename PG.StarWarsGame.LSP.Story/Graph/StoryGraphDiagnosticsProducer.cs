@@ -3,9 +3,8 @@
 
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Story.Model;
-
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
 

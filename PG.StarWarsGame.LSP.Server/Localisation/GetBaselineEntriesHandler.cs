@@ -8,7 +8,6 @@ using PG.StarWarsGame.Localisation.Languages;
 using PG.StarWarsGame.Localisation.Services;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
-
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Localisation;
@@ -64,7 +63,7 @@ public sealed class GetBaselineEntriesHandler
             foreach (var db in new[]
                      {
                          _baselineProvider.GetCreditsText(GameContext.EaW, languages),
-                         _baselineProvider.GetCreditsText(GameContext.FoC, languages),
+                         _baselineProvider.GetCreditsText(GameContext.FoC, languages)
                      })
             foreach (var entry in db)
                 credits.Add(new BaselineEntry(

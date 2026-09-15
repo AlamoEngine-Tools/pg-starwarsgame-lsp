@@ -19,22 +19,6 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Symbols;
 /// </remarks>
 public sealed class DefinitionLocatorTest
 {
-    /// <remarks>
-    ///     <c>GameObjectType</c> is in here deliberately. The real schema declares it, so a locator
-    ///     that only asked "is this a declared type" would happily prefer it - and then find nothing,
-    ///     because no symbol is ever indexed under the umbrella. A fake that did not know the name
-    ///     would let that regression through.
-    /// </remarks>
-    private sealed class TypedSchemaProvider : NullSchemaProvider
-    {
-        public override GameObjectTypeDefinition? GetObjectType(string typeName)
-        {
-            return typeName is "StoryEvent" or "SpecialAbility" or "Planet" or "GameObjectType"
-                ? new GameObjectTypeDefinition { TypeName = typeName }
-                : null;
-        }
-    }
-
     private static DefinitionLocator LocatorFor(GameIndex index)
     {
         return new DefinitionLocator(new FakeGameIndexService(index), new TypedSchemaProvider());
@@ -135,5 +119,21 @@ public sealed class DefinitionLocatorTest
 
         Assert.Null(located.Error);
         Assert.Equal("file:///ws/data/xml/spaceunits.xml", located.Uri);
+    }
+
+    /// <remarks>
+    ///     <c>GameObjectType</c> is in here deliberately. The real schema declares it, so a locator
+    ///     that only asked "is this a declared type" would happily prefer it - and then find nothing,
+    ///     because no symbol is ever indexed under the umbrella. A fake that did not know the name
+    ///     would let that regression through.
+    /// </remarks>
+    private sealed class TypedSchemaProvider : NullSchemaProvider
+    {
+        public override GameObjectTypeDefinition? GetObjectType(string typeName)
+        {
+            return typeName is "StoryEvent" or "SpecialAbility" or "Planet" or "GameObjectType"
+                ? new GameObjectTypeDefinition { TypeName = typeName }
+                : null;
+        }
     }
 }

@@ -16,6 +16,26 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Encyclopedia;
 /// </summary>
 public sealed class GetEncyclopediaEntryHandlerTest
 {
+    // ── active abilities ─────────────────────────────────────────────────────
+
+    private const string ThreeAbilities = """
+                                          <Unit_Abilities_Data SubObjectList="Yes">
+                                              <!-- Primary ability -->
+                                              <Unit_Ability>
+                                                  <Type>DEFEND</Type>
+                                                  <Recharge_Seconds>30.0f</Recharge_Seconds>
+                                                  <GUI_Activated_Ability_Name>Infiltrator_Grenade_Attack</GUI_Activated_Ability_Name>
+                                              </Unit_Ability>
+                                              <Unit_Ability>
+                                                  <Type>POWER_TO_WEAPONS</Type>
+                                              </Unit_Ability>
+                                              <Unit_Ability>
+                                                  <Type>SPREAD_OUT</Type>
+                                                  <Mod_Multiplier>SPEED_MULTIPLIER, 0.5f</Mod_Multiplier>
+                                              </Unit_Ability>
+                                          </Unit_Abilities_Data>
+                                          """;
+
     private static GameSymbol Sym(string id, string? variantBaseId = null)
     {
         return new GameSymbol(id, GameSymbolKind.XmlObject, "SpaceUnit",
@@ -176,26 +196,6 @@ public sealed class GetEncyclopediaEntryHandlerTest
         Assert.Equal(["TIE Fighter"], result.GoodAgainst.Select(r => r.DisplayName));
         Assert.Equal(["Star Destroyer"], result.VulnerableTo.Select(r => r.DisplayName));
     }
-
-    // ── active abilities ─────────────────────────────────────────────────────
-
-    private const string ThreeAbilities = """
-        <Unit_Abilities_Data SubObjectList="Yes">
-            <!-- Primary ability -->
-            <Unit_Ability>
-                <Type>DEFEND</Type>
-                <Recharge_Seconds>30.0f</Recharge_Seconds>
-                <GUI_Activated_Ability_Name>Infiltrator_Grenade_Attack</GUI_Activated_Ability_Name>
-            </Unit_Ability>
-            <Unit_Ability>
-                <Type>POWER_TO_WEAPONS</Type>
-            </Unit_Ability>
-            <Unit_Ability>
-                <Type>SPREAD_OUT</Type>
-                <Mod_Multiplier>SPEED_MULTIPLIER, 0.5f</Mod_Multiplier>
-            </Unit_Ability>
-        </Unit_Abilities_Data>
-        """;
 
     [Fact]
     public async Task Handle_UnitAbilities_ReportsEveryAbilityInDocumentOrder()

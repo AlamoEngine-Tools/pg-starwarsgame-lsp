@@ -393,26 +393,6 @@ public sealed class XmlDocumentFactProducer(
         }
     }
 
-    /// <summary>
-    ///     The values that are fixed for one document, carried through the recursion together.
-    /// </summary>
-    /// <param name="VariantSupported">
-    ///     Whether any type this document is registered for declares the variant-parent tag. Asked
-    ///     of the schema rather than hardcoded to <c>GameObjectType</c>, so the rule follows the
-    ///     schema if the engine mapping is ever extended.
-    /// </param>
-    /// <param name="OwnerTypeName">
-    ///     The document's first registered type, used to name the owner in messages. Null when the
-    ///     registry types the document not at all, which is what keeps those documents silent.
-    /// </param>
-    private sealed record WalkState(
-        string DocumentUri,
-        string Text,
-        LineOffsetIndex LineIndex,
-        List<XmlFact> Facts,
-        bool VariantSupported,
-        string? OwnerTypeName);
-
     private XmlTagDefinition? ResolveTag(string name, TagResolutionContext? context)
     {
         return XmlTagResolver.Resolve(schema, name, context);
@@ -438,11 +418,9 @@ public sealed class XmlDocumentFactProducer(
     {
         var hasElementChildren = false;
         foreach (var child in node.ChildNodes)
-        {
             if (child.NodeType == HtmlNodeType.Element) hasElementChildren = true;
             else if (child.NodeType == HtmlNodeType.Text && !string.IsNullOrWhiteSpace(child.InnerText))
                 return false;
-        }
 
         return hasElementChildren;
     }
@@ -467,4 +445,24 @@ public sealed class XmlDocumentFactProducer(
             XmlUtility.GetOriginalTagName(owner, text),
             TagNameSuggester.Suggest(schema, authored));
     }
+
+    /// <summary>
+    ///     The values that are fixed for one document, carried through the recursion together.
+    /// </summary>
+    /// <param name="VariantSupported">
+    ///     Whether any type this document is registered for declares the variant-parent tag. Asked
+    ///     of the schema rather than hardcoded to <c>GameObjectType</c>, so the rule follows the
+    ///     schema if the engine mapping is ever extended.
+    /// </param>
+    /// <param name="OwnerTypeName">
+    ///     The document's first registered type, used to name the owner in messages. Null when the
+    ///     registry types the document not at all, which is what keeps those documents silent.
+    /// </param>
+    private sealed record WalkState(
+        string DocumentUri,
+        string Text,
+        LineOffsetIndex LineIndex,
+        List<XmlFact> Facts,
+        bool VariantSupported,
+        string? OwnerTypeName);
 }

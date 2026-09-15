@@ -70,20 +70,6 @@ public sealed class SchemaBootstrapperTest
         Assert.Empty(notifier.Errors);
     }
 
-    // ── helpers ──────────────────────────────────────────────────────────────
-
-    /// <summary>Serves the given manifest for _index.json and 404s everything else.</summary>
-    private sealed class ManifestHttpHandler(string manifestJson) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(
-            HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            return Task.FromResult(request.RequestUri!.AbsolutePath.EndsWith("_index.json")
-                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifestJson) }
-                : new HttpResponseMessage(HttpStatusCode.NotFound));
-        }
-    }
-
     private static SchemaBootstrapper Build(IHttpClientFactory factory)
     {
         return Build(factory, new RecordingUserNotifier(), out _);
@@ -116,6 +102,20 @@ public sealed class SchemaBootstrapperTest
             NullLogger<SchemaBootstrapper>.Instance,
             NullLogger<LocalFileSchemaProvider>.Instance,
             NullLogger<HttpSchemaProvider>.Instance);
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>Serves the given manifest for _index.json and 404s everything else.</summary>
+    private sealed class ManifestHttpHandler(string manifestJson) : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            return Task.FromResult(request.RequestUri!.AbsolutePath.EndsWith("_index.json")
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(manifestJson) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
     }
 
     private sealed class FakeConfigProvider(LspConfiguration config) : ILspConfigurationProvider

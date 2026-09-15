@@ -25,18 +25,16 @@ public sealed record ShipNamePool(string SourcePath, bool FileFound, IReadOnlyLi
 /// </summary>
 public sealed class ShipNameCatalog
 {
-    private readonly IReadOnlyDictionary<string, ShipNamePool> _pools;
-
     private ShipNameCatalog(IReadOnlyDictionary<string, ShipNamePool> pools)
     {
-        _pools = pools;
+        Pools = pools;
     }
 
     public static ShipNameCatalog Empty { get; } =
         new(new Dictionary<string, ShipNamePool>(StringComparer.OrdinalIgnoreCase));
 
     /// <summary>All objects with a pool, for reporting the wiring as a whole.</summary>
-    public IReadOnlyDictionary<string, ShipNamePool> Pools => _pools;
+    public IReadOnlyDictionary<string, ShipNamePool> Pools { get; }
 
     /// <summary>
     ///     Builds the catalog from the raw <c>ShipNameTextFiles</c> value.
@@ -79,6 +77,6 @@ public sealed class ShipNameCatalog
     /// </summary>
     public ShipNamePool? For(string objectId)
     {
-        return _pools.GetValueOrDefault(objectId);
+        return Pools.GetValueOrDefault(objectId);
     }
 }

@@ -22,18 +22,6 @@ public sealed class ModelTextureExistenceHandlerTest
 {
     private static readonly ModelTextureExistenceHandler Sut = new();
 
-    /// <summary>Stands in for the reader that parses an .alo; the Xml layer cannot open one.</summary>
-    private sealed class FakeModelTextures(params string[] textures) : IModelTextureIndex
-    {
-        public string? Asked { get; private set; }
-
-        public IReadOnlyList<string> TexturesOf(string modelReference)
-        {
-            Asked = modelReference;
-            return textures;
-        }
-    }
-
     private static XmlTagDefinition Tag(ReferenceKind kind = ReferenceKind.ModelFile)
     {
         return XmlHandlerTestFixtures.MakeTag("Model_Name", XmlValueType.NameReference,
@@ -147,5 +135,17 @@ public sealed class ModelTextureExistenceHandlerTest
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(), "absent.alo");
 
         Assert.Empty(Sut.Handle(fact, CtxWith(reader, "data/art/textures/hull.tga")));
+    }
+
+    /// <summary>Stands in for the reader that parses an .alo; the Xml layer cannot open one.</summary>
+    private sealed class FakeModelTextures(params string[] textures) : IModelTextureIndex
+    {
+        public string? Asked { get; private set; }
+
+        public IReadOnlyList<string> TexturesOf(string modelReference)
+        {
+            Asked = modelReference;
+            return textures;
+        }
     }
 }

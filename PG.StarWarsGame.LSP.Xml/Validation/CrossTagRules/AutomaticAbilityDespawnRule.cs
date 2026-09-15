@@ -46,7 +46,7 @@ public sealed class AutomaticAbilityDespawnRule : IXmlCrossTagRule
         "Galactic_Automatic",
         "Space_Automatic",
         "Ground_Automatic",
-        "Skirmish_Automatic",
+        "Skirmish_Automatic"
     };
 
     public IEnumerable<XmlFact> Evaluate(

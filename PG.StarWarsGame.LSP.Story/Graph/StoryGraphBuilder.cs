@@ -2,9 +2,8 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
-using PG.StarWarsGame.LSP.Story.Model;
-
 using PG.StarWarsGame.LSP.Core.Util;
+using PG.StarWarsGame.LSP.Story.Model;
 
 namespace PG.StarWarsGame.LSP.Story.Graph;
 

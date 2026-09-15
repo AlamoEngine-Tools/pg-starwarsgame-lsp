@@ -492,7 +492,6 @@ public sealed record PreviewAbilityModifier(string Stat, float Factor);
 /// <param name="Particles">
 ///     The proxies the clone's own model carries - for the Star Destroyer's wreck, eight of them:
 ///     the explosions, the fire smoke and the debris trails that ARE the death.
-///
 ///     Their <c>PartId</c> names the CLONE OBJECT, not a part in the scene, because the server
 ///     cannot know what the client will call the instance it loads. It is a descriptor of a model,
 ///     and the client rewrites both it and the ids when it puts one in the scene.
@@ -507,8 +506,12 @@ public sealed record PreviewAbilityModifier(string Stat, float Factor);
 ///         speed, corkscrewing, and explodes at the end.
 ///     </para>
 ///     <para>
-///         Measured over both shipped trees: <b>34 objects declare it, all Yes, and not one of them
-///         also declares a Death_Clone.</b> The rule holds in the data. The engine's own parameter
+///         Measured over both shipped trees:
+///         <b>
+///             34 objects declare it, all Yes, and not one of them
+///             also declares a Death_Clone.
+///         </b>
+///         The rule holds in the data. The engine's own parameter
 ///         table names five tags in the family, so the time, the chance and the explosion are read
 ///         rather than invented; only the corkscrew itself has no number in any file.
 ///     </para>
@@ -658,7 +661,10 @@ public sealed record PreviewTargetDefence(
     IReadOnlyList<string> DamageTypes);
 
 public sealed record PreviewFaction(
-    string Name, PreviewRgba? Color, PreviewRgba? NoColorizationColor, PreviewRgba? DisplayFontColor);
+    string Name,
+    PreviewRgba? Color,
+    PreviewRgba? NoColorizationColor,
+    PreviewRgba? DisplayFontColor);
 
 /// <summary>Something the author should see about this scene.</summary>
 /// <param name="DiagnosticId">
@@ -687,7 +693,10 @@ public sealed record PreviewFaction(
 public sealed record PreviewDamageBand(float Threshold, int Stage);
 
 public sealed record PreviewProblem(
-    DiagnosticId DiagnosticId, string Severity, string Message, string? HardpointId = null);
+    DiagnosticId DiagnosticId,
+    string Severity,
+    string Message,
+    string? HardpointId = null);
 
 /// <summary>
 ///     Everything needed to draw a preview, with no binary payload.

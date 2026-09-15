@@ -28,7 +28,8 @@ namespace PG.StarWarsGame.LSP.Server.Assets;
 ///     </para>
 /// </remarks>
 public sealed class ModelTextureIndex(
-    IGameAssetResolver assets, ILogger<ModelTextureIndex> logger) : IModelTextureIndex
+    IGameAssetResolver assets,
+    ILogger<ModelTextureIndex> logger) : IModelTextureIndex
 {
     /// <summary>
     ///     Parsed texture lists, by the reference as the XML wrote it.
@@ -71,7 +72,7 @@ public sealed class ModelTextureIndex(
             {
                 AloFileKind.Particle => ParticleTextures(bytes),
                 AloFileKind.Model => ModelTextures(bytes),
-                _ => [],
+                _ => []
             };
         }
         catch (Exception e)

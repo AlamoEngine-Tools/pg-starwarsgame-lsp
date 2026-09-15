@@ -125,7 +125,8 @@ public sealed class SuppressionCommentParserTest
     [Fact]
     public void ObjectDirectiveOutsideAnyObject_CoversOnlyItsOwnLine()
     {
-        var range = Assert.Single(Parse("<Units>\n<!-- aetswg:suppress-object aetswg-004-0001 -->\n<Model/>\n</Units>"));
+        var range = Assert.Single(
+            Parse("<Units>\n<!-- aetswg:suppress-object aetswg-004-0001 -->\n<Model/>\n</Units>"));
 
         Assert.True(range.Covers(Asset1, 1));
         Assert.False(range.Covers(Asset1, 2));

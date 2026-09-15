@@ -37,27 +37,6 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         _fileHelper = fileHelper;
     }
 
-    /// <summary>
-    ///     Whether a file in this format can hold more than one language, and so can be given
-    ///     another language column.
-    /// </summary>
-    /// <remarks>
-    ///     The two that cannot hold a second language are <c>.properties</c> and <c>.dat</c>: both
-    ///     store one language per file and carry it in the file name, the way Java's
-    ///     <c>ResourceBundle</c> and the engine's own <c>mastertextfile_english.dat</c> do. Another
-    ///     language means another file, not another column.
-    ///     <para>
-    ///         Both <c>addLanguage</c> refusals below defer to this, so does the read endpoint that
-    ///         tells the client whether to offer the action, and so does
-    ///         <see cref="LocalisationFileNameLanguageResolver.CarriesLanguageInFileName" /> - the list
-    ///         of single-language formats lives here only.
-    ///     </para>
-    /// </remarks>
-    public static bool SupportsMultipleLanguages(string extension)
-    {
-        return extension.ToLowerInvariant() is not (".properties" or ".dat");
-    }
-
     public async Task<LocalisationEditResult> ApplyToFileAsync(
         string filePath, IReadOnlyList<LocEditCommandDto> commands, CancellationToken ct)
     {
@@ -194,6 +173,55 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
         return KeyedCommandTranslator.Translate(document, commands, _hashing);
     }
 
+    public LocalisationEditResult Apply(
+        string originalText, string extension, IReadOnlyList<LocEditCommandDto> commands,
+        string? fileName = null)
+    {
+        // XML is composed through XDocument rather than through row slices: with preserved
+        // whitespace it already re-serialises untouched markup unchanged, and rebuilding elements
+        // from slices would mean reimplementing namespace and escaping rules.
+        if (extension == ".xml") return ApplyXml(originalText, commands);
+
+        LocDocument document;
+        try
+        {
+            document = _reader.Read(originalText, extension, fileName);
+        }
+        catch (NotSupportedException)
+        {
+            return LocalisationEditResult.Fail(0, $"Unsupported format: {extension}");
+        }
+
+        var state = new EditState(document, extension);
+
+        for (var i = 0; i < commands.Count; i++)
+            if (state.Apply(commands[i]) is { } error)
+                return LocalisationEditResult.Fail(i, error);
+
+        return LocalisationEditResult.Ok(state.Compose());
+    }
+
+    /// <summary>
+    ///     Whether a file in this format can hold more than one language, and so can be given
+    ///     another language column.
+    /// </summary>
+    /// <remarks>
+    ///     The two that cannot hold a second language are <c>.properties</c> and <c>.dat</c>: both
+    ///     store one language per file and carry it in the file name, the way Java's
+    ///     <c>ResourceBundle</c> and the engine's own <c>mastertextfile_english.dat</c> do. Another
+    ///     language means another file, not another column.
+    ///     <para>
+    ///         Both <c>addLanguage</c> refusals below defer to this, so does the read endpoint that
+    ///         tells the client whether to offer the action, and so does
+    ///         <see cref="LocalisationFileNameLanguageResolver.CarriesLanguageInFileName" /> - the list
+    ///         of single-language formats lives here only.
+    ///     </para>
+    /// </remarks>
+    public static bool SupportsMultipleLanguages(string extension)
+    {
+        return extension.ToLowerInvariant() is not (".properties" or ".dat");
+    }
+
     /// <summary>
     ///     Applies a batch to a compiled DAT by rebuilding it from its rows.
     ///     <para>
@@ -278,7 +306,7 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
             return $"Row {command.Index} is out of range (the file has {rows.Count} rows).";
 
         if (addressed && command.ExpectedKey is { } expected
-            && !string.Equals(rows[index].Key, expected, StringComparison.Ordinal))
+                      && !string.Equals(rows[index].Key, expected, StringComparison.Ordinal))
             return $"Row {index} is no longer '{expected}'. Reload before editing again.";
 
         switch (command.Kind)
@@ -330,34 +358,6 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
                 rows[i] = rows[i] with { Index = i };
 
         return null;
-    }
-
-    public LocalisationEditResult Apply(
-        string originalText, string extension, IReadOnlyList<LocEditCommandDto> commands,
-        string? fileName = null)
-    {
-        // XML is composed through XDocument rather than through row slices: with preserved
-        // whitespace it already re-serialises untouched markup unchanged, and rebuilding elements
-        // from slices would mean reimplementing namespace and escaping rules.
-        if (extension == ".xml") return ApplyXml(originalText, commands);
-
-        LocDocument document;
-        try
-        {
-            document = _reader.Read(originalText, extension, fileName);
-        }
-        catch (NotSupportedException)
-        {
-            return LocalisationEditResult.Fail(0, $"Unsupported format: {extension}");
-        }
-
-        var state = new EditState(document, extension);
-
-        for (var i = 0; i < commands.Count; i++)
-            if (state.Apply(commands[i]) is { } error)
-                return LocalisationEditResult.Fail(i, error);
-
-        return LocalisationEditResult.Ok(state.Compose());
     }
 
     // ── XML ──────────────────────────────────────────────────────────────────
@@ -527,8 +527,8 @@ public sealed class LocalisationDocumentEditor : ILocalisationDocumentEditor
     private sealed class EditState
     {
         private readonly string _extension;
-        private readonly string _lineEnding;
         private readonly List<string> _languages;
+        private readonly string _lineEnding;
         private readonly List<RowState> _rows;
         private string _preamble;
 

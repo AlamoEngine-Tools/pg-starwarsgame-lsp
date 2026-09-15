@@ -598,6 +598,7 @@ public sealed class LuaRenameHandlerTest
     private sealed class FakeGameIndexService : IGameIndexService
     {
         public GameIndex Current { get; } = GameIndex.Empty;
+
         public event Action<GameIndex>? IndexChanged
         {
             add { }

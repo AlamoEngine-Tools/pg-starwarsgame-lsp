@@ -35,7 +35,8 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
         return new XmlDiagnosticResult(
             XmlDiagnosticSeverity.Warning,
             $"The {fact.Faction} faction is attached to '{fact.Value}' more than once{InCampaign(fact)}. " +
-            $"Only one attachment is needed.{AlsoAt(fact.OtherLines)}", Id: DiagnosticIds.CampaignStoryRedundantAttachment);
+            $"Only one attachment is needed.{AlsoAt(fact.OtherLines)}",
+            Id: DiagnosticIds.CampaignStoryRedundantAttachment);
     }
 
     // Error: the engine merges both attachments, so which manifest the faction actually runs is
@@ -57,7 +58,8 @@ public sealed class CampaignStoryAttachmentHandler : XmlDiagnosticsHandler<Campa
             XmlDiagnosticSeverity.Information,
             $"Campaign{Named(fact)} attaches plots through both the faction-specific " +
             $"<Faction_Story_Name> tags and the generic <{StoryNameTagSyntax.GenericTag}> tuple list. " +
-            "Both are read by the engine; only the generic form can attach a non-major faction.", Id: DiagnosticIds.CampaignStoryMixedAuthoringForms);
+            "Both are read by the engine; only the generic form can attach a non-major faction.",
+            Id: DiagnosticIds.CampaignStoryMixedAuthoringForms);
     }
 
     private static string InCampaign(CampaignStoryAttachmentFact fact)

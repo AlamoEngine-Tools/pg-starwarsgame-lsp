@@ -565,7 +565,7 @@ public sealed class XmlGameDocumentParserTest
         // user reached for on a Star Destroyer and found dead.
         return new XmlTagDefinition
         {
-            Tag = "Death_Clone", ValueType = XmlValueType.DeathCloneSpec, MultipleAllowed = true,
+            Tag = "Death_Clone", ValueType = XmlValueType.DeathCloneSpec, MultipleAllowed = true
         };
     }
 

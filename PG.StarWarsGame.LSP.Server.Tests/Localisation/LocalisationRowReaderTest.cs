@@ -5,10 +5,9 @@ using System.IO.Abstractions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Server.Localisation.Rows;
-
-using PG.StarWarsGame.LSP.Core.Configuration;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -23,6 +22,25 @@ namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 /// </summary>
 public sealed class LocalisationRowReaderTest
 {
+    // ── XML ──────────────────────────────────────────────────────────────────
+
+    private const string XmlDoc = """
+                                  <?xml version="1.0" encoding="utf-8"?>
+                                  <Localisations xmlns="urn:alamoenginetools:localisation:v1">
+                                    <Localisation key="TEXT_A">
+                                      <TranslationData>
+                                        <Translation Language="ENGLISH">Alpha</Translation>
+                                        <Translation Language="GERMAN">Alfa</Translation>
+                                      </TranslationData>
+                                    </Localisation>
+                                    <Localisation key="TEXT_B">
+                                      <TranslationData>
+                                        <Translation Language="ENGLISH">Beta</Translation>
+                                      </TranslationData>
+                                    </Localisation>
+                                  </Localisations>
+                                  """;
+
     private static ILocalisationRowReader Reader()
     {
         var services = new ServiceCollection();
@@ -170,25 +188,6 @@ public sealed class LocalisationRowReaderTest
     {
         Assert.Equal(expected, Reader().Read(csv, ".csv").LineEnding);
     }
-
-    // ── XML ──────────────────────────────────────────────────────────────────
-
-    private const string XmlDoc = """
-                                  <?xml version="1.0" encoding="utf-8"?>
-                                  <Localisations xmlns="urn:alamoenginetools:localisation:v1">
-                                    <Localisation key="TEXT_A">
-                                      <TranslationData>
-                                        <Translation Language="ENGLISH">Alpha</Translation>
-                                        <Translation Language="GERMAN">Alfa</Translation>
-                                      </TranslationData>
-                                    </Localisation>
-                                    <Localisation key="TEXT_B">
-                                      <TranslationData>
-                                        <Translation Language="ENGLISH">Beta</Translation>
-                                      </TranslationData>
-                                    </Localisation>
-                                  </Localisations>
-                                  """;
 
     [Fact]
     public void Xml_ReadsElementsInDocumentOrder()

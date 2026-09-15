@@ -39,7 +39,7 @@ public sealed class BooleanGatedRequirementRuleTest
         { "System_Spy_Ability", "See_Most_Powerful_Ship", "See_Num_Fleets" },
         { "System_Spy_Ability", "See_Ground_Company_Contents", "See_Num_Ground_Companies" },
         { "System_Spy_Ability", "See_Credit_Income_Breakdown", "See_Credit_Income" },
-        { "System_Spy_Ability", "See_Political_Control_Breakdown", "See_Political_Control" },
+        { "System_Spy_Ability", "See_Political_Control_Breakdown", "See_Political_Control" }
     };
 
     [Theory]

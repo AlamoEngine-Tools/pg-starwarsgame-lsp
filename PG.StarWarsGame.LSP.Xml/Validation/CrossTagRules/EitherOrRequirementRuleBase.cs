@@ -50,30 +50,6 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
     /// <summary>What the author should do about it.</summary>
     protected virtual string Remedy => "set one of them to Yes";
 
-    /// <summary>
-    ///     Whether a written value counts as set. A flag must read true; a list only has to carry
-    ///     something, which is why a list rule must not inherit the boolean reading - a category
-    ///     legitimately named "No" is content, and the engine counts content.
-    /// </summary>
-    protected virtual bool IsSatisfied(string value)
-    {
-        return EngineBoolean.IsTrue(value);
-    }
-
-    /// <summary>
-    ///     Whether the engine asks the question of this object at all.
-    /// </summary>
-    /// <remarks>
-    ///     Nearly always yes. <c>ForceHealingAbilityClass</c> is the exception: it only asks which
-    ///     units it applies to when <c>Heal_Range</c> is positive, so an ability that heals at no
-    ///     range is not required to name any. Reporting it would be inventing a rule the engine
-    ///     does not state for that object.
-    /// </remarks>
-    protected virtual bool Applies(IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
-    {
-        return true;
-    }
-
     public IEnumerable<XmlFact> Evaluate(
         HtmlNode objectNode,
         IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName,
@@ -100,6 +76,30 @@ public abstract class EitherOrRequirementRuleBase : IXmlCrossTagRule
                 Consequence,
                 Remedy)
         ];
+    }
+
+    /// <summary>
+    ///     Whether a written value counts as set. A flag must read true; a list only has to carry
+    ///     something, which is why a list rule must not inherit the boolean reading - a category
+    ///     legitimately named "No" is content, and the engine counts content.
+    /// </summary>
+    protected virtual bool IsSatisfied(string value)
+    {
+        return EngineBoolean.IsTrue(value);
+    }
+
+    /// <summary>
+    ///     Whether the engine asks the question of this object at all.
+    /// </summary>
+    /// <remarks>
+    ///     Nearly always yes. <c>ForceHealingAbilityClass</c> is the exception: it only asks which
+    ///     units it applies to when <c>Heal_Range</c> is positive, so an ability that heals at no
+    ///     range is not required to name any. Reporting it would be inventing a rule the engine
+    ///     does not state for that object.
+    /// </remarks>
+    protected virtual bool Applies(IReadOnlyDictionary<string, IReadOnlyList<HtmlNode>> childrenByName)
+    {
+        return true;
     }
 
     /// <summary>

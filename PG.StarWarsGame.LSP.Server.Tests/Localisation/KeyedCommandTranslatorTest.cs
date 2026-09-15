@@ -1,17 +1,12 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using PG.StarWarsGame.LSP.Server.Localisation.Rows;
-
-using Microsoft.Extensions.DependencyInjection;
-
-using PG.Commons.Hashing;
-
-using PG.StarWarsGame.Localisation.Baseline;
-
 using System.IO.Abstractions;
-
 using System.IO.Abstractions.TestingHelpers;
+using Microsoft.Extensions.DependencyInjection;
+using PG.Commons.Hashing;
+using PG.StarWarsGame.Localisation.Baseline;
+using PG.StarWarsGame.LSP.Server.Localisation.Rows;
 
 namespace PG.StarWarsGame.LSP.Server.Tests.Localisation;
 
@@ -190,7 +185,7 @@ public sealed class KeyedCommandTranslatorTest
     public void RenameKey_ToABlankKey_Fails()
     {
         var result = KeyedCommandTranslator.Translate(
-            Document("TEXT_A"), [new LocKeyedCommandDto("renameKey", "TEXT_A", NewKey: "")], Hashing());
+            Document("TEXT_A"), [new LocKeyedCommandDto("renameKey", "TEXT_A", "")], Hashing());
 
         Assert.False(result.Success);
     }
@@ -204,7 +199,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var commands = Translate(
             Document("text_a", "TEXT_B"),
-            new LocKeyedCommandDto("renameKey", "text_a", NewKey: "TEXT_A"));
+            new LocKeyedCommandDto("renameKey", "text_a", "TEXT_A"));
 
         Assert.Equal("TEXT_A", Assert.Single(commands).Key);
     }
@@ -264,7 +259,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var commands = Translate(
             Document("TEXT_A", "TEXT_B"),
-            new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_RENAMED"));
+            new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_RENAMED"));
 
         var command = Assert.Single(commands);
         Assert.Equal("setKey", command.Kind);
@@ -277,7 +272,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var commands = Translate(
             Document("TEXT_A", "TEXT_B"),
-            new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_RENAMED"),
+            new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_RENAMED"),
             SetValue("TEXT_RENAMED", "x"));
 
         Assert.Equal(1, commands[1].Index);
@@ -289,7 +284,7 @@ public sealed class KeyedCommandTranslatorTest
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_A", "TEXT_B"),
             [
-                new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_RENAMED"),
+                new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_RENAMED"),
                 SetValue("TEXT_B", "x")
             ], Hashing());
 
@@ -302,7 +297,7 @@ public sealed class KeyedCommandTranslatorTest
     {
         var result = KeyedCommandTranslator.Translate(
             Document("TEXT_A", "TEXT_B"),
-            [new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_A")], Hashing());
+            [new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_A")], Hashing());
 
         Assert.False(result.Success);
         Assert.Contains("TEXT_A", result.Error);
@@ -358,7 +353,7 @@ public sealed class KeyedCommandTranslatorTest
             [
                 new LocKeyedCommandDto("deleteEntry", "TEXT_A"),
                 new LocKeyedCommandDto("addEntry", "TEXT_NEW", Values: []),
-                new LocKeyedCommandDto("renameKey", "TEXT_B", NewKey: "TEXT_B2")
+                new LocKeyedCommandDto("renameKey", "TEXT_B", "TEXT_B2")
             ], Hashing());
 
         Assert.True(result.Success, result.Error);

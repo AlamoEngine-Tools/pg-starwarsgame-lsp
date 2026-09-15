@@ -14,14 +14,14 @@ using PG.StarWarsGame.LSP.Core;
 using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Configuration;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
+using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Util;
 using PG.StarWarsGame.LSP.Core.Workspace;
-using PG.StarWarsGame.LSP.Core.Diagnostics.Suppression;
 using PG.StarWarsGame.LSP.Xml.Util;
-using PG.StarWarsGame.LSP.Xml.Validation.Suppression;
 using PG.StarWarsGame.LSP.Xml.Validation;
+using PG.StarWarsGame.LSP.Xml.Validation.Suppression;
 using Range = OmniSharp.Extensions.LanguageServer.Protocol.Models.Range;
 
 namespace PG.StarWarsGame.LSP.Xml;
@@ -43,35 +43,41 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
 
     private static readonly char[] DamageTypeTokenSeparators = [' ', '\t', '\r', '\n', ','];
     private readonly ILspConfigurationProvider? _configProvider;
+
+    // Null in the test convenience constructors, like the hardpoint producer beside it. The
+    // damage-stage diagnostic then simply never fires.
+    private readonly IXmlDamageStageFactProducer? _damageStageProducer;
     private readonly IXmlDocumentFactProducer _documentProducer;
     private readonly IFileHelper _fileHelper;
     private readonly IFileTypeRegistry _fileTypeRegistry;
 
     private readonly ConcurrentDictionary<string, Dictionary<(int Line, int Char), string>> _fixCache = new();
     private readonly IXmlDiagnosticsHandlerRegistry _handlerRegistry;
-    private readonly IXmlIndexFactProducer _indexProducer;
-    private readonly IGameIndexService _indexService;
-    private readonly ILogger<XmlDiagnosticsPublisher> _logger;
-    private readonly IXmlParseCache _parseCache;
-    private readonly ISchemaProvider _schema;
     private readonly IXmlHardpointFactProducer? _hardpointProducer;
 
-    // Null in the test convenience constructors, like the hardpoint producer beside it. The
-    // damage-stage diagnostic then simply never fires.
-    private readonly IXmlDamageStageFactProducer? _damageStageProducer;
+    // Null wherever nothing can open a mega texture - the test constructors, and any host without
+    // the asset layer. Texture references then resolve against files alone, exactly as before.
+    private readonly IIconNameIndex? _iconNames;
 
     // Null in the test convenience constructors and whenever no workspace icon catalog exists;
     // the icon-repack diagnostic then simply never fires.
     private readonly IIconRepackStatusProvider? _iconRepack;
+    private readonly IXmlIndexFactProducer _indexProducer;
+    private readonly IGameIndexService _indexService;
+    private readonly ILogger<XmlDiagnosticsPublisher> _logger;
 
     // Null wherever nothing can parse an .alo - the test constructors, and any host without the
     // asset layer. The model-texture diagnostic then simply never fires, which is the right answer:
     // the Xml project cannot open a binary asset on its own.
     private readonly IModelTextureIndex? _modelTextures;
-
-    // Null wherever nothing can open a mega texture - the test constructors, and any host without
-    // the asset layer. Texture references then resolve against files alone, exactly as before.
-    private readonly IIconNameIndex? _iconNames;
+    private readonly IXmlParseCache _parseCache;
+    private readonly ISchemaProvider _schema;
+    private readonly IXmlLayerShadowFactProducer? _shadowProducer;
+    private readonly IStoryChainProblemStore? _storyChainProblems;
+    private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
+    private readonly IStoryFactProducer _storyProducer;
+    private readonly IDocumentTextSource _textSource;
+    private readonly IXmlVariantFactProducer? _variantProducer;
 
     /// <summary>
     ///     The workspace half of variant resolution. Held rather than a finished resolver because a
@@ -79,23 +85,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
     /// </summary>
     private readonly IVariantTagSource? _variantTagSource;
 
-    /// <summary>
-    ///     Whether cross-object rules can run at all.
-    /// </summary>
-    /// <remarks>
-    ///     The tag source arrives through an OPTIONAL constructor parameter, so a container that
-    ///     declines to fill it produces a publisher that works in every respect except that every
-    ///     cross-object diagnostic silently reports nothing - and no unit test would notice, because
-    ///     they supply the dependency by hand. Exposed so a registration test can assert the live
-    ///     graph actually wired it.
-    /// </remarks>
-    internal bool HasObjectSource => _variantTagSource is not null;
-    private readonly IXmlLayerShadowFactProducer? _shadowProducer;
-    private readonly IStoryChainProblemStore? _storyChainProblems;
-    private readonly IStoryGraphDiagnosticsSource? _storyGraphDiagnostics;
-    private readonly IStoryFactProducer _storyProducer;
-    private readonly IDocumentTextSource _textSource;
-    private readonly IXmlVariantFactProducer? _variantProducer;
     private readonly IGameWorkspaceHost _workspaceHost;
 
     public XmlDiagnosticsPublisher(
@@ -193,6 +182,18 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         _storyGraphDiagnostics = storyGraphDiagnostics;
     }
 
+    /// <summary>
+    ///     Whether cross-object rules can run at all.
+    /// </summary>
+    /// <remarks>
+    ///     The tag source arrives through an OPTIONAL constructor parameter, so a container that
+    ///     declines to fill it produces a publisher that works in every respect except that every
+    ///     cross-object diagnostic silently reports nothing - and no unit test would notice, because
+    ///     they supply the dependency by hand. Exposed so a registration test can assert the live
+    ///     graph actually wired it.
+    /// </remarks>
+    internal bool HasObjectSource => _variantTagSource is not null;
+
     protected override string FileExtension => ".xml";
 
     // Feature-flag gate: a null provider (test convenience ctors) means always enabled.
@@ -262,27 +263,6 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
         return FilterSuppressed(allDiags, scan.Ranges);
     }
 
-    /// <summary>
-    ///     Whether an element is an "object" for <c>aetswg:suppress-object</c> - the same test the
-    ///     fact producer uses to decide what a tag belongs to: its name resolves to a schema object
-    ///     type, in either the source or PascalCase spelling.
-    /// </summary>
-    private bool IsObjectNode(HtmlNode node)
-    {
-        return _schema.GetObjectType(node.Name) is not null
-               || _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name)) is not null;
-    }
-
-    /// <summary>
-    ///     XML publishes diagnostics for every indexed document, not only the open ones, so its
-    ///     republish has to cover the same set - refreshing open documents alone would leave stale
-    ///     problems in the panel for files the user has not opened.
-    /// </summary>
-    public override Task RepublishAllAsync(CancellationToken ct)
-    {
-        return RevalidateWorkspaceAsync(ct);
-    }
-
     public async Task RevalidateWorkspaceAsync(CancellationToken ct)
     {
         if (!DiagnosticsEnabled) return;
@@ -312,6 +292,27 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
             fixes.TryGetValue((startLine, startChar), out var fix))
             return fix;
         return null;
+    }
+
+    /// <summary>
+    ///     Whether an element is an "object" for <c>aetswg:suppress-object</c> - the same test the
+    ///     fact producer uses to decide what a tag belongs to: its name resolves to a schema object
+    ///     type, in either the source or PascalCase spelling.
+    /// </summary>
+    private bool IsObjectNode(HtmlNode node)
+    {
+        return _schema.GetObjectType(node.Name) is not null
+               || _schema.GetObjectType(XmlUtility.ToPascalCase(node.Name)) is not null;
+    }
+
+    /// <summary>
+    ///     XML publishes diagnostics for every indexed document, not only the open ones, so its
+    ///     republish has to cover the same set - refreshing open documents alone would leave stale
+    ///     problems in the panel for files the user has not opened.
+    /// </summary>
+    public override Task RepublishAllAsync(CancellationToken ct)
+    {
+        return RevalidateWorkspaceAsync(ct);
     }
 
     protected override void PublishForDocument(string uri, string text, GameIndex index)
@@ -662,8 +663,8 @@ public sealed class XmlDiagnosticsPublisher : DiagnosticsPublisherBase, IXmlDiag
                     ["line"] = e.Line,
                     ["column"] = e.Column,
                     ["length"] = e.Length,
-                    ["newText"] = e.NewText,
-                })),
+                    ["newText"] = e.NewText
+                }))
             };
         if (result.CreateLocalisationKey is not null)
             obj["createLocKey"] = result.CreateLocalisationKey;

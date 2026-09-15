@@ -42,8 +42,8 @@ public sealed class ModProjectLoader
 
     private readonly IFileHelper _fileHelper;
     private readonly ILogger<ModProjectLoader> _logger;
-    private readonly IReadOnlyList<IDocumentMigration> _migrations;
     private readonly IPgprojMigrationSink _migrationSink;
+    private readonly IReadOnlyList<IDocumentMigration> _migrations;
 
     public ModProjectLoader(
         IFileHelper fileHelper,
@@ -178,7 +178,7 @@ public sealed class ModProjectLoader
 
             // It names a PAIR - foo.mtd and foo.tga - so an extension here is ambiguous about which
             // half the author meant, and silently stripping it would hide a real misunderstanding.
-            var extension = System.IO.Path.GetExtension(dto.MegaTexture);
+            var extension = Path.GetExtension(dto.MegaTexture);
             if (extension.Equals(".mtd", StringComparison.OrdinalIgnoreCase)
                 || extension.Equals(".tga", StringComparison.OrdinalIgnoreCase))
                 throw new ModProjectLoadException(
@@ -365,8 +365,7 @@ public sealed class ModProjectLoader
         [JsonPropertyName("_type")]
         public string? Type { get; init; }
 
-        [JsonPropertyName("_typeVersion")]
-        public string? TypeVersion { get; init; }
+        [JsonPropertyName("_typeVersion")] public string? TypeVersion { get; init; }
 
         public string? Name { get; init; }
         public JsonElement? Modinfo { get; init; }

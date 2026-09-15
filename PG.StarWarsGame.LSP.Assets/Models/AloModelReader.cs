@@ -149,7 +149,7 @@ public static class AloModelReader
                 default:
                     throw Malformed(
                         $"unexpected top-level chunk 0x{chunk.Type:X} at offset " +
-                        $"{chunk.BodyStart - AloChunkStream.HeaderSize}");
+                        $"{chunk.BodyStart - HeaderSize}");
             }
         }
 
@@ -373,10 +373,10 @@ public static class AloModelReader
 
         // Bound the count against the payload BEFORE multiplying, so a crafted count can neither
         // overflow the multiply nor drive an allocation the file could not possibly fill.
-        if ((long)vertexCount * stride != chunk.BodyLength)
+        if (vertexCount * stride != chunk.BodyLength)
             throw Malformed(
                 $"{where} declares {vertexCount} vertices at {stride} bytes each, which needs " +
-                $"{(long)vertexCount * stride} bytes, but its vertex chunk holds {chunk.BodyLength}");
+                $"{vertexCount * stride} bytes, but its vertex chunk holds {chunk.BodyLength}");
 
         // The size check above is the validation; only the per-vertex decode is optional.
         if (options.HasFlag(AloReadOptions.SkipGeometry))

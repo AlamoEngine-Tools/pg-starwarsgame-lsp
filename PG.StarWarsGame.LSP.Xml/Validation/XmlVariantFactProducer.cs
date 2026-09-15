@@ -164,7 +164,7 @@ public sealed class XmlVariantFactProducer(ISchemaProvider schema, IVariantTagSo
     {
         return doc.DocumentNode.Descendants()
             .FirstOrDefault(n => n.NodeType == HtmlNodeType.Element &&
-                                 string.Equals(XmlUtility.GetNameAttributeValue(n, NameAttribute),
+                                 string.Equals(XmlUtility.GetNameAttributeValue(n),
                                      objectId, StringComparison.OrdinalIgnoreCase));
     }
 

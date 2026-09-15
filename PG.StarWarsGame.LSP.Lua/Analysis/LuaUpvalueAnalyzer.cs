@@ -1,13 +1,13 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
-using Loretta.CodeAnalysis.Lua.Syntax;
-using Loretta.CodeAnalysis.Lua;
 using Loretta.CodeAnalysis;
-using OmniSharp.Extensions.LanguageServer.Protocol.Models;
+using Loretta.CodeAnalysis.Lua;
+using Loretta.CodeAnalysis.Lua.Syntax;
 using OmniSharp.Extensions.LanguageServer.Protocol;
-using PG.StarWarsGame.LSP.Core.Diagnostics;
+using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 using PG.StarWarsGame.LSP.Core;
+using PG.StarWarsGame.LSP.Core.Diagnostics;
 using Location = OmniSharp.Extensions.LanguageServer.Protocol.Models.Location;
 using LspDiagnostic = OmniSharp.Extensions.LanguageServer.Protocol.Models.Diagnostic;
 using LspDiagnosticCode = OmniSharp.Extensions.LanguageServer.Protocol.Models.DiagnosticCode;
