@@ -15,18 +15,21 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 /// <remarks>
 ///     <para>
 ///         The tag description states two conditions: the object must have the
-///         <c>EJECT_VEHICLE_THIEF</c> ability, and must have <c>GARRISON_VEHICLE</c> removed. Only
-///         the first is enforced, and the corpus is why. All 18 clones vanilla points at carry
-///         EJECT_VEHICLE_THIEF, so that rule fires on nothing shipped and is mechanically necessary
-///         anyway - without it the thief can never get out, which is the clone's whole purpose.
+///         <c>EJECT_VEHICLE_THIEF</c> ability, and must have <c>GARRISON_VEHICLE</c> removed. Both are
+///         enforced, under separate ids so either can be silenced alone.
 ///     </para>
 ///     <para>
-///         The GARRISON_VEHICLE half is deliberately NOT enforced. Two of those 18 -
-///         F9TZ_Cloaking_Transport_Captured and HAV_Juggernaut_Captured - declare no behaviour tag
-///         of their own and so inherit GARRISON_VEHICLE from their base, meaning the effective
-///         object really does keep it. The GlyphX release covers the Lua garrison wrapper but not
-///         the capture mechanic, so nothing available says whether that actually breaks anything.
-///         An unverified rule that fires on shipped data is the mistake #98 was.
+///         The ability half is an engine assert: <c>VehicleThiefBehaviorClass::Begin_Stealing_Vehicle</c>
+///         asserts the clone has EJECT_VEHICLE_THIEF and only activates the eject when it does. All 18
+///         clones vanilla points at carry it.
+///     </para>
+///     <para>
+///         The behaviour half was held back until the maintainer asked for it. The capture never reads
+///         GARRISON_VEHICLE, but it puts the thief into the vehicle's flagship container, and
+///         <c>GarrisonableBehaviorClass::Garrison_Unit</c> loads garrisoned units into that same
+///         container. Two vanilla clones - F9TZ_Cloaking_Transport_Captured and
+///         HAV_Juggernaut_Captured - inherit the behaviour from their base and are reported; a vanilla
+///         hit is not a veto.
 ///     </para>
 /// </remarks>
 public sealed class VehicleThiefCloneHandlerTest
@@ -55,12 +58,56 @@ public sealed class VehicleThiefCloneHandlerTest
         };
     }
 
-    private static DiagnosticsContext Ctx(string objectId, string abilitiesFragment)
+    private static DiagnosticsContext Ctx(string objectId, string abilitiesFragment,
+        params (string Tag, string Value)[] behaviours)
     {
         return XmlHandlerTestFixtures.EmptyCtx with
         {
-            Objects = new FakeObjects(objectId, abilitiesFragment)
+            Objects = new FakeObjects(objectId, abilitiesFragment, behaviours)
         };
+    }
+
+    [Fact]
+    public void Clone_that_keeps_garrison_vehicle_is_reported_under_its_own_id()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(CloneTag(), "HAV_Juggernaut_Captured");
+
+        var d = Assert.Single(Sut.Handle(fact,
+            Ctx("HAV_Juggernaut_Captured", Abilities, ("LandBehavior", "SELECTABLE, GARRISON_VEHICLE"))).ToList());
+
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
+        Assert.Equal(DiagnosticIds.VehicleThiefCloneGarrison, d.Id);
+        Assert.Contains("HAV_Juggernaut_Captured", d.Message);
+        Assert.Contains("GARRISON_VEHICLE", d.Message);
+    }
+
+    // Behaviours live in any of three tags; the plain Behavior tag counts as much as LandBehavior.
+    [Fact]
+    public void Garrison_vehicle_in_the_plain_behavior_tag_counts()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(CloneTag(), "Clone");
+
+        Assert.Single(Sut.Handle(fact, Ctx("Clone", Abilities, ("Behavior", "GARRISON_VEHICLE"))).ToList());
+    }
+
+    [Fact]
+    public void Clone_with_other_behaviours_only_is_accepted()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(CloneTag(), "Clone");
+
+        Assert.Empty(Sut.Handle(fact, Ctx("Clone", Abilities, ("LandBehavior", "SELECTABLE, GARRISON_UNIT"))));
+    }
+
+    [Fact]
+    public void A_clone_breaking_both_conditions_gets_both_reports()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(CloneTag(), "Clone");
+
+        var ids = Sut.Handle(fact, Ctx("Clone", NoEject, ("LandBehavior", "GARRISON_VEHICLE")))
+            .Select(d => d.Id).ToList();
+
+        Assert.Equal(2, ids.Count);
+        Assert.Contains(DiagnosticIds.VehicleThiefCloneGarrison, ids);
     }
 
     [Fact]
@@ -136,7 +183,8 @@ public sealed class VehicleThiefCloneHandlerTest
         Assert.Empty(Sut.Handle(fact, Ctx("Bare", string.Empty)));
     }
 
-    private sealed class FakeObjects(string objectId, string abilitiesFragment) : IEffectiveObjectSource
+    private sealed class FakeObjects(string objectId, string abilitiesFragment,
+        (string Tag, string Value)[] behaviours) : IEffectiveObjectSource
     {
         public EffectiveObject Resolve(string id)
         {
@@ -144,14 +192,15 @@ public sealed class VehicleThiefCloneHandlerTest
                 return new EffectiveObject(id, null, false, false, null,
                     ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
 
-            var tags = abilitiesFragment.Length == 0
-                ? ImmutableArray<EffectiveTag>.Empty
-                : ImmutableArray.Create(new EffectiveTag(
-                    "Unit_Abilities_Data", string.Empty, abilitiesFragment,
+            var tags = ImmutableArray.CreateBuilder<EffectiveTag>();
+            if (abilitiesFragment.Length > 0)
+                tags.Add(new EffectiveTag("Unit_Abilities_Data", string.Empty, abilitiesFragment,
                     VariantProvenance.Own, id, null));
+            foreach (var (tag, value) in behaviours)
+                tags.Add(new EffectiveTag(tag, value, string.Empty, VariantProvenance.Own, id, null));
 
             return new EffectiveObject(id, "GameObjectType", true, false, null,
-                ImmutableArray<string>.Empty, tags);
+                ImmutableArray<string>.Empty, tags.ToImmutable());
         }
     }
 }

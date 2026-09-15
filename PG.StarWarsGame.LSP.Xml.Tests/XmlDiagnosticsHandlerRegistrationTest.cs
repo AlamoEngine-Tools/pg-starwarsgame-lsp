@@ -96,9 +96,9 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // rather than the name, because vanilla's own special weapons (Ground_Ion_Cannon,
         // Ground_Empire_Hypervelocity_Gun) would fail the name rule the issue originally asked for.
         // 113 -> 114: VehicleThiefCloneHandler added - a capture clone with no EJECT_VEHICLE_THIEF
-        // ability, so the thief can never get out. Second user of the cross-object seam. Only the
-        // ability half of the tag's stated rule is enforced; the GARRISON_VEHICLE half would warn
-        // on two shipped objects with nothing but a description to justify it.
+        // ability, so the thief can never get out. Second user of the cross-object seam. The
+        // GARRISON_VEHICLE half was added later, in the same handler under its own id, once the
+        // maintainer asked for it: it warns on two shipped foc clones that inherit the behaviour.
         // 114 -> 115: LandDamageTableMismatchHandler added - Land_Damage_Thresholds and
         // Land_Damage_Alternates are one positional table and must be the same length. Two of the
         // three columns the issue named: Land_Damage_SFX disagrees with the alternates on 42 of
@@ -273,7 +273,13 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // "the engine rejects this" about the upper end would state an inference as a fact.
         // Measured: 866 cone values across eaw/ and foc/, none <= 0, two > 360 - HP_MC30_LASER_00
         // at 364.0 and HP_Gargantuan_Small_Turret_Front_Left at 450.0 beside three siblings at 45.0.
-        const int expectedHandlerCount = 147;
+        // 147 -> 148: FiresForwardHandler added, fed by FiresForwardRule. Fires_Forward has one
+        // reader, WeaponBehaviorClass::Calculate_Projectile_Facing, so on an object without the WEAPON
+        // behaviour it does nothing (zero shipped objects), and with WEAPON it skips
+        // Is_In_Cone_Of_Fire, so the turret-extent tags stop limiting the shot (Y-Wing_Bombing_Run,
+        // once per game, on purpose). Two ids, both hints. The rule only notices the flag; the handler
+        // judges the EFFECTIVE object, because behaviours and extents are routinely inherited.
+        const int expectedHandlerCount = 148;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

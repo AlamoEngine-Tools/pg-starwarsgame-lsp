@@ -402,6 +402,32 @@ public static class DiagnosticIds
     public static readonly DiagnosticId GrenadeProjectileCategory = new(DiagnosticGroup.CrossTag, 23);
 
     /// <summary>
+    ///     A <c>Vehicle_Thief_Inside_Clone</c> that keeps <c>GARRISON_VEHICLE</c>, which the tag's
+    ///     description says the clone must not have.
+    /// </summary>
+    /// <remarks>
+    ///     Its own id rather than <see cref="VehicleThiefCloneAbility" />: the ability half is an engine
+    ///     assert, this half is the documented requirement plus a shared container, and two vanilla
+    ///     clones trip it - someone silencing one should not lose the other.
+    /// </remarks>
+    public static readonly DiagnosticId VehicleThiefCloneGarrison = new(DiagnosticGroup.CrossTag, 24);
+
+    /// <summary>
+    ///     <c>Fires_Forward</c> on an object with no <c>WEAPON</c> behaviour, where nothing reads it.
+    /// </summary>
+    public static readonly DiagnosticId FiresForwardWithoutWeapon = new(DiagnosticGroup.CrossTag, 25);
+
+    /// <summary>
+    ///     <c>Fires_Forward</c> on a <c>WEAPON</c> object that also sets turret extents, which then no
+    ///     longer limit the shot.
+    /// </summary>
+    /// <remarks>
+    ///     Separate from <see cref="FiresForwardWithoutWeapon" />: one flags a flag doing nothing, the
+    ///     other two tags overruling each other on purpose, as vanilla's own bombing run does.
+    /// </remarks>
+    public static readonly DiagnosticId FiresForwardIgnoresArc = new(DiagnosticGroup.CrossTag, 26);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.
