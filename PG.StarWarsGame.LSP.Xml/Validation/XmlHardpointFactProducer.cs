@@ -313,7 +313,10 @@ public sealed class XmlHardpointFactProducer(ISchemaProvider schema, IVariantTag
             // is wrong. Uses the document line index (HAP's per-node LinePosition is unreliable for some
             // nested elements, which produced invalid ranges the client silently dropped).
             var (line, column, length) = XmlUtility.GetValuePosition(child, pass.LineIndex);
-            result.Add(new BoneReference(child.Name, value, new Position(line, column, length)));
+
+            // OriginalName, not Name: HAP lower-cases Name, and the tag is quoted back in the message.
+            result.Add(new BoneReference(child.OriginalName ?? child.Name, value,
+                new Position(line, column, length)));
         }
 
         return result;

@@ -321,6 +321,22 @@ public sealed class XmlHardpointFactProducerModelKeyTest
     }
 
     /// <summary>
+    ///     The tag name is reported as the author wrote it. HAP lower-cases element names, so reading
+    ///     <c>Name</c> made the hardpoint's own file say <c>&lt;collision_mesh&gt;</c> while the attaching
+    ///     object's file, fed from resolved tags, said <c>&lt;Collision_Mesh&gt;</c> - measured on the
+    ///     Gargantuan's <c>Hardpoints_underworld.xml</c>.
+    /// </summary>
+    [Fact]
+    public void HardpointFileOpen_Fact_KeepsTheTagNameAsWritten()
+    {
+        var facts = HardpointFileOpen(GargantuanHardpoint("HP_turret_front_00_COL"),
+            new ModelSchema("Space_Model_Name"), GargantuanSource("HP_turret_front_00_COL"),
+            GargantuanBones("HP_turret_front_00_COLLISION"));
+
+        Assert.Equal("Collision_Mesh", Assert.Single(facts.OfType<HardpointBoneNotOnModelFact>()).TagName);
+    }
+
+    /// <summary>
     ///     From the ATTACHING object's file the diagnostic sits on the hardpoint's id in the
     ///     <c>HardPoints</c> list, and a quick fix replaces the diagnostic's range - so a suggestion
     ///     there would overwrite the hardpoint id with a mesh name. Never offered from that side.
