@@ -279,7 +279,13 @@ public sealed class XmlDiagnosticsHandlerRegistrationTest
         // Is_In_Cone_Of_Fire, so the turret-extent tags stop limiting the shot (Y-Wing_Bombing_Run,
         // once per game, on purpose). Two ids, both hints. The rule only notices the flag; the handler
         // judges the EFFECTIVE object, because behaviours and extents are routinely inherited.
-        const int expectedHandlerCount = 148;
+        // 148 -> 149: AttackDistanceBeyondHardpointRangeHandler added, fed by AttackDistanceRule (#101).
+        // Movement closes to Targeting_Max_Attack_Distance plus the target's size, while a hardpoint
+        // refuses shots beyond its own Fire_Range_Distance plus the target's soft radius, so an attack
+        // distance above the longest weapon-hardpoint range can park the unit out of reach. Units with
+        // the WEAPON behaviour are out of scope: there the attack distance IS the shot's flight distance.
+        // Measured: equal on 22 eaw and 43 foc units, above on 3 and 4 (Tantive_IV 2000 against 800).
+        const int expectedHandlerCount = 149;
 
         Assert.Equal(expectedHandlerCount, RegisteredHandlerTypes().Count);
     }

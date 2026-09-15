@@ -428,6 +428,13 @@ public static class DiagnosticIds
     public static readonly DiagnosticId FiresForwardIgnoresArc = new(DiagnosticGroup.CrossTag, 26);
 
     /// <summary>
+    ///     A unit without the WEAPON behaviour whose <c>Targeting_Max_Attack_Distance</c> exceeds the
+    ///     longest <c>Fire_Range_Distance</c> of its weapon hardpoints, so it can stop where none fires
+    ///     (#101).
+    /// </summary>
+    public static readonly DiagnosticId AttackDistanceBeyondHardpointRange = new(DiagnosticGroup.CrossTag, 27);
+
+    /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the
     ///     reverse - see <see cref="PreviewDamageStageNotInModel" />, which is the same finding
     ///     reported inside the preview.
