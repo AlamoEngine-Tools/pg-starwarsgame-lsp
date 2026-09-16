@@ -164,8 +164,10 @@ public sealed class LuaDiagnosticsPublisher : DiagnosticsPublisherBase
             diagnostics.Add(new LspDiagnostic
             {
                 // Same id the XML side uses: an unresolved reference is the same kind of problem
-                // whichever language names the target.
-                Code = new LspDiagnosticCode(DiagnosticIds.UnresolvedReference.ToString()),
+                // whichever language names the target. Taken from the evaluator rather than named
+                // here, so the two cannot disagree once this side is taught about indexed types -
+                // it passes none today, so every id it sees is still UnresolvedReference.
+                Code = new LspDiagnosticCode(eval.Value.Id.ToString()),
                 Severity = eval.Value.Severity.ToLsp(),
                 Message = eval.Value.Message,
                 Range = range,

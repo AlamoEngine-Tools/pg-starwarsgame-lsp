@@ -38,6 +38,79 @@ public sealed class ReferenceResolutionEvaluatorTest
         Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
     }
 
+    // ── unresolved because the TYPE is not indexed at all ─────────────────────
+    //
+    // "No object with this name exists in the workspace" is a claim we cannot make about a type we
+    // never read: the AI tree is excluded on purpose (EaWXmlContext), and GRAPHICDETAILS.XML emits
+    // no symbols yet, so the object IS there and we skipped it. Zero indexed instances of a
+    // schema-declared type is the signal - it needs no list to maintain and it stops being true by
+    // itself the moment the type starts indexing.
+
+    [Fact]
+    public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_IsInformation()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            indexedTypeNames: new HashSet<string> { "Faction", "GameObjectType" });
+
+        Assert.NotNull(result);
+        Assert.Equal(XmlDiagnosticSeverity.Information, result!.Value.Severity);
+    }
+
+    [Fact]
+    public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_CarriesItsOwnId()
+    {
+        // Never UnresolvedReference: suppressing "we cannot check this yet" must not suppress every
+        // genuine unresolved reference along with it.
+        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            indexedTypeNames: new HashSet<string> { "Faction" });
+
+        Assert.Equal(DiagnosticIds.ReferenceTypeNotIndexed, result!.Value.Id);
+    }
+
+    [Fact]
+    public void Evaluate_Unresolved_ExpectedTypeHasNoIndexedInstances_MessageDoesNotBlameTheAuthor()
+    {
+        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null,
+            indexedTypeNames: new HashSet<string> { "Faction" });
+
+        Assert.DoesNotContain("No object with this name exists", result!.Value.Message);
+        Assert.Contains("AIPlayerType", result.Value.Message);
+    }
+
+    [Fact]
+    public void Evaluate_Unresolved_ExpectedTypeIsIndexed_StaysAnError()
+    {
+        // The type indexes fine and the name is still missing: that is a typo, and it keeps the
+        // error it has always had.
+        var result = ReferenceResolutionEvaluator.Evaluate("MISPELLED", "Faction", null,
+            indexedTypeNames: new HashSet<string> { "Faction" });
+
+        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(DiagnosticIds.UnresolvedReference, result.Value.Id);
+    }
+
+    [Fact]
+    public void Evaluate_Unresolved_EmptyTypeIndex_StaysAnError()
+    {
+        // An empty index is "nothing has been indexed yet" - startup, or a fixture - not "this type
+        // is unsupported". Reading it the other way would downgrade every missing reference in the
+        // workspace to a notice until indexing finished.
+        var result = ReferenceResolutionEvaluator.Evaluate("MISSING", "SpaceUnit", null,
+            indexedTypeNames: new HashSet<string>());
+
+        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+        Assert.Equal(DiagnosticIds.UnresolvedReference, result.Value.Id);
+    }
+
+    [Fact]
+    public void Evaluate_Unresolved_NoTypeIndexSupplied_BehavesAsBefore()
+    {
+        // Every caller that has not been taught about the type index keeps today's behaviour.
+        var result = ReferenceResolutionEvaluator.Evaluate("BasicEmpire", "AIPlayerType", null);
+
+        Assert.Equal(XmlDiagnosticSeverity.Error, result!.Value.Severity);
+    }
+
     // ── resolved, no expected type ────────────────────────────────────────────
 
     [Fact]

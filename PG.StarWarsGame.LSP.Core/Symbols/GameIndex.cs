@@ -33,6 +33,7 @@ public sealed record GameIndex(
     private ImmutableDictionary<string, ImmutableArray<GroupMembership>>? _allGroupMemberships;
     private int _leafLayerRank = -1;
     private ImmutableDictionary<string, ImmutableArray<GameSymbol>>? _ownerScopedByBareName;
+    private ImmutableHashSet<string>? _indexedTypeNames;
 
     // Replaces the compiler-synthesised copy constructor used by `with` expressions. Every
     // property must be copied here - add new properties to this list when extending the record.
@@ -43,6 +44,7 @@ public sealed record GameIndex(
     {
         _leafLayerRank = -1;
         _ownerScopedByBareName = null;
+        _indexedTypeNames = null;
         Baseline = original.Baseline;
         Documents = original.Documents;
         WorkspaceDefinitions = original.WorkspaceDefinitions;
@@ -144,6 +146,33 @@ public sealed record GameIndex(
             if (rank >= 0) return rank;
             return _leafLayerRank = Documents.Count == 0 ? 0 : Documents.Values.Max(d => d.LayerRank);
         }
+    }
+
+    /// <summary>
+    ///     Every type name the index holds at least one instance of, across baseline and workspace.
+    ///     A type the schema declares but that appears nowhere here is not indexed AT ALL, which is a
+    ///     different answer from "this name is missing" - see
+    ///     <see cref="Diagnostics.DiagnosticIds.ReferenceTypeNotIndexed" />.
+    /// </summary>
+    /// <remarks>
+    ///     Computed once for the index rather than per diagnostic: the unresolved-reference handler
+    ///     asks this for every failed reference in the document, and the answer is a property of the
+    ///     whole index. Memoized the way <see cref="AllGroupMemberships" /> is, so a <c>with</c>
+    ///     mutation recomputes against its own dictionaries instead of inheriting a stale set.
+    /// </remarks>
+    public IReadOnlySet<string> IndexedTypeNames => _indexedTypeNames ??= ComputeIndexedTypeNames();
+
+    private ImmutableHashSet<string> ComputeIndexedTypeNames()
+    {
+        var builder = ImmutableHashSet.CreateBuilder<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var symbol in Baseline.Symbols.Values)
+            if (symbol.TypeName is { } baselineType)
+                builder.Add(baselineType);
+        foreach (var symbols in WorkspaceDefinitions.Values)
+        foreach (var symbol in symbols)
+            if (symbol.TypeName is { } workspaceType)
+                builder.Add(workspaceType);
+        return builder.ToImmutable();
     }
 
     private ImmutableDictionary<string, ImmutableArray<GroupMembership>> ComputeAllGroupMemberships()
