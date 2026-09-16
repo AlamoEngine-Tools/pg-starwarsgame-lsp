@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Startup;
@@ -17,8 +18,10 @@ namespace PG.StarWarsGame.LSP.Server.Project;
 public sealed class ModProjectReloadService : IModProjectReloadService
 {
     private readonly IWorkspaceIndexer _indexer;
+    private readonly IGameIndexService _index;
     private readonly IProjectLayerMap _layerMap;
     private readonly ILocalisationLoader _localisation;
+    private readonly IUserNotifier _notifier;
     private readonly ILogger<ModProjectReloadService> _logger;
     private readonly PgprojMigrationOffer? _migrationOffer;
     private readonly IClientRefreshNotifier? _refresh;
@@ -27,11 +30,16 @@ public sealed class ModProjectReloadService : IModProjectReloadService
     private List<string>? _lastRoots;
 
     // refresh is optional so the many minimal test setups can omit it; production always wires it.
+    // index and notifier are NOT optional: they are what the baseline gate below reads and speaks
+    // through, and an optional parameter is the one shape the container can silently skip - the gate
+    // would then never fire and nothing would say so.
     public ModProjectReloadService(
         IProjectConfigurationResolver resolver,
         IWorkspaceIndexer indexer,
         ILocalisationLoader localisation,
         IProjectLayerMap layerMap,
+        IGameIndexService index,
+        IUserNotifier notifier,
         ILogger<ModProjectReloadService> logger,
         IClientRefreshNotifier? refresh = null,
         PgprojMigrationOffer? migrationOffer = null)
@@ -40,6 +48,8 @@ public sealed class ModProjectReloadService : IModProjectReloadService
         _indexer = indexer;
         _localisation = localisation;
         _layerMap = layerMap;
+        _index = index;
+        _notifier = notifier;
         _logger = logger;
         _refresh = refresh;
         _migrationOffer = migrationOffer;
@@ -57,8 +67,22 @@ public sealed class ModProjectReloadService : IModProjectReloadService
 
         var config = _resolver.Resolve(roots);
         if (config is null)
-            // No project file (the resolver already logged); nothing to index.
+            // No project file (the resolver already told the user); nothing to index.
             return;
+
+        // A mod project is a mod OVER the shipped game. Without the baseline every object the game
+        // defines reads as missing, so the answers would not be incomplete - they would be wrong,
+        // and an author cannot tell which. Refuse to index and say why, rather than producing
+        // diagnostics they have to learn to distrust.
+        if (_index.Current.Baseline.Symbols.IsEmpty)
+        {
+            _logger.LogError("No baseline is loaded; refusing to index '{Roots}'.", string.Join(", ", roots));
+            _notifier.ShowError(
+                "The shipped-game baseline could not be loaded, so nothing in this project can be "
+                + "checked against the game. Set 'aet-eaw-edit.lsp.source.baseline.type' to 'http' to "
+                + "download it, or to 'local' and point it at a baseline file. Nothing has been indexed.");
+            return;
+        }
 
         LastWorkspaceConfig = config;
         // Publish layer precedence before indexing so each document is stamped with its rank

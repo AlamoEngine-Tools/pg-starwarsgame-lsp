@@ -49,6 +49,21 @@ public sealed class ProjectConfigurationResolverTest
     }
 
     [Fact]
+    public void Resolve_NoProjectFile_ShowsUserErrorNotification()
+    {
+        // Without a .pgproj there is nothing to index and every answer the server could give would
+        // be an empty one. That used to be a log line nobody reads, so the editor looked like it was
+        // working and simply knew nothing.
+        var fs = new MockFileSystem();
+        fs.AddDirectory(WorkspaceRoot);
+
+        Build(fs, out var notifier).Resolve([WorkspaceRoot]);
+
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains(".pgproj", message);
+    }
+
+    [Fact]
     public void Resolve_ProjectFileFound_ReturnsResolvedConfig()
     {
         const string json = """
