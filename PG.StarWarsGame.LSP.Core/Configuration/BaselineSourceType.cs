@@ -6,6 +6,5 @@ namespace PG.StarWarsGame.LSP.Core.Configuration;
 public enum BaselineSourceType
 {
     Http,
-    Local,
-    None
+    Local
 }

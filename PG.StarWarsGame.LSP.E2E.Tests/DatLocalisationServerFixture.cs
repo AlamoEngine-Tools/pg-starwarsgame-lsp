@@ -73,7 +73,6 @@ public sealed class DatLocalisationServerFixture : LspServerFixture
             schemaLocalPath = LspTestEnvironment.SchemaLocalPath,
             gamePath = LspTestEnvironment.GamePath,
             baselineLocalPath = LspTestEnvironment.BaselineLocalPath,
-            baselineType = LspTestEnvironment.BaselineLocalPath is null ? "None" : null,
             locale = LspTestEnvironment.Locale,
             features = new { tools = new { localisation = true } }
         };

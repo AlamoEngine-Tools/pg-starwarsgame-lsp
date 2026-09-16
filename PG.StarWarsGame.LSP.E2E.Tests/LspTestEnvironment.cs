@@ -33,11 +33,29 @@ public static class LspTestEnvironment
         ExistingPath(Environment.GetEnvironmentVariable("LSP_EAW_WORKSPACE_PATH"))
         ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "eaw") : null);
 
+    /// <summary>
+    ///     The suite's own authored mod workspace. Prefers <c>LSP_E2E_WORKSPACE_PATH</c>; falls back to
+    ///     <c>e2e-workspace/</c> inside the repository. Unlike <c>eaw/</c> and <c>foc/</c> this one is
+    ///     TRACKED, because nothing in it comes from the game - which is what lets a test edit it to
+    ///     create the condition it needs.
+    /// </summary>
+    public static string? E2eWorkspacePath =>
+        ExistingPath(Environment.GetEnvironmentVariable("LSP_E2E_WORKSPACE_PATH"))
+        ?? ExistingPath(SolutionRoot is not null ? Path.Combine(SolutionRoot, "e2e-workspace") : null);
+
     public static string? GamePath =>
         Environment.GetEnvironmentVariable("LSP_GAME_PATH");
 
+    /// <summary>
+    ///     Shipped-game baseline index. Prefers <c>LSP_BASELINE_LOCAL_PATH</c>; falls back to the
+    ///     FoC baseline checked in under <c>baseline/</c>, matching the <c>foc/</c> workspace the
+    ///     fixtures open by default. Returns <c>null</c> if neither exists.
+    /// </summary>
     public static string? BaselineLocalPath =>
-        Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH");
+        ExistingFile(Environment.GetEnvironmentVariable("LSP_BASELINE_LOCAL_PATH"))
+        ?? ExistingFile(SolutionRoot is not null
+            ? Path.Combine(SolutionRoot, "baseline", "foc", "aet-pg-swg-lsp-foc-baseline.aet")
+            : null);
 
     public static string Locale =>
         Environment.GetEnvironmentVariable("LSP_LOCALE") ?? "en";
@@ -56,6 +74,12 @@ public static class LspTestEnvironment
     private static string? ExistingPath(string? path)
     {
         return path is not null && Directory.Exists(path) ? path : null;
+    }
+
+    // The baseline is a FILE, not a directory - ExistingPath would reject it whatever it points at.
+    private static string? ExistingFile(string? path)
+    {
+        return path is not null && File.Exists(path) ? path : null;
     }
 
     private static string? FindSolutionRoot(string start)
