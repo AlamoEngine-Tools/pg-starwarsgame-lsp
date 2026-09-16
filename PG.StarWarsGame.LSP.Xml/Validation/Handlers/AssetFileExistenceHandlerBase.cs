@@ -38,6 +38,17 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
     /// </remarks>
     protected virtual bool ResolvesFromMegaTexture => false;
 
+    /// <summary>
+    ///     How badly the game takes this asset going missing. Warning by default, because most
+    ///     missing art degrades what the player sees and the game still runs.
+    /// </summary>
+    /// <remarks>
+    ///     Per asset kind rather than one severity for all of them, because the engine does not treat
+    ///     them alike: a missing model is drawn as nothing, while a missing map ends the load. See
+    ///     <see cref="MapFileExistenceHandler" /> for the measured branch.
+    /// </remarks>
+    protected virtual XmlDiagnosticSeverity MissingSeverity => XmlDiagnosticSeverity.Warning;
+
     protected sealed override IEnumerable<XmlDiagnosticResult> Handle(XmlTagValueFact fact, DiagnosticsContext ctx)
     {
         if (fact.Tag.ReferenceKind != TargetKind)
@@ -48,7 +59,7 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
             return [];
 
         var results = new List<XmlDiagnosticResult>();
-        foreach (var se in Normalize(value))
+        foreach (var se in Normalize(value, fact.Tag.ValueType))
         {
             if (AssetFileLookup.Resolves(
                     ctx.Index.AssetFiles, se, AllowedExtensions, InterchangeableExtensions))
@@ -64,16 +75,33 @@ public abstract class AssetFileExistenceHandlerBase : XmlDiagnosticsHandler<XmlT
             var alsoChecked = alternates.Count > 0
                 ? $" Also checked {string.Join(", ", alternates.Select(a => $"'{a}'"))} (the game treats these formats interchangeably)."
                 : string.Empty;
-            results.Add(new XmlDiagnosticResult(XmlDiagnosticSeverity.Warning,
+            results.Add(new XmlDiagnosticResult(MissingSeverity,
                 $"{AssetNoun} file '{se}' was not found in the game data or workspace asset files.{alsoChecked}"));
         }
 
         return results;
     }
 
-    private static IEnumerable<string> Normalize(string raw)
+    /// <summary>
+    ///     The names in this value: several for a list-typed tag, and exactly ONE otherwise - spaces
+    ///     included.
+    /// </summary>
+    /// <remarks>
+    ///     Splitting every asset value on space is what made a model called
+    ///     <c>CIS_Vazus Mandrake.alo</c> read as two missing files (issue #124). A space is not a
+    ///     separator in an asset name: <c>Mt_commandbar.mtd</c> ships
+    ///     <c>I_BUTTON_EV_MDU_GRENADE MORTAR.TGA</c>, and four vanilla <c>Icon_Name</c> values carry
+    ///     one. The tag's own type is what says whether several names are allowed, so that is what
+    ///     decides - asset tags are only ever <c>NameReference</c> (84), <c>NameReferenceList</c> (16)
+    ///     or <c>TypeReferenceList</c> (6).
+    /// </remarks>
+    private static IEnumerable<string> Normalize(string raw, XmlValueType valueType)
     {
-        return ListValueConstants.PrepareValueForSplit(raw)
-            .Split(ListValueConstants.GetListSeparators(), StringSplitOptions.RemoveEmptyEntries);
+        var prepared = ListValueConstants.PrepareValueForSplit(raw);
+        if (valueType is not (XmlValueType.NameReferenceList or XmlValueType.TypeReferenceList
+            or XmlValueType.GameObjectTypeReferenceList))
+            return prepared.Length == 0 ? [] : [prepared];
+
+        return prepared.Split(ListValueConstants.GetListSeparators(), StringSplitOptions.RemoveEmptyEntries);
     }
 }

@@ -226,12 +226,69 @@ public sealed class AssetFileExistenceHandlerTest
     }
 
     [Fact]
+    public void SingleValuedTag_NameContainingASpace_IsOneName()
+    {
+        // #124. Asset values were split on space, pipe and comma whatever the tag's type, so a model
+        // called "CIS_Vazus Mandrake.alo" was looked up as two files and reported missing. Spaces in
+        // asset names are not a mod-only oddity: Mt_commandbar.mtd ships
+        // "I_BUTTON_EV_MDU_GRENADE MORTAR.TGA", and four vanilla Icon_Name values carry one.
+        var tag = XmlHandlerTestFixtures.MakeTag("Land_Model_Name", XmlValueType.NameReference,
+            referenceKind: ReferenceKind.ModelFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, "CIS_Vazus Mandrake.alo");
+        var ctx = CtxWith("data/art/models/cis_vazus mandrake.alo");
+
+        Assert.Empty(ModelSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void ListValuedTag_StillSplitsOnSpace()
+    {
+        // The control: a list tag means several files, and 16 asset tags are list-typed - audio
+        // Samples alone appears 2868 times with space-separated names.
+        var tag = XmlHandlerTestFixtures.MakeTag("Samples", XmlValueType.NameReferenceList,
+            referenceKind: ReferenceKind.AudioFile);
+        var fact = XmlHandlerTestFixtures.MakeFact(tag, "one.wav missing.wav");
+        var ctx = CtxWith("data/audio/one.wav");
+
+        var d = Assert.Single(AudioSut.Handle(fact, ctx));
+        Assert.Contains("missing.wav", d.Message);
+    }
+
+    [Fact]
     public void Map_Present_EmitsNothing()
     {
         var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.MapFile), "skirmish.ted");
         var ctx = CtxWith("data/maps/skirmish.ted");
 
         Assert.Empty(MapSut.Handle(fact, ctx));
+    }
+
+    [Fact]
+    public void Map_Absent_IsAnError_NotAWarning()
+    {
+        // #132. A missing map is not a degraded battle, it is no battle: measured in the 2018 build,
+        // GameModeClass::Load_Named_Map retries with the resolved map path and a .ted extension, and
+        // when the file still will not open it calls Assert_Handler("false", "GameMode.cpp", 0x8db)
+        // and returns false. The hardcoded _Desert_L5_01.ted / _Space_Temperate1.ted defaults sit on
+        // the EMPTY-name path in Transition_To_Sub_Mode, not on this one, so nothing stands in for a
+        // map that was named and is not there.
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.MapFile), "missing.ted");
+        var ctx = CtxWith("data/maps/skirmish.ted");
+
+        var d = Assert.Single(MapSut.Handle(fact, ctx));
+        Assert.Equal(XmlDiagnosticSeverity.Error, d.Severity);
+    }
+
+    [Fact]
+    public void Model_Absent_StaysAWarning()
+    {
+        // The control for the map change: a missing model degrades what you see, it does not stop
+        // the game loading, so the severity split has to be per asset kind rather than global.
+        var fact = XmlHandlerTestFixtures.MakeFact(Tag(ReferenceKind.ModelFile), "missing.alo");
+        var ctx = CtxWith("data/art/models/x.alo");
+
+        var d = Assert.Single(ModelSut.Handle(fact, ctx));
+        Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
     }
 
     [Fact]
