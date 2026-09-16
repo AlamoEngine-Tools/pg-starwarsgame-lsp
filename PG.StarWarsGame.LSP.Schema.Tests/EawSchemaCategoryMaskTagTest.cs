@@ -59,6 +59,58 @@ public sealed class EawSchemaCategoryMaskTagTest
         Assert.Equal("GameObjectCategoryType", tag.EnumName);
     }
 
+    /// <remarks>
+    ///     Read out of the 2018 build's tag table, where each row is
+    ///     {name, type code, struct offset, descriptor}. Every one of these carries type <c>0x0e</c>
+    ///     and the same enum descriptor <c>0x018ead3c</c> as <c>Applicable_Unit_Categories</c>, the
+    ///     known mask - so the engine parses them all through one path and accepts '|' in each.
+    ///     The table discriminates, which is what makes that meaningful: <c>Fire_Category_Restrictions</c>
+    ///     is type <c>0x2a</c> with NO descriptor and <c>Unit_Command_Rankings_By_Category</c> is
+    ///     <c>0x1b</c>, and both are correctly left unmarked.
+    ///     <para>
+    ///         <c>Garrison_Category</c> is here because the corpus misled: it ships comma-separated
+    ///         values, commas are split whatever the tag's type, so it looked fine. What vanilla
+    ///         happens to write is not what the engine accepts.
+    ///     </para>
+    ///     <para>
+    ///         <c>Space_Or_Garrison_Category</c> is the weak one. Its schema entry calls it an
+    ///         alternate spelling of <c>Garrison_Category</c>, but it appears in NO tag-table row in
+    ///         the 2018 build, in neither game's DatabaseMapExport.xml, and nowhere in either corpus.
+    ///         Marking it costs nothing - FlagList only ever widens what is accepted - but the mark is
+    ///         not evidence that the tag exists, and the alternate-spelling claim is still unverified.
+    ///         An absence in that build is never proof on its own; it predates the shipped game.
+    ///     </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("Planet_Restricted_Unit_Categories")]
+    [InlineData("Garrison_Category")]
+    [InlineData("Space_Or_Garrison_Category")]
+    public void CategoryMaskTagsOnGameObjectType_AreFlagLists(string tagName)
+    {
+        Assert.Equal(TagSemanticType.FlagList, GameObjectTag(tagName).SemanticType);
+    }
+
+    [Theory]
+    [InlineData("Fire_Category_Restrictions")]
+    [InlineData("Unit_Command_Rankings_By_Category")]
+    public void TagsTheEngineParsesDifferently_AreNotFlagLists(string tagName)
+    {
+        // The control for the theory above. These two bind the same enum in our schema but carry a
+        // different type code and no enum descriptor in the engine, so they are not masks.
+        Assert.NotEqual(TagSemanticType.FlagList, GameObjectTag(tagName).SemanticType);
+    }
+
+    private static RawTagDefinition GameObjectTag(string name)
+    {
+        var file = name is "Unit_Command_Rankings_By_Category" ? "GameConstants.yaml"
+            : name is "Fire_Category_Restrictions" ? "HardPoint.yaml"
+            : "GameObjectType.yaml";
+        var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find("tags", file)));
+        var tag = tags.FirstOrDefault(t => string.Equals(t.Tag, name, StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(tag);
+        return tag!;
+    }
+
     private static RawTagDefinition Tag(string name)
     {
         var tags = YamlSchemaParser.ParseTagFile(File.ReadAllText(Find("tags", "SpecialAbility.yaml")));
