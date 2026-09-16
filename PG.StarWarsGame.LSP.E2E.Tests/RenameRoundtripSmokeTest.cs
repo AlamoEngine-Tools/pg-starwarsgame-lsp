@@ -182,13 +182,20 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
 
             // ── Subscribe to corvettes diagnostics, apply edits ────────────────
             var corvettesUri = DocumentUri.FromFileSystemPath(Path.Combine(workspace, CorvettesXmlRel));
-            var diagTask = _fixture.WaitForDiagnosticsAsync(corvettesUri, TimeSpan.FromSeconds(15));
+            // Wait for the diagnostics to SETTLE, not for the first publish after the edit. The file
+            // carries ~90 diagnostics once the baseline is loaded, and an edit can be answered by a
+            // publish that was already in flight - which says nothing about whether the rename left
+            // anything stale.
+            var diagTask = _fixture.WaitForDiagnosticsAsync(corvettesUri,
+                p => !(p.Diagnostics?.Any(d =>
+                    d.Message.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)) ?? false),
+                TimeSpan.FromSeconds(15));
 
             await ApplyWorkspaceEditAsync(edit, inMemory, versions);
             renamed = true;
 
             var diags = await diagTask;
-            var diagMessages = diags.Diagnostics?.Select(d => d.Message).ToList() ?? [];
+            var diagMessages = diags?.Diagnostics?.Select(d => d.Message).ToList() ?? [];
 
             // "Rename_Test" must not be unresolved (proves symbol was properly defined/indexed).
             Assert.False(
@@ -200,7 +207,10 @@ public sealed class RenameRoundtripSmokeTest : IClassFixture<EawLspServerFixture
             // Old name must not appear in diagnostics (proves no stale references in corvettes.xml).
             Assert.False(
                 diagMessages.Any(m => m.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)),
-                $"Old name '{OriginalName}' still appears in corvettes.xml diagnostics after rename - stale diagnostics?");
+                $"Old name '{OriginalName}' still appears in corvettes.xml diagnostics after rename - stale diagnostics? "
+                + $"Got: {string.Join(" | ", diagMessages.Where(m => m.Contains(OriginalName, StringComparison.OrdinalIgnoreCase)))}");
+            Assert.True(diags is not null,
+                $"No diagnostics publish for corvettes.xml ever dropped '{OriginalName}' after the rename.");
 
             // ── Locate "Rename_Test" in updated entry file for rename-back ─────
             var updatedLines = inMemory[entryUri.ToString()].Split('\n');
