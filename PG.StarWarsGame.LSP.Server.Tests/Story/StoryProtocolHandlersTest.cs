@@ -281,6 +281,82 @@ public sealed class StoryProtocolHandlersTest
         Assert.DoesNotContain("Later", labels);
     }
 
+    /// <summary>
+    ///     The inverse of the reachable-from filter: what LEADS TO an event, asked for by an author who
+    ///     had only "what follows from here".
+    /// </summary>
+    [Fact]
+    public async Task GetStoryGraph_ReachableUpstream_KeepsWhatLeadsHere()
+    {
+        var nextId = $"{ThreadUri}#next";
+
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: "Upstream"),
+                CancellationToken.None);
+
+        var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
+        Assert.Contains("Start", labels);
+        Assert.Contains("Next", labels);
+        Assert.DoesNotContain("Later", labels);
+    }
+
+    // Downstream of Next is nothing, so Both is what distinguishes it from the default direction.
+    [Fact]
+    public async Task GetStoryGraph_ReachableBoth_KeepsBothSides()
+    {
+        var nextId = $"{ThreadUri}#next";
+
+        var both = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: "Both"),
+                CancellationToken.None);
+        var downstream = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId), CancellationToken.None);
+
+        Assert.Contains("Start", both.Nodes.Select(n => n.Label));
+        Assert.DoesNotContain("Start", downstream.Nodes.Select(n => n.Label));
+        Assert.Contains("Next", both.Nodes.Select(n => n.Label));
+    }
+
+    [Theory]
+    [InlineData("upstream")]
+    [InlineData("UPSTREAM")]
+    public async Task GetStoryGraph_ReachableDirection_IsReadHoweverItIsCased(string direction)
+    {
+        var nextId = $"{ThreadUri}#next";
+
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: nextId, ReachableDirection: direction),
+                CancellationToken.None);
+
+        Assert.Contains("Start", result.Nodes.Select(n => n.Label));
+    }
+
+    // An older client sends no direction at all, and a direction with no event to anchor it means nothing.
+    [Fact]
+    public async Task GetStoryGraph_NoDirection_IsDownstream()
+    {
+        var startId = $"{ThreadUri}#start";
+
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableFrom: startId, ReachableDirection: null),
+                CancellationToken.None);
+
+        var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
+        Assert.Contains("Next", labels);
+        Assert.DoesNotContain("Later", labels);
+    }
+
+    [Fact]
+    public async Task GetStoryGraph_DirectionWithoutAnEvent_FiltersNothing()
+    {
+        var result = await new GetStoryGraphHandler(Models(), Config())
+            .Handle(new GetStoryGraphParams("GC", "Rebel", ReachableDirection: "Upstream"), CancellationToken.None);
+
+        var labels = result.Nodes.Where(n => n.Kind == "Event").Select(n => n.Label).ToList();
+        Assert.Contains("Start", labels);
+        Assert.Contains("Later", labels);
+    }
+
     [Fact]
     public async Task GetStoryGraph_EventNodes_CarryFullParamDataForInlineRendering()
     {

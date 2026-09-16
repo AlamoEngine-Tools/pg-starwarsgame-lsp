@@ -100,6 +100,12 @@ export interface GraphFilters {
     lifecycle?: string;
     reachableFrom?: string;
     /**
+     * Which way `reachableFrom` reaches: `Downstream` (what the event leads to), `Upstream` (what
+     * leads to it) or `Both`. Absent is Downstream, which is what the filter did before the other
+     * two directions existed.
+     */
+    reachableDirection?: string;
+    /**
      * `Active` or `Suspended` - how the faction's plot manifest registers the thread an event
      * lives in. Absent or empty keeps both, which is the whole chain.
      *

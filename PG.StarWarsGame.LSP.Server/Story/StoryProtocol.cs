@@ -97,7 +97,11 @@ public sealed record GetStoryGraphParams(
     string? ReachableFrom = null,
     // Whether the faction manifest registers a plot as Active_Plot or Suspended_Plot.
     // Null or empty keeps both, which is the whole chain.
-    string? PlotState = null) : IRequest<GetStoryGraphResult>;
+    string? PlotState = null,
+    // Which way <paramref name="ReachableFrom" /> reaches: "Downstream" (what the event leads to),
+    // "Upstream" (what leads to it) or "Both". Null or unrecognised is Downstream, which is what the
+    // filter did before the other two directions existed - so an older client keeps its behaviour.
+    string? ReachableDirection = null) : IRequest<GetStoryGraphResult>;
 
 /// <param name="Branches">
 ///     Every branch name in the campaign, INDEPENDENT of the filters that produced

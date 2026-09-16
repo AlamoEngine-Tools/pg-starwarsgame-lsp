@@ -35,6 +35,9 @@ import { FrameNotifier } from './storyGraph/frameNotifier';
 import { canReuseStoredLayout } from './storyGraph/layoutReuse';
 import { createLabelSizer, LINE_RATIO, wrapLabel } from './storyGraph/lodLabel';
 import { facetList } from './storyGraph/facets';
+import { PathFilterMenu } from './storyGraph/PathFilterMenu';
+import { type PathDirection } from './storyGraph/pathDirection';
+import { arrangePositions } from './storyGraph/modelArrange';
 import { lodShape } from './storyGraph/lodShape';
 import { needsFullMountForLayout, shouldShowOverview, shouldWindow } from './storyGraph/lodPolicy';
 import { Extent, fitZoom } from './storyGraph/viewportFit';
@@ -43,6 +46,7 @@ import { paramRowSpecs } from './storyGraph/paramRows';
 import { StagedRenames } from './storyGraph/stagedRenames';
 import { optimisticEdit, PREVIEW_KINDS, STAGED_KINDS } from './staging';
 import { useEdgeResize } from './useEdgeResize';
+import { GRAPH_FILTER_DEBOUNCE_MS, useDebounced } from './loc/useDebounced';
 import { worstSeverity } from './loc/validateState';
 import { createRoot } from 'react-dom/client';
 import { ClassicPreset, GetSchemes, NodeEditor } from 'rete';
@@ -83,12 +87,14 @@ initPanelLayout(vscode);
 /**
  * The complete filter state this view holds.
  *
- * Distinct from the protocol'"'"'s FilterState, whose every field is optional: that one describes
+ * Distinct from the protocol's FilterState, whose every field is optional: that one describes
  * what gets sent, and "no branch filter" travels as an absent field. Here every filter always has
  * a value, because every filter always has a control showing it.
  */
 interface FilterState {
     nameFilter: string; branch: string; lifecycle: string; reachableFrom: string;
+    /** Which way `reachableFrom` reaches - see pathDirection. Only meaningful with an event to anchor it. */
+    reachableDirection: PathDirection;
     /** Active_Plot or Suspended_Plot, as the faction manifest registers the thread. */
     plotState: string;
 }
@@ -119,7 +125,8 @@ function fetchParamOptions(
 }
 
 const EMPTY_FILTERS: FilterState = {
-    nameFilter: '', branch: '', lifecycle: '', reachableFrom: '', plotState: '',
+    nameFilter: '', branch: '', lifecycle: '', reachableFrom: '',
+    reachableDirection: 'Downstream', plotState: '',
 };
 
 /** Event/reward type names flagged `untested` in the schema - set once, read during render. */
@@ -453,10 +460,14 @@ interface EditorHandle {
     destroy(): void;
 }
 
-/** Set by the React app before the editor exists; invoked from an Event node's "reachable from
- * here" button - a node body has no direct line to App's `setFilter`, so it goes through this
- * bridge, the same pattern `onGraphDesynced` already uses. */
-let onReachableFromRequested: (nodeId: string) => void = () => { /* replaced by App */ };
+/** Set by the React app before the editor exists; invoked from an Event node's path-filter menu - a
+ * node body has no direct line to App's `setFilter`, so it goes through this bridge, the same
+ * pattern `onGraphDesynced` already uses. */
+let onReachableFromRequested: (nodeId: string, direction: PathDirection) => void =
+    () => { /* replaced by App */ };
+
+/** The event the graph is filtered to and which way, so a node's menu can mark its own direction. */
+let currentReachable: { from: string; direction: PathDirection } = { from: '', direction: 'Downstream' };
 
 /** A gesture locally changed the graph without a server command - re-fetch to reconcile. */
 let onGraphDesynced: () => void = () => { /* replaced by App */ };
@@ -1381,56 +1392,49 @@ async function createEditor(container: HTMLElement): Promise<EditorHandle> {
             return;
         }
 
-        // First-ever open (no stored layout): mount everything and run elk once, then persist so
-        // every later open takes the fast/LOD path above.
-        windowed = false;
+        // First-ever open (no stored layout): lay the whole campaign out ON THE MODEL, then persist so
+        // every later open takes the fast path above.
+        //
+        // Nothing mounts to be measured. It used to: every node was added to the editor purely so elk
+        // could read the DOM, and unmounted again straight after. Measured on the shipped Underworld
+        // campaign (2860 nodes) that was about 18 s of a 28 s open (#131), and the sizes it produced
+        // were thrown away - `modelSizeFor` recomputes them on every later open anyway.
         lodActive = false;
         const branches = branchIndex(nodes);
         const hasIn = new Set(edges.map(e => e.toId));
         const hasOut = new Set(edges.map(e => e.fromId));
-        const byId = new Map<string, StoryNode>();
-        const created = nodes.map(dto => {
-            const node = new StoryNode(dto, hasIn.has(dto.id), hasOut.has(dto.id));
-            node.branchGlow = branchOfNodeId(dto.id, branches);
-            byId.set(dto.id, node);
-            return node;
-        });
-        await Promise.all(created.map(n => editor.addNode(n)));
-        const conns = edges
-            .map(edge => {
-                const source = byId.get(edge.fromId);
-                const target = byId.get(edge.toId);
-                return source && target
-                    ? new StoryConnection(source, target, edge.kind,
-                        edgeBranchFrom(edge.fromId, edge.toId, edge.kind, branches))
-                    : null;
-            })
-            .filter((c): c is StoryConnection => c !== null);
-        await Promise.all(conns.map(c => editor.addConnection(c)));
 
-        // This path adds nodes to the editor directly rather than through mountNodes, so record
-        // what is now mounted. Without this the bookkeeping says "nothing is mounted" while the
-        // editor holds the entire campaign, and the later teardown finds nothing to remove: the
-        // overview is switched on OVER a full set of real nodes, which is both of them drawn at
-        // once and the stutter that comes with it.
-        for (const node of created) { mountedIds.add(node.id); }
-        for (const edge of edges) {
-            if (byId.has(edge.fromId) && byId.has(edge.toId)) {
-                mountedConnKeys.add(connectionKey(edge.fromId, edge.toId, edge.kind));
-            }
+        graphModel.clear();
+        for (const dto of nodes) {
+            const { w, h } = modelSizeFor(dto);
+            graphModel.set(dto.id, {
+                dto, x: 0, y: 0, w, h,
+                colorToken: overviewToken(dto, branchOfNodeId(dto.id, branches)),
+            });
         }
 
-        await arrange.layout({ options: ARRANGE_OPTIONS });
-        rebuildModel();
-        saveAllPositions(); // persist so the next open takes the fast path
-        await AreaExtensions.zoomAt(area, editor.getNodes());
+        // The sockets the mounted node would carry, so the elk graph is the one the plugin built when
+        // it was handed real nodes.
+        const positions = await arrangePositions(
+            nodes.map(dto => {
+                const { w, h } = modelSizeFor(dto);
+                return { id: dto.id, width: w, height: h, hasIn: hasIn.has(dto.id), hasOut: hasOut.has(dto.id) };
+            }),
+            edges.map((edge, index) => ({ id: `c${index}`, source: edge.fromId, target: edge.toId })));
 
-        // Elk needs every node mounted to lay them out, so this path necessarily starts unwindowed.
-        // Now that positions exist, adopt the same cost decision every later open makes - otherwise
-        // a first-ever open of a large campaign stays fully mounted for the whole session, which is
-        // exactly when it is slowest and most noticeable.
+        for (const [id, at] of positions) {
+            const m = graphModel.get(id);
+            if (m) { m.x = at.x; m.y = at.y; }
+        }
+
+        saveAllPositions(); // persist so the next open takes the fast path
+        await fitModel();
+
+        // The same cost decision every later open makes.
         windowed = shouldWindow(graphModel.size);
         await reconcileWindow();
+        scheduleGeometryChanged();
+        scheduleAreaChanged();
     };
 
     /** Reconciles the live graph against the server's - no re-layout, viewport untouched. */
@@ -2169,7 +2173,7 @@ function VirtualNodeView(props: { data: StoryNode; emit: RenderEmit<Schemes> }):
                 <Drag.NoDrag>
                     <button
                         className="jump" title="Jump to this battle's own story"
-                        onClick={() => onReachableFromRequested(dto.id)}
+                        onClick={() => onReachableFromRequested(dto.id, 'Downstream')}
                     ><span className="codicon codicon-arrow-right" /></button>
                 </Drag.NoDrag>
             ) : null}
@@ -2861,10 +2865,12 @@ function EventForm(props: { dto: StoryGraphNodeDto; readOnly: boolean }): React.
                     ><span className="codicon codicon-go-to-file" /></button>
                 </Drag.NoDrag>
                 <Drag.NoDrag>
-                    <button
-                        title="Show only what's reachable from here"
-                        onClick={() => onReachableFromRequested(dto.id)}
-                    ><span className="codicon codicon-filter" /></button>
+                    {/* Three directions behind one icon: what leads here, the whole path, what
+                        follows. The header has no room for three buttons. */}
+                    <PathFilterMenu
+                        active={currentReachable.from === dto.id ? currentReachable.direction : undefined}
+                        onPick={direction => onReachableFromRequested(dto.id, direction)}
+                    />
                 </Drag.NoDrag>
                 {readOnly ? null : (
                     <Drag.NoDrag>
@@ -3466,6 +3472,9 @@ function App(): React.JSX.Element {
     } | null>(null);
 
     const [filters, setFiltersState] = useState<FilterState>({ ...EMPTY_FILTERS });
+    // What the filter box shows, ahead of what has been applied. Every applied pattern costs a server
+    // request and a full rebuild, so a typed word must ask once, at the end of it (#131).
+    const [nameDraft, setNameDraft] = useState('');
     const [branches, setBranches] = useState<string[]>([]);
     // The branches the graph on screen actually draws, for the colour key - not the campaign-wide
     // facet list above, which also names branches the current filter is hiding.
@@ -3669,6 +3678,9 @@ function App(): React.JSX.Element {
 
     const fetchGraph = useCallback((next: FilterState) => {
         filtersRef.current = next;
+        // Node bodies render through rete's portal pipeline, where App state is out of reach, so the
+        // active filter reaches their menus the way `currentMode` does.
+        currentReachable = { from: next.reachableFrom, direction: next.reachableDirection };
         setFiltersState(next);
         fullRenderRef.current = true;
         vscode.postMessage({ type: 'fetch', filters: next });
@@ -3720,7 +3732,8 @@ function App(): React.JSX.Element {
             // Re-fetch with the current filters; the incremental patch restores the view.
             vscode.postMessage({ type: 'fetch', filters: filtersRef.current });
         };
-        onReachableFromRequested = id => setFilter({ reachableFrom: id });
+        onReachableFromRequested = (id, direction) =>
+            setFilter({ reachableFrom: id, reachableDirection: direction });
         requestPreview = () => vscode.postMessage({
             type: 'previewGraph', commands: [...pendingCommands], filters: filtersRef.current,
         });
@@ -3910,7 +3923,20 @@ function App(): React.JSX.Element {
     }, [runSetGraph]);
 
     const setFilter = (patch: Partial<FilterState>): void => fetchGraph({ ...filtersRef.current, ...patch });
-    const clearFilters = (): void => fetchGraph({ ...EMPTY_FILTERS });
+
+    // Applies the typed filter once it has settled. Guarded against re-applying what is already the
+    // active filter, which is what `clearFilters` and the first render would otherwise do.
+    const settledName = useDebounced(nameDraft, GRAPH_FILTER_DEBOUNCE_MS);
+    useEffect(() => {
+        if (settledName === filtersRef.current.nameFilter) { return; }
+        // setFilter reads the filter REF rather than state, so the settled text is the only dependency.
+        setFilter({ nameFilter: settledName });
+    }, [settledName]);
+
+    const clearFilters = (): void => {
+        setNameDraft('');
+        fetchGraph({ ...EMPTY_FILTERS });
+    };
     const toggleLane = (which: 'thread' | 'chapter'): void => {
         const nextThread = which === 'thread' ? !showThreadLanes : showThreadLanes;
         const nextChapter = which === 'chapter' ? !showChapterLanes : showChapterLanes;
@@ -4076,15 +4102,22 @@ function App(): React.JSX.Element {
                         <div className="dock-search">
                             <div className="dock-section-title">Filter</div>
                             <div className="search-field">
+                                {/* The box shows what was typed at once; only the APPLIED filter waits -
+                                    each one costs a server request and a full rebuild (#131). */}
                                 <input
-                                    type="text" placeholder="Filter event names..." value={filters.nameFilter}
-                                    onChange={e => setFilter({ nameFilter: e.target.value })}
+                                    type="text" placeholder="Filter event names..." value={nameDraft}
+                                    onChange={e => setNameDraft(e.target.value)}
                                 />
                             </div>
                         </div>
                         <div className="overview-mid">
                             <div className="overview-tools">
-                                <ClearFiltersButton filters={filters} onClear={clearFilters} />
+                                {/* The draft, so the button wakes with the first letter rather than with
+                                    the fetch it is waiting on. */}
+                                <ClearFiltersButton
+                                    filters={{ ...filters, nameFilter: nameDraft }}
+                                    onClear={clearFilters}
+                                />
                                 <IconButton
                                     icon="arrange"
                                     onClick={() => {
