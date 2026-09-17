@@ -48,6 +48,12 @@ public record LuaFeatureFlags
     public bool CodeLens { get; init; } = true;
     public bool InlayHints { get; init; } = true;
     public bool CodeActions { get; init; } = true;
+
+    /// <summary>
+    ///     Gates the Lua debugger: <c>aet/getScriptRoots</c> on the language server, and on the
+    ///     client the debug adapter itself. Off by default in the client while the feature is new.
+    /// </summary>
+    public bool Debugger { get; init; } = true;
 }
 
 /// <summary>Flags for story-mode capabilities.</summary>

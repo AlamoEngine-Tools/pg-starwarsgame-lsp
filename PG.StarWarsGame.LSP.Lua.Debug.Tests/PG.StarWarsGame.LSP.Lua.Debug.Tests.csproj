@@ -29,6 +29,7 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk"/>
+        <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Client"/>
         <PackageReference Include="System.IO.Abstractions.TestingHelpers"/>
     </ItemGroup>
 

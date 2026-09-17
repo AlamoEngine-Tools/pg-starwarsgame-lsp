@@ -159,7 +159,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
     {
         RequireKnownScript(scriptId);
         var reply = await RequestAsync<ThreadListMessage>(
-            new RequestThreadListMessage(scriptId), m => m.ScriptId == scriptId, cancellationToken).ConfigureAwait(false);
+                new RequestThreadListMessage(scriptId), m => m.ScriptId == scriptId, cancellationToken)
+            .ConfigureAwait(false);
 
         lock (_gate)
         {
@@ -173,7 +174,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
     {
         RequireKnownScript(scriptId);
         var reply = await RequestAsync<ChildScriptListMessage>(
-            new AttachScriptMessage(scriptId), m => m.ParentScriptId == scriptId, cancellationToken).ConfigureAwait(false);
+                new AttachScriptMessage(scriptId), m => m.ParentScriptId == scriptId, cancellationToken)
+            .ConfigureAwait(false);
 
         lock (_gate)
         {
@@ -215,7 +217,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
         // rather than left to the timeout.
         RequireKnownScript(scriptId);
         var reply = await RequestAsync<ExecuteTextResponseMessage>(
-            new ExecuteTextMessage(scriptId, text), m => m.ScriptId == scriptId, cancellationToken).ConfigureAwait(false);
+                new ExecuteTextMessage(scriptId, text), m => m.ScriptId == scriptId, cancellationToken)
+            .ConfigureAwait(false);
         return reply.ResultText;
     }
 
@@ -227,7 +230,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
         ValidateBreakpointTarget(scriptId, threadId);
         if (scriptId >= 0 && !AttachedScriptIds.Contains(scriptId))
             await AttachAsync(scriptId, cancellationToken).ConfigureAwait(false);
-        await _connection.SendAsync(new AddBreakpointMessage(scriptId, threadId, sourceName, line, ""), cancellationToken)
+        await _connection.SendAsync(new AddBreakpointMessage(scriptId, threadId, sourceName, line, ""),
+                cancellationToken)
             .ConfigureAwait(false);
     }
 
@@ -235,7 +239,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
         CancellationToken cancellationToken)
     {
         ValidateBreakpointTarget(scriptId, threadId);
-        return _connection.SendAsync(new RemoveBreakpointMessage(scriptId, threadId, sourceName, line), cancellationToken);
+        return _connection.SendAsync(new RemoveBreakpointMessage(scriptId, threadId, sourceName, line),
+            cancellationToken);
     }
 
     // -- execution control --------------------------------------------------------------------
@@ -282,8 +287,10 @@ public sealed class LuaDebugSession : ILuaDebugSession
         {
             if (ContextScriptId is not { } context)
                 throw new LuaDebugStateException("Cannot break a thread: no script is selected");
-            if (threadId != -1 && !(_threads.TryGetValue(context, out var threads) && threads.Any(t => t.ThreadIndex == threadId)))
-                throw new LuaDebugStateException($"Thread {threadId} is not a known thread of script {context}; request its threads first");
+            if (threadId != -1 && !(_threads.TryGetValue(context, out var threads) &&
+                                    threads.Any(t => t.ThreadIndex == threadId)))
+                throw new LuaDebugStateException(
+                    $"Thread {threadId} is not a known thread of script {context}; request its threads first");
         }
 
         return CommandAsync(Trigger.ArmBreakThread, new BreakThreadMessage(threadId),
@@ -324,11 +331,13 @@ public sealed class LuaDebugSession : ILuaDebugSession
             if (_state != DebugRunState.Suspended || SuspendedScriptId is not { } suspended)
                 throw new LuaDebugStateException("Cannot select a frame: no script is suspended");
             if (level < 0 || level >= Callstack.Count)
-                throw new LuaDebugStateException($"Frame {level} is outside the call stack of {Callstack.Count} frames");
+                throw new LuaDebugStateException(
+                    $"Frame {level} is outside the call stack of {Callstack.Count} frames");
             scriptId = suspended;
         }
 
-        await _connection.SendAsync(new SetCallstackDepthMessage(scriptId, level), cancellationToken).ConfigureAwait(false);
+        await _connection.SendAsync(new SetCallstackDepthMessage(scriptId, level), cancellationToken)
+            .ConfigureAwait(false);
         lock (_gate)
         {
             SelectedFrame = level;
@@ -385,10 +394,14 @@ public sealed class LuaDebugSession : ILuaDebugSession
     {
         return (trigger, _state) switch
         {
-            (Trigger.ArmBreakAll, DebugRunState.Suspended) => "Cannot break: a script is already suspended; continue or step first",
-            (Trigger.ArmBreakAll, DebugRunState.BreakArmed) => "A break is already armed and waiting for the next Lua line",
-            (Trigger.ArmBreakThread, DebugRunState.Suspended) => "Cannot break a thread: a script is already suspended; continue first",
-            (Trigger.SelectScript, DebugRunState.Suspended) => "Cannot select a script while one is suspended; continue first",
+            (Trigger.ArmBreakAll, DebugRunState.Suspended) =>
+                "Cannot break: a script is already suspended; continue or step first",
+            (Trigger.ArmBreakAll, DebugRunState.BreakArmed) =>
+                "A break is already armed and waiting for the next Lua line",
+            (Trigger.ArmBreakThread, DebugRunState.Suspended) =>
+                "Cannot break a thread: a script is already suspended; continue first",
+            (Trigger.SelectScript, DebugRunState.Suspended) =>
+                "Cannot select a script while one is suspended; continue first",
             (Trigger.ArmStep, _) => "Cannot step: no script is suspended",
             (Trigger.Resume, _) => "Cannot continue: no script is suspended",
             _ => $"Cannot {trigger} while the debugger is {_state}"
@@ -402,7 +415,8 @@ public sealed class LuaDebugSession : ILuaDebugSession
             if (_lost is not null)
                 throw new LuaDebugConnectionLostException("The debugger connection is gone", _lost);
             if (!_scripts.ContainsKey(scriptId))
-                throw new LuaDebugStateException($"Script {scriptId} is not in the game's script list; refresh it first");
+                throw new LuaDebugStateException(
+                    $"Script {scriptId} is not in the game's script list; refresh it first");
         }
     }
 
@@ -415,8 +429,10 @@ public sealed class LuaDebugSession : ILuaDebugSession
         RequireKnownScript(scriptId);
         lock (_gate)
         {
-            if (threadId != -1 && !(_threads.TryGetValue(scriptId, out var threads) && threads.Any(t => t.ThreadIndex == threadId)))
-                throw new LuaDebugStateException($"Thread {threadId} is not a known thread of script {scriptId}; request its threads first");
+            if (threadId != -1 && !(_threads.TryGetValue(scriptId, out var threads) &&
+                                    threads.Any(t => t.ThreadIndex == threadId)))
+                throw new LuaDebugStateException(
+                    $"Thread {threadId} is not a known thread of script {scriptId}; request its threads first");
         }
     }
 
@@ -440,9 +456,11 @@ public sealed class LuaDebugSession : ILuaDebugSession
             {
                 return (T)await waiter.Reply.Task.WaitAsync(linked.Token).ConfigureAwait(false);
             }
-            catch (OperationCanceledException) when (deadline.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
+            catch (OperationCanceledException) when (deadline.IsCancellationRequested &&
+                                                     !cancellationToken.IsCancellationRequested)
             {
-                throw new TimeoutException($"The game did not answer {request.Id} within {RequestTimeout.TotalSeconds:0.#} s");
+                throw new TimeoutException(
+                    $"The game did not answer {request.Id} within {RequestTimeout.TotalSeconds:0.#} s");
             }
         }
         finally

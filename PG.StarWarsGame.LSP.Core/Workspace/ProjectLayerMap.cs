@@ -25,8 +25,11 @@ public sealed class ProjectLayerMap : IProjectLayerMap
         _fileHelper = fileHelper;
     }
 
+    public IReadOnlyList<ProjectLayer> Layers { get; private set; } = [];
+
     public void SetLayers(IReadOnlyList<ProjectLayer> layers)
     {
+        Layers = layers.ToImmutableArray();
         var prefixes = ImmutableArray.CreateBuilder<(string, int)>();
         var names = ImmutableDictionary.CreateBuilder<int, string>();
         var top = 0;

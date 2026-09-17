@@ -93,6 +93,37 @@ Lua script files inside the declared `scripts` directories are indexed and check
 
 ---
 
+## Lua debugger
+
+> **Work in progress - off by default.** Enable `aet-eaw-edit.features.lua.debugger` to get the **Empire at War Lua** debug type. It needs a debug build of the game with its Lua debug server running; a retail build has no debug server and cannot be attached to.
+
+The debugger connects VS Code's Run and Debug view to the Lua debug server built into the game's debug build: breakpoints in the Lua files under your project's script directories, attach to a running game or launch it with your mod chain, the call stack and the frame's locals on a stop, watches and hovers on plain variable names, and a Debug Console that runs Lua in the selected script. Because the game cannot start a script from the debugger, the **Lua Scripts** view in Run and Debug lists every script instance the game is running, with its coroutine threads, and lets you break in one; the game then stops at the next Lua line it runs there.
+
+Press `F5` in a Lua file to attach with the settings below, or add a `launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "eaw-lua",
+      "request": "attach",
+      "name": "Attach to Empire at War (Lua)"
+    },
+    {
+      "type": "eaw-lua",
+      "request": "launch",
+      "name": "Launch Empire at War (Lua)",
+      "program": "${config:aet-eaw-edit.game.executable}"
+    }
+  ]
+}
+```
+
+A launch passes the game one `MODPATH=` entry per project layer, your mod first and its dependencies after it. The game reads a mod folder as-is, so every layer must already have its declared directories under its `Data/` folder and no space in its path; a layer that does not is refused with the reason, and `modPaths` in the configuration lets you name the folders yourself. The game's own limits apply throughout: breakpoint conditions are never evaluated, the whole game freezes while a script is stopped, a pause takes effect at the next Lua line, and tables expand only with `aet-eaw-edit.game.unsafeTableExpansion`, which the game is reported to crash on for long member text. The extension's README documents each attribute and limit.
+
+---
+
 ## Suppressing diagnostics
 
 Every diagnostic the server reports carries an id of the form `aetswg-<group>-<number>`, for example `aetswg-004-0001`. The id is shown in the Code column of the Problems panel and is what you name when you want a diagnostic silenced. Ids are stable: they are never renumbered or reused, so a suppression you commit today keeps meaning the same thing.
@@ -274,6 +305,18 @@ The baseline is a snapshot of all vanilla game objects and localisation keys. It
 |---|---|---|
 | `aet-eaw-edit.localisation.format` | `format-dat` | Default format when creating a new localisation project (`format-dat`, `format-csv`, `format-xml`) |
 
+### Lua debugger
+
+Only read when `aet-eaw-edit.features.lua.debugger` is enabled.
+
+| Setting | Default | Description |
+|---|---|---|
+| `aet-eaw-edit.game.executable` | _(empty)_ | Path to the debug `StarWarsI.exe` the Lua debugger launches. A retail build has no Lua debug server |
+| `aet-eaw-edit.game.arguments` | `[]` | Extra command-line arguments for the game when the Lua debugger launches it, placed before the mod chain |
+| `aet-eaw-edit.game.luaDebugHost` | `127.0.0.1` | The machine running the game. The debugger talks to it over UDP |
+| `aet-eaw-edit.game.luaDebugPort` | `1234` | The game's Lua debug UDP port. The game takes the first free port from 1234 upward |
+| `aet-eaw-edit.game.unsafeTableExpansion` | `false` | Allows expanding table values in the Variables view. The game is reported to crash on a table member whose text is 255 bytes or longer |
+
 ---
 
 ## What this extension downloads
@@ -302,6 +345,9 @@ Only files inside directories declared in your `.pgproj` are indexed. Add the re
 
 **The localisation views are not visible**
 Set `aet-eaw-edit.features.tools.localisation` to `true`. Feature flags are applied at startup, so restart the server afterwards (`Ctrl+Shift+P` > **EaWEdit: Restart LSP Server**).
+
+**"The game did not answer on 127.0.0.1:1234 within 60 s"**
+The Lua debugger needs a debug build of the game with its Lua debug server up; a retail build never answers. Start the debug build, run `luadebug` in its console, then attach. The game takes the first free UDP port from 1234 upward, so match `aet-eaw-edit.game.luaDebugPort` to the instance you mean.
 
 **Viewing server output**
 Set `aet-eaw-edit.lsp.debug.traceServer` to `messages` and open the **EaWEdit** output channel in the Output panel.

@@ -147,7 +147,7 @@ public sealed class SpecialWeaponIndexHandlerTest
                     ImmutableArray<string>.Empty, ImmutableArray<EffectiveTag>.Empty);
 
             return new EffectiveObject(id, "GameObjectType", true, false, null, [id],
-                [..tags.Select(t => new EffectiveTag(t.Tag, t.Value, t.Value, VariantProvenance.Own, id, null))]);
+                [.. tags.Select(t => new EffectiveTag(t.Tag, t.Value, t.Value, VariantProvenance.Own, id, null))]);
         }
     }
 }

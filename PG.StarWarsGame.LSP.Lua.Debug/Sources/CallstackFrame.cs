@@ -13,7 +13,14 @@ namespace PG.StarWarsGame.LSP.Lua.Debug.Sources;
 /// <param name="NameWhat">How the function was reached: global, local, method, field, or empty.</param>
 /// <param name="Name">The function's name where the game knows one, else empty.</param>
 /// <param name="Raw">The wire entry as received.</param>
-public sealed record CallstackFrame(int Level, string Source, int Line, string What, string NameWhat, string Name, string Raw)
+public sealed record CallstackFrame(
+    int Level,
+    string Source,
+    int Line,
+    string What,
+    string NameWhat,
+    string Name,
+    string Raw)
 {
     /// <summary>A display name: the function name, or its kind when it has none.</summary>
     public string DisplayName => Name.Length > 0 ? Name : What.Length > 0 ? $"<{What}>" : "<unknown>";

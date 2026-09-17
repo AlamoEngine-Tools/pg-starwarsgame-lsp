@@ -11,7 +11,7 @@ public sealed class EffectiveObjectTest
     private static EffectiveObject With(params (string Tag, string Value)[] tags)
     {
         return new EffectiveObject("Obj", "GameObjectType", true, false, null, ["Obj"],
-            [..tags.Select(t => new EffectiveTag(t.Tag, t.Value, t.Value, VariantProvenance.Own, "Obj", null))]);
+            [.. tags.Select(t => new EffectiveTag(t.Tag, t.Value, t.Value, VariantProvenance.Own, "Obj", null))]);
     }
 
     [Fact]
@@ -31,7 +31,8 @@ public sealed class EffectiveObjectTest
     [Fact]
     public void ValueOf_takes_the_last_occurrence()
     {
-        Assert.Equal("2", With(("Special_Weapon_Index", "1"), ("Special_Weapon_Index", "2")).ValueOf("Special_Weapon_Index"));
+        Assert.Equal("2",
+            With(("Special_Weapon_Index", "1"), ("Special_Weapon_Index", "2")).ValueOf("Special_Weapon_Index"));
     }
 
     [Fact]

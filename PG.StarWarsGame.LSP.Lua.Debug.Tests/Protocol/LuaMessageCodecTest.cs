@@ -45,7 +45,9 @@ public sealed class LuaMessageCodecTest
             new DumpTableMessage(7, 1, "Flat", []),
             new SetCallstackDepthMessage(7, 2),
             new ExecuteTextMessage(7, "__debug_result = object.Get_Name()"),
-            new ScriptListMessage([new ScriptEntry(1, "Data\\Scripts\\A.lua"), new ScriptEntry(2, "Data\\Scripts\\B.lua")]),
+            new ScriptListMessage([
+                new ScriptEntry(1, "Data\\Scripts\\A.lua"), new ScriptEntry(2, "Data\\Scripts\\B.lua")
+            ]),
             new ScriptListMessage([]),
             new ThreadListMessage(7, 3, [new ThreadEntry(0, "main"), new ThreadEntry(4, "Story_Thread")]),
             new ThreadListMessage(7, 0, []),
@@ -59,7 +61,8 @@ public sealed class LuaMessageCodecTest
             new VariableDumpMessage(99, "missing", -1, ""),
             new TableDumpMessage(1, [new TableMember(4, "name", 4, "Coruscant"), new TableMember(3, "1", 3, "42")]),
             new TableDumpMessage(2, []),
-            new ChildScriptListMessage(7, ["Data\\Scripts\\Library\\PGBase.lua", "Data\\Scripts\\Library\\PGDebug.lua"]),
+            new ChildScriptListMessage(7,
+                ["Data\\Scripts\\Library\\PGBase.lua", "Data\\Scripts\\Library\\PGDebug.lua"]),
             new ChildScriptListMessage(7, []),
             new OutputMessage(0, "LuaScript: \"A\", Warning: something\n"),
             new OutputMessage(1, "type = number, value = 1.000000"),
@@ -70,7 +73,8 @@ public sealed class LuaMessageCodecTest
     /// <summary>The payload as the reliable layer delivers it: through a datagram, padding bits included.</summary>
     private BitBuffer AsDelivered(BitBuffer payload)
     {
-        return _datagrams.Decode(_datagrams.Encode(new PgNetPacket(0, PgNetPacketKind.Guaranteed, false, payload))).Payload;
+        return _datagrams.Decode(_datagrams.Encode(new PgNetPacket(0, PgNetPacketKind.Guaranteed, false, payload)))
+            .Payload;
     }
 
     // -- vectors ------------------------------------------------------------------------------

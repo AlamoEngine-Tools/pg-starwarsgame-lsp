@@ -4,8 +4,10 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using Microsoft.Extensions.Logging;
 using OmniSharp.Extensions.LanguageServer.Server;
 using PG.StarWarsGame.LSP.Core.Configuration;
+using PG.StarWarsGame.LSP.Lua.Debug.Dap;
 using PG.StarWarsGame.LSP.Server;
 using Serilog;
 
@@ -30,6 +32,23 @@ Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Debug()
     .CreateLogger();
 #endif
+
+// The Lua debug adapter is a second process of this same exe: VS Code starts one per debug
+// session and talks DAP to it over stdio. It shares nothing with a running language server.
+if (args.Contains("--debug-adapter"))
+{
+    using var loggerFactory = LoggerFactory.Create(builder =>
+    {
+        builder.SetMinimumLevel(LogLevel.Information);
+#if DEBUG
+        builder.AddSerilog(dispose: false);
+#endif
+    });
+    Console.Error.WriteLine($"[DAP] PID {Environment.ProcessId} serving the Lua debug adapter on stdio");
+    await LuaDebugAdapterHost.RunAsync(Console.OpenStandardInput(), Console.OpenStandardOutput(), loggerFactory,
+        CancellationToken.None);
+    return;
+}
 
 var serverOptions = LoadServerOptions();
 if (waitForDebugger)

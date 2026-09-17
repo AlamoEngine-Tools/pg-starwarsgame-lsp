@@ -40,6 +40,7 @@ using PG.StarWarsGame.LSP.Server.Startup;
 using PG.StarWarsGame.LSP.Server.Story;
 using PG.StarWarsGame.LSP.Server.Suppression;
 using PG.StarWarsGame.LSP.Server.Symbols;
+using PG.StarWarsGame.LSP.Server.Debug;
 using PG.StarWarsGame.LSP.Server.Variants;
 using PG.StarWarsGame.LSP.Story.Dialog;
 using PG.StarWarsGame.LSP.Story.Dialog.Handlers;
@@ -141,6 +142,10 @@ public static class ServerConfigurator
             .WithHandler<ApplyCreditsBatchHandler>()
             .WithHandler<ValidateCreditsBatchHandler>()
             .WithHandler<GetEffectiveObjectHandler>()
+            // Lua debugger: the layers a debug session maps game paths with and launches the game
+            // from. The adapter itself runs as a separate process of this exe (--debug-adapter),
+            // never in here.
+            .WithHandler<GetLaunchLayersHandler>()
             .WithHandler<GetEncyclopediaEntryHandler>()
             .WithHandler<GetPreviewSceneHandler>()
             .WithHandler<GetModelGlbHandler>()

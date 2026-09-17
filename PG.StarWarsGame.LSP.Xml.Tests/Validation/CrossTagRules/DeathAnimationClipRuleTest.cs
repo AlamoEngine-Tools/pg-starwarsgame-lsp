@@ -59,7 +59,8 @@ public sealed class DeathAnimationClipRuleTest
     [Fact]
     public void An_object_writing_no_type_emits_nothing()
     {
-        Assert.Empty(Produce("<X><Unit Name=\"A\"><Specific_Death_Anim_Index>1</Specific_Death_Anim_Index></Unit></X>"));
+        Assert.Empty(
+            Produce("<X><Unit Name=\"A\"><Specific_Death_Anim_Index>1</Specific_Death_Anim_Index></Unit></X>"));
     }
 
     [Fact]

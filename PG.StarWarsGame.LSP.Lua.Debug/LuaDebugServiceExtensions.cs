@@ -3,6 +3,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using PG.StarWarsGame.LSP.Lua.Debug.Dap;
 using PG.StarWarsGame.LSP.Lua.Debug.PgNet;
 using PG.StarWarsGame.LSP.Lua.Debug.Protocol;
 using PG.StarWarsGame.LSP.Lua.Debug.Session;
@@ -13,11 +14,12 @@ namespace PG.StarWarsGame.LSP.Lua.Debug;
 public static class LuaDebugServiceExtensions
 {
     /// <summary>
-    ///     Registers the Lua debugger's protocol and session services. The datagram codec needs
-    ///     PG.Commons' <c>ICrc32HashingService</c>, which the host registers exactly once through
-    ///     <c>PetroglyphCommons.ContributeServices</c>: the language server already gets it from
-    ///     the localisation stack, a standalone debug-adapter host has to call it itself. Logging
-    ///     is the host's too.
+    ///     Registers the Lua debugger's protocol, session and adapter services. The datagram codec
+    ///     needs PG.Commons' <c>ICrc32HashingService</c>, which the host registers exactly once
+    ///     through <c>PetroglyphCommons.ContributeServices</c>: the language server already gets
+    ///     it from the localisation stack, the standalone adapter host does it in
+    ///     <see cref="LuaDebugAdapterHost.CreateServices" />. Logging and <c>IFileHelper</c> are
+    ///     the host's too.
     /// </summary>
     public static IServiceCollection AddLuaDebugServices(this IServiceCollection services)
     {
@@ -32,10 +34,13 @@ public static class LuaDebugServiceExtensions
         // Needs the host's IFileHelper, the same one the index resolves documents with.
         services.AddSingleton<IScriptSourceMapFactory, ScriptSourceMapFactory>();
         services.AddSingleton<IFrameLocalsProvider, FrameLocalsProvider>();
+        services.AddSingleton<ILuaDebugSessionFactory, LuaDebugSessionFactory>();
+        services.TryAddSingleton<IGameLauncher, ProcessGameLauncher>();
         // One channel per connection and one connection per session: each resolution is fresh.
         services.AddTransient<IReliableChannel, ReliableChannel>();
         services.AddTransient<ILuaDebugConnection, LuaDebugConnection>();
         services.AddTransient<ILuaDebugSession, LuaDebugSession>();
+        services.AddTransient<LuaDebugAdapter>();
         return services;
     }
 }

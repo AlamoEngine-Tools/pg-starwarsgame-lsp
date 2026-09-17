@@ -25,6 +25,16 @@
         <PackageReference Include="GitHubActionsTestLogger"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk"/>
         <PackageReference Include="OmniSharp.Extensions.LanguageClient"/>
+        <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Client"/>
+        <PackageReference Include="System.IO.Abstractions.TestingHelpers"/>
+    </ItemGroup>
+
+    <!-- The fake game and the container it needs, shared with the debugger's own tests as linked
+         sources: one fake, one set of engine rules, no second copy to drift. -->
+    <ItemGroup>
+        <Compile Include="..\PG.StarWarsGame.LSP.Lua.Debug.Tests\Session\FakeGameDebugServer.cs"
+                 Link="LuaDebug\FakeGameDebugServer.cs"/>
+        <Compile Include="..\PG.StarWarsGame.LSP.Lua.Debug.Tests\TestServices.cs" Link="LuaDebug\TestServices.cs"/>
     </ItemGroup>
 
     <ItemGroup>

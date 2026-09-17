@@ -40,12 +40,14 @@ public sealed class CallstackParser : ICallstackParser
         ArgumentNullException.ThrowIfNull(entries);
 
         var first = 0;
-        if (dropDuplicateOutermost && entries.Count >= 2 && string.Equals(entries[0], entries[1], StringComparison.Ordinal))
+        if (dropDuplicateOutermost && entries.Count >= 2 &&
+            string.Equals(entries[0], entries[1], StringComparison.Ordinal))
             first = 1;
 
         var frames = new List<CallstackFrame>(entries.Count - first);
         for (var level = entries.Count - 1; level >= first; level--)
-            frames.Add(ParseEntry(level, entries[level]) ?? new CallstackFrame(level, "", 0, "", "", "", entries[level]));
+            frames.Add(
+                ParseEntry(level, entries[level]) ?? new CallstackFrame(level, "", 0, "", "", "", entries[level]));
         return frames;
     }
 }

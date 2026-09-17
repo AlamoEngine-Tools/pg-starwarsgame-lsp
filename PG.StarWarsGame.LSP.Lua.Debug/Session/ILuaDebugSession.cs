@@ -70,9 +70,11 @@ public interface ILuaDebugSession : IAsyncDisposable
     ///     Script id -1 with thread id -1 is a source-wide breakpoint. A script-scoped breakpoint
     ///     attaches the script first when it is not attached yet.
     /// </summary>
-    Task AddBreakpointAsync(int scriptId, int threadId, string sourceName, int line, CancellationToken cancellationToken);
+    Task AddBreakpointAsync(int scriptId, int threadId, string sourceName, int line,
+        CancellationToken cancellationToken);
 
-    Task RemoveBreakpointAsync(int scriptId, int threadId, string sourceName, int line, CancellationToken cancellationToken);
+    Task RemoveBreakpointAsync(int scriptId, int threadId, string sourceName, int line,
+        CancellationToken cancellationToken);
 
     /// <summary>Arms a break at the next Lua line of the context script, or of any attached script when none is selected.</summary>
     Task BreakAllAsync(CancellationToken cancellationToken);
@@ -96,7 +98,8 @@ public interface ILuaDebugSession : IAsyncDisposable
 
     Task<VariableDumpMessage> DumpVariableAsync(int scriptId, string variableName, CancellationToken cancellationToken);
 
-    Task<TableDumpMessage> DumpTableAsync(int scriptId, string tableName, IReadOnlyList<uint> path, CancellationToken cancellationToken);
+    Task<TableDumpMessage> DumpTableAsync(int scriptId, string tableName, IReadOnlyList<uint> path,
+        CancellationToken cancellationToken);
 
     /// <summary>Runs a Lua chunk in the script's main state and returns the game's text reply.</summary>
     Task<string> ExecuteTextAsync(int scriptId, string text, CancellationToken cancellationToken);

@@ -12,7 +12,10 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions"/>
+        <PackageReference Include="OmniSharp.Extensions.DebugAdapter.Server"/>
         <PackageReference Include="Stateless"/>
+        <!-- The standalone adapter host registers the real file system itself; the server does the same. -->
+        <PackageReference Include="System.IO.Abstractions"/>
     </ItemGroup>
 
     <ItemGroup>

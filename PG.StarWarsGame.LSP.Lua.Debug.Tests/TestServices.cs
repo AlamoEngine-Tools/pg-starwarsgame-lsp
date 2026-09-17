@@ -3,7 +3,9 @@
 
 using System.IO.Abstractions;
 using System.IO.Abstractions.TestingHelpers;
+using AnakinRaW.CommonUtilities.Hashing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using PG.Commons;
@@ -29,6 +31,9 @@ internal static class TestServices
         services.AddSingleton<IFileSystem>(new MockFileSystem());
         services.AddSingleton<IFileHelper>(sp => new FileHelper(sp.GetRequiredService<IFileSystem>()));
         services.AddSingleton(typeof(ILogger<>), typeof(NullLogger<>));
+        // Same as the adapter host: the older PG.Commons copy that wins in the server's output
+        // folder (and so in the E2E project, which links this file) leaves IHashingService to the caller.
+        services.TryAddSingleton<IHashingService>(sp => new HashingService(sp));
         PetroglyphCommons.ContributeServices(services);
         configure?.Invoke(services);
         services.AddLuaDebugServices();

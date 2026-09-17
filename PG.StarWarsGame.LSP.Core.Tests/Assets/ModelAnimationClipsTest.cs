@@ -85,7 +85,8 @@ public sealed class ModelAnimationClipsTest
     [Fact]
     public void CountOfType_counts_every_take_of_the_type()
     {
-        string[] clips = ["ni_gungan_die_00.ala", "ni_gungan_die_01.ala", "ni_gungan_fw_die_00.ala", "ni_gungan_move_00.ala"];
+        string[] clips =
+            ["ni_gungan_die_00.ala", "ni_gungan_die_01.ala", "ni_gungan_fw_die_00.ala", "ni_gungan_move_00.ala"];
 
         Assert.Equal(2, ModelAnimationClips.CountOfType(clips, "NI_Gungan.alo", "DIE"));
         Assert.Equal(1, ModelAnimationClips.CountOfType(clips, "NI_Gungan.alo", "fw_die"));

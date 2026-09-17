@@ -19,6 +19,7 @@
         <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11"/>
         <!-- The Lua debug adapter speaks DAP through the same OmniSharp family as the language
              server, held at the same version so the two never disagree on the JSON-RPC layer. -->
+        <PackageVersion Include="OmniSharp.Extensions.DebugAdapter.Client" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.DebugAdapter.Server" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.LanguageClient" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>

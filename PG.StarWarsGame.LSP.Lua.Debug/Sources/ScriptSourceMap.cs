@@ -151,6 +151,7 @@ public sealed class ScriptSourceMap : IScriptSourceMap
 
     private static bool LooksAbsolute(string forwardSlashed)
     {
-        return forwardSlashed.StartsWith('/') || (forwardSlashed.Length > 2 && forwardSlashed[1] == ':' && forwardSlashed[2] == '/');
+        return forwardSlashed.StartsWith('/') ||
+               (forwardSlashed.Length > 2 && forwardSlashed[1] == ':' && forwardSlashed[2] == '/');
     }
 }
