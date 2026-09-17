@@ -5,6 +5,9 @@
         <IsPackable>false</IsPackable>
         <OutputType>Exe</OutputType>
         <IsTestable>true</IsTestable>
+        <!-- VSTHRD003: session tests start a request, drive the fake clock, then await that request;
+             the fake game awaits its own receive loop on dispose - both by design -->
+        <NoWarn>VSTHRD003</NoWarn>
     </PropertyGroup>
 
     <ItemGroup>
@@ -24,6 +27,7 @@
         </PackageReference>
         <PackageReference Include="GitHubActionsTestLogger"/>
         <PackageReference Include="Microsoft.Extensions.DependencyInjection"/>
+        <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing"/>
         <PackageReference Include="Microsoft.NET.Test.Sdk"/>
         <PackageReference Include="System.IO.Abstractions.TestingHelpers"/>
     </ItemGroup>

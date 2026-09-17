@@ -2,24 +2,57 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Time.Testing;
 using PG.StarWarsGame.LSP.Lua.Debug.PgNet;
+using PG.StarWarsGame.LSP.Lua.Debug.Protocol;
+using PG.StarWarsGame.LSP.Lua.Debug.Session;
 
 namespace PG.StarWarsGame.LSP.Lua.Debug.Tests;
 
 public sealed class LuaDebugServiceExtensionsTest
 {
     [Fact]
-    public void AddLuaDebugServices_WithCommonsHashing_ResolvesCodecAndHandshakeAsSingletons()
+    public void AddLuaDebugServices_WithCommonsHashing_ResolvesTheSingletons()
     {
         var provider = TestServices.Build();
 
-        var codec = provider.GetRequiredService<IPgNetDatagramCodec>();
-        var handshake = provider.GetRequiredService<IConnectHandshake>();
+        Assert.IsType<PgNetDatagramCodec>(provider.GetRequiredService<IPgNetDatagramCodec>());
+        Assert.IsType<ConnectHandshake>(provider.GetRequiredService<IConnectHandshake>());
+        Assert.IsType<LuaMessageCodec>(provider.GetRequiredService<ILuaMessageCodec>());
+        Assert.IsType<UdpTransportFactory>(provider.GetRequiredService<IUdpTransportFactory>());
+        Assert.Same(provider.GetRequiredService<ILuaMessageCodec>(), provider.GetRequiredService<ILuaMessageCodec>());
+    }
 
-        Assert.IsType<PgNetDatagramCodec>(codec);
-        Assert.IsType<ConnectHandshake>(handshake);
-        Assert.Same(codec, provider.GetRequiredService<IPgNetDatagramCodec>());
-        Assert.Same(handshake, provider.GetRequiredService<IConnectHandshake>());
+    [Fact]
+    public void AddLuaDebugServices_ChannelConnectionAndSession_AreOnePerResolution()
+    {
+        var provider = TestServices.Build();
+
+        Assert.NotSame(provider.GetRequiredService<IReliableChannel>(),
+            provider.GetRequiredService<IReliableChannel>());
+        Assert.NotSame(provider.GetRequiredService<ILuaDebugConnection>(),
+            provider.GetRequiredService<ILuaDebugConnection>());
+        Assert.NotSame(provider.GetRequiredService<ILuaDebugSession>(),
+            provider.GetRequiredService<ILuaDebugSession>());
+        Assert.IsType<LuaDebugSession>(provider.GetRequiredService<ILuaDebugSession>());
+    }
+
+    [Fact]
+    public void AddLuaDebugServices_NoTimeProviderRegistered_UsesTheSystemClock()
+    {
+        var provider = TestServices.Build();
+
+        Assert.Same(TimeProvider.System, provider.GetRequiredService<TimeProvider>());
+    }
+
+    [Fact]
+    public void AddLuaDebugServices_TimeProviderRegisteredFirst_IsKept()
+    {
+        var fake = new FakeTimeProvider();
+
+        var provider = TestServices.Build(services => services.AddSingleton<TimeProvider>(fake));
+
+        Assert.Same(fake, provider.GetRequiredService<TimeProvider>());
     }
 
     [Fact]
@@ -29,6 +62,6 @@ public sealed class LuaDebugServiceExtensionsTest
         // itself, because a second CRC-32 provider makes the hashing service refuse to start.
         var provider = new ServiceCollection().AddLuaDebugServices().BuildServiceProvider();
 
-        Assert.Throws<InvalidOperationException>(() => provider.GetRequiredService<IPgNetDatagramCodec>());
+        Assert.Throws<InvalidOperationException>(provider.GetRequiredService<IPgNetDatagramCodec>);
     }
 }
