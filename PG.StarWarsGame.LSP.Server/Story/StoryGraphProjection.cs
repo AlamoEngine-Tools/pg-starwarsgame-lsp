@@ -27,9 +27,15 @@ internal static class StoryGraphProjection
 
     private const string Suspended = "Suspended";
 
+    /// <summary>What leads TO the anchored event, rather than what it leads to.</summary>
+    private const string Upstream = "Upstream";
+
+    /// <summary>The whole path through the anchored event - both directions at once.</summary>
+    private const string Both = "Both";
+
     public static GetStoryGraphResult Project(
         StoryCampaignModel model, string? nameFilter, string? branch, string? lifecycle,
-        string? reachableFrom, string? plotState = null)
+        string? reachableFrom, string? plotState = null, string? reachableDirection = null)
     {
         // Null or empty is every plot the manifest registers, in either state - a suspended plot is
         // part of the chain, waiting for something to resume it.
@@ -40,6 +46,9 @@ internal static class StoryGraphProjection
         {
             SuspendedThreads = StoryRuntimeState.Initial.SuspendedThreads.Union(model.SuspendedThreadUris)
         };
+        // Not cached, though it is a fixpoint over every event and every request recomputes it: caching
+        // it per model was measured on the shipped Underworld campaign (2196 nodes) at 135 -> 132 ms,
+        // so the cost is the RESULT - 2196 node DTOs built and serialised - not this (#131).
         var reachable = evaluator.ComputeReachableEvents();
 
         // Filters select EVENT nodes; virtual nodes and edges survive when both endpoints do.
@@ -67,7 +76,7 @@ internal static class StoryGraphProjection
         }
 
         if (reachableFrom is { Length: > 0 } fromId)
-            keptEvents.IntersectWith(ForwardClosure(model.Graph, fromId));
+            keptEvents.IntersectWith(Closure(model.Graph, fromId, reachableDirection));
 
         var keptNodes = new List<StoryGraphNodeDto>();
         var keptIds = new HashSet<string>(StringComparer.Ordinal);
@@ -119,16 +128,41 @@ internal static class StoryGraphProjection
             .ToList();
     }
 
-    // Everything transitively downstream of the given node - "show me what this event leads to".
-    private static HashSet<string> ForwardClosure(StoryGraph graph, string fromId)
+    /// <summary>
+    ///     Everything the reachable-from filter keeps, in the direction asked for.
+    /// </summary>
+    /// <remarks>
+    ///     Downstream - "what does this lead to" - is the original filter and the default, so a client
+    ///     that sends no direction, or one this build does not know, gets exactly what it used to.
+    ///     Upstream is the inverse an author asked for - "what leads here" - and Both is the union,
+    ///     which is the whole path through the event.
+    /// </remarks>
+    private static HashSet<string> Closure(StoryGraph graph, string fromId, string? direction)
     {
-        var byFrom = graph.Edges.ToLookup(e => e.FromId, StringComparer.Ordinal);
+        var upstream = string.Equals(direction, Upstream, StringComparison.OrdinalIgnoreCase);
+        var both = string.Equals(direction, Both, StringComparison.OrdinalIgnoreCase);
+
+        if (!upstream && !both) return Walk(graph, fromId, false);
+        if (upstream) return Walk(graph, fromId, true);
+
+        var closure = Walk(graph, fromId, false);
+        closure.UnionWith(Walk(graph, fromId, true));
+        return closure;
+    }
+
+    /// <summary>Transitive closure from <paramref name="fromId" />, following edges backwards when asked.</summary>
+    private static HashSet<string> Walk(StoryGraph graph, string fromId, bool backwards)
+    {
+        var next = backwards
+            ? graph.Edges.ToLookup(e => e.ToId, e => e.FromId, StringComparer.Ordinal)
+            : graph.Edges.ToLookup(e => e.FromId, e => e.ToId, StringComparer.Ordinal);
+
         var closure = new HashSet<string>(StringComparer.Ordinal) { fromId };
         var queue = new Queue<string>([fromId]);
         while (queue.Count > 0)
-            foreach (var edge in byFrom[queue.Dequeue()])
-                if (closure.Add(edge.ToId))
-                    queue.Enqueue(edge.ToId);
+            foreach (var id in next[queue.Dequeue()])
+                if (closure.Add(id))
+                    queue.Enqueue(id);
         return closure;
     }
 }

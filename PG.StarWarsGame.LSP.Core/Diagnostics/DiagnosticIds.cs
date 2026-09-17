@@ -44,6 +44,25 @@ public static class DiagnosticIds
     public static readonly DiagnosticId PerFactionObjectListEmpty = new(DiagnosticGroup.References, 26);
     public static readonly DiagnosticId StoryDialogChapterNotDefined = new(DiagnosticGroup.References, 27);
 
+    /// <summary>
+    ///     A reference whose expected type has NO indexed instances anywhere in the workspace - so the
+    ///     tool cannot tell whether the name is wrong, and says so instead of guessing.
+    /// </summary>
+    /// <remarks>
+    ///     Deliberately NOT <see cref="UnresolvedReference" />, and deliberately Information rather
+    ///     than Error. Two scopes reach this today and neither is the author's mistake: the AI tree is
+    ///     skipped by <c>EaWXmlContext</c> until a parser for its format exists, and GRAPHICDETAILS.XML
+    ///     emits no type symbols yet. Reporting those as "No object with this name exists in the
+    ///     workspace" states something false about the author's data.
+    ///     It carries its own id because the two are suppressed separately: silencing "we cannot check
+    ///     this yet" must never silence a genuine missing reference. It is Information rather than a
+    ///     Hint because the author should see the limitation, and rather than a Warning because
+    ///     nothing is wrong with what they wrote.
+    ///     The rule is a zero-instance count, not a list of known-unsupported scopes: it needs no
+    ///     maintenance and it stops firing by itself the moment a type starts indexing.
+    /// </remarks>
+    public static readonly DiagnosticId ReferenceTypeNotIndexed = new(DiagnosticGroup.References, 30);
+
     /// <summary>A <c>require()</c> naming a module with no matching <c>.lua</c> file.</summary>
     public static readonly DiagnosticId LuaUnresolvedModule = new(DiagnosticGroup.References, 28);
 
@@ -442,6 +461,18 @@ public static class DiagnosticIds
     ///     the hull's firing arc, not turret configuration (A5). A hint: fighters do it on purpose.
     /// </summary>
     public static readonly DiagnosticId HullFiringArc = new(DiagnosticGroup.CrossTag, 28);
+
+    /// <summary>
+    ///     A faction's standalone special weapon names an object whose <c>Special_Weapon_Index</c> is unset
+    ///     or outside 0 to 2, so the engine asserts and never registers the weapon (#98).
+    /// </summary>
+    public static readonly DiagnosticId SpecialWeaponIndex = new(DiagnosticGroup.CrossTag, 29);
+
+    /// <summary>
+    ///     <c>Specific_Death_Anim_Type</c> names a type the model has no clip for, or an index past its last
+    ///     take, so no death animation plays - and with <c>Remove_Upon_Death</c> the unit vanishes at once (#104).
+    /// </summary>
+    public static readonly DiagnosticId DeathAnimationClip = new(DiagnosticGroup.CrossTag, 30);
 
     /// <summary>
     ///     <c>Land_Damage_Alternates</c> names a stage the object's model tags nothing for. Never the

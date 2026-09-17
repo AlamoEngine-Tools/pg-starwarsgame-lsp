@@ -13,12 +13,18 @@ namespace PG.StarWarsGame.LSP.Xml.Tests.Validation.Handlers;
 ///     A faction's special weapon must actually be a special weapon (issue #98).
 /// </summary>
 /// <remarks>
-///     The issue asked to enforce a name whitelist - "Hypervelocity Cannon or Ion Cannon" - and the
-///     reporter withdrew that in the comments once they noticed EaWX uses a <c>Ground_</c> prefix.
-///     Vanilla settles it: the shipped values are <c>Ground_Ion_Cannon</c> and
-///     <c>Ground_Empire_Hypervelocity_Gun</c>, so a name check would fire on the base game. What
-///     both of those DO have is <c>SPECIAL_WEAPON</c>, which is the reporter's revised rule and the
-///     one implemented here.
+///     <para>
+///         The issue asked to enforce a name whitelist - "Hypervelocity Cannon or Ion Cannon" - and the
+///         reporter withdrew that in the comments once they noticed EaWX uses a <c>Ground_</c> prefix.
+///         Vanilla settles it: the shipped values are <c>Ground_Ion_Cannon</c> and
+///         <c>Ground_Empire_Hypervelocity_Gun</c>, so a name check would fire on the base game.
+///     </para>
+///     <para>
+///         The reporter's revised rule was the behaviour, and the engine agrees with a correction:
+///         <c>GameModeClass::Add_Special_Weapon</c> registers the weapon only if it behaves like
+///         <c>SPECIAL_WEAPON</c> OR <c>LOBBING_SUPERWEAPON</c>, and otherwise returns false without an
+///         assert - the weapon is never registered, so there is nothing to fire.
+///     </para>
 /// </remarks>
 public sealed class SpecialWeaponBehaviorHandlerTest
 {
@@ -62,6 +68,17 @@ public sealed class SpecialWeaponBehaviorHandlerTest
         Assert.Empty(Sut.Handle(fact, ctx));
     }
 
+    // Add_Special_Weapon accepts either behaviour. Rejecting a lobbing superweapon reported a weapon
+    // the engine registers.
+    [Fact]
+    public void Object_with_LOBBING_SUPERWEAPON_is_accepted()
+    {
+        var fact = XmlHandlerTestFixtures.MakeFact(WeaponTag(), "Ground_Magnepulse_Cannon");
+        var ctx = CtxWith(("Ground_Magnepulse_Cannon", "SpaceBehavior", "TURRET, LOBBING_SUPERWEAPON"));
+
+        Assert.Empty(Sut.Handle(fact, ctx));
+    }
+
     [Fact]
     public void Object_without_the_behaviour_is_reported()
     {
@@ -72,6 +89,26 @@ public sealed class SpecialWeaponBehaviorHandlerTest
         Assert.Equal(XmlDiagnosticSeverity.Warning, d.Severity);
         Assert.Contains("Ground_Barracks", d.Message);
         Assert.Contains("SPECIAL_WEAPON", d.Message);
+        Assert.Contains("LOBBING_SUPERWEAPON", d.Message);
+        // What the engine does, not a guess about firing.
+        Assert.Contains("never registers it", d.Message);
+    }
+
+    // B has no command bar button and is deprecated; the deprecation is the one warning it gets.
+    [Fact]
+    public void Weapon_B_is_left_to_the_deprecation()
+    {
+        var b = new XmlTagDefinition
+        {
+            Tag = "Standalone_Space_Maps_Special_Weapon_B",
+            ValueType = XmlValueType.TypeReference,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ReferenceTypeName = "GameObjectType"
+        };
+        var fact = XmlHandlerTestFixtures.MakeFact(b, "Ground_Barracks");
+        var ctx = CtxWith(("Ground_Barracks", "LandBehavior", "SELECTABLE"));
+
+        Assert.Empty(Sut.Handle(fact, ctx));
     }
 
     // An id nothing defines is the unresolved-reference check's business. Reporting it here too

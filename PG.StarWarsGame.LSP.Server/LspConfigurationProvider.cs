@@ -137,13 +137,14 @@ public sealed class LspConfigurationProvider : ILspConfigurationProvider
                 : string.IsNullOrWhiteSpace(schemaUrl)
                     ? new SchemaSourceConfig()
                     : new SchemaSourceConfig { Url = schemaUrl },
-            BaselineSource = string.Equals(baselineType, "None", StringComparison.OrdinalIgnoreCase)
-                ? new BaselineSourceConfig { Type = BaselineSourceType.None }
-                : !string.IsNullOrWhiteSpace(baselineLocalPath)
-                    ? new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = baselineLocalPath }
-                    : !string.IsNullOrWhiteSpace(baselineUrl)
-                        ? new BaselineSourceConfig { Url = baselineUrl }
-                        : new BaselineSourceConfig()
+            // No "none": a mod project without the shipped-game index cannot answer a cross-reference
+            // question, it can only answer it wrongly. A stale setting falls through to the ordinary
+            // precedence rather than being honoured.
+            BaselineSource = !string.IsNullOrWhiteSpace(baselineLocalPath)
+                ? new BaselineSourceConfig { Type = BaselineSourceType.Local, LocalPath = baselineLocalPath }
+                : !string.IsNullOrWhiteSpace(baselineUrl)
+                    ? new BaselineSourceConfig { Url = baselineUrl }
+                    : new BaselineSourceConfig()
         };
     }
 

@@ -325,16 +325,14 @@
             "order": 600,
             "type": "string",
             "default": "http",
-            "markdownDescription": "Where to load the EaW baseline index from. Use `http` to download automatically; `local` to point at a file; `none` to disable baseline loading.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
+            "markdownDescription": "Where to load the EaW baseline index from. Use `http` to download automatically, or `local` to point at a file.\n\nOnly applies when `#aet-eaw-edit.lsp.enabled#` is set to `true`.",
             "enum": [
               "http",
-              "local",
-              "none"
+              "local"
             ],
             "enumItemLabels": [
               "Download automatically (recommended)",
-              "Local file",
-              "Disabled"
+              "Local file"
             ]
           },
           "aet-eaw-edit.lsp.source.baseline.localPath": {

@@ -2,7 +2,9 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using System.Collections.Concurrent;
+using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using PG.StarWarsGame.LSP.Core.Symbols;
 using PG.StarWarsGame.LSP.Core.Workspace;
 using PG.StarWarsGame.LSP.Server.Localisation;
 using PG.StarWarsGame.LSP.Server.Project;
@@ -18,12 +20,45 @@ public sealed class ModProjectReloadServiceTest
     private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger) Build(
         WorkspaceConfiguration? resolved)
     {
+        var (service, indexer, logger, _) = BuildWithBaseline(resolved, true);
+        return (service, indexer, logger);
+    }
+
+    // A loaded baseline is the ordinary case, so Build assumes one; only the tests that are ABOUT the
+    // baseline gate say otherwise.
+    private static (ModProjectReloadService Service, RecordingIndexer Indexer, ListLogger Logger,
+        RecordingUserNotifier Notifier) BuildWithBaseline(
+            WorkspaceConfiguration? resolved, bool baselineLoaded)
+    {
         var indexer = new RecordingIndexer();
         var logger = new ListLogger();
+        var notifier = new RecordingUserNotifier();
         var service = new ModProjectReloadService(
             new FakeResolver(resolved), indexer, new NullLocalisationLoader(),
-            new RecordingLayerMap(), logger);
-        return (service, indexer, logger);
+            new RecordingLayerMap(), new FakeGameIndexService(IndexWithBaseline(baselineLoaded)),
+            notifier, logger);
+        return (service, indexer, logger, notifier);
+    }
+
+    // The tests that are not about the gate still have to get past it.
+    private static FakeGameIndexService LoadedIndex()
+    {
+        return new FakeGameIndexService(IndexWithBaseline(true));
+    }
+
+    private static GameIndex IndexWithBaseline(bool loaded)
+    {
+        if (!loaded) return GameIndex.Empty;
+
+        var symbol = new GameSymbol("SOME_UNIT", GameSymbolKind.XmlObject, "SpaceUnit",
+            new FileOrigin("file:///baseline.xml", 0, null), null);
+        return GameIndex.Empty with
+        {
+            Baseline = BaselineIndex.Empty with
+            {
+                Symbols = ImmutableDictionary<string, GameSymbol>.Empty.Add(symbol.Id, symbol)
+            }
+        };
     }
 
     [Fact]
@@ -35,6 +70,33 @@ public sealed class ModProjectReloadServiceTest
 
         Assert.Null(indexer.LastConfig);
         Assert.Equal(0, indexer.IndexCallCount);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ProjectFileFound_WithoutABaseline_RefusesToIndex()
+    {
+        // A mod project without the shipped-game index cannot answer a cross-reference question, it
+        // can only answer it wrongly: every object the game defines reads as missing. That is a
+        // broken setup, so the server says so and indexes nothing rather than producing diagnostics
+        // the author would have to learn to distrust.
+        var (service, indexer, _, notifier) = BuildWithBaseline(SampleConfig, baselineLoaded: false);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(0, indexer.IndexCallCount);
+        var message = Assert.Single(notifier.Errors);
+        Assert.Contains("baseline", message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task LoadAsync_ProjectFileFound_WithABaseline_IndexesAndSaysNothing()
+    {
+        var (service, indexer, _, notifier) = BuildWithBaseline(SampleConfig, baselineLoaded: true);
+
+        await service.LoadAsync(["/ws"], CancellationToken.None);
+
+        Assert.Equal(1, indexer.IndexCallCount);
+        Assert.Empty(notifier.Errors);
     }
 
     [Fact]
@@ -100,7 +162,7 @@ public sealed class ModProjectReloadServiceTest
         var localisation = new RecordingLocalisationLoader();
         var indexer = new RecordingIndexer();
         var service = new ModProjectReloadService(
-            new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), new ListLogger());
+            new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger());
         await service.LoadAsync(["/ws"], CancellationToken.None);
         var indexCallsAfterLoad = indexer.IndexCallCount;
         var localisationCallsAfterLoad = localisation.LoadCallCount;
@@ -123,7 +185,7 @@ public sealed class ModProjectReloadServiceTest
         var refresh = new RecordingClientRefreshNotifier();
         var service = new ModProjectReloadService(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
-            new RecordingLayerMap(), new ListLogger(), refresh);
+            new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(), refresh);
         await service.LoadAsync(["/ws"], CancellationToken.None);
         var before = refresh.CallCount;
 
@@ -138,7 +200,7 @@ public sealed class ModProjectReloadServiceTest
         var refresh = new RecordingClientRefreshNotifier();
         var service = new ModProjectReloadService(
             new FakeResolver(SampleConfig), new RecordingIndexer(), new RecordingLocalisationLoader(),
-            new RecordingLayerMap(), new ListLogger(), refresh);
+            new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger(), refresh);
 
         await service.ReloadLocalisationAsync(CancellationToken.None);
 
@@ -157,7 +219,7 @@ public sealed class ModProjectReloadServiceTest
         };
         var config = SampleConfig with { Layers = layers };
         var service = new ModProjectReloadService(
-            new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, new ListLogger());
+            new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, LoadedIndex(), new RecordingUserNotifier(), new ListLogger());
 
         await service.LoadAsync(["/ws"], CancellationToken.None);
 

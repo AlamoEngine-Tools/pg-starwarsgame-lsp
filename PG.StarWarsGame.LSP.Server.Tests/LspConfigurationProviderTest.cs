@@ -102,11 +102,24 @@ public sealed class LspConfigurationProviderTest : IDisposable
     }
 
     [Fact]
-    public void LoadFrom_WithBaselineTypeNone_SetsNoneType()
+    public void LoadFrom_WithBaselineTypeNone_IsNoLongerASource()
     {
+        // "none" was an escape hatch for running without the shipped-game index. Inside a mod
+        // project that is not a mode, it is a broken setup: every cross-reference diagnostic would
+        // report objects the game defines as missing. The value is gone from the settings enum, so a
+        // stale one falls through to the ordinary precedence rather than being honoured.
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(Json(new { baselineType = "None" }));
-        Assert.Equal(BaselineSourceType.None, provider.Current.BaselineSource.Type);
+        Assert.Equal(BaselineSourceType.Http, provider.Current.BaselineSource.Type);
+    }
+
+    [Fact]
+    public void LoadFrom_WithBaselineTypeNoneAndLocalPath_StillPrefersTheLocalPath()
+    {
+        var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
+        provider.LoadFrom(Json(new { baselineType = "None", baselineLocalPath = "/baselines/eaw.aet" }));
+        Assert.Equal(BaselineSourceType.Local, provider.Current.BaselineSource.Type);
+        Assert.Equal("/baselines/eaw.aet", provider.Current.BaselineSource.LocalPath);
     }
 
     [Fact]
@@ -114,10 +127,10 @@ public sealed class LspConfigurationProviderTest : IDisposable
     {
         // Simulate OmniSharp delivering initializationOptions as a Newtonsoft JToken.
         // JToken.ToString() returns the raw JSON string, so our fallback path handles it.
-        var fakeToken = new FakeJsonToken("""{"baselineType":"None","schemaLocalPath":"/schema"}""");
+        var fakeToken = new FakeJsonToken("""{"baselineLocalPath":"/baselines/eaw.aet","schemaLocalPath":"/schema"}""");
         var provider = new LspConfigurationProvider(new FileSystem(), NullLogger<LspConfigurationProvider>.Instance);
         provider.LoadFrom(fakeToken);
-        Assert.Equal(BaselineSourceType.None, provider.Current.BaselineSource.Type);
+        Assert.Equal(BaselineSourceType.Local, provider.Current.BaselineSource.Type);
         Assert.Equal(SchemaSourceType.Local, provider.Current.SchemaSource.Type);
     }
 

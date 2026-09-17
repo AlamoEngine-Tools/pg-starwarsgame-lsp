@@ -51,14 +51,16 @@ public sealed class BaselineLoaderTest
         return ms.ToArray();
     }
 
-    // ── None ────────────────────────────────────────────────────────────────
+    // ── unrecognised source ──────────────────────────────────────────────────
 
     [Fact]
-    public async Task LoadAsync_None_ReturnsEmpty()
+    public async Task LoadAsync_SourceTypeOutOfRange_ReturnsEmptyWithoutFetching()
     {
+        // There is no "none" source any more - Http and Local are the only ways to get a baseline.
+        // Only a cast can produce anything else, and it must not reach the network.
         var loader = Build(new MockFileSystem(), new FakeHttpHandler(_ =>
             throw new InvalidOperationException("should not be called")));
-        var config = new BaselineSourceConfig { Type = BaselineSourceType.None };
+        var config = new BaselineSourceConfig { Type = (BaselineSourceType)99 };
 
         var result = await loader.LoadAsync(config, CancellationToken.None);
 

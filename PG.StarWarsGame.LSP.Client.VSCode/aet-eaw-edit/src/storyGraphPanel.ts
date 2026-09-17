@@ -527,6 +527,7 @@ function filterFields(filters: GraphFilters | undefined): Record<string, string 
         branch: filters?.branch || undefined,
         lifecycle: filters?.lifecycle || undefined,
         reachableFrom: filters?.reachableFrom || undefined,
+        reachableDirection: filters?.reachableDirection || undefined,
         plotState: filters?.plotState || undefined,
     };
 }

@@ -169,7 +169,7 @@ public sealed class GetStoryGraphHandler(IStoryModelService modelService, ILspCo
 
         return Task.FromResult(StoryGraphProjection.Project(
             model, request.NameFilter, request.Branch, request.Lifecycle, request.ReachableFrom,
-            request.PlotState));
+            request.PlotState, request.ReachableDirection));
     }
 }
 

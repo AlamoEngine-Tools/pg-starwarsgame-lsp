@@ -65,7 +65,15 @@ public sealed class ProjectConfigurationResolver : IProjectConfigurationResolver
             return null;
         }
 
+        // Not a mod project, so there is nothing for the server to be right about: no directories to
+        // index, no baseline to compare against, and every answer it could give would be an empty
+        // one. That used to be a log line nobody reads, which left the editor looking like it worked
+        // and simply knew nothing.
         _logger.LogWarning("No .pgproj found under [{Roots}]; nothing to index.", string.Join(", ", roots));
+        _notifier.ShowError(
+            $"No .pgproj file was found under [{string.Join(", ", roots)}]. This folder is not a mod "
+            + "project, so nothing has been indexed and no XML or Lua support is available here. Open "
+            + "the folder that contains your .pgproj, or create one.");
         return null;
     }
 }

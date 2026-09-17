@@ -8,11 +8,11 @@ using OmniSharp.Extensions.LanguageServer.Protocol.Models;
 namespace PG.StarWarsGame.LSP.E2E.Tests;
 
 [Trait("Category", "E2E")]
-public sealed class AbilityTypeSmokeTest : IClassFixture<EawLspServerFixture>
+public sealed class AbilityTypeSmokeTest : IClassFixture<E2eModServerFixture>
 {
-    private readonly EawLspServerFixture _fixture;
+    private readonly E2eModServerFixture _fixture;
 
-    public AbilityTypeSmokeTest(EawLspServerFixture fixture)
+    public AbilityTypeSmokeTest(E2eModServerFixture fixture)
     {
         _fixture = fixture;
     }
@@ -20,9 +20,9 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<EawLspServerFixture>
     [Fact]
     public async Task UnitAbility_InvalidType_EmitsDiagnosticForUnknownAbilityType()
     {
-        RequireEawWorkspace();
+        RequireE2eWorkspace();
 
-        var filePath = Path.Combine(LspTestEnvironment.EawWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
+        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
@@ -47,10 +47,10 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<EawLspServerFixture>
     [Fact]
     public async Task UnitAbility_TypeTag_HoverDoesNotShowGameObjectType()
     {
-        RequireEawWorkspace();
+        RequireE2eWorkspace();
         await WaitForScanAsync();
 
-        var filePath = Path.Combine(LspTestEnvironment.EawWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
+        var filePath = Path.Combine(LspTestEnvironment.E2eWorkspacePath!, "Data", "XML", "Spaceunitsfighters.xml");
         var uri = DocumentUri.FromFileSystemPath(filePath);
         var lines = await File.ReadAllLinesAsync(filePath);
 
@@ -87,10 +87,10 @@ public sealed class AbilityTypeSmokeTest : IClassFixture<EawLspServerFixture>
 
     // ── helpers ──────────────────────────────────────────────────────────────
 
-    private static void RequireEawWorkspace()
+    private static void RequireE2eWorkspace()
     {
-        if (LspTestEnvironment.EawWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
-            throw new Exception("$XunitDynamicSkip$eaw/ workspace not found; cannot run ability type smoke tests.");
+        if (LspTestEnvironment.E2eWorkspacePath is null || LspTestEnvironment.SchemaLocalPath is null)
+            throw new Exception("$XunitDynamicSkip$e2e-workspace/ not found; cannot run ability type smoke tests.");
     }
 
     private async Task WaitForScanAsync()

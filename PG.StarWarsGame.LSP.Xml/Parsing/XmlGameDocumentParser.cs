@@ -278,6 +278,17 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                     continue;
                 }
 
+                // (Faction, AIPlayerType) pairs. Both slots are objects, but of DIFFERENT types, so
+                // the generic multi-value path cannot serve them: it would stamp the tag's one
+                // referenceType on the faction token too and report a type mismatch on every
+                // occurrence in both games.
+                if (tagDef.SemanticType == TagSemanticType.FactionAiPlayerPairList)
+                {
+                    if (HasChildElement(child)) continue;
+                    CollectFactionAiPlayerPairReferences(child, tagDef, lineIndex, documentUri, references);
+                    continue;
+                }
+
                 // (key, SFXEvent) tuples: slot 0 is an enum / hardcoded ability code / unit type and
                 // slot 1 is the SFXEvent name. These tags carry no referenceKind - the pair is
                 // validated by the *SfxMap handlers - so without this the SFXEvent half is invisible
@@ -597,6 +608,37 @@ public sealed class XmlGameDocumentParser : IGameDocumentParser
                 token,
                 GameSymbolKind.XmlObject,
                 tagDef.ObjectType?.TypeName,
+                documentUri,
+                line,
+                column,
+                length));
+        }
+    }
+
+    // Slot 0 as a Faction, slot 1 as the tag's own referenceType (AIPlayerType). The faction half is
+    // indexed and resolves; the AI player half lives in the AI tree, which EaWXmlContext excludes
+    // until a parser for its format exists - so slot 1 is what the not-indexed rule answers for,
+    // instead of the reference pipeline claiming no such object exists.
+    private static void CollectFactionAiPlayerPairReferences(HtmlNode child, XmlTagDefinition tagDef,
+        LineOffsetIndex lineIndex, string documentUri, List<GameReference> references)
+    {
+        var innerText = child.InnerText;
+        var slot = 0;
+        foreach (var (token, offset) in XmlUtility.SplitListWithOffsets(innerText))
+        {
+            // A third token is not a shape this tag has in either corpus; if a mod writes one, the
+            // PerFactionObjectList grammar reports it rather than this collector guessing at it.
+            if (slot > 1) break;
+
+            var expectedType = slot == 0 ? "Faction" : tagDef.ObjectType?.TypeName;
+            slot++;
+
+            var (line, column, length) =
+                XmlUtility.GetInnerOffsetValuePosition(child, offset, token.Length, lineIndex);
+            references.Add(new GameReference(
+                token,
+                GameSymbolKind.XmlObject,
+                expectedType,
                 documentUri,
                 line,
                 column,

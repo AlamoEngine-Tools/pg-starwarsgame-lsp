@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
-import { dockChromeCss, rotarySwitchCss } from './dockChrome';
+import { dockChromeCss, rotarySwitchCss, stageChromeCss, stageFlyoutCss } from './dockChrome';
 import { scaleCss } from './tokens';
 
 /** Every class this stylesheet defines a rule for. */
@@ -127,6 +127,32 @@ describe('dockChromeCss', () => {
     /** An action in a settings pane needs a surface. A borderless glyph reads as an ornament. */
     it('lays a button out as a row, so it can carry a glyph beside its label', () => {
         assert.match(dockChromeCss, /\.btn\s*\{[^}]*display:\s*inline-flex/);
+    });
+});
+
+describe('stageFlyoutCss', () => {
+    /**
+     * Shared since the story graph's colour key (#128) took the preview's flyout. A flyout opened
+     * from a button on the bottom edge must grow upwards from there - one that appears at the top
+     * reads as a different panel.
+     */
+    it('opens a bottom-edge flyout upwards', () => {
+        assert.match(stageFlyoutCss, /\.stage-flyout\.from-bottom\s*\{[^}]*top:\s*auto[^}]*bottom:/);
+    });
+
+    it('scrolls the body, never the box, so the head stays put', () => {
+        assert.match(stageFlyoutCss, /\.stage-flyout\s*\{[^}]*max-height:/);
+        assert.match(stageFlyoutCss, /\.stage-flyout-body\s*\{[^}]*overflow-y:\s*auto/);
+    });
+
+    it('sits above the corner plate that opens it', () => {
+        const layer = (css: string, selector: string): number => {
+            const rule = new RegExp(`\\.${selector}\\s*\\{[^}]*z-index:\\s*(\\d+)`).exec(css);
+            assert.ok(rule !== null, `no z-index for .${selector}`);
+            return Number(rule[1]);
+        };
+
+        assert.ok(layer(stageFlyoutCss, 'stage-flyout') > layer(stageChromeCss, 'stage-chrome'));
     });
 });
 

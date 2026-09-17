@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- E2E fixture for AbilityTypeSmokeTest.
+
+     E2E_ABILITY_FIGHTER carries a DELIBERATELY INVALID ability type: HUN is not a member of the
+     AbilityType hardcoded set (the real member is HUNT). Do not "fix" it - two tests depend on it:
+
+       UnitAbility_InvalidType_EmitsDiagnosticForUnknownAbilityType  wants the diagnostic.
+       UnitAbility_TypeTag_HoverDoesNotShowGameObjectType            hovers it and asserts the hover
+                                                                     is the ability type's, not a
+                                                                     GameObjectType's.
+
+     E2E_ABILITY_FIGHTER_VALID is the control: same shape, a real member, so a regression that
+     silenced the diagnostic entirely cannot pass by making both quiet. -->
+<GameObjectFiles>
+
+    <SpaceUnit Name="E2E_ABILITY_FIGHTER">
+        <Text_ID>TEXT_E2E_ABILITY_FIGHTER</Text_ID>
+        <Unit_Abilities_Data SubObjectList="Yes">
+            <Unit_Ability>
+                <Type>HUN</Type>
+                <Recharge_Seconds>60.0</Recharge_Seconds>
+            </Unit_Ability>
+        </Unit_Abilities_Data>
+    </SpaceUnit>
+
+    <SpaceUnit Name="E2E_ABILITY_FIGHTER_VALID">
+        <Text_ID>TEXT_E2E_ABILITY_FIGHTER_VALID</Text_ID>
+        <Unit_Abilities_Data SubObjectList="Yes">
+            <Unit_Ability>
+                <Type>HUNT</Type>
+                <Recharge_Seconds>60.0</Recharge_Seconds>
+            </Unit_Ability>
+        </Unit_Abilities_Data>
+    </SpaceUnit>
+
+</GameObjectFiles>

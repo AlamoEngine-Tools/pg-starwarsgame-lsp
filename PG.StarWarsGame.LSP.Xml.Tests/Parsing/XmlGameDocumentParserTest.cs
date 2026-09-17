@@ -207,6 +207,58 @@ public sealed class XmlGameDocumentParserTest
     }
 
     [Fact]
+    public async Task AiPlayerControl_Pair_EmitsFactionThenAiPlayerTypeReferences()
+    {
+        // <AI_Player_Control> is "Faction, AIPlayerType" - measured on every one of the 484
+        // occurrences in eaw and foc, none of them anything else. Today the tag is a
+        // NameReferenceList, so BOTH tokens resolve as bare names: the faction happens to resolve
+        // and the AI player never can, which is #141. Slot semantics is what separates them.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "AI_Player_Control",
+            ValueType = XmlValueType.PerFactionObjectList,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
+            SemanticType = TagSemanticType.FactionAiPlayerPairList
+        });
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n</Campaign>",
+            1, default);
+
+        Assert.Equal(["Empire"],
+            index.References.Where(r => r.ExpectedTypeName == "Faction").Select(r => r.TargetId));
+        Assert.Equal(["BasicEmpire"],
+            index.References.Where(r => r.ExpectedTypeName == "AIPlayerType").Select(r => r.TargetId));
+    }
+
+    [Fact]
+    public async Task AiPlayerControl_Repeated_EmitsBothSlotsOfEveryOccurrence()
+    {
+        // The tag repeats, one per faction, rather than carrying several pairs in one value.
+        var schema = new FakeSchemaProvider();
+        schema.AddTag(new XmlTagDefinition
+        {
+            Tag = "AI_Player_Control",
+            ValueType = XmlValueType.PerFactionObjectList,
+            ReferenceKind = ReferenceKind.XmlObject,
+            ObjectType = new GameObjectTypeDefinition { TypeName = "AIPlayerType" },
+            SemanticType = TagSemanticType.FactionAiPlayerPairList
+        });
+
+        var index = await Build(schema).ParseAsync("file:///c.xml",
+            "<Campaign>\n<AI_Player_Control> Empire, BasicEmpire </AI_Player_Control>\n"
+            + "<AI_Player_Control> Rebel, BasicRebel </AI_Player_Control>\n</Campaign>",
+            1, default);
+
+        Assert.Equal(["Empire", "Rebel"],
+            index.References.Where(r => r.ExpectedTypeName == "Faction").Select(r => r.TargetId));
+        Assert.Equal(["BasicEmpire", "BasicRebel"],
+            index.References.Where(r => r.ExpectedTypeName == "AIPlayerType").Select(r => r.TargetId));
+    }
+
+    [Fact]
     public async Task WorkspaceFileTag_SingleValued_EmitsNoFactionReference()
     {
         // Rebel_Story_Name names its faction in the TAG, not in the value - the value is only ever

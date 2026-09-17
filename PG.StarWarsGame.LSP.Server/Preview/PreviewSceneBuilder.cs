@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Runtime.CompilerServices;
 using PG.StarWarsGame.LSP.Assets.Icons;
 using PG.StarWarsGame.LSP.Assets.Models;
+using PG.StarWarsGame.LSP.Core.Assets;
 using PG.StarWarsGame.LSP.Core.Diagnostics;
 using PG.StarWarsGame.LSP.Core.Localisation;
 using PG.StarWarsGame.LSP.Core.Schema;
@@ -988,50 +989,18 @@ public sealed class PreviewSceneBuilder(
     ///     and 50 of the shipped animations sit beside a model they do not fit. Listing one that
     ///     turns out not to match costs an entry in a picker; listing none at all - which is what
     ///     happened while nothing could enumerate them - reads as a model with no animations.
+    ///     <para>
+    ///         The matching lives in <see cref="ModelAnimationClips" />, shared with the death animation
+    ///         diagnostic. The longest model name prefixing a clip owns it there: without that a hull
+    ///         collected its own death clone's clips - <c>rv_gargantuan_</c> prefixes
+    ///         <c>rv_gargantuan_dc_die_00</c> - and since a clip binds by INDEX and carries VISIBILITY tracks,
+    ///         the clone's clip switched off whichever hull bones sat at the indices its own skeleton hides.
+    ///         Two of the Gargantuan's turrets were mounted on those bones and went with them.
+    ///     </para>
     /// </remarks>
     private IReadOnlyList<string> AnimationsFor(string modelReference)
     {
-        var stem = Path.GetFileNameWithoutExtension(
-            PreviewModelReference.Normalise(modelReference));
-
-        if (stem.Length == 0)
-            return [];
-
-        var index = indexService.Current;
-
-        // Every OTHER model whose name also starts this one's - the variants that would otherwise
-        // have their clips taken. `Rv_gargantuan_dc` beside `Rv_gargantuan` is the shipped case.
-        var longer = index.ModelBones.Keys
-            .Select(Path.GetFileNameWithoutExtension)
-            .Where(other => other is not null
-                            && other.Length > stem.Length
-                            && other.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase))
-            .Select(other => other! + "_")
-            .ToList();
-
-        return
-        [
-            .. index.AssetFiles
-                .GetByExtension(".ala")
-                .Select(Path.GetFileName)
-                .Where(name => name is not null
-                               && name.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase)
-                               // The LONGEST model name that prefixes a clip owns it, which is the rule
-                               // `BuildForAnimation` already uses coming the other way. Without it a hull
-                               // collects its own death clone's clips - `rv_gargantuan_` prefixes
-                               // `rv_gargantuan_dc_die_00` - and since a clip binds by INDEX and carries
-                               // VISIBILITY tracks, the clone's clip switched off whichever hull bones sat at
-                               // the indices its own skeleton hides. Two of the Gargantuan's turrets were
-                               // mounted on those bones and went with them.
-                               //
-                               // Harmless only while the strict name check dropped such a clip downstream.
-                               // Relaxing that check to bind by index is what made this reachable.
-                               && !longer.Any(other =>
-                                   name.StartsWith(other, StringComparison.OrdinalIgnoreCase)))
-                .Select(name => name!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Order(StringComparer.OrdinalIgnoreCase)
-        ];
+        return ModelAnimationClips.For(indexService.Current, PreviewModelReference.Normalise(modelReference));
     }
 
     /// <summary>

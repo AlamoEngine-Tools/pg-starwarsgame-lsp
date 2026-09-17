@@ -30,6 +30,16 @@ export function useDebounced<T>(value: T, delayMs: number): T {
 export const FILTER_DEBOUNCE_MS = 120;
 
 /**
+ * How long the story graph's filter box waits.
+ *
+ * Longer than the grid's, because this filter is not local: each applied pattern costs a server
+ * request AND a full rebuild of the graph. Measured on the shipped Underworld campaign (2196 nodes)
+ * the request alone is 135ms, and the rebuild 326ms on a 679-node graph - so at 120ms a fast typist
+ * still queued one of those per letter, which is issue #131's "extremely delayed".
+ */
+export const GRAPH_FILTER_DEBOUNCE_MS = 300;
+
+/**
  * How long staged edits settle before the file is re-checked.
  *
  * Longer than the filter, because each run costs a round trip and a full re-validation of the
