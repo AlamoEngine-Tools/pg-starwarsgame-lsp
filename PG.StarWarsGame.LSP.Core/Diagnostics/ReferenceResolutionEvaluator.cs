@@ -35,7 +35,7 @@ public static class ReferenceResolutionEvaluator
             // reference until the index loads. Same guard PerFactionObjectListHandler applies to the
             // baseline before it trusts a faction lookup.
             if (expectedTypeName is not null && indexedTypeNames is { Count: > 0 }
-                && !indexedTypeNames.Contains(expectedTypeName))
+                                             && !indexedTypeNames.Contains(expectedTypeName))
                 return (XmlDiagnosticSeverity.Information,
                     $"Cannot verify reference '{displayId}': No {expectedTypeName} is indexed yet, "
                     + "so this reference cannot be checked.",

@@ -5,6 +5,7 @@
     <Project Path="PG.StarWarsGame.LSP.Assets/PG.StarWarsGame.LSP.Assets.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Core/PG.StarWarsGame.LSP.Core.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Lua/PG.StarWarsGame.LSP.Lua.csproj"/>
+    <Project Path="PG.StarWarsGame.LSP.Lua.Debug/PG.StarWarsGame.LSP.Lua.Debug.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Server/PG.StarWarsGame.LSP.Server.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Xml/PG.StarWarsGame.LSP.Xml.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Schema/PG.StarWarsGame.LSP.Schema.csproj"/>
@@ -13,6 +14,7 @@
     <Project Path="PG.StarWarsGame.LSP.Assets.Tests/PG.StarWarsGame.LSP.Assets.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Core.Tests/PG.StarWarsGame.LSP.Core.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Lua.Tests/PG.StarWarsGame.LSP.Lua.Tests.csproj"/>
+    <Project Path="PG.StarWarsGame.LSP.Lua.Debug.Tests/PG.StarWarsGame.LSP.Lua.Debug.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Schema.Tests/PG.StarWarsGame.LSP.Schema.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Server.Tests/PG.StarWarsGame.LSP.Server.Tests.csproj"/>
     <Project Path="PG.StarWarsGame.LSP.Story.Tests/PG.StarWarsGame.LSP.Story.Tests.csproj"/>

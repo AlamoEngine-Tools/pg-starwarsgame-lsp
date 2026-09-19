@@ -81,6 +81,13 @@ public sealed class ModProjectLoader
             throw new ModProjectLoadException(
                 $"Could not load mod project '{fileName}': The file is empty or is not a JSON object.");
 
+        // JSON permits a repeated property and the parser accepts one; JsonObject only objects on
+        // the first access, as a dictionary-key ArgumentException. A hand-edited file (the envelope
+        // pasted in twice) deserves the file and property named instead.
+        if (FindDuplicateProperty(text) is { } duplicate)
+            throw new ModProjectLoadException(
+                $"Could not load mod project '{fileName}': The property '{duplicate}' appears more than once. Keep one of them.");
+
         // Before anything is read out of it: a project from a newer extension is refused rather
         // than read as best we can, because this build would go on to write its own shape back
         // over it. Absent means version one - every .pgproj written so far predates the fields.
@@ -297,6 +304,36 @@ public sealed class ModProjectLoader
     private static string NormalizePath(string path)
     {
         return path.Replace('\\', '/');
+    }
+
+    /// <summary>The name of the first property that repeats within one object, anywhere in the document.</summary>
+    private static string? FindDuplicateProperty(string text)
+    {
+        using var parsed = JsonDocument.Parse(text, DocumentOptions);
+        return FindDuplicateProperty(parsed.RootElement);
+    }
+
+    private static string? FindDuplicateProperty(JsonElement element)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Object:
+                var seen = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in element.EnumerateObject())
+                {
+                    if (!seen.Add(property.Name)) return property.Name;
+                    if (FindDuplicateProperty(property.Value) is { } nested) return nested;
+                }
+
+                return null;
+            case JsonValueKind.Array:
+                foreach (var item in element.EnumerateArray())
+                    if (FindDuplicateProperty(item) is { } nested)
+                        return nested;
+                return null;
+            default:
+                return null;
+        }
     }
 
     /// <summary>

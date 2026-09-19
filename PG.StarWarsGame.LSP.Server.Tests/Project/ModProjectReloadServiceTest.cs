@@ -162,7 +162,8 @@ public sealed class ModProjectReloadServiceTest
         var localisation = new RecordingLocalisationLoader();
         var indexer = new RecordingIndexer();
         var service = new ModProjectReloadService(
-            new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), LoadedIndex(), new RecordingUserNotifier(), new ListLogger());
+            new FakeResolver(SampleConfig), indexer, localisation, new RecordingLayerMap(), LoadedIndex(),
+            new RecordingUserNotifier(), new ListLogger());
         await service.LoadAsync(["/ws"], CancellationToken.None);
         var indexCallsAfterLoad = indexer.IndexCallCount;
         var localisationCallsAfterLoad = localisation.LoadCallCount;
@@ -219,7 +220,8 @@ public sealed class ModProjectReloadServiceTest
         };
         var config = SampleConfig with { Layers = layers };
         var service = new ModProjectReloadService(
-            new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, LoadedIndex(), new RecordingUserNotifier(), new ListLogger());
+            new FakeResolver(config), indexer, new NullLocalisationLoader(), layerMap, LoadedIndex(),
+            new RecordingUserNotifier(), new ListLogger());
 
         await service.LoadAsync(["/ws"], CancellationToken.None);
 
@@ -242,6 +244,8 @@ public sealed class ModProjectReloadServiceTest
     private sealed class RecordingLayerMap : IProjectLayerMap
     {
         public IReadOnlyList<ProjectLayer>? LastLayers { get; private set; }
+
+        public IReadOnlyList<ProjectLayer> Layers => LastLayers ?? [];
 
         public void SetLayers(IReadOnlyList<ProjectLayer> layers)
         {

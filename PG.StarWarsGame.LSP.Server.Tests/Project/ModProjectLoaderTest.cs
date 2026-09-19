@@ -50,6 +50,23 @@ public sealed class ModProjectLoaderTest
         Assert.Contains("mymod.pgproj", error.Message, StringComparison.Ordinal);
     }
 
+    // JSON allows a repeated property and System.Text.Json only objects on first access, as an
+    // ArgumentException about a dictionary key - which is what a hand-edited project file used to
+    // surface as. The file is the user's; the message has to name the file and the property.
+    [Fact]
+    public void Load_DuplicateProperty_RefusesNamingTheProperty()
+    {
+        var loader = Build(
+            $$"""{ "_type": "{{PgprojFormat.TypeName}}", "name": "Mod", "_type": "{{PgprojFormat.TypeName}}" }""",
+            out _);
+
+        var error = Assert.Throws<ModProjectLoadException>(() => loader.Load(ProjectPath));
+
+        Assert.Contains("mymod.pgproj", error.Message, StringComparison.Ordinal);
+        Assert.Contains("'_type'", error.Message, StringComparison.Ordinal);
+        Assert.Contains("more than once", error.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void Load_UnreadableTypeVersion_Refuses()
     {

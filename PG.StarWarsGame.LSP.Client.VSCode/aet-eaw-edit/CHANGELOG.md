@@ -4,216 +4,280 @@
 
 ### Features
 
-- Dependencies updated. React 19, and current releases of the language client, the VS Code API typings, ESLint and the build tooling on the extension side; current patch releases across the server's packages. Three are deliberately held back: `elkjs`, because the graph's auto-arrange plugin supports only 0.8.x and a newer one is an unsupported combination; `typescript`, because the ESLint TypeScript plugin does not yet accept 7.x; and `@vscode/codicons`, whose newest published version is a prerelease.
+- **Lua debugger** - off by default, flag `aet-eaw-edit.features.lua.debugger`. See [#142](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/142).
+  - New debug type **Empire at War Lua** for the game's debug build
+  - Breakpoints in project scripts; attach to a running game, or launch it with the mod chain
+  - Call stack, locals, watches, hovers, and a Lua Debug Console
+  - **Lua Scripts** view in Run and Debug: every running script instance with its coroutine threads; break in a script or a thread
+  - Adapter: the language server binary in a second mode, nothing extra to install
+  - Settings under `aet-eaw-edit.game.*`: executable, arguments, host, port, table expansion
+  - Limits inherited from the game, reported as such:
+    - Breakpoint conditions never evaluated
+    - Whole game frozen while a script is stopped
+    - Pause at the next Lua line
+    - Locals from the source parse
+    - Table expansion only with the unsafe switch
+  - Launch refuses a layer not laid out under `Data/` or with a space in its path; a build step for such projects is planned ([#144](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/144))
 
-- Diagnostics can be suppressed, at the scope you choose, in every language the extension checks. Not every reported problem is one you want fixed - a deliberate duplicate, an asset generated at build time, a reference the extension cannot see - and until now the only options were to live with the warning or turn a whole feature off. Every diagnostic can now be silenced individually by writing a comment next to it, with four scopes to pick from: the next item, the enclosing declaration, the whole file, or the entire project. The same directive works in XML (`<!-- aetswg:suppress aetswg-004-0001 -->`), in Lua (`-- aetswg:suppress ...`) and in dialog scripts (`# aetswg:suppress ...`); the enclosing declaration means the object, the function or the `[CHAPTER n]` section respectively. One comment can name several diagnostics at once, separated by commas, and can carry a note for whoever reads it next after `reason::`. A quick fix on the diagnostic writes it for you, offering the narrowest scope first; the first three insert a comment you can see and undo like any other edit, and the project-wide one is recorded in `.aetswg/suppressions.json`, which is meant to be committed so your team shares the decision. In dialog scripts the quick fixes are opt-in via `aet-eaw-edit.features.dialog.codeActions`, in line with the rest of the dialog language service; the directives themselves are always honoured. The whole syntax is documented under "Suppressing diagnostics" in the README. See [#66](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/66), [#67](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/67) and [#69](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/69).
+- **Model preview** - flag `aet-eaw-edit.features.tools.modelPreview`, on by default. See [#137](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/137).
+  - **Alamo Model Preview** editor for `.alo` and `.ala` files
+  - **Preview Assembled Unit** (command and code lens): a GameObject as the game builds it - hardpoints on their attachment bones, movable turrets, firing arcs, team colour
+  - *Model* lens: model tree, LOD and ALT levels, skeleton, cameras, inspector, scene and light settings
+  - *Animation* lens: clip library by family, action and take; the game's loop rule; transport; playback speed
+  - *Gameplay* lens: attacker weapons and abilities, shields, hardpoint destroy and repair with damage smoke and death clone, damage log naming the armour type per hit
+  - Particle systems: effects, groups, emitters
+  - Saved shots
+  - Handoff to AloViewer and the Particle Editor via `aet-eaw-edit.tools.*`
+  - **Set Up Base Shader Sources**: Petroglyph's published shader sources into `aet-eaw-edit.shaders.directory`; never redistributed
+  - Game models need `aet-eaw-edit.lsp.source.baseGameDirectory` and `expansionDirectory`
+  - Energy pool behind `aet-eaw-edit.features.preview.energyPool`, off on purpose
+  - Not covered: sounds, animation SFX maps
 
-- A suppression comment that would not work now says so. Identifiers are numeric by design, which makes them easy to mistype - and a directive naming something the extension cannot read silences nothing, so the diagnostic simply stayed where it was with no hint that the comment beside it was the problem. A misspelled entry is now reported on the comment itself (`aetswg-013-0001`), naming the entry it could not read, as is a directive that names no diagnostic at all (`aetswg-013-0002`). The most common slip is dropping the padding zeros - `aetswg-4-1` for `aetswg-004-0001` - which now gets an explanation instead of silence. Only the bad entry is rejected: in a comma-separated list the identifiers you got right still take effect. These warnings can themselves be silenced with `aetswg-013-*`.
+- **Encyclopedia popup preview** - flag `aet-eaw-edit.features.tools.encyclopedia`, on by default. Read-only.
+  - **Preview Encyclopedia Popup** (command and code lens): the in-game tooltip card
+  - Icon, name, class line, `Encyclopedia_Text` wrapped as the game wraps it, ship names, faction switch
+  - Game language from `aet-eaw-edit.lsp.localisation.language`
 
-- Every diagnostic now carries a stable identifier, shown next to the message - `aetswg-004-0001` and the like, where the middle number is the family it belongs to (references, enum values, asset files, story, syntax and so on). Families describe the kind of problem, not the language it was found in, so silencing `aetswg-001-*` stops unresolved-reference reports in XML and Lua alike. The identifier is what a suppression names, so it is deliberately narrow: where one check previously reported several different problems under one banner, each now has its own identifier and can be silenced without silencing the others. Lua parse errors keep the number Loretta gives them, so `LUA1003` is reported as `aetswg-012-1003` and can still be looked up. A whole family can be turned off at once with `aetswg-004-*` when that is genuinely what you want - for example to stop checking whether asset files exist in a workspace where they are produced by a build step. See [#68](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/68).
+- **Mega-texture icons**
+  - Game icons baked into the baseline
+  - A project's own `mt_commandbar` replaces them wholesale, as in the engine
+  - `.pgproj` `icons` node: `megaTexture` (atlas pair, no extension), `sourceRoots` (loose files)
+  - Diagnostics: icon missing everywhere = error; in sources but not in the mega texture = warning to rebuild
 
-- **Breaking:** the older `<!-- lsp:suppress duplicate-symbol -->` comment is no longer honoured. It predates diagnostic identifiers and had no way to name anything but that one check. Replace each occurrence with `<!-- aetswg:suppress aetswg-010-0001 -->`; a plain find-and-replace does it, and the new form is if anything more accurate, since it covers exactly the element that follows rather than a fixed five lines. Files still carrying the old comment will report duplicate symbols again until it is updated.
+- **About 45 new XML checks from the engine's own rules.** Schema audited tag by tag against the game's parser over 24 sweeps; value handlers 105 to 150, cross-tag rules 2 to 14.
+  - Unknown or misspelled tags, with a suggestion
+  - Unnamed objects
+  - Missing required tags
+  - Numeric ranges: angles, percentages, counts, durations
+  - Tags required or forbidden together
+  - Tag comparisons: damage vs chase radius, respawn min vs max
+  - `Land_Damage_*` trio lengths ([#102](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/102))
+  - Capture clone without eject ([#103](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/103))
+  - Death animations on the model ([#104](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/104))
+  - Absorb settings that heal nothing ([#106](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/106))
+  - Standalone space-map special weapons ([#98](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/98), [#99](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/99))
+  - Attack distance beyond hardpoint range ([#101](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/101))
+  - Variant chains too deep, cyclic, or with a missing base
+  - Case-sensitive tags; engine text limits
+  - Missing or misnamed tactical maps are errors ([#132](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/132))
+  - `Excluded_Unit_Categories` accepts a list ([#123](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/123))
+  - Model names with spaces resolve ([#124](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/124))
+  - `Debug_Hot_Key_Load_Map_Script` is a plot-file reference ([#109](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/109))
+  - No `Tactical_Health` rule: the shipped game matches it on no unit and the engine never compares the totals ([#100](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/100)). Instead, three hardpoint faults that make a unit unkillable:
+    - No attachment bone
+    - Missing or duplicated collision mesh
+    - Collision mesh on no model
+  - A reference that cannot be checked (no baseline, no game directory) is reported as such under its own id, not as broken
 
-- The `<!-- <Override Name="..."/> -->` marker is unchanged, and is **not** a suppression. It declares that shadowing a definition from a lower layer is deliberate - an assertion about your mod, in the spirit of Java's `@Override` - rather than a request to hide a message. The two are now kept clearly apart, and the shadow warnings say "declare it" instead of "suppress it" to match.
+- **Story graph fixes**
+  - Colour key flyout for node, border and edge styles, including per-branch hues ([#128](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/128))
+  - Reachability filter isolates an event's chain, incoming or outgoing ([#126](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/126))
+  - Lightweight overview and windowed nodes keep campaigns of 1000+ events responsive ([#131](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/131))
+  - Branch filter facets ([#130](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/130))
+  - Problems bar follows the branch filter; jumping to a hidden problem lifts it ([#129](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/129))
+  - Nodes and boxes aligned ([#127](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/127))
+  - Optional story params no longer demanded ([#125](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/125))
+  - `STORY_ELAPSED` accepts `Event_Param2` ([#134](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/134))
 
-- Suppressing a diagnostic project-wide now takes effect immediately in every language, and an unusable `suppressions.json` says so. **Suppress ... across the project** wrote the entry but only refreshed XML, so using it from a Lua or dialog file left the diagnostic on screen until that file was next edited - it looked as though the suppression had not worked. All three languages are now refreshed together. In the same spirit, an entry in `.aetswg/suppressions.json` that is not a diagnostic id, or a file too damaged to read at all, is reported in the editor instead of only in the server log; that file is hand-editable and committed, so a typo in it was previously invisible.
+- **Breaking: settings moved.** Read by the preview, the encyclopedia card and the asset checks, not ModVerify alone.
+  - `aet-eaw-edit.modVerify.baseGameDirectory` -> `aet-eaw-edit.lsp.source.baseGameDirectory`
+  - `aet-eaw-edit.modVerify.expansionDirectory` -> `aet-eaw-edit.lsp.source.expansionDirectory`
 
-- **Initialising and importing a localisation project now tell you what happened.** Both commands could stop for a dozen different reasons - the file already exists, the folder holds nothing in the format you picked, the project has no `.pgproj` to record the result in - and every one of them was written only to the server log while the editor still said "Localisation project initialised." The result looked identical whether it had worked or done nothing at all, which is why both were reported as doing nothing. Each reason is now shown, naming the file or folder involved, and success says what it wrote and where. An import that had to skip files it could not read says how many, instead of quietly producing a file with less in it than you expected.
+- **Localisation commands**
+  - **Set Localisation Project Format** writes `localisation.type` ([#121](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/121))
+  - **Open Localisation File as Text**
+  - **Refresh Localisation Files**
+  - **Convert Localisation File to Another Format**
+  - **Export Localisation to DAT**
 
-- **Saving a localisation file no longer makes every open tab reload itself twice.** A save already
-  reloads the server's localisation index, and the file watcher then reported that same write - so
-  one save announced the index had moved twice over, and each announcement made every open
-  localisation tab re-read its file, hand the grid all 19,000 rows again, and re-fetch the game
-  baseline. That reset the tab's selection, sort and inherited toggle as a side effect, and on a
-  large file it was long enough to be felt. The server now recognises its own write by content, so
-  an edit made elsewhere in that moment is still picked up; and a tab that re-reads a file which has
-  not changed leaves what is on screen alone.
+- **Dependencies updated.** React 19; current language client, VS Code typings, ESLint and build tooling; current server patch releases. Held back:
+  - `elkjs` - the auto-arrange plugin supports 0.8.x only
+  - `typescript` - the ESLint plugin does not accept 7.x
+  - `@vscode/codicons` - the latest version is a prerelease
 
-- **A localisation file can be rewritten in another format.** A project that started as CSV can move to XML, or one imported from the game's DAT files can become something reviewable in a diff, without going back through the import wizard - which only ever adopted files it did not already know about. The action is a tile on the localisation editor's dock, on the file's right-click menu in the Files tree, and in the command palette as **EaWEdit: Convert Localisation File to Another Format**. The original file is kept exactly as it was, so a conversion is something you can look at before committing to; the project's declared format is repointed at the new file, and if that leaves other files behind in the old format you are told how many, because those are no longer loaded. DAT is not offered as a target - it is the format the game loads rather than one to work in, and **Export Localisation to DAT** already produces it.
+- **Diagnostic suppression in every language.** See [#66](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/66), [#67](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/67), [#69](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/69).
+  - Directives: `<!-- aetswg:suppress ... -->` (XML), `-- aetswg:suppress ...` (Lua), `# aetswg:suppress ...` (dialog)
+  - Scopes: next item; enclosing declaration (`-object`); file (`-file`); project (`.aetswg/suppressions.json`, meant to be committed)
+  - Comma lists, `reason::` notes, group wildcards (`aetswg-004-*`)
+  - Quick fixes write the directive, narrowest scope first; dialog quick fixes behind `aet-eaw-edit.features.dialog.codeActions`
+  - Project-wide suppression refreshes XML, Lua and dialog at once
+  - Unreadable directives reported on the comment: `aetswg-013-0001` (bad entry), `aetswg-013-0002` (no id); good entries in the same list still apply
 
-- **A blank line in a credits file is recognised however it was written.** A spacer is normally marked in one language and left empty in the others, but the editor only treated a row as a blank line when every language carried the `[TBL]` marker - so a spacer you inserted rendered correctly (it writes the marker into every column) while one loaded from a real multi-language file appeared as an ordinary row with `[TBL]` sitting in it as text. A row now counts as a blank line when it is marked in at least one language and holds no text in any of them. A row that is merely empty everywhere is left as an ordinary editable row, since nothing marks it as a spacer.
+- **Stable diagnostic ids** `aetswg-<group>-<number>`, shown next to every message. See [#68](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/68).
+  - Groups classify the problem, not the language
+  - One id per distinct problem
+  - Lua parse errors keep Loretta's number: `LUA1003` = `aetswg-012-1003`
 
-- **A language can be filled in, from another language or from the game itself.** **Fill language** on the dock asks which language to fill and where the text should come from. *From another language* copies one of the file's own columns into the cells another has left empty - most of a credits list is names, and a name is usually the same in every language. *From the game* takes what Empire at War already ships: in a translation file that is matched by key, and in a credits file by the text itself, since a credits key is a formatting instruction that hundreds of rows share and identifies nothing. So a mod reusing the game's section headings gets them translated for free, while its own names are left alone because the game has never heard of them. Neither ever overwrites something the target language already says, and both report how many cells they would fill before you commit.
+- **Breaking:** `<!-- lsp:suppress duplicate-symbol -->` is no longer honoured; replace with `<!-- aetswg:suppress aetswg-010-0001 -->`. `<!-- <Override Name="..."/> -->` is unchanged: a declaration of intended shadowing, not a suppression; shadow warnings now say "declare it".
 
-- **Validate reports a language left half-finished, differently for each kind of file.** In a translation file every key is meant to resolve, so a language with entries missing is reported with a count - those entries are left out of that language's build entirely and the game falls back to a lower layer, or to nothing. A credits file is not held to that: a crawl may legitimately differ between languages, since a dub recorded with a smaller cast is a shorter list and not an unfinished one, and an entry left empty being dropped on export is exactly what lets one file carry both. What is reported there instead is the thing that is wrong in any language - a heading with nothing under it, which the crawl reads out before moving straight on. Leaving the heading empty as well is how you skip a whole section, and that passes without comment.
+- **Localisation editor in editor tabs**
+  - **Localisation Editor** activity bar view; **Text files** and **Credits files**; one grid tab per file, splittable side by side
+  - Staged edits, explicit **Save** with a count; one all-or-nothing write; refused if the file changed on disk
+  - **Validate** without writing, on open and on demand; results in a bar under the table
+  - Saves rewrite changed rows only; quoting, comments and line endings preserved
+  - Row context menu per file kind; **Add translation...** dialog with key suggestions from lower layers
+  - Inherited rows hidden by default; **Inherited** toggle; **Reset to inherited value**
+  - Column sort on text files
+  - Language columns from a header gear; empty languages hidden at first
+  - Footer with row and filter counts
+  - Filter by text, wildcard or regex with scope; applied after typing stops; invalid patterns flagged
+  - **Add language** and **Fill language** (from another language, or from the game) on the dock
+  - Conversion to another format keeps the original
+  - Compiled `.dat` files editable for `"type": "DAT"` projects
+  - `.pgproj` format matched case-insensitively
+  - Initialise and import report every outcome
+  - Removed: `aet-eaw-edit.localisation.editorEnabled`
 
-- **Adding a language to an XML translation file works.** The column appeared in the grid and the save was then refused with "Row 0 has no 'GERMAN' translation". In the eaw-translation XML format a language exists only where a value does - there is no column list to extend - so declaring one had nothing to do, and every value written into the new language was rejected for want of an element to write it into. Writing a value now creates that element, which is what adding a language to this format actually means. Only the rows you write gain it, and the new element is indented like the ones beside it, so the change reads as a few added lines rather than a reformatted file. CSV and the properties format were unaffected.
+- **Credits files as their own editor**
+  - Ordered, position-addressed rows: insert above and below, move, delete
+  - Blank spacer rows (`[TBL]`) shown as rules
+  - Tile library of the three line kinds (label, name, blank) with drag and drop
+  - Directives `HEADER` and `CENTER` from a dropdown
+  - Detection by engine naming (`credits*`) or `localisation.credits` in the `.pgproj`: `detection` (`convention`, `explicit`, `none`) and `files`
+  - Export writes `CreditsText_LANGUAGE.dat` in file order
+  - Preview crawl (**Open Credits Preview to the Side**, **Play Credits Crawl Full Screen**): staged rows as the game plays them, generated starfield, fixed reading pace, reduced-motion fallback
+  - Validate reports empty headings, not per-language gaps
 
-- **A newly added language can be filled from the game's own translations.** Adding one otherwise gives you an empty column and a long afternoon, because most of the keys in a mod's text file are the game's and the game already ships them in that language. The dialog offers to copy them in, saying how many of the file's entries it can fill before you commit to it - "2 of 3 entries", or that the game translates none of them, in which case the offer is there but cannot be taken. Only keys the file already has are filled, so adding a language never drags the rest of the game's text in with it, and a key the game does not define is left visibly empty rather than invented. The filled values are staged like any other edit: they are in the grid to read and change before you save, and discarded with everything else if you abandon the tab.
-
-- **A language can be added to a file from the editor.** Adding one previously meant editing the file by hand outside the extension and reopening it. The dock offers it as a tile for the formats that can hold more than one language, and leaves it out for the ones that cannot - a `.properties` file has no way to name a second language and a `.dat` carries its one language in its file name, so the action would only ever have been refused. The name is checked before the column appears: blank names, names the file already has under a different spelling, and characters that would corrupt a CSV heading or an XML attribute are all rejected in the box rather than at save time.
-
-- **The story graph editor and the localisation editors are laid out as one application.** Their docks had been built separately and had drifted into three different looks: the graph's node palette used its own tile size, its own heading style and its own dock width, while the two localisation editors had a third shape again. Tiles are now one object everywhere - the graph's event and reward types, the credits content elements and the file actions are the same size, spacing and corner radius, in the same grid, under the same section headings, in docks that open at the same width. The graph's palette and filter boxes get the same breathing room as the localisation search. Node types are still coloured by family; that is the graph's own information, and only the geometry was ever meant to be shared.
-
-- **Both localisation editors' docks are laid out the same way.** They had drifted into two different control sets in the same frame: the credits editor's step library was a column of wide rows with descriptions, while the file actions beside it were compact centred tiles, so one dock showed two unrelated species of button. Everything is now one titled section of tiles on one grid - the file actions in both editors and the credits step library alike - reflowing with the dock's width, two across at its default size. Each opens a dialog rather than acting the moment it is touched: all three change the file as a whole, and the dialog is where the consequences are stated - that a conversion keeps the original, that an export overwrites the .dat files beside it and writes what is saved rather than what is staged.
-
-- The search controls have room to work in. The box, the three search-mode toggles and the scope picker were three stacked rows crammed into the last few pixels of the dock, which read as leftovers rather than as one control. The toggles now sit inside the box, where an editor's find widget puts them, which buys back a row; what remains is a labelled field with space around it. The modes themselves are unchanged, and each editor's example patterns now match its own file - a credits file suggests `CENTER*`, a translation file `TEXT_*_NAME`.
-
-- **A filter pattern that cannot be compiled now says so.** In regex mode a half-typed pattern - `([unclosed` - matched nothing, so the grid emptied exactly as if the search had no results; there was no way to tell a typo from an honest miss. The box is marked and the reason is shown beneath it. What it matches is unchanged.
-
-- The filter applies once you stop typing rather than on each keystroke, and compiles the pattern once for the whole table rather than once per row.
-
-- The localisation editor has moved out of the sidebar and into a proper editor tab, one per file. A flyout was the wrong host for a wide table: it competed with the file explorer for width, only one file could be open at a time, and the grid could never sit beside the XML that references its keys. There is now an **EaWEdit: Localisation** activity bar view listing every localisation file the project declares, and opening one from it gives you a full editor tab that can be split, moved to another column, or kept open beside anything else. Two files can be compared side by side.
-
-- Localisation files are grouped into **Text files** and **Credits files**, and credits files are understood as what they are. A credits file is ordered and allows the same key more than once - it is a running list, not a lookup table - so it could never be edited safely by a key-addressed grid, which would collapse repeated keys the moment you touched one. Rows are now addressed by position throughout, so duplicate keys, blank spacer rows and row order all survive editing, and the grid offers insert, delete and reorder on them. Files are recognised by the engine's own naming (anything beginning with `credits`); a project that names things differently can say so in its `.pgproj`:
-
-  ```jsonc
-  "localisation": {
-    "type": "CSV",
-    "directory": "data/text",
-    "credits": { "detection": "convention", "files": ["rolls.csv"] }
-  }
-  ```
-
-  `detection` is `convention` (the default), `explicit` (only the files listed) or `none` (nothing is a credits file - the opt-out for a project whose text file merely looks like one).
-
-- **Edits are staged and written by an explicit Save.** Previously every cell wrote to disk the moment you left it, so a mistyped value was already saved before you noticed. Changes now accumulate in the tab - shown as a count on the Save button - and reach the file only when you save, as a single all-or-nothing write. **Validate** checks a batch without writing, reporting duplicate or empty keys for text files and staying quiet about them for credits files, where duplicates and blanks are the format. If the file changed on disk since the tab loaded it, the save is refused with an offer to reload rather than overwriting someone else's work.
-
-  Saving writes the file directly, so it does not create an undo entry in the editor and an open unsaved text editor on the same file can still conflict - the file-changed check turns that into a refusal rather than a silent overwrite.
-
-- A save rewrites only the rows you changed. Every untouched row is written back exactly as it was read, keeping its original quoting, comments, blank lines and line endings, so editing one cell of a 19,000-row file produces a one-line diff instead of an unreviewable one.
-
-- Credits files export to `CreditsText_LANGUAGE.dat`, which is what the engine loads for the crawl - the export previously wrote `MasterTextFile_*` for every file, so a credits file could not be exported into something the game would read. Credits exports are the file itself in order, without the game baseline merged underneath it.
-
-- In a credits file the key column is understood as what it actually is: a formatting instruction, not an identifier. That is why the format repeats the same "key" hundreds of times. The shipped `creditstext_english.dat` uses two - `HEADER` for a label line (a role, or a section heading) and `CENTER` for the line beneath it - plus the value `[TBL]`, which is the engine's marker for a blank spacer line rather than any text. The grid now offers those directives as a dropdown instead of a free-text box, and a **Spacer** button inserts a `[TBL]` row, so a mistyped `CENTRE` or a stray trailing space cannot silently produce a row the engine ignores.
-
-- Rows are edited from a right-click menu on the row itself, and what it offers depends on the kind of file. A credits file is a running list where position is the content, so it gets insert above, insert below, move up, move down and delete. A text file is a lookup table where position means nothing, so it gets just **Add translation...** and **Delete row** - there is no meaningful difference between adding above and below.
-
-- **Translation files and credits files are now separate editors.** They are different kinds of thing - a translation file is a lookup table where the key identifies the entry and the row order carries no meaning, while a credits file is a running order the crawl plays top to bottom, repeating the same key on hundreds of rows because there it is a formatting instruction. One grid trying to be both is why credits behaviour kept turning up in text files. Each now has only the controls that make sense for it: no sorting or inherited filtering in credits, no spacers, directives or reordering in translations. Translation edits address entries by key throughout, so nothing in that editor depends on where a row happens to sit.
-
-- **Adding a translation can start from what the game already defines.** Typing in the key field suggests keys that exist in the layers below but not in this file - which is exactly what an override is - and picking one fills in the inherited text for every language, ready to edit. Previously the only way to override a line was to go and read the game's own file for the exact key and type it in by hand. The suggestions come from the baseline already loaded for the Inherited toggle, so this costs no extra work when the dialog opens.
-
-- **The Localisation and Story views no longer say a workspace is empty while they are still reading it.** Both asked the server for their contents before the workspace scan had finished, got nothing back, and reported "No localisation files found in this workspace." - then corrected themselves a moment later when the index arrived. An empty answer before the scan completes means "not indexed yet", and the views now say so. They also fetch their contents as soon as the scan finishes rather than when you first open them, so the first click shows the list instead of loading one.
-
-- **The credits table's columns keep in step with the column picker.** Its column widths were worked out from a stale copy of which languages were showing, so hiding or showing one left the table laid out for the previous set - the header ended up with more cells than the table had columns, and the picker's own button wrapped onto a second line under the first column. The translation table was unaffected, which is what gave the two tables their different behaviour.
-
-- **Which language columns to show is chosen on the table, from a gear at the right-hand end of the header.** It is a question about this table rather than about the file, so it sits on the table rather than in the dock beside the things that change the file. **A language the file says nothing in is hidden to begin with** - a project declaring six languages with two written showed four columns of nothing, which is most of the width spent on emptiness. They are one click away in the menu, a language with even a single value is never hidden, and the last remaining column cannot be hidden at all. Choosing anything in the menu makes the choice explicit from then on, so a language you add and have not written in yet stays visible. Hiding a column changes nothing about the file: every edit still applies to it and it is still written on save.
-
-- The table has a footer saying what it is showing: the total row count, how many rows are being held back, and how many filters are doing the holding. Previously the dock reported "19222 of 19222 rows" - which says nothing when the two are equal, and does not read at a glance without separators - alongside the selected row and the kind of file, both of which the grid and the tab already show.
-
-- The credits crawl moved to the editor's title bar, where Markdown and LaTeX editors put their previews, and behaves the way those do. **Open Credits Preview to the Side** opens the crawl in its own tab beside the editor and keeps it in step with what you have staged, so a reordered or inserted line plays without saving first. **Play Credits Crawl Full Screen** plays it over the editor instead, filling the screen where the host allows it; leaving the preview restores the window.
-
-- The filter controls are the story graph editor's controls, not a lookalike. The search box and the scope picker had their own colours, padding and focus treatment, and the three search-mode toggles were filled buttons using a different accent from every other icon button in the extension. They now use the graph editor's rules verbatim: the same input and select styling with the same focus border, the same soft icon buttons, and the pickers stacked in the same full-width column beneath.
-
-- The localisation dock is laid out like the story graph editor's: Save is an icon button pinned to the left of the header carrying its pending count, Validate is a soft pill pinned right that takes the colour of its own state, and the filters sit at the foot of the dock rather than the top. The **Add translation...** button is gone - it is on the right-click menu, including on the empty area of a file with no rows yet. **Open as text** has moved to the file's own right-click menu in the Files tree, beside Export to DAT, since opening the raw file is something you do to a file rather than from inside the editor showing it.
-
-- Every glyph the story graph editor used as an icon is now a real icon. Buttons that read as `x`, `->`, `v`, a pencil, a bin, a tick and so on were literal characters standing in for icons, which do not follow the theme, render differently on every platform, and are not something a screen reader can make sense of. They are codicons now, matching the rest of the extension; the AND/OR shapes in the legend and the node palette are drawn rather than typed. Remaining stray characters in user-facing text - an ellipsis in four placeholders and the status bar, a middle dot in the localisation picker, arrows in two prompts - were replaced with plain ASCII.
-
-- The credits crawl has a proper sky. It was six repeating gradient tiles, so the same handful of stars recurred on a fixed pitch across the whole screen; it is now a generated field of several hundred, varied in size and brightness and repeating nowhere.
-
-- Validation results moved out of the dock and into a bar across the foot of the table, the same shape the story graph editor uses: draggable from its top edge, closeable, and reopening whenever a fresh result arrives. Clicking a result takes you to the entry it names - lifting the filter, and revealing inherited entries, if either was hiding it. The dock was the wrong home for them: it is narrow enough that every message was truncated, and a list appearing there shifted the controls above it.
-
-- **Validate now describes the file, not just what you have staged.** It used to be greyed out and unpressable until an edit was made, showing a question mark that meant nothing - even though a file can arrive with problems already in it, such as a duplicate key it was saved with. The file is checked as soon as it opens, so the indicator shows a green tick or a red count from the start, and it is always pressable. Staging an edit returns it to a question mark, since the last verdict no longer describes what is there, and the tooltip says what it found rather than repeating the button's name.
-
-- **A credits file is now built from a library of the three kinds of line it is made of** - a label, the name beneath it, and a blank line - shown as tiles in the dock. Drag one onto the table and a line marks exactly where it will land, above or below whichever row you are over; drop it and it goes there, ready to type into. Clicking a tile adds it at the end instead, so the library works without dragging. This says what the format actually is far better than a menu item and a directive dropdown did: the whole shipped credits file is nothing but these three.
-
-- Row creation in a credits file is entirely on the right-click menu, including on the empty area below the rows - which is also how a file with no rows yet is reached. The **Add row at end** button is gone.
-
-- The row menu no longer opens off the edge of the window. Right-clicking the last row of a full table put its lower half below the window where none of its items could be reached; it now flips to the other side of the pointer, and is clamped inside the window - with a scrollable height - when the window is too small for it to fit either way.
-
-- Fixed a horizontal scrollbar under a table whose columns fitted perfectly well. Every control in the grid is sized to fill its column and also carries padding and a border, which without `box-sizing` made each one wider than the column holding it. The same fault had the dock's filter box hanging over its right-hand edge.
-
-- Fixed the sorted column header being unreadable in light themes. It was tinted with the colour VS Code uses for text on a selected row, which assumes the dark background a selection has - on an ordinary header that came out white on near-white. The sorted column is now marked by its arrow and a heavier label instead.
-
-- **Adding a translation asks for it up front rather than dropping an empty row into the grid.** A dialog takes the key and a field for every language the file declares, and will not create anything until the key is usable: it must not be empty, and it must not already exist in the file - checked without regard to case, which is how the server compares keys, so a clash cannot slip through and fail at Save instead. The key is trimmed, languages left blank stay blank, and the finished row is added at the end, scrolled to and focused. Any active filter or sort is cleared first, so the new row is where you can see it rather than wherever its key happens to sort.
-
-- Blank lines in a credits file are shown as what they are. Rather than a row containing the literal text `[TBL]`, a spacer renders as a dimmed rule labelled "blank line", with no fields to type into - it can be placed and removed from the row menu, but there is nothing meaningful to edit inside one. This applies to credits files only: in an ordinary text file `[TBL]` is just a value, and a row holding it stays fully editable.
-
-- The row menu no longer flickers away when the caret is in another row. Right-clicking a row while a cell elsewhere was being edited opened the menu and closed it again a frame later: blurring the cell made the browser scroll the grid back by a few pixels, and the menu was dismissing itself on any scroll at all. It now watches whether its own row has actually moved, so a real scroll still dismisses it and a blur does not.
-
-- Rows that only repeat what a lower layer already says are hidden by default, as they were in the sidebar editor. A mod's text file is usually a copy of the game's with a handful of lines altered, so showing all of it buries the part that matters. The **Inherited** checkbox in the dock brings them back, with a count of how many there are; when shown they are dimmed and italic so it stays obvious which lines the file actually changes, and a row that has been overridden offers **Reset to inherited value** on its right-click menu, staged like any other edit rather than written immediately. This applies to text files only - a credits file keys every row by a formatting directive, so matching it against a baseline by key would pair unrelated lines.
-
-- Text files can be sorted by clicking a column header - by key or by any language - cycling ascending, descending, then back to the order on disk. Sorting a language column puts the untranslated rows together, which is the quickest way to see what is still missing. It changes the view only: rows keep their identity underneath, so an edit made while sorted lands on the row you clicked. Credits files are deliberately not sortable, because there the running order is the content rather than a presentation choice. Adding a row clears any active sort, so the new row appears where you asked for it instead of jumping to wherever an empty key would sort.
-
-- Credits files have a preview that plays them the way the game does: centred text scrolling up a starfield, label lines set small above the larger names beneath them, and blank lines as real pauses. It renders what you have staged rather than what is on disk, so a reordered or newly inserted line shows up before you save - which makes row order and spacing, the things this format is actually about, visible at a glance. It scrolls at a fixed reading pace, so a long file plays no slower than a short one and the first line appears immediately rather than after a wait. Pause, restart, speed and language are on the toolbar, `Esc` closes it, and it falls back to a static list if you have asked your system for reduced motion.
-
-- **Removed:** the `aet-eaw-edit.localisation.editorEnabled` setting, which existed only to show or hide the old sidebar panel. The localisation views now follow `aet-eaw-edit.features.tools.localisation` alone. `aet-eaw-edit.localisation.format` is unchanged.
-
-- Compiled `.dat` files are editable, not just an export target. The engine ships its text as `.dat`, so a project declaring `"type": "DAT"` can now open one in the grid, edit it and save it back. The language is taken from the filename (`creditstext_english.dat`), and the file's existing sort order is preserved on write - rewriting an unsorted credits file as a sorted one would reorder the crawl into checksum order. A `.dat` holds exactly one language, so adding a column is refused rather than half-applied.
-
-- A note on scope: each project still reads one localisation format, taken from its `.pgproj`. A CSV project's credits file is expected to be a `.csv` alongside its text file, and mixing formats within one project remains out of scope. The format in `.pgproj` is now matched case-insensitively, so `"dat"` and `"DAT"` both validate - the loader always accepted either, but the authoring schema flagged the lower-case spelling as invalid.
+- **Shared chrome**
+  - Story graph and localisation docks: one tile grid, one section style, one dock width
+  - Codicons replace typed glyphs
+  - Filter controls share the graph editor's styling
+  - Fixed: validation results placement, row menus off screen, sorted headers in light themes, stray horizontal scrollbar
+  - Localisation and Story views show "Loading..." before the scan completes and preload when it finishes
 
 ### Improvements
 
-- The game schema now declares a version, and the extension checks it. The schema is published separately and updates on its own cadence, so it can get ahead of an installed extension. Until now that failed silently and, worse, sometimes loudly-wrong: a value shape the extension did not recognise was read as an ordinary value, which could report perfectly valid XML as broken. There is now a `schemaVersion` in the schema manifest, checked against the range each extension build understands. A schema whose major version is too new is refused outright with a message telling you to update, rather than half-loaded into wrong answers; an older schema is used as-is; a schema from before the field existed keeps working untouched. Independently of the version check, a tag whose value *shape* the extension cannot interpret now has its validation withheld instead of guessed at - so a newer schema costs you a feature on that tag, never a false error.
+- **Typed project files.** `.pgproj`, `.aetswg/story-layout.json`, `.aetswg/suppressions.json` and workspace settings carry `_type` and `_typeVersion` and are migrated on format changes.
+  - Sidecars migrate in place
+  - A `.pgproj` migration is offered once per project per session, with a note on what changed
+
+- **Schema version check.** The schema manifest declares `schemaVersion`.
+  - Major version too new: refused with an update message
+  - Older schemas: load as before
+  - A tag whose value shape the extension cannot interpret: validation withheld, not guessed
 
 ### Bug fixes
 
-- **EaWEdit: Re-validate Workspace** re-validates the whole workspace. It re-ran XML diagnostics only - a leftover from when XML was the only language that reported any - so running it to clear a stale Lua or dialog problem reported success while re-checking nothing at all. All three languages are now refreshed, and one of them failing no longer abandons the rest of the sweep.
+- **Re-validate Workspace** covers XML, Lua and dialog; one language failing no longer stops the rest.
 
-- Campaign story attachments are validated as you type. Pasting the generic tag's `Faction, PlotFile` tuple into a faction-specific tag - `<Rebel_Story_Name>test, Conquests\Story_Plots_GCMenu.xml</Rebel_Story_Name>` - is now an error that names `<Story_Name>` as the form that takes a tuple, and offers a quick fix that drops the stray faction token. Previously the whole string was taken as a filename, so the mistake could only ever surface as a misleading "file does not exist", and only after a restart or project reload.
+- **Campaign story attachments** validated as you type.
+  - A `Faction, PlotFile` tuple in a faction-specific tag: error with a quick fix
+  - A faction attached twice: warning (same manifest) or error (different manifests); paths compared in normal form
+  - The faction half of a `<Story_Name>` tuple is a real reference: navigation, rename, unknown-faction check
+  - Broken story-chain links (`*_Story_Name`, `Active_Plot`, `Suspended_Plot`, tactical plots) come from the live chain and update on every edit
 
-- Attaching one faction twice in the same campaign is reported. Naming the same plot manifest through both a `<Rebel_Story_Name>` tag and a `<Story_Name>` slot is a warning (the engine merges both, so one of them is dead weight); pointing them at *different* manifests is an error, because which one the faction ends up running can no longer be read off the file. Paths are compared in their normal form, so `Conquests\X.xml`, `Conquests/X.xml` and `DATA\XML\Conquests\X.xml` count as the same file. A campaign that uses both authoring forms for different factions gets an informational note rather than a warning - only the generic form can attach a non-major faction, so the split is often deliberate.
-
-- The faction half of a `<Story_Name>` tuple is a real reference: Ctrl+Click jumps to the faction definition, rename reaches it, and a faction no `<Faction>` defines is flagged. Only the plot-file half was ever indexed, so a typo in the faction slot resolved to nothing and was silently ignored.
-
-- Broken story-chain links are reported as you type. A `*_Story_Name`, `Active_Plot`, `Suspended_Plot` or tactical plot reference pointing at a missing file was only ever checked during the startup scan, which re-ran on a `.pgproj` change and nothing else - so a link broken after startup stayed silent until the next restart, and one that had since been *fixed* kept being reported. These diagnostics now come from the live campaign chain, which reads unsaved editor content and re-runs whenever any file it touched changes.
-
-- Metafiles shipped by several layers follow the engine's override rule instead of being merged. When a mod and one of its dependencies each ship a `GameObjectFiles.xml`, `CampaignFiles.xml` or any other registry, the game resolves the name to a single file and reads only that one - the mod's copy shadows the dependency's outright, which is why a mod that ships its own registry has to repeat the entries it wants to keep. The extension used to read every layer's copy and combine the results, so files the winning registry leaves out were still typed and indexed, and objects the game never loads still counted as defined. The winning registry can of course still name files that live in a dependency; those continue to resolve across all layers, as do individual campaign, manifest and thread files, which still take the highest-ranked copy.
-
-  Expect this to surface real problems that were previously masked: if your `GameObjectFiles.xml` (or any other registry) omits entries that a dependency's copy listed, references to the objects in those files will now be reported as unknown - which is what the game does too.
+- **Metafile override rule.** A registry (`GameObjectFiles.xml`, `CampaignFiles.xml`, ...) shipped by several layers resolves to the highest-ranked copy only, as in the engine. Entries a mod's copy omits are no longer indexed from a dependency's; expect previously masked unknown-reference reports.
 
 ## 0.3.1
 
 ### Improvements
 
-- The story graph panel opens and navigates very large campaigns smoothly. A campaign with well over a thousand events used to take several seconds to open and stuttered while panning and zooming; it now opens near-instantly and stays responsive throughout. When zoomed out the whole graph is drawn as a lightweight overview - nodes as branch-coloured tiles, with event titles fading in as you zoom - and the real, interactive nodes for the visible area take over once you zoom in close enough to work with them. The minimap, thread and chapter swimlanes, Fit, Arrange, and jump-to-node from the problems list all work against the overview, and Edit mode no longer has to render the whole graph to make a change.
+- **Story graph on very large campaigns.** A campaign with over a thousand events opens near-instantly and stays responsive.
+  - Zoomed out: a lightweight overview of branch-coloured tiles, titles fading in with zoom
+  - Zoomed in: real, interactive nodes for the visible area only
+  - Minimap, swimlanes, Fit, Arrange and jump-to-problem work against the overview
+  - Edit mode no longer renders the whole graph for a change
 
 ### Bug fixes
 
-- Campaign story chains attached through the generic, additive `Story_Name` tag are discovered, navigated and validated. This is the flat `Faction, PlotFile[, Faction, PlotFile ...]` tuple form that mods such as EaWX use to attach plots (and the only form that can attach a non-major faction); it is now handled alongside the faction-specific `Rebel_Story_Name` / `Empire_Story_Name` / `Underworld_Story_Name` tags, with every occurrence of both forms merged into one (faction, plot) list to match the engine.
+- **Generic `Story_Name` attachments** are discovered, navigated and validated.
+  - The flat `Faction, PlotFile[, Faction, PlotFile ...]` tuple form (used by EaWX, and the only form for non-major factions)
+  - Merged with `Rebel_Story_Name`, `Empire_Story_Name` and `Underworld_Story_Name` into one (faction, plot) list, as in the engine
 
 ## 0.3.0
 
 ### Features
 
-- XML tags close themselves as you type: typing the `>` that ends an opening tag now inserts the matching `</Tag>` and leaves the cursor between the two, so hand-typed tags behave the way accepting a tag-name completion already did. Self-closing tags, closing tags, comments/processing instructions, and elements that already have a closing tag are left alone; the inserted name preserves the source casing. Opt-out via `aet-eaw-edit.features.xml.autoCloseTag`. Because it rides on VS Code's on-type formatting it only fires when `editor.formatOnType` is enabled, which is off by default - the same way the existing linked editing of tag pairs (rename an opening tag and its closing tag follows) needs `editor.linkedEditing`. Both settings are cross-linked from the extension's own settings so the editor toggle is a click away.
+- **Auto-close XML tags.** Typing the `>` of an opening tag inserts `</Tag>` and places the cursor between the two.
+  - Left alone: self-closing tags, closing tags, comments, processing instructions, elements already closed
+  - Source casing preserved
+  - Opt-out: `aet-eaw-edit.features.xml.autoCloseTag`
+  - Needs `editor.formatOnType`; linked editing of tag pairs needs `editor.linkedEditing`; both cross-linked from the extension's settings
 
-- Variant inheritance is readable at a glance: a tag that changes an inherited value is marked inline with what it displaced (`overrides 99`, `adds to 3 inherited`), and the *Show effective object* view now names the replaced value next to each overridden tag instead of only saying it was overridden. Additive tags - ones the engine accumulates rather than replaces, like `Death_Clone` - are called out where they are set, explaining that the base's entries are kept as well, so a re-skinned hero variant that quietly inherits the base model's damage clones is visible before it ships. See [#73](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/73) and [#63](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/63).
+- **Variant inheritance at a glance.** See [#73](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/73), [#63](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/63).
+  - Inline marks on overriding tags: `overrides 99`, `adds to 3 inherited`
+  - *Show effective object* names the replaced value next to each overridden tag
+  - Additive tags (accumulated by the engine, e.g. `Death_Clone`) called out where set
 
-- Galactic ability lists resolve: the ability names in `GameConstants` (`Activated_Sabotage_Ability_Names` and its nine siblings) and `BlackMarketItem.Ability_Names` are now real references. Ctrl+Click jumps to the ability, and a name no unit defines is flagged. These name an ability without saying which object owns it - which the engine accepts - so they are matched across owners rather than against the owning unit.
+- **Galactic ability lists resolve.** `GameConstants` ability names (`Activated_Sabotage_Ability_Names` and its nine siblings) and `BlackMarketItem.Ability_Names` are references: Ctrl+Click navigates, unknown names are flagged. Matched across owners, as the engine accepts them.
 
-- `Campaign.Autoresolve_Exclusion_Locations` is understood as the (planet, mode) pair list it is: the planets are references you can navigate and validate, the modes are checked against the known battle modes, and a planet left without a mode is reported - a mistake that silently throws every following pair out of step.
+- **`Campaign.Autoresolve_Exclusion_Locations`** understood as a (planet, mode) pair list.
+  - Planets navigable and validated
+  - Modes checked against the known battle modes
+  - A planet without a mode reported (it throws every following pair out of step)
 
-- Hardpoint bone validation: a hardpoint declared `Is_Destroyable` but with no `Attachment_Bone` is reported as an error - the engine has nothing to attach it to, so it becomes **indestructible** and the unit keeps a weak point that can never be shot off. Beyond that, the bones a hardpoint names are cross-checked against the models of every game object that mounts it: `Attachment_Bone`, `Collision_Mesh`, `Damage_Decal` and `Damage_Particles` against the mounting unit's models (all of them, resolved through variant inheritance), and `Turret_Bone_Name`/`Barrel_Bone_Name` against the hardpoint's own `Model_To_Attach` - with `Fire_Bone_A`/`_B` following whichever side `Is_Turret` puts them on. Checks run from both ends, so the problem is visible whether you have the hardpoint file or the unit file open. Where a model's bones could not be read at all the extension says so rather than staying silent, so a missing or unreadable `.alo` is never mistaken for a clean bill of health. See [#53](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/53).
+- **Hardpoint bone validation.** See [#53](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/53).
+  - `Is_Destroyable` without `Attachment_Bone`: error - the hardpoint becomes indestructible
+  - `Attachment_Bone`, `Collision_Mesh`, `Damage_Decal`, `Damage_Particles` checked against every mounting unit's models, through variant inheritance
+  - `Turret_Bone_Name`, `Barrel_Bone_Name` checked against the hardpoint's `Model_To_Attach`; `Fire_Bone_A`/`_B` follow `Is_Turret`
+  - Checked from both the hardpoint file and the unit file
+  - Unreadable model bones reported, never silently passed
 
-- Reference-list tags that use `|` (OR) where the engine only understands it as AND are now flagged. In a plain list tag (`GameObjectTypeReferenceList`, `TypeReferenceList`, `NameReferenceList` and per-faction object lists) a `|` looks like an OR but the engine's reference splitter silently treats it as just another separator, so every listed value is required after all. The error explains this and offers a quick fix that rewrites the value with commas; tags actually documented for OR-expressions (like `Required_Special_Structures`) are left alone. See [#64](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/64).
+- **`|` in plain reference lists** flagged: the engine treats it as another separator (AND), not OR. Quick fix rewrites with commas; tags documented for OR-expressions (e.g. `Required_Special_Structures`) exempt. See [#64](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/64).
 
-- Story-dialog navigation & hints: dialog `.txt` scripts gain inlay hints (opt-in via `aet-eaw-edit.features.dialog.inlayHints`) showing the referenced localisation text at the end of `TEXT`/`TITLE` lines - or a MISSING marker for unknown keys - and go-to-definition (opt-in via `aet-eaw-edit.features.dialog.goToDefinition`) jumping from `DIALOG`, `MOVIE`/`MOVIE_ONCE`, and `SFX` arguments to the defining XML object. Both apply only to files under the `.pgproj` `directories.storyDialog` folders.
+- **Story-dialog navigation and hints** for `.txt` scripts under `directories.storyDialog`.
+  - Inlay hints (`aet-eaw-edit.features.dialog.inlayHints`): localisation text after `TEXT`/`TITLE` lines, or a MISSING marker
+  - Go to definition (`aet-eaw-edit.features.dialog.goToDefinition`): from `DIALOG`, `MOVIE`/`MOVIE_ONCE` and `SFX` arguments to the XML object
 
-- Story navigator & read-only graph viewer (opt-in via `aet-eaw-edit.features.tools.storyEditor` + `aet-eaw-edit.features.story.discovery`): a new *EaWEdit: Story* activity-bar view lists every campaign → faction → plot threads and attached Lua scripts (suspended threads marked; clicking opens the file). The graph icon on a campaign - or the *EaWEdit: Open Story Graph* command - opens a read-only graph panel: auto-laid-out event flow with AND/OR junctions, cross-file portals and tactical plots, node colours by lifecycle (inactive/waiting/armed/fired/disabled), dimmed unreachable events, and dashed borders on schema-untested event/reward types. A toolbar filters by name, branch and lifecycle; selecting an event shows its full property view with *Open XML* (jumps to the event block) and *Reachable from here* (trims the graph to everything downstream). The view refreshes live as story files are edited. See [#87](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/87).
+- **Story navigator and read-only graph viewer** (`aet-eaw-edit.features.tools.storyEditor` + `aet-eaw-edit.features.story.discovery`). See [#87](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/87).
+  - *EaWEdit: Story* view: campaign, faction, plot threads, attached Lua scripts; suspended threads marked
+  - Graph panel (*EaWEdit: Open Story Graph*): auto-laid-out event flow, AND/OR junctions, cross-file portals, tactical plots
+  - Node colours by lifecycle; unreachable events dimmed; schema-untested types dashed
+  - Toolbar filters: name, branch, lifecycle
+  - Event property view with *Open XML* and *Reachable from here*
+  - Live refresh on edits
 
-- Cross-language story rename (opt-in via `aet-eaw-edit.features.story.rename`, builds on story symbols): renaming a story event, flag, or AI-notification id - from XML or from Lua - updates the definition and every reference across story threads and scripts in one workspace edit. Guard rails match engine semantics: an event name defined more than once in the workspace is rejected instead of mass-renamed (disambiguate first), and story flag names are capped at the engine's 31-character limit. See [#85](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/85).
+- **Cross-language story rename** (`aet-eaw-edit.features.story.rename`). See [#85](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/85).
+  - Events, flags and AI-notification ids renamed across threads and scripts in one workspace edit
+  - Refused for an event name defined more than once
+  - Flag names capped at the engine's 31 characters
 
-- Cross-language story symbols (opt-in via `aet-eaw-edit.features.story.symbols`, builds on story discovery): story event names, flags, and AI-notification ids are indexed across XML and Lua. Go-to-definition works from a `Prereq` token or `TRIGGER_EVENT` parameter to the event block, and from a `STORY_AI_NOTIFICATION` id straight to the Lua `Story_Event("…")` call that fires it; `StoryModeEvents` table keys and `Check_Story_Flag` arguments are linked back too. Story event/reward parameters whose schema names a real object type (planets, units, factions, speech events) are full references too: Ctrl+Click jumps to the defining XML, hover works, and unknown values are flagged by the same validation the rest of the workspace uses - including the engine-placeholder exemption (`None`/`null`/`Default` are no longer false positives). See [#84](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/84).
+- **Cross-language story symbols** (`aet-eaw-edit.features.story.symbols`). See [#84](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/84).
+  - Event names, flags and AI-notification ids indexed across XML and Lua
+  - Go to definition from `Prereq` tokens and `TRIGGER_EVENT` parameters to the event; from `STORY_AI_NOTIFICATION` ids to the Lua `Story_Event("...")` call; `StoryModeEvents` keys and `Check_Story_Flag` arguments linked back
+  - Typed story parameters (planets, units, factions, speech events) are full references with hover and validation; `None`/`null`/`Default` exempt
 
-- Story campaign graph diagnostics (opt-in via `aet-eaw-edit.features.story.graphDiagnostics`, builds on story discovery): story thread files are analysed as part of their whole campaign - dangling or cyclic prerequisites, duplicate event names in one file, ambiguous campaign-global event targets (`TRIGGER_EVENT` resolves campaign-wide), events that can never fire, suspended plots that nothing activates, deviations from the documented event tag order, and flag names over the engine's 31-character limit. See [#83](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/83).
+- **Story campaign graph diagnostics** (`aet-eaw-edit.features.story.graphDiagnostics`). See [#83](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/83).
+  - Dangling or cyclic prerequisites
+  - Duplicate event names in one file
+  - Ambiguous campaign-global `TRIGGER_EVENT` targets
+  - Events that can never fire
+  - Suspended plots nothing activates
+  - Deviations from the documented tag order
+  - Flag names over 31 characters
 
-- Campaign story-chain discovery (opt-in via `aet-eaw-edit.features.story.discovery`): campaigns, story plot manifests, and story thread files are followed from `CampaignFiles.xml` and typed, activating story event/reward parameter validation and completion in story files. Broken links in the chain (a `*_Story_Name` or plot entry pointing at a missing file, tactical plot references, malformed manifests) are reported as diagnostics on the referencing line. See [#82](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/82).
+- **Campaign story-chain discovery** (`aet-eaw-edit.features.story.discovery`). See [#82](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/82).
+  - Campaigns, plot manifests and thread files followed from `CampaignFiles.xml` and typed
+  - Story event and reward parameter validation and completion
+  - Broken links (`*_Story_Name`, plot entries, tactical plots, malformed manifests) reported on the referencing line
 
-- Story-dialog language service (opt-in via `aet-eaw-edit.features.dialog.diagnostics`): dialog `.txt` scripts get diagnostics - unknown commands, wrong argument counts and types, warnings for documented-but-untested commands, and reference checks for localisation keys (`TEXT`/`TITLE`), speech events (`DIALOG`), movies (`MOVIE`/`MOVIE_ONCE`) and sound events (`SFX`). Which `.txt` files are dialog scripts is declared in the `.pgproj` via the new `directories.storyDialog` node - filename conventions play no part. Story events cross-check too: a `Story_Dialog` that doesn't resolve inside the declared scope and a `Story_Chapter` pointing at a chapter the script doesn't define are flagged. See [#89](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/89).
+- **Story-dialog language service** (`aet-eaw-edit.features.dialog.diagnostics`). See [#89](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/89).
+  - Unknown commands, wrong argument counts and types, untested-command warnings
+  - Reference checks: `TEXT`/`TITLE` keys, `DIALOG` speech events, `MOVIE`/`MOVIE_ONCE`, `SFX`
+  - Scope declared in the `.pgproj` `directories.storyDialog` node
+  - Story events cross-checked: unresolved `Story_Dialog`, `Story_Chapter` naming an undefined chapter
 
 ### Bug fixes
 
-- Go-to-definition works on a class of tags where it previously did nothing at all - silently, with no diagnostic either, because the values were never indexed as references. Fixed across 36 tags, including the skirmish AI force lists (`Space_Skirmish_AI_Default_Forces`, `Land_Skirmish_AI_Default_Forces`), faction `Allies`/`Enemies`, `Preferred_Pathfinder_Types`, the random-story unit lists, and tags that reference bones, icons, maps and localisation keys. The same values are now validated too, so a typo is reported rather than ignored. See [#77](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/77).
+- **Go to definition on 36 more tags**, previously never indexed as references, now navigable and validated. Includes skirmish AI force lists, faction `Allies`/`Enemies`, `Preferred_Pathfinder_Types`, random-story unit lists, and bone, icon, map and localisation references. See [#77](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/77).
 
-- Go-to-definition works on the SFX half of tuple-valued sound tags (`SFXEvent_Hardpoint_Destroyed`, `SFXEvent_Attack_Hardpoint`, the GUI ability toggles and friends). The event name resolved fine from a plain SFX tag but did nothing inside these pairs, which looked like SFX navigation being unreliable. See [#78](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/78).
+- **Go to definition on the SFX half of tuple sound tags** (`SFXEvent_Hardpoint_Destroyed`, `SFXEvent_Attack_Hardpoint`, GUI ability toggles). See [#78](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/78).
 
-- Inlay hints and code lenses no longer go stale after a localisation change. Editing a translation, adding a language, or a loca file changing on disk refreshed the data but never told the editor, so localisation-backed annotations kept showing the old text until you opened another file. See [#45](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/45).
+- **Inlay hints and code lenses refresh after localisation changes**: edits, added languages and on-disk changes now notify the editor. See [#45](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/45).
 
-- Additive tags no longer lose data in the *Show effective object* view. A repeatable additive tag such as `Death_Clone` was flattened into a single comma-separated value with duplicate tokens dropped, which detached the surviving clone names from their damage types and produced XML that could not be pasted back. Each entry now survives as its own element, base entries first.
+- **Additive tags keep their entries in *Show effective object***: each `Death_Clone` entry survives as its own element, base entries first, instead of a flattened, deduplicated value.
 
-- Multiple `<Prereq>` lines on one story event are no longer reported as duplicate tags. They are an OR of AND-groups, and every OR-chained event drew a spurious warning. See [#60](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/60).
+- **Multiple `<Prereq>` lines** on one story event are an OR of AND-groups, no longer reported as duplicates. See [#60](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/60).
 
-- Localisation editor icons (the search-mode toggles and the reset-to-inherited gutter arrows) now appear in the packaged extension. They were loaded from `node_modules`, which is not part of the published VSIX, so they only showed up when running the extension from source.
+- **Localisation editor icons** ship in the packaged VSIX; they were loaded from `node_modules`.
 
-- Hovering over an XML comment no longer writes a spurious warning to the server log. The "no hover found" case on comments was logged at warning level; it is now debug, so a clean session stays quiet. See [#72](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/72).
+- **Hovering an XML comment** no longer logs a warning. See [#72](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/72).
 
 ## 0.2.0
 
 ### Breaking changes
 
-- **`.pgproj` localisation configuration moved out of `directories`.** The `directories.text` array and `directories.textResourceType` string are removed. Localisation is now declared in a new top-level `localisation` node:
+- **`.pgproj` localisation moved out of `directories`.** `directories.text` and `directories.textResourceType` removed; new top-level `localisation` node:
 
   ```jsonc
   // Before (0.1.x)
@@ -233,18 +297,21 @@
   }
   ```
 
-  `type` is one of `CSV`, `DAT`, `XML`, `NLS` (uppercase). **A `.pgproj` left in the old shape now fails to load, with a notification explaining the fix** - the server refuses to guess, rather than silently indexing your mod without localisation. If you have an existing `.pgproj`, edit it before or right after upgrading. See [Upgrading from 0.1.x](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/blob/master/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#upgrading-from-01x) in the README for the full migration steps, including clearing cached indexes.
-- **Multiple `.pgproj` files under one workspace root now fail startup with a notification** instead of silently picking one at random. If you have more than one `.pgproj` under the folder you open in VS Code (for example, a leftover backup copy), remove or relocate the extras, or open the specific subfolder that contains the one you want to use.
+  - `type`: `CSV`, `DAT`, `XML` or `NLS` (uppercase)
+  - A `.pgproj` in the old shape fails to load with a notification naming the fix
+  - Full steps, including clearing cached indexes: [Upgrading from 0.1.x](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/blob/master/PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/README.md#upgrading-from-01x)
+
+- **Multiple `.pgproj` files under one workspace root fail startup** with a notification listing them, instead of picking one at random. Remove the extras or open the subfolder.
 
 ### Features
 
-- Feature flags: independently enable or disable XML, Lua, and cross-language tooling capabilities via new `aet-eaw-edit.features.*` settings. Changing any flag automatically restarts the language server. Lua hover, Lua diagnostics, and the localisation tooling (editor panel, initialise/import commands, create-key code action) ship disabled by default while still in development - enable the corresponding setting to opt in early.
-- Text Editor overhaul: clearer, more consistent editing experience. See [#55](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/55).
-- Import existing localisation projects into a `.pgproj`. See [#56](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/56).
-- `.pgproj` localisation support extended to all supported formats. See [#57](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/57).
-- Support for `.pgproj` localisation merge chains. See [#58](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/58).
+- **Feature flags** (`aet-eaw-edit.features.*`) for XML, Lua and cross-language tooling; any change restarts the server. Off by default while in development: Lua hover, Lua diagnostics, localisation tooling.
+- **Text editor overhaul.** See [#55](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/55).
+- **Import existing localisation projects** into a `.pgproj`. See [#56](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/56).
+- **`.pgproj` localisation support for all formats.** See [#57](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/57).
+- **`.pgproj` localisation merge chains.** See [#58](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/58).
 
-### Lua / EmmyLua Support
+### Lua / EmmyLua support
 
 - Layer-ranked `require()` resolution. See [#3](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/3).
 - Relative `require()` support. See [#4](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/4).
@@ -256,39 +323,39 @@
 - `.d.lua` declaration file indexing. See [#10](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/10).
 - Member access completion from `LuaTypeIndex`. See [#11](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/11).
 - Type hover from `LuaTypeIndex`. See [#12](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/12).
-- `LuaApiSchemaProvider` extended to parse `@class` and `@field` annotations. See [#13](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/13).
+- `LuaApiSchemaProvider` parses `@class` and `@field`. See [#13](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/13).
 
-### Bug Fixes
+### Bug fixes
 
-- Fixed `Land_Terrain_Model_Mapping` incorrect format causing an error. See [#23](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/23).
-- Fixed `Presence_Induced_Animations` incorrect format causing an error. See [#24](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/24).
-- Stopped flagging valid behaviours. See [#25](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/25).
-- Fixed `SurfaceFX_Name` content issue. See [#27](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/27).
-- Stopped flagging valid 64-bit category masks. See [#28](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/28).
-- Stopped flagging valid ability names. See [#30](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/30).
-- Fixed `Hardpoint::Damage_Particles` being incorrectly flagged. See [#38](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/38).
-- Fixed Min/Max Pitch issue. See [#40](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/40).
-- Fixed `MSS_3D_Provider_Name` duplicate tag flagging. See [#41](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/41).
-- Fixed multiple "Defaults" issue. See [#42](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/42).
-- Fixed `Factions.xml` flagged musicevents. See [#43](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/43).
-- Fixed `Land_Skirmish_Unit_Cap_By_Player_Count` issue. See [#44](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/44).
-- Fixed invalid-but-valid `Damage_To_Armor_Mod` flagging. See [#47](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/47).
-- Stopped flagging tags that are fine and necessary to duplicate. See [#48](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/48).
-- Fixed base game `Damage_Type` issue. See [#49](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/49).
-- `TALK` is now recognized as a valid animation. See [#50](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/50).
-- Fixed `Map_Load_Spawn_Table` spawn probability issue. See [#51](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/51).
+- `Land_Terrain_Model_Mapping` format. See [#23](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/23).
+- `Presence_Induced_Animations` format. See [#24](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/24).
+- Valid behaviours no longer flagged. See [#25](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/25).
+- `SurfaceFX_Name` content. See [#27](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/27).
+- Valid 64-bit category masks no longer flagged. See [#28](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/28).
+- Valid ability names no longer flagged. See [#30](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/30).
+- `Hardpoint::Damage_Particles` no longer flagged. See [#38](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/38).
+- Min/Max Pitch. See [#40](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/40).
+- `MSS_3D_Provider_Name` duplicate-tag flagging. See [#41](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/41).
+- Multiple "Defaults". See [#42](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/42).
+- `Factions.xml` music events. See [#43](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/43).
+- `Land_Skirmish_Unit_Cap_By_Player_Count`. See [#44](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/44).
+- Invalid-but-valid `Damage_To_Armor_Mod`. See [#47](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/47).
+- Necessary duplicate tags no longer flagged. See [#48](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/48).
+- Base game `Damage_Type`. See [#49](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/49).
+- `TALK` recognised as a valid animation. See [#50](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/50).
+- `Map_Load_Spawn_Table` spawn probability. See [#51](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/51).
 
 ## 0.1.2
 
-- Hotfix for URI encoding/decoding issues causing cash misses. See [#20](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/20).
+- Hotfix for URI encoding and decoding causing cache misses. See [#20](https://github.com/AlamoEngine-Tools/pg-starwarsgame-lsp/issues/20).
 
 ## 0.1.1
 
 First public preview release.
 
-- XML completions, hover, diagnostics, go-to-definition, find-all-references, rename, code actions, code lens
-- Variant inheritance: Show Effective Object command resolves `Variant_Of_Existing_Type` chains
+- XML: completions, hover, diagnostics, go to definition, find all references, rename, code actions, code lens
+- Variant inheritance: Show Effective Object resolves `Variant_Of_Existing_Type` chains
 - Lua script indexing and diagnostics
-- Localisation editor panel (CSV, XML, DAT, Properties formats)
-- Mod project file (`.pgproj`) support with multi-project references
-- Server version check on startup with download prompt if version does not match
+- Localisation editor panel (CSV, XML, DAT, Properties)
+- Mod project file (`.pgproj`) with multi-project references
+- Server version check on startup, with a download prompt on mismatch

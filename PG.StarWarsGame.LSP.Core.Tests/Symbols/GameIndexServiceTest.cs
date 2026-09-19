@@ -1066,6 +1066,8 @@ public sealed class GameIndexServiceTest
             _name = name;
         }
 
+        public IReadOnlyList<ProjectLayer> Layers => [];
+
         public void SetLayers(IReadOnlyList<ProjectLayer> layers)
         {
         }

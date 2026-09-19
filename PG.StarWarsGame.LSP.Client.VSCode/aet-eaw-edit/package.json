@@ -33,10 +33,158 @@
   "activationEvents": [
     "onLanguage:xml",
     "onLanguage:lua",
+    "onDebugResolve:eaw-lua",
     "workspaceContains:**/*.pgproj"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "breakpoints": [
+      {
+        "language": "lua"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "eaw-lua",
+        "label": "Empire at War Lua",
+        "languages": [
+          "lua"
+        ],
+        "configurationAttributes": {
+          "attach": {
+            "properties": {
+              "host": {
+                "type": "string",
+                "default": "127.0.0.1",
+                "description": "The machine running the game. Defaults to the aet-eaw-edit.game.luaDebugHost setting"
+              },
+              "port": {
+                "type": "number",
+                "default": 1234,
+                "description": "The game's Lua debug UDP port. Defaults to the aet-eaw-edit.game.luaDebugPort setting"
+              },
+              "sourceRoots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Script root directories the game's script paths are mapped onto, mod first. Defaults to every project layer's script directories"
+              },
+              "clientName": {
+                "type": "string",
+                "description": "The client name the game logs for this session"
+              },
+              "unsafeTableExpansion": {
+                "type": "boolean",
+                "default": false,
+                "description": "Allow expanding table values in the Variables view. The game is reported to crash on a table member whose text is 255 bytes or longer, so this is off unless you accept losing the game session"
+              },
+              "dropDuplicateOutermostFrame": {
+                "type": "boolean",
+                "default": true,
+                "description": "Drop the outermost call-stack entry when the game reports it twice"
+              }
+            }
+          },
+          "launch": {
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "The internal/debug game executable. Defaults to the aet-eaw-edit.game.executable setting"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Extra command-line arguments, appended after the mod chain"
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory for the game; defaults to the executable's directory"
+              },
+              "modPaths": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Mod directories to pass the game as MODPATH= entries, leaf first, replacing the chain built from the project layers. For mod folders you maintain yourself"
+              },
+              "attachTimeoutSeconds": {
+                "type": "number",
+                "default": 60,
+                "description": "How long to keep trying to attach after the game starts"
+              },
+              "host": {
+                "type": "string",
+                "default": "127.0.0.1",
+                "description": "The machine running the game. Defaults to the aet-eaw-edit.game.luaDebugHost setting"
+              },
+              "port": {
+                "type": "number",
+                "default": 1234,
+                "description": "The game's Lua debug UDP port. Defaults to the aet-eaw-edit.game.luaDebugPort setting"
+              },
+              "sourceRoots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Script root directories the game's script paths are mapped onto, mod first. Defaults to every project layer's script directories"
+              },
+              "clientName": {
+                "type": "string",
+                "description": "The client name the game logs for this session"
+              },
+              "unsafeTableExpansion": {
+                "type": "boolean",
+                "default": false,
+                "description": "Allow expanding table values in the Variables view. The game is reported to crash on a table member whose text is 255 bytes or longer, so this is off unless you accept losing the game session"
+              },
+              "dropDuplicateOutermostFrame": {
+                "type": "boolean",
+                "default": true,
+                "description": "Drop the outermost call-stack entry when the game reports it twice"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "eaw-lua",
+            "request": "attach",
+            "name": "Attach to Empire at War (Lua)"
+          },
+          {
+            "type": "eaw-lua",
+            "request": "launch",
+            "name": "Launch Empire at War (Lua)",
+            "program": "${config:aet-eaw-edit.game.executable}"
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Empire at War: Attach to the Lua debugger",
+            "description": "Attach to a running debug build of the game whose Lua debug server is up",
+            "body": {
+              "type": "eaw-lua",
+              "request": "attach",
+              "name": "Attach to Empire at War (Lua)"
+            }
+          },
+          {
+            "label": "Empire at War: Launch with the Lua debugger",
+            "description": "Start the game with the project's mod chain and attach",
+            "body": {
+              "type": "eaw-lua",
+              "request": "launch",
+              "name": "Launch Empire at War (Lua)",
+              "program": "^\"\\${config:aet-eaw-edit.game.executable}\""
+            }
+          }
+        ]
+      }
+    ],
     "viewsContainers": {
       "activitybar": [
         {
@@ -60,6 +208,15 @@
           "icon": "resources/icons/book-journal-whills-solid-full.svg",
           "when": "config.aet-eaw-edit.features.tools.storyEditor && config.aet-eaw-edit.features.story.discovery"
         }
+      ],
+      "debug": [
+        {
+          "id": "aet-eaw-edit.luaDebug.scripts",
+          "name": "Lua Scripts",
+          "icon": "$(file-code)",
+          "contextualTitle": "Empire at War Lua scripts",
+          "when": "config.aet-eaw-edit.features.lua.debugger"
+        }
       ]
     },
     "menus": {
@@ -76,6 +233,11 @@
         }
       ],
       "view/title": [
+        {
+          "command": "aet-eaw-edit.luaDebug.refreshScripts",
+          "when": "view == aet-eaw-edit.luaDebug.scripts",
+          "group": "navigation"
+        },
         {
           "command": "aet-eaw-edit.lsp.refreshStoryNavigator",
           "when": "view == aet-eaw-edit.lsp.storyNavigator",
@@ -98,6 +260,21 @@
         }
       ],
       "view/item/context": [
+        {
+          "command": "aet-eaw-edit.luaDebug.breakScript",
+          "when": "view == aet-eaw-edit.luaDebug.scripts && viewItem == aetLuaScript",
+          "group": "inline@1"
+        },
+        {
+          "command": "aet-eaw-edit.luaDebug.refreshThreads",
+          "when": "view == aet-eaw-edit.luaDebug.scripts && viewItem == aetLuaScript",
+          "group": "inline@2"
+        },
+        {
+          "command": "aet-eaw-edit.luaDebug.breakThread",
+          "when": "view == aet-eaw-edit.luaDebug.scripts && viewItem == aetLuaThread",
+          "group": "inline"
+        },
         {
           "command": "aet-eaw-edit.lsp.openStoryGraph",
           "when": "view == aet-eaw-edit.lsp.storyNavigator && viewItem == aetStoryFaction",
@@ -126,6 +303,30 @@
       ]
     },
     "commands": [
+      {
+        "command": "aet-eaw-edit.luaDebug.refreshScripts",
+        "title": "EaWEdit: Refresh Lua Scripts",
+        "icon": "$(refresh)",
+        "enablement": "config.aet-eaw-edit.features.lua.debugger && aet-eaw-edit.luaDebug.sessionActive"
+      },
+      {
+        "command": "aet-eaw-edit.luaDebug.refreshThreads",
+        "title": "EaWEdit: Refresh Script Threads",
+        "icon": "$(list-tree)",
+        "enablement": "aet-eaw-edit.luaDebug.sessionActive"
+      },
+      {
+        "command": "aet-eaw-edit.luaDebug.breakScript",
+        "title": "EaWEdit: Break in Script",
+        "icon": "$(debug-pause)",
+        "enablement": "aet-eaw-edit.luaDebug.sessionActive && aet-eaw-edit.luaDebug.canBreak"
+      },
+      {
+        "command": "aet-eaw-edit.luaDebug.breakThread",
+        "title": "EaWEdit: Break in Thread",
+        "icon": "$(debug-pause)",
+        "enablement": "aet-eaw-edit.luaDebug.sessionActive && aet-eaw-edit.luaDebug.canBreak"
+      },
       {
         "command": "aet-eaw-edit.lsp.debug.forceStartup",
         "title": "EaWEdit: Force LSP Startup",
@@ -602,6 +803,12 @@
             "default": true,
             "markdownDescription": "Enables code actions (quick fixes) in Lua script files.\n\nChanging this setting automatically restarts the LSP server."
           },
+          "aet-eaw-edit.features.lua.debugger": {
+            "order": 1820,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Enables the Lua debugger: the *Empire at War Lua* debug type, which attaches to a running debug build of the game or launches it with the project's mod chain.\n\n*Work in progress - disabled by default.*\n\nChanging this setting automatically restarts the LSP server."
+          },
           "aet-eaw-edit.features.story.discovery": {
             "order": 1850,
             "type": "boolean",
@@ -707,6 +914,48 @@
             "format": "uri",
             "scope": "machine-overridable",
             "markdownDescription": "Download location for *Set Up Base Shader Sources*. For proxies, mirrors and air-gapped machines.\n\nLeave empty to use Petroglyph's published download."
+          }
+        }
+      },
+      {
+        "title": "Lua debugger",
+        "properties": {
+          "aet-eaw-edit.game.executable": {
+            "order": 3100,
+            "type": "string",
+            "default": "",
+            "format": "uri-reference",
+            "scope": "machine-overridable",
+            "markdownDescription": "Path to the internal/debug `StarWarsI.exe` the Lua debugger launches. A retail build has no Lua debug server.\n\nOnly used when `#aet-eaw-edit.features.lua.debugger#` is enabled."
+          },
+          "aet-eaw-edit.game.arguments": {
+            "order": 3200,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [],
+            "markdownDescription": "Extra command-line arguments for the game when the Lua debugger launches it, placed before the mod chain."
+          },
+          "aet-eaw-edit.game.luaDebugHost": {
+            "order": 3300,
+            "type": "string",
+            "default": "127.0.0.1",
+            "markdownDescription": "The machine running the game. The debugger talks to it over UDP."
+          },
+          "aet-eaw-edit.game.luaDebugPort": {
+            "order": 3400,
+            "type": "integer",
+            "default": 1234,
+            "minimum": 1,
+            "maximum": 65535,
+            "markdownDescription": "The game's Lua debug UDP port. The game takes the first free port from 1234 upward."
+          },
+          "aet-eaw-edit.game.unsafeTableExpansion": {
+            "order": 3500,
+            "type": "boolean",
+            "default": false,
+            "markdownDescription": "Allows expanding table values in the Variables view. The game is reported to crash on a table member whose text is 255 bytes or longer, so leave this off unless losing the game session is acceptable."
           }
         }
       }

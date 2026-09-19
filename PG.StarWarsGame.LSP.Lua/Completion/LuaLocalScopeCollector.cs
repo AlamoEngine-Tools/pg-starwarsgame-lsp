@@ -83,7 +83,7 @@ internal static class LuaLocalScopeCollector
         return entries;
     }
 
-    private static int ComputeOffset(string text, int line, int character)
+    internal static int ComputeOffset(string text, int line, int character)
     {
         var offset = 0;
         var lines = text.Split('\n');
@@ -93,7 +93,7 @@ internal static class LuaLocalScopeCollector
         return offset;
     }
 
-    private static void CollectLocals(
+    internal static void CollectLocals(
         SyntaxNode root,
         int cursorOffset,
         List<ScopeEntry> entries)
@@ -121,7 +121,7 @@ internal static class LuaLocalScopeCollector
         return ann.TypeAnnotation is { IsEmpty: false } t ? t.Raw : null;
     }
 
-    private static void CollectParameters(
+    internal static void CollectParameters(
         SyntaxNode root,
         int cursorOffset,
         List<ScopeEntry> entries)

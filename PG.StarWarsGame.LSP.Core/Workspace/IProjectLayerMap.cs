@@ -11,6 +11,9 @@ namespace PG.StarWarsGame.LSP.Core.Workspace;
 /// </summary>
 public interface IProjectLayerMap
 {
+    /// <summary>The layers last passed to <see cref="SetLayers" />, in the order given; empty before the first load.</summary>
+    IReadOnlyList<ProjectLayer> Layers { get; }
+
     /// <summary>Replaces the current layer set (e.g. after a project reload).</summary>
     void SetLayers(IReadOnlyList<ProjectLayer> layers);
 

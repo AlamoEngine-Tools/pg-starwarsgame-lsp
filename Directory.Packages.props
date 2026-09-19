@@ -17,9 +17,17 @@
         <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.11"/>
         <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.11"/>
         <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.11"/>
+        <!-- The Lua debug adapter speaks DAP through the same OmniSharp family as the language
+             server, held at the same version so the two never disagree on the JSON-RPC layer. -->
+        <PackageVersion Include="OmniSharp.Extensions.DebugAdapter.Client" Version="0.19.9"/>
+        <PackageVersion Include="OmniSharp.Extensions.DebugAdapter.Server" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.LanguageClient" Version="0.19.9"/>
         <PackageVersion Include="OmniSharp.Extensions.LanguageServer" Version="0.19.9"/>
         <PackageVersion Include="Semver" Version="3.0.0"/>
+        <!-- The Lua debugger session mirrors the game's own debugger state machine; a declarative
+             machine keeps the "may this command be sent right now" answer in one place, which the
+             adapter and the scripts view both ask. -->
+        <PackageVersion Include="Stateless" Version="5.20.1"/>
         <!-- Writes the glTF/GLB the model preview ships to the webview. MIT, with a real net10.0
              target. Chosen over hand-rolling the container because accessor, skin and animation
              encoding is exactly the kind of spec detail worth not owning - and a .glb opens in any
@@ -44,6 +52,9 @@
         <PackageVersion Include="coverlet.collector" Version="10.0.1"/>
         <PackageVersion Include="coverlet.msbuild" Version="10.0.1"/>
         <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5"/>
+        <!-- FakeTimeProvider for the Lua debugger's reliable channel: resend timers are tested by
+             advancing a clock, never by sleeping. -->
+        <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0"/>
         <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.9.0"/>
         <PackageVersion Include="Microsoft.Testing.Platform" Version="2.3.3"/>
         <PackageVersion Include="System.IO.Abstractions.TestingHelpers" Version="22.2.0"/>

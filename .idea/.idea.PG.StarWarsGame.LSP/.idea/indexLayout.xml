@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="UserContentModel">
-    <attachedFolders />
+    <attachedFolders>
+      <Path>PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit</Path>
+    </attachedFolders>
     <explicitIncludes />
-    <explicitExcludes />
+    <explicitExcludes>
+      <Path>PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/.vscode-test</Path>
+      <Path>PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/node_modules</Path>
+      <Path>PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/out</Path>
+      <Path>PG.StarWarsGame.LSP.Client.VSCode/aet-eaw-edit/dist</Path>
+    </explicitExcludes>
   </component>
 </project>
