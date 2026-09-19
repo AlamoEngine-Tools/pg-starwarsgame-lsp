@@ -61,19 +61,24 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
         var commands = 0;
         var idleAdvances = 0;
         // A perpetual manual event re-arms after every answer; answering it forever would be the
-        // policy looping, not the story. Three answers per node, then it counts as settled.
+        // policy looping, not the story. Eight answers per node, then it counts as settled.
         var answers = new Dictionary<string, int>(StringComparer.Ordinal);
         while (commands < MaxCommands)
         {
             commands++;
-            var next = sim.GetInterventions(snapshot).FirstOrDefault(i => answers.GetValueOrDefault(i.NodeId) < 3);
+            var next = sim.GetInterventions(snapshot).FirstOrDefault(i => answers.GetValueOrDefault(i.NodeId) < 8);
             if (next is not null)
             {
                 idleAdvances = 0;
                 answers[next.NodeId] = answers.GetValueOrDefault(next.NodeId) + 1;
-                snapshot = next is { Kind: "lua", Options.Count: > 0 }
-                    ? sim.LuaNotify(snapshot, next.Options[0])
-                    : sim.SatisfyTrigger(snapshot, next.NodeId);
+                // The policy answers the way an author would: change the world the event asks
+                // for when it names one, else the Lua notification, else assume the trigger met.
+                snapshot = next switch
+                {
+                    { Kind: "lua", Options.Count: > 0 } => sim.LuaNotify(snapshot, next.Options[0]),
+                    { Suggested: { } change } => sim.ApplyWorldChange(snapshot, change),
+                    _ => sim.SatisfyTrigger(snapshot, next.NodeId)
+                };
                 continue;
             }
 
@@ -85,7 +90,7 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
 
         var lifecycles = sim.GetLifecycles(snapshot);
         var offered = sim.GetInterventions(snapshot).Select(i => i.NodeId).ToHashSet(StringComparer.Ordinal);
-        offered.UnionWith(answers.Where(kvp => kvp.Value >= 3).Select(kvp => kvp.Key));
+        offered.UnionWith(answers.Where(kvp => kvp.Value >= 8).Select(kvp => kvp.Key));
         var stuck = model.Graph.Nodes
             .Where(n => n.Kind == StoryNodeKind.Event
                         && lifecycles[n.Id] == StoryEventLifecycle.Armed
@@ -97,6 +102,16 @@ public sealed class VanillaReplayTest(ITestOutputHelper output)
         var fired = lifecycles.Values.Count(l => l == StoryEventLifecycle.Fired);
         output.WriteLine($"{game}/{campaign}/{faction}: events {lifecycles.Count}, fired {fired}, " +
                          $"commands {commands}, clock {snapshot.Clock:0}s, log lines {snapshot.Log.Count}");
+        // Events the policy answered three times without firing: a facet whose suggested change
+        // does not satisfy the event's own parameters. Not a dead end, but a modelling gap to read.
+        var everFired = snapshot.Steps.Where(s => s.To == StoryEventLifecycle.Fired).Select(s => s.NodeId)
+            .ToHashSet(StringComparer.Ordinal);
+        var unanswered = answers.Where(kvp => kvp.Value >= 8 && !everFired.Contains(kvp.Key))
+            .Select(kvp => model.Graph.Nodes.First(n => n.Id == kvp.Key).Event!)
+            .Select(e => $"{e.Name} ({e.EventType})")
+            .ToList();
+        output.WriteLine($"  answered 8x without firing: {unanswered.Count}" +
+                         (unanswered.Count > 0 ? " - " + string.Join(", ", unanswered.Take(12)) : ""));
 
         Assert.True(commands < MaxCommands, "The replay did not settle within the command budget.");
         Assert.Empty(stuck);

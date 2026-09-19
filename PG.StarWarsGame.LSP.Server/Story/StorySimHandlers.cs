@@ -132,6 +132,19 @@ public sealed class StorySimSeekHandler(IStorySimulationService sim, ILspConfigu
     }
 }
 
+public sealed class StorySimWorldHandler(IStorySimulationService sim, ILspConfigurationProvider config)
+    : IJsonRpcRequestHandler<StorySimWorldParams, StorySimStateResult>
+{
+    public Task<StorySimStateResult> Handle(StorySimWorldParams request, CancellationToken ct)
+    {
+        if (StorySimFeature.Rejection(config) is { } rejection)
+            return Task.FromResult(new StorySimStateResult(null, rejection));
+        var (state, error) = sim.ApplyWorldChange(new StoryModelKey(request.Campaign, request.Faction),
+            request.Change, request.SinceSeq);
+        return Task.FromResult(new StorySimStateResult(state, error));
+    }
+}
+
 public sealed class StorySimBreakpointsHandler(IStorySimulationService sim, ILspConfigurationProvider config)
     : IJsonRpcRequestHandler<StorySimBreakpointsParams, StorySimStateResult>
 {

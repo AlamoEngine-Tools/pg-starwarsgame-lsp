@@ -197,6 +197,35 @@ public sealed class StorySimulationServiceTest
     }
 
     [Fact]
+    public void WorldChange_WritesTheFact_AndTheStateCarriesTheWorld()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+
+        var (state, error) = service.ApplyWorldChange(Key,
+            new StorySimWorldChangeDto("capturePlanet") { Planet = "Kuat", Faction = "Rebel" });
+
+        Assert.Null(error);
+        var kuat = Assert.Single(state!.World.Planets, p => p.Name == "Kuat");
+        Assert.Equal("Rebel", kuat.Owner);
+        Assert.Contains(state.Steps, s => s.Cause == "fact");
+        Assert.Equal(1, state.World.Counters.Single(c => c.Name == "conquered|Rebel").Value);
+    }
+
+    [Fact]
+    public void Interventions_CarryFacetAndSuggestedChange_OnTheWire()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+
+        var manual = service.GetState(Key).State!.Interventions.Single(i => i.EventName == "Manual");
+
+        // STORY_GENERIC with no sub-type: a generic facet with no candidate, so no suggestion.
+        Assert.Equal("generic", manual.Facet);
+        Assert.Null(manual.Suggested);
+    }
+
+    [Fact]
     public void RunToDecision_StopsAtTheFirstIntervention()
     {
         var (service, _) = BuildService();

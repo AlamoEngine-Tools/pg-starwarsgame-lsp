@@ -284,6 +284,49 @@ export interface StorySimInterventionDto {
     eventName: string;
     eventType?: string | null;
     options: string[];
+    /** The world change kind that fires this event when its type reads the world. */
+    facet?: string | null;
+    /** A ready change built from the event's own parameters; null when the author must pick. */
+    suggested?: StorySimWorldChangeDto | null;
+}
+
+/** An author's change to the world; fields a kind does not read stay undefined. */
+export interface StorySimWorldChangeDto {
+    kind: string;
+    planet?: string | null;
+    unitType?: string | null;
+    faction?: string | null;
+    name?: string | null;
+    mode?: string | null;
+    amount?: number;
+    flags?: StorySimFlagDto[] | null;
+    nodeId?: string | null;
+}
+
+export interface StorySimPlanetDto {
+    name: string;
+    owner?: string | null;
+    revealed: boolean;
+    corrupted: boolean;
+    destroyed: boolean;
+}
+
+export interface StorySimUnitDto {
+    type: string;
+    owner: string;
+    planet: string;
+    count: number;
+}
+
+/** The fact table: seeded from the campaign, then written only by rewards and the author. */
+export interface StorySimWorldDto {
+    planets: StorySimPlanetDto[];
+    units: StorySimUnitDto[];
+    tech: StorySimFlagDto[];
+    credits: StorySimFlagDto[];
+    era?: string | null;
+    counters: StorySimFlagDto[];
+    objectives: string[];
 }
 
 export interface StorySimStateDto {
@@ -305,6 +348,7 @@ export interface StorySimStateDto {
     breakOnGates: boolean;
     /** The event whose breakpoint halted the last run, until the next command. */
     haltedAt?: string | null;
+    world: StorySimWorldDto;
 }
 
 export interface StorySimStateResult {

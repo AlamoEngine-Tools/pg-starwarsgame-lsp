@@ -24,6 +24,9 @@ public interface IStorySimulationService
 
     (StorySimStateDto? State, string? Error) SetBreakpoints(StoryModelKey key, IReadOnlyList<string> nodeIds,
         bool onConditionalGates);
+
+    (StorySimStateDto? State, string? Error) ApplyWorldChange(StoryModelKey key, StorySimWorldChangeDto change,
+        int sinceSeq = 0);
 }
 
 /// <summary>
@@ -36,7 +39,8 @@ public sealed class StorySimulationService(
     IStoryModelService modelService,
     IGameIndexService indexService,
     ISchemaProvider schema,
-    Action<StoryModelKey> notifyChanged) : IStorySimulationService
+    Action<StoryModelKey> notifyChanged,
+    IStoryWorldSymbols? symbols = null) : IStorySimulationService
 {
     private const int LogTail = 200;
     private readonly object _gate = new();
@@ -48,7 +52,7 @@ public sealed class StorySimulationService(
         if (model is null)
             return (null, $"{key} was not found.");
 
-        var simulator = new StorySimulator(model, schema);
+        var simulator = new StorySimulator(model, schema, symbols);
         var session = new Session(simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
             ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None);
         lock (_gate)
@@ -111,6 +115,12 @@ public sealed class StorySimulationService(
     public (StorySimStateDto? State, string? Error) RunToDecision(StoryModelKey key, int sinceSeq = 0)
     {
         return Mutate(key, new SimCommand(SimCommandKind.Run), sinceSeq);
+    }
+
+    public (StorySimStateDto? State, string? Error) ApplyWorldChange(StoryModelKey key, StorySimWorldChangeDto change,
+        int sinceSeq = 0)
+    {
+        return Mutate(key, new SimCommand(SimCommandKind.World) { Change = ToChange(change) }, sinceSeq);
     }
 
     public (StorySimStateDto? State, string? Error) Seek(StoryModelKey key, int tick)
@@ -179,6 +189,7 @@ public sealed class StorySimulationService(
             SimCommandKind.Lua => sim.LuaNotify(snapshot, command.Text!),
             SimCommandKind.Tick => sim.Tick(snapshot, command.Number, breakpoints),
             SimCommandKind.Run => sim.RunToDecision(snapshot, breakpoints),
+            SimCommandKind.World when command.Change is { } change => sim.ApplyWorldChange(snapshot, change),
             _ => snapshot
         };
     }
@@ -239,7 +250,8 @@ public sealed class StorySimulationService(
                     fireCounts.GetValueOrDefault(kvp.Key)))
                 .ToList(),
             session.Simulator.GetInterventions(snapshot)
-                .Select(i => new StorySimInterventionDto(i.Kind, i.NodeId, i.EventName, i.EventType, i.Options))
+                .Select(i => new StorySimInterventionDto(i.Kind, i.NodeId, i.EventName, i.EventType, i.Options,
+                    i.Facet, i.Suggested is null ? null : ToChangeDto(i.Suggested)))
                 .ToList(),
             session.LuaNotifications,
             snapshot.Log.Count > LogTail ? snapshot.Log.GetRange(snapshot.Log.Count - LogTail, LogTail) : snapshot.Log,
@@ -251,7 +263,47 @@ public sealed class StorySimulationService(
             snapshot.Steps.Count,
             session.Breakpoints.NodeIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
             session.Breakpoints.OnConditionalGates,
-            snapshot.HaltedAt);
+            snapshot.HaltedAt,
+            ToWorldDto(snapshot.Runtime.World));
+    }
+
+    private static StorySimWorldDto ToWorldDto(StoryWorld world)
+    {
+        static List<StorySimFlagDto> Pairs(IEnumerable<KeyValuePair<string, int>> source)
+        {
+            return source.OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(kvp => new StorySimFlagDto(kvp.Key, kvp.Value)).ToList();
+        }
+
+        return new StorySimWorldDto(
+            world.Planets.Values.OrderBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                .Select(p => new StorySimPlanetDto(p.Name, p.Owner, p.Revealed, p.Corrupted, p.Destroyed)).ToList(),
+            world.UnitFacts().OrderBy(u => u.Planet, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(u => u.Owner, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(u => u.Type, StringComparer.OrdinalIgnoreCase)
+                .Select(u => new StorySimUnitDto(u.Type, u.Owner, u.Planet, u.Count)).ToList(),
+            Pairs(world.Tech), Pairs(world.Credits), world.Era, Pairs(world.Counters),
+            world.Objectives.OrderBy(o => o, StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
+    private static StoryWorldChange ToChange(StorySimWorldChangeDto dto)
+    {
+        return new StoryWorldChange(dto.Kind)
+        {
+            Planet = dto.Planet, UnitType = dto.UnitType, Faction = dto.Faction, Name = dto.Name, Mode = dto.Mode,
+            Amount = dto.Amount, NodeId = dto.NodeId,
+            Flags = dto.Flags?.Select(f => new StoryFlagWrite(f.Name, f.Value)).ToList()
+        };
+    }
+
+    private static StorySimWorldChangeDto ToChangeDto(StoryWorldChange change)
+    {
+        return new StorySimWorldChangeDto(change.Kind)
+        {
+            Planet = change.Planet, UnitType = change.UnitType, Faction = change.Faction, Name = change.Name,
+            Mode = change.Mode, Amount = change.Amount, NodeId = change.NodeId,
+            Flags = change.Flags?.Select(f => new StorySimFlagDto(f.Flag, f.Value)).ToList()
+        };
     }
 
     private IReadOnlyList<string> CollectLuaNotifications(IReadOnlyList<string> luaScripts)
@@ -281,10 +333,14 @@ public sealed class StorySimulationService(
         Flag,
         Lua,
         Tick,
-        Run
+        Run,
+        World
     }
 
-    private sealed record SimCommand(SimCommandKind Kind, string? Text = null, int Number = 0);
+    private sealed record SimCommand(SimCommandKind Kind, string? Text = null, int Number = 0)
+    {
+        public StoryWorldChange? Change { get; init; }
+    }
 
     private sealed record Session(
         StorySimulator Simulator,

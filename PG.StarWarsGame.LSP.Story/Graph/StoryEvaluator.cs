@@ -65,6 +65,31 @@ public sealed record StoryRuntimeState
     public ImmutableHashSet<string> PendingCompletions { get; init; } =
         ImmutableHashSet.Create<string>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>The fact table the simulator's world changes and rewards write; empty for static analysis.</summary>
+    public Sim.StoryWorld World { get; init; } = Sim.StoryWorld.Empty;
+
+    /// <summary>
+    ///     Per-event dispatch counts for the counting types (a STORY_CONQUER with a count, the
+    ///     battle counters): the engine keeps these on the event object and resets them with it.
+    /// </summary>
+    public ImmutableDictionary<string, int> Hits { get; init; } =
+        ImmutableDictionary.Create<string, int>(StringComparer.Ordinal);
+
+    public StoryRuntimeState WithWorld(Sim.StoryWorld world)
+    {
+        return this with { World = world };
+    }
+
+    public StoryRuntimeState WithHit(string eventNodeId)
+    {
+        return this with { Hits = Hits.SetItem(eventNodeId, Hits.GetValueOrDefault(eventNodeId) + 1) };
+    }
+
+    public StoryRuntimeState WithoutHits(string eventNodeId)
+    {
+        return this with { Hits = Hits.Remove(eventNodeId) };
+    }
+
     public StoryRuntimeState WithFired(string eventNodeId)
     {
         return this with { FiredEvents = FiredEvents.Add(eventNodeId) };

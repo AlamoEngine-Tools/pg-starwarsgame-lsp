@@ -29,13 +29,20 @@ public sealed record StorySimSnapshot
     public ImmutableList<string> Log { get; init; } = ImmutableList<string>.Empty;
 }
 
-/// <summary>One actionable choice the simulation is waiting on.</summary>
+/// <summary>
+///     One actionable choice the simulation is waiting on. <see cref="Facet" /> names the world
+///     change kind that would fire the event when its type reads the world; <see cref="Options" />
+///     are the candidates the event's own parameters name (planets, unit types, notification ids)
+///     and <see cref="Suggested" /> is the first of them as a ready change.
+/// </summary>
 public sealed record StorySimIntervention(
     string Kind, // "manual" | "lua" | "tactical"
     string NodeId,
     string EventName,
     string? EventType,
-    IReadOnlyList<string> Options);
+    IReadOnlyList<string> Options,
+    string? Facet = null,
+    StoryWorldChange? Suggested = null);
 
 /// <summary>
 ///     Semantic story simulation over <see cref="StoryEvaluator" /> - no game process, no DAP.
@@ -60,7 +67,7 @@ public sealed record StorySimIntervention(
 ///     LuaNotify for <c>STORY_AI_NOTIFICATION</c>, and tactical outcomes resolved by firing the
 ///     armed <c>STORY_VICTORY</c>/<c>STORY_MISSION_LOST</c>/<c>STORY_MISSION_FAILED</c> events.
 /// </summary>
-public sealed class StorySimulator
+public sealed partial class StorySimulator
 {
     public const double ClockStepSeconds = 1;
     private const int MaxFireDepth = 64;
@@ -78,10 +85,16 @@ public sealed class StorySimulator
     private readonly Dictionary<string, List<List<string>>> _prereqLinesById;
     private readonly Dictionary<(string Type, int Position), string> _rewardParamTypes;
     private readonly List<string> _startupNotes = [];
+    private readonly IStoryWorldSymbols? _symbols;
 
-    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema)
+    /// <summary>
+    ///     <paramref name="symbols" /> answers whether a planet, unit type or faction the author
+    ///     names exists in the game; null skips the check (tests, static callers).
+    /// </summary>
+    public StorySimulator(StoryCampaignModel model, ISchemaProvider schema, IStoryWorldSymbols? symbols = null)
     {
         _model = model;
+        _symbols = symbols;
         _evaluator = new StoryEvaluator(model.Graph);
         _eventNodes = model.Graph.Nodes.Where(n => n.Kind == StoryNodeKind.Event).ToList();
         _nodesById = _eventNodes.ToDictionary(n => n.Id, StringComparer.Ordinal);
@@ -142,7 +155,8 @@ public sealed class StorySimulator
             Runtime = StoryRuntimeState.Initial with
             {
                 SuspendedThreads = StoryRuntimeState.Initial.SuspendedThreads.Union(_model.SuspendedThreadUris),
-                ArmedEvents = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
+                ArmedEvents = ImmutableHashSet.Create<string>(StringComparer.Ordinal),
+                World = SeedWorld(_model.Seed)
             },
             Log = ImmutableList.Create("Simulation started.").AddRange(_startupNotes)
         };
@@ -273,9 +287,16 @@ public sealed class StorySimulator
                 "STORY_VICTORY" or "STORY_MISSION_LOST" or "STORY_MISSION_FAILED" => "tactical",
                 _ => "manual"
             };
-            var options = kind == "lua" ? NotificationIdsOf(storyEvent).ToList() : [];
+            if (kind == "lua")
+            {
+                interventions.Add(new StorySimIntervention(kind, node.Id, storyEvent.Name,
+                    storyEvent.EventType, NotificationIdsOf(storyEvent).ToList()));
+                continue;
+            }
+
+            var (facet, options, suggested) = FacetOf(storyEvent);
             interventions.Add(new StorySimIntervention(kind, node.Id, storyEvent.Name,
-                storyEvent.EventType, options));
+                storyEvent.EventType, options, facet, suggested));
         }
 
         return interventions;
@@ -421,8 +442,10 @@ public sealed class StorySimulator
             return Note(snapshot, node.Id, sourceId, StorySimCause.Ignored,
                 $"'{storyEvent.Name}' is disabled - fire swallowed.");
 
+        // The fire step always lands on Fired, even for a perpetual event whose lifecycle reads
+        // Armed again the moment it re-arms: the engine sets Triggered here and clears it later.
         snapshot = Transition(snapshot, node, sourceId, cause, $"Fired '{storyEvent.Name}' ({cause}).",
-            r => r.WithFired(node.Id));
+            r => r.WithFired(node.Id), StoryEventLifecycle.Fired);
         snapshot = GiveReward(snapshot, node, depth);
 
         if (_dependantsById.TryGetValue(node.Id, out var dependants))
@@ -475,7 +498,7 @@ public sealed class StorySimulator
             "DISABLE_BRANCH" => RewardDisableBranch(snapshot, node),
             "SPEECH" => OweCompletion(snapshot, node, SpeechDone),
             "START_MOVIE" => OweCompletion(snapshot, node, MovieDone),
-            _ => snapshot
+            _ => ApplyWorldReward(snapshot, node, upperReward, depth)
         };
     }
 
@@ -676,11 +699,11 @@ public sealed class StorySimulator
 
     /// <summary>Applies a lifecycle-changing mutation and records the step with the lifecycle before and after.</summary>
     private StorySimSnapshot Transition(StorySimSnapshot snapshot, StoryNode node, string? sourceId, string cause,
-        string? logLine, Func<StoryRuntimeState, StoryRuntimeState> mutate)
+        string? logLine, Func<StoryRuntimeState, StoryRuntimeState> mutate, StoryEventLifecycle? forcedTo = null)
     {
         var from = _evaluator.GetLifecycle(node.Id, snapshot.Runtime);
         var runtime = mutate(snapshot.Runtime);
-        var to = _evaluator.GetLifecycle(node.Id, runtime);
+        var to = forcedTo ?? _evaluator.GetLifecycle(node.Id, runtime);
         var step = new StorySimStep(snapshot.Tick, snapshot.Steps.Count, node.Id, from, to, sourceId, cause);
         return snapshot with
         {

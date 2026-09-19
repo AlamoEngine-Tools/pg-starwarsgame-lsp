@@ -16,6 +16,9 @@ public sealed record StoryCampaignChain(string Name, IReadOnlyList<StoryFactionM
     ///     for manifest attach/detach mutations. Empty for pre-mutation-era cached results.
     /// </summary>
     public string SourceFile { get; init; } = "";
+
+    /// <summary>The campaign's starting world, for the simulator. Empty for pre-seed cached results.</summary>
+    public StoryCampaignSeed Seed { get; init; } = StoryCampaignSeed.Empty;
 }
 
 /// <summary>The parsed entries of one plot manifest (xml-relative thread files, raw Lua names).</summary>

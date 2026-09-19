@@ -2,6 +2,7 @@
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
 using PG.StarWarsGame.LSP.Core.Schema;
+using PG.StarWarsGame.LSP.Story.Discovery;
 using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Model;
 using PG.StarWarsGame.LSP.Story.Sim;
@@ -289,6 +290,254 @@ public sealed class StorySimulatorTest
             s => s.NodeId == NodeId(model, "Follower") && s.To == StoryEventLifecycle.Fired);
         Assert.Equal(NodeId(model, "Root"), followerFired.SourceNodeId);
         Assert.True(armed.Seq < followerFired.Seq);
+    }
+
+    // ── World facts (chunk 3) ────────────────────────────────────────────────
+
+    private const string WorldThreadText =
+        "<Story>\n" +
+        "\t<Event Name=\"Conq\">\n" +
+        "\t\t<Event_Type>STORY_CONQUER</Event_Type>\n" +
+        "\t\t<Event_Param1>Kuat Corellia</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Build\">\n" +
+        "\t\t<Event_Type>STORY_CONSTRUCT</Event_Type>\n" +
+        "\t\t<Event_Param1>X_Wing</Event_Param1>\n" +
+        "\t\t<Event_Param2>2</Event_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Tech\">\n" +
+        "\t\t<Event_Type>STORY_TECH_LEVEL</Event_Type>\n" +
+        "\t\t<Event_Param1>3</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Win\">\n" +
+        "\t\t<Event_Type>STORY_VICTORY</Event_Type>\n" +
+        "\t\t<Event_Param1>Rebel</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"TwoWins\">\n" +
+        "\t\t<Event_Type>STORY_WIN_BATTLES</Event_Type>\n" +
+        "\t\t<Event_Param1>2</Event_Param1>\n" +
+        "\t\t<Event_Param4>Kuat</Event_Param4>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Rich\">\n" +
+        "\t\t<Event_Type>STORY_ACCUMULATE</Event_Type>\n" +
+        "\t\t<Event_Param1>1000</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Wreck\">\n" +
+        "\t\t<Event_Type>STORY_TACTICAL_DESTROY</Event_Type>\n" +
+        "\t\t<Event_Param1>TIE_Fighter</Event_Param1>\n" +
+        "\t\t<Event_Param3>2</Event_Param3>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Give\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Reward_Type>PLANET_FACTION</Reward_Type>\n" +
+        "\t\t<Reward_Param1>Kuat</Reward_Param1>\n" +
+        "\t\t<Reward_Param2>Empire</Reward_Param2>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Untyped\">\n" +
+        "\t\t<Event_Type>STORY_CLICK_GUI</Event_Type>\n" +
+        "\t\t<Event_Param1>Button_Build</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "</Story>\n";
+
+    private static readonly StoryCampaignSeed Seed = new(
+        ["Kuat", "Corellia", "Hoth"],
+        [new StoryStartingForce("Rebel", "Hoth", "X_Wing"), new StoryStartingForce("Empire", "Kuat", "TIE_Fighter")],
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = 2 },
+        new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = 500 },
+        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["Rebel"] = "Hoth" });
+
+    private static (StorySimulator Sim, StoryCampaignModel Model) BuildWorld(IStoryWorldSymbols? symbols = null)
+    {
+        var schema = new SimSchemaProvider();
+        var thread = StoryThreadParser.Parse(WorldThreadText, ThreadAUri);
+        var model = new StoryCampaignModel("GC", "Rebel", [thread],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new StoryGraphBuilder(schema).Build([thread])) { Seed = Seed };
+        return (new StorySimulator(model, schema, symbols), model);
+    }
+
+    [Fact]
+    public void Start_SeedsTheWorld_FromTheCampaignSeed()
+    {
+        var (sim, _) = BuildWorld();
+
+        var world = sim.Start().Runtime.World;
+
+        Assert.Equal("Empire", world.Planets["Kuat"].Owner);
+        Assert.Equal("Rebel", world.Planets["Hoth"].Owner);
+        Assert.Null(world.Planets["Corellia"].Owner);
+        Assert.Equal(1, world.UnitCount("X_Wing", "Rebel", "Hoth"));
+        Assert.Equal(2, world.Tech["Rebel"]);
+        Assert.Equal(500, world.Credits["Rebel"]);
+    }
+
+    [Fact]
+    public void CapturePlanet_FiresTheConquerWatcher_ForAListedPlanetOnly()
+    {
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.CapturePlanet) { Planet = "Hoth", Faction = "Rebel" });
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Conq"));
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.CapturePlanet) { Planet = "Kuat", Faction = "Rebel" });
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Conq"));
+        Assert.Equal("Rebel", snapshot.Runtime.World.Planets["Kuat"].Owner);
+        Assert.Contains(snapshot.Steps, s => s.Cause == StorySimCause.World && s.NodeId == NodeId(model, "Conq"));
+    }
+
+    [Fact]
+    public void BuildUnit_CountsToTheConstructThreshold()
+    {
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+        var build = new StoryWorldChange(StoryWorldChangeKind.BuildUnit)
+            { UnitType = "X_Wing", Faction = "Rebel", Planet = "Hoth" };
+
+        snapshot = sim.ApplyWorldChange(snapshot, build);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Build"));
+
+        snapshot = sim.ApplyWorldChange(snapshot, build);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Build"));
+        Assert.Equal(3, snapshot.Runtime.World.UnitCount("X_Wing", "Rebel", "Hoth"));
+    }
+
+    [Fact]
+    public void SetTech_FiresTheTechWatcher_AtOrAboveItsLevel()
+    {
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.SetTech) { Faction = "Rebel", Amount = 2 });
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Tech"));
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.SetTech) { Faction = "Rebel", Amount = 4 });
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Tech"));
+        Assert.Equal(4, snapshot.Runtime.World.Tech["Rebel"]);
+    }
+
+    [Fact]
+    public void BattleWon_FiresVictoryForThatFaction_CountsListedPlanets_AndWritesAttachedFlags()
+    {
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+        var win = new StoryWorldChange(StoryWorldChangeKind.BattleWon)
+        {
+            Planet = "Kuat", Faction = "Rebel", Mode = "space",
+            Flags = [new StoryFlagWrite("MISSION_DONE", 1)]
+        };
+
+        snapshot = sim.ApplyWorldChange(snapshot, win);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Win"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "TwoWins"));
+        Assert.Equal(1, snapshot.Runtime.Flags["MISSION_DONE"]);
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.BattleWon) { Planet = "Hoth", Faction = "Rebel" });
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "TwoWins"));
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.BattleWon) { Planet = "Kuat", Faction = "Rebel" });
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "TwoWins"));
+    }
+
+    [Fact]
+    public void AddCredits_FiresAccumulate_WithTheGreaterThanDefault()
+    {
+        // Measured: StoryEventAccumulateClass defaults to COMPARE_NONE, which the switch treats
+        // as GREATER_THAN, and compares the player's credits after the change.
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.AddCredits) { Faction = "Rebel", Amount = 500 });
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Rich"));
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.AddCredits) { Faction = "Rebel", Amount = 1 });
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Rich"));
+        Assert.Equal(1001, snapshot.Runtime.World.Credits["Rebel"]);
+    }
+
+    [Fact]
+    public void DestroyUnit_CountsPerTypeToTheThreshold()
+    {
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+        var wreck = new StoryWorldChange(StoryWorldChangeKind.DestroyUnit)
+            { UnitType = "TIE_Fighter", Faction = "Empire", Planet = "Kuat" };
+
+        snapshot = sim.ApplyWorldChange(snapshot, wreck);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Wreck"));
+        Assert.Equal(0, snapshot.Runtime.World.UnitCount("TIE_Fighter", "Empire", "Kuat"));
+
+        snapshot = sim.ApplyWorldChange(snapshot, wreck);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "Wreck"));
+    }
+
+    [Fact]
+    public void PlanetFactionReward_WritesTheOwnerFact()
+    {
+        var (sim, model) = BuildWorld();
+        var snapshot = sim.Start();
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.CapturePlanet) { Planet = "Kuat", Faction = "Rebel" });
+        Assert.Equal("Rebel", snapshot.Runtime.World.Planets["Kuat"].Owner);
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Give"));
+
+        Assert.Equal("Empire", snapshot.Runtime.World.Planets["Kuat"].Owner);
+    }
+
+    [Fact]
+    public void UnknownPlanet_IsIgnoredWithAWarning_WhenSymbolsAreChecked()
+    {
+        var (sim, model) = BuildWorld(new KnownSymbols(["Kuat", "Corellia", "Hoth"]));
+        var snapshot = sim.Start();
+
+        snapshot = sim.ApplyWorldChange(snapshot,
+            new StoryWorldChange(StoryWorldChangeKind.CapturePlanet) { Planet = "Kuatt", Faction = "Rebel" });
+
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "Conq"));
+        Assert.False(snapshot.Runtime.World.Planets.ContainsKey("Kuatt"));
+        Assert.Contains(snapshot.Steps, s => s.Cause == StorySimCause.Ignored && s.Detail!.Contains("Kuatt"));
+    }
+
+    [Fact]
+    public void Interventions_CarryTheWorldFacet_AndASuggestedChange()
+    {
+        var (sim, _) = BuildWorld();
+        var snapshot = sim.Start();
+
+        var interventions = sim.GetInterventions(snapshot);
+
+        var conquer = Assert.Single(interventions, i => i.EventName == "Conq");
+        Assert.Equal(StoryWorldChangeKind.CapturePlanet, conquer.Facet);
+        Assert.Equal(["Kuat", "Corellia"], conquer.Options);
+        Assert.Equal("Kuat", conquer.Suggested!.Planet);
+        Assert.Equal("Rebel", conquer.Suggested.Faction);
+
+        var tech = Assert.Single(interventions, i => i.EventName == "Tech");
+        Assert.Equal(StoryWorldChangeKind.SetTech, tech.Facet);
+        Assert.Equal(3, tech.Suggested!.Amount);
+
+        var click = Assert.Single(interventions, i => i.EventName == "Untyped");
+        Assert.Equal(StoryWorldChangeKind.ClickGui, click.Facet);
+        Assert.Equal("Button_Build", click.Suggested!.Name);
+    }
+
+    private sealed class KnownSymbols(IEnumerable<string> planets) : IStoryWorldSymbols
+    {
+        private readonly HashSet<string> _planets = new(planets, StringComparer.OrdinalIgnoreCase);
+
+        public bool Exists(string kind, string name)
+        {
+            return kind != StoryWorldSymbolKind.Planet || _planets.Contains(name);
+        }
     }
 
     private const string TimerChainText =

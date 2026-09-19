@@ -59,7 +59,7 @@ import styled, {createGlobalStyle} from 'styled-components';
 
 import {
     StoryDiagnosticDto, StoryGraphEdgeDto, StoryGraphNodeDto, StoryLayoutEntryDto,
-    StoryParamOptionDto, StoryParamSchemaDto, StorySimNodeStateDto, StorySimStateDto, StorySimStepDto,
+    StoryParamOptionDto, StoryParamSchemaDto, StorySimStateDto, StorySimStepDto, StorySimWorldChangeDto,
 } from '../protocol';
 
 import {readPanelSize, writePanelSize} from './shared/panelLayout';
@@ -147,6 +147,53 @@ function writePace(pace: SimPace): void {
         localStorage.setItem(SIM_PACE_KEY, JSON.stringify(pace));
     } catch {
         // Same: nothing to do when storage is unavailable.
+    }
+}
+
+/** A world change as the author reads it - the button label for a suggested change. */
+function describeChange(change: StorySimWorldChangeDto): string {
+    const who = change.faction ?? '';
+    switch (change.kind) {
+        case 'capturePlanet':
+            return `${who} captures ${change.planet ?? '?'}`;
+        case 'buildUnit':
+            return `${who} builds ${change.unitType ?? '?'}`;
+        case 'destroyUnit':
+            return `${change.unitType ?? '?'} destroyed`;
+        case 'destroyAll':
+            return `All ${change.unitType ?? 'units'} of ${who} destroyed`;
+        case 'captureUnit':
+            return `${who} captures ${change.unitType ?? '?'}`;
+        case 'setTech':
+            return `${who} tech level ${change.amount ?? 1}`;
+        case 'addCredits':
+            return `${who} credits +${change.amount ?? 0}`;
+        case 'battleWon':
+            return `${who} wins${change.planet ? ' at ' + change.planet : ''}`;
+        case 'battleLost':
+            return `${who} loses${change.name ? ' ' + change.name : ''}`;
+        case 'battleStarted':
+            return `${change.mode ?? 'a'} battle at ${change.planet ?? '?'}`;
+        case 'enterPlanet':
+            return `${who} enters ${change.planet ?? '?'}`;
+        case 'bounced':
+            return `${who} bounced at ${change.planet ?? '?'}`;
+        case 'moveUnit':
+            return `${change.unitType ?? '?'} to ${change.planet ?? '?'}`;
+        case 'clickGui':
+            return `Click ${change.name ?? '?'}`;
+        case 'selectPlanet':
+            return `Select ${change.planet ?? '?'}`;
+        case 'corrupt':
+            return `Corrupt ${change.planet ?? '?'}`;
+        case 'beginEra':
+            return `Era ${change.amount ?? 1}`;
+        case 'planetDestroyed':
+            return `${change.planet ?? '?'} destroyed`;
+        case 'generic':
+            return `Trigger ${change.name ?? '?'}`;
+        default:
+            return change.kind;
     }
 }
 
@@ -5455,12 +5502,42 @@ function SimControls(props: { state: StorySimStateDto; transport: SimTransport }
                         {i.kind === 'lua' && i.options.length
                             ? i.options.map(o => (
                                 <button key={o} title={`Story_Event("${o}")`}
-                                        onClick={() => sendSim('luaNotify', {id: o})}>{o}</button>
+                                        onClick={() => simRequest('luaNotify', {id: o})}>{o}</button>
                             ))
-                            : <button title="Fire this event's trigger"
-                                      onClick={() => sendSim('satisfyTrigger', {nodeId: i.nodeId})}>Fire</button>}
+                            : i.suggested
+                                ? <button title={describeChange(i.suggested)}
+                                          onClick={() => simRequest('world', {change: i.suggested})}>
+                                    {describeChange(i.suggested)}
+                                </button>
+                                : <button title="Assume this event's trigger condition met"
+                                          onClick={() => simRequest('satisfyTrigger', {nodeId: i.nodeId})}>Assume
+                                    met</button>}
                     </div>
                 ))}
+            </div>
+            <div className="sim-section">
+                <div className="sim-head">World</div>
+                {state.world.planets.filter(p => p.owner).map(p => (
+                    <div className="sim-row" key={p.name}>
+                        <span className="sim-name" title={p.name}>{p.name}</span>
+                        <span className="sim-name" title={'Owner - ' + p.owner}>{p.owner}</span>
+                    </div>
+                ))}
+                {state.world.tech.map(t => (
+                    <div className="sim-row" key={'tech-' + t.name}>
+                        <span className="sim-name">Tech {t.name}</span>
+                        <span>{t.value}</span>
+                    </div>
+                ))}
+                {state.world.credits.map(c => (
+                    <div className="sim-row" key={'credits-' + c.name}>
+                        <span className="sim-name">Credits {c.name}</span>
+                        <span>{c.value}</span>
+                    </div>
+                ))}
+                <div className="sim-row">{state.world.units.reduce((n, u) => n + u.count, 0)} units
+                    on {state.world.planets.length} planets
+                </div>
                 {state.luaNotifications.length ? (
                     <div className="sim-row">
                         <select

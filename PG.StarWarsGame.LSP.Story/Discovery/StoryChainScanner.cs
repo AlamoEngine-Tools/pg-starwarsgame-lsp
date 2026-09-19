@@ -109,7 +109,8 @@ public sealed class StoryChainScanner
             if (campaignName.Length > 0 && factionManifests.Count > 0)
                 state.Campaigns.Add(new StoryCampaignChain(campaignName, factionManifests)
                 {
-                    SourceFile = campaignRel
+                    SourceFile = campaignRel,
+                    Seed = ReadSeed(campaignNode)
                 });
         }
 
@@ -120,6 +121,45 @@ public sealed class StoryChainScanner
                                  StoryNameTagSyntax.IsStoryNameTag(n.Name) && !processed.Contains(n)))
         foreach (var (_, plotFile) in StoryNameTagSyntax.ReadPairs(node.Name, node.InnerText))
             AddManifest(plotFile, source.At(node, plotFile), StoryChainProblemKind.UnresolvedStoryName, state);
+    }
+
+    /// <summary>
+    ///     The campaign's starting world in the simulator's simplified form. Every tag here is a
+    ///     comma list; the engine trims the pieces, so a stray space or newline is not a name.
+    /// </summary>
+    private static StoryCampaignSeed ReadSeed(HtmlNode campaignNode)
+    {
+        var planets = new List<string>();
+        var forces = new List<StoryStartingForce>();
+        var tech = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var credits = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        var homes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var node in campaignNode.ChildNodes.Where(n => n.NodeType == HtmlNodeType.Element))
+        {
+            var parts = node.InnerText.Split(',',
+                StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            switch (node.Name.ToLowerInvariant())
+            {
+                case "locations":
+                    planets.AddRange(parts);
+                    break;
+                case "starting_forces" when parts.Length >= 3:
+                    forces.Add(new StoryStartingForce(parts[0], parts[1], parts[2]));
+                    break;
+                case "starting_tech_level" when parts.Length >= 2 && int.TryParse(parts[1], out var level):
+                    tech[parts[0]] = level;
+                    break;
+                case "starting_credits" when parts.Length >= 2 && int.TryParse(parts[1], out var amount):
+                    credits[parts[0]] = amount;
+                    break;
+                case "home_location" when parts.Length >= 2:
+                    homes[parts[0]] = parts[1];
+                    break;
+            }
+        }
+
+        return new StoryCampaignSeed(planets, forces, tech, credits, homes);
     }
 
     private void AddManifest(string rawReference, SourceLocation origin,

@@ -45,6 +45,12 @@ public static class StorySimCause
     /// <summary>Fired by a TRIGGER_EVENT reward (or RESET_BRANCH's second parameter).</summary>
     public const string Trigger = "trigger";
 
+    /// <summary>Fired by a world change the author made (or a reward's write to the world).</summary>
+    public const string World = "world";
+
+    /// <summary>A fact written to the world (detail says which).</summary>
+    public const string Fact = "fact";
+
     /// <summary>Cleared by RESET_EVENT or RESET_BRANCH.</summary>
     public const string Reset = "reset";
 
@@ -74,7 +80,7 @@ public static class StorySimCause
 
     /// <summary>The causes that mean "this event fired", for fire counts.</summary>
     public static readonly IReadOnlySet<string> Fires =
-        new HashSet<string>(StringComparer.Ordinal) { Manual, Lua, Poll, Prereq, Trigger, Speech, Movie };
+        new HashSet<string>(StringComparer.Ordinal) { Manual, Lua, Poll, Prereq, Trigger, Speech, Movie, World };
 }
 
 /// <summary>

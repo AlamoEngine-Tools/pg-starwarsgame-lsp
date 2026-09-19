@@ -24,6 +24,41 @@ public sealed class StoryChainScannerTest
         return new StoryChainScanner(resolver).Scan(Registry);
     }
 
+    [Fact]
+    public void Scan_ReadsTheCampaignSeed_ForTheSimulator()
+    {
+        var resolver = new FakeResolver()
+            .Add(Registry, CampaignRegistry("Campaigns_Test.xml"))
+            .Add("Campaigns_Test.xml",
+                """
+                <Campaigns>
+                  <Campaign Name="Test">
+                    <Rebel_Story_Name>Story_Plots_Rebel.xml</Rebel_Story_Name>
+                    <Locations>
+                      Galaxy_Core_Art_Model,
+                      Kuat, Hoth
+                    </Locations>
+                    <Home_Location> Rebel, Hoth </Home_Location>
+                    <Starting_Tech_Level> Rebel, 2 </Starting_Tech_Level>
+                    <Starting_Credits> Rebel,  5000 </Starting_Credits>
+                    <Starting_Forces> Rebel, Hoth, X_Wing </Starting_Forces>
+                    <Starting_Forces> Rebel, Hoth, X_Wing </Starting_Forces>
+                    <Starting_Forces> Empire, Kuat, TIE_Fighter </Starting_Forces>
+                  </Campaign>
+                </Campaigns>
+                """)
+            .Add("Story_Plots_Rebel.xml", "<Story_Mode_Plots/>");
+
+        var seed = Scan(resolver).Campaigns.Single().Seed;
+
+        Assert.Equal(["Galaxy_Core_Art_Model", "Kuat", "Hoth"], seed.Planets);
+        Assert.Equal(3, seed.StartingForces.Count);
+        Assert.Equal(new StoryStartingForce("Empire", "Kuat", "TIE_Fighter"), seed.StartingForces[2]);
+        Assert.Equal(2, seed.Tech["Rebel"]);
+        Assert.Equal(5000, seed.Credits["Rebel"]);
+        Assert.Equal("Hoth", seed.HomePlanets["Rebel"]);
+    }
+
     // ── Happy path ───────────────────────────────────────────────────────────
 
     [Fact]

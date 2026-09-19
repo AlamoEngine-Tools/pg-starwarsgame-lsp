@@ -41,22 +41,59 @@ public sealed record StorySimStateDto(
     int TotalSteps,
     IReadOnlyList<string> Breakpoints,
     bool BreakOnGates,
-    string? HaltedAt)
+    string? HaltedAt,
+    StorySimWorldDto World)
 {
     public static StorySimStateDto NotRunning { get; } =
-        new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null);
+        new(false, 0, 0, 1, [], [], [], [], [], [], 0, [], false, null, StorySimWorldDto.Empty);
 }
 
 public sealed record StorySimFlagDto(string Name, int Value);
 
 public sealed record StorySimNodeStateDto(string NodeId, string Lifecycle, int FireCount);
 
+/// <summary>
+///     <see cref="Facet" /> is the world change kind that fires this event when its type reads
+///     the world; <see cref="Suggested" /> is a ready change built from the event's own parameters.
+/// </summary>
 public sealed record StorySimInterventionDto(
     string Kind,
     string NodeId,
     string EventName,
     string? EventType,
-    IReadOnlyList<string> Options);
+    IReadOnlyList<string> Options,
+    string? Facet,
+    StorySimWorldChangeDto? Suggested);
+
+/// <summary>An author's change to the world; the fields a kind does not read stay null.</summary>
+public sealed record StorySimWorldChangeDto(string Kind)
+{
+    public string? Planet { get; init; }
+    public string? UnitType { get; init; }
+    public string? Faction { get; init; }
+    public string? Name { get; init; }
+    public string? Mode { get; init; }
+    public int Amount { get; init; } = 1;
+    public IReadOnlyList<StorySimFlagDto>? Flags { get; init; }
+    public string? NodeId { get; init; }
+}
+
+public sealed record StorySimPlanetDto(string Name, string? Owner, bool Revealed, bool Corrupted, bool Destroyed);
+
+public sealed record StorySimUnitDto(string Type, string Owner, string Planet, int Count);
+
+/// <summary>The fact table. Lists, never dictionaries, for the serializer's sake.</summary>
+public sealed record StorySimWorldDto(
+    IReadOnlyList<StorySimPlanetDto> Planets,
+    IReadOnlyList<StorySimUnitDto> Units,
+    IReadOnlyList<StorySimFlagDto> Tech,
+    IReadOnlyList<StorySimFlagDto> Credits,
+    string? Era,
+    IReadOnlyList<StorySimFlagDto> Counters,
+    IReadOnlyList<string> Objectives)
+{
+    public static StorySimWorldDto Empty { get; } = new([], [], [], [], null, [], []);
+}
 
 /// <summary>One trace transition; lifecycles travel as their enum names, null when the step is not a lifecycle change.</summary>
 public sealed record StorySimStepDto(
@@ -109,6 +146,14 @@ public sealed record StorySimRunToDecisionParams(string Campaign, string Faction
 /// <summary>Replays the session to the state just after the given tick and drops everything after it.</summary>
 [Method("aet/storySimSeek", Direction.ClientToServer)]
 public sealed record StorySimSeekParams(string Campaign, string Faction, int Tick) : IRequest<StorySimStateResult>;
+
+[Method("aet/storySimWorld", Direction.ClientToServer)]
+public sealed record StorySimWorldParams(
+    string Campaign,
+    string Faction,
+    StorySimWorldChangeDto Change,
+    int SinceSeq = 0)
+    : IRequest<StorySimStateResult>;
 
 [Method("aet/storySimBreakpoints", Direction.ClientToServer)]
 public sealed record StorySimBreakpointsParams(

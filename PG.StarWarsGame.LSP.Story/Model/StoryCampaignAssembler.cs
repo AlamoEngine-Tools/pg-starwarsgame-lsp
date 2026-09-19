@@ -33,6 +33,9 @@ public sealed record StoryCampaignModel(
     /// </summary>
     public IReadOnlyDictionary<string, IReadOnlySet<string>> TacticalManifestThreads { get; init; } =
         new Dictionary<string, IReadOnlySet<string>>();
+
+    /// <summary>The campaign's starting world for the simulator; null when the chain carried none.</summary>
+    public StoryCampaignSeed? Seed { get; init; }
 }
 
 /// <summary>
@@ -132,7 +135,9 @@ public sealed class StoryCampaignAssembler(ISchemaProvider schema)
             new StoryGraphBuilder(schema).Build(threads, tacticalManifestThreads))
         {
             LuaScripts = luaScripts,
-            TacticalManifestThreads = tacticalManifestThreads
+            TacticalManifestThreads = tacticalManifestThreads,
+            // The first declaration's seed: a campaign declared across layers keeps one world.
+            Seed = campaigns[0].Seed
         };
 
         void AddThread(string threadFile)
