@@ -226,11 +226,157 @@ public sealed class StorySimulatorTest
         var snapshot = sim.Start();
         Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_X", 1);
+        snapshot = sim.Tick(sim.SetFlag(snapshot, "FLAG_X", 1));
         Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_X", 0);
+        snapshot = sim.Tick(sim.SetFlag(snapshot, "FLAG_X", 0));
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+    }
+
+    [Fact]
+    public void Tick_AdvancesTheClockByOneSecond_AndCommandsDoNotPoll()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        Assert.Equal(0, snapshot.Tick);
+
+        // A command records the world change; the watcher only sees it on the next tick.
+        snapshot = sim.SetFlag(snapshot, "FLAG_X", 0);
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+
+        snapshot = sim.Tick(snapshot);
+        Assert.Equal(1, snapshot.Tick);
+        Assert.Equal(1.0, snapshot.Clock);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "FlagWatcher"));
+    }
+
+    [Fact]
+    public void Start_RecordsLoadArming_AsSteps()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+
+        var rootStep = Assert.Single(snapshot.Steps, s => s.NodeId == NodeId(model, "Root"));
+        Assert.Equal(0, rootStep.Tick);
+        Assert.Equal(StorySimCause.Load, rootStep.Cause);
+        Assert.Equal(StoryEventLifecycle.Armed, rootStep.To);
+        Assert.DoesNotContain(snapshot.Steps, s => s.NodeId == NodeId(model, "Follower"));
+    }
+
+    [Fact]
+    public void Steps_RecordEachTransition_WithSourceAndCause()
+    {
+        var (sim, model) = Build();
+        var snapshot = sim.Start();
+        var before = snapshot.Steps.Count;
+
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Root"));
+
+        var steps = snapshot.Steps.Skip(before).ToList();
+        Assert.Equal(steps.Select(s => s.Seq), steps.Select(s => s.Seq).OrderBy(x => x));
+        var fired = steps[0];
+        Assert.Equal(NodeId(model, "Root"), fired.NodeId);
+        Assert.Equal(StorySimCause.Manual, fired.Cause);
+        Assert.Equal(StoryEventLifecycle.Fired, fired.To);
+
+        var armed = Assert.Single(steps,
+            s => s.NodeId == NodeId(model, "Follower") && s.To == StoryEventLifecycle.Armed);
+        Assert.Equal(StoryEventLifecycle.Waiting, armed.From);
+        Assert.Equal(NodeId(model, "Root"), armed.SourceNodeId);
+        Assert.Equal(StorySimCause.Prereq, armed.Cause);
+
+        var followerFired = Assert.Single(steps,
+            s => s.NodeId == NodeId(model, "Follower") && s.To == StoryEventLifecycle.Fired);
+        Assert.Equal(NodeId(model, "Root"), followerFired.SourceNodeId);
+        Assert.True(armed.Seq < followerFired.Seq);
+    }
+
+    private const string TimerChainText =
+        "<Story>\n" +
+        "\t<Event Name=\"T0\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>1</Event_Param1>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"T1\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>1</Event_Param1>\n" +
+        "\t\t<Prereq>T0</Prereq>\n" +
+        "\t</Event>\n" +
+        "\t<Event Name=\"Decision\">\n" +
+        "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
+        "\t\t<Prereq>T1</Prereq>\n" +
+        "\t</Event>\n" +
+        "</Story>\n";
+
+    private static (StorySimulator Sim, StoryCampaignModel Model) BuildTimerChain()
+    {
+        var schema = new SimSchemaProvider();
+        var thread = StoryThreadParser.Parse(TimerChainText, ThreadAUri);
+        var model = new StoryCampaignModel("GC", "Rebel", [thread],
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+            new StoryGraphBuilder(schema).Build([thread]));
+        return (new StorySimulator(model, schema), model);
+    }
+
+    [Fact]
+    public void RunToDecision_TicksUntilAnInterventionAppears()
+    {
+        var (sim, model) = BuildTimerChain();
+        var snapshot = sim.Start();
+        Assert.Empty(sim.GetInterventions(snapshot));
+
+        // T0 fires at tick 1 and arms T1, which fires at tick 2 and arms the manual Decision.
+        snapshot = sim.RunToDecision(snapshot, StorySimBreakpoints.None);
+
+        Assert.Equal(2, snapshot.Tick);
+        Assert.Equal("Decision", Assert.Single(sim.GetInterventions(snapshot)).EventName);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "T1"));
+    }
+
+    [Fact]
+    public void RunToDecision_StopsWhenATickChangesNothing()
+    {
+        var (sim, model) = BuildTimerChain();
+        var snapshot = sim.RunToDecision(sim.Start(), StorySimBreakpoints.None);
+        snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Decision"));
+
+        // Nothing is left to happen: the run ends after one idle tick instead of spinning.
+        snapshot = sim.RunToDecision(snapshot, StorySimBreakpoints.None);
+
+        Assert.Equal(3, snapshot.Tick);
+        Assert.Empty(sim.GetInterventions(snapshot));
+    }
+
+    [Fact]
+    public void Breakpoint_HaltsAfterTheTickInWhichTheNodeFires()
+    {
+        var (sim, model) = BuildTimerChain();
+        var breakpoints = new StorySimBreakpoints([NodeId(model, "T0")], false);
+        var snapshot = sim.Start();
+
+        snapshot = sim.Tick(snapshot, 5, breakpoints);
+
+        Assert.Equal(1, snapshot.Tick);
+        Assert.Equal(NodeId(model, "T0"), snapshot.HaltedAt);
+        Assert.Contains(snapshot.Steps, s => s.Cause == StorySimCause.Breakpoint && s.NodeId == NodeId(model, "T0"));
+
+        // The halt is a pause, not a wall: the next command continues past it.
+        snapshot = sim.Tick(snapshot, 5, breakpoints);
+        Assert.Null(snapshot.HaltedAt);
+        Assert.Equal(6, snapshot.Tick);
+        Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "T1"));
+    }
+
+    [Fact]
+    public void BreakOnGates_HaltsWhenAClockOrFlagEventFires()
+    {
+        var (sim, model) = BuildTimerChain();
+        var breakpoints = new StorySimBreakpoints([], true);
+
+        var snapshot = sim.RunToDecision(sim.Start(), breakpoints);
+
+        Assert.Equal(1, snapshot.Tick);
+        Assert.Equal(NodeId(model, "T0"), snapshot.HaltedAt);
     }
 
     [Fact]
@@ -353,7 +499,7 @@ public sealed class StorySimulatorTest
         var (sim, model) = Build();
         var snapshot = sim.Start();
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_B", 0);
+        snapshot = sim.Tick(sim.SetFlag(snapshot, "FLAG_B", 0));
 
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "EitherWatcher"));
     }
@@ -364,10 +510,10 @@ public sealed class StorySimulatorTest
         var (sim, model) = Build();
         var snapshot = sim.Start();
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_C", 3);
+        snapshot = sim.Tick(sim.SetFlag(snapshot, "FLAG_C", 3));
         Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_C", 4);
+        snapshot = sim.Tick(sim.SetFlag(snapshot, "FLAG_C", 4));
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
     }
 
@@ -380,8 +526,9 @@ public sealed class StorySimulatorTest
 
         snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Incrementer"));
         snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Incrementer"));
+        snapshot = sim.Tick(snapshot);
 
-        // 2 + 2×2 = 6 > 3 - the greater-than watcher fires after the second increment.
+        // 2 + 2 x 2 = 6 > 3 - the greater-than watcher fires on the tick after the second increment.
         Assert.Equal(6, snapshot.Runtime.Flags["FLAG_C"]);
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "CounterWatcher"));
     }
@@ -442,21 +589,23 @@ public sealed class StorySimulatorTest
         Assert.Equal(StoryEventLifecycle.Inactive, LifecycleOf(sim, snapshot, model, "BEvent"));
 
         snapshot = sim.SatisfyTrigger(snapshot, NodeId(model, "Activator"));
+        Assert.Equal(StoryEventLifecycle.Armed, LifecycleOf(sim, snapshot, model, "BEvent"));
 
-        // Thread B is active now; its elapsed-0 event fires in the same cascade.
+        // Thread B is active now; its elapsed-0 event fires on the next tick's poll.
+        snapshot = sim.Tick(snapshot);
         Assert.Equal(StoryEventLifecycle.Fired, LifecycleOf(sim, snapshot, model, "BEvent"));
     }
 
     [Fact]
-    public void PerpetualEvent_RefiresOncePerCommandCascade()
+    public void PerpetualEvent_RefiresOncePerTick()
     {
         var (sim, model) = Build();
         var snapshot = sim.Start();
 
-        snapshot = sim.SetFlag(snapshot, "FLAG_P", 0);
+        snapshot = sim.Tick(sim.SetFlag(snapshot, "FLAG_P", 0));
         var firstCount = snapshot.Log.Count(l => l.Contains("Fired 'PerpFlag'"));
 
-        snapshot = sim.AdvanceClock(snapshot, 1);
+        snapshot = sim.Tick(snapshot);
         var secondCount = snapshot.Log.Count(l => l.Contains("Fired 'PerpFlag'"));
 
         Assert.Equal(1, firstCount);
@@ -488,7 +637,9 @@ public sealed class StorySimulatorTest
             var flags = string.Join(",", snapshot.Runtime.Flags
                 .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(kvp => $"{kvp.Key}={kvp.Value}"));
-            return $"{fired}|{flags}|{snapshot.Clock}|{string.Join(";", snapshot.Log)}";
+            var steps = string.Join(";",
+                snapshot.Steps.Select(s => $"{s.Tick}:{s.Seq}:{s.NodeId}:{s.From}>{s.To}:{s.Cause}"));
+            return $"{fired}|{flags}|{snapshot.Clock}|{string.Join(";", snapshot.Log)}|{steps}";
         }
 
         static string Run()

@@ -178,6 +178,10 @@ public static class ServerConfigurator
             .WithHandler<StorySimSetFlagHandler>()
             .WithHandler<StorySimAdvanceClockHandler>()
             .WithHandler<StorySimLuaNotifyHandler>()
+            .WithHandler<StorySimTickHandler>()
+            .WithHandler<StorySimRunToDecisionHandler>()
+            .WithHandler<StorySimSeekHandler>()
+            .WithHandler<StorySimBreakpointsHandler>()
             .WithServices(services =>
             {
                 services.AddSingleton(serverOptions ?? CoreServerOptions.Default);

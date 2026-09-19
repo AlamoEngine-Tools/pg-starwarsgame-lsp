@@ -1,8 +1,10 @@
 // Copyright (c) Alamo Engine Tools and contributors. All rights reserved.
 // Licensed under the MIT license. See LICENSE file in the project root for details.
 
+using System.Collections.Immutable;
 using PG.StarWarsGame.LSP.Core.Schema;
 using PG.StarWarsGame.LSP.Core.Symbols;
+using PG.StarWarsGame.LSP.Story.Graph;
 using PG.StarWarsGame.LSP.Story.Sim;
 
 namespace PG.StarWarsGame.LSP.Server.Story;
@@ -11,19 +13,24 @@ public interface IStorySimulationService
 {
     (StorySimStateDto? State, string? Error) Start(StoryModelKey key);
     (StorySimStateDto? State, string? Error) Stop(StoryModelKey key);
-    (StorySimStateDto? State, string? Error) GetState(StoryModelKey key);
-    (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId);
-    (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value);
-    (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds);
-    (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id);
+    (StorySimStateDto? State, string? Error) GetState(StoryModelKey key, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) Tick(StoryModelKey key, int count, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) RunToDecision(StoryModelKey key, int sinceSeq = 0);
+    (StorySimStateDto? State, string? Error) Seek(StoryModelKey key, int tick);
+
+    (StorySimStateDto? State, string? Error) SetBreakpoints(StoryModelKey key, IReadOnlyList<string> nodeIds,
+        bool onConditionalGates);
 }
 
 /// <summary>
-///     One simulation session per campaign FACTION, pinned to the model that existed at
-///     <see cref="Start" /> - edits during a run don't mutate a running story; restart to pick
-///     them up. Every state change invokes the notify delegate (aet/storySimChanged) so all
-///     panels re-fetch. The Lua notification catalogue is collected from the workspace index's
-///     StoryNotification symbols, filtered to that faction's attached scripts.
+///     One simulation session per campaign and faction, pinned to the model at Start. The session
+///     keeps the command log alongside the snapshot: the simulator is deterministic, so seeking to
+///     an earlier tick is a replay of the log up to that tick, which needs no per-tick snapshots
+///     and drops the future for free.
 /// </summary>
 public sealed class StorySimulationService(
     IStoryModelService modelService,
@@ -31,6 +38,7 @@ public sealed class StorySimulationService(
     ISchemaProvider schema,
     Action<StoryModelKey> notifyChanged) : IStorySimulationService
 {
+    private const int LogTail = 200;
     private readonly object _gate = new();
     private readonly Dictionary<StoryModelKey, Session> _sessions = new();
 
@@ -41,14 +49,15 @@ public sealed class StorySimulationService(
             return (null, $"{key} was not found.");
 
         var simulator = new StorySimulator(model, schema);
-        var session = new Session(simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts));
+        var session = new Session(simulator, simulator.Start(), CollectLuaNotifications(model.LuaScripts),
+            ImmutableList<SimCommand>.Empty, StorySimBreakpoints.None);
         lock (_gate)
         {
             _sessions[key] = session;
         }
 
         notifyChanged(key);
-        return (ToDto(session, true), null);
+        return (ToDto(session, 0), null);
     }
 
     public (StorySimStateDto? State, string? Error) Stop(StoryModelKey key)
@@ -59,74 +68,190 @@ public sealed class StorySimulationService(
         }
 
         notifyChanged(key);
-        return (new StorySimStateDto(false, 0, [], [], [], [], []), null);
+        return (StorySimStateDto.NotRunning, null);
     }
 
-    public (StorySimStateDto? State, string? Error) GetState(StoryModelKey key)
+    public (StorySimStateDto? State, string? Error) GetState(StoryModelKey key, int sinceSeq = 0)
     {
         lock (_gate)
         {
             if (_sessions.TryGetValue(key, out var session))
-                return (ToDto(session, true), null);
+                return (ToDto(session, sinceSeq), null);
         }
 
-        return (new StorySimStateDto(false, 0, [], [], [], [], []), null);
+        return (StorySimStateDto.NotRunning, null);
     }
 
-    public (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId)
+    public (StorySimStateDto? State, string? Error) SatisfyTrigger(StoryModelKey key, string nodeId, int sinceSeq = 0)
     {
-        return Mutate(key, (sim, snapshot) => sim.SatisfyTrigger(snapshot, nodeId));
+        return Mutate(key, new SimCommand(SimCommandKind.Satisfy, nodeId), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value)
+    public (StorySimStateDto? State, string? Error) SetFlag(StoryModelKey key, string flag, int value, int sinceSeq = 0)
     {
-        return Mutate(key, (sim, snapshot) => sim.SetFlag(snapshot, flag, value));
+        return Mutate(key, new SimCommand(SimCommandKind.Flag, flag, value), sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds)
+    public (StorySimStateDto? State, string? Error) AdvanceClock(StoryModelKey key, double seconds, int sinceSeq = 0)
     {
-        return Mutate(key, (sim, snapshot) => sim.AdvanceClock(snapshot, seconds));
+        var ticks = (int)Math.Round(seconds / StorySimulator.ClockStepSeconds);
+        return ticks <= 0 ? GetState(key, sinceSeq) : Tick(key, ticks, sinceSeq);
     }
 
-    public (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id)
+    public (StorySimStateDto? State, string? Error) LuaNotify(StoryModelKey key, string id, int sinceSeq = 0)
     {
-        return Mutate(key, (sim, snapshot) => sim.LuaNotify(snapshot, id));
+        return Mutate(key, new SimCommand(SimCommandKind.Lua, id), sinceSeq);
     }
 
-    private (StorySimStateDto? State, string? Error) Mutate(
-        StoryModelKey key, Func<StorySimulator, StorySimSnapshot, StorySimSnapshot> step)
+    public (StorySimStateDto? State, string? Error) Tick(StoryModelKey key, int count, int sinceSeq = 0)
+    {
+        return Mutate(key, new SimCommand(SimCommandKind.Tick, null, count), sinceSeq);
+    }
+
+    public (StorySimStateDto? State, string? Error) RunToDecision(StoryModelKey key, int sinceSeq = 0)
+    {
+        return Mutate(key, new SimCommand(SimCommandKind.Run), sinceSeq);
+    }
+
+    public (StorySimStateDto? State, string? Error) Seek(StoryModelKey key, int tick)
     {
         Session next;
         lock (_gate)
         {
             if (!_sessions.TryGetValue(key, out var session))
                 return (null, $"No simulation is running for {key}.");
-            next = session with { Snapshot = step(session.Simulator, session.Snapshot) };
+            if (tick < 0 || tick > session.Snapshot.Tick)
+                return (null, $"Tick {tick} is outside the run (0 to {session.Snapshot.Tick}).");
+            next = Replay(session, tick);
             _sessions[key] = next;
         }
 
         notifyChanged(key);
-        return (ToDto(next, true), null);
+        return (ToDto(next, 0), null);
     }
 
-    private static StorySimStateDto ToDto(Session session, bool running)
+    public (StorySimStateDto? State, string? Error) SetBreakpoints(StoryModelKey key, IReadOnlyList<string> nodeIds,
+        bool onConditionalGates)
+    {
+        Session next;
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(key, out var session))
+                return (null, $"No simulation is running for {key}.");
+            next = session with
+            {
+                Breakpoints = new StorySimBreakpoints(
+                    nodeIds.ToImmutableHashSet(StringComparer.Ordinal), onConditionalGates)
+            };
+            _sessions[key] = next;
+        }
+
+        notifyChanged(key);
+        return (ToDto(next, next.Snapshot.Steps.Count), null);
+    }
+
+    private (StorySimStateDto? State, string? Error) Mutate(StoryModelKey key, SimCommand command, int sinceSeq)
+    {
+        Session next;
+        lock (_gate)
+        {
+            if (!_sessions.TryGetValue(key, out var session))
+                return (null, $"No simulation is running for {key}.");
+            next = session with
+            {
+                Snapshot = Apply(session.Simulator, session.Snapshot, command, session.Breakpoints),
+                Commands = session.Commands.Add(command)
+            };
+            _sessions[key] = next;
+        }
+
+        notifyChanged(key);
+        return (ToDto(next, sinceSeq), null);
+    }
+
+    private static StorySimSnapshot Apply(StorySimulator sim, StorySimSnapshot snapshot, SimCommand command,
+        StorySimBreakpoints breakpoints)
+    {
+        return command.Kind switch
+        {
+            SimCommandKind.Satisfy => sim.SatisfyTrigger(snapshot, command.Text!),
+            SimCommandKind.Flag => sim.SetFlag(snapshot, command.Text!, command.Number),
+            SimCommandKind.Lua => sim.LuaNotify(snapshot, command.Text!),
+            SimCommandKind.Tick => sim.Tick(snapshot, command.Number, breakpoints),
+            SimCommandKind.Run => sim.RunToDecision(snapshot, breakpoints),
+            _ => snapshot
+        };
+    }
+
+    /// <summary>
+    ///     Replays the command log from Start until the run first reaches <paramref name="tick" />,
+    ///     ticking one at a time inside tick and run commands so the stop lands exactly. The log is
+    ///     cut there: a tick command is shortened to the ticks consumed, a run becomes those ticks.
+    /// </summary>
+    private static Session Replay(Session session, int tick)
+    {
+        var sim = session.Simulator;
+        var snapshot = sim.Start();
+        var commands = ImmutableList<SimCommand>.Empty;
+        foreach (var command in session.Commands)
+        {
+            if (snapshot.Tick >= tick) break;
+            if (command.Kind is SimCommandKind.Tick or SimCommandKind.Run)
+            {
+                var budget = command.Kind == SimCommandKind.Tick ? command.Number : int.MaxValue;
+                var consumed = 0;
+                while (consumed < budget && snapshot.Tick < tick)
+                {
+                    snapshot = sim.Tick(snapshot);
+                    consumed++;
+                }
+
+                if (consumed > 0) commands = commands.Add(new SimCommand(SimCommandKind.Tick, null, consumed));
+                continue;
+            }
+
+            snapshot = Apply(sim, snapshot, command, StorySimBreakpoints.None);
+            commands = commands.Add(command);
+        }
+
+        return session with { Snapshot = snapshot, Commands = commands };
+    }
+
+    private static StorySimStateDto ToDto(Session session, int sinceSeq)
     {
         var snapshot = session.Snapshot;
+        var fireCounts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var step in snapshot.Steps)
+            if (StorySimCause.Fires.Contains(step.Cause) && step.To == StoryEventLifecycle.Fired)
+                fireCounts[step.NodeId] = fireCounts.GetValueOrDefault(step.NodeId) + 1;
+
         return new StorySimStateDto(
-            running,
+            true,
+            snapshot.Tick,
             snapshot.Clock,
+            StorySimulator.ClockStepSeconds,
             snapshot.Runtime.Flags
                 .OrderBy(kvp => kvp.Key, StringComparer.OrdinalIgnoreCase)
                 .Select(kvp => new StorySimFlagDto(kvp.Key, kvp.Value))
                 .ToList(),
             session.Simulator.GetLifecycles(snapshot)
-                .Select(kvp => new StorySimNodeStateDto(kvp.Key, kvp.Value.ToString()))
+                .Select(kvp => new StorySimNodeStateDto(kvp.Key, kvp.Value.ToString(),
+                    fireCounts.GetValueOrDefault(kvp.Key)))
                 .ToList(),
             session.Simulator.GetInterventions(snapshot)
                 .Select(i => new StorySimInterventionDto(i.Kind, i.NodeId, i.EventName, i.EventType, i.Options))
                 .ToList(),
             session.LuaNotifications,
-            snapshot.Log);
+            snapshot.Log.Count > LogTail ? snapshot.Log.GetRange(snapshot.Log.Count - LogTail, LogTail) : snapshot.Log,
+            snapshot.Steps
+                .Where(s => s.Seq >= Math.Max(0, sinceSeq))
+                .Select(s => new StorySimStepDto(s.Tick, s.Seq, s.NodeId, s.From?.ToString(), s.To?.ToString(),
+                    s.SourceNodeId, s.Cause, s.Detail))
+                .ToList(),
+            snapshot.Steps.Count,
+            session.Breakpoints.NodeIds.OrderBy(x => x, StringComparer.Ordinal).ToList(),
+            session.Breakpoints.OnConditionalGates,
+            snapshot.HaltedAt);
     }
 
     private IReadOnlyList<string> CollectLuaNotifications(IReadOnlyList<string> luaScripts)
@@ -150,8 +275,21 @@ public sealed class StorySimulationService(
         return ids.ToList();
     }
 
+    private enum SimCommandKind
+    {
+        Satisfy,
+        Flag,
+        Lua,
+        Tick,
+        Run
+    }
+
+    private sealed record SimCommand(SimCommandKind Kind, string? Text = null, int Number = 0);
+
     private sealed record Session(
         StorySimulator Simulator,
         StorySimSnapshot Snapshot,
-        IReadOnlyList<string> LuaNotifications);
+        IReadOnlyList<string> LuaNotifications,
+        ImmutableList<SimCommand> Commands,
+        StorySimBreakpoints Breakpoints);
 }

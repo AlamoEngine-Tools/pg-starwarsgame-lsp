@@ -13,7 +13,17 @@ namespace PG.StarWarsGame.LSP.Story.Sim;
 public sealed record StorySimSnapshot
 {
     public required StoryRuntimeState Runtime { get; init; }
+
+    /// <summary>Ticks run so far. One tick is one second of story time.</summary>
+    public int Tick { get; init; }
+
     public double Clock { get; init; }
+
+    /// <summary>Every transition since Start, in order. Seq is the index.</summary>
+    public ImmutableList<StorySimStep> Steps { get; init; } = ImmutableList<StorySimStep>.Empty;
+
+    /// <summary>The event whose breakpoint halted the last run, until the next command.</summary>
+    public string? HaltedAt { get; init; }
 
     /// <summary>Human-readable step log, newest last.</summary>
     public ImmutableList<string> Log { get; init; } = ImmutableList<string>.Empty;
@@ -29,9 +39,12 @@ public sealed record StorySimIntervention(
 
 /// <summary>
 ///     Semantic story simulation over <see cref="StoryEvaluator" /> - no game process, no DAP.
-///     Deterministic by construction: state transitions are pure, cascades poll events in graph
-///     node order, and every polled event fires at most once per cascade (perpetual events re-arm
-///     and may fire again on the NEXT command).
+///     Deterministic by construction: state transitions are pure and every transition is a
+///     <see cref="StorySimStep" /> in the snapshot's trace.
+///     Time is a tick of one second. A command (SatisfyTrigger, SetFlag, LuaNotify) is a world
+///     event dispatched at once, pushes included; a tick dispatches the completions owed by the
+///     previous commands and polls the clock and flag events to a fixpoint, each polled event at
+///     most once per tick (perpetual events re-arm and fire again on the next tick).
 ///     The event machine reproduces the engine as measured in the decompile (2026-09-19):
 ///     an event is ARMED (the engine's Active flag) at load when it has no prereq line, or by a
 ///     PUSH when a prereq fires and one of its lines is fully fired; a <c>STORY_TRIGGER</c> fires
@@ -43,13 +56,15 @@ public sealed record StorySimIntervention(
 ///     boolean or are ignored. A disabled event still arms but its fire is swallowed. Polled
 ///     types: <c>STORY_ELAPSED</c> counts from arming; <c>STORY_FLAG</c> defaults to EQUAL_TO 0
 ///     and never fires on an unset flag. SPEECH and START_MOVIE rewards owe a completion that
-///     the next command dispatches. Everything else is a manual intervention: SatisfyTrigger,
+///     the next tick dispatches. Everything else is a manual intervention: SatisfyTrigger,
 ///     LuaNotify for <c>STORY_AI_NOTIFICATION</c>, and tactical outcomes resolved by firing the
 ///     armed <c>STORY_VICTORY</c>/<c>STORY_MISSION_LOST</c>/<c>STORY_MISSION_FAILED</c> events.
 /// </summary>
 public sealed class StorySimulator
 {
+    public const double ClockStepSeconds = 1;
     private const int MaxFireDepth = 64;
+    private const int MaxRunTicks = 3600;
     private const string SpeechDone = "STORY_SPEECH_DONE";
     private const string MovieDone = "STORY_MOVIE_DONE";
 
@@ -118,84 +133,116 @@ public sealed class StorySimulator
         }
     }
 
+    // ── Commands ─────────────────────────────────────────────────────────────
+
     public StorySimSnapshot Start()
     {
-        // The parser arms every event that has no prereq line; everything else waits for a push.
-        var runtime = StoryRuntimeState.Initial with
-        {
-            SuspendedThreads = StoryRuntimeState.Initial.SuspendedThreads.Union(_model.SuspendedThreadUris),
-            ArmedEvents = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
-        };
-        foreach (var node in _eventNodes)
-            if (node.Event!.PrereqGroups.Count == 0)
-                runtime = runtime.WithArmed(node.Id, 0);
-
         var snapshot = new StorySimSnapshot
         {
-            Runtime = runtime,
+            Runtime = StoryRuntimeState.Initial with
+            {
+                SuspendedThreads = StoryRuntimeState.Initial.SuspendedThreads.Union(_model.SuspendedThreadUris),
+                ArmedEvents = ImmutableHashSet.Create<string>(StringComparer.Ordinal)
+            },
             Log = ImmutableList.Create("Simulation started.").AddRange(_startupNotes)
         };
-        return Cascade(snapshot);
+
+        // The parser arms every event that has no prereq line; everything else waits for a push.
+        foreach (var node in _eventNodes)
+            if (node.Event!.PrereqGroups.Count == 0)
+                snapshot = Transition(snapshot, node, null, StorySimCause.Load, null,
+                    r => r.WithArmed(node.Id, 0));
+
+        // Tick 0 is the first frame: whatever is due at once (STORY_ELAPSED 0) fires now.
+        return Poll(snapshot);
+    }
+
+    /// <summary>Runs <paramref name="count" /> ticks, stopping early at a breakpoint.</summary>
+    public StorySimSnapshot Tick(StorySimSnapshot snapshot, int count = 1, StorySimBreakpoints? breakpoints = null)
+    {
+        breakpoints ??= StorySimBreakpoints.None;
+        snapshot = snapshot with { HaltedAt = null };
+        for (var i = 0; i < count; i++)
+        {
+            snapshot = TickOnce(snapshot, breakpoints);
+            if (snapshot.HaltedAt is not null) break;
+        }
+
+        return snapshot;
+    }
+
+    /// <summary>
+    ///     Ticks until the story waits on the user (an intervention appears), a breakpoint halts
+    ///     the run, or a tick changes nothing - which is a finished or stuck story, not a reason to
+    ///     spin.
+    /// </summary>
+    public StorySimSnapshot RunToDecision(StorySimSnapshot snapshot, StorySimBreakpoints breakpoints)
+    {
+        snapshot = snapshot with { HaltedAt = null };
+        for (var i = 0; i < MaxRunTicks; i++)
+        {
+            var before = snapshot.Steps.Count;
+            snapshot = TickOnce(snapshot, breakpoints);
+            if (snapshot.HaltedAt is not null) break;
+            if (GetInterventions(snapshot).Count > 0) break;
+            if (snapshot.Steps.Count == before) break;
+        }
+
+        return snapshot;
+    }
+
+    /// <summary>Convenience over <see cref="Tick" />: whole seconds become ticks.</summary>
+    public StorySimSnapshot AdvanceClock(StorySimSnapshot snapshot, double seconds)
+    {
+        var ticks = (int)Math.Round(seconds / ClockStepSeconds);
+        return ticks <= 0 ? snapshot : Tick(snapshot, ticks);
     }
 
     /// <summary>Manually fires an active event (the user says its trigger condition happened).</summary>
     public StorySimSnapshot SatisfyTrigger(StorySimSnapshot snapshot, string nodeId)
     {
-        snapshot = DispatchCompletions(snapshot);
+        snapshot = snapshot with { HaltedAt = null };
         if (!_nodesById.TryGetValue(nodeId, out var node))
             return snapshot with { Log = snapshot.Log.Add($"Unknown event node '{nodeId}'.") };
         if (!IsActive(node, snapshot.Runtime))
-            return snapshot with
-            {
-                Log = snapshot.Log.Add($"'{node.Event!.Name}' is not armed - trigger ignored.")
-            };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                $"'{node.Event!.Name}' is not armed - trigger ignored.");
 
-        return Cascade(Fire(snapshot, node, "manual trigger", 0));
+        return Fire(snapshot, node, StorySimCause.Manual, null, 0);
     }
 
     public StorySimSnapshot SetFlag(StorySimSnapshot snapshot, string flag, int value)
     {
-        snapshot = DispatchCompletions(snapshot);
-        var next = snapshot with
+        return snapshot with
         {
+            HaltedAt = null,
             Runtime = snapshot.Runtime.WithFlag(flag, value),
             Log = snapshot.Log.Add($"Flag {flag} = {value}.")
         };
-        return Cascade(next);
-    }
-
-    public StorySimSnapshot AdvanceClock(StorySimSnapshot snapshot, double seconds)
-    {
-        if (seconds <= 0) return snapshot;
-        snapshot = DispatchCompletions(snapshot);
-        var next = snapshot with
-        {
-            Clock = snapshot.Clock + seconds,
-            Log = snapshot.Log.Add($"Clock advanced to {snapshot.Clock + seconds:0.##}s.")
-        };
-        return Cascade(next);
     }
 
     /// <summary>Simulates Lua calling <c>Story_Event("id")</c>: fires active AI-notification events with that id.</summary>
     public StorySimSnapshot LuaNotify(StorySimSnapshot snapshot, string notificationId)
     {
-        snapshot = DispatchCompletions(snapshot);
-        var next = snapshot with { Log = snapshot.Log.Add($"Lua Story_Event(\"{notificationId}\").") };
+        snapshot = snapshot with
+        {
+            HaltedAt = null, Log = snapshot.Log.Add($"Lua Story_Event(\"{notificationId}\").")
+        };
         var fired = false;
         foreach (var node in _eventNodes)
         {
             if (!string.Equals(node.Event!.EventType, "STORY_AI_NOTIFICATION", StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (!IsActive(node, next.Runtime)) continue;
+            if (!IsActive(node, snapshot.Runtime)) continue;
             if (!NotificationIdsOf(node.Event).Any(id =>
                     string.Equals(id, notificationId, StringComparison.OrdinalIgnoreCase))) continue;
-            next = Fire(next, node, "Lua notification", 0);
+            snapshot = Fire(snapshot, node, StorySimCause.Lua, null, 0);
             fired = true;
         }
 
         if (!fired)
-            next = next with { Log = next.Log.Add($"No armed event listens for '{notificationId}'.") };
-        return Cascade(next);
+            snapshot = snapshot with { Log = snapshot.Log.Add($"No armed event listens for '{notificationId}'.") };
+        return snapshot;
     }
 
     // ── Read model ───────────────────────────────────────────────────────────
@@ -217,7 +264,7 @@ public sealed class StorySimulator
             var type = storyEvent.EventType?.ToUpperInvariant();
             // Polled types fire on their own; a STORY_TRIGGER only ever fires from a push.
             if (type is "STORY_ELAPSED" or "STORY_TRIGGER" or "STORY_FLAG") continue;
-            // A completion the simulator already owes will dispatch on the next command.
+            // A completion the simulator already owes will dispatch on the next tick.
             if (type is SpeechDone or MovieDone && HasPendingCompletion(node, snapshot.Runtime)) continue;
 
             var kind = type switch
@@ -234,29 +281,48 @@ public sealed class StorySimulator
         return interventions;
     }
 
-    // ── Step semantics ───────────────────────────────────────────────────────
+    // ── Tick ─────────────────────────────────────────────────────────────────
 
-    /// <summary>
-    ///     One command's worth of engine frames: poll the clock and flag events to a fixpoint.
-    ///     Each polled node fires at most once per cascade; pushes (prereqs, TRIGGER_EVENT) run
-    ///     inside Fire. Completions owed by the previous command are dispatched by each command
-    ///     before it acts, so a reward given now completes on the NEXT command.
-    /// </summary>
-    private StorySimSnapshot Cascade(StorySimSnapshot snapshot)
+    private StorySimSnapshot TickOnce(StorySimSnapshot snapshot, StorySimBreakpoints breakpoints)
     {
-        var firedThisCascade = new HashSet<string>(StringComparer.Ordinal);
+        var firstSeq = snapshot.Steps.Count;
+        snapshot = snapshot with
+        {
+            Tick = snapshot.Tick + 1,
+            Clock = snapshot.Clock + ClockStepSeconds,
+            Log = snapshot.Log.Add($"Tick {snapshot.Tick + 1} ({snapshot.Clock + ClockStepSeconds:0.##}s).")
+        };
+        snapshot = DispatchCompletions(snapshot);
+        snapshot = Poll(snapshot);
+
+        // A breakpoint halts AFTER the tick in which its event fired - a frame cannot stop halfway.
+        var hit = snapshot.Steps.Skip(firstSeq).FirstOrDefault(s =>
+            s.To == StoryEventLifecycle.Fired && StorySimCause.Fires.Contains(s.Cause) &&
+            (breakpoints.NodeIds.Contains(s.NodeId) ||
+             (breakpoints.OnConditionalGates && s.Cause == StorySimCause.Poll)));
+        if (hit is null) return snapshot;
+
+        snapshot = Note(snapshot, hit.NodeId, null, StorySimCause.Breakpoint,
+            $"Halted at '{EventNameOf(hit.NodeId)}'.");
+        return snapshot with { HaltedAt = hit.NodeId };
+    }
+
+    /// <summary>Polls the clock and flag events to a fixpoint; each polled node fires at most once per pass.</summary>
+    private StorySimSnapshot Poll(StorySimSnapshot snapshot)
+    {
+        var firedThisPass = new HashSet<string>(StringComparer.Ordinal);
         bool changed;
         do
         {
             changed = false;
             foreach (var node in _eventNodes)
             {
-                if (firedThisCascade.Contains(node.Id)) continue;
+                if (firedThisPass.Contains(node.Id)) continue;
                 if (!IsActive(node, snapshot.Runtime)) continue;
                 if (!PolledTriggerSatisfied(node, snapshot)) continue;
 
-                snapshot = Fire(snapshot, node, "auto", 0);
-                firedThisCascade.Add(node.Id);
+                snapshot = Fire(snapshot, node, StorySimCause.Poll, null, 0);
+                firedThisPass.Add(node.Id);
                 changed = true;
             }
         } while (changed);
@@ -271,14 +337,17 @@ public sealed class StorySimulator
 
         // Consume first: the engine dispatches once and an event not active at that moment misses it.
         snapshot = snapshot with { Runtime = snapshot.Runtime.WithoutCompletions(pending) };
+        var owed = pending.Select(ParseCompletion).ToList();
         foreach (var node in _eventNodes)
         {
             if (!IsActive(node, snapshot.Runtime)) continue;
             var type = node.Event!.EventType?.ToUpperInvariant();
             if (type is not (SpeechDone or MovieDone)) continue;
-            var match = StringTokensOf(node.Event).FirstOrDefault(t => pending.Contains(type + "|" + t));
-            if (match is null) continue;
-            snapshot = Fire(snapshot, node, type == SpeechDone ? $"speech '{match}' done" : $"movie '{match}' done", 0);
+            var tokens = StringTokensOf(node.Event).ToList();
+            var match = owed.FirstOrDefault(o => o.Type == type && tokens.Contains(o.Name));
+            if (match == default) continue;
+            snapshot = Fire(snapshot, node, type == SpeechDone ? StorySimCause.Speech : StorySimCause.Movie,
+                match.OwnerNodeId, 0);
         }
 
         return snapshot;
@@ -339,45 +408,42 @@ public sealed class StorySimulator
         }
     }
 
+    // ── Event machine ────────────────────────────────────────────────────────
+
     /// <summary>Engine Event_Triggered: swallowed when disabled, else reward, push dependants, perpetual re-arm.</summary>
-    private StorySimSnapshot Fire(StorySimSnapshot snapshot, StoryNode node, string reason, int depth)
+    private StorySimSnapshot Fire(StorySimSnapshot snapshot, StoryNode node, string cause, string? sourceId, int depth)
     {
         var storyEvent = node.Event!;
         if (depth > MaxFireDepth)
-            return snapshot with
-            {
-                Log = snapshot.Log.Add($"'{storyEvent.Name}' not fired - trigger chain deeper than {MaxFireDepth}.")
-            };
+            return Note(snapshot, node.Id, sourceId, StorySimCause.Ignored,
+                $"'{storyEvent.Name}' not fired - trigger chain deeper than {MaxFireDepth}.");
         if (snapshot.Runtime.DisabledEvents.Contains(node.Id))
-            return snapshot with
-            {
-                Log = snapshot.Log.Add($"'{storyEvent.Name}' is disabled - fire swallowed ({reason}).")
-            };
+            return Note(snapshot, node.Id, sourceId, StorySimCause.Ignored,
+                $"'{storyEvent.Name}' is disabled - fire swallowed.");
 
-        snapshot = snapshot with
-        {
-            Runtime = snapshot.Runtime.WithFired(node.Id),
-            Log = snapshot.Log.Add($"Fired '{storyEvent.Name}' ({reason}).")
-        };
-
+        snapshot = Transition(snapshot, node, sourceId, cause, $"Fired '{storyEvent.Name}' ({cause}).",
+            r => r.WithFired(node.Id));
         snapshot = GiveReward(snapshot, node, depth);
 
         if (_dependantsById.TryGetValue(node.Id, out var dependants))
             foreach (var dependant in dependants)
-                snapshot = ParentTriggered(snapshot, dependant, depth + 1);
+                snapshot = ParentTriggered(snapshot, dependant, node.Id, depth + 1);
 
         if (!storyEvent.Perpetual) return snapshot;
 
         // Perpetual: Triggered cleared, Reset (drops arming when it has prereqs), then Active
         // again for every type but STORY_TRIGGER, which waits for the next push.
-        var runtime = snapshot.Runtime.WithUnfired(node.Id);
-        if (storyEvent.PrereqGroups.Count > 0) runtime = runtime.WithUnarmed(node.Id);
-        if (!IsStoryTrigger(storyEvent)) runtime = runtime.WithArmed(node.Id, snapshot.Clock);
-        return snapshot with { Runtime = runtime };
+        var clock = snapshot.Clock;
+        return Transition(snapshot, node, null, StorySimCause.Perpetual, null, r =>
+        {
+            r = r.WithUnfired(node.Id);
+            if (storyEvent.PrereqGroups.Count > 0) r = r.WithUnarmed(node.Id);
+            return IsStoryTrigger(storyEvent) ? r : r.WithArmed(node.Id, clock);
+        });
     }
 
     /// <summary>Engine Parent_Triggered: arm when a line is fully fired; a STORY_TRIGGER fires at once.</summary>
-    private StorySimSnapshot ParentTriggered(StorySimSnapshot snapshot, StoryNode node, int depth)
+    private StorySimSnapshot ParentTriggered(StorySimSnapshot snapshot, StoryNode node, string sourceId, int depth)
     {
         var runtime = snapshot.Runtime;
         if (runtime.ArmedEvents?.Contains(node.Id) == true || runtime.FiredEvents.Contains(node.Id))
@@ -386,12 +452,9 @@ public sealed class StorySimulator
         var lines = _prereqLinesById[node.Id];
         if (!lines.Any(line => line.All(runtime.FiredEvents.Contains))) return snapshot;
 
-        snapshot = snapshot with
-        {
-            Runtime = runtime.WithArmed(node.Id, snapshot.Clock),
-            Log = snapshot.Log.Add($"  -> armed '{node.Event!.Name}'.")
-        };
-        return IsStoryTrigger(node.Event) ? Fire(snapshot, node, "prereqs met", depth) : snapshot;
+        snapshot = Transition(snapshot, node, sourceId, StorySimCause.Prereq, $"  -> armed '{node.Event!.Name}'.",
+            r => r.WithArmed(node.Id, snapshot.Clock));
+        return IsStoryTrigger(node.Event) ? Fire(snapshot, node, StorySimCause.Prereq, sourceId, depth) : snapshot;
     }
 
     private StorySimSnapshot GiveReward(StorySimSnapshot snapshot, StoryNode node, int depth)
@@ -400,90 +463,83 @@ public sealed class StorySimulator
         if (storyEvent.RewardType is not { } rewardType) return snapshot;
         var upperReward = rewardType.ToUpperInvariant();
 
-        snapshot = ApplyFlagRewards(snapshot, storyEvent, upperReward);
+        snapshot = ApplyFlagRewards(snapshot, node, upperReward);
 
-        switch (upperReward)
+        return upperReward switch
         {
-            case "STORY_ELEMENT":
-                return ActivateThread(snapshot, storyEvent);
-            case "TRIGGER_EVENT":
-                return RewardTriggerEvent(snapshot, storyEvent, depth);
-            case "RESET_EVENT":
-                return RewardResetEvent(snapshot, node);
-            case "RESET_BRANCH":
-                return RewardResetBranch(snapshot, node, depth);
-            case "DISABLE_STORY_EVENT":
-                return RewardDisableStoryEvent(snapshot, node);
-            case "DISABLE_BRANCH":
-                return RewardDisableBranch(snapshot, node);
-            case "SPEECH":
-                return OweCompletion(snapshot, storyEvent, SpeechDone);
-            case "START_MOVIE":
-                return OweCompletion(snapshot, storyEvent, MovieDone);
-            default:
-                return snapshot;
-        }
+            "STORY_ELEMENT" => ActivateThread(snapshot, node),
+            "TRIGGER_EVENT" => RewardTriggerEvent(snapshot, node, depth),
+            "RESET_EVENT" => RewardResetEvent(snapshot, node),
+            "RESET_BRANCH" => RewardResetBranch(snapshot, node, depth),
+            "DISABLE_STORY_EVENT" => RewardDisableStoryEvent(snapshot, node),
+            "DISABLE_BRANCH" => RewardDisableBranch(snapshot, node),
+            "SPEECH" => OweCompletion(snapshot, node, SpeechDone),
+            "START_MOVIE" => OweCompletion(snapshot, node, MovieDone),
+            _ => snapshot
+        };
     }
 
-    private StorySimSnapshot ApplyFlagRewards(StorySimSnapshot snapshot, StoryEvent storyEvent, string upperReward)
+    private StorySimSnapshot ApplyFlagRewards(StorySimSnapshot snapshot, StoryNode node, string upperReward)
     {
         // Flag-writing rewards (schema StoryFlag params on the reward side). SET_FLAG writes
         // param 1 (default 1), INCREMENT_FLAG adds param 1 (default 1, may be negative), other
         // flag-writing rewards conservatively set 1.
+        var storyEvent = node.Event!;
         var rawAmount = storyEvent.RewardParams.FirstOrDefault(p => p.Position == 1)?.RawValue;
         var amount = int.TryParse(rawAmount, out var parsedAmount) ? parsedAmount : 1;
-        var runtime = snapshot.Runtime;
-        var log = snapshot.Log;
         foreach (var slot in storyEvent.RewardParams)
         {
             if (_rewardParamTypes.GetValueOrDefault((upperReward, slot.Position)) != StoryReferenceTypes.Flag)
                 continue;
             foreach (var flag in StoryReferenceTypes.SplitList(slot.RawValue))
             {
-                var value = upperReward == "INCREMENT_FLAG"
-                    ? runtime.Flags.GetValueOrDefault(flag) + amount
-                    : upperReward == "SET_FLAG"
-                        ? amount
-                        : 1;
-                runtime = runtime.WithFlag(flag, value);
-                log = log.Add($"  -> flag {flag} = {value}.");
+                var value = upperReward switch
+                {
+                    "INCREMENT_FLAG" => snapshot.Runtime.Flags.GetValueOrDefault(flag) + amount,
+                    "SET_FLAG" => amount,
+                    _ => 1
+                };
+                snapshot = Note(snapshot with { Runtime = snapshot.Runtime.WithFlag(flag, value) },
+                    node.Id, null, StorySimCause.Flag, $"  -> flag {flag} = {value}.");
             }
         }
 
-        return snapshot with { Runtime = runtime, Log = log };
+        return snapshot;
     }
 
     // STORY_ELEMENT activates a suspended thread (param = thread name sans .xml).
-    private static StorySimSnapshot ActivateThread(StorySimSnapshot snapshot, StoryEvent storyEvent)
+    private static StorySimSnapshot ActivateThread(StorySimSnapshot snapshot, StoryNode node)
     {
-        var element = storyEvent.RewardParams.FirstOrDefault(p => p.Position == 0)?.RawValue;
-        if (string.IsNullOrEmpty(element)) return snapshot;
+        var element = Param(node.Event!, 0);
+        if (element is null) return snapshot;
         var suffix = "/" + element.ToLowerInvariant() + ".xml";
         var match = snapshot.Runtime.SuspendedThreads.FirstOrDefault(u =>
             u.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
         if (match is null) return snapshot;
-        return snapshot with
-        {
-            Runtime = snapshot.Runtime with { SuspendedThreads = snapshot.Runtime.SuspendedThreads.Remove(match) },
-            Log = snapshot.Log.Add($"  -> activated thread '{element}'.")
-        };
+        return Note(
+            snapshot with
+            {
+                Runtime = snapshot.Runtime with
+                {
+                    SuspendedThreads = snapshot.Runtime.SuspendedThreads.Remove(match)
+                }
+            },
+            node.Id, null, StorySimCause.Thread, $"  -> activated thread '{element}'.");
     }
 
     // Measured: Trigger_Event(name) runs Event_Triggered on the named event in EVERY subplot,
     // with no prereq, armed or fired check - a waiting event fires, a fired one fires again.
-    private StorySimSnapshot RewardTriggerEvent(StorySimSnapshot snapshot, StoryEvent storyEvent, int depth)
+    private StorySimSnapshot RewardTriggerEvent(StorySimSnapshot snapshot, StoryNode node, int depth)
     {
-        var name = Param(storyEvent, 0);
+        var name = Param(node.Event!, 0);
         if (name is null)
-            return snapshot with { Log = snapshot.Log.Add("  -> TRIGGER_EVENT ignored - missing parameter.") };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                "  -> TRIGGER_EVENT ignored - missing parameter.");
         if (!_eventsByName.TryGetValue(name, out var targets))
-            return snapshot with { Log = snapshot.Log.Add($"  -> TRIGGER_EVENT: no event named '{name}'.") };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                $"  -> TRIGGER_EVENT: no event named '{name}'.");
         foreach (var target in targets)
-        {
-            snapshot = snapshot with { Log = snapshot.Log.Add($"  -> triggered '{target.Event!.Name}'.") };
-            snapshot = Fire(snapshot, target, $"TRIGGER_EVENT from '{storyEvent.Name}'", depth + 1);
-        }
-
+            snapshot = Fire(snapshot, target, StorySimCause.Trigger, node.Id, depth + 1);
         return snapshot;
     }
 
@@ -502,18 +558,13 @@ public sealed class StorySimulator
             var target = SameThreadEvent(node, name);
             if (target is null)
             {
-                snapshot = snapshot with
-                {
-                    Log = snapshot.Log.Add($"  -> RESET_EVENT: no event '{name}' in this thread.")
-                };
+                snapshot = Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                    $"  -> RESET_EVENT: no event '{name}' in this thread.");
                 continue;
             }
 
-            snapshot = snapshot with
-            {
-                Runtime = ClearTriggered(snapshot.Runtime, target),
-                Log = snapshot.Log.Add($"  -> reset '{target.Event!.Name}'.")
-            };
+            snapshot = Transition(snapshot, target, node.Id, StorySimCause.Reset,
+                $"  -> reset '{target.Event!.Name}'.", r => ClearTriggered(r, target));
         }
 
         return snapshot;
@@ -521,30 +572,27 @@ public sealed class StorySimulator
 
     // Measured: pass 1 clears every member of the branch, pass 2 re-pushes each (a STORY_TRIGGER
     // member whose prereqs are still fired fires again), then param 1 triggers a named event in
-    // this thread. Both params are required for the reset itself.
+    // this thread.
     private StorySimSnapshot RewardResetBranch(StorySimSnapshot snapshot, StoryNode node, int depth)
     {
         var storyEvent = node.Event!;
         var branch = Param(storyEvent, 0);
         if (branch is null)
-            return snapshot with { Log = snapshot.Log.Add("  -> RESET_BRANCH ignored - missing parameter.") };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                "  -> RESET_BRANCH ignored - missing parameter.");
 
         var members = BranchMembers(node, branch);
-        var runtime = snapshot.Runtime;
-        foreach (var member in members) runtime = ClearTriggered(runtime, member);
-        snapshot = snapshot with
-        {
-            Runtime = runtime,
-            Log = snapshot.Log.Add($"  -> reset branch '{branch}' ({members.Count} events).")
-        };
-        foreach (var member in members) snapshot = ParentTriggered(snapshot, member, depth + 1);
+        foreach (var member in members)
+            snapshot = Transition(snapshot, member, node.Id, StorySimCause.Reset,
+                $"  -> reset '{member.Event!.Name}' (branch '{branch}').", r => ClearTriggered(r, member));
+        foreach (var member in members) snapshot = ParentTriggered(snapshot, member, node.Id, depth + 1);
 
         if (Param(storyEvent, 1) is not { } named) return snapshot;
         var target = SameThreadEvent(node, named);
         if (target is null)
-            return snapshot with { Log = snapshot.Log.Add($"  -> RESET_BRANCH: no event '{named}' in this thread.") };
-        snapshot = snapshot with { Log = snapshot.Log.Add($"  -> triggered '{target.Event!.Name}'.") };
-        return Fire(snapshot, target, $"RESET_BRANCH from '{storyEvent.Name}'", depth + 1);
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                $"  -> RESET_BRANCH: no event '{named}' in this thread.");
+        return Fire(snapshot, target, StorySimCause.Trigger, node.Id, depth + 1);
     }
 
     // Measured: params 0 and 1 are both required or the reward is ignored; Disabled =
@@ -555,10 +603,8 @@ public sealed class StorySimulator
         var name = Param(storyEvent, 0);
         var flag = Param(storyEvent, 1);
         if (name is null || flag is null)
-            return snapshot with
-            {
-                Log = snapshot.Log.Add("  -> DISABLE_STORY_EVENT ignored - missing parameter.")
-            };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                "  -> DISABLE_STORY_EVENT ignored - missing parameter.");
 
         var disable = ParseInt(flag) != 0;
         var everywhere = ParseInt(Param(storyEvent, 2)) != 0;
@@ -568,17 +614,11 @@ public sealed class StorySimulator
                 ? [single]
                 : [];
         if (targets.Count == 0)
-            return snapshot with { Log = snapshot.Log.Add($"  -> DISABLE_STORY_EVENT: no event named '{name}'.") };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                $"  -> DISABLE_STORY_EVENT: no event named '{name}'.");
 
-        var runtime = snapshot.Runtime;
-        var log = snapshot.Log;
-        foreach (var target in targets)
-        {
-            runtime = disable ? runtime.WithDisabled(target.Id) : runtime.WithEnabled(target.Id);
-            log = log.Add(disable ? $"  -> disabled '{target.Event!.Name}'." : $"  -> enabled '{target.Event!.Name}'.");
-        }
-
-        return snapshot with { Runtime = runtime, Log = log };
+        foreach (var target in targets) snapshot = SetDisabled(snapshot, target, node.Id, disable);
+        return snapshot;
     }
 
     // Measured: both params required; Disabled = atoi(param 1) != 0 on every member, this thread only.
@@ -588,30 +628,41 @@ public sealed class StorySimulator
         var branch = Param(storyEvent, 0);
         var flag = Param(storyEvent, 1);
         if (branch is null || flag is null)
-            return snapshot with { Log = snapshot.Log.Add("  -> DISABLE_BRANCH ignored - missing parameter.") };
+            return Note(snapshot, node.Id, null, StorySimCause.Ignored,
+                "  -> DISABLE_BRANCH ignored - missing parameter.");
 
         var disable = ParseInt(flag) != 0;
-        var runtime = snapshot.Runtime;
-        var members = BranchMembers(node, branch);
-        foreach (var member in members)
-            runtime = disable ? runtime.WithDisabled(member.Id) : runtime.WithEnabled(member.Id);
-        return snapshot with
-        {
-            Runtime = runtime,
-            Log = snapshot.Log.Add(
-                $"  -> {(disable ? "disabled" : "enabled")} branch '{branch}' ({members.Count} events).")
-        };
+        foreach (var member in BranchMembers(node, branch)) snapshot = SetDisabled(snapshot, member, node.Id, disable);
+        return snapshot;
     }
 
-    private static StorySimSnapshot OweCompletion(StorySimSnapshot snapshot, StoryEvent storyEvent, string doneType)
+    private StorySimSnapshot SetDisabled(StorySimSnapshot snapshot, StoryNode target, string sourceId, bool disable)
     {
-        var name = Param(storyEvent, 0);
+        return disable
+            ? Transition(snapshot, target, sourceId, StorySimCause.Disable, $"  -> disabled '{target.Event!.Name}'.",
+                r => r.WithDisabled(target.Id))
+            : Transition(snapshot, target, sourceId, StorySimCause.Enable, $"  -> enabled '{target.Event!.Name}'.",
+                r => r.WithEnabled(target.Id));
+    }
+
+    private static StorySimSnapshot OweCompletion(StorySimSnapshot snapshot, StoryNode node, string doneType)
+    {
+        var name = Param(node.Event!, 0);
         if (name is null) return snapshot;
-        return snapshot with
-        {
-            Runtime = snapshot.Runtime.WithCompletionPending(doneType + "|" + name.ToUpperInvariant()),
-            Log = snapshot.Log.Add($"  -> {doneType} '{name}' owed on the next command.")
-        };
+        var cause = doneType == SpeechDone ? StorySimCause.Speech : StorySimCause.Movie;
+        return Note(
+            snapshot with
+            {
+                Runtime = snapshot.Runtime.WithCompletionPending(doneType + "|" + name.ToUpperInvariant() + "|" +
+                                                                 node.Id)
+            },
+            node.Id, null, cause, $"  -> {doneType} '{name}' owed on the next tick.");
+    }
+
+    private static (string Type, string Name, string OwnerNodeId) ParseCompletion(string key)
+    {
+        var parts = key.Split('|', 3);
+        return (parts[0], parts[1], parts.Length > 2 ? parts[2] : "");
     }
 
     // Measured: Clear_Triggered drops Triggered and Reset drops Active when the event has prereqs.
@@ -619,6 +670,32 @@ public sealed class StorySimulator
     {
         runtime = runtime.WithUnfired(node.Id);
         return node.Event!.PrereqGroups.Count > 0 ? runtime.WithUnarmed(node.Id) : runtime;
+    }
+
+    // ── Trace ────────────────────────────────────────────────────────────────
+
+    /// <summary>Applies a lifecycle-changing mutation and records the step with the lifecycle before and after.</summary>
+    private StorySimSnapshot Transition(StorySimSnapshot snapshot, StoryNode node, string? sourceId, string cause,
+        string? logLine, Func<StoryRuntimeState, StoryRuntimeState> mutate)
+    {
+        var from = _evaluator.GetLifecycle(node.Id, snapshot.Runtime);
+        var runtime = mutate(snapshot.Runtime);
+        var to = _evaluator.GetLifecycle(node.Id, runtime);
+        var step = new StorySimStep(snapshot.Tick, snapshot.Steps.Count, node.Id, from, to, sourceId, cause);
+        return snapshot with
+        {
+            Runtime = runtime,
+            Steps = snapshot.Steps.Add(step),
+            Log = logLine is null ? snapshot.Log : snapshot.Log.Add(logLine)
+        };
+    }
+
+    /// <summary>Records a step that is not a lifecycle change (the detail is also the log line).</summary>
+    private static StorySimSnapshot Note(StorySimSnapshot snapshot, string nodeId, string? sourceId, string cause,
+        string detail)
+    {
+        var step = new StorySimStep(snapshot.Tick, snapshot.Steps.Count, nodeId, null, null, sourceId, cause, detail);
+        return snapshot with { Steps = snapshot.Steps.Add(step), Log = snapshot.Log.Add(detail) };
     }
 
     // ── Lookups ──────────────────────────────────────────────────────────────
@@ -638,10 +715,16 @@ public sealed class StorySimulator
             .ToList();
     }
 
+    private string EventNameOf(string nodeId)
+    {
+        return _nodesById.TryGetValue(nodeId, out var node) ? node.Event!.Name : nodeId;
+    }
+
     private static bool HasPendingCompletion(StoryNode node, StoryRuntimeState runtime)
     {
         var type = node.Event!.EventType!.ToUpperInvariant();
-        return StringTokensOf(node.Event).Any(t => runtime.PendingCompletions.Contains(type + "|" + t));
+        var tokens = StringTokensOf(node.Event).ToList();
+        return runtime.PendingCompletions.Select(ParseCompletion).Any(o => o.Type == type && tokens.Contains(o.Name));
     }
 
     private static bool IsStoryTrigger(StoryEvent storyEvent)

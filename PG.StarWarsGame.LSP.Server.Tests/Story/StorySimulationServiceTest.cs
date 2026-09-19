@@ -29,6 +29,10 @@ public sealed class StorySimulationServiceTest
         "\t\t<Event_Type>STORY_GENERIC</Event_Type>\n" +
         "\t\t<Prereq>Begin</Prereq>\n" +
         "\t</Event>\n" +
+        "\t<Event Name=\"Later\">\n" +
+        "\t\t<Event_Type>STORY_ELAPSED</Event_Type>\n" +
+        "\t\t<Event_Param1>2</Event_Param1>\n" +
+        "\t</Event>\n" +
         "</Story>\n";
 
     /// <summary>The campaign faction every fixture here runs as; a session is keyed by both.</summary>
@@ -136,6 +140,75 @@ public sealed class StorySimulationServiceTest
         Assert.Equal(["Alert_From_Lua"], state!.LuaNotifications);
     }
 
+    [Fact]
+    public void Tick_ReturnsOnlyTheStepsAfterSinceSeq()
+    {
+        var (service, _) = BuildService();
+        var started = service.Start(Key).State!;
+
+        var (state, error) = service.Tick(Key, 2, started.TotalSteps);
+
+        Assert.Null(error);
+        Assert.Equal(2, state!.Tick);
+        Assert.Equal(2.0, state.Clock);
+        Assert.Equal(1.0, state.ClockStepSeconds);
+        Assert.All(state.Steps, s => Assert.True(s.Seq >= started.TotalSteps));
+        Assert.Contains(state.Steps, s => s.Cause == "poll" && s.To == "Fired");
+        Assert.True(state.TotalSteps > started.TotalSteps);
+        Assert.Equal(1, state.Nodes.Single(n => n.NodeId.EndsWith("#later", StringComparison.Ordinal)).FireCount);
+    }
+
+    [Fact]
+    public void Seek_RestoresTheStateJustAfterThatTick_AndDropsTheFuture()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        service.Tick(Key, 3);
+        service.SetFlag(Key, "FLAG_X", 1);
+        service.Tick(Key, 2);
+        Assert.Equal(5, service.GetState(Key).State!.Tick);
+
+        var (state, error) = service.Seek(Key, 3);
+
+        Assert.Null(error);
+        Assert.Equal(3, state!.Tick);
+        Assert.Empty(state.Flags);
+
+        // The future is gone: ticking again continues from tick 3.
+        Assert.Equal(4, service.Tick(Key, 1).State!.Tick);
+        Assert.Empty(service.GetState(Key).State!.Flags);
+    }
+
+    [Fact]
+    public void Breakpoints_HaltATickRun_AndAreReportedOnTheState()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+        var later = service.GetState(Key).State!.Nodes
+            .Single(n => n.NodeId.EndsWith("#later", StringComparison.Ordinal)).NodeId;
+
+        var (state, error) = service.SetBreakpoints(Key, [later], false);
+        Assert.Null(error);
+        Assert.Equal([later], state!.Breakpoints);
+
+        var ticked = service.Tick(Key, 5).State!;
+        Assert.Equal(2, ticked.Tick);
+        Assert.Equal(later, ticked.HaltedAt);
+    }
+
+    [Fact]
+    public void RunToDecision_StopsAtTheFirstIntervention()
+    {
+        var (service, _) = BuildService();
+        service.Start(Key);
+
+        var (state, error) = service.RunToDecision(Key);
+
+        Assert.Null(error);
+        Assert.Equal(1, state!.Tick);
+        Assert.Single(state.Interventions);
+    }
+
     // ── Handler gating ───────────────────────────────────────────────────────
 
     [Fact]
@@ -163,9 +236,13 @@ public sealed class StorySimulationServiceTest
             .Handle(new StorySimStartParams("GC", "Rebel"), CancellationToken.None);
         var advanced = await new StorySimAdvanceClockHandler(service, config)
             .Handle(new StorySimAdvanceClockParams("GC", "Rebel", 5), CancellationToken.None);
+        var ticked = await new StorySimTickHandler(service, config)
+            .Handle(new StorySimTickParams("GC", "Rebel", 1, advanced.State!.TotalSteps), CancellationToken.None);
 
         Assert.Null(started.Error);
         Assert.Equal(5, advanced.State!.Clock);
+        Assert.Equal(6, ticked.State!.Tick);
+        Assert.All(ticked.State.Steps, s => Assert.True(s.Seq >= advanced.State.TotalSteps));
     }
 
     // ── fakes ────────────────────────────────────────────────────────────────

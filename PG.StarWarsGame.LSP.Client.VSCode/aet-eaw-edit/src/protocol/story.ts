@@ -257,6 +257,25 @@ export interface StorySimFlagDto {
 export interface StorySimNodeStateDto {
     nodeId: string;
     lifecycle: string;
+    /** How often the event fired since Start (a perpetual event counts every time). */
+    fireCount: number;
+}
+
+/**
+ * One trace transition. `from`/`to` are lifecycle names, both null for a step that is not a
+ * lifecycle change (a flag write, an owed completion, an ignored reward). `sourceNodeId` is the
+ * event whose firing caused this one - the edge to animate runs from it to `nodeId`. `seq` is the
+ * position in the whole trace; every request carries `sinceSeq` and gets only the steps after it.
+ */
+export interface StorySimStepDto {
+    tick: number;
+    seq: number;
+    nodeId: string;
+    from?: string | null;
+    to?: string | null;
+    sourceNodeId?: string | null;
+    cause: string;
+    detail?: string | null;
 }
 
 export interface StorySimInterventionDto {
@@ -269,12 +288,23 @@ export interface StorySimInterventionDto {
 
 export interface StorySimStateDto {
     running: boolean;
+    /** Ticks run so far; one tick is `clockStepSeconds` of story time. */
+    tick: number;
     clock: number;
+    clockStepSeconds: number;
     flags: StorySimFlagDto[];
     nodes: StorySimNodeStateDto[];
     interventions: StorySimInterventionDto[];
     luaNotifications: string[];
+    /** The last lines of the text log; the trace in `steps` is the complete record. */
     log: string[];
+    /** Steps with seq >= the request's sinceSeq. */
+    steps: StorySimStepDto[];
+    totalSteps: number;
+    breakpoints: string[];
+    breakOnGates: boolean;
+    /** The event whose breakpoint halted the last run, until the next command. */
+    haltedAt?: string | null;
 }
 
 export interface StorySimStateResult {
